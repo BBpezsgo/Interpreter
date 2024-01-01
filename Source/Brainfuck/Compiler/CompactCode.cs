@@ -102,7 +102,7 @@ namespace LanguageCore.Brainfuck
         static readonly char[] Duplicatable = new char[] { '>', '<', '+', '-' };
 
         public static CompactCodeSegment[] Generate(char[] code) => CompactCode.Generate(new string(code));
-      
+
         public static CompactCodeSegment[] Generate(string code)
         {
             List<(byte OpCode, int Count)> result = new();

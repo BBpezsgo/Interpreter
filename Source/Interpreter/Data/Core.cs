@@ -196,7 +196,7 @@ namespace LanguageCore.Runtime
             _ => throw new UnreachableException(),
         };
 
-        public readonly override int GetHashCode()
+        public override readonly int GetHashCode()
         {
             HashCode hash = new();
             hash.Add(Type);

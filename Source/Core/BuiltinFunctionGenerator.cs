@@ -130,7 +130,7 @@ namespace LanguageCore.Runtime
         }
     }
 
-    unsafe public static class ExternalFunctionGenerator
+    public static unsafe class ExternalFunctionGenerator
     {
         [RequiresUnreferencedCode("Loading Assembly")]
         public static void LoadAssembly(this ExternalFunctionCollection externalFunctions, string path)

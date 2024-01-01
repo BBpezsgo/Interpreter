@@ -65,18 +65,18 @@ namespace ConsoleGUI
                     switch (layout.SizeMode)
                     {
                         case InlineLayoutSizeMode.Fixed:
-                            {
-                                rect.Height = layout.Value;
-                                break;
-                            }
+                        {
+                            rect.Height = layout.Value;
+                            break;
+                        }
                         case InlineLayoutSizeMode.Stretchy:
-                            {
-                                if (i == elementCount - 1)
-                                { rect.Height = currentHeight; }
-                                else
-                                { rect.Height = (int)Math.Round((float)currentHeight * ((float)layout.Value / 100f)); }
-                                break;
-                            }
+                        {
+                            if (i == elementCount - 1)
+                            { rect.Height = currentHeight; }
+                            else
+                            { rect.Height = (int)Math.Round((float)currentHeight * ((float)layout.Value / 100f)); }
+                            break;
+                        }
                         default: throw new UnreachableException();
                     }
                     rect.Y = currentPosition;
@@ -121,18 +121,18 @@ namespace ConsoleGUI
                     switch (layout.SizeMode)
                     {
                         case InlineLayoutSizeMode.Fixed:
-                            {
-                                rect.Width = layout.Value;
-                                break;
-                            }
+                        {
+                            rect.Width = layout.Value;
+                            break;
+                        }
                         case InlineLayoutSizeMode.Stretchy:
-                            {
-                                if (i == elementCount - 1)
-                                { rect.Width = total - currentPosition + 1; }
-                                else
-                                { rect.Width = (int)Math.Round((float)total / (float)elementCount * ((float)layout.Value / 100f)); }
-                                break;
-                            }
+                        {
+                            if (i == elementCount - 1)
+                            { rect.Width = total - currentPosition + 1; }
+                            else
+                            { rect.Width = (int)Math.Round((float)total / (float)elementCount * ((float)layout.Value / 100f)); }
+                            break;
+                        }
                         default: throw new UnreachableException();
                     }
                     rect.X = currentPosition;

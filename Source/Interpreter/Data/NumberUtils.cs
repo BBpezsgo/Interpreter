@@ -622,7 +622,7 @@ namespace LanguageCore.Runtime
             _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.Single)}"),
         };
 
-        public readonly override string ToString() => this.ToString(CultureInfo.InvariantCulture);
+        public override readonly string ToString() => this.ToString(CultureInfo.InvariantCulture);
 
         public readonly string ToString(IFormatProvider? provider) => type switch
         {

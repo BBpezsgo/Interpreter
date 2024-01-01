@@ -4,6 +4,10 @@
 /obj
 /out
 
+/Tests/bin
+/Tests/obj
+/Tests/Program.cs
+
 *.user
 
 /Source/package.json

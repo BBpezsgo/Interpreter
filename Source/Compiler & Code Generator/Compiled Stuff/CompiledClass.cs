@@ -18,7 +18,7 @@ namespace LanguageCore.Compiler
 
         public IReadOnlyList<Reference<TypeInstance>> References => references;
         public IReadOnlyDictionary<string, CompiledType> CurrentTypeArguments => currentTypeArguments;
-     
+
         public IReadOnlyDictionary<string, int> FieldOffsets
         {
             get

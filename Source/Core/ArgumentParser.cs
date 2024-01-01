@@ -307,7 +307,7 @@ namespace TheProgram
                         result.GeneratorSettings.PrintInstructions = true;
                         continue;
                     }
-           
+
                     throw new ArgumentException($"Unknown argument \"{args[i]}\"");
                 }
             }

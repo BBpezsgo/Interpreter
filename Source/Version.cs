@@ -24,12 +24,12 @@ namespace TheProgram
                 httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(Cookies);
 
                 System.Net.Http.HttpResponseMessage result = httpClient.GetAsync(ProjectGithubUri).Result;
-                
+
                 string res = result.Content.ReadAsStringAsync().Result;
 
                 System.Text.Json.JsonDocument resJson = System.Text.Json.JsonDocument.Parse(res);
                 string lastCommitDateStr = resJson.RootElement.GetProperty("commit").GetProperty("commit").GetProperty("author").GetProperty("date").GetString()!;
-                
+
                 DateTime lastCommitDate = DateTime.Parse(lastCommitDateStr, CultureInfo.CurrentCulture);
                 UploadedSaved = Convert(lastCommitDate);
                 return UploadedSaved;

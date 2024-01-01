@@ -4,7 +4,7 @@
 
     public class CompiledVariable : VariableDeclaration
     {
-        public readonly new CompiledType Type;
+        public new readonly CompiledType Type;
 
         public readonly int MemoryAddress;
         public bool IsInitialized;

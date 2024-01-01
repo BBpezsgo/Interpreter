@@ -101,7 +101,7 @@ namespace LanguageCore.Runtime
             };
         }
 
-        public readonly override bool Equals(object? obj) => obj is DataItem value && this.Equals(value);
+        public override readonly bool Equals(object? obj) => obj is DataItem value && this.Equals(value);
 
         public readonly bool Equals(DataItem other)
         {

@@ -26,3 +26,8 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Justification = "<Pending>")]
 [assembly: SuppressMessage("Security", "CA5394:Do not use insecure randomness", Justification = "<Pending>")]
 [assembly: SuppressMessage("Design", "CA1041:Provide ObsoleteAttribute message", Justification = "<Pending>")]
+[assembly: SuppressMessage("Style", "IDE0028:Simplify collection initialization", Justification = "<Pending>")]
+[assembly: SuppressMessage("Style", "IDE0301:Simplify collection initialization", Justification = "<Pending>")]
+[assembly: SuppressMessage("Style", "IDE0290:Use primary constructor", Justification = "<Pending>")]
+[assembly: SuppressMessage("Style", "IDE0305:Simplify collection initialization", Justification = "<Pending>")]
+[assembly: SuppressMessage("Style", "IDE0300:Simplify collection initialization", Justification = "<Pending>")]

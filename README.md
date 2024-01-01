@@ -33,7 +33,7 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 **Code Generator:**
 - `--remove-unused-functions|-ruf <iterations>` Sets the unused function removal's max iteration count
 - `--print-instructions|-pi` Prints the generated instructions
-- `--no-nullcheck|-nn` Check for null pointers (and throw runtime exceptions) when accessing something by a pointer (accessing a field, calling a method, etc.)
+- `--no-nullcheck|-nn` Disables the check for null pointers (and throw runtime exceptions) when accessing something by a pointer (accessing a field, calling a method, etc.)
 - `--dont-optimize|-do` Disables basic optimization
 - `--no-debug-info|-ndi` Disables the generation of debug informations (if you compiling into brainfuck, generating debug informations will take a lots of time)
 
@@ -53,7 +53,7 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 **Other:**
 - `--throw-errors|-te` With this option, the program crashes on any exception and lets the .NET runtime handle them.
-- `--basepath|-bp <base folder path>` Sets a path where .dll and other source files will be searched for `using` statements. If it's not there, it will look for them in the directory where the input file is.
+- `--basepath|-bp <base folder path>` Sets a path where .dll ([read more](https://github.com/BBpezsgo/Interpreter/wiki/Advanced-Topics#importing-dll-files)) and other source files will be searched for `using` statements. If it's not there, it will look for them in the directory where the input file is.
 - `--console-gui|-cg` I use this mode for debugging
 - `--no-pause|-np` With this option, the program exits at the end of execution without printing "Press any key to exit" and doesn't wait for any key press
 

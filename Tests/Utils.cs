@@ -385,6 +385,9 @@ public struct Utils
 
         process.StandardInput.Close();
 
+        if (File.Exists(outputFile + ".exe"))
+        { File.Delete(outputFile + ".exe"); }
+
         if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out ProcessRuntimeException? runtimeException))
         { throw runtimeException; }
 

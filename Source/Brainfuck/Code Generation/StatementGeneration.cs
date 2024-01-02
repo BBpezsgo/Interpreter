@@ -1105,6 +1105,15 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(CompoundAssignment statement)
         {
+            {
+                OperatorCall @operator = statement.GetOperatorCall();
+                if (GetOperator(@operator, out CompiledOperator? compiledOperator) || GetOperatorTemplate(@operator, out CompliableTemplate<CompiledOperator> compilableFunction))
+                {
+                    GenerateCodeForStatement(statement.ToAssignment());
+                    return;
+                }
+            }
+
             switch (statement.Operator.Content)
             {
                 case "+=":
@@ -1235,6 +1244,15 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(ShortOperatorCall statement)
         {
+            {
+                OperatorCall @operator = statement.GetOperatorCall();
+                if (GetOperator(@operator, out CompiledOperator? compiledOperator) || GetOperatorTemplate(@operator, out CompliableTemplate<CompiledOperator> compilableFunction))
+                {
+                    GenerateCodeForStatement(statement.ToAssignment());
+                    return;
+                }
+            }
+
             switch (statement.Operator.Content)
             {
                 case "++":
@@ -1871,6 +1889,7 @@ namespace LanguageCore.Brainfuck.Generator
                         int rightAddress = Stack.NextAddress;
                         if (TryCompute(statement.Right, null, out DataItem rightConst) && rightConst.Integer.HasValue)
                         {
+                            Stack.PushVirtual(1);
                             Code.SetValue(rightAddress, (int)Math.Pow(2, rightConst.Integer.Value));
                         }
                         else
@@ -1896,6 +1915,30 @@ namespace LanguageCore.Brainfuck.Generator
                         Stack.Pop();
 
                         break;
+                    }
+                    case "!":
+                    {
+                        int leftAddress = Stack.NextAddress;
+                        using (Code.Block("Compute left-side value"))
+                        { GenerateCodeForStatement(statement.Left); }
+
+                        Code.LOGIC_NOT(leftAddress, leftAddress + 1);
+
+                        break;
+                    }
+                    case "&":
+                    {
+                        if (TryCompute(statement.Right, null, out DataItem right) &&
+                            right == 1)
+                        {
+                            GenerateCodeForStatement(new OperatorCall(
+                                Token.CreateAnonymous("%", TokenType.Operator, statement.Operator.Position),
+                                statement.Left,
+                                new Literal(LiteralType.Integer, Token.CreateAnonymous(right.ToString(), TokenType.LiteralNumber, statement.Right!.Position))
+                                ));
+                            break;
+                        }
+                        throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
                     }
                     default: throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
                 }

@@ -2030,7 +2030,7 @@ namespace LanguageCore.Compiler
                     return result;
                 }
 
-                throw new CompilerException($"Field definition \"{prevStatementType}\" not found in class \"{prevStatementType.Class.Name.Content}\"", field.FieldName, CurrentFile);
+                throw new CompilerException($"Field definition \"{field.FieldName}\" not found in type \"{prevStatementType}\"", field.FieldName, CurrentFile);
             }
 
             if (prevStatementType.IsEnum)

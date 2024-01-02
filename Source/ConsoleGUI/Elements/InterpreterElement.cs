@@ -182,11 +182,9 @@ namespace ConsoleGUI
             Interpreter.OnStdOut += (sender, data) => ConsolePanel.Write(char.ToString(data));
             Interpreter.OnStdError += (sender, data) => ConsolePanel.Write(char.ToString(data), CharColor.BrightRed);
 
-            Interpreter.OnNeedInput += (sender) =>
-            {
-                ConsoleKeyInfo input = Console.ReadKey();
-                sender.OnInput(input.KeyChar);
-            };
+            Interpreter.OnNeedInput += (_) => ConsolePanel.BeginRead();
+
+            ConsolePanel.OnInput += Interpreter.OnInput;
 
             if (!Interpreter.IsExecutingCode)
             {

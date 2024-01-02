@@ -99,15 +99,26 @@ export void Sleep(int ms);
 
 export int ParseInt(temp String v)
 {
+    if (v.length == 0)
+    { return 0; }
     bool IsNegative = (v[0] == '-');
     String parsing = v;
-    if (IsNegative) { parsing = parsing.Substring(1); };
-    parsing = parsing.Reverse();
+    if (IsNegative)
+    {
+        parsing = parsing.Substring(1);
+        String reversed = parsing.Reverse();
+        delete parsing;
+        parsing = reversed;
+    }
+    else
+    {
+        parsing = parsing.Reverse();
+    }
     int result = 0;
     for (int i = 0; i < parsing.length; i++)
     {
         char digit = parsing[i];
-        result += (Pow(10, i) * ParseDigit(digit));
+        result += (Pow(10, i) * (digit - '0'));
     };
     if (IsNegative)
     { result *= -1; };
@@ -124,25 +135,11 @@ export byte ParseByte(temp String v)
     for (int i = 0; i < parsing.length; i++)
     {
         char digit = parsing[i];
-        result += (Pow(10, i) * ParseDigit(digit));
+        result += (Pow(10, i) * (digit - '0'));
     };
     if (IsNegative)
     { result *= -1; };
     return result;
-}
-
-int ParseDigit(char digit)
-{
-    if (digit == '0') { return 0; }
-    elseif (digit == '1') { return 1; }
-    elseif (digit == '2') { return 2; }
-    elseif (digit == '3') { return 3; }
-    elseif (digit == '4') { return 4; }
-    elseif (digit == '5') { return 5; }
-    elseif (digit == '6') { return 6; }
-    elseif (digit == '7') { return 7; }
-    elseif (digit == '8') { return 8; }
-    elseif (digit == '9') { return 9; }
 }
 
 [External("int-to-float")]

@@ -142,5 +142,6 @@ export String ReadLine() {
 
         result = newResult;
     };
+    Print('\n');
     return result;
 }

@@ -76,6 +76,20 @@ class String
         return a + temp b.ToString();
     }
     
+    export String +(temp String a, char b)
+    {
+        String result = new String(a.length + 1);
+        
+        for (int i; i < a.length; i++)
+        {
+            UnsafeSet(result, i, UnsafeGet(a, i));
+        }
+
+        result[a.length] = b;
+  
+        return result;
+    }
+    
     export String +(int a, temp String b)
     {
         return temp a.ToString() + b;

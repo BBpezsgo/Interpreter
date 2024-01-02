@@ -8,6 +8,8 @@ namespace ConsoleGUI
     [SupportedOSPlatform("windows")]
     public class StandardIOElement : InlineElement
     {
+        public delegate void InputEventHandler(char input);
+
         readonly struct ConsoleText
         {
             public readonly string Text;
@@ -22,14 +24,18 @@ namespace ConsoleGUI
 
         readonly ScrollBar ScrollBar;
         readonly List<ConsoleText> ConsoleTexts;
+        bool IsReading;
+
+        public event InputEventHandler? OnInput;
 
         public StandardIOElement() : base()
         {
             ConsoleTexts = new List<ConsoleText>();
             ScrollBar = new ScrollBar(GetScrollBarBounds, this);
+            IsReading = false;
         }
 
-        private LanguageCore.Range<int> GetScrollBarBounds(Element element)
+        LanguageCore.Range<int> GetScrollBarBounds(Element element)
         {
             int totalLines = 0;
             for (int i = 0; i < ConsoleTexts.Count; i++)
@@ -46,7 +52,7 @@ namespace ConsoleGUI
             return new LanguageCore.Range<int>(0, Math.Max(1, totalLines));
         }
 
-        public void Write(string text, byte color = Win32.CharColor.Silver)
+        public void Write(string text, byte color = CharColor.Silver)
         {
             ConsoleTexts.Add(new ConsoleText(text, color));
         }
@@ -93,6 +99,12 @@ namespace ConsoleGUI
         {
             base.OnKeyEvent(e);
             ScrollBar.FeedEvent(this, e);
+
+            if (IsReading)
+            {
+                OnInput?.Invoke(e.UnicodeChar);
+                IsReading = false;
+            }
         }
 
         public override void OnMouseEvent(MouseEvent e)
@@ -100,5 +112,7 @@ namespace ConsoleGUI
             base.OnMouseEvent(e);
             ScrollBar.FeedEvent(this, e);
         }
+
+        public void BeginRead() => IsReading = true;
     }
 }

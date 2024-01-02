@@ -55,6 +55,26 @@ namespace LanguageCore.ASM
 
             return new NasmException(potentialFileName, lineNumber, text, innerException);
         }
+
+        public string? GetArrows()
+        {
+            if (File == null) return null;
+            string text = System.IO.File.ReadAllText(File);
+
+            string[] lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+
+            if (LineNumber > lines.Length)
+            { return null; }
+
+            string line = lines[LineNumber];
+
+            StringBuilder result = new();
+
+            result.Append(line.Replace('\t', ' '));
+            result.AppendLine();
+            result.Append('^', Math.Max(1, line.Length));
+            return result.ToString();
+        }
     }
 
     public static class Nasm

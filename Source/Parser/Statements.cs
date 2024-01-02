@@ -873,34 +873,9 @@ namespace LanguageCore.Parser.Statement
 
         public override Assignment ToAssignment()
         {
-            switch (Operator.Content)
-            {
-                case "++":
-                {
-                    Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
-                    one.SaveValue = true;
-
-                    OperatorCall operatorCall = new(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one);
-
-                    Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
-
-                    return new Assignment(assignmentToken, Left, operatorCall);
-                }
-
-                case "--":
-                {
-                    Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
-                    one.SaveValue = true;
-
-                    OperatorCall operatorCall = new(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one);
-
-                    Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
-
-                    return new Assignment(assignmentToken, Left, operatorCall);
-                }
-
-                default: throw new NotImplementedException();
-            }
+            OperatorCall operatorCall = GetOperatorCall();
+            Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
+            return new Assignment(assignmentToken, Left, operatorCall);
         }
 
         public override IEnumerator<Statement> GetEnumerator()
@@ -910,6 +885,26 @@ namespace LanguageCore.Parser.Statement
                 yield return Left;
                 foreach (Statement substatement in Left)
                 { yield return substatement; }
+            }
+        }
+
+        public OperatorCall GetOperatorCall()
+        {
+            switch (Operator.Content)
+            {
+                case "++":
+                {
+                    Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
+                    return new OperatorCall(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one);
+                }
+
+                case "--":
+                {
+                    Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
+                    return new OperatorCall(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one);
+                }
+
+                default: throw new NotImplementedException();
             }
         }
     }
@@ -977,9 +972,14 @@ namespace LanguageCore.Parser.Statement
 
         public override Assignment ToAssignment()
         {
-            OperatorCall statementToAssign = new(Token.CreateAnonymous(Operator.Content.Replace("=", string.Empty, StringComparison.Ordinal), TokenType.Operator, Operator.Position), Left, Right);
+            OperatorCall statementToAssign = GetOperatorCall();
             return new Assignment(Token.CreateAnonymous("=", TokenType.Operator, Operator.Position), Left, statementToAssign);
         }
+
+        public OperatorCall GetOperatorCall() => new(
+            Token.CreateAnonymous(Operator.Content.Replace("=", string.Empty, StringComparison.Ordinal), TokenType.Operator, Operator.Position),
+            Left,
+            Right);
 
         public override IEnumerator<Statement> GetEnumerator()
         {

@@ -41,7 +41,7 @@ public class MainFileTests
     [TestMethod] public void Test36() => Utils.GetTest(36).DoMain();
     [TestMethod] public void Test37() => Utils.GetTest(37).DoMain();
     [TestMethod] public void Test38() => Utils.GetTest(38).DoMain();
-    [TestMethod, Ignore] public void Test39() => Utils.GetTest(39).DoMain();
+    [TestMethod] public void Test39() => Utils.GetTest(39).DoMain();
     [TestMethod, Ignore] public void Test40() => Utils.GetTest(40).DoMain();
     [TestMethod, Ignore] public void Test41() => Utils.GetTest(41).DoMain();
     [TestMethod, Ignore] public void Test42() => Utils.GetTest(42).DoMain();

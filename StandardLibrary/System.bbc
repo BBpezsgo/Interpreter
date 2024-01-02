@@ -102,7 +102,7 @@ export int ParseInt(temp String v)
     if (v.length == 0)
     { return 0; }
     bool IsNegative = (v[0] == '-');
-    String parsing = v;
+    temp String parsing = v;
     if (IsNegative)
     {
         parsing = parsing.Substring(1);
@@ -128,9 +128,18 @@ export int ParseInt(temp String v)
 export byte ParseByte(temp String v)
 {
     bool IsNegative = (v[0] == '-');
-    String parsing = v;
-    if (IsNegative) { parsing = parsing.Substring(1); };
-    parsing = parsing.Reverse();
+    temp String parsing = v;
+    if (IsNegative)
+    {
+        parsing = parsing.Substring(1);
+        String reversed = parsing.Reverse();
+        delete parsing;
+        parsing = reversed;
+    }
+    else
+    {
+        parsing = parsing.Reverse();
+    }
     int result = 0;
     for (int i = 0; i < parsing.length; i++)
     {

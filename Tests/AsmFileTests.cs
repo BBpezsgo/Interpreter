@@ -41,7 +41,7 @@ public class AsmFileTests
     [TestMethod] public void Test36() => Utils.GetTest(36).DoAssembly();
     [TestMethod] public void Test37() => Utils.GetTest(37).DoAssembly();
     [TestMethod] public void Test38() => Utils.GetTest(38).DoAssembly();
-    [TestMethod, Ignore] public void Test39() => Utils.GetTest(39).DoAssembly();
+    [TestMethod] public void Test39() => Utils.GetTest(39).DoAssembly();
     [TestMethod, Ignore] public void Test40() => Utils.GetTest(40).DoAssembly();
     [TestMethod, Ignore] public void Test41() => Utils.GetTest(41).DoAssembly();
     [TestMethod, Ignore] public void Test42() => Utils.GetTest(42).DoAssembly();

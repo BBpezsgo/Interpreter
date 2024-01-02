@@ -1,8 +1,0 @@
-using System;
-
-template<T>
-void PrintT(T v) {
-	Print(v);
-}
-
-PrintT(77);

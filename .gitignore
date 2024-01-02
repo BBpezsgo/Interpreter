@@ -15,6 +15,7 @@
 /Diagsessions
 
 /TestFiles/*.exe
+/TestFiles/Old
 
 /publish-*.txt
 

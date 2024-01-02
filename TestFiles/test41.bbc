@@ -1,5 +1,0 @@
-using System; 
-
-char[4] message = "bruh";
-message[1] = '0';
-Print(message[1]);

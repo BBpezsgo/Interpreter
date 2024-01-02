@@ -1,9 +1,0 @@
-using System;
-
-{
-	String g_str = new String(5);
-	
-	delete g_str;
-
-	delete new String(7) as int;
-}

@@ -21,6 +21,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\TestFiles\**\*.*">
+      <Link>TestFiles\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\BBCodeInterpreter.csproj" />
   </ItemGroup>
 </Project>

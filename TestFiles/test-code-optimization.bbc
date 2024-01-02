@@ -1,4 +1,0 @@
-﻿using System;
-
-PrintLine(temp (5 + 5 * 5).ToString());
-

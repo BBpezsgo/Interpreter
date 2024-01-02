@@ -1,3 +1,0 @@
-using System.Memory;
-
-*Alloc(1) = 6;

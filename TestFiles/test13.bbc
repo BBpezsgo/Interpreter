@@ -1,8 +1,0 @@
-using System;
-
-{
-	int number = -44;
-	String str = number.ToString();
-	Print(str);
-	delete str;
-}

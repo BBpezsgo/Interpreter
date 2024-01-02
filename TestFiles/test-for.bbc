@@ -1,6 +1,0 @@
-﻿using System;
-
-for (int i; 10 - i; i++)
-{
-	PrintLine(i);
-};

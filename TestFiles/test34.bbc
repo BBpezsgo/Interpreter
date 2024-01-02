@@ -1,9 +1,0 @@
-using System;
-
-template<T>
-void Bruh(T eh) {
-	T copy = eh;
-	PrintLine(eh);
-}
-
-Bruh(53);

@@ -1,8 +1,0 @@
-using System;
-
-{
-	Print("Type something > ");
-	temp String input = ReadLine();
-	PrintLine();
-	PrintLine("Input: " + input);
-}

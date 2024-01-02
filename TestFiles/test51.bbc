@@ -1,7 +1,0 @@
-using System; 
-
-if (1) {
-	Print('A');
-	return;
-}
-Print('B');

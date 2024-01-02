@@ -1,4 +1,0 @@
-using System;
-using Win32;
-
-MessageBoxD(0, "Text", "Caption", 0);

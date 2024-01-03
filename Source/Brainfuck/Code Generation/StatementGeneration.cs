@@ -1107,7 +1107,7 @@ namespace LanguageCore.Brainfuck.Generator
         {
             {
                 OperatorCall @operator = statement.GetOperatorCall();
-                if (GetOperator(@operator, out CompiledOperator? compiledOperator) || GetOperatorTemplate(@operator, out CompliableTemplate<CompiledOperator> compilableFunction))
+                if (GetOperator(@operator, out _) || GetOperatorTemplate(@operator, out _))
                 {
                     GenerateCodeForStatement(statement.ToAssignment());
                     return;
@@ -1246,7 +1246,7 @@ namespace LanguageCore.Brainfuck.Generator
         {
             {
                 OperatorCall @operator = statement.GetOperatorCall();
-                if (GetOperator(@operator, out CompiledOperator? compiledOperator) || GetOperatorTemplate(@operator, out CompliableTemplate<CompiledOperator> compilableFunction))
+                if (GetOperator(@operator, out _) || GetOperatorTemplate(@operator, out _))
                 {
                     GenerateCodeForStatement(statement.ToAssignment());
                     return;

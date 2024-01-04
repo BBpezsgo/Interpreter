@@ -94,7 +94,7 @@ namespace LanguageCore.Runtime
 
                 _heapOperation =
                     nextInstruction.opcode == Opcode.HEAP_ALLOC ||
-                    nextInstruction.opcode == Opcode.HEAP_DEALLOC ||
+                    nextInstruction.opcode == Opcode.HEAP_FREE ||
                     nextInstruction.opcode == Opcode.HEAP_GET ||
                     nextInstruction.opcode == Opcode.HEAP_SET;
 

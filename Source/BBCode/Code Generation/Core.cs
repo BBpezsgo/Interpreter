@@ -116,12 +116,6 @@ namespace LanguageCore.BBCode.Generator
             GeneratorSettings settings,
             PrintCallback? printCallback = null)
         {
-            UnusedFunctionManager.RemoveUnusedFunctions(
-                ref compilerResult,
-                settings.RemoveUnusedFunctionsMaxIterations,
-                printCallback,
-                settings.CompileLevel);
-
             List<string> usedExternalFunctions = new();
 
             foreach (CompiledFunction function in this.CompiledFunctions)
@@ -189,7 +183,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 AddComment("Clear external functions cache {");
                 for (int i = 0; i < ExternalFunctionsCache.Count; i++)
-                { AddInstruction(Opcode.HEAP_DEALLOC); }
+                { AddInstruction(Opcode.HEAP_FREE); }
                 AddComment("}");
             }
 
@@ -295,6 +289,14 @@ namespace LanguageCore.BBCode.Generator
             GeneratorSettings settings,
             PrintCallback? printCallback = null,
             AnalysisCollection? analysisCollection = null)
-            => new CodeGeneratorForMain(compilerResult, settings, analysisCollection).GenerateCode(compilerResult, settings, printCallback);
+        {
+            UnusedFunctionManager.RemoveUnusedFunctions(
+                ref compilerResult,
+                settings.RemoveUnusedFunctionsMaxIterations,
+                printCallback,
+                settings.CompileLevel);
+
+            return new CodeGeneratorForMain(compilerResult, settings, analysisCollection).GenerateCode(compilerResult, settings, printCallback);
+        }
     }
 }

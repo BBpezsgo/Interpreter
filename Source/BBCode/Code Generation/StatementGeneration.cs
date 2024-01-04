@@ -164,7 +164,7 @@ namespace LanguageCore.BBCode.Generator
                 if (valueType == Type.Integer)
                 {
                     GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
-                    AddInstruction(Opcode.HEAP_DEALLOC);
+                    AddInstruction(Opcode.HEAP_FREE);
 
                     return;
                 }
@@ -180,7 +180,7 @@ namespace LanguageCore.BBCode.Generator
                     if (!GetGeneralFunctionTemplate(valueType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                     {
                         GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
-                        AddInstruction(Opcode.HEAP_DEALLOC);
+                        AddInstruction(Opcode.HEAP_FREE);
                         AddComment("}");
 
                         return;
@@ -532,7 +532,7 @@ namespace LanguageCore.BBCode.Generator
             if (compiledFunction.BuiltinFunctionName == "free")
             {
                 GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.Integer));
-                AddInstruction(Opcode.HEAP_DEALLOC);
+                AddInstruction(Opcode.HEAP_FREE);
                 return;
             }
 
@@ -633,7 +633,7 @@ namespace LanguageCore.BBCode.Generator
 
                     AddComment(" Deallocate Function Name String:");
 
-                    AddInstruction(Opcode.HEAP_DEALLOC);
+                    AddInstruction(Opcode.HEAP_FREE);
                 }
 
                 AddComment("}");
@@ -882,10 +882,10 @@ namespace LanguageCore.BBCode.Generator
 
                     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
                     AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
-                    AddInstruction(Opcode.HEAP_DEALLOC);
+                    AddInstruction(Opcode.HEAP_FREE);
 
                     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
-                    AddInstruction(Opcode.HEAP_DEALLOC);
+                    AddInstruction(Opcode.HEAP_FREE);
 
                     if (thereIsReturnValue)
                     {
@@ -1787,43 +1787,49 @@ namespace LanguageCore.BBCode.Generator
 
             if (GetParameter(statementToSet.Content, out CompiledParameter? parameter))
             {
+                statementToSet.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
+
                 CompiledType valueType = FindStatementType(value, parameter.Type);
 
-                if (parameter.Type != valueType)
-                { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{parameter.Type.Name}\" type parameter.", value, CurrentFile); }
+                AssignTypeCheck(parameter.Type, valueType, value);
 
                 GenerateCodeForStatement(value);
 
-                if (parameter.IsRef)
+                ValueAddress address = GetBaseAddress(parameter);
+
+                if (address.IsReference)
                 {
-                    ValueAddress offset = GetBaseAddress(parameter);
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, offset.Address);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, address.Address);
                     AddInstruction(Opcode.STORE_VALUE, AddressingMode.Runtime);
                 }
                 else
                 {
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, parameter.MemoryAddress);
+                    StackStore(address);
                 }
             }
             else if (GetVariable(statementToSet.Content, out CompiledVariable? variable))
             {
+                statementToSet.Token.AnalyzedType = TokenAnalyzedType.VariableName;
+
                 CompiledType valueType = FindStatementType(value, variable.Type);
 
-                if (variable.Type != valueType)
-                { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{variable.Type.Name}\" type variable.", value, CurrentFile); }
+                AssignTypeCheck(variable.Type, valueType, value);
 
                 GenerateCodeForStatement(value);
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, variable.MemoryAddress);
+
+                StackStore(new ValueAddress(variable));
             }
             else if (GetGlobalVariable(statementToSet.Content, out CompiledVariable? globalVariable))
             {
+                statementToSet.Token.AnalyzedType = TokenAnalyzedType.VariableName;
+
                 CompiledType valueType = FindStatementType(value, globalVariable.Type);
 
-                if (globalVariable.Type != valueType)
-                { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{globalVariable.Type.Name}\" type variable.", value, CurrentFile); }
+                AssignTypeCheck(globalVariable.Type, valueType, value);
 
                 GenerateCodeForStatement(value);
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.Absolute, GetGlobalVariableAddress(globalVariable).Address);
+
+                StackStore(GetGlobalVariableAddress(globalVariable));
             }
             else
             {
@@ -1990,8 +1996,8 @@ namespace LanguageCore.BBCode.Generator
             }
 
             variable.IsInitialized = true;
-            int destination = variable.MemoryAddress;
 
+            int destination = variable.MemoryAddress;
             int size = variable.Type.SizeOnStack;
             for (int offset = 1; offset <= size; offset++)
             { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, destination + size - offset); }
@@ -2033,7 +2039,7 @@ namespace LanguageCore.BBCode.Generator
 
             if (deallocateableType == Type.Integer)
             {
-                AddInstruction(Opcode.HEAP_DEALLOC);
+                AddInstruction(Opcode.HEAP_FREE);
                 AddComment("}");
                 return;
             }
@@ -2044,7 +2050,7 @@ namespace LanguageCore.BBCode.Generator
                 {
                     if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                     {
-                        AddInstruction(Opcode.HEAP_DEALLOC);
+                        AddInstruction(Opcode.HEAP_FREE);
                         AddComment("}");
                         return;
                     }
@@ -2076,7 +2082,7 @@ namespace LanguageCore.BBCode.Generator
                 return;
             }
 
-            AddInstruction(Opcode.HEAP_DEALLOC);
+            AddInstruction(Opcode.HEAP_FREE);
             AddComment("}");
         }
 

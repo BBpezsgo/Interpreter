@@ -748,7 +748,7 @@
         ///     none
         /// </para>
         /// </summary>
-        HEAP_DEALLOC,
+        HEAP_FREE,
         #endregion
 
         #region === TYPE OPERATINS ===

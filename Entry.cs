@@ -253,7 +253,7 @@ namespace TheProgram
                         Output.Write("Press any key to start the interpreter");
                         Console.ReadKey();
 
-                        interpreter.RunWithUI(true, 3);
+                        interpreter.RunWithUI();
                     }
                     else
                     {

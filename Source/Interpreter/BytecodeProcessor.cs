@@ -85,7 +85,7 @@ namespace LanguageCore.Runtime
                 case Opcode.HEAP_SET: HEAP_SET(); break;
 
                 case Opcode.HEAP_ALLOC: HEAP_ALLOC(); break;
-                case Opcode.HEAP_DEALLOC: HEAP_DEALLOC(); break;
+                case Opcode.HEAP_FREE: HEAP_FREE(); break;
 
                 case Opcode.GET_BASEPOINTER: GET_BASEPOINTER(); break;
                 case Opcode.SET_BASEPOINTER: SET_BASEPOINTER(); break;
@@ -145,7 +145,7 @@ namespace LanguageCore.Runtime
             Step();
         }
 
-        void HEAP_DEALLOC()
+        void HEAP_FREE()
         {
             DataItem pointerData = Memory.Stack.Pop();
             int pointer = pointerData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_DEALLOC, got {pointerData.Type}");

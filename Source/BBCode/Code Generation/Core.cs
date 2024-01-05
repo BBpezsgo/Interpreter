@@ -292,7 +292,6 @@ namespace LanguageCore.BBCode.Generator
         {
             UnusedFunctionManager.RemoveUnusedFunctions(
                 ref compilerResult,
-                settings.RemoveUnusedFunctionsMaxIterations,
                 printCallback,
                 settings.CompileLevel);
 

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Text;
 
 namespace TheProgram
 {
@@ -50,80 +52,69 @@ namespace TheProgram
         ASM,
     }
 
-    public static class ArgumentParser
+    public static class ArgumentNormalizer
     {
-        sealed class ArgumentNormalizer
+        enum NormalizerState
         {
-            public readonly List<string> Result;
+            None,
+            String,
+        }
 
-            NormalizerState State;
-            string CurrentArg;
+        public static string[] NormalizeArgs(params string[] args) => NormalizeArgs(string.Join(' ', args));
+        public static string[] NormalizeArgs(string args)
+        {
+            List<string> result = new();
 
-            enum NormalizerState
-            {
-                None,
-                String,
-            }
-
-            public ArgumentNormalizer()
-            {
-                Result = new();
-                State = NormalizerState.None;
-                CurrentArg = string.Empty;
-            }
+            NormalizerState state = NormalizerState.None;
+            StringBuilder currentArg = new();
 
             void FinishArgument()
             {
-                string currentArg = CurrentArg.Trim();
+                state = NormalizerState.None;
+                currentArg.Clear();
 
-                State = NormalizerState.None;
-                CurrentArg = string.Empty;
+                if (currentArg.Length == 0) return;
 
-                if (string.IsNullOrEmpty(currentArg)) return;
-
-                Result.Add(currentArg);
+                result.Add(currentArg.ToString());
             }
 
-            public void NormalizeArgs(params string[] args) => NormalizeArgs(string.Join(' ', args));
-            public void NormalizeArgs(string args)
+            for (int i = 0; i < args.Length; i++)
             {
-                Result.Clear();
-                State = NormalizerState.None;
-                CurrentArg = string.Empty;
+                char c = args[i];
 
-                for (int i = 0; i < args.Length; i++)
+                switch (c)
                 {
-                    char c = args[i];
-
-                    switch (c)
-                    {
-                        case '"':
-                            if (State == NormalizerState.String)
-                            {
-                                FinishArgument();
-                                break;
-                            }
-                            State = NormalizerState.String;
-                            break;
-                        case '\t':
-                        case ' ':
-                            if (State == NormalizerState.String)
-                            {
-                                CurrentArg += c;
-                                break;
-                            }
+                    case '"':
+                        if (state == NormalizerState.String)
+                        {
                             FinishArgument();
                             break;
-                        default:
-                            CurrentArg += c;
+                        }
+                        state = NormalizerState.String;
+                        break;
+                    case '\t':
+                    case ' ':
+                        if (state == NormalizerState.String)
+                        {
+                            currentArg.Append(c);
                             break;
-                    }
+                        }
+                        FinishArgument();
+                        break;
+                    default:
+                        currentArg.Append(c);
+                        break;
                 }
-
-                FinishArgument();
             }
-        }
 
+            FinishArgument();
+
+            return result.ToArray();
+        }
+    }
+
+    public static class ArgumentParser
+    {
         static bool ExpectArg(string[] args, ref int i, [NotNullWhen(true)] out string? result, params string[] name)
         {
             result = null;
@@ -171,7 +162,7 @@ namespace TheProgram
             return true;
         }
 
-        static ProgramArguments ParseArgs(string[] args)
+        static ProgramArguments ParseInternal(string[] args)
         {
             ProgramArguments result = ProgramArguments.Default;
 #pragma warning disable IDE0018 // Inline variable declaration
@@ -183,6 +174,11 @@ namespace TheProgram
                 int i = 0;
                 while (i < args.Length - 1)
                 {
+                    if (ExpectArg(args, ref i, out _, "--dont-normalize-args", "-nna"))
+                    {
+                        continue;
+                    }
+
                     if (ExpectArg(args, ref i, out _, "--no-nullcheck", "-nn"))
                     {
                         result.GeneratorSettings.CheckNullPointers = false;
@@ -286,14 +282,6 @@ namespace TheProgram
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out _, "--remove-unused-functions", "-ruf"))
-                    {
-                        if (!ExpectParam(args, ref i, out result.GeneratorSettings.RemoveUnusedFunctionsMaxIterations))
-                        { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
-
-                        continue;
-                    }
-
                     if (ExpectArg(args, ref i, out arg, "--stack-size", "-ss"))
                     {
                         if (!ExpectParam(args, ref i, out result.BytecodeInterpreterSettings.StackMaxSize))
@@ -341,40 +329,36 @@ namespace TheProgram
                 return false;
             }
         }
+
         public static ProgramArguments? Parse(params string[] args)
         {
             if (args.Length == 0)
             { return ProgramArguments.Default; }
 
-            ArgumentNormalizer normalizer = new();
-            normalizer.NormalizeArgs(args);
-            string[] normalizedArgs = normalizer.Result.ToArray();
-
-            ProgramArguments settings;
+            if (!args.Contains("--dont-normalize-args") && !args.Contains("-nna"))
+            { args = ArgumentNormalizer.NormalizeArgs(args); }
 
             try
             {
-                settings = ParseArgs(normalizedArgs);
+                return ParseInternal(args);
             }
             catch (ArgumentException error)
             {
                 Output.LogError(error.Message);
-                PrintArgs(normalizedArgs);
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine("Arguments i tried to parse:");
+                Console.Write("{ ");
+                for (int i = 0; i < args.Length; i++)
+                {
+                    if (i > 0) Console.Write(", ");
+                    Console.Write($"\"{args[i].Escape()}\"");
+                }
+                Console.WriteLine(" }");
+                Console.ResetColor();
+
                 return null;
             }
-
-            return settings;
-        }
-
-        public static void PrintArgs(params string[] args)
-        {
-            Console.Write("[ ");
-            for (int i = 0; i < args.Length; i++)
-            {
-                if (i > 0) Console.Write(", ");
-                Console.Write($"'{args[i]}'");
-            }
-            Console.WriteLine(" ]");
         }
     }
 }

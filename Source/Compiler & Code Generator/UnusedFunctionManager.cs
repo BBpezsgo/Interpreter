@@ -10,6 +10,8 @@ namespace LanguageCore.BBCode.Generator
         readonly PrintCallback? Print;
         readonly AnalysisCollection? AnalysisCollection;
 
+        const int MaxIterations = 40;
+
         public UnusedFunctionManager(CompileLevel compileLevel, PrintCallback? printCallback, AnalysisCollection? analysisCollection)
         {
             CompileLevel = compileLevel;
@@ -113,14 +115,13 @@ namespace LanguageCore.BBCode.Generator
 
         public static void RemoveUnusedFunctions(
             ref CompilerResult compilerResult,
-            int iterations,
             PrintCallback? printCallback = null,
             CompileLevel level = CompileLevel.Minimal,
             AnalysisCollection? analysisCollection = null)
         {
             UnusedFunctionManager unusedFunctionManager = new(level, printCallback, analysisCollection);
 
-            for (int iteration = 0; iteration < iterations; iteration++)
+            for (int iteration = 0; iteration < MaxIterations; iteration++)
             {
                 ReferenceCollector.CollectReferences(in compilerResult, printCallback);
 

@@ -18,7 +18,6 @@ namespace LanguageCore.Compiler
     public struct GeneratorSettings
     {
         public bool GenerateComments;
-        public int RemoveUnusedFunctionsMaxIterations;
         public bool PrintInstructions;
         public bool DontOptimize;
         public bool GenerateDebugInstructions;
@@ -31,7 +30,6 @@ namespace LanguageCore.Compiler
         public GeneratorSettings(GeneratorSettings other)
         {
             GenerateComments = other.GenerateComments;
-            RemoveUnusedFunctionsMaxIterations = other.RemoveUnusedFunctionsMaxIterations;
             PrintInstructions = other.PrintInstructions;
             DontOptimize = other.DontOptimize;
             GenerateDebugInstructions = other.GenerateDebugInstructions;
@@ -43,7 +41,6 @@ namespace LanguageCore.Compiler
         public static GeneratorSettings Default => new()
         {
             GenerateComments = true,
-            RemoveUnusedFunctionsMaxIterations = 10,
             PrintInstructions = false,
             DontOptimize = false,
             GenerateDebugInstructions = true,

@@ -102,7 +102,7 @@ namespace LanguageCore.Compiler
                     }
                 }
 
-                string filename = @using.PathString.Replace('/', '\\');
+                string filename = @using.PathString;
                 if (!filename.EndsWith(".bbc", System.StringComparison.Ordinal)) filename += ".bbc";
 
                 List<string> searchForThese = new();
@@ -110,28 +110,16 @@ namespace LanguageCore.Compiler
                 if (file != null)
                 {
                     if (basePath != null)
-                    {
-                        try
-                        { searchForThese.Add(Path.GetFullPath(basePath.Replace('/', '\\') + filename, file.Directory!.FullName!)); }
-                        catch (System.Exception) { }
-                    }
+                    { searchForThese.Add(Path.Combine(Path.GetFullPath(basePath, file.Directory!.FullName), filename)); }
 
-                    try
-                    { searchForThese.Add(Path.GetFullPath(filename, file.Directory!.FullName!)); }
-                    catch (System.Exception) { }
+                    searchForThese.Add(Path.GetFullPath(filename, file.Directory!.FullName));
                 }
                 else
                 {
                     if (basePath != null)
-                    {
-                        try
-                        { searchForThese.Add(Path.GetFullPath(basePath.Replace('/', '\\') + filename, System.Environment.CurrentDirectory)); }
-                        catch (System.Exception) { }
-                    }
+                    { searchForThese.Add(Path.Combine(Path.GetFullPath(basePath, System.Environment.CurrentDirectory), filename)); }
 
-                    try
-                    { searchForThese.Add(Path.GetFullPath(filename, System.Environment.CurrentDirectory)); }
-                    catch (System.Exception) { }
+                    searchForThese.Add(Path.GetFullPath(filename, System.Environment.CurrentDirectory));
                 }
 
                 string? path = null;

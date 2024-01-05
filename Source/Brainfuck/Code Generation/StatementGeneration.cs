@@ -1847,72 +1847,53 @@ namespace LanguageCore.Brainfuck.Generator
                     }
                     case "<<":
                     {
-                        int leftAddress = Stack.NextAddress;
+                        int valueAddress = Stack.NextAddress;
                         using (Code.Block("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
-                        int rightAddress = Stack.NextAddress;
-                        if (TryCompute(statement.Right, null, out DataItem rightConst) && rightConst.Integer.HasValue)
+                        if (!TryCompute(statement.Right, null, out DataItem offsetConst))
+                        { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
+
+                        if (offsetConst != 0)
                         {
-                            Code.SetValue(rightAddress, (int)Math.Pow(2, rightConst.Integer.Value));
-                        }
-                        else
-                        {
-                            using (Code.Block("Compute right-side value"))
-                            { GenerateCodeForStatement(statement.Right!); }
+                            if (!Utils.PowerOf2((int)offsetConst))
+                            { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
-                            int valueTwoAddress = Stack.Push(2);
+                            int offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
 
-                            Code.MATH_POW(valueTwoAddress, rightAddress, valueTwoAddress + 1, valueTwoAddress + 2, valueTwoAddress + 3);
-
-                            Stack.PopAndStore(rightAddress);
-                        }
-
-                        using (Code.Jump(rightAddress))
-                        {
-                            using (Code.Block($"Snippet BITSHIFT_LEFT({leftAddress} {rightAddress})"))
+                            using (Code.Block($"Snippet MULTIPLY({valueAddress} {offsetAddress})"))
                             {
-                                Code.MULTIPLY(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
+                                Code.MULTIPLY(valueAddress, offsetAddress, offsetAddress + 1, offsetAddress + 2);
                             }
-                        }
 
-                        Stack.Pop();
+                            Stack.Pop();
+                        }
 
                         break;
                     }
                     case ">>":
                     {
-                        int leftAddress = Stack.NextAddress;
+                        int valueAddress = Stack.NextAddress;
                         using (Code.Block("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
-                        int rightAddress = Stack.NextAddress;
-                        if (TryCompute(statement.Right, null, out DataItem rightConst) && rightConst.Integer.HasValue)
+                        if (!TryCompute(statement.Right, null, out DataItem offsetConst))
+                        { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
+
+                        if (offsetConst != 0)
                         {
-                            Stack.PushVirtual(1);
-                            Code.SetValue(rightAddress, (int)Math.Pow(2, rightConst.Integer.Value));
-                        }
-                        else
-                        {
-                            using (Code.Block("Compute right-side value"))
-                            { GenerateCodeForStatement(statement.Right!); }
+                            if (!Utils.PowerOf2((int)offsetConst))
+                            { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
-                            int valueTwoAddress = Stack.Push(2);
+                            int offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
 
-                            Code.MATH_POW(valueTwoAddress, rightAddress, valueTwoAddress + 1, valueTwoAddress + 2, valueTwoAddress + 3);
-
-                            Stack.PopAndStore(rightAddress);
-                        }
-
-                        using (Code.Jump(rightAddress))
-                        {
-                            using (Code.Block($"Snippet BITSHIFT_LEFT({leftAddress} {rightAddress})"))
+                            using (Code.Block($"Snippet MATH_DIV({valueAddress} {offsetAddress})"))
                             {
-                                Code.MATH_DIV(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3, rightAddress + 4);
+                                Code.MATH_DIV(valueAddress, offsetAddress, offsetAddress + 1, offsetAddress + 2, offsetAddress + 3, offsetAddress + 4);
                             }
-                        }
 
-                        Stack.Pop();
+                            Stack.Pop();
+                        }
 
                         break;
                     }
@@ -1928,14 +1909,21 @@ namespace LanguageCore.Brainfuck.Generator
                     }
                     case "&":
                     {
-                        if (TryCompute(statement.Right, null, out DataItem right) &&
-                            right == 1)
+                        if (TryCompute(statement.Right, null, out DataItem right) && right == 1)
                         {
-                            GenerateCodeForStatement(new OperatorCall(
-                                Token.CreateAnonymous("%", TokenType.Operator, statement.Operator.Position),
-                                statement.Left,
-                                new Literal(LiteralType.Integer, Token.CreateAnonymous(right.ToString(), TokenType.LiteralNumber, statement.Right!.Position))
-                                ));
+                            int leftAddress = Stack.NextAddress;
+                            using (Code.Block("Compute left-side value"))
+                            { GenerateCodeForStatement(statement.Left); }
+
+                            int rightAddress = Stack.Push(2);
+
+                            using (Code.Block($"Snippet MOD({leftAddress} {rightAddress})"))
+                            {
+                                Code.MATH_MOD(leftAddress, rightAddress, rightAddress + 1);
+                            }
+
+                            Stack.Pop();
+
                             break;
                         }
                         throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);

@@ -15,6 +15,8 @@ namespace LanguageCore
 
     public static partial class Utils
     {
+        public static bool PowerOf2(int n) => n != 0 && (n & (n - 1)) == 0;
+
         readonly struct EscapedCharacters
         {
             public const string QuotationMark = "\\\"";

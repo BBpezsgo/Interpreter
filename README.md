@@ -31,7 +31,6 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 - `--hide-warning|-hw` Hides warning logs
 
 **Code Generator:**
-- `--remove-unused-functions|-ruf <iterations>` Sets the unused function removal's max iteration count
 - `--print-instructions|-pi` Prints the generated instructions
 - `--no-nullcheck|-nn` Disables the check for null pointers (and throw runtime exceptions) when accessing something by a pointer (accessing a field, calling a method, etc.)
 - `--dont-optimize|-do` Disables basic optimization

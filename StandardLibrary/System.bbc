@@ -18,18 +18,19 @@ enum bool
 export String ToString(this bool v)
 {
     if (v) { return "true"; }
-    else { return "false"; };
+    else { return "false"; }
 }
 
 export String ToString(this byte number)
 {
 	String result = new String(0);
 
-	if (number == 0) {
+	if (number == 0)
+    {
 	      delete result;
 	      result = "0";
 	      return result;
-	};
+	}
 
 	byte v = number;
 
@@ -44,7 +45,7 @@ export String ToString(this byte number)
 		result = newResult;
 
 		v = v / 10;
-	};
+	}
 
 	String reversed = result.Reverse();
 	delete result;
@@ -54,9 +55,8 @@ export String ToString(this byte number)
 
 export String ToString(this int number)
 {
-	if (number == 0) {
-	    return "0";
-	};
+	if (number == 0)
+    { return "0"; }
     
 	String result = new String(0);
 
@@ -64,7 +64,7 @@ export String ToString(this int number)
 
 	bool isNegative = v < 0;
 	if (isNegative)
-	{ v = 0 - v; };
+	{ v = 0 - v; }
 
 	while (v > 0)
 	{
@@ -77,7 +77,7 @@ export String ToString(this int number)
 		result = newResult;
 
 		v = v / 10;
-	};
+	}
 
     if (isNegative)
     {
@@ -86,7 +86,7 @@ export String ToString(this int number)
         newResult[result.length] = '-';
         delete result;
         result = newResult;
-    };
+    }
 
 	String reversed = result.Reverse();
 	delete result;
@@ -101,8 +101,10 @@ export int ParseInt(temp String v)
 {
     if (v.length == 0)
     { return 0; }
+
     bool IsNegative = (v[0] == '-');
     temp String parsing = v;
+
     if (IsNegative)
     {
         parsing = parsing.Substring(1);
@@ -114,14 +116,17 @@ export int ParseInt(temp String v)
     {
         parsing = parsing.Reverse();
     }
+
     int result = 0;
     for (int i = 0; i < parsing.length; i++)
     {
         char digit = parsing[i];
         result += (Pow(10, i) * (digit - '0'));
-    };
+    }
+
     if (IsNegative)
-    { result *= -1; };
+    { result *= -1; }
+
     return result;
 }
 
@@ -129,6 +134,7 @@ export byte ParseByte(temp String v)
 {
     bool IsNegative = (v[0] == '-');
     temp String parsing = v;
+
     if (IsNegative)
     {
         parsing = parsing.Substring(1);
@@ -140,14 +146,17 @@ export byte ParseByte(temp String v)
     {
         parsing = parsing.Reverse();
     }
+
     int result = 0;
     for (int i = 0; i < parsing.length; i++)
     {
         char digit = parsing[i];
         result += (Pow(10, i) * (digit - '0'));
-    };
+    }
+
     if (IsNegative)
-    { result *= -1; };
+    { result *= -1; }
+
     return result;
 }
 
@@ -183,5 +192,5 @@ void memcp(int source, int destination, int size)
     for (int offset; offset < size; offset++)
     {
         (*(destination + offset)) = *(source + offset);
-    };
+    }
 }

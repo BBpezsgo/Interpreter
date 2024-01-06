@@ -1,28 +1,32 @@
-void GetHeader(int ptr, ref int size, ref int allocated) {
+void GetHeader(int ptr, ref int size, ref int allocated)
+{
 	int value = (*ptr) as int;
-	if (value >= 127) {
+	if (value >= 127)
+    {
 		value -= 127;
 
 		size = value;
 		allocated = 1;
-	} else {
+	}
+    else
+    {
 		size = value;
 		allocated = 0;
-	};
+	}
 }
 
-void SetHeader(int ptr, int size, int allocated) {
+void SetHeader(int ptr, int size, int allocated)
+{
 	int value = size;
-	if (allocated) {
-		value += 127;
-	};
+	if (allocated)
+    { value += 127; }
 	*ptr = value;
 }
 
-void FixSize(ref int size) {
-    if (size == 0) {
-        size++;
-    };
+void FixSize(ref int size)
+{
+    if (size == 0)
+    { size++; }
 }
 
 [Builtin("alloc")]
@@ -63,7 +67,7 @@ export int Alloc(int sizeNeed)
                 // PrintLine("Perfect match");
 
                 return dataPointer;
-            };
+            }
             
             // If the block's size is larger than needed
             if (blockSize > sizeNeed)
@@ -86,19 +90,20 @@ export int Alloc(int sizeNeed)
                     {
                         // Update the next block's header
                         SetHeader(nextHeaderPointer, _remainingSize, 0);
-                    };
-                // };
+                    }
+                // }
                 
                 return dataPointer;
-            };
-        };
+            }
+        }
         
         headerPointer += blockSize + 1;
-    };
+    }
 }
 
 [Builtin("free")]
-export void Dealloc(int ptr) {
+export void Dealloc(int ptr)
+{
 	int position = ptr;
 
     int size;
@@ -115,5 +120,5 @@ export void Dealloc(int ptr) {
 		*position = 0;
 		size--;
 		position++;
-	};
+	}
 }

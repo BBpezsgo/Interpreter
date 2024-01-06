@@ -43,13 +43,9 @@ export void Print(int message)
 export void Print(bool message)
 {
     if (message)
-    {
-        Print("true");
-    }
+    { Print("true"); }
     else
-    {
-        Print("false");
-    };
+    { Print("false"); }
 }
 
 [StandardOutput]
@@ -65,8 +61,8 @@ export void Print(temp String message)
         for (int i; i < length; i++)
         {
             Print(*(&message + sizeof(String) + i) as char);
-        };
-    };
+        }
+    }
 }
 
 //
@@ -124,7 +120,8 @@ export char ReadKey()
     return in;
 }
 
-export String ReadLine() {
+export String ReadLine()
+{
     String result = new String(0);
     while (true)
     {
@@ -141,7 +138,7 @@ export String ReadLine() {
         delete result;
 
         result = newResult;
-    };
+    }
     Print('\n');
     return result;
 }

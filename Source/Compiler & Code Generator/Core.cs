@@ -257,6 +257,7 @@ namespace LanguageCore.Compiler
         CompiledClass? @class;
         CompiledEnum? @enum;
         FunctionType? function;
+        CompiledType? pointerTo;
         CompiledType[] typeParameters;
 
         public Type BuiltinType => builtinType;
@@ -278,6 +279,7 @@ namespace LanguageCore.Compiler
         public CompiledClass Class => @class ?? throw new InternalException($"This isn't a class");
         public CompiledEnum Enum => @enum ?? throw new InternalException($"This isn't an enum");
         public FunctionType Function => function ?? throw new InternalException($"This isn't a function");
+        public CompiledType PointerTo => pointerTo ?? throw new InternalException($"This isn't a pointer");
         public CompiledType[] TypeParameters => typeParameters;
 
         string? genericName;
@@ -313,6 +315,7 @@ namespace LanguageCore.Compiler
                 if (@class is not null) return @class.Name.Content;
                 if (@enum is not null) return @enum.Identifier.Content;
                 if (function is not null) return function.ToString();
+                if (pointerTo is not null) return $"{pointerTo.Name}*";
 
                 throw new UnreachableException();
             }
@@ -333,6 +336,10 @@ namespace LanguageCore.Compiler
         [MemberNotNullWhen(true, nameof(function))]
         public bool IsFunction => function is not null;
 
+        /// <summary><c><see cref="PointerTo"/> != <see langword="null"/></c></summary>
+        [MemberNotNullWhen(true, nameof(pointerTo))]
+        public bool IsPointer => pointerTo is not null;
+
         public bool IsBuiltin => builtinType != Type.NotBuiltin;
 
         public bool CanBeBuiltin
@@ -341,6 +348,7 @@ namespace LanguageCore.Compiler
             {
                 if (builtinType != Type.NotBuiltin) return true;
                 if (IsEnum) return true;
+                if (IsPointer) return true;
 
                 return false;
             }
@@ -369,8 +377,6 @@ namespace LanguageCore.Compiler
 
                     return size;
                 }
-                if (IsEnum) return 1;
-                if (IsFunction) return 1;
                 if (IsStackArray) return (stackArraySize * new DataItem(stackArrayOf.SizeOnStack)).Integer ?? throw new InternalException(); ;
                 return 1;
             }
@@ -437,6 +443,7 @@ namespace LanguageCore.Compiler
             this.genericName = null;
             this.typeParameters = Array.Empty<CompiledType>();
             this.stackArrayOf = null;
+            this.pointerTo = null;
         }
 
         /// <exception cref="ArgumentNullException"/>
@@ -446,15 +453,9 @@ namespace LanguageCore.Compiler
 
             this.Set(other);
 
-            if (IsBuiltin)
-            {
-                return;
-            }
-
-            if (IsEnum)
-            {
-                return;
-            }
+            if (IsBuiltin) return;
+            if (IsEnum) return;
+            if (IsStruct) return;
 
             if (IsFunction)
             {
@@ -480,11 +481,6 @@ namespace LanguageCore.Compiler
                     }
                     typeParameters = typeArgumentValues;
                 }
-                return;
-            }
-
-            if (IsStruct)
-            {
                 return;
             }
 
@@ -557,6 +553,7 @@ namespace LanguageCore.Compiler
             };
         }
 
+        /// <exception cref="InternalException"/>
         public CompiledType(string type, Func<string, CompiledType>? typeFinder) : this()
         {
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type, out this.builtinType))
@@ -567,6 +564,8 @@ namespace LanguageCore.Compiler
             Set(typeFinder.Invoke(type));
         }
 
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="InternalException"/>
         public CompiledType(TypeInstance type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
             if (type is TypeInstanceSimple simpleType)
@@ -584,6 +583,12 @@ namespace LanguageCore.Compiler
             if (type is TypeInstanceStackArray stackArrayType)
             {
                 Set(new CompiledType(stackArrayType, typeFinder, constComputer));
+                return;
+            }
+
+            if (type is TypeInstancePointer pointerType)
+            {
+                Set(new CompiledType(pointerType, typeFinder, constComputer));
                 return;
             }
 
@@ -629,6 +634,8 @@ namespace LanguageCore.Compiler
             typeParameters = CompiledType.FromArray(type.GenericTypes, typeFinder);
         }
 
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="InternalException"/>
         public CompiledType(TypeInstanceFunction type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
             CompiledType returnType = new(type.FunctionReturnType, typeFinder, constComputer);
@@ -650,6 +657,13 @@ namespace LanguageCore.Compiler
             { throw new CompilerException($"Failed to compute value", type.StackArraySize, null); }
         }
 
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="InternalException"/>
+        public CompiledType(TypeInstancePointer type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        {
+            pointerTo = new CompiledType(type.To, typeFinder, constComputer);
+        }
+
         public CompiledType(CompiledType other)
         {
             this.builtinType = other.builtinType;
@@ -662,6 +676,7 @@ namespace LanguageCore.Compiler
             this.stackArrayOf = (other.stackArrayOf is null) ? null : new CompiledType(other.stackArrayOf);
             this.stackArraySize = other.stackArraySize;
             this.stackArraySizeStatement = other.stackArraySizeStatement;
+            this.pointerTo = other.pointerTo;
         }
 
         void Set(CompiledType other)
@@ -676,6 +691,7 @@ namespace LanguageCore.Compiler
             this.stackArrayOf = (other.stackArrayOf is null) ? null : new CompiledType(other.stackArrayOf);
             this.stackArraySize = other.stackArraySize;
             this.stackArraySizeStatement = other.stackArraySizeStatement;
+            this.pointerTo = other.pointerTo;
         }
 
         public override string ToString()
@@ -713,6 +729,9 @@ namespace LanguageCore.Compiler
                     _ => throw new UnreachableException(),
                 };
             }
+
+            if (IsPointer)
+            { return $"{pointerTo}*"; }
 
             StringBuilder result = new();
             result.Append(Name);
@@ -765,6 +784,7 @@ namespace LanguageCore.Compiler
             if (this.IsFunction != other.IsFunction) return false;
             if (this.IsStackArray != other.IsStackArray) return false;
             if (this.IsGeneric != other.IsGeneric) return false;
+            if (this.IsPointer != other.IsPointer) return false;
 
             if (!CompiledType.Equals(this.typeParameters, other.typeParameters)) return false;
 
@@ -774,6 +794,7 @@ namespace LanguageCore.Compiler
             if (this.IsFunction && other.IsFunction) return this.@function == other.@function;
             if (this.IsStackArray && other.IsStackArray) return this.stackArrayOf == other.stackArrayOf;
             if (this.IsGeneric && other.IsGeneric) return this.genericName == other.genericName;
+            if (this.IsPointer && other.IsPointer) return this.pointerTo.Equals(other.pointerTo);
 
             if (this.IsBuiltin && other.IsBuiltin) return this.builtinType == other.builtinType;
 
@@ -789,6 +810,13 @@ namespace LanguageCore.Compiler
                 if (other is not TypeInstanceFunction otherFunction) return false;
                 if (!Function.ReturnType.Equals(otherFunction.FunctionReturnType)) return false;
                 if (!CompiledType.Equals(Function.Parameters, otherFunction.FunctionParameterTypes)) return false;
+                return true;
+            }
+
+            if (IsPointer)
+            {
+                if (other is not TypeInstancePointer otherPointer) return false;
+                if (!pointerTo.Equals(otherPointer.To)) return false;
                 return true;
             }
 
@@ -947,6 +975,7 @@ namespace LanguageCore.Compiler
             if (IsStruct) return HashCode.Combine((byte)3, Struct);
             if (IsStackArray) return HashCode.Combine((byte)4, StackArrayOf, StackArraySize);
             if (IsFunction) return HashCode.Combine((byte)5, function);
+            if (IsPointer) return HashCode.Combine((byte)6, pointerTo);
             throw new NotImplementedException();
         }
 
@@ -1026,6 +1055,8 @@ namespace LanguageCore.Compiler
 
             if (IsEnum) return true;
 
+            if (IsPointer) return pointerTo.AllGenericsDefined();
+
             if (IsStackArray) return StackArrayOf.AllGenericsDefined();
 
             if (IsFunction)
@@ -1048,6 +1079,11 @@ namespace LanguageCore.Compiler
 
             throw new NotImplementedException();
         }
+
+        public static CompiledType Pointer(CompiledType to) => new()
+        {
+            pointerTo = to,
+        };
     }
 
     public interface IAmInContext<T>

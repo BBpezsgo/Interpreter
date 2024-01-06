@@ -1,6 +1,6 @@
-void GetHeader(int ptr, ref int size, ref int allocated)
+void GetHeader(int* ptr, ref int size, ref int allocated)
 {
-	int value = (*ptr) as int;
+	int value = *ptr;
 	if (value >= 127)
     {
 		value -= 127;
@@ -15,7 +15,7 @@ void GetHeader(int ptr, ref int size, ref int allocated)
 	}
 }
 
-void SetHeader(int ptr, int size, int allocated)
+void SetHeader(int* ptr, int size, int allocated)
 {
 	int value = size;
 	if (allocated)
@@ -30,7 +30,7 @@ void FixSize(ref int size)
 }
 
 [Builtin("alloc")]
-export int Alloc(int sizeNeed)
+export int* Alloc(int sizeNeed)
 {
     FixSize(ref sizeNeed);
     
@@ -39,13 +39,13 @@ export int Alloc(int sizeNeed)
     // Print(" ...");
     // PrintLine();
 
-    int headerPointer = 0;
+    int* headerPointer = 0;
     while (1)
     {
         int blockSize;
         int blockUsed;
         GetHeader(headerPointer, ref blockSize, ref blockUsed);
-        int dataPointer = headerPointer + 1;
+        int* dataPointer = headerPointer + 1;
         
         // Print("Block #");
         // Print(headerPointer);
@@ -77,7 +77,7 @@ export int Alloc(int sizeNeed)
                 // Update the current block's header
                 SetHeader(headerPointer, sizeNeed, 1);
                 
-                int nextHeaderPointer = dataPointer + sizeNeed;
+                int* nextHeaderPointer = dataPointer + sizeNeed;
 
                 // If the next block is exists
                 // if (1)
@@ -102,9 +102,9 @@ export int Alloc(int sizeNeed)
 }
 
 [Builtin("free")]
-export void Dealloc(int ptr)
+export void Dealloc(int* ptr)
 {
-	int position = ptr;
+	int* position = ptr;
 
     int size;
     int allocated;
@@ -116,7 +116,8 @@ export void Dealloc(int ptr)
 
 	// *(ptr - 1) = 0;
 
-	while (size) {
+	while (size)
+    {
 		*position = 0;
 		size--;
 		position++;

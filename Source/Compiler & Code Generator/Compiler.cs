@@ -129,8 +129,8 @@ namespace LanguageCore.Compiler
 
         readonly Dictionary<string, (CompiledType ReturnValue, CompiledType[] Parameters)> BuiltinFunctions = new()
         {
-            { "alloc", (new CompiledType(Type.Integer), [ new CompiledType(Type.Integer) ]) },
-            { "free", (new CompiledType(Type.Void), [ new CompiledType(Type.Integer) ]) },
+            { "alloc", (CompiledType.Pointer(new CompiledType(Type.Integer)), [ new CompiledType(Type.Integer) ]) },
+            { "free", (new CompiledType(Type.Void), [ CompiledType.Pointer(new CompiledType(Type.Integer)) ]) },
         };
 
         Compiler(ExternalFunctionCollection? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection)

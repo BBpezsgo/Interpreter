@@ -1984,6 +1984,7 @@ namespace LanguageCore.Parser
 
             if (possibleType.Equals("macro"))
             { return false; }
+
             if (possibleType.Equals("return"))
             { return false; }
 
@@ -1992,6 +1993,7 @@ namespace LanguageCore.Parser
             if (possibleType.Content.Equals("any"))
             {
                 possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
+
                 if ((flags & AllowedType.ExplicitAny) == 0)
                 {
                     Errors.Add(new Error($"Type \"{possibleType.Content}\" is not valid in the current context", possibleType));
@@ -2001,12 +2003,16 @@ namespace LanguageCore.Parser
                 if (ExpectOperator(TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType, out Token? illegalT))
                 { throw new SyntaxException($"This is not allowed", illegalT); }
 
+                if (ExpectOperator("*", out Token? pointerOperator))
+                { type = new TypeInstancePointer(type, pointerOperator); }
+
                 return true;
             }
 
             if (possibleType.Content.Equals("var"))
             {
                 possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
+
                 if ((flags & AllowedType.Implicit) == 0)
                 {
                     Errors.Add(new Error($"implicit type not allowed in the current context", possibleType));
@@ -2020,15 +2026,17 @@ namespace LanguageCore.Parser
             }
 
             if (LanguageConstants.BuiltinTypes.Contains(possibleType.Content))
-            {
-                possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
-            }
+            { possibleType.AnalyzedType = TokenAnalyzedType.Keyword; }
 
             int afterIdentifier = CurrentTokenIndex;
 
             while (true)
             {
-                if (ExpectOperator("<"))
+                if (ExpectOperator("*", out Token? pointerOperator))
+                {
+                    type = new TypeInstancePointer(type, pointerOperator);
+                }
+                else if (ExpectOperator("<"))
                 {
                     if (type is not TypeInstanceSimple)
                     { throw new NotImplementedException(); }

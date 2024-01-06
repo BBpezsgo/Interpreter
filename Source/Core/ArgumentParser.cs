@@ -71,11 +71,11 @@ namespace TheProgram
             void FinishArgument()
             {
                 state = NormalizerState.None;
-                currentArg.Clear();
 
                 if (currentArg.Length == 0) return;
 
                 result.Add(currentArg.ToString());
+                currentArg.Clear();
             }
 
             for (int i = 0; i < args.Length; i++)

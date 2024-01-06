@@ -2014,14 +2014,22 @@ namespace LanguageCore.BBCode.Generator
             if (valueType.IsEnum)
             { if (CodeGenerator.SameType(valueType.Enum, destination)) return; }
 
-            if (destination.IsBuiltin && destination.BuiltinType == Type.Byte &&
+            if (destination.IsPointer &&
+                valueType.IsBuiltin &&
+                valueType.BuiltinType == Type.Integer)
+            { return; }
+
+            if (destination.IsBuiltin &&
+                destination.BuiltinType == Type.Byte &&
                 TryCompute(value, null, out DataItem yeah) &&
                 yeah.Type == RuntimeType.SInt32)
             { return; }
 
-            if (value is LiteralStatement literal && literal.Type == LiteralType.String)
+            if (value is LiteralStatement literal &&
+                literal.Type == LiteralType.String)
             {
-                if (destination.IsStackArray && destination.StackArrayOf == Type.Char)
+                if (destination.IsStackArray &&
+                    destination.StackArrayOf == Type.Char)
                 {
                     string literalValue = literal.Value;
                     if (literalValue.Length != destination.StackArraySize)

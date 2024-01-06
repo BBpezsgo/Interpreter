@@ -18,7 +18,7 @@ class String
 
     export constructor(int length)
     {
-        int pointer = Alloc(sizeof(String) + length);
+        int* pointer = Alloc(sizeof(String) + length);
         
         *pointer = length;
 
@@ -27,7 +27,7 @@ class String
 
     export constructor(int length, char character)
     {
-        int pointer = Alloc(sizeof(String) + length);
+        int* pointer = Alloc(sizeof(String) + length);
 
         *pointer = length;
 

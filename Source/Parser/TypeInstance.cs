@@ -304,4 +304,37 @@ namespace LanguageCore.Parser
             return result.ToString();
         }
     }
+
+    public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?>
+    {
+        public readonly TypeInstance To;
+        public readonly Token Operator;
+
+        public TypeInstancePointer(TypeInstance to, Token @operator) : base()
+        {
+            this.To = to;
+            this.Operator = @operator;
+        }
+
+        public override bool Equals(object? obj) => obj is TypeInstancePointer other && Equals(other);
+        public override bool Equals(TypeInstance? other) => other is TypeInstancePointer other_ && Equals(other_);
+        public bool Equals(TypeInstancePointer? other)
+        {
+            if (other is null) return false;
+            return this.To.Equals(other.To);
+        }
+
+        public override int GetHashCode() => HashCode.Combine((byte)4, To);
+
+        public override Position Position => new(To, Operator);
+
+        public override void SetAnalyzedType(CompiledType type)
+        {
+            if (!type.IsPointer) return;
+            To.SetAnalyzedType(type.PointerTo);
+        }
+
+        public override string ToString() => $"{To}{Operator}";
+        public override string ToString(TypeArguments typeArguments) => $"{To.ToString(typeArguments)}{Operator}";
+    }
 }

@@ -1769,14 +1769,13 @@ namespace LanguageCore.Compiler
             }
 
             if (type.IsFunction)
-            {
-                return new DataItem(int.MaxValue);
-            }
+            { return new DataItem(int.MaxValue); }
 
             if (type.IsBuiltin)
-            {
-                return GetInitialValue(type.BuiltinType);
-            }
+            { return GetInitialValue(type.BuiltinType); }
+
+            if (type.IsPointer)
+            { return new DataItem(0); }
 
             throw new NotImplementedException();
         }
@@ -1897,7 +1896,15 @@ namespace LanguageCore.Compiler
 
             CompiledType result = new(predictedValue.Type);
 
-            if (expectedType is not null && CanConvertImplicitly(result, expectedType)) return expectedType;
+            if (expectedType is not null)
+            {
+                if (CanConvertImplicitly(result, expectedType))
+                { return expectedType; }
+
+                if (result == Type.Integer &&
+                    expectedType.IsPointer)
+                { return expectedType; }
+            }
 
             return result;
         }
@@ -1950,8 +1957,18 @@ namespace LanguageCore.Compiler
 
             throw new CompilerException($"Symbol \"{identifier.Content}\" not found", identifier, CurrentFile);
         }
-        protected static CompiledType FindStatementType(AddressGetter _) => new(Type.Integer);
-        protected static CompiledType FindStatementType(Pointer _) => new(Type.Unknown);
+        protected CompiledType FindStatementType(AddressGetter addressGetter)
+        {
+            CompiledType to = FindStatementType(addressGetter.PrevStatement);
+            return CompiledType.Pointer(to);
+        }
+        protected CompiledType FindStatementType(Pointer pointer)
+        {
+            CompiledType to = FindStatementType(pointer.PrevStatement);
+            if (!to.IsPointer)
+            { return new CompiledType(Type.Unknown); }
+            return to.PointerTo;
+        }
         protected CompiledType FindStatementType(NewInstance newInstance) => new(newInstance.TypeName, FindType);
         protected CompiledType FindStatementType(ConstructorCall constructorCall) => new(constructorCall.TypeName, FindType);
         protected CompiledType FindStatementType(Field field)

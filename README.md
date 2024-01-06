@@ -1,6 +1,6 @@
-# Interpreter
+# My programming language
 
-[![.Net 7.0](https://img.shields.io/badge/.NET-7.0-5C2D91)](#)
+[![.Net 8.0](https://img.shields.io/badge/.NET-8.0-5C2D91)](#)
 [![C# preview](https://img.shields.io/badge/C%23-preview-239120.svg)](#)
 
 ## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)

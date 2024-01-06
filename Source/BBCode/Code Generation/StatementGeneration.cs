@@ -2003,44 +2003,6 @@ namespace LanguageCore.BBCode.Generator
             { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, destination + size - offset); }
         }
 
-        void AssignTypeCheck(CompiledType destination, CompiledType valueType, StatementWithValue value)
-        {
-            if (destination == valueType)
-            { return; }
-
-            if (destination.IsEnum)
-            { if (CodeGenerator.SameType(destination.Enum, valueType)) return; }
-
-            if (valueType.IsEnum)
-            { if (CodeGenerator.SameType(valueType.Enum, destination)) return; }
-
-            if (destination.IsPointer &&
-                valueType.IsBuiltin &&
-                valueType.BuiltinType == Type.Integer)
-            { return; }
-
-            if (destination.IsBuiltin &&
-                destination.BuiltinType == Type.Byte &&
-                TryCompute(value, null, out DataItem yeah) &&
-                yeah.Type == RuntimeType.SInt32)
-            { return; }
-
-            if (value is LiteralStatement literal &&
-                literal.Type == LiteralType.String)
-            {
-                if (destination.IsStackArray &&
-                    destination.StackArrayOf == Type.Char)
-                {
-                    string literalValue = literal.Value;
-                    if (literalValue.Length != destination.StackArraySize)
-                    { throw new CompilerException($"Can not set \"{literalValue}\" (length of {literalValue.Length}) value to stack array {destination} (length of {destination.StackArraySize}) variable.", value, CurrentFile); }
-                    return;
-                }
-            }
-
-            throw new CompilerException($"Can not set a {valueType} type value to the {destination} type variable.", value, CurrentFile);
-        }
-
         void GenerateDeallocator(CompiledType deallocateableType)
         {
             AddComment($"Deallocate \"{deallocateableType}\" {{");

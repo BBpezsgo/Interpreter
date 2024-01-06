@@ -103,7 +103,7 @@ namespace LanguageCore.Brainfuck.Generator
                 }
                 else
                 {
-                    if (!initialValueType.Equals(type))
+                    if (initialValueType.SizeOnStack != type.SizeOnStack)
                     { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
 
                     int address = Stack.PushVirtual(type.SizeOnStack);
@@ -257,8 +257,7 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 if (TryCompute(value, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out DataItem constantValue))
                 {
-                    if (variable.Type != constantValue.Type)
-                    { throw new CompilerException($"Cannot set {constantValue.Type} to variable of type {variable.Type}", value, CurrentFile); }
+                    AssignTypeCheck(variable.Type, constantValue, value);
 
                     Code.SetValue(variable.Address, constantValue);
 
@@ -2776,8 +2775,8 @@ namespace LanguageCore.Brainfuck.Generator
                 StatementWithValue passed = parameters[i];
                 ParameterDefinition defined = function.Parameters[i];
 
-                CompiledType passedType = FindStatementType(passed);
                 CompiledType definedType = function.ParameterTypes[i];
+                CompiledType passedType = FindStatementType(passed, definedType);
 
                 if (passedType != definedType)
                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }

@@ -1482,6 +1482,71 @@ namespace LanguageCore.Compiler
             return false;
         }
 
+        protected void AssignTypeCheck(CompiledType destination, CompiledType valueType, StatementWithValue value)
+        {
+            if (destination == valueType)
+            { return; }
+
+            if (destination.SizeOnStack != valueType.SizeOnStack)
+            { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.SizeOnStack}) value to {destination} (size of {destination.SizeOnStack})", value, CurrentFile); }
+
+            if (destination.IsEnum)
+            { if (CodeGenerator.SameType(destination.Enum, valueType)) return; }
+
+            if (valueType.IsEnum)
+            { if (CodeGenerator.SameType(valueType.Enum, destination)) return; }
+
+            if (destination.IsPointer &&
+                valueType.IsBuiltin &&
+                valueType.BuiltinType == Type.Integer)
+            { return; }
+
+            if (destination.IsBuiltin &&
+                destination.BuiltinType == Type.Byte &&
+                TryCompute(value, null, out DataItem yeah) &&
+                yeah.Type == RuntimeType.SInt32)
+            { return; }
+
+            if (value is LiteralStatement literal &&
+                literal.Type == LiteralType.String)
+            {
+                if (destination.IsStackArray &&
+                    destination.StackArrayOf == Type.Char)
+                {
+                    string literalValue = literal.Value;
+                    if (literalValue.Length != destination.StackArraySize)
+                    { throw new CompilerException($"Can not set \"{literalValue}\" (length of {literalValue.Length}) value to stack array {destination} (length of {destination.StackArraySize})", value, CurrentFile); }
+                    return;
+                }
+            }
+
+            throw new CompilerException($"Can not set a {valueType} type value to the {destination} type", value, CurrentFile);
+        }
+
+        protected void AssignTypeCheck(CompiledType destination, DataItem value, IPositioned valuePosition)
+        {
+            CompiledType valueType = new(value.Type);
+
+            if (destination == valueType)
+            { return; }
+
+            if (destination.SizeOnStack != valueType.SizeOnStack)
+            { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.SizeOnStack}) value to {destination} (size of {destination.SizeOnStack})", valuePosition, CurrentFile); }
+
+            if (destination.IsEnum)
+            { if (CodeGenerator.SameType(destination.Enum, valueType)) return; }
+
+            if (destination.IsPointer)
+            { return; }
+
+            if (destination.IsBuiltin &&
+                destination.BuiltinType == Type.Byte &&
+                value.Type == RuntimeType.SInt32)
+            { return; }
+
+            throw new CompilerException($"Can not set a {valueType} type value to the {destination} type", valuePosition, CurrentFile);
+        }
+
         #region Addressing Helpers
 
         protected ValueAddress GetDataAddress(StatementWithValue value)
@@ -1658,7 +1723,7 @@ namespace LanguageCore.Compiler
         protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset)
         {
             if (LanguageConstants.Keywords.Contains(newVariable.VariableName.Content))
-            { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
+            { throw new CompilerException($"Illegal variable name \"{newVariable.VariableName.Content}\"", newVariable.VariableName, CurrentFile); }
 
             CompiledType type;
             if (newVariable.Type == "var")

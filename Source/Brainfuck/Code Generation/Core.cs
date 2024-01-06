@@ -433,7 +433,9 @@ namespace LanguageCore.Brainfuck.Generator
                                     Tokenizing.Token.CreateAnonymous(variable.Name, Tokenizing.TokenType.Identifier)
                                     ),
                                 Tokenizing.Token.CreateAnonymous("as"),
-                                TypeInstanceSimple.CreateAnonymous("int", TypeDefinitionReplacer)
+                                new TypeInstancePointer(
+                                    TypeInstanceSimple.CreateAnonymous("int", TypeDefinitionReplacer),
+                                    Tokenizing.Token.CreateAnonymous("*", Tokenizing.TokenType.Operator))
                                 )
                             );
                     }

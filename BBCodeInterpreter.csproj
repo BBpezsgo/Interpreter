@@ -31,6 +31,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\Wiki\**\*.md">
+      <Link>Wiki\%(RecursiveDir)%(FileName)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="ConsoleGUI.cs" />
     <Compile Remove="Core.cs" />
     <Compile Remove="SomeTests.cs" />

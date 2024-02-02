@@ -54,15 +54,9 @@ namespace ConsoleGUI
         public void FeedEvent(Element sender, MouseEvent e)
         {
             LanguageCore.Range<int> range = GetRange.Invoke(sender);
-            if ((e.ButtonState & (uint)MouseButton.ScrollDown & (~0b_0000_0000_1000_1000_0000_0000_0000_0000)) != 0)
+            if (e.EventFlags.HasFlag(MouseEventFlags.MouseWheeled))
             {
-                offset = Math.Clamp(offset + 1, range.Start, range.End);
-                return;
-            }
-
-            if ((e.ButtonState & (uint)MouseButton.ScrollUp & (~0b_0000_0000_1000_1000_0000_0000_0000_0000)) != 0)
-            {
-                offset = Math.Clamp(offset - 1, range.Start, range.End);
+                offset = Math.Clamp(offset + Math.Sign(e.Scroll), range.Start, range.End);
                 return;
             }
 

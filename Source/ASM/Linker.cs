@@ -16,7 +16,11 @@ namespace LanguageCore.ASM
             if (File.Exists(outputFile))
             { File.Delete(outputFile); }
 
-            string ld = @"C:\MinGW\bin\ld.exe"; // @$"C:\users\{Environment.UserName}\MinGW\bin\ld.exe";
+            if (!Utils.GetFullPath("ld.exe", out string? ld))
+            { throw new FileNotFoundException($"Linker not found", "ld.exe"); }
+
+            // // https://deac-riga.dl.sourceforge.net/project/gnuwin32/sed/4.2.1/sed-4.2.1-setup.exe
+            // string ld = @"C:\MinGW\bin\ld.exe"; // @$"C:\users\{Environment.UserName}\MinGW\bin\ld.exe";
             using Process? process = Process.Start(new ProcessStartInfo(ld, $"{inputFile} -o {outputFile} -L \"C:\\Windows\\System32\" -l \"kernel32\"")
             {
                 RedirectStandardOutput = true,

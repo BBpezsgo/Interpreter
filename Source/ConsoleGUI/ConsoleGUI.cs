@@ -339,7 +339,7 @@ namespace ConsoleGUI
             }
 
             if (Kernel32.WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
-                new Coord((short)Console.WindowWidth, (short)Console.WindowHeight),
+                new Win32.Common.SmallSize((short)Console.WindowWidth, (short)Console.WindowHeight),
                 new Coord(0, 0),
                 ref rect) == 0)
             { throw Win32.Common.WindowsException.Get(); }

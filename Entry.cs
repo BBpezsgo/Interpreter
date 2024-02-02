@@ -169,9 +169,7 @@ namespace TheProgram
                     if (arguments.ThrowErrors)
                     {
                         tokens = StreamTokenizer.Tokenize(arguments.File!.FullName);
-                        ParserResult ast = Parser.Parse(tokens);
-                        ast.SetFile(arguments.File!.FullName);
-                        CompilerResult compiled = Compiler.Compile(ast, null, arguments.File!, CompilerSettings.Default, Output.Log, analysisCollection);
+                        CompilerResult compiled = Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings.Default, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
@@ -182,9 +180,7 @@ namespace TheProgram
                         try
                         {
                             tokens = StreamTokenizer.Tokenize(arguments.File!.FullName);
-                            ParserResult ast = Parser.Parse(tokens);
-                            ast.SetFile(arguments.File!.FullName);
-                            CompilerResult compiled = Compiler.Compile(ast, null, arguments.File!, CompilerSettings.Default, Output.Log, analysisCollection);
+                            CompilerResult compiled = Compiler.CompileFile(arguments.File!, null, arguments.CompilerSettings, Output.Log, analysisCollection);
                             generated = CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings.Default, Output.Log, analysisCollection);
                             analysisCollection.Throw();
                             analysisCollection.Print();
@@ -253,7 +249,7 @@ namespace TheProgram
                         Output.Write("Press any key to start the interpreter");
                         Console.ReadKey();
 
-                        interpreter.RunWithUI();
+                        interpreter.RunWithUI(true, 10);
                     }
                     else
                     {
@@ -356,7 +352,7 @@ namespace TheProgram
 #else
                     AnalysisCollection analysisCollection = new();
 
-                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, CompilerSettings.Default, Output.Log, analysisCollection);
+                    CompilerResult compiled = Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
 
                     ILGeneratorResult generated = CodeGeneratorForIL.Generate(compiled, arguments.CompilerSettings, default, Output.Log, analysisCollection);
 
@@ -371,7 +367,7 @@ namespace TheProgram
                 {
                     AnalysisCollection analysisCollection = new();
 
-                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, CompilerSettings.Default, Output.Log, analysisCollection);
+                    CompilerResult compiled = Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
 
                     AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, default, Output.Log, analysisCollection);
 

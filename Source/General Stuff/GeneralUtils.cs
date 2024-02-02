@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.IO;
 using System.Text;
 
 namespace LanguageCore
@@ -15,6 +17,31 @@ namespace LanguageCore
 
     public static partial class Utils
     {
+        /// <summary>
+        /// Source: <see href="https://stackoverflow.com/questions/3855956/check-if-an-executable-exists-in-the-windows-path"/>
+        /// </summary>
+        public static bool GetFullPath(string fileName, [NotNullWhen(true)] out string? fullPath) => (fullPath = GetFullPath(fileName)) is not null;
+        /// <summary>
+        /// Source: <see href="https://stackoverflow.com/questions/3855956/check-if-an-executable-exists-in-the-windows-path"/>
+        /// </summary>
+        public static string? GetFullPath(string fileName)
+        {
+            if (File.Exists(fileName))
+            { return Path.GetFullPath(fileName); }
+
+            string? values = Environment.GetEnvironmentVariable("PATH");
+            if (values is null) return null;
+
+            foreach (string path in values.Split(Path.PathSeparator))
+            {
+                string fullPath = Path.Combine(path, fileName);
+                if (File.Exists(fullPath))
+                { return fullPath; }
+            }
+
+            return null;
+        }
+
         public static bool PowerOf2(int n) => n != 0 && (n & (n - 1)) == 0;
 
         readonly struct EscapedCharacters

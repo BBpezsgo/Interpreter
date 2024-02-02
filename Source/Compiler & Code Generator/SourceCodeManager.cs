@@ -126,14 +126,16 @@ namespace LanguageCore.Compiler
 
                 for (int i = 0; i < searchForThese.Count; i++)
                 {
-                    path = searchForThese[i];
-                    if (File.Exists(path))
-                    { break; }
+                    if (File.Exists(searchForThese[i]))
+                    {
+                        path = searchForThese[i];
+                        break;
+                    }
                 }
 
                 if (path == null)
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path), file?.FullName));
+                    AnalysisCollection?.Errors.Add(new Error($"File \"{@using.PathString}\" not found", new Position(@using.Path), file?.FullName));
                     return (null, path);
                 }
 

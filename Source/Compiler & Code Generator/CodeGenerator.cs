@@ -292,6 +292,7 @@ namespace LanguageCore.Compiler
                 if (variableDeclaration.Type != "var")
                 {
                     CompiledType constantType = new(variableDeclaration.Type, FindType, TryCompute);
+                    variableDeclaration.Type.SetAnalyzedType(constantType);
 
                     if (!constantType.IsBuiltin)
                     { throw new NotSupportedException($"Only builtin types supported as a constant value"); }
@@ -1736,6 +1737,7 @@ namespace LanguageCore.Compiler
             else
             {
                 type = new CompiledType(newVariable.Type, FindType, TryCompute);
+                newVariable.Type.SetAnalyzedType(type);
             }
 
             if (!type.AllGenericsDefined())
@@ -1907,7 +1909,10 @@ namespace LanguageCore.Compiler
             if (functionCall.FunctionName == "sizeof") return new CompiledType(Type.Integer);
 
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
-            { return FindMacroType(macro, functionCall.Parameters); }
+            {
+                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
+                return FindMacroType(macro, functionCall.Parameters);
+            }
 
             if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
@@ -1917,6 +1922,7 @@ namespace LanguageCore.Compiler
                 compiledFunction = compiledFunctionTemplate.Function;
             }
 
+            functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
             return compiledFunction.Type;
         }
 
@@ -1934,7 +1940,10 @@ namespace LanguageCore.Compiler
             { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
 
             if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
-            { return operatorDefinition.Type; }
+            {
+                @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
+                return operatorDefinition.Type;
+            }
 
             CompiledType leftType = FindStatementType(@operator.Left);
             if (@operator.Right == null)
@@ -2004,16 +2013,34 @@ namespace LanguageCore.Compiler
             { return new CompiledType(Type.Integer); }
 
             if (GetConstant(identifier.Content, out DataItem constant))
-            { return new CompiledType(constant.Type); }
+            {
+                identifier.Token.AnalyzedType = TokenAnalyzedType.ConstantName;
+                return new CompiledType(constant.Type);
+            }
 
             if (GetLocalSymbolType(identifier.Content, out CompiledType? type))
-            { return type; }
+            {
+                if (GetParameter(identifier.Content, out _))
+                { identifier.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
+                else if (GetVariable(identifier.Content, out _))
+                { identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName; }
+                else if (GetGlobalVariable(identifier.Content, out _))
+                { identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName; }
+
+                return type;
+            }
 
             if (GetEnum(identifier.Content, out CompiledEnum? @enum))
-            { return new CompiledType(@enum); }
+            {
+                identifier.Token.AnalyzedType = TokenAnalyzedType.Enum;
+                return new CompiledType(@enum);
+            }
 
             if (GetFunction(identifier.Token, expectedType, out CompiledFunction? function))
-            { return new CompiledType(function); }
+            {
+                identifier.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
+                return new CompiledType(function);
+            }
 
             try
             { return FindType(identifier.Token); }
@@ -2034,14 +2061,25 @@ namespace LanguageCore.Compiler
             { return new CompiledType(Type.Unknown); }
             return to.PointerTo;
         }
-        protected CompiledType FindStatementType(NewInstance newInstance) => new(newInstance.TypeName, FindType);
-        protected CompiledType FindStatementType(ConstructorCall constructorCall) => new(constructorCall.TypeName, FindType);
+        protected CompiledType FindStatementType(NewInstance newInstance)
+        {
+            CompiledType type = new(newInstance.TypeName, FindType);
+            newInstance.TypeName.SetAnalyzedType(type);
+            return type;
+        }
+        protected CompiledType FindStatementType(ConstructorCall constructorCall)
+        {
+            CompiledType type = new(constructorCall.TypeName, FindType);
+            constructorCall.TypeName.SetAnalyzedType(type);
+            return type;
+        }
         protected CompiledType FindStatementType(Field field)
         {
             CompiledType prevStatementType = FindStatementType(field.PrevStatement);
 
             if (prevStatementType.IsStackArray && field.FieldName.Equals("Length"))
             {
+                field.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
                 return new CompiledType(Type.Integer);
             }
 
@@ -2052,6 +2090,7 @@ namespace LanguageCore.Compiler
                     CompiledField definedField = prevStatementType.Struct.Fields[i];
 
                     if (definedField.Identifier.Content != field.FieldName.Content) continue;
+                    field.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
 
                     if (definedField.Type.IsGeneric)
                     { throw new NotSupportedException($"Struct templates not supported :(", definedField, prevStatementType.Struct.FilePath); }
@@ -2069,6 +2108,7 @@ namespace LanguageCore.Compiler
                     CompiledField definedField = prevStatementType.Class.Fields[i];
 
                     if (definedField.Identifier.Content != field.FieldName.Content) continue;
+                    field.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
 
                     if (definedField.Type.IsGeneric)
                     {
@@ -2116,8 +2156,9 @@ namespace LanguageCore.Compiler
             {
                 foreach (CompiledEnumMember enumMember in prevStatementType.Enum.Members)
                 {
-                    if (enumMember.Identifier.Content == field.FieldName.Content)
-                    { return new CompiledType(enumMember.ComputedValue.Type); }
+                    if (enumMember.Identifier.Content != field.FieldName.Content) continue;
+                    field.FieldName.AnalyzedType = TokenAnalyzedType.EnumMember;
+                    return new CompiledType(enumMember.ComputedValue.Type);
                 }
 
                 throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{prevStatementType.Enum.Identifier.Content}\"", field.FieldName, CurrentFile);
@@ -2125,7 +2166,12 @@ namespace LanguageCore.Compiler
 
             throw new CompilerException($"Type \"{prevStatementType}\" does not have a field \"{field.FieldName}\"", field, CurrentFile);
         }
-        protected CompiledType FindStatementType(TypeCast @as) => new(@as.Type, FindType);
+        protected CompiledType FindStatementType(TypeCast @as)
+        {
+            CompiledType type = new(@as.Type, FindType);
+            @as.Type.SetAnalyzedType(type);
+            return type;
+        }
         protected CompiledType FindStatementType(ModifiedStatement modifiedStatement, CompiledType? expectedType)
         {
             if (modifiedStatement.Modifier.Equals("ref"))

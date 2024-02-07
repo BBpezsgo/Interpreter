@@ -244,7 +244,10 @@ namespace LanguageCore.Compiler
         {
             CompiledType[] result = new CompiledType[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
-            { result[i] = new CompiledType(parameters[i].Type, unknownTypeCallback); }
+            {
+                result[i] = new CompiledType(parameters[i].Type, unknownTypeCallback);
+                parameters[i].Type.SetAnalyzedType(result[i]);
+            }
             return result;
         }
 
@@ -307,6 +310,7 @@ namespace LanguageCore.Compiler
                     {
                         Type definedParameterType = externalFunction.ParameterTypes[i];
                         CompiledType passedParameterType = new(function.Parameters[i].Type, GetCustomType);
+                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                         if (passedParameterType == definedParameterType)
                         { continue; }
@@ -343,6 +347,7 @@ namespace LanguageCore.Compiler
                     {
                         CompiledType definedParameterType = builtinFunction.Parameters[i];
                         CompiledType passedParameterType = new(function.Parameters[i].Type, GetCustomType);
+                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                         if (passedParameterType == definedParameterType)
                         { continue; }

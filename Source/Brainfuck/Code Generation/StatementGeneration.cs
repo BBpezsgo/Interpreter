@@ -56,6 +56,7 @@ namespace LanguageCore.Brainfuck.Generator
             else
             {
                 type = new CompiledType(variableDeclaration.Type, FindType, TryCompute);
+                variableDeclaration.Type.SetAnalyzedType(type);
             }
 
             return PrecompileVariable(Variables, variableDeclaration.VariableName.Content, type, initialValue, variableDeclaration.Modifiers.Contains("temp"));

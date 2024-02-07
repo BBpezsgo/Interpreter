@@ -13,12 +13,9 @@ namespace LanguageCore.Tokenizing
             char prevChar = PreviousChar;
             PreviousChar = currChar;
 
-            if ((currChar == '\r' && prevChar != '\n') ||
-                currChar == '\n' && prevChar != '\r')
-            {
-                breakLine = true;
-                returnLine = true;
-            }
+            if (currChar == '\r' ||
+                (currChar == '\n' && prevChar != '\r'))
+            { breakLine = true; }
 
             if (currChar is '\r' or '\n')
             { returnLine = true; }

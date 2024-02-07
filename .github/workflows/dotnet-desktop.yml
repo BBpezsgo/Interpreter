@@ -35,25 +35,25 @@ jobs:
       shell: powershell
       working-directory: ./BuildJob
       run: |
-        ..\clone-repos.ps1
+        ..\Scripts\clone-repos.ps1
 
     - name: Building
       shell: powershell
       working-directory: ./BuildJob
       run: |
-        ..\build.ps1
+        ..\Scripts\build.ps1
 
     - name: Cleaning up the projects
       shell: powershell
       working-directory: ./BuildJob
       run: |
-        ..\cleanup-projects.ps1
+        ..\Scripts\cleanup-projects.ps1
 
     - name: Compressing
       shell: powershell
       working-directory: ./BuildJob
       run: |
-        ..\compress.ps1
+        ..\Scripts\compress.ps1
 
     - name: Cleaning up
       shell: powershell

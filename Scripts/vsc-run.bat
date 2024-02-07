@@ -2,4 +2,4 @@
 set DOTNET_ROOT=%USERPROFILE%\dotnet
 set PATH=%USERPROFILE%\dotnet;%PATH%
 set DOTNET_MULTILEVEL_LOOKUP=0
-dotnet build BBCodeInterpreter.csproj --configuration Debug
+dotnet run ../BBCodeInterpreter.csproj /unsafe

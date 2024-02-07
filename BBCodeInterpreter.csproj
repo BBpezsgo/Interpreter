@@ -61,7 +61,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="call post-build.bat" />
+    <Exec Command="call .\Scripts\post-build.bat" />
   </Target>
 
 </Project>

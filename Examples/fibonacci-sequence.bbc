@@ -1,13 +1,16 @@
-using System;
+using System.Console;
 
 int a = 0;
 int b = 1;
+int last = 0;
 
 while (true)
 {
 	int sum = a + b;
 	a = b;
 	b = sum;
-
+	
+	if (sum < last) break;
+	last = sum;
 	PrintLine(sum);
-};
+}

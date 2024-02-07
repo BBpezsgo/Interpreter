@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Linq;
 
-// TODO: new lines aren't working
-
 namespace LanguageCore.Tokenizing
 {
     public abstract partial class Tokenizer
@@ -25,12 +23,12 @@ namespace LanguageCore.Tokenizing
             if (currChar is '\r' or '\n')
             { returnLine = true; }
 
-            if (breakLine && CurrentToken.TokenType == PreparationTokenType.CommentMultiline)
-            {
-                EndToken(offsetTotal);
-                CurrentToken.Content.Clear();
-                CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
-            }
+            // if (breakLine && CurrentToken.TokenType == PreparationTokenType.CommentMultiline)
+            // {
+            //     EndToken(offsetTotal);
+            //     CurrentToken.Content.Clear();
+            //     CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
+            // }
 
             if (CurrentToken.TokenType == PreparationTokenType.STRING_UnicodeCharacter)
             {
@@ -163,16 +161,25 @@ namespace LanguageCore.Tokenizing
                 return;
             }
 
-            if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_END_MULTILINE_COMMENT && currChar == '/')
+            if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_END_MULTILINE_COMMENT)
             {
-                // CurrentToken.Content.Append(currChar);
-                // Remove last character ('*')
-                CurrentToken.Content.Remove(CurrentToken.Content.Length - 1, 1);
-                // Remove first two characters ('/' and '*')
-                CurrentToken.Content.Remove(0, 2);
-                CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
-                EndToken(offsetTotal, true);
-                return;
+                if (currChar == '/')
+                {
+                    // CurrentToken.Content.Append(currChar);
+                    // Remove last character ('*')
+                    CurrentToken.Content.Remove(CurrentToken.Content.Length - 1, 1);
+                    // Remove first two characters ('/' and '*')
+                    CurrentToken.Content.Remove(0, 2);
+                    CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
+                    EndToken(offsetTotal, true);
+                    return;
+                }
+                else
+                {
+                    CurrentToken.Content.Append(currChar);
+                    CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
+                    return;
+                }
             }
 
             if (CurrentToken.TokenType is PreparationTokenType.CommentMultiline or PreparationTokenType.POTENTIAL_END_MULTILINE_COMMENT)

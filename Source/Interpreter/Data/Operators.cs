@@ -14,7 +14,8 @@ namespace LanguageCore.Runtime
         IUnaryPlusOperators<DataItem, DataItem>,
         IUnaryNegationOperators<DataItem, DataItem>,
         IBitwiseOperators<DataItem, DataItem, DataItem>,
-        IShiftOperators<DataItem, DataItem, DataItem>
+        IShiftOperators<DataItem, DataItem, DataItem>,
+        IShiftOperators<DataItem, int, DataItem>
     {
         /// <inheritdoc/>
         /// <exception cref="InternalException"/>
@@ -52,54 +53,43 @@ namespace LanguageCore.Runtime
         /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator <<(DataItem leftSide, DataItem rightSide)
-        {
-            int? _offset = rightSide.Integer;
-            if (!_offset.HasValue)
-            { throw new RuntimeException($"Can't do << operation with type {leftSide.Type} and {rightSide.Type}"); }
-            int offset = _offset.Value;
-
-            return leftSide.type switch
-            {
-                RuntimeType.UInt8 => new DataItem(unchecked((byte)(leftSide.valueUInt8 << offset))),
-                RuntimeType.SInt32 => new DataItem(unchecked((int)(leftSide.valueSInt32 << offset))),
-                RuntimeType.UInt16 => new DataItem(unchecked((char)(leftSide.valueUInt16 << offset))),
-                _ => throw new RuntimeException($"Can't do << operation with type {leftSide.Type} and {rightSide.Type}"),
-            };
-        }
+            => leftSide << (rightSide.Integer ?? throw new RuntimeException($"Can't do << operation with type {leftSide.Type} and {rightSide.Type}"));
         /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator >>(DataItem leftSide, DataItem rightSide)
-        {
-            int? _offset = rightSide.Integer;
-            if (!_offset.HasValue)
-            { throw new RuntimeException($"Can't do >> operation with type {leftSide.Type} and {rightSide.Type}"); }
-            int offset = _offset.Value;
-
-            return leftSide.type switch
-            {
-                RuntimeType.UInt8 => new DataItem(unchecked((byte)(leftSide.valueUInt8 >> offset))),
-                RuntimeType.SInt32 => new DataItem(unchecked((int)(leftSide.valueSInt32 >> offset))),
-                RuntimeType.UInt16 => new DataItem(unchecked((char)(leftSide.valueUInt16 >> offset))),
-                _ => throw new RuntimeException($"Can't do >> operation with type {leftSide.Type} and {rightSide.Type}"),
-            };
-        }
+            => leftSide >> (rightSide.Integer ?? throw new RuntimeException($"Can't do >> operation with type {leftSide.Type} and {rightSide.Type}"));
         /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator >>>(DataItem leftSide, DataItem rightSide)
-        {
-            int? _offset = rightSide.Integer;
-            if (!_offset.HasValue)
-            { throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type} and {rightSide.Type}"); }
-            int offset = _offset.Value;
+            => leftSide >>> (rightSide.Integer ?? throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type} and {rightSide.Type}"));
 
-            return leftSide.type switch
-            {
-                RuntimeType.UInt8 => new DataItem(unchecked((byte)(leftSide.valueUInt8 >>> offset))),
-                RuntimeType.SInt32 => new DataItem(unchecked((int)(leftSide.valueSInt32 >>> offset))),
-                RuntimeType.UInt16 => new DataItem(unchecked((char)(leftSide.valueUInt16 >>> offset))),
-                _ => throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type} and {rightSide.Type}"),
-            };
-        }
+        /// <inheritdoc/>
+        /// <exception cref="RuntimeException"/>
+        public static DataItem operator <<(DataItem leftSide, int rightSide) => leftSide.type switch
+        {
+            RuntimeType.UInt8 => new DataItem(unchecked((byte)(leftSide.valueUInt8 << rightSide))),
+            RuntimeType.SInt32 => new DataItem(unchecked((int)(leftSide.valueSInt32 << rightSide))),
+            RuntimeType.UInt16 => new DataItem(unchecked((char)(leftSide.valueUInt16 << rightSide))),
+            _ => throw new RuntimeException($"Can't do << operation with type {leftSide.Type}"),
+        };
+        /// <inheritdoc/>
+        /// <exception cref="RuntimeException"/>
+        public static DataItem operator >>(DataItem leftSide, int rightSide) => leftSide.type switch
+        {
+            RuntimeType.UInt8 => new DataItem(unchecked((byte)(leftSide.valueUInt8 >> rightSide))),
+            RuntimeType.SInt32 => new DataItem(unchecked((int)(leftSide.valueSInt32 >> rightSide))),
+            RuntimeType.UInt16 => new DataItem(unchecked((char)(leftSide.valueUInt16 >> rightSide))),
+            _ => throw new RuntimeException($"Can't do >> operation with type {leftSide.Type}"),
+        };
+        /// <inheritdoc/>
+        /// <exception cref="RuntimeException"/>
+        public static DataItem operator >>>(DataItem leftSide, int rightSide) => leftSide.type switch
+        {
+            RuntimeType.UInt8 => new DataItem(unchecked((byte)(leftSide.valueUInt8 >>> rightSide))),
+            RuntimeType.SInt32 => new DataItem(unchecked((int)(leftSide.valueSInt32 >>> rightSide))),
+            RuntimeType.UInt16 => new DataItem(unchecked((char)(leftSide.valueUInt16 >>> rightSide))),
+            _ => throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type}"),
+        };
 
         public override readonly bool Equals(object? obj) => obj is DataItem value && this.Equals(value);
 
@@ -301,7 +291,7 @@ namespace LanguageCore.Runtime
 
             return a.type switch
             {
-                RuntimeType.Null => b.IsNull,
+                RuntimeType.Null => b.type == RuntimeType.Null,
                 RuntimeType.UInt8 => a.valueUInt8 == b.valueUInt8,
                 RuntimeType.SInt32 => a.valueSInt32 == b.valueSInt32,
                 RuntimeType.Single => a.valueSingle == b.valueSingle,

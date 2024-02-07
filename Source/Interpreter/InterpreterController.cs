@@ -393,15 +393,6 @@ namespace LanguageCore.Runtime
                 });
 
             #endregion
-
-            #region Win32
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                externalFunctions.AddExternalFunction<IntPtr, string, string, uint, Win32.MessageBoxResult>("MessageBox", Win32.LowLevel.User32.MessageBox);
-            }
-
-            #endregion
         }
 
         protected void OnCodeExecuted()

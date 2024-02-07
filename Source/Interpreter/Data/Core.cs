@@ -18,37 +18,22 @@ namespace LanguageCore.Runtime
     [StructLayout(LayoutKind.Explicit)]
     public partial struct DataItem
     {
-        public static DataItem Null => new() { };
+        public static DataItem Null => default;
 
         public readonly RuntimeType Type => type;
 
-        [FieldOffset(0)]
-        RuntimeType type;
+        [FieldOffset(0)] RuntimeType type;
 
         #region Value Fields
 
-        [FieldOffset(1)]
-        byte valueUInt8;
-        [FieldOffset(1)]
-        int valueSInt32;
-        [FieldOffset(1)]
-        float valueSingle;
-        [FieldOffset(1)]
-        char valueUInt16;
+        [FieldOffset(1)] byte valueUInt8;
+        [FieldOffset(1)] int valueSInt32;
+        [FieldOffset(1)] float valueSingle;
+        [FieldOffset(1)] char valueUInt16;
 
         #endregion
 
-        public readonly bool IsNull
-        {
-            get
-            {
-                if (valueUInt8 != 0) return false;
-                if (valueSInt32 != 0) return false;
-                if (valueSingle != 0) return false;
-                if (valueUInt16 != 0) return false;
-                return type == RuntimeType.Null;
-            }
-        }
+        public readonly bool IsNull => type == RuntimeType.Null;
 
         #region Value Properties
 
@@ -116,8 +101,6 @@ namespace LanguageCore.Runtime
             this.valueUInt8 = default;
             this.valueSingle = default;
             this.valueUInt16 = default;
-
-            // this.Tag = tag;
         }
 
         public DataItem(int value) : this(RuntimeType.SInt32)
@@ -154,27 +137,21 @@ namespace LanguageCore.Runtime
                     case RuntimeType.SInt32:
                         if (valueSInt32 is >= byte.MinValue and <= byte.MaxValue)
                         { return (byte)valueSInt32; }
-                        else
-                        { return null; }
+                        return null;
                     case RuntimeType.Single:
                         if (!float.IsInteger(valueSingle)) return null;
                         if (valueSingle is >= byte.MinValue and <= byte.MaxValue)
                         { return (byte)valueSingle; }
-                        else
-                        { return null; }
+                        return null;
                     case RuntimeType.UInt16:
                         if ((ushort)valueUInt16 is >= byte.MinValue and <= byte.MaxValue)
                         { return (byte)valueUInt16; }
-                        else
-                        { return null; }
+                        return null;
                     default:
                         return null;
                 }
             }
         }
-
-        /// <exception cref="InvalidCastException"/>
-        public readonly float Float => this.ToSingle(null);
 
         public readonly object? GetValue() => type switch
         {
@@ -196,62 +173,43 @@ namespace LanguageCore.Runtime
             _ => throw new UnreachableException(),
         };
 
-        public override readonly int GetHashCode()
+        public override readonly int GetHashCode() => Type switch
         {
-            HashCode hash = new();
-            hash.Add(Type);
-            switch (Type)
-            {
-                case RuntimeType.UInt8:
-                    hash.Add(valueUInt8);
-                    break;
-                case RuntimeType.SInt32:
-                    hash.Add(valueSInt32);
-                    break;
-                case RuntimeType.Single:
-                    hash.Add(valueSingle);
-                    break;
-                case RuntimeType.UInt16:
-                    hash.Add(valueUInt16);
-                    break;
-                default: throw new UnreachableException();
-            }
-            return hash.ToHashCode();
-        }
+            RuntimeType.UInt8 => HashCode.Combine(Type, valueUInt8),
+            RuntimeType.SInt32 => HashCode.Combine(Type, valueSInt32),
+            RuntimeType.Single => HashCode.Combine(Type, valueSingle),
+            RuntimeType.UInt16 => HashCode.Combine(Type, valueUInt16),
+            _ => throw new UnreachableException(),
+        };
 
         public readonly void DebugPrint()
         {
             ConsoleColor savedFgColor = Console.ForegroundColor;
             ConsoleColor savedBgColor = Console.BackgroundColor;
-            IFormatProvider ci = CultureInfo.InvariantCulture;
 
-            if (IsNull)
+            switch (Type)
             {
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write("null");
-            }
-            else
-            {
-                switch (Type)
-                {
-                    case RuntimeType.UInt8:
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(this.valueUInt8.ToString(ci));
-                        break;
-                    case RuntimeType.SInt32:
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(this.valueSInt32.ToString(ci));
-                        break;
-                    case RuntimeType.Single:
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(this.valueSingle.ToString(ci));
-                        break;
-                    case RuntimeType.UInt16:
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write("'" + this.valueUInt16.ToString(ci) + "'");
-                        break;
-                    default: throw new UnreachableException();
-                }
+                case RuntimeType.UInt8:
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write(valueUInt8);
+                    break;
+                case RuntimeType.SInt32:
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write(valueSInt32);
+                    break;
+                case RuntimeType.Single:
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write(valueSingle);
+                    break;
+                case RuntimeType.UInt16:
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write($"\'{valueUInt16.Escape()}\'");
+                    break;
+                case RuntimeType.Null:
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("null");
+                    break;
+                default: throw new UnreachableException();
             }
 
             Console.ResetColor();

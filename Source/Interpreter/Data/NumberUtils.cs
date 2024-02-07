@@ -18,18 +18,16 @@ namespace LanguageCore.Runtime
         IConvertible,
         ISpanFormattable,
         IComparable<DataItem>,
-        IEquatable<DataItem>
+        IEquatable<DataItem>,
+        IBinaryInteger<DataItem>
     {
         public static DataItem One => new(1);
         public static DataItem NegativeOne => new(-1);
         public static DataItem Zero => new(0);
-        /// <exception cref="System.NotSupportedException"/>
-        public static int Radix => throw new System.NotSupportedException("What is Radix???");
+        public static int Radix => 10;
 
-        /// <exception cref="System.NotSupportedException"/>
-        public static DataItem AdditiveIdentity => throw new System.NotSupportedException("What is AdditiveIdentity???");
-        /// <exception cref="System.NotSupportedException"/>
-        public static DataItem MultiplicativeIdentity => throw new System.NotSupportedException("What is MultiplicativeIdentity???");
+        public static DataItem AdditiveIdentity => 0;
+        public static DataItem MultiplicativeIdentity => 1;
 
         public static DataItem Abs(DataItem value) => value.type switch
         {
@@ -107,7 +105,7 @@ namespace LanguageCore.Runtime
 
         public static bool IsNaN(DataItem value) => value.type switch
         {
-            RuntimeType.Null => false,
+            RuntimeType.Null => true,
             RuntimeType.Single => float.IsNaN(value.valueSingle),
             _ => false,
         };
@@ -162,10 +160,10 @@ namespace LanguageCore.Runtime
         public static DataItem Log2(DataItem value) => value.type switch
         {
             RuntimeType.Null => value,
-            RuntimeType.UInt8 => new DataItem(byte.Log2(value.valueUInt8)),
-            RuntimeType.SInt32 => new DataItem(int.Log2(value.valueSInt32)),
-            RuntimeType.Single => new DataItem(float.Log2(value.valueSingle)),
-            RuntimeType.UInt16 => new DataItem(ushort.Log2(value.valueUInt16)),
+            RuntimeType.UInt8 => new DataItem((byte)byte.Log2(value.valueUInt8)),
+            RuntimeType.SInt32 => new DataItem((int)int.Log2(value.valueSInt32)),
+            RuntimeType.Single => new DataItem((float)float.Log2(value.valueSingle)),
+            RuntimeType.UInt16 => new DataItem((ushort)ushort.Log2(value.valueUInt16)),
             _ => throw new UnreachableException(),
         };
 
@@ -430,6 +428,8 @@ namespace LanguageCore.Runtime
             _ => throw new UnreachableException(),
         };
 
+        /// <inheritdoc/>
+        /// <exception cref="InvalidCastException"/>
         public readonly bool ToBoolean(IFormatProvider? provider) => Type switch
         {
             RuntimeType.Null => false,
@@ -437,124 +437,84 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => valueSInt32 != 0,
             RuntimeType.Single => valueSingle != 0f,
             RuntimeType.UInt16 => valueUInt16 != 0,
-            _ => throw new UnreachableException(),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Boolean)}"),
         };
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly byte ToByte(IFormatProvider? provider)
+        public readonly byte ToByte(IFormatProvider? provider) => type switch
         {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    return (byte)valueUInt8;
-                case RuntimeType.SInt32:
-                    return checked((byte)valueSInt32);
-                case RuntimeType.UInt16:
-                    return checked((byte)valueUInt16);
-                case RuntimeType.Single:
-                    if (float.IsInteger(valueSingle))
-                    { return checked((byte)valueSingle); }
-                    throw new OverflowException();
-                default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(System.Byte)}");
-            }
-        }
+            RuntimeType.UInt8 => Convert.ToByte(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToByte(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToByte(valueUInt16),
+            RuntimeType.Single => Convert.ToByte(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Byte)}"),
+        };
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly char ToChar(IFormatProvider? provider)
+        public readonly char ToChar(IFormatProvider? provider) => type switch
         {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    return (char)(ushort)valueUInt8;
-                case RuntimeType.SInt32:
-                    return (char)checked((ushort)valueSInt32);
-                case RuntimeType.UInt16:
-                    return valueUInt16;
-                case RuntimeType.Single:
-                    if (float.IsInteger(valueSingle))
-                    { return (char)checked((ushort)valueSingle); }
-                    throw new OverflowException();
-                default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(System.Char)}");
-            }
-        }
+            RuntimeType.UInt8 => Convert.ToChar(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToChar(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToChar(valueUInt16),
+            RuntimeType.Single => Convert.ToChar(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Char)}"),
+        };
 
         /// <inheritdoc/>
         /// <exception cref="InvalidCastException"/>
         [DoesNotReturn]
-        public readonly DateTime ToDateTime(IFormatProvider? provider) => throw new InvalidCastException($"Can't cast {type} to {nameof(System.DateTime)}");
+        public readonly DateTime ToDateTime(IFormatProvider? provider) => throw new InvalidCastException($"Can't cast {type} to {nameof(DateTime)}");
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
         public readonly decimal ToDecimal(IFormatProvider? provider) => type switch
         {
-            RuntimeType.UInt8 => (decimal)valueUInt8,
-            RuntimeType.SInt32 => (decimal)valueSInt32,
-            RuntimeType.UInt16 => (decimal)valueUInt16,
-            RuntimeType.Single => checked((decimal)valueSingle),
-            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.Decimal)}"),
+            RuntimeType.UInt8 => Convert.ToDecimal(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToDecimal(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToDecimal(valueUInt16),
+            RuntimeType.Single => Convert.ToDecimal(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Decimal)}"),
         };
 
         /// <inheritdoc/>
         /// <exception cref="InvalidCastException"/>
         public readonly double ToDouble(IFormatProvider? provider) => type switch
         {
-            RuntimeType.UInt8 => (double)valueUInt8,
-            RuntimeType.SInt32 => (double)valueSInt32,
-            RuntimeType.UInt16 => (double)valueUInt16,
-            RuntimeType.Single => (double)valueSingle,
-            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.Double)}"),
+            RuntimeType.UInt8 => Convert.ToDouble(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToDouble(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToDouble(valueUInt16),
+            RuntimeType.Single => Convert.ToDouble(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Double)}"),
         };
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly short ToInt16(IFormatProvider? provider)
+        public readonly short ToInt16(IFormatProvider? provider) => type switch
         {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    return (short)valueUInt8;
-                case RuntimeType.SInt32:
-                    return checked((short)valueSInt32);
-                case RuntimeType.UInt16:
-                    return checked((short)valueUInt16);
-                case RuntimeType.Single:
-                    if (float.IsInteger(valueSingle))
-                    { return checked((short)valueSingle); }
-                    throw new OverflowException();
-                default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(System.Int16)}");
-            }
-        }
+            RuntimeType.UInt8 => Convert.ToInt16(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToInt16(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToInt16(valueUInt16),
+            RuntimeType.Single => Convert.ToInt16(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Int16)}"),
+        };
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly int ToInt32(IFormatProvider? provider)
+        public readonly int ToInt32(IFormatProvider? provider) => type switch
         {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    return (int)valueUInt8;
-                case RuntimeType.SInt32:
-                    return (int)valueSInt32;
-                case RuntimeType.UInt16:
-                    return (int)valueUInt16;
-                case RuntimeType.Single:
-                    if (float.IsInteger(valueSingle))
-                    { return checked((int)valueSingle); }
-                    throw new OverflowException();
-                default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(System.Int32)}");
-            }
-        }
+            RuntimeType.UInt8 => Convert.ToInt32(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToInt32(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToInt32(valueUInt16),
+            RuntimeType.Single => Convert.ToInt32(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Int32)}"),
+        };
 
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
@@ -564,62 +524,42 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => (int)valueSInt32,
             RuntimeType.UInt16 => (int)valueUInt16,
             RuntimeType.Single => checked((int)MathF.Round(valueSingle)),
-            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.Int32)}"),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Int32)}"),
         };
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly long ToInt64(IFormatProvider? provider)
+        public readonly long ToInt64(IFormatProvider? provider) => type switch
         {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    return (long)valueUInt8;
-                case RuntimeType.SInt32:
-                    return (long)valueSInt32;
-                case RuntimeType.UInt16:
-                    return (long)valueUInt16;
-                case RuntimeType.Single:
-                    if (float.IsInteger(valueSingle))
-                    { return checked((long)valueSingle); }
-                    throw new OverflowException();
-                default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(System.Int64)}");
-            }
-        }
+            RuntimeType.UInt8 => Convert.ToInt64(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToInt64(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToInt64(valueUInt16),
+            RuntimeType.Single => Convert.ToInt64(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Int64)}"),
+        };
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly sbyte ToSByte(IFormatProvider? provider)
+        public readonly sbyte ToSByte(IFormatProvider? provider) => type switch
         {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    return checked((sbyte)valueUInt8);
-                case RuntimeType.SInt32:
-                    return checked((sbyte)valueSInt32);
-                case RuntimeType.UInt16:
-                    return checked((sbyte)valueUInt16);
-                case RuntimeType.Single:
-                    if (float.IsInteger(valueSingle))
-                    { return checked((sbyte)valueSingle); }
-                    throw new OverflowException();
-                default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(System.SByte)}");
-            }
-        }
+            RuntimeType.UInt8 => Convert.ToSByte(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToSByte(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToSByte(valueUInt16),
+            RuntimeType.Single => Convert.ToSByte(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(SByte)}"),
+        };
 
         /// <inheritdoc/>
         /// <exception cref="InvalidCastException"/>
         public readonly float ToSingle(IFormatProvider? provider) => type switch
         {
-            RuntimeType.UInt8 => (float)valueUInt8,
-            RuntimeType.SInt32 => (float)valueSInt32,
-            RuntimeType.UInt16 => (float)valueUInt16,
-            RuntimeType.Single => (float)valueSingle,
-            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.Single)}"),
+            RuntimeType.UInt8 => Convert.ToSingle(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToSingle(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToSingle(valueUInt16),
+            RuntimeType.Single => Convert.ToSingle(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Single)}"),
         };
 
         public override readonly string ToString() => this.ToString(CultureInfo.InvariantCulture);
@@ -627,10 +567,10 @@ namespace LanguageCore.Runtime
         public readonly string ToString(IFormatProvider? provider) => type switch
         {
             RuntimeType.Null => "null",
-            RuntimeType.UInt8 => valueUInt8.ToString(provider),
-            RuntimeType.SInt32 => valueSInt32.ToString(provider),
-            RuntimeType.UInt16 => valueUInt16.ToString(provider),
-            RuntimeType.Single => valueSingle.ToString(provider),
+            RuntimeType.UInt8 => Convert.ToString(valueUInt8, provider),
+            RuntimeType.SInt32 => Convert.ToString(valueSInt32, provider),
+            RuntimeType.UInt16 => Convert.ToString(valueUInt16, provider),
+            RuntimeType.Single => Convert.ToString(valueSingle, provider),
             _ => throw new UnreachableException(),
         };
 
@@ -710,107 +650,43 @@ namespace LanguageCore.Runtime
 
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly T ToType<T>(IFormatProvider? provider)
-        {
-            if (typeof(T) == typeof(byte)) return (T)(object)ToByte(provider);
-            if (typeof(T) == typeof(sbyte)) return (T)(object)ToSByte(provider);
-            if (typeof(T) == typeof(short)) return (T)(object)ToInt16(provider);
-            if (typeof(T) == typeof(ushort)) return (T)(object)ToUInt16(provider);
-            if (typeof(T) == typeof(int)) return (T)(object)ToInt32(provider);
-            if (typeof(T) == typeof(uint)) return (T)(object)ToUInt32(provider);
-            if (typeof(T) == typeof(long)) return (T)(object)ToInt64(provider);
-            if (typeof(T) == typeof(ulong)) return (T)(object)ToUInt64(provider);
-            if (typeof(T) == typeof(float)) return (T)(object)ToSingle(provider);
-            if (typeof(T) == typeof(decimal)) return (T)(object)ToDecimal(provider);
-            if (typeof(T) == typeof(double)) return (T)(object)ToDouble(provider);
-            if (typeof(T) == typeof(bool)) return (T)(object)ToBoolean(provider);
-            if (typeof(T) == typeof(char)) return (T)(object)ToChar(provider);
-            if (typeof(T) == typeof(DateTime)) return (T)(object)ToDateTime(provider);
-
-            if (typeof(T) == typeof(IntPtr))
-            {
-                if (IntPtr.Size == 4)
-                { return (T)(object)new IntPtr(ToInt32(provider)); }
-                else
-                { return (T)(object)new IntPtr(ToInt64(provider)); }
-            }
-
-            if (typeof(T) == typeof(UIntPtr))
-            {
-                if (UIntPtr.Size == 4)
-                { return (T)(object)new UIntPtr(ToUInt32(provider)); }
-                else
-                { return (T)(object)new UIntPtr(ToUInt64(provider)); }
-            }
-
-            throw new InvalidCastException($"Can't cast {type} to {typeof(T)}");
-        }
+        public readonly T ToType<T>(IFormatProvider? provider) => (T)ToType(typeof(T), provider);
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly ushort ToUInt16(IFormatProvider? provider)
+        public readonly ushort ToUInt16(IFormatProvider? provider) => type switch
         {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    return (ushort)valueUInt8;
-                case RuntimeType.SInt32:
-                    return checked((ushort)valueSInt32);
-                case RuntimeType.UInt16:
-                    return (ushort)valueUInt16;
-                case RuntimeType.Single:
-                    if (float.IsInteger(valueSingle))
-                    { return checked((ushort)valueSingle); }
-                    throw new OverflowException();
-                default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(UInt16)}");
-            }
-        }
+            RuntimeType.UInt8 => Convert.ToUInt16(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToUInt16(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToUInt16(valueUInt16),
+            RuntimeType.Single => Convert.ToUInt16(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(UInt16)}"),
+        };
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly uint ToUInt32(IFormatProvider? provider)
+        public readonly uint ToUInt32(IFormatProvider? provider) => type switch
         {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    return (uint)valueUInt8;
-                case RuntimeType.SInt32:
-                    return checked((uint)valueSInt32);
-                case RuntimeType.UInt16:
-                    return (uint)valueUInt16;
-                case RuntimeType.Single:
-                    if (float.IsInteger(valueSingle))
-                    { return checked((uint)valueSingle); }
-                    throw new OverflowException();
-                default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(System.UInt32)}");
-            }
-        }
+            RuntimeType.UInt8 => Convert.ToUInt32(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToUInt32(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToUInt32(valueUInt16),
+            RuntimeType.Single => Convert.ToUInt32(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.UInt32)}"),
+        };
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        public readonly ulong ToUInt64(IFormatProvider? provider)
+        public readonly ulong ToUInt64(IFormatProvider? provider) => type switch
         {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    return (ulong)valueUInt8;
-                case RuntimeType.SInt32:
-                    return checked((ulong)valueSInt32);
-                case RuntimeType.UInt16:
-                    return (ulong)valueUInt16;
-                case RuntimeType.Single:
-                    if (float.IsInteger(valueSingle))
-                    { return checked((ulong)valueSingle); }
-                    throw new OverflowException();
-                default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(System.UInt64)}");
-            }
-        }
+            RuntimeType.UInt8 => Convert.ToUInt64(valueUInt8),
+            RuntimeType.SInt32 => Convert.ToUInt64(valueSInt32),
+            RuntimeType.UInt16 => Convert.ToUInt16(valueUInt16),
+            RuntimeType.Single => Convert.ToUInt64(valueSingle),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.UInt64)}"),
+        };
 
         public static void Cast(ref DataItem value, RuntimeType targetType)
         {
@@ -940,9 +816,56 @@ namespace LanguageCore.Runtime
             }
         }
 
+        public readonly int GetByteCount() => type switch
+        {
+            RuntimeType.Null => 0,
+            RuntimeType.UInt8 => sizeof(byte),
+            RuntimeType.SInt32 => sizeof(int),
+            RuntimeType.Single => sizeof(float),
+            RuntimeType.UInt16 => sizeof(char),
+            _ => throw new UnreachableException(),
+        };
+        /// <inheritdoc/>
+        /// <exception cref="NotImplementedException"/>
+        [DoesNotReturn]
+        public readonly int GetShortestBitLength() => throw new NotImplementedException();
+        public static DataItem PopCount(DataItem value) => value.type switch
+        {
+            RuntimeType.UInt8 => (DataItem)BitOperations.PopCount(value.ValueUInt8),
+            RuntimeType.SInt32 => (DataItem)BitOperations.PopCount(unchecked((uint)value.ValueSInt32)),
+            RuntimeType.UInt16 => (DataItem)BitOperations.PopCount(value.valueUInt16),
+            _ => throw new NotImplementedException($"Can't do {nameof(PopCount)} on type {value.type}"),
+        };
+        public static DataItem TrailingZeroCount(DataItem value) => value.type switch
+        {
+            RuntimeType.UInt8 => (DataItem)BitOperations.TrailingZeroCount(value.ValueUInt8),
+            RuntimeType.SInt32 => (DataItem)BitOperations.TrailingZeroCount(unchecked((uint)value.ValueSInt32)),
+            RuntimeType.UInt16 => (DataItem)BitOperations.TrailingZeroCount(value.valueUInt16),
+            _ => throw new NotImplementedException($"Can't do {nameof(TrailingZeroCount)} on type {value.type}"),
+        };
+        /// <inheritdoc/>
+        /// <exception cref="NotImplementedException"/>
+        [DoesNotReturn]
+        public static bool TryReadBigEndian(ReadOnlySpan<byte> source, bool isUnsigned, out DataItem value) => throw new NotImplementedException();
+        /// <inheritdoc/>
+        /// <exception cref="NotImplementedException"/>
+        [DoesNotReturn]
+        public static bool TryReadLittleEndian(ReadOnlySpan<byte> source, bool isUnsigned, out DataItem value) => throw new NotImplementedException();
+        /// <inheritdoc/>
+        /// <exception cref="NotImplementedException"/>
+        [DoesNotReturn]
+        public readonly bool TryWriteBigEndian(Span<byte> destination, out int bytesWritten) => throw new NotImplementedException();
+        /// <inheritdoc/>
+        /// <exception cref="NotImplementedException"/>
+        [DoesNotReturn]
+        public readonly bool TryWriteLittleEndian(Span<byte> destination, out int bytesWritten) => throw new NotImplementedException();
+
+        /// <exception cref="InvalidCastException"/>
         public static bool operator true(DataItem v) => v.ToBoolean(null);
+        /// <exception cref="InvalidCastException"/>
         public static bool operator false(DataItem v) => !v.ToBoolean(null);
 
+        /// <exception cref="InvalidCastException"/>
         public static explicit operator bool(DataItem v) => v.ToBoolean(null);
         public static implicit operator DataItem(bool v) => new(v);
 

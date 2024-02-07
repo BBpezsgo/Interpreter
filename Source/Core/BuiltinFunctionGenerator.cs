@@ -122,10 +122,6 @@ namespace LanguageCore.Runtime
         public void Callback(DataItem[] parameters)
         {
             base.BeforeCallback(parameters);
-
-            if (callback == null)
-            { throw new InternalException("Callback is null"); }
-
             callback.Invoke(parameters);
         }
     }
@@ -153,7 +149,7 @@ namespace LanguageCore.Runtime
 
         /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
-        public static ExternalFunctionSimple AddExternalFunction(this ExternalFunctionCollection functions, System.Reflection.MethodInfo method)
+        static ExternalFunctionSimple AddExternalFunction(this ExternalFunctionCollection functions, System.Reflection.MethodInfo method)
         {
             if (!method.IsStatic)
             { throw new InternalException($"Only static functions can be added as an external function"); }

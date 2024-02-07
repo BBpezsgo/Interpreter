@@ -24,6 +24,7 @@ namespace LanguageCore.Tokenizing
         Enum,
         EnumMember,
         TypeParameter,
+        ConstantName,
     }
 
     public struct TokenizerSettings

@@ -757,7 +757,7 @@ namespace LanguageCore.Parser
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
     }
 
-    public class UsingDefinition
+    public class UsingDefinition : IPositioned
     {
         public readonly Token[] Path;
         public readonly Token Keyword;
@@ -780,6 +780,8 @@ namespace LanguageCore.Parser
             }
         }
         public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].Content, UriKind.Absolute, out Uri? uri) && uri.Scheme != "file:";
+
+        public Position Position => new Position(Path).Union(Keyword);
 
         public UsingDefinition(
             Token keyword,

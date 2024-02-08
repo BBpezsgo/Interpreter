@@ -16,6 +16,16 @@ namespace LanguageCore.Parser.Statement
         public const int CozyLength = 30;
     }
 
+    public interface IReferenceableTo
+    {
+        public object? Reference { get; set; }
+    }
+
+    public interface IReferenceableTo<T> where T : notnull
+    {
+        public T? Reference { get; set; }
+    }
+
     public static class StatementExtensions
     {
         public static T? GetStatementAt<T>(this ParserResult parserResult, int absolutePosition)
@@ -440,19 +450,20 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class AnyCall : StatementWithValue, IReadable
+    public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
     {
         public readonly StatementWithValue PrevStatement;
         public readonly Token BracketLeft;
         public readonly StatementWithValue[] Parameters;
         public readonly Token BracketRight;
 
-        public override Position Position
-            => new(PrevStatement, BracketLeft, BracketRight);
+        public override Position Position => new(PrevStatement, BracketLeft, BracketRight);
 
         public bool IsFunctionCall => PrevStatement is Identifier;
         public bool IsMethodCall => PrevStatement is Field;
         public bool IsFunctionOrMethodCall => IsFunctionCall || IsMethodCall;
+
+        public object? Reference { get; set; }
 
         public AnyCall(StatementWithValue prevStatement, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
         {
@@ -543,7 +554,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class FunctionCall : StatementWithValue, IReadable
+    public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
     {
         public readonly Token Identifier;
         public readonly StatementWithValue[] Parameters;
@@ -566,8 +577,9 @@ namespace LanguageCore.Parser.Statement
             }
         }
 
-        public override Position Position
-            => new Position(BracketLeft, BracketRight, Identifier).Union(MethodParameters);
+        public override Position Position => new Position(BracketLeft, BracketRight, Identifier).Union(MethodParameters);
+
+        public object? Reference { get; set; }
 
         public FunctionCall(StatementWithValue? prevStatement, Token identifier, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
         {
@@ -708,7 +720,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class OperatorCall : StatementWithValue, IReadable
+    public class OperatorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledOperator>
     {
         public readonly Token Operator;
         public readonly StatementWithValue Left;
@@ -742,6 +754,8 @@ namespace LanguageCore.Parser.Statement
 
         public override Position Position
             => new(Operator, Left, Right);
+
+        public CompiledOperator? Reference { get; set; }
 
         public OperatorCall(Token op, StatementWithValue left, StatementWithValue? right = null)
         {
@@ -1087,7 +1101,7 @@ namespace LanguageCore.Parser.Statement
         { yield break; }
     }
 
-    public class Identifier : StatementWithValue
+    public class Identifier : StatementWithValue, IReferenceableTo
     {
         public readonly Token Token;
 
@@ -1098,6 +1112,8 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override Position Position => Token.Position;
+
+        public object? Reference { get; set; }
 
         public Identifier(Token token) => Token = token;
 
@@ -1394,7 +1410,7 @@ namespace LanguageCore.Parser.Statement
         { yield break; }
     }
 
-    public class ConstructorCall : StatementWithValue, IReadable
+    public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledGeneralFunction>
     {
         public readonly Token Keyword;
         public readonly TypeInstance TypeName;
@@ -1406,6 +1422,8 @@ namespace LanguageCore.Parser.Statement
 
         public override Position Position
             => new Position(Keyword, TypeName, BracketLeft, BracketRight).Union(Parameters);
+
+        public CompiledGeneralFunction? Reference { get; set; }
 
         public ConstructorCall(Token keyword, TypeInstance typeName, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
         {
@@ -1530,13 +1548,14 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class Field : StatementWithValue
+    public class Field : StatementWithValue, IReferenceableTo
     {
         public readonly Token FieldName;
         public readonly StatementWithValue PrevStatement;
 
-        public override Position Position
-            => new(PrevStatement, FieldName);
+        public override Position Position => new(PrevStatement, FieldName);
+
+        public object? Reference { get; set; }
 
         public Field(StatementWithValue prevStatement, Token fieldName)
         {

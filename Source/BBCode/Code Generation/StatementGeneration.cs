@@ -292,6 +292,7 @@ namespace LanguageCore.BBCode.Generator
             if (GetVariable(functionCall.Identifier.Content, out CompiledVariable? compiledVariable))
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
+                functionCall.Reference = compiledVariable;
 
                 if (!compiledVariable.Type.IsFunction)
                 { throw new CompilerException($"Variable \"{compiledVariable.VariableName.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
@@ -303,6 +304,7 @@ namespace LanguageCore.BBCode.Generator
             if (GetParameter(functionCall.Identifier.Content, out CompiledParameter? compiledParameter))
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalyzedType.ParameterName;
+                functionCall.Reference = compiledParameter;
 
                 if (!compiledParameter.Type.IsFunction)
                 { throw new CompilerException($"Variable \"{compiledParameter.Identifier.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
@@ -317,6 +319,7 @@ namespace LanguageCore.BBCode.Generator
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
+                functionCall.Reference = macro;
 
                 string? prevFile = CurrentFile;
                 IAmInContext<CompiledClass>? prevContext = CurrentContext;
@@ -354,6 +357,8 @@ namespace LanguageCore.BBCode.Generator
             }
 
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
+            functionCall.Reference = compiledFunction;
+
             GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
         }
 
@@ -742,6 +747,14 @@ namespace LanguageCore.BBCode.Generator
             if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
             {
                 GenerateCodeForStatement(functionCall);
+                if (anyCall.PrevStatement is IReferenceableTo _ref1)
+                {
+                    _ref1.Reference = functionCall.Reference;
+                }
+                else
+                {
+                    anyCall.Reference = functionCall.Reference;
+                }
                 return;
             }
 
@@ -825,6 +838,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 operatorDefinition.AddReference(@operator, CurrentFile);
                 @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
+                @operator.Reference = operatorDefinition;
 
                 AddComment($"Call {operatorDefinition.Identifier} {{");
 
@@ -1039,6 +1053,8 @@ namespace LanguageCore.BBCode.Generator
             if (GetParameter(variable.Content, out CompiledParameter? param))
             {
                 variable.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
+                variable.Reference = param;
+
                 ValueAddress address = GetBaseAddress(param);
 
                 AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
@@ -1052,6 +1068,8 @@ namespace LanguageCore.BBCode.Generator
             if (GetVariable(variable.Content, out CompiledVariable? val))
             {
                 variable.Token.AnalyzedType = TokenAnalyzedType.VariableName;
+                variable.Reference = val;
+
                 StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
                 return;
             }
@@ -1059,6 +1077,8 @@ namespace LanguageCore.BBCode.Generator
             if (GetGlobalVariable(variable.Content, out CompiledVariable? globalVariable))
             {
                 variable.Token.AnalyzedType = TokenAnalyzedType.VariableName;
+                variable.Reference = globalVariable;
+
                 StackLoad(GetGlobalVariableAddress(globalVariable), globalVariable.Type.SizeOnStack);
                 return;
             }
@@ -1067,6 +1087,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 compiledFunction.AddReference(variable, CurrentFile);
                 variable.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
+                variable.Reference = compiledFunction;
 
                 if (compiledFunction.InstructionOffset == -1)
                 { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction, CurrentFile)); }
@@ -1360,6 +1381,7 @@ namespace LanguageCore.BBCode.Generator
             }
 
             constructor.AddReference(constructorCall, CurrentFile);
+            constructorCall.Reference = constructor;
 
             if (!constructor.CanUse(CurrentFile))
             {
@@ -1444,6 +1466,8 @@ namespace LanguageCore.BBCode.Generator
 
             if (!GetField(field, out CompiledField? compiledField))
             { throw new CompilerException($"Field definition \"{field.FieldName}\" not found in type \"{prevType}\"", field, CurrentFile); }
+
+            field.Reference = compiledField;
 
             if (CurrentContext?.Context != null)
             {

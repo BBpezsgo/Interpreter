@@ -1,6 +1,7 @@
 ﻿global using CompiledAttributeCollection = System.Collections.Generic.Dictionary<string, LanguageCore.Compiler.AttributeValues>;
 
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -14,7 +15,7 @@ namespace LanguageCore.Compiler
         public List<CompiledLiteral> parameters;
         public Token Identifier;
 
-        public readonly Position Position => new Position((IEnumerable<IPositioned>)parameters).Union(Identifier);
+        public readonly Position Position => new Position(parameters.Select(v => v.Position)).Union(Identifier);
 
         public readonly bool TryGetValue<T>(int index, [NotNullWhen(true)] out T? value)
         {

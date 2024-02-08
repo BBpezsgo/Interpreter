@@ -51,6 +51,27 @@ namespace LanguageCore
         public Position(IEnumerable<IPositioned?> elements) : this(elements.ToArray())
         { }
 
+        public Position(params Position[] elements)
+        {
+            if (elements.Length == 0) throw new ArgumentException($"Number of elements must be more than zero", nameof(elements));
+
+            Range = Position.UnknownPosition.Range;
+            AbsoluteRange = Position.UnknownPosition.AbsoluteRange;
+
+            for (int i = 0; i < elements.Length; i++)
+            {
+                Position position = elements[i];
+                Range = position.Range;
+                AbsoluteRange = position.AbsoluteRange;
+                break;
+            }
+
+            for (int i = 1; i < elements.Length; i++)
+            { Union(elements[i]); }
+        }
+        public Position(IEnumerable<Position> elements) : this(elements.ToArray())
+        { }
+
         public Position Union(Position other)
         {
             if (other.AbsoluteRange == Position.UnknownPosition.AbsoluteRange ||

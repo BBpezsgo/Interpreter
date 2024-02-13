@@ -182,15 +182,18 @@ namespace LanguageCore.Parser.Statement
     public abstract class StatementWithValue : Statement
     {
         public bool SaveValue = true;
+        public CompiledType? CompiledType { get; internal set; }
 
         public StatementWithValue() : base()
         {
             SaveValue = true;
+            CompiledType = null;
         }
 
         public StatementWithValue(StatementWithValue other) : base(other)
         {
             SaveValue = other.SaveValue;
+            CompiledType = null;
         }
     }
 

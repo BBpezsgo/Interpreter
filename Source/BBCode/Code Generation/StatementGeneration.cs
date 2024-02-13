@@ -284,6 +284,8 @@ namespace LanguageCore.BBCode.Generator
                 StatementWithValue param0 = functionCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
 
+                OnGotStatementType(functionCall, new CompiledType(Type.Integer));
+
                 AddInstruction(Opcode.PUSH_VALUE, param0Type.Size);
 
                 return;
@@ -511,6 +513,7 @@ namespace LanguageCore.BBCode.Generator
         void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
         {
             compiledFunction.AddReference(functionCall, CurrentFile);
+            OnGotStatementType(functionCall, compiledFunction.Type);
 
             if (!compiledFunction.CanUse(CurrentFile))
             {
@@ -668,6 +671,7 @@ namespace LanguageCore.BBCode.Generator
         void GenerateCodeForFunctionCall_Variable(FunctionCall functionCall, CompiledVariable compiledVariable)
         {
             FunctionType functionType = compiledVariable.Type.Function;
+            OnGotStatementType(functionCall, compiledVariable.Type.Function.ReturnType);
 
             if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
@@ -706,6 +710,7 @@ namespace LanguageCore.BBCode.Generator
         void GenerateCodeForFunctionCall_Variable(FunctionCall functionCall, CompiledParameter compiledParameter)
         {
             FunctionType functionType = compiledParameter.Type.Function;
+            OnGotStatementType(functionCall, compiledParameter.Type.Function.ReturnType);
 
             if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
@@ -747,14 +752,14 @@ namespace LanguageCore.BBCode.Generator
             if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
             {
                 GenerateCodeForStatement(functionCall);
+
+                if (functionCall.CompiledType is not null)
+                { OnGotStatementType(anyCall, functionCall.CompiledType); }
+
                 if (anyCall.PrevStatement is IReferenceableTo _ref1)
-                {
-                    _ref1.Reference = functionCall.Reference;
-                }
+                { _ref1.Reference = functionCall.Reference; }
                 else
-                {
-                    anyCall.Reference = functionCall.Reference;
-                }
+                { anyCall.Reference = functionCall.Reference; }
                 return;
             }
 
@@ -829,6 +834,8 @@ namespace LanguageCore.BBCode.Generator
         {
             if (Settings.OptimizeCode && TryCompute(@operator, null, out DataItem predictedValue))
             {
+                OnGotStatementType(@operator, new CompiledType(predictedValue.Type));
+
                 AddInstruction(Opcode.PUSH_VALUE, predictedValue);
                 AnalysisCollection?.Informations.Add(new Information($"Predicted value: {predictedValue}", @operator, CurrentFile));
                 return;
@@ -839,6 +846,7 @@ namespace LanguageCore.BBCode.Generator
                 operatorDefinition.AddReference(@operator, CurrentFile);
                 @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
                 @operator.Reference = operatorDefinition;
+                OnGotStatementType(@operator, operatorDefinition.Type);
 
                 AddComment($"Call {operatorDefinition.Identifier} {{");
 
@@ -941,6 +949,8 @@ namespace LanguageCore.BBCode.Generator
                 if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
                 { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
 
+                FindStatementType(@operator);
+
                 int jumpInstruction = -1;
 
                 GenerateCodeForStatement(@operator.Left);
@@ -984,18 +994,34 @@ namespace LanguageCore.BBCode.Generator
             switch (literal.Type)
             {
                 case LiteralType.Integer:
+                    OnGotStatementType(literal, new CompiledType(Type.Integer));
+
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.GetInt()));
                     break;
                 case LiteralType.Float:
+                    OnGotStatementType(literal, new CompiledType(Type.Float));
+
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.GetFloat()));
                     break;
                 case LiteralType.String:
+                    try
+                    { OnGotStatementType(literal, FindReplacedType("string", literal)); }
+                    catch (CompilerException)
+                    { }
+
                     GenerateCodeForLiteralString(literal.Value);
                     break;
                 case LiteralType.Boolean:
+                    try
+                    { OnGotStatementType(literal, FindReplacedType("boolean", literal)); }
+                    catch (CompilerException)
+                    { }
+
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(bool.Parse(literal.Value) ? 1 : 0));
                     break;
                 case LiteralType.Char:
+                    OnGotStatementType(literal, new CompiledType(Type.Char));
+
                     if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", CurrentFile);
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.Value[0]));
                     break;
@@ -1046,6 +1072,7 @@ namespace LanguageCore.BBCode.Generator
         {
             if (GetConstant(variable.Content, out DataItem constant))
             {
+                OnGotStatementType(variable, new CompiledType(constant.Type));
                 AddInstruction(Opcode.PUSH_VALUE, constant);
                 return;
             }
@@ -1054,6 +1081,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 variable.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
                 variable.Reference = param;
+                OnGotStatementType(variable, param.Type);
 
                 ValueAddress address = GetBaseAddress(param);
 
@@ -1069,6 +1097,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 variable.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                 variable.Reference = val;
+                OnGotStatementType(variable, val.Type);
 
                 StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
                 return;
@@ -1078,6 +1107,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 variable.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                 variable.Reference = globalVariable;
+                OnGotStatementType(variable, globalVariable.Type);
 
                 StackLoad(GetGlobalVariableAddress(globalVariable), globalVariable.Type.SizeOnStack);
                 return;
@@ -1088,6 +1118,7 @@ namespace LanguageCore.BBCode.Generator
                 compiledFunction.AddReference(variable, CurrentFile);
                 variable.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
                 variable.Reference = compiledFunction;
+                OnGotStatementType(variable, new CompiledType(compiledFunction));
 
                 if (compiledFunction.InstructionOffset == -1)
                 { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction, CurrentFile)); }
@@ -1289,6 +1320,7 @@ namespace LanguageCore.BBCode.Generator
 
             CompiledType instanceType = FindType(newObjectType);
             newObjectType.SetAnalyzedType(instanceType);
+            OnGotStatementType(newObject, instanceType);
 
             if (instanceType.IsStruct)
             {
@@ -1355,6 +1387,7 @@ namespace LanguageCore.BBCode.Generator
 
             CompiledType instanceType = FindType(constructorCall.TypeName);
             constructorCall.TypeName.SetAnalyzedType(instanceType);
+            OnGotStatementType(constructorCall, instanceType);
 
             if (instanceType.IsStruct)
             { throw new NotImplementedException(); }
@@ -1450,12 +1483,17 @@ namespace LanguageCore.BBCode.Generator
             {
                 if (!prevType.Enum.GetValue(field.FieldName.Content, out DataItem enumValue))
                 { throw new CompilerException($"I didn't find anything like \"{field.FieldName.Content}\" in the enum {prevType.Enum.Identifier}", field.FieldName, CurrentFile); }
+
+                OnGotStatementType(field, new CompiledType(enumValue.Type));
+
                 AddInstruction(Opcode.PUSH_VALUE, enumValue);
                 return;
             }
 
             if (prevType.IsStackArray && field.FieldName.Equals("Length"))
             {
+                OnGotStatementType(field, new CompiledType(Type.Integer));
+
                 AddInstruction(Opcode.PUSH_VALUE, prevType.StackArraySize);
                 return;
             }
@@ -1649,6 +1687,7 @@ namespace LanguageCore.BBCode.Generator
         {
             CompiledType targetType = new(@as.Type, FindType);
             @as.Type.SetAnalyzedType(targetType);
+            OnGotStatementType(@as, targetType);
 
             GenerateCodeForStatement(@as.PrevStatement, targetType);
 
@@ -2448,7 +2487,6 @@ namespace LanguageCore.BBCode.Generator
                 Type = StackElementType.Value,
             });
 
-            CurrentFile = null;
             CurrentContext = null;
             TagCount.Push(0);
             InMacro.Push(false);

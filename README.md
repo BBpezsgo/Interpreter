@@ -5,6 +5,8 @@
 
 ## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 
+## [Language Server](https://github.com/BBpezsgo/BBCode-LanguageServer)
+
 ## About
 It's my own programming language with three different output formats: bytecodes (executed by a custom interpreter), x86-64 assembly (that can be assembled by [nasm](https://www.nasm.us/) (WIP)), and [brainfuck](https://esolangs.org/wiki/brainfuck) (with limitations).
 

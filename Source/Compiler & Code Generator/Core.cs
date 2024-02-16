@@ -260,6 +260,8 @@ namespace LanguageCore.Compiler
         CompiledType? pointerTo;
         CompiledType[] typeParameters;
 
+        TypeInstance? typeInstance;
+
         public Type BuiltinType => builtinType;
         /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
@@ -358,6 +360,7 @@ namespace LanguageCore.Compiler
         public bool IsGeneric => !string.IsNullOrEmpty(genericName);
         [MemberNotNullWhen(true, nameof(stackArrayOf))]
         public bool IsStackArray => stackArrayOf is not null;
+        public TypeInstance? Origin => typeInstance;
 
         public int Size
         {
@@ -598,6 +601,8 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         public CompiledType(TypeInstanceSimple type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
+            typeInstance = type;
+
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
             { return; }
 
@@ -631,6 +636,7 @@ namespace LanguageCore.Compiler
 
             Set(typeFinder.Invoke(type.Identifier.Content));
 
+            typeInstance = type;
             typeParameters = CompiledType.FromArray(type.GenericTypes, typeFinder);
         }
 
@@ -641,6 +647,7 @@ namespace LanguageCore.Compiler
             CompiledType returnType = new(type.FunctionReturnType, typeFinder, constComputer);
             CompiledType[] parameterTypes = CompiledType.FromArray(type.FunctionParameterTypes, typeFinder);
 
+            typeInstance = type;
             function = new FunctionType(returnType, parameterTypes);
         }
 
@@ -650,6 +657,7 @@ namespace LanguageCore.Compiler
         {
             ArgumentNullException.ThrowIfNull(constComputer, nameof(constComputer));
 
+            typeInstance = type;
             stackArrayOf = new CompiledType(type.StackArrayOf, typeFinder, constComputer);
             stackArraySizeStatement = type.StackArraySize!;
 
@@ -661,26 +669,19 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         public CompiledType(TypeInstancePointer type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
+            typeInstance = type;
             pointerTo = new CompiledType(type.To, typeFinder, constComputer);
         }
 
         public CompiledType(CompiledType other)
         {
-            this.builtinType = other.builtinType;
-            this.@class = other.@class;
-            this.@enum = other.@enum;
-            this.function = other.function;
-            this.genericName = other.genericName;
-            this.@struct = other.@struct;
-            this.typeParameters = new List<CompiledType>(other.typeParameters).ToArray();
-            this.stackArrayOf = (other.stackArrayOf is null) ? null : new CompiledType(other.stackArrayOf);
-            this.stackArraySize = other.stackArraySize;
-            this.stackArraySizeStatement = other.stackArraySizeStatement;
-            this.pointerTo = other.pointerTo;
+            typeParameters = null!;
+            Set(other);
         }
 
         void Set(CompiledType other)
         {
+            this.typeInstance = other.typeInstance;
             this.builtinType = other.builtinType;
             this.@class = other.@class;
             this.@enum = other.@enum;

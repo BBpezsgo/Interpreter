@@ -11,6 +11,8 @@
 
         public CompiledVariable(int memoryOffset, CompiledType type, VariableDeclaration declaration) : base(declaration)
         {
+            base.CompiledType = type;
+
             this.Type = type;
 
             this.MemoryAddress = memoryOffset;

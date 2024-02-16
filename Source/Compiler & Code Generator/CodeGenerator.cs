@@ -1738,6 +1738,7 @@ namespace LanguageCore.Compiler
                 type = new CompiledType(newVariable.Type, FindType, TryCompute);
 
                 newVariable.Type.SetAnalyzedType(type);
+                newVariable.CompiledType = type;
             }
 
             if (!type.AllGenericsDefined())
@@ -2028,12 +2029,21 @@ namespace LanguageCore.Compiler
 
             if (GetLocalSymbolType(identifier.Content, out CompiledType? type))
             {
-                if (GetParameter(identifier.Content, out _))
-                { identifier.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
-                else if (GetVariable(identifier.Content, out _))
-                { identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName; }
-                else if (GetGlobalVariable(identifier.Content, out _))
-                { identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName; }
+                if (GetParameter(identifier.Content, out var parameter))
+                {
+                    identifier.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
+                    identifier.Reference = parameter;
+                }
+                else if (GetVariable(identifier.Content, out var variable))
+                {
+                    identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName;
+                    identifier.Reference = variable;
+                }
+                else if (GetGlobalVariable(identifier.Content, out var globalVariable))
+                {
+                    identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName;
+                    identifier.Reference = globalVariable;
+                }
 
                 return OnGotStatementType(identifier, type);
             }

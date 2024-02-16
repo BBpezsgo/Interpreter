@@ -588,18 +588,17 @@ namespace LanguageCore.Compiler
             Classes.AddRange(parserResult.Classes);
             Functions.AddRange(parserResult.Functions);
             Macros.AddRange(parserResult.Macros);
+            Enums.AddRange(parserResult.Enums);
 
-            CollectorResult collectorResult;
             if (file != null)
             {
-                collectorResult = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, Settings.BasePath, AnalysisCollection);
-            }
-            else
-            {
-                collectorResult = CollectorResult.Empty;
+                CollectorResult collectorResult = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, Settings.BasePath, AnalysisCollection);
+
+                for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
+                { CompileFile(collectorResult.CollectedASTs[i]); }
             }
 
-            CompileInternal(collectorResult);
+            CompileInternal();
 
             return new CompilerResult(
                 CompiledFunctions,
@@ -619,7 +618,10 @@ namespace LanguageCore.Compiler
         {
             CollectorResult collectorResult = SourceCodeManager.Collect(usings, null, PrintCallback, Settings.BasePath, AnalysisCollection);
 
-            CompileInternal(collectorResult);
+            for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
+            { CompileFile(collectorResult.CollectedASTs[i]); }
+
+            CompileInternal();
 
             return new CompilerResult(
                 CompiledFunctions,
@@ -635,13 +637,8 @@ namespace LanguageCore.Compiler
                 null);
         }
 
-        void CompileInternal(CollectorResult collectorResult)
+        void CompileInternal()
         {
-            for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
-            { CompileFile(collectorResult.CollectedASTs[i]); }
-
-            #region Compile test external functions
-
             foreach (CompileTag hash in Hashes)
             {
                 switch (hash.HashName.Content)
@@ -706,31 +703,17 @@ ExitBreak:
                 continue;
             }
 
-            #endregion
-
-            #region Compile Classes
-
             this.CompiledClasses = new CompiledClass[Classes.Count];
             for (int i = 0; i < Classes.Count; i++)
             { this.CompiledClasses[i] = CompileClass(Classes[i]); }
-
-            #endregion
-
-            #region Compile Enums
 
             this.CompiledEnums = new CompiledEnum[Enums.Count];
             for (int i = 0; i < Enums.Count; i++)
             { this.CompiledEnums[i] = CompileEnum(Enums[i]); }
 
-            #endregion
-
-            #region Compile Structs
-
             this.CompiledStructs = new CompiledStruct[Structs.Count];
             for (int i = 0; i < Structs.Count; i++)
             { this.CompiledStructs[i] = CompileStruct(Structs[i]); }
-
-            #endregion
 
             for (int i = 0; i < CompiledStructs.Length; i++)
             {
@@ -742,6 +725,7 @@ ExitBreak:
                     CompiledStructs[i].Fields[j] = compiledField;
                 }
             }
+
             for (int i = 0; i < CompiledClasses.Length; i++)
             {
                 CompiledClass @class = CompiledClasses[i];
@@ -764,8 +748,6 @@ ExitBreak:
                 { GenericParameters.Pop(); }
             }
 
-            #region Compile Operators
-
             {
                 List<CompiledOperator> compiledOperators = new();
 
@@ -781,10 +763,6 @@ ExitBreak:
 
                 this.CompiledOperators = compiledOperators.ToArray();
             }
-
-            #endregion
-
-            #region Compile Functions
 
             {
                 List<CompiledFunction> compiledFunctions = new();
@@ -873,8 +851,6 @@ ExitBreak:
                 this.CompiledFunctions = compiledFunctions.ToArray();
                 this.CompiledGeneralFunctions = compiledGeneralFunctions.ToArray();
             }
-
-            #endregion
         }
 
         /// <exception cref="EndlessLoopException"/>

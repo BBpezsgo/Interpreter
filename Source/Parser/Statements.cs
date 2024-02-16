@@ -416,6 +416,7 @@ namespace LanguageCore.Parser.Statement
         public readonly Token VariableName;
         public readonly StatementWithValue? InitialValue;
         public readonly Token[] Modifiers;
+        public CompiledType? CompiledType;
 
         public string? FilePath { get; set; }
 
@@ -429,6 +430,7 @@ namespace LanguageCore.Parser.Statement
             InitialValue = other.InitialValue;
             Modifiers = other.Modifiers;
             FilePath = other.FilePath;
+            CompiledType = other.CompiledType;
         }
 
         public VariableDeclaration(Token[] modifiers, TypeInstance type, Token variableName, StatementWithValue? initialValue)

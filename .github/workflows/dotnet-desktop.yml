@@ -95,6 +95,8 @@ jobs:
           ./BuildJob/Windows_x64_RuntimeIndependent.zip
           ./BuildJob/Windows_x64_RuntimeDependent.zip
           ./BuildJob/Windows_x64_AOT.zip
+          ./BuildJob/LanguageServer_Windows_x64_RuntimeIndependent.zip
+          ./BuildJob/LanguageServer_Windows_x64_RuntimeDependent.zip
         tag_name: ${{ steps.date.outputs.date }}
         name: Release ${{ steps.date.outputs.date }}
         fail_on_unmatched_files: true

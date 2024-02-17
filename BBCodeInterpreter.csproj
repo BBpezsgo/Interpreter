@@ -60,8 +60,4 @@
     <None Include=".github\workflows\dotnet-desktop.yml" />
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="call .\Scripts\post-build.bat" />
-  </Target>
-
 </Project>

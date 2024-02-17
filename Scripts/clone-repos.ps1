@@ -15,3 +15,9 @@ if (Test-Path -Path ./Interpreter) { } else
     mkdir ./Interpreter
     git clone https://github.com/BBpezsgo/Interpreter.git ./Interpreter
 }
+
+if (Test-Path -Path ./LanguageServer) { } else
+{
+    mkdir ./LanguageServer
+    git clone https://github.com/BBpezsgo/BBCode-LanguageServer.git ./LanguageServer
+}

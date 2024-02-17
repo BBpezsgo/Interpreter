@@ -39,6 +39,84 @@ namespace LanguageCore.Compiler
 
         public readonly FileInfo? File;
 
+        public readonly IEnumerable<string> Files
+        {
+            get
+            {
+                HashSet<string> alreadyExists = new();
+
+                foreach (CompiledFunction function in Functions)
+                {
+                    string? file = function.FilePath;
+                    if (file is not null && !alreadyExists.Contains(file))
+                    {
+                        alreadyExists.Add(file);
+                        yield return file;
+                    }
+                }
+
+                foreach (MacroDefinition macro in Macros)
+                {
+                    string? file = macro.FilePath;
+                    if (file is not null && !alreadyExists.Contains(file))
+                    {
+                        alreadyExists.Add(file);
+                        yield return file;
+                    }
+                }
+
+                foreach (CompiledGeneralFunction generalFunction in GeneralFunctions)
+                {
+                    string? file = generalFunction.FilePath;
+                    if (file is not null && !alreadyExists.Contains(file))
+                    {
+                        alreadyExists.Add(file);
+                        yield return file;
+                    }
+                }
+
+                foreach (CompiledOperator @operator in Operators)
+                {
+                    string? file = @operator.FilePath;
+                    if (file is not null && !alreadyExists.Contains(file))
+                    {
+                        alreadyExists.Add(file);
+                        yield return file;
+                    }
+                }
+
+                foreach (CompiledStruct @struct in Structs)
+                {
+                    string? file = @struct.FilePath;
+                    if (file is not null && !alreadyExists.Contains(file))
+                    {
+                        alreadyExists.Add(file);
+                        yield return file;
+                    }
+                }
+
+                foreach (CompiledClass @class in Classes)
+                {
+                    string? file = @class.FilePath;
+                    if (file is not null && !alreadyExists.Contains(file))
+                    {
+                        alreadyExists.Add(file);
+                        yield return file;
+                    }
+                }
+
+                foreach (CompiledEnum @enum in Enums)
+                {
+                    string? file = @enum.FilePath;
+                    if (file is not null && !alreadyExists.Contains(file))
+                    {
+                        alreadyExists.Add(file);
+                        yield return file;
+                    }
+                }
+            }
+        }
+
         public static CompilerResult Empty => new(
             Array.Empty<CompiledFunction>(),
             Array.Empty<MacroDefinition>(),

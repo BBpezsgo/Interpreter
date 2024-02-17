@@ -12,3 +12,13 @@ if (Test-Path -Path ./Published/Windows_x64_AOT)
 {
     Compress-Archive -Path ./Published/Windows_x64_AOT -DestinationPath ./Windows_x64_AOT.zip
 }
+
+if (Test-Path -Path ./Published/LanguageServer_Windows_x64_RuntimeIndependent)
+{
+    Compress-Archive -Path ./Published/LanguageServer_Windows_x64_RuntimeIndependent -DestinationPath ./LanguageServer_Windows_x64_RuntimeIndependent.zip
+}
+
+if (Test-Path -Path ./Published/LanguageServer_Windows_x64_RuntimeDependent)
+{
+    Compress-Archive -Path ./Published/LanguageServer_Windows_x64_RuntimeDependent -DestinationPath ./LanguageServer_Windows_x64_RuntimeDependent.zip
+}

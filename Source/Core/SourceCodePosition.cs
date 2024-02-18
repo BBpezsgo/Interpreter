@@ -58,12 +58,11 @@ namespace LanguageCore
             Range = Position.UnknownPosition.Range;
             AbsoluteRange = Position.UnknownPosition.AbsoluteRange;
 
-            for (int i = 0; i < elements.Length; i++)
+            if (elements.Length > 0)
             {
-                Position position = elements[i];
+                Position position = elements[0];
                 Range = position.Range;
                 AbsoluteRange = position.AbsoluteRange;
-                break;
             }
 
             for (int i = 1; i < elements.Length; i++)

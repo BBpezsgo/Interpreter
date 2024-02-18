@@ -313,8 +313,8 @@ namespace LanguageCore.Compiler
                     _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
                 };
 
-                if (@struct is not null) return @struct.Name.Content;
-                if (@class is not null) return @class.Name.Content;
+                if (@struct is not null) return @struct.Identifier.Content;
+                if (@class is not null) return @class.Identifier.Content;
                 if (@enum is not null) return @enum.Identifier.Content;
                 if (function is not null) return function.ToString();
                 if (pointerTo is not null) return $"{pointerTo.Name}*";
@@ -562,14 +562,25 @@ namespace LanguageCore.Compiler
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type, out this.builtinType))
             { return; }
 
-            if (typeFinder == null) throw new InternalException($"Can't parse {type} to CompiledType");
+            if (typeFinder == null) throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}");
+
+            Set(typeFinder.Invoke(type));
+        }
+
+        /// <exception cref="InternalException"/>
+        public CompiledType(Token type, Func<Token, CompiledType>? typeFinder) : this()
+        {
+            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Content, out this.builtinType))
+            { return; }
+
+            if (typeFinder == null) throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}", type, null);
 
             Set(typeFinder.Invoke(type));
         }
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstance type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstance type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
             if (type is TypeInstanceSimple simpleType)
             {
@@ -599,7 +610,7 @@ namespace LanguageCore.Compiler
         }
 
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceSimple type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstanceSimple type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
             typeInstance = type;
 
@@ -632,9 +643,9 @@ namespace LanguageCore.Compiler
                 return;
             }
 
-            if (typeFinder == null) throw new InternalException($"Can't parse \"{type}\" to \"{nameof(CompiledType)}\"");
+            if (typeFinder == null) throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}", type, null);
 
-            Set(typeFinder.Invoke(type.Identifier.Content));
+            Set(typeFinder.Invoke(type.Identifier));
 
             typeInstance = type;
             typeParameters = CompiledType.FromArray(type.GenericTypes, typeFinder);
@@ -642,7 +653,7 @@ namespace LanguageCore.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceFunction type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstanceFunction type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
             CompiledType returnType = new(type.FunctionReturnType, typeFinder, constComputer);
             CompiledType[] parameterTypes = CompiledType.FromArray(type.FunctionParameterTypes, typeFinder);
@@ -653,7 +664,7 @@ namespace LanguageCore.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceStackArray type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstanceStackArray type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
             ArgumentNullException.ThrowIfNull(constComputer, nameof(constComputer));
 
@@ -667,7 +678,7 @@ namespace LanguageCore.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstancePointer type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstancePointer type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
             typeInstance = type;
             pointerTo = new CompiledType(type.To, typeFinder, constComputer);
@@ -789,8 +800,8 @@ namespace LanguageCore.Compiler
 
             if (!CompiledType.Equals(this.typeParameters, other.typeParameters)) return false;
 
-            if (this.IsClass && other.IsClass) return this.@class.Name.Content == other.@class.Name.Content;
-            if (this.IsStruct && other.IsStruct) return this.@struct.Name.Content == other.@struct.Name.Content;
+            if (this.IsClass && other.IsClass) return this.@class.Identifier.Content == other.@class.Identifier.Content;
+            if (this.IsStruct && other.IsStruct) return this.@struct.Identifier.Content == other.@struct.Identifier.Content;
             if (this.IsEnum && other.IsEnum) return this.@enum.Identifier.Content == other.@enum.Identifier.Content;
             if (this.IsFunction && other.IsFunction) return this.@function == other.@function;
             if (this.IsStackArray && other.IsStackArray) return this.stackArrayOf == other.stackArrayOf;
@@ -839,10 +850,10 @@ namespace LanguageCore.Compiler
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(otherSimple.Identifier.Content, out Type type))
             { return type == this.builtinType; }
 
-            if (this.@struct != null && this.@struct.Name.Content == otherSimple.Identifier.Content)
+            if (this.@struct != null && this.@struct.Identifier.Content == otherSimple.Identifier.Content)
             { return true; }
 
-            if (this.@class != null && this.@class.Name.Content == otherSimple.Identifier.Content)
+            if (this.@class != null && this.@class.Identifier.Content == otherSimple.Identifier.Content)
             { return true; }
 
             if (this.@enum != null && this.@enum.Identifier.Content == otherSimple.Identifier.Content)
@@ -942,7 +953,7 @@ namespace LanguageCore.Compiler
 
                 if (defined.IsClass && passed.IsClass)
                 {
-                    if (defined.Class.Name.Content != passed.Class.Name.Content) return false;
+                    if (defined.Class.Identifier.Content != passed.Class.Identifier.Content) return false;
                     if (defined.Class.TemplateInfo is not null && passed.Class.TemplateInfo is not null)
                     {
                         if (defined.Class.TemplateInfo.TypeParameters.Length != passed.TypeParameters.Length)
@@ -985,9 +996,9 @@ namespace LanguageCore.Compiler
             genericName = content,
         };
 
-        public static CompiledType[] FromArray(IEnumerable<TypeInstance> types, Func<string, CompiledType> typeFinder)
+        public static CompiledType[] FromArray(IEnumerable<TypeInstance> types, Func<Token, CompiledType> typeFinder)
             => CompiledType.FromArray(types.ToArray(), typeFinder);
-        public static CompiledType[] FromArray(TypeInstance[]? types, Func<string, CompiledType>? typeFinder)
+        public static CompiledType[] FromArray(TypeInstance[]? types, Func<Token, CompiledType>? typeFinder)
         {
             if (types is null || types.Length == 0) return Array.Empty<CompiledType>();
 

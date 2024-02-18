@@ -1,6 +1,6 @@
 (Get-Content "./Interpreter/BBCodeInterpreter.csproj") -replace 'C:\\Users\\bazsi\\source\\repos', '..' | Set-Content "./Interpreter/BBCodeInterpreter.csproj"
 
-(Get-Content "./LanguageServer/BBCodeLanguageServer.csproj") -replace '<BaseOutputPath>C:\\Users\\bazsi\\Documents\\GitHub\\InterpreterVSCodeExtension\\language-server</BaseOutputPath>', '' | Set-Content "./LanguageServer/BBCodeLanguageServer.csproj"
+(Get-Content "./LanguageServer/BBCodeLanguageServer.csproj") -replace '<BaseOutputPath>C:\\Users\\bazsi\\Documents\\GitHub\\InterpreterVSCodeExtension\\out\\language-server</BaseOutputPath>', '' | Set-Content "./LanguageServer/BBCodeLanguageServer.csproj"
 
 (Get-Content "./LanguageServer/BBCodeLanguageServer.csproj") -replace '..\\..\\BBCode\\BBCodeInterpreter.csproj', '..\Interpreter\\BBCodeInterpreter.csproj' | Set-Content "./LanguageServer/BBCodeLanguageServer.csproj"
 

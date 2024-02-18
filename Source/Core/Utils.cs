@@ -15,6 +15,14 @@ namespace LanguageCore
         string IReadable.ToReadable(Func<Parser.Statement.StatementWithValue, CompiledType> typeSearch) => ToReadable();
     }
 
+    [Flags]
+    public enum ToReadableFlags
+    {
+        None = 0b_0000,
+        ParameterIdentifiers = 0b_0001,
+        Modifiers = 0b_0010,
+    }
+
     public static partial class Utils
     {
         /// <exception cref="NotImplementedException"/>

@@ -70,5 +70,7 @@ namespace LanguageCore.Compiler
             member = null;
             return false;
         }
+
+        public override string ToString() => $"enum {Identifier} : {Type}";
     }
 }

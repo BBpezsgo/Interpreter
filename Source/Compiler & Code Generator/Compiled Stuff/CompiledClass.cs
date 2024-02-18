@@ -153,7 +153,7 @@ namespace LanguageCore.Compiler
             StringBuilder result = new();
             result.Append("class ");
 
-            result.Append(this.Name.Content);
+            result.Append(this.Identifier.Content);
 
             if (this.TemplateInfo != null)
             {

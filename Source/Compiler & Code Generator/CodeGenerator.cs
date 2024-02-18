@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Collections.Immutable;
-using LanguageCore.BBCode.Generator;
 using ConsoleGUI;
+using LanguageCore.BBCode.Generator;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -477,7 +477,7 @@ namespace LanguageCore.Compiler
                 {
                     if (definedType == typeName)
                     {
-                        return @struct.Name.Content;
+                        return @struct.Identifier.Content;
                     }
                 }
             }
@@ -487,7 +487,7 @@ namespace LanguageCore.Compiler
                 {
                     if (definedType == typeName)
                     {
-                        return @class.Name.Content;
+                        return @class.Identifier.Content;
                     }
                 }
             }
@@ -1040,14 +1040,33 @@ namespace LanguageCore.Compiler
         {
             compiledFunction = null;
 
-            for (int i = 0; i < this.CompiledFunctions.Length; i++)
+            for (int i = 0; i < CompiledFunctions.Length; i++)
             {
-                CompiledFunction function = this.CompiledFunctions[i];
+                CompiledFunction function = CompiledFunctions[i];
 
                 if (!function.Identifier.Equals(name.Content)) continue;
 
                 if (compiledFunction is not null)
                 { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, CurrentFile); }
+
+                compiledFunction = function;
+            }
+
+            return compiledFunction is not null;
+        }
+
+        public static bool GetFunction(CompiledFunction[] compiledFunctions, Token name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+        {
+            compiledFunction = null;
+
+            for (int i = 0; i < compiledFunctions.Length; i++)
+            {
+                CompiledFunction function = compiledFunctions[i];
+
+                if (!function.Identifier.Equals(name.Content)) continue;
+
+                if (compiledFunction is not null)
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, null); }
 
                 compiledFunction = function;
             }
@@ -1302,7 +1321,7 @@ namespace LanguageCore.Compiler
             {
                 CompiledStruct @struct = CompiledStructs[i];
 
-                if (@struct.Name.Content != structName) continue;
+                if (@struct.Identifier.Content != structName) continue;
 
                 compiledStruct = @struct;
                 return true;
@@ -1319,7 +1338,7 @@ namespace LanguageCore.Compiler
                 CompiledStruct? @struct = structs[i];
                 if (@struct == null) continue;
 
-                if (@struct.Name.Content == structName)
+                if (@struct.Identifier.Content == structName)
                 {
                     compiledStruct = @struct;
                     return true;
@@ -1371,7 +1390,7 @@ namespace LanguageCore.Compiler
                 CompiledClass? @class = classes[i];
                 if (@class == null) continue;
 
-                if (@class.Name.Content != className) continue;
+                if (@class.Identifier.Content != className) continue;
                 if (typeParameterCount > 0 && @class.TemplateInfo != null)
                 { if (@class.TemplateInfo.TypeParameters.Length != typeParameterCount) continue; }
 
@@ -1388,9 +1407,6 @@ namespace LanguageCore.Compiler
         #region FindType()
 
         /// <exception cref="CompilerException"/>
-        protected CompiledType FindType(Token name) => FindType(name.Content, name);
-
-        /// <exception cref="CompilerException"/>
         protected CompiledType FindType(string name, IPositioned? position) => FindType(name, position?.Position ?? Position.UnknownPosition);
 
         /// <exception cref="CompilerException"/>
@@ -1398,7 +1414,7 @@ namespace LanguageCore.Compiler
 
         /// <param name="position">Used for exceptions</param>
         /// <exception cref="CompilerException"/>
-        CompiledType FindType(string name, Position position)
+        protected CompiledType FindType(string name, Position position)
         {
             if (GetStruct(name, out CompiledStruct? @struct)) return new CompiledType(@struct);
             if (GetClass(name, out CompiledClass? @class)) return new CompiledType(@class);
@@ -1414,6 +1430,47 @@ namespace LanguageCore.Compiler
             { return globalVariable.Type; }
 
             throw new CompilerException($"Type \"{name}\" not found", position, CurrentFile);
+        }
+
+        /// <exception cref="CompilerException"/>
+        protected CompiledType FindType(Token name)
+        {
+            if (GetStruct(name.Content, out CompiledStruct? @struct))
+            {
+                name.AnalyzedType = TokenAnalyzedType.Struct;
+                @struct.AddReference(new TypeInstanceSimple(name), CurrentFile);
+
+                return new CompiledType(@struct);
+            }
+
+            if (GetClass(name.Content, out CompiledClass? @class))
+            {
+                name.AnalyzedType = TokenAnalyzedType.Class;
+                @class.AddReference(new TypeInstanceSimple(name), CurrentFile);
+
+                return new CompiledType(@class);
+            }
+
+            if (GetEnum(name.Content, out CompiledEnum? @enum))
+            {
+                name.AnalyzedType = TokenAnalyzedType.Enum;
+                return new CompiledType(@enum);
+            }
+
+            if (TypeArguments.TryGetValue(name.Content, out CompiledType? typeArgument))
+            { return typeArgument; }
+
+            if (GetFunction(name, out CompiledFunction? function))
+            {
+                name.AnalyzedType = TokenAnalyzedType.FunctionName;
+                function.AddReference(new Identifier(name), CurrentFile);
+                return new CompiledType(new FunctionType(function));
+            }
+
+            if (GetGlobalVariable(name.Content, out CompiledVariable? globalVariable))
+            { return globalVariable.Type; }
+
+            throw new CompilerException($"Type \"{name}\" not found", name, CurrentFile);
         }
 
         /// <exception cref="InternalException"/>
@@ -2029,17 +2086,18 @@ namespace LanguageCore.Compiler
 
             if (GetLocalSymbolType(identifier.Content, out CompiledType? type))
             {
-                if (GetParameter(identifier.Content, out var parameter))
+                if (GetParameter(identifier.Content, out CompiledParameter? parameter))
                 {
-                    identifier.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
+                    if (identifier.Content != "this")
+                    { identifier.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
                     identifier.Reference = parameter;
                 }
-                else if (GetVariable(identifier.Content, out var variable))
+                else if (GetVariable(identifier.Content, out CompiledVariable? variable))
                 {
                     identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                     identifier.Reference = variable;
                 }
-                else if (GetGlobalVariable(identifier.Content, out var globalVariable))
+                else if (GetGlobalVariable(identifier.Content, out CompiledVariable? globalVariable))
                 {
                     identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                     identifier.Reference = globalVariable;
@@ -2116,7 +2174,7 @@ namespace LanguageCore.Compiler
                     return OnGotStatementType(field, definedField.Type);
                 }
 
-                throw new CompilerException($"Field definition \"{prevStatementType}\" not found in struct \"{prevStatementType.Struct.Name.Content}\"", field.FieldName, CurrentFile);
+                throw new CompilerException($"Field definition \"{prevStatementType}\" not found in struct \"{prevStatementType.Struct.Identifier.Content}\"", field.FieldName, CurrentFile);
             }
 
             if (prevStatementType.IsClass)

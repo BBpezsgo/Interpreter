@@ -1207,7 +1207,8 @@ namespace LanguageCore.ASM.Generator
 
             if (GetParameter(statement.Content, out CompiledParameter? compiledParameter))
             {
-                statement.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
+                if (statement.Content != "this")
+                { statement.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
                 ValueAddress address = GetBaseAddress(compiledParameter);
                 StackLoad(address, compiledParameter.Type.SizeOnStack);
                 return;

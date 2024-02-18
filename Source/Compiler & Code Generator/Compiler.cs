@@ -117,6 +117,46 @@ namespace LanguageCore.Compiler
             }
         }
 
+        public readonly IEnumerable<Statement> Statements
+        {
+            get
+            {
+                for (int i = 0; i < TopLevelStatements.Length; i++)
+                { yield return TopLevelStatements[i]; }
+
+                foreach (CompiledFunction function in Functions)
+                {
+                    if (function.Block != null) yield return function.Block;
+                }
+
+                foreach (CompiledGeneralFunction function in GeneralFunctions)
+                {
+                    if (function.Block != null) yield return function.Block;
+                }
+
+                foreach (MacroDefinition macro in Macros)
+                {
+                    yield return macro.Block;
+                }
+
+                foreach (CompiledOperator @operator in Operators)
+                {
+                    if (@operator.Block != null) yield return @operator.Block;
+                }
+            }
+        }
+
+        public readonly ParserResult AST => new(
+            Enumerable.Empty<Error>(),
+            Functions,
+            Macros,
+            Structs,
+            Enumerable.Empty<UsingDefinition>(),
+            Enumerable.Empty<CompileTag>(),
+            Classes,
+            TopLevelStatements,
+            Enums);
+
         public static CompilerResult Empty => new(
             Array.Empty<CompiledFunction>(),
             Array.Empty<MacroDefinition>(),
@@ -154,6 +194,96 @@ namespace LanguageCore.Compiler
             Enums = enums;
             TopLevelStatements = topLevelStatements;
             File = file;
+        }
+
+        public CompiledFunction? GetFunctionAt(string file, SinglePosition position)
+        {
+            for (int i = 0; i < Functions.Length; i++)
+            {
+                if (Functions[i].FilePath != file)
+                { continue; }
+
+                if (!Functions[i].Identifier.Position.Range.Contains(position))
+                { continue; }
+
+                return Functions[i];
+            }
+            return null;
+        }
+
+        public CompiledGeneralFunction? GetGeneralFunctionAt(string file, SinglePosition position)
+        {
+            for (int i = 0; i < GeneralFunctions.Length; i++)
+            {
+                if (GeneralFunctions[i].FilePath != file)
+                { continue; }
+
+                if (!GeneralFunctions[i].Identifier.Position.Range.Contains(position))
+                { continue; }
+
+                return GeneralFunctions[i];
+            }
+            return null;
+        }
+
+        public CompiledOperator? GetOperatorAt(string file, SinglePosition position)
+        {
+            for (int i = 0; i < Operators.Length; i++)
+            {
+                if (Operators[i].FilePath != file)
+                { continue; }
+
+                if (!Operators[i].Identifier.Position.Range.Contains(position))
+                { continue; }
+
+                return Operators[i];
+            }
+            return null;
+        }
+
+        public CompiledClass? GetClassAt(string file, SinglePosition position)
+        {
+            for (int i = 0; i < Classes.Length; i++)
+            {
+                if (Classes[i].FilePath != file)
+                { continue; }
+
+                if (!Classes[i].Identifier.Position.Range.Contains(position))
+                { continue; }
+
+                return Classes[i];
+            }
+            return null;
+        }
+
+        public CompiledStruct? GetStructAt(string file, SinglePosition position)
+        {
+            for (int i = 0; i < Structs.Length; i++)
+            {
+                if (Structs[i].FilePath != file)
+                { continue; }
+
+                if (!Structs[i].Identifier.Position.Range.Contains(position))
+                { continue; }
+
+                return Structs[i];
+            }
+            return null;
+        }
+
+        public CompiledEnum? GetEnumAt(string file, SinglePosition position)
+        {
+            for (int i = 0; i < Enums.Length; i++)
+            {
+                if (Enums[i].FilePath != file)
+                { continue; }
+
+                if (!Enums[i].Identifier.Position.Range.Contains(position))
+                { continue; }
+
+                return Enums[i];
+            }
+            return null;
         }
     }
 
@@ -235,13 +365,17 @@ namespace LanguageCore.Compiler
             AnalysisCollection = analysisCollection;
         }
 
-        CompiledType GetCustomType(string name)
+        CompiledType FindType(Token name)
         {
+            if (CodeGenerator.GetStruct(CompiledStructs, name.Content, out CompiledStruct? @struct)) return new CompiledType(@struct);
+            if (CodeGenerator.GetClass(CompiledClasses, name.Content, out CompiledClass? @class)) return new CompiledType(@class);
+            if (CodeGenerator.GetEnum(CompiledEnums, name.Content, out CompiledEnum? @enum)) return new CompiledType(@enum);
+
             for (int i = 0; i < GenericParameters.Count; i++)
             {
                 for (int j = 0; j < GenericParameters[i].Length; j++)
                 {
-                    if (GenericParameters[i][j].Content == name)
+                    if (GenericParameters[i][j].Content == name.Content)
                     {
                         GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
                         return CompiledType.CreateGeneric(GenericParameters[i][j].Content);
@@ -249,11 +383,10 @@ namespace LanguageCore.Compiler
                 }
             }
 
-            if (CodeGenerator.GetStruct(CompiledStructs, name, out CompiledStruct? @struct)) return new CompiledType(@struct);
-            if (CodeGenerator.GetClass(CompiledClasses, name, out CompiledClass? @class)) return new CompiledType(@class);
-            if (CodeGenerator.GetEnum(CompiledEnums, name, out CompiledEnum? @enum)) return new CompiledType(@enum);
+            if (CodeGenerator.GetFunction(CompiledFunctions, name, out CompiledFunction? function))
+            { return new CompiledType(new FunctionType(function)); }
 
-            throw new InternalException($"Type \"{name}\" not found");
+            throw new InternalException($"Type \"{name}\" not found", name, null);
         }
 
         protected string? TypeDefinitionReplacer(string? typeName)
@@ -264,7 +397,7 @@ namespace LanguageCore.Compiler
                 {
                     if (definedType == typeName)
                     {
-                        return @struct.Name.Content;
+                        return @struct.Identifier.Content;
                     }
                 }
             }
@@ -274,7 +407,7 @@ namespace LanguageCore.Compiler
                 {
                     if (definedType == typeName)
                     {
-                        return @class.Name.Content;
+                        return @class.Identifier.Content;
                     }
                 }
             }
@@ -318,7 +451,7 @@ namespace LanguageCore.Compiler
             return result;
         }
 
-        static CompiledType[] CompileTypes(ParameterDefinition[] parameters, Func<string, CompiledType> unknownTypeCallback)
+        static CompiledType[] CompileTypes(ParameterDefinition[] parameters, Func<Token, CompiledType> unknownTypeCallback)
         {
             CompiledType[] result = new CompiledType[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
@@ -331,13 +464,13 @@ namespace LanguageCore.Compiler
 
         CompiledStruct CompileStruct(StructDefinition @struct)
         {
-            if (LanguageConstants.Keywords.Contains(@struct.Name.Content))
-            { throw new CompilerException($"Illegal struct name '{@struct.Name.Content}'", @struct.Name, @struct.FilePath); }
+            if (LanguageConstants.Keywords.Contains(@struct.Identifier.Content))
+            { throw new CompilerException($"Illegal struct name '{@struct.Identifier.Content}'", @struct.Identifier, @struct.FilePath); }
 
-            @struct.Name.AnalyzedType = TokenAnalyzedType.Struct;
+            @struct.Identifier.AnalyzedType = TokenAnalyzedType.Struct;
 
-            if (CodeGenerator.GetStruct(CompiledStructs, @struct.Name.Content, out _))
-            { throw new CompilerException($"Struct with name '{@struct.Name.Content}' already exist", @struct.Name, @struct.FilePath); }
+            if (CodeGenerator.GetStruct(CompiledStructs, @struct.Identifier.Content, out _))
+            { throw new CompilerException($"Struct with name '{@struct.Identifier.Content}' already exist", @struct.Identifier, @struct.FilePath); }
 
             CompiledAttributeCollection attributes = CompileAttributes(@struct.Attributes);
 
@@ -346,13 +479,13 @@ namespace LanguageCore.Compiler
 
         CompiledClass CompileClass(ClassDefinition @class)
         {
-            if (LanguageConstants.Keywords.Contains(@class.Name.Content))
-            { throw new CompilerException($"Illegal class name '{@class.Name.Content}'", @class.Name, @class.FilePath); }
+            if (LanguageConstants.Keywords.Contains(@class.Identifier.Content))
+            { throw new CompilerException($"Illegal class name '{@class.Identifier.Content}'", @class.Identifier, @class.FilePath); }
 
-            @class.Name.AnalyzedType = TokenAnalyzedType.Class;
+            @class.Identifier.AnalyzedType = TokenAnalyzedType.Class;
 
-            if (CodeGenerator.GetClass(CompiledClasses, @class.Name.Content, out _))
-            { throw new CompilerException($"Class with name '{@class.Name.Content}' already exist", @class.Name, @class.FilePath); }
+            if (CodeGenerator.GetClass(CompiledClasses, @class.Identifier.Content, out _))
+            { throw new CompilerException($"Class with name '{@class.Identifier.Content}' already exist", @class.Identifier, @class.FilePath); }
 
             CompiledAttributeCollection attributes = CompileAttributes(@class.Attributes);
 
@@ -370,7 +503,7 @@ namespace LanguageCore.Compiler
                 { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
             }
 
-            CompiledType type = new(function.Type, GetCustomType);
+            CompiledType type = new(function.Type, FindType);
             function.Type.SetAnalyzedType(type);
 
             if (attributes.TryGetAttribute<string>("External", out string? externalName, out AttributeValues? attribute))
@@ -387,7 +520,7 @@ namespace LanguageCore.Compiler
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
                         Type definedParameterType = externalFunction.ParameterTypes[i];
-                        CompiledType passedParameterType = new(function.Parameters[i].Type, GetCustomType);
+                        CompiledType passedParameterType = new(function.Parameters[i].Type, FindType);
                         function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                         if (passedParameterType == definedParameterType)
@@ -424,7 +557,7 @@ namespace LanguageCore.Compiler
                     for (int i = 0; i < builtinFunction.Parameters.Length; i++)
                     {
                         CompiledType definedParameterType = builtinFunction.Parameters[i];
-                        CompiledType passedParameterType = new(function.Parameters[i].Type, GetCustomType);
+                        CompiledType passedParameterType = new(function.Parameters[i].Type, FindType);
                         function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                         if (passedParameterType == definedParameterType)
@@ -440,7 +573,7 @@ namespace LanguageCore.Compiler
 
             CompiledFunction result = new(
                 type,
-                CompileTypes(function.Parameters.ToArray(), GetCustomType),
+                CompileTypes(function.Parameters.ToArray(), FindType),
                 function
                 )
             {
@@ -457,7 +590,7 @@ namespace LanguageCore.Compiler
         {
             CompiledAttributeCollection attributes = CompileAttributes(function.Attributes);
 
-            CompiledType type = new(function.Type, GetCustomType);
+            CompiledType type = new(function.Type, FindType);
             function.Type.SetAnalyzedType(type);
 
             if (attributes.TryGetAttribute<string>("External", out string? name, out AttributeValues? attribute))
@@ -491,7 +624,7 @@ namespace LanguageCore.Compiler
 
             return new CompiledOperator(
                 type,
-                CompileTypes(function.Parameters.ToArray(), GetCustomType),
+                CompileTypes(function.Parameters.ToArray(), FindType),
                 function
                 )
             {
@@ -503,7 +636,7 @@ namespace LanguageCore.Compiler
         {
             return new CompiledGeneralFunction(
                 returnType,
-                CompileTypes(function.Parameters.ToArray(), GetCustomType),
+                CompileTypes(function.Parameters.ToArray(), FindType),
                 function
                 );
         }
@@ -555,17 +688,17 @@ namespace LanguageCore.Compiler
         {
             foreach (ClassDefinition @class in Classes)
             {
-                if (@class.Name.Content == symbol)
+                if (@class.Identifier.Content == symbol)
                 {
-                    where = @class.Name;
+                    where = @class.Identifier;
                     return true;
                 }
             }
             foreach (StructDefinition @struct in Structs)
             {
-                if (@struct.Name.Content == symbol)
+                if (@struct.Identifier.Content == symbol)
                 {
-                    where = @struct.Name;
+                    where = @struct.Identifier;
                     return true;
                 }
             }
@@ -627,16 +760,16 @@ namespace LanguageCore.Compiler
 
             foreach (StructDefinition @struct in collectedAST.ParserResult.Structs)
             {
-                if (IsSymbolExists(@struct.Name.Content, out _))
-                { AnalysisCollection?.Errors.Add(new Error($"Symbol {@struct.Name} already defined", @struct.Name, @struct.FilePath)); continue; }
+                if (IsSymbolExists(@struct.Identifier.Content, out _))
+                { AnalysisCollection?.Errors.Add(new Error($"Symbol {@struct.Identifier} already defined", @struct.Identifier, @struct.FilePath)); continue; }
                 else
                 { Structs.Add(@struct); }
             }
 
             foreach (ClassDefinition @class in collectedAST.ParserResult.Classes)
             {
-                if (IsSymbolExists(@class.Name.Content, out _))
-                { AnalysisCollection?.Errors.Add(new Error($"Symbol {@class.Name} already defined", @class.Name, @class.FilePath)); continue; }
+                if (IsSymbolExists(@class.Identifier.Content, out _))
+                { AnalysisCollection?.Errors.Add(new Error($"Symbol {@class.Identifier} already defined", @class.Identifier, @class.FilePath)); continue; }
                 else
                 { Classes.Add(@class); }
 
@@ -798,7 +931,7 @@ ExitBreak:
                 for (int j = 0; j < CompiledStructs[i].Fields.Length; j++)
                 {
                     FieldDefinition field = ((StructDefinition)CompiledStructs[i]).Fields[j];
-                    CompiledField compiledField = new(new CompiledType(field.Type, GetCustomType), null, field);
+                    CompiledField compiledField = new(new CompiledType(field.Type, FindType), null, field);
                     field.Type.SetAnalyzedType(compiledField.Type);
                     CompiledStructs[i].Fields[j] = compiledField;
                 }
@@ -817,7 +950,7 @@ ExitBreak:
                 for (int j = 0; j < @class.Fields.Length; j++)
                 {
                     FieldDefinition field = ((ClassDefinition)@class).Fields[j];
-                    CompiledField newField = new(new CompiledType(field.Type, GetCustomType), @class, field);
+                    CompiledField newField = new(new CompiledType(field.Type, FindType), @class, field);
                     field.Type.SetAnalyzedType(newField.Type);
                     @class.Fields[j] = newField;
                 }
@@ -871,7 +1004,7 @@ ExitBreak:
                             parameters.Insert(0,
                                 new ParameterDefinition(
                                     new Token[1] { Token.CreateAnonymous("this") },
-                                    TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
+                                    TypeInstanceSimple.CreateAnonymous(compiledClass.Identifier.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
                                     Token.CreateAnonymous("this"))
                                 );
                             method.Parameters = new ParameterDefinitionCollection(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
@@ -898,7 +1031,7 @@ ExitBreak:
                         parameters.Insert(0,
                             new ParameterDefinition(
                                 new Token[1] { Token.CreateAnonymous("this") },
-                                TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
+                                TypeInstanceSimple.CreateAnonymous(compiledClass.Identifier.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
                                 Token.CreateAnonymous("this"))
                             );
                         method.Parameters = new ParameterDefinitionCollection(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);

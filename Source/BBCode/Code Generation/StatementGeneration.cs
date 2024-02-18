@@ -161,7 +161,7 @@ namespace LanguageCore.BBCode.Generator
 
                 CompiledType valueType = FindStatementType(keywordCall.Parameters[0]);
 
-                if (valueType == Type.Integer)
+                if (valueType.IsPointer)
                 {
                     GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
                     AddInstruction(Opcode.HEAP_FREE);
@@ -171,7 +171,7 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!valueType.IsClass)
                 {
-                    AnalysisCollection?.Warnings.Add(new Warning($"The 'delete' keyword-function is only working on type class or int so I skip this shit", keywordCall.Parameters[0], CurrentFile));
+                    AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on type class or pointer so I skip this", keywordCall.Parameters[0], CurrentFile));
                     return;
                 }
 
@@ -191,7 +191,7 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!destructor.CanUse(CurrentFile))
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{valueType.Class.Name.Content}' function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{valueType.Class.Identifier.Content}\" function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
                     AddComment("}");
                     return;
                 }
@@ -229,11 +229,11 @@ namespace LanguageCore.BBCode.Generator
                 }
 
                 if (!GetGeneralFunction(paramType.Class, BuiltinFunctionNames.Cloner, out CompiledGeneralFunction? cloner))
-                { throw new CompilerException($"Cloner for type \"{paramType.Class.Name}\" not found. Check if you defined a general function with name \"clone\" in class \"{paramType.Class.Name}\"", keywordCall.Identifier, CurrentFile); }
+                { throw new CompilerException($"Cloner for type \"{paramType.Class.Identifier}\" not found. Check if you defined a general function with name \"clone\" in class \"{paramType.Class.Identifier}\"", keywordCall.Identifier, CurrentFile); }
 
                 if (!cloner.CanUse(CurrentFile))
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"Cloner for type \"{paramType.Class.Name.Content}\" function could not be called due to its protection level.", keywordCall.Identifier, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Cloner for type \"{paramType.Class.Identifier.Content}\" function could not be called due to its protection level.", keywordCall.Identifier, CurrentFile));
                     AddComment("}");
                     return;
                 }
@@ -305,7 +305,8 @@ namespace LanguageCore.BBCode.Generator
 
             if (GetParameter(functionCall.Identifier.Content, out CompiledParameter? compiledParameter))
             {
-                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.ParameterName;
+                if (functionCall.Identifier.Content != "this")
+                { functionCall.Identifier.AnalyzedType = TokenAnalyzedType.ParameterName; }
                 functionCall.Reference = compiledParameter;
 
                 if (!compiledParameter.Type.IsFunction)
@@ -1079,7 +1080,8 @@ namespace LanguageCore.BBCode.Generator
 
             if (GetParameter(variable.Content, out CompiledParameter? param))
             {
-                variable.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
+                if (variable.Content != "this")
+                { variable.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
                 variable.Reference = param;
                 OnGotStatementType(variable, param.Type);
 
@@ -1199,13 +1201,9 @@ namespace LanguageCore.BBCode.Generator
 
             AddComment("}");
 
-            if (conditionIsComputed)
-            {
-                if (!(bool)computedCondition)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Bruh", whileLoop.Keyword, CurrentFile)); }
-                else if (BreakInstructions.Last.Count == 0)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Potential infinity loop", whileLoop.Keyword, CurrentFile)); }
-            }
+            if (conditionIsComputed &&
+                !(bool)computedCondition)
+            { AnalysisCollection?.Warnings.Add(new Warning($"Bruh", whileLoop.Keyword, CurrentFile)); }
 
             BreakInstructions.Pop();
         }
@@ -1512,8 +1510,8 @@ namespace LanguageCore.BBCode.Generator
                 switch (compiledField.Protection)
                 {
                     case Protection.Private:
-                        if (CurrentContext.Context.Name.Content != compiledField.Class!.Name.Content)
-                        { throw new CompilerException($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Name}\" due to it's protection level", field, CurrentFile); }
+                        if (CurrentContext.Context.Identifier.Content != compiledField.Class!.Identifier.Content)
+                        { throw new CompilerException($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Identifier}\" due to it's protection level", field, CurrentFile); }
                         break;
                     case Protection.Public:
                         break;
@@ -1850,7 +1848,8 @@ namespace LanguageCore.BBCode.Generator
 
             if (GetParameter(statementToSet.Content, out CompiledParameter? parameter))
             {
-                statementToSet.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
+                if (statementToSet.Content != "this")
+                { statementToSet.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
 
                 CompiledType valueType = FindStatementType(value, parameter.Type);
 
@@ -1986,7 +1985,7 @@ namespace LanguageCore.BBCode.Generator
             if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
             {
                 if (!GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index setter \"{prevType.Class.Name}[] = {valueType}\" not found", statementToSet, CurrentFile); }
+                { throw new CompilerException($"Index setter \"{prevType.Class.Identifier}[] = {valueType}\" not found", statementToSet, CurrentFile); }
 
                 indexerTemplate = AddCompilable(indexerTemplate);
                 indexer = indexerTemplate.Function;
@@ -2093,7 +2092,7 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!destructor.CanUse(CurrentFile))
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Name.Content}' function cannot be called due to its protection level", null, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Identifier.Content}' function cannot be called due to its protection level", null, CurrentFile));
                     AddComment("}");
                     return;
                 }

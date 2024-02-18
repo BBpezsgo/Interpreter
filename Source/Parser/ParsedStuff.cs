@@ -132,7 +132,7 @@ namespace LanguageCore.Parser
             ProtectionToken = protectionToken;
         }
 
-        public override string ToString() => $"{(ProtectionToken is not null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
+        public override string ToString() => $"{(ProtectionToken is not null ? ProtectionToken.Content + " " : string.Empty)}{Type} {Identifier}";
     }
 
     public interface IExportable
@@ -187,6 +187,8 @@ namespace LanguageCore.Parser
             Attributes = attributes;
             Members = members;
         }
+
+        public override string ToString() => $"enum {Identifier}";
     }
 
     public class TemplateInfo : IPositioned, IEquatable<TemplateInfo>
@@ -317,31 +319,56 @@ namespace LanguageCore.Parser
 
         public bool CanUse(string? sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
-        public string ToReadable()
+        string ISimpleReadable.ToReadable() => ToReadable();
+        public string ToReadable(ToReadableFlags flags = ToReadableFlags.None)
         {
             StringBuilder result = new();
             result.Append(Identifier.ToString());
             result.Append('(');
-            for (int j = 0; j < this.Parameters.Count; j++)
+            for (int j = 0; j < Parameters.Count; j++)
             {
                 if (j > 0) result.Append(", ");
-                result.Append(this.Parameters[j].Type.ToString());
+                if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
+                {
+                    result.Append(string.Join<Token>(' ', Parameters[j].Modifiers));
+                    result.Append(' ');
+                }
+
+                result.Append(Parameters[j].Type.ToString());
+
+                if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
+                {
+                    result.Append(' ');
+                    result.Append(Parameters[j].Identifier.ToString());
+                }
             }
             result.Append(')');
             return result.ToString();
         }
 
-        public string ToReadable(TypeArguments? typeArguments)
+        public string ToReadable(TypeArguments? typeArguments, ToReadableFlags flags = ToReadableFlags.None)
         {
-            if (typeArguments == null) return ToReadable();
+            if (typeArguments == null) return ToReadable(flags);
             StringBuilder result = new();
-            result.Append(this.Identifier.ToString());
+            result.Append(Identifier.ToString());
 
             result.Append('(');
-            for (int j = 0; j < this.Parameters.Count; j++)
+            for (int j = 0; j < Parameters.Count; j++)
             {
                 if (j > 0) { result.Append(", "); }
-                result.Append(this.Parameters[j].Type.ToString(typeArguments));
+                if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
+                {
+                    result.Append(string.Join<Token>(' ', Parameters[j].Modifiers));
+                    result.Append(' ');
+                }
+
+                result.Append(Parameters[j].Type.ToString(typeArguments));
+
+                if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
+                {
+                    result.Append(' ');
+                    result.Append(Parameters[j].Identifier.ToString());
+                }
             }
             result.Append(')');
             return result.ToString();
@@ -612,7 +639,7 @@ namespace LanguageCore.Parser
     public class ClassDefinition : IExportable, IInFile, IPositioned
     {
         public readonly AttributeUsage[] Attributes;
-        public readonly Token Name;
+        public readonly Token Identifier;
         public readonly Token BracketStart;
         public readonly Token BracketEnd;
         public readonly List<Statement.Statement> Statements;
@@ -634,7 +661,7 @@ namespace LanguageCore.Parser
         public ClassDefinition(ClassDefinition other)
         {
             Attributes = other.Attributes;
-            Name = other.Name;
+            Identifier = other.Identifier;
             BracketStart = other.BracketStart;
             BracketEnd = other.BracketEnd;
             Statements = other.Statements;
@@ -658,7 +685,7 @@ namespace LanguageCore.Parser
             IEnumerable<GeneralFunctionDefinition> generalMethods,
             IEnumerable<FunctionDefinition> operators)
         {
-            this.Name = name;
+            this.Identifier = name;
             this.BracketStart = bracketStart;
             this.BracketEnd = bracketEnd;
             this.Fields = fields.ToArray();
@@ -675,15 +702,13 @@ namespace LanguageCore.Parser
             StringBuilder result = new();
             result.Append("class ");
 
-            result.Append(Name.Content);
+            result.Append(Identifier.Content);
             if (TemplateInfo is not null)
             {
                 result.Append('<');
                 result.Append(string.Join<Token>(", ", TemplateInfo.TypeParameters));
                 result.Append('>');
             }
-            result.Append(' ');
-            result.Append("{...}");
             return result.ToString();
         }
 
@@ -693,7 +718,7 @@ namespace LanguageCore.Parser
         {
             get
             {
-                Position result = new(Name);
+                Position result = new(Identifier);
                 result.Union(BracketStart);
                 result.Union(BracketEnd);
                 return result;
@@ -704,7 +729,7 @@ namespace LanguageCore.Parser
     public class StructDefinition : IExportable, IInFile, IPositioned
     {
         public readonly AttributeUsage[] Attributes;
-        public readonly Token Name;
+        public readonly Token Identifier;
         public readonly Token BracketStart;
         public readonly Token BracketEnd;
         public readonly List<Statement.Statement> Statements;
@@ -718,12 +743,12 @@ namespace LanguageCore.Parser
         public IReadOnlyCollection<FunctionDefinition> Methods => methods;
         readonly FunctionDefinition[] methods;
 
-        public virtual Position Position => new(Name, BracketStart, BracketEnd);
+        public virtual Position Position => new(Identifier, BracketStart, BracketEnd);
 
         public StructDefinition(StructDefinition other)
         {
             Attributes = other.Attributes;
-            Name = other.Name;
+            Identifier = other.Identifier;
             BracketStart = other.BracketStart;
             BracketEnd = other.BracketEnd;
             Statements = other.Statements;
@@ -742,7 +767,7 @@ namespace LanguageCore.Parser
             IEnumerable<FunctionDefinition> methods,
             IEnumerable<Token> modifiers)
         {
-            this.Name = name;
+            this.Identifier = name;
             this.BracketStart = bracketStart;
             this.BracketEnd = bracketEnd;
             this.Fields = fields.ToArray();
@@ -752,7 +777,7 @@ namespace LanguageCore.Parser
             this.Modifiers = modifiers.ToArray();
         }
 
-        public override string ToString() => $"struct {this.Name.Content} {{...}}";
+        public override string ToString() => $"struct {Identifier.Content}";
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
     }

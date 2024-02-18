@@ -716,7 +716,7 @@ namespace LanguageCore.Parser
                 TemplateInfo = templateInfo,
             };
 
-            Classes.Add(classDefinition.Name.Content, classDefinition);
+            Classes.Add(classDefinition.Identifier.Content, classDefinition);
 
             // Warnings.Add(new Warning($"Class is experimental feature!", keyword, classDefinition.FilePath));
 
@@ -767,7 +767,7 @@ namespace LanguageCore.Parser
 
             StructDefinition structDefinition = new(possibleStructName, braceletStart, braceletEnd, attributes, fields, methods, modifiers);
 
-            Structs.Add(structDefinition.Name.Content, structDefinition);
+            Structs.Add(structDefinition.Identifier.Content, structDefinition);
 
             return true;
         }

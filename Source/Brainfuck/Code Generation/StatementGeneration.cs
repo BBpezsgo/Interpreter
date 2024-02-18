@@ -1029,7 +1029,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                                 if (!deallocator.CanUse(CurrentFile))
                                 {
-                                    AnalysisCollection?.Errors.Add(new Error($"Function \"{deletableType.Class.Name.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
+                                    AnalysisCollection?.Errors.Add(new Error($"Function \"{deletableType.Class.Identifier.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
                                     return;
                                 }
 
@@ -1065,7 +1065,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                     if (!destructor.CanUse(CurrentFile))
                     {
-                        AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{deletableType.Class.Name.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
+                        AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{deletableType.Class.Identifier.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
                         return;
                     }
 
@@ -2603,7 +2603,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 if (!destructor.CanUse(CurrentFile))
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Name.Content}' function cannot be called due to its protection level", null, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Identifier.Content}' function cannot be called due to its protection level", null, CurrentFile));
                     return;
                 }
 

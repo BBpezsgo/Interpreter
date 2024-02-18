@@ -52,7 +52,7 @@ class Array
 
 class Map
 {
-    private int pointer;
+    private int* pointer;
     int length;
     int width;
 

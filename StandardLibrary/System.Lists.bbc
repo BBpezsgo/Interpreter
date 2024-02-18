@@ -38,7 +38,7 @@ class Array
     
     export constructor(int capacity)
     {
-        int pointer = Alloc(1 + capacity * sizeof(T));
+        int* pointer = Alloc(1 + capacity * sizeof(T));
         Array<T> result = pointer as Array<T>;
         result.capacity = capacity;
         return result;
@@ -47,6 +47,100 @@ class Array
     export destructor()
     {
         delete &this;
+    }
+}
+
+template<T>
+class List
+{
+    private int _capacity;
+    private int _length;
+    private Array<T> _ptr;
+
+    export int Length() { return this._length; }
+    
+    export void Clear() { this._length = 0; }
+
+    export String ToString()
+    {
+        String result = "";
+        for (int i; i < this._length; i++)
+        {
+            if (i > 0)
+            { result = (temp result) + ", "; }
+
+            result = (temp result) + (temp this[i].ToString());
+        }
+        return "{ " + (temp result) + " }";
+    }
+    
+    export T indexer_get(int index)
+    {
+        if (index < 0 || index >= this._length)
+        { throw "Index out of range exception"; }
+        return this._ptr[index];
+    }
+
+    export void indexer_set(int index, T value)
+    {
+        if (index < 0 || index >= this._length)
+        { throw "Index out of range exception"; }
+        this._ptr[index] = value;
+    }
+    
+    export constructor(int capacity)
+    {
+        List<T> result = new List<T>;
+        result._capacity = capacity;
+        result._length = 0;
+        result._ptr = new Array<T>(capacity);
+        return result;
+    }
+
+    export destructor()
+    {
+        delete this._ptr as int*;
+        delete &this as int*;
+    }
+
+    export void Add(T item)
+    {
+        if (this._length + 1 >= this._capacity)
+        {
+            this.EnsureCapacity(this._capacity * 2);
+        }
+        this._length++;
+        this[this._length - 1] = item;
+    }
+
+    export T Remove(int index)
+    {
+        if (index < 0 || index >= this._length)
+        { throw "Index out of range exception"; }
+        T removed = this._ptr[index];
+        for (int i = index + 1; i < this._length; i++)
+        {
+            this._ptr[i - 1] = this._ptr[i];
+        }
+        this._length--;
+        return removed;
+    }
+
+    void EnsureCapacity(int capacity)
+    {
+        if (this._capacity < capacity)
+        {
+            var old = this._ptr;
+            this._ptr = new Array<T>(capacity);
+            this._capacity = capacity;
+
+            for (int i = 0; i < this._length; i++)
+            {
+                this._ptr[i] = old[i];
+            }
+
+            delete old as int*;
+        }
     }
 }
 

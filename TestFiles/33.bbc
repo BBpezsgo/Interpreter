@@ -2,7 +2,7 @@ using System.Memory;
 
 void Func(int* v)
 {
-	*v = *v + 7;
+	*v += 7;
 }
 
 int* a = Alloc(1) as int*;

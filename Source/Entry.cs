@@ -159,7 +159,7 @@ namespace TheProgram
 
                     BrainfuckCompilerFlags compileOptions =
                         arguments.GeneratorSettings.PrintInstructions
-                        ? BrainfuckCompilerFlags.PrintFinal
+                        ? BrainfuckCompilerFlags.PrintFinal | BrainfuckCompilerFlags.PrintCompiled
                         : BrainfuckCompilerFlags.None;
 
                     BrainfuckGeneratorResult generated;
@@ -297,6 +297,9 @@ namespace TheProgram
 
                             for (int i = 0; i < finalIndex; i++)
                             {
+                                if (i % 16 == 0 && i > 0)
+                                { Console.WriteLine(); }
+
                                 byte cell = interpreter.Memory[i];
 
                                 ConsoleColor fg = ConsoleColor.White;
@@ -306,16 +309,28 @@ namespace TheProgram
                                 { fg = ConsoleColor.DarkGray; }
 
                                 if (i == heapStart)
-                                {
-                                    bg = ConsoleColor.DarkBlue;
-                                }
+                                { bg = ConsoleColor.DarkBlue; }
 
                                 if (i > heapStart + 2)
                                 {
                                     int j = (i - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE;
                                     int k = (i - heapStart) % BasicHeapCodeHelper.BLOCK_SIZE;
                                     if (k == BasicHeapCodeHelper.OFFSET_DATA)
-                                    { bg = ConsoleColor.DarkGreen; }
+                                    {
+                                        bg = ConsoleColor.DarkGreen;
+                                        if (cell == 0)
+                                        { fg = ConsoleColor.Green; }
+                                        else
+                                        { fg = ConsoleColor.White; }
+                                    }
+                                    else
+                                    {
+                                        bg = ConsoleColor.DarkGray;
+                                        if (cell == 0)
+                                        { fg = ConsoleColor.Gray; }
+                                        else
+                                        { fg = ConsoleColor.White; }
+                                    }
                                 }
 
                                 if (i == interpreter.MemoryPointer)
@@ -337,8 +352,17 @@ namespace TheProgram
                                 Console.Write($" ... ");
                                 Console.ResetColor();
                                 Console.WriteLine();
-                                break;
                             }
+
+                            // byte[] heap = interpreter.GetHeap(BrainfuckGeneratorSettings.Default);
+                            // Output.WriteLine();
+                            // Output.WriteLine();
+                            // Output.WriteLine($" === HEAP ===");
+                            // Output.WriteLine();
+                            // for (int i = 0; i < heap.Length; i++)
+                            // {
+                            //     Console.WriteLine($"{i}: {heap[i]}");
+                            // }
 
                             Console.WriteLine();
                         }

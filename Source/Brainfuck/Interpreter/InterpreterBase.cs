@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
+using LanguageCore.Brainfuck.Generator;
 
 namespace LanguageCore.Brainfuck
 {
@@ -68,6 +71,26 @@ namespace LanguageCore.Brainfuck
             codePointer = 0;
             memoryPointer = 0;
             Array.Clear(Memory);
+        }
+
+        public byte[] GetRawHeap(BrainfuckGeneratorSettings settings)
+        {
+            int heapStart = BasicHeapCodeHelper.GetOffsettedStart(settings.HeapStart);
+            // int heapEnd = brainfuckGeneratorSettings.HeapStart + brainfuckGeneratorSettings.HeapSize * BasicHeapCodeHelper.BLOCK_SIZE;
+
+            byte[] result = new byte[(Memory.Length - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE];
+
+            for (int i = heapStart; i < Memory.Length; i += BasicHeapCodeHelper.BLOCK_SIZE)
+            {
+                // byte addressCarry = Memory[i + BasicHeapCodeHelper.OFFSET_ADDRESS_CARRY];
+                // byte valueCarry = Memory[i + BasicHeapCodeHelper.OFFSET_VALUE_CARRY];
+                byte data = Memory[i + BasicHeapCodeHelper.OFFSET_DATA];
+
+                int heapAddress = (i - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE;
+                result[heapAddress] = data;
+            }
+
+            return result;
         }
     }
 

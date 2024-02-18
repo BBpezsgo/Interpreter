@@ -1,9 +1,9 @@
 void GetHeader(int* ptr, ref int size, ref int allocated)
 {
 	int value = *ptr;
-	if (value >= 127)
+	if (value >= 127) // value & 0b_1000_0000
     {
-		value -= 127;
+		value -= 127; // value &= ~0b_1000_0000
 
 		size = value;
 		allocated = 1;
@@ -19,7 +19,7 @@ void SetHeader(int* ptr, int size, int allocated)
 {
 	int value = size;
 	if (allocated)
-    { value += 127; }
+    { value += 127; } // value |= 0b_1000_0000
 	*ptr = value;
 }
 

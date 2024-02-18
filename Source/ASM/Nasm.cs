@@ -93,9 +93,8 @@ namespace LanguageCore.ASM
             { File.Delete(outputFile); }
 
             if (!Utils.GetFullPath("nasm.exe", out string? nasm))
-            { throw new FileNotFoundException($"Linker not found", "nasm.exe"); }
+            { throw new FileNotFoundException($"NASM not found", "nasm.exe"); }
 
-            // string nasm = @$"C:\users\{Environment.UserName}\nasm\nasm.exe";
             using Process? process = Process.Start(new ProcessStartInfo(nasm, $"-gcv8 -f win32 {inputFile} -o {outputFile}")
             {
                 RedirectStandardOutput = true,

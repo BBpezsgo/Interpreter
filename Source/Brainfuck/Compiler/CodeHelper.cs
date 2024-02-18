@@ -719,17 +719,14 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        public int Push(Runtime.DataItem v)
+        public int Push(Runtime.DataItem v) => v.Type switch
         {
-            return v.Type switch
-            {
-                Runtime.RuntimeType.UInt8 => Push(v.ValueUInt8),
-                Runtime.RuntimeType.SInt32 => Push(v.ValueSInt32),
-                Runtime.RuntimeType.Single => throw new NotSupportedException("Floats are not supported by the brainfuck compiler"),
-                Runtime.RuntimeType.UInt16 => Push(v.ValueUInt16),
-                _ => throw new UnreachableException(),
-            };
-        }
+            Runtime.RuntimeType.UInt8 => Push(v.ValueUInt8),
+            Runtime.RuntimeType.SInt32 => Push(v.ValueSInt32),
+            Runtime.RuntimeType.Single => throw new NotSupportedException("Floats are not supported by the brainfuck compiler"),
+            Runtime.RuntimeType.UInt16 => Push(v.ValueUInt16),
+            _ => throw new UnreachableException(),
+        };
 
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
@@ -1005,7 +1002,12 @@ namespace LanguageCore.Brainfuck
         {
             using (Code.Block("Destroy HEAP"))
             {
-                // Code.ClearValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY);
+                int start = OffsettedStart;
+                int end = start + (BLOCK_SIZE * (Size + 4));
+
+                for (int i = start; i < end; i += BLOCK_SIZE)
+                { Code.ClearValue(i + OFFSET_DATA); }
+
                 Code.SetPointer(0);
             }
         }

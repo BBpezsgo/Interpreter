@@ -1,8 +1,21 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Text;
 
 namespace LanguageCore.ASM
 {
+
+    public class LinkerException : Exception
+    {
+        public LinkerException(string message, Exception? inner) : base(message, inner)
+        {
+
+        }
+    }
+
     public static class Linker
     {
         /// <exception cref="ProcessException"/>
@@ -17,10 +30,8 @@ namespace LanguageCore.ASM
             { File.Delete(outputFile); }
 
             if (!Utils.GetFullPath("ld.exe", out string? ld))
-            { throw new FileNotFoundException($"Linker not found", "ld.exe"); }
+            { throw new FileNotFoundException($"LD not found", "ld.exe"); }
 
-            // // https://deac-riga.dl.sourceforge.net/project/gnuwin32/sed/4.2.1/sed-4.2.1-setup.exe
-            // string ld = @"C:\MinGW\bin\ld.exe"; // @$"C:\users\{Environment.UserName}\MinGW\bin\ld.exe";
             using Process? process = Process.Start(new ProcessStartInfo(ld, $"{inputFile} -o {outputFile} -L \"C:\\Windows\\System32\" -l \"kernel32\"")
             {
                 RedirectStandardOutput = true,
@@ -36,7 +47,21 @@ namespace LanguageCore.ASM
             string stdError = process.StandardError.ReadToEnd();
 
             if (process.ExitCode != 0)
-            { throw new ProcessException(ld, process.ExitCode, stdOutput, stdError); }
+            {
+                List<LinkerException> linkerExceptions = new();
+
+                string[] lines = stdError.Split('\n');
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    string line = lines[i].Replace(ld + ": ", null).Trim();
+                    linkerExceptions.Add(new LinkerException(line, null));
+                }
+
+                if (linkerExceptions.Count > 0)
+                { throw linkerExceptions[0]; }
+
+                throw new ProcessException(ld, process.ExitCode, stdOutput, stdError);
+            }
         }
     }
 }

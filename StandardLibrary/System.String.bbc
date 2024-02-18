@@ -1,5 +1,32 @@
 using System;
 using System.Memory;
+using System.Lists;
+
+export void Split(this String string, char separator, List<String> result)
+{
+	String current = "";
+
+	for (int i = 0; i < string.length; i++)
+	{
+		if (string[i] == separator)
+		{
+			if (current.length > 0)
+			{
+				result.Add(current);
+				current = "";
+			}
+		}
+		else
+		{
+			current = (temp current) + string[i];
+		}
+	}
+
+	if (current.length > 0)
+	{
+		result.Add(current);
+	}
+}
 
 macro UnsafeGet(list, index)
 {
@@ -128,6 +155,8 @@ class String
         { throw "Index out of range exception"; }
         *((&this) + sizeof(String) + index) = element;
     }
+
+    export String ToString() { return this; }
 }
 
 export void CopyString(temp String from, String to)

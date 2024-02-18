@@ -904,8 +904,8 @@ namespace LanguageCore.Brainfuck.Generator
 
                 CleanupVariables(VariableCleanupStack.Pop());
 
-                ContinueReturnStatements();
-                ContinueBreakStatements();
+                // ContinueReturnStatements();
+                // ContinueBreakStatements();
             }
         }
         void GenerateCodeForStatement(KeywordCall statement)
@@ -1002,7 +1002,7 @@ namespace LanguageCore.Brainfuck.Generator
                     StatementWithValue deletable = statement.Parameters[0];
                     CompiledType deletableType = FindStatementType(deletable);
 
-                    if (deletableType.BuiltinType == Type.Integer)
+                    if (deletableType.IsPointer)
                     {
                         if (!TryGetBuiltinFunction("free", out CompiledFunction? function))
                         { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", statement, CurrentFile); }
@@ -1257,44 +1257,52 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 case "++":
                 {
-                    if (statement.Left is not Identifier variableIdentifier)
-                    { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
-
-                    if (!GetVariable(Variables, variableIdentifier.Content, out Variable variable))
-                    { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
-
-                    if (variable.IsDiscarded)
-                    { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
-
-                    if (variable.Size != 1)
-                    { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
-
-                    using (Code.Block($"Increment variable {variable.Name} (at {variable.Address})"))
+                    if (statement.Left is Identifier variableIdentifier)
                     {
-                        Code.AddValue(variable.Address, 1);
+                        if (!GetVariable(Variables, variableIdentifier.Content, out Variable variable))
+                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
+
+                        if (variable.IsDiscarded)
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
+
+                        if (variable.Size != 1)
+                        { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
+
+                        using (Code.Block($"Increment variable {variable.Name} (at {variable.Address})"))
+                        {
+                            Code.AddValue(variable.Address, 1);
+                        }
+
+                        Optimizations++;
+                        return;
                     }
 
+                    GenerateCodeForStatement(statement.ToAssignment());
                     return;
                 }
                 case "--":
                 {
-                    if (statement.Left is not Identifier variableIdentifier)
-                    { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
-
-                    if (!CodeGeneratorForBrainfuck.GetVariable(Variables, variableIdentifier.Content, out Variable variable))
-                    { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
-
-                    if (variable.IsDiscarded)
-                    { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
-
-                    if (variable.Size != 1)
-                    { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
-
-                    using (Code.Block($"Decrement variable {variable.Name} (at {variable.Address})"))
+                    if (statement.Left is Identifier variableIdentifier)
                     {
-                        Code.AddValue(variable.Address, -1);
+                        if (!CodeGeneratorForBrainfuck.GetVariable(Variables, variableIdentifier.Content, out Variable variable))
+                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
+
+                        if (variable.IsDiscarded)
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
+
+                        if (variable.Size != 1)
+                        { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
+
+                        using (Code.Block($"Decrement variable {variable.Name} (at {variable.Address})"))
+                        {
+                            Code.AddValue(variable.Address, -1);
+                        }
+
+                        Optimizations++;
+                        return;
                     }
 
+                    GenerateCodeForStatement(statement.ToAssignment());
                     return;
                 }
                 default:
@@ -3311,7 +3319,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
-                if (CurrentMacro[i].Identifier.Content == function.Identifier.Content)
+                if (CurrentMacro[i] == function)
                 { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile); }
             }
 
@@ -3531,8 +3539,7 @@ namespace LanguageCore.Brainfuck.Generator
             int accumulatedReturnCount = ReturnCount.Pop();
             using (Code.Block($"Finish {accumulatedReturnCount} \"return\" statements"))
             {
-                Code.SetPointer(Stack.NextAddress);
-                Code.ClearCurrent();
+                Code.ClearValue(Stack.NextAddress);
                 Code.CommentLine($"Pointer: {Code.Pointer}");
                 for (int i = 0; i < accumulatedReturnCount; i++)
                 {
@@ -3544,14 +3551,14 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void ContinueReturnStatements()
         {
-            if (ReturnTagStack.Count > 0)
+            if (ReturnTagStack.Count <= 0)
+            { return; }
+
+            using (Code.Block("Continue \"return\" statements"))
             {
-                using (Code.Block("Continue \"return\" statements"))
-                {
-                    Code.CopyValue(ReturnTagStack[^1], Stack.NextAddress);
-                    Code.JumpStart(Stack.NextAddress);
-                    ReturnCount[^1]++;
-                }
+                Code.CopyValue(ReturnTagStack[^1], Stack.NextAddress);
+                Code.JumpStart(Stack.NextAddress);
+                ReturnCount[^1]++;
             }
         }
 
@@ -3560,8 +3567,7 @@ namespace LanguageCore.Brainfuck.Generator
             int accumulatedBreakCount = BreakCount.Pop();
             using (Code.Block($"Finish {accumulatedBreakCount} \"break\" statements"))
             {
-                Code.SetPointer(Stack.NextAddress);
-                Code.ClearCurrent();
+                Code.ClearValue(Stack.NextAddress);
                 Code.CommentLine($"Pointer: {Code.Pointer}");
                 for (int i = 0; i < accumulatedBreakCount; i++)
                 {
@@ -3573,16 +3579,16 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void ContinueBreakStatements()
         {
-            if (BreakTagStack.Count > 0)
+            if (BreakTagStack.Count <= 0)
+            { return; }
+
+            using (Code.Block("Continue \"break\" statements"))
             {
-                using (Code.Block("Continue \"break\" statements"))
-                {
-                    Code.CopyValue(BreakTagStack[^1], Stack.NextAddress);
+                Code.CopyValue(BreakTagStack[^1], Stack.NextAddress);
 
-                    Code.JumpStart(Stack.NextAddress);
+                Code.JumpStart(Stack.NextAddress);
 
-                    BreakCount[^1]++;
-                }
+                BreakCount[^1]++;
             }
         }
     }

@@ -234,10 +234,16 @@ namespace LanguageCore.BBCode.Generator
                 GenerateCodeForCompilableFunction(function);
             }
 
-            foreach (CompliableTemplate<CompiledGeneralFunction> function in CompilableGeneralFunctions)
             {
-                function.Function.InstructionOffset = GeneratedCode.Count;
-                GenerateCodeForCompilableFunction(function);
+                int i = 0;
+                while (i < CompilableGeneralFunctions.Count)
+                {
+                    CompliableTemplate<CompiledGeneralFunction> function = CompilableGeneralFunctions[i];
+                    i++;
+
+                    function.Function.InstructionOffset = GeneratedCode.Count;
+                    GenerateCodeForCompilableFunction(function);
+                }
             }
 
             foreach (UndefinedOffset<CompiledFunction> item in UndefinedFunctionOffsets)

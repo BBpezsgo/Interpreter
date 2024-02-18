@@ -11,8 +11,8 @@ namespace TheProgram
         [System.Diagnostics.CodeAnalysis.RequiresAssemblyFiles]
         public static bool Start(string[] args)
         {
-            // string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "..", "Examples", "fibonacci-sequence.bbc");
-            string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "23.bbc");
+            string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "..", "Examples", "calc.bbc");
+            // string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "01.bbc");
 
             string[] generatedArgs =
             [
@@ -23,7 +23,7 @@ namespace TheProgram
                 // "--dont-optimize",
                 // "--console-gui",
                 // "--print-instructions",
-                // "--brainfuck",
+                "--brainfuck",
                 // "--il",
                 // "--asm",
                 // "--no-nullcheck",

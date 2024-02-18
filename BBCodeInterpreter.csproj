@@ -53,10 +53,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Examples\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include=".github\workflows\dotnet-desktop.yml" />
   </ItemGroup>
 

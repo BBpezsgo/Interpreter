@@ -1,0 +1,76 @@
+using System;
+using System.Lists;
+
+// List<String> yeah1 = new List<String>(4);
+// String yeah2 = "abc def ghj";
+// Split(yeah2, ' ', yeah1);
+// PrintLine(temp yeah1.ToString());
+
+// List<int> yeah = new List<int>(1);
+// yeah.Add(69);
+// yeah.Add(128);
+// yeah.Add(33);
+// yeah.Add(64);
+// PrintLine(temp yeah.ToString());
+// yeah.Remove(1);
+// PrintLine(temp yeah.ToString());
+
+List<String> splits = new List<String>(4);
+
+while (1)
+{
+    Print(" > ");
+    temp String line = ReadLine();
+    
+    for (int i = 0; i < splits.Length(); i++)
+    {
+        delete splits[i] as int*;
+    }
+    splits.Clear();
+    line.Split(' ', splits);
+
+    if (splits.Length() < 3)
+    {
+        PrintLine("Invalid input");
+    }
+    else
+    {
+        temp String a = splits[0];
+        temp String _op = splits[1];
+        temp String b = splits[2];
+
+        if (_op.length != 1)
+        {
+            PrintLine("Invalid operator");
+            PrintLine(_op);            
+        }
+        else
+        {
+            byte numa = ParseByte(a);
+            byte numb = ParseByte(b);
+            char op = _op[0];
+
+            if (op == '+')
+            {
+                PrintLine(numa + numb);
+            }
+            elseif (op == '-')
+            {
+                PrintLine(numa - numb);
+            }
+            elseif (op == '*')
+            {
+                PrintLine(numa * numb);
+            }
+            elseif (op == '/')
+            {
+                PrintLine(numa / numb);
+            }
+            else
+            {
+                PrintLine("Unknown operator");
+                PrintLine(op);
+            }
+        }
+    }
+}

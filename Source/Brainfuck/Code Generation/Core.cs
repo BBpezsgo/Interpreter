@@ -448,6 +448,8 @@ namespace LanguageCore.Brainfuck.Generator
 
         bool SafeToDiscardVariable(Statement statement, Variable variable)
         {
+            return false;
+
             int usages = 0;
 
             foreach (Statement _statement in statement)
@@ -600,6 +602,9 @@ namespace LanguageCore.Brainfuck.Generator
             { return TryGetRuntimeAddress(field, out pointerAddress, out size); }
 
             if (statement is ConstructorCall)
+            { pointerAddress = default; size = default; return false; }
+
+            if (statement is IndexCall)
             { pointerAddress = default; size = default; return false; }
 
             throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);

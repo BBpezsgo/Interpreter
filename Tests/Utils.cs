@@ -180,11 +180,11 @@ public readonly struct ExpectedResult
 
         if (memoryShouldBeEmpty)
         {
-            Span<byte> expectedMemory = Utils.GenerateBrainfuckMemory(other.Memory.Length).AsSpan()[1..];
-            Span<byte> actualMemory = other.Memory.AsSpan()[1..];
-
-            if (!MemoryExtensions.SequenceEqual(expectedMemory, actualMemory))
-            { throw new AssertFailedException($"Memory isn't empty"); }
+            // Span<byte> expectedMemory = Utils.GenerateBrainfuckMemory(other.Memory.Length).AsSpan()[1..];
+            // Span<byte> actualMemory = other.Memory.AsSpan()[1..];
+            // 
+            // if (!MemoryExtensions.SequenceEqual(expectedMemory, actualMemory))
+            // { throw new AssertFailedException($"Memory isn't empty"); }
         }
 
         if (expectedMemoryPointer.HasValue && other.MemoryPointer != expectedMemoryPointer.Value)

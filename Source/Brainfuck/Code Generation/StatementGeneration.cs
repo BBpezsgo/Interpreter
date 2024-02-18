@@ -2570,29 +2570,12 @@ namespace LanguageCore.Brainfuck.Generator
             return pointerAddress;
         }
 
-        void Free(int pointer, IPositioned position)
-        {
-            if (!TryGetBuiltinFunction("free", out CompiledFunction? deallocator))
-            { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", position, CurrentFile); }
-
-            GenerateCodeForMacro(deallocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, pointer.ToString(CultureInfo.InvariantCulture), position) }, null, position);
-
-            if (deallocator.ReturnSomething)
-            { Stack.Pop(); }
-        }
-
         void GenerateDeallocator(StatementWithValue value)
         {
             CompiledType deallocateableType = FindStatementType(value);
 
             if (!TryGetBuiltinFunction("free", out CompiledFunction? deallocator))
             { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", value, CurrentFile); }
-
-            if (deallocateableType == Type.Integer)
-            {
-                GenerateCodeForMacro(deallocator, new StatementWithValue[] { value }, null, value);
-                return;
-            }
 
             if (deallocateableType.IsClass)
             {
@@ -2749,12 +2732,6 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            for (int i = 0; i < CurrentMacro.Count; i++)
-            {
-                if (CurrentMacro[i] == function)
-                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile); }
-            }
-
             if (function.ParameterCount != parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
@@ -2772,6 +2749,9 @@ namespace LanguageCore.Brainfuck.Generator
                 CompiledType returnType = function.Type;
                 returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
             }
+
+            if (!DoRecursivityStuff(function, callerPosition))
+            { return; }
 
             Stack<Variable> compiledParameters = new();
             List<CompiledConstant> constantParameters = new();
@@ -2945,6 +2925,26 @@ namespace LanguageCore.Brainfuck.Generator
 
             using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
             {
+                using (Code.Block($"Deallocate macro variables ({Variables.Count})"))
+                {
+                    for (int i = 0; i < Variables.Count; i++)
+                    {
+                        Variable variable = Variables[i];
+                        if (!variable.HaveToClean) continue;
+                        if (variable.DeallocateOnClean &&
+                            variable.Type.InHEAP)
+                        {
+                            GenerateDeallocator(
+                                new TypeCast(
+                                    new Identifier(Token.CreateAnonymous(variable.Name)),
+                                    Token.CreateAnonymous("as"),
+                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int", null), Token.CreateAnonymous("*", TokenType.Operator))
+                                    )
+                                );
+                        }
+                    }
+                }
+
                 using (Code.Block($"Clean up macro variables ({Variables.Count})"))
                 {
                     int n = Variables.Count;
@@ -2952,9 +2952,6 @@ namespace LanguageCore.Brainfuck.Generator
                     {
                         Variable variable = Variables.Pop();
                         if (!variable.HaveToClean) continue;
-                        if (variable.DeallocateOnClean &&
-                            variable.Type.InHEAP)
-                        { }
                         Stack.Pop();
                     }
                 }
@@ -3072,12 +3069,6 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            for (int i = 0; i < CurrentMacro.Count; i++)
-            {
-                if (CurrentMacro[i] == function)
-                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile); }
-            }
-
             if (function.ParameterCount != parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
@@ -3095,6 +3086,9 @@ namespace LanguageCore.Brainfuck.Generator
                 CompiledType returnType = function.Type;
                 returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
             }
+
+            if (!DoRecursivityStuff(function, callerPosition))
+            { return; }
 
             Stack<Variable> compiledParameters = new();
             List<CompiledConstant> constantParameters = new();
@@ -3261,6 +3255,26 @@ namespace LanguageCore.Brainfuck.Generator
 
             using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
             {
+                using (Code.Block($"Deallocate macro variables ({Variables.Count})"))
+                {
+                    for (int i = 0; i < Variables.Count; i++)
+                    {
+                        Variable variable = Variables[i];
+                        if (!variable.HaveToClean) continue;
+                        if (variable.DeallocateOnClean &&
+                            variable.Type.InHEAP)
+                        {
+                            GenerateDeallocator(
+                                new TypeCast(
+                                    new Identifier(Token.CreateAnonymous(variable.Name)),
+                                    Token.CreateAnonymous("as"),
+                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int", null), Token.CreateAnonymous("*", TokenType.Operator))
+                                    )
+                                );
+                        }
+                    }
+                }
+
                 using (Code.Block($"Clean up macro variables ({Variables.Count})"))
                 {
                     int n = Variables.Count;
@@ -3317,12 +3331,6 @@ namespace LanguageCore.Brainfuck.Generator
             if (GenerateDebugInformation)
             { instructionStart = Code.GetFinalCode().Length; }
 
-            for (int i = 0; i < CurrentMacro.Count; i++)
-            {
-                if (CurrentMacro[i] == function)
-                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile); }
-            }
-
             if (function.ParameterCount != parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
@@ -3333,6 +3341,9 @@ namespace LanguageCore.Brainfuck.Generator
                 CompiledType returnType = new(function.Type, typeArguments);
                 returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
             }
+
+            if (!DoRecursivityStuff(function, callerPosition))
+            { return; }
 
             Stack<Variable> compiledParameters = new();
             List<CompiledConstant> constantParameters = new();
@@ -3492,6 +3503,26 @@ namespace LanguageCore.Brainfuck.Generator
 
             using (Code.Block($"Clean up macro variables ({Variables.Count})"))
             {
+                using (Code.Block($"Deallocate macro variables ({Variables.Count})"))
+                {
+                    for (int i = 0; i < Variables.Count; i++)
+                    {
+                        Variable variable = Variables[i];
+                        if (!variable.HaveToClean) continue;
+                        if (variable.DeallocateOnClean &&
+                            variable.Type.InHEAP)
+                        {
+                            GenerateDeallocator(
+                                new TypeCast(
+                                    new Identifier(Token.CreateAnonymous(variable.Name)),
+                                    Token.CreateAnonymous("as"),
+                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int", null), Token.CreateAnonymous("*", TokenType.Operator))
+                                    )
+                                );
+                        }
+                    }
+                }
+
                 int n = Variables.Count;
                 for (int i = 0; i < n; i++)
                 {
@@ -3532,6 +3563,40 @@ namespace LanguageCore.Brainfuck.Generator
                     SourcePosition = function.Position,
                 });
             }
+        }
+
+        /// <returns>
+        /// Returns <see langword="true"/> if the function can be generated.
+        /// </returns>
+        bool DoRecursivityStuff(FunctionThingDefinition function, IPositioned callerPosition)
+        {
+            int depth = 0;
+            for (int i = 0; i < CurrentMacro.Count; i++)
+            {
+                FunctionThingDefinition macroFrame = CurrentMacro[i];
+                if (macroFrame != function)
+                { continue; }
+                depth++;
+
+                if (MaxRecursiveDepth > 0)
+                {
+                    if (MaxRecursiveDepth >= depth)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        GenerateCodeForPrinter(Ansi.Style(Ansi.BrightForegroundRed));
+                        GenerateCodeForPrinter($"Max recursivity depth ({MaxRecursiveDepth}) exceeded (\"{function.ToReadable()}\")");
+                        GenerateCodeForPrinter(Ansi.Reset);
+                        return false;
+                    }
+                }
+
+                throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile);
+            }
+
+            return true;
         }
 
         void FinishReturnStatements()

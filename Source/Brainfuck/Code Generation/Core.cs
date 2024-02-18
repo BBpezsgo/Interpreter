@@ -198,7 +198,7 @@ namespace LanguageCore.Brainfuck.Generator
                     ClearGlobalVariablesBeforeExit = true,
                     StackStart = 0,
                     HeapStart = 64,
-                    HeapSize = 8,
+                    HeapSize = 16,
                     GenerateDebugInformation = false,
                     ShowProgress = false,
                 };
@@ -287,6 +287,8 @@ namespace LanguageCore.Brainfuck.Generator
 
         readonly bool GenerateDebugInformation;
 
+        readonly int MaxRecursiveDepth;
+
         #endregion
 
         public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback, AnalysisCollection? analysisCollection) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection)
@@ -307,6 +309,7 @@ namespace LanguageCore.Brainfuck.Generator
             this.PrintCallback = printCallback;
             this.GenerateDebugInformation = settings.GenerateDebugInformation;
             this.ShowProgress = settings.ShowProgress;
+            this.MaxRecursiveDepth = 4;
         }
 
         [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]

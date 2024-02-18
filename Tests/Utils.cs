@@ -126,6 +126,7 @@ public readonly struct ExpectedResult
                                 tagBuilder = null;
                             }
                             state = ExpectedResultParserState.Normal;
+                            i--;
                             break;
                     }
                     break;

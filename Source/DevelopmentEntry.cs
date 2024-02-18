@@ -11,8 +11,8 @@ namespace TheProgram
         [System.Diagnostics.CodeAnalysis.RequiresAssemblyFiles]
         public static bool Start(string[] args)
         {
-            string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "..", "Examples", "calc.bbc");
-            // string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "01.bbc");
+            // string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "..", "Examples", "calc.bbc");
+            string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "40.bbc");
 
             string[] generatedArgs =
             [

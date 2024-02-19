@@ -28,7 +28,7 @@ namespace LanguageCore.ASM
 
                 Nasm.Assemble(fileAsmTemp, fileObjTemp);
 
-                Linker.Link(fileObjTemp, fileExeTemp);
+                GolinkLinker.Link(fileObjTemp, fileExeTemp);
 
                 if (File.Exists(fileExeTemp))
                 { File.Copy(fileExeTemp, fileExeFinal, true); }

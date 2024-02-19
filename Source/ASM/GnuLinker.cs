@@ -8,15 +8,15 @@ using System.Text;
 namespace LanguageCore.ASM
 {
 
-    public class LinkerException : Exception
+    public class GnuLinkerException : Exception
     {
-        public LinkerException(string message, Exception? inner) : base(message, inner)
+        public GnuLinkerException(string message, Exception? inner) : base(message, inner)
         {
 
         }
     }
 
-    public static class Linker
+    public static class GnuLinker
     {
         /// <exception cref="ProcessException"/>
         /// <exception cref="FileNotFoundException"/>
@@ -32,7 +32,7 @@ namespace LanguageCore.ASM
             if (!Utils.GetFullPath("ld.exe", out string? ld))
             { throw new FileNotFoundException($"LD not found", "ld.exe"); }
 
-            using Process? process = Process.Start(new ProcessStartInfo(ld, $"{inputFile} -o {outputFile} -L \"C:\\Windows\\System32\" -l \"kernel32\"")
+            using Process? process = Process.Start(new ProcessStartInfo(ld, $"{inputFile} -m i386pe -o {outputFile} -L \"C:\\Windows\\System32\" -l \"kernel32\"")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -48,13 +48,14 @@ namespace LanguageCore.ASM
 
             if (process.ExitCode != 0)
             {
-                List<LinkerException> linkerExceptions = new();
+                List<GnuLinkerException> linkerExceptions = new();
 
                 string[] lines = stdError.Split('\n');
                 for (int i = 0; i < lines.Length; i++)
                 {
                     string line = lines[i].Replace(ld + ": ", null).Trim();
-                    linkerExceptions.Add(new LinkerException(line, null));
+                    if (string.IsNullOrEmpty(line)) continue;
+                    linkerExceptions.Add(new GnuLinkerException(line, null));
                 }
 
                 if (linkerExceptions.Count > 0)

@@ -7,11 +7,6 @@ namespace LanguageCore.ASM
 {
     using Runtime;
 
-    public struct AssemblyHeader
-    {
-        public List<string> Externs;
-    }
-
     public enum Instruction
     {
         /// <summary> </summary>
@@ -277,10 +272,12 @@ namespace LanguageCore.ASM
     public class TextSectionBuilder : SectionBuilder
     {
         readonly List<string> Labels;
+        public readonly HashSet<string> Imports;
 
         public TextSectionBuilder() : base()
         {
-            this.Labels = [];
+            Labels = new List<string>();
+            Imports = new HashSet<string>();
         }
 
         bool HasLabel(string dataLabel)
@@ -402,6 +399,11 @@ namespace LanguageCore.ASM
             AppendText(EOL);
         }
 
+        public void Import(string label)
+        {
+            Imports.Add(label);
+        }
+
         #region Call_cdecl
 
         /// <inheritdoc cref="Call_cdecl(string, int, string?[])"/>
@@ -418,6 +420,9 @@ namespace LanguageCore.ASM
         /// </summary>
         public void Call_cdecl(string label, int parametersSize, params string?[] parameters)
         {
+            if (label.StartsWith('_') && label.Contains('@'))
+            { Import(label); }
+
             if (parameters.Length > 0)
             {
                 AppendCommentLine("Arguments (in reverse)");
@@ -440,6 +445,9 @@ namespace LanguageCore.ASM
         /// <inheritdoc cref="Call_cdecl(string, int, string?[])"/>
         public void Call_cdecl(string label, int parametersSize)
         {
+            if (label.StartsWith('_') && label.Contains('@'))
+            { Import(label); }
+
             AppendInstruction(Instruction.CALL, label);
 
             AppendCommentLine("Clear arguments");
@@ -469,6 +477,9 @@ namespace LanguageCore.ASM
         /// </summary>
         public void Call_stdcall(string label, int parametersSize, params string?[] parameters)
         {
+            if (label.StartsWith('_') && label.Contains('@'))
+            { Import(label); }
+
             AppendCommentLine("Arguments (in reverse)");
 
             for (int i = parameters.Length - 1; i >= 0; i--)
@@ -482,6 +493,9 @@ namespace LanguageCore.ASM
         /// <inheritdoc cref="Call_stdcall(string, int, string?[])"/>
         public void Call_stdcall(string label, int parametersSize)
         {
+            if (label.StartsWith('_') && label.Contains('@'))
+            { Import(label); }
+
             AppendInstruction(Instruction.CALL, label);
         }
 
@@ -699,7 +713,7 @@ namespace LanguageCore.ASM
             return false;
         }
 
-        public string Make(AssemblyHeader header)
+        public string Make()
         {
             StringBuilder builder = new();
 
@@ -708,14 +722,17 @@ namespace LanguageCore.ASM
             builder.Append(";" + EOL);
             builder.Append(EOL);
 
-            builder.Append(";" + EOL);
-            builder.Append("; External functions" + EOL);
-            builder.Append(";" + EOL);
-            for (int i = 0; i < header.Externs.Count; i++)
+            if (CodeBuilder.Imports.Count > 0)
             {
-                builder.Append($"extern {header.Externs[i]}" + EOL);
+                builder.Append(";" + EOL);
+                builder.Append("; External functions" + EOL);
+                builder.Append(";" + EOL);
+                foreach (string import in CodeBuilder.Imports)
+                {
+                    builder.Append($"extern {import}" + EOL);
+                }
+                builder.Append(EOL);
             }
-            builder.Append(EOL);
 
             builder.Append(";" + EOL);
             builder.Append("; Global functions" + EOL);
@@ -733,12 +750,15 @@ namespace LanguageCore.ASM
             builder.Append(CodeBuilder.Builder);
             builder.Append(EOL);
 
-            builder.Append(";" + EOL);
-            builder.Append("; Data Section" + EOL);
-            builder.Append(";" + EOL);
-            builder.Append("section .rodata" + EOL);
-            builder.Append(DataBuilder.Builder);
-            builder.Append(EOL);
+            if (DataBuilder.Builder.Length > 0)
+            {
+                builder.Append(";" + EOL);
+                builder.Append("; Data Section" + EOL);
+                builder.Append(";" + EOL);
+                builder.Append("section .rodata" + EOL);
+                builder.Append(DataBuilder.Builder);
+                builder.Append(EOL);
+            }
 
             return builder.ToString();
         }

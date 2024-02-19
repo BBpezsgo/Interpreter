@@ -292,7 +292,7 @@ namespace LanguageCore.ASM.Generator
                 {
                     size += GenerateInitialValue(field.Type);
                 }
-                throw new NotImplementedException();
+                return size;
             }
 
             if (type.IsClass)
@@ -309,7 +309,7 @@ namespace LanguageCore.ASM.Generator
                 {
                     size += GenerateInitialValue(type.StackArrayOf);
                 }
-                throw new NotImplementedException();
+                return size;
             }
 
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(type));
@@ -1749,15 +1749,7 @@ namespace LanguageCore.ASM.Generator
 
             return new AsmGeneratorResult()
             {
-                AssemblyCode = Builder.Make(new AssemblyHeader()
-                {
-                    Externs = new List<string>()
-                    {
-                        "_GetStdHandle@4",
-                        "_WriteFile@20",
-                        "_ExitProcess@4",
-                    },
-                }),
+                AssemblyCode = Builder.Make(),
             };
         }
 

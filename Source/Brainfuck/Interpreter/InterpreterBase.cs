@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using LanguageCore.Brainfuck.Generator;
 
@@ -10,7 +8,7 @@ namespace LanguageCore.Brainfuck
     public delegate void OutputCallback(byte data);
     public delegate byte InputCallback();
 
-    public abstract class InterpreterBase
+    public abstract class InterpreterBase : IDisposable
     {
         public const int MEMORY_SIZE = 1024;
 
@@ -19,17 +17,19 @@ namespace LanguageCore.Brainfuck
         protected OutputCallback OnOutput;
         protected InputCallback OnInput;
 
-        protected int codePointer;
-        protected int memoryPointer;
+        protected int _codePointer;
+        protected int _memoryPointer;
 
-        public int CodePointer => codePointer;
-        public int MemoryPointer => memoryPointer;
+        protected Range<int> _memoryPointerRange;
 
-        protected bool isPaused;
+        protected bool _isPaused;
+        bool _isDisposed;
 
-        public bool IsPaused => isPaused;
+        public int CodePointer => _codePointer;
+        public int MemoryPointer => _memoryPointer;
+        public bool IsPaused => _isPaused;
 
-        public RuntimeContext CurrentContext => new(memoryPointer, codePointer);
+        public RuntimeContext CurrentContext => new(_memoryPointer, _codePointer);
 
         public static void OnDefaultOutput(byte data) => Console.Write(CharCode.GetChar(data));
         public static byte OnDefaultInput() => CharCode.GetByte(Console.ReadKey(true).KeyChar);
@@ -41,9 +41,9 @@ namespace LanguageCore.Brainfuck
             OnOutput = onOutput ?? OnDefaultOutput;
             OnInput = onInput ?? OnDefaultInput;
 
-            codePointer = 0;
-            memoryPointer = 0;
-            isPaused = false;
+            _codePointer = 0;
+            _memoryPointer = 0;
+            _isPaused = false;
         }
 
         public abstract bool Step();
@@ -68,8 +68,9 @@ namespace LanguageCore.Brainfuck
 
         public void Reset()
         {
-            codePointer = 0;
-            memoryPointer = 0;
+            _codePointer = 0;
+            _memoryPointer = 0;
+            _memoryPointerRange = default;
             Array.Clear(Memory);
         }
 
@@ -92,51 +93,76 @@ namespace LanguageCore.Brainfuck
 
             return result;
         }
+
+        protected virtual void DisposeManaged() { }
+        protected virtual void DisposeUnmanaged() { }
+        void Dispose(bool disposing)
+        {
+            if (_isDisposed) return;
+            if (disposing)
+            { DisposeManaged(); }
+            DisposeUnmanaged();
+            _isDisposed = true;
+        }
+        ~InterpreterBase() { Dispose(disposing: false); }
+        void IDisposable.Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
     }
 
     public abstract class InterpreterBase<TCode> : InterpreterBase
     {
         protected TCode[] Code;
 
-        public bool OutOfCode => codePointer >= Code.Length || codePointer < 0;
+        public bool IsDone => _codePointer >= Code.Length || _codePointer < 0;
 
         public InterpreterBase(Uri uri, OutputCallback? onOutput = null, InputCallback? onInput = null)
             : this(onOutput, onInput)
-        {
-            using System.Net.Http.HttpClient client = new();
-            client.GetStringAsync(uri).ContinueWith((code) =>
-            {
-                Code = ParseCode(code.Result);
-            }, System.Threading.Tasks.TaskScheduler.Default).Wait();
-        }
+            => LoadCode(uri);
 
         public InterpreterBase(FileInfo file, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : this(File.ReadAllText(file.FullName), onOutput, onInput)
-        {
-
-        }
+            : this(onOutput, onInput)
+            => LoadCode(file);
 
         public InterpreterBase(string code, OutputCallback? onOutput = null, InputCallback? onInput = null)
             : this(onOutput, onInput)
-        {
-            Code = ParseCode(code);
-        }
+            => LoadCode(code);
 
         public InterpreterBase(OutputCallback? onOutput = null, InputCallback? onInput = null) : base(onOutput, onInput)
         {
             Code = Array.Empty<TCode>();
         }
 
+        public void LoadCode(Uri uri)
+        {
+            using System.Net.Http.HttpClient client = new();
+            client.GetStringAsync(uri).ContinueWith((code) =>
+            {
+                Code = ParseCode(code.Result);
+                _codePointer = 0;
+            }, System.Threading.Tasks.TaskScheduler.Default).Wait();
+        }
+
+        public void LoadCode(FileInfo file) => LoadCode(File.ReadAllText(file.FullName));
+
+        public void LoadCode(string code)
+        {
+            Code = ParseCode(code);
+            _codePointer = 0;
+        }
+
         protected abstract TCode[] ParseCode(string code);
 
         public override bool Step()
         {
-            if (OutOfCode) return false;
+            if (IsDone) return false;
 
-            Evaluate(Code[codePointer]);
+            Evaluate(Code[_codePointer]);
 
-            codePointer++;
-            return !OutOfCode;
+            _codePointer++;
+            return !IsDone;
         }
 
         protected abstract void Evaluate(TCode instruction);

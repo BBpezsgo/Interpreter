@@ -250,6 +250,8 @@ namespace TheProgram
                         Console.ReadKey();
 
                         interpreter.RunWithUI(true, 10);
+
+                        Console.ReadKey();
                     }
                     else
                     {

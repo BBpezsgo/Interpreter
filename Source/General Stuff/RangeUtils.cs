@@ -22,6 +22,16 @@ namespace LanguageCore
             { a.End = b.End; }
             return a;
         }
+
+        public static Range<T> Union<T>(Range<T> a, T b)
+            where T : IEquatable<T>, IComparisonOperators<T, T, bool>
+        {
+            if (a.Start > b)
+            { a.Start = b; }
+            if (a.End < b)
+            { a.End = b; }
+            return a;
+        }
     }
 
     public static class RangeExtensions

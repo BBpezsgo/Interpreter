@@ -56,68 +56,68 @@ namespace LanguageCore.Brainfuck
             switch (instruction)
             {
                 case OpCodes.ADD:
-                    Memory[memoryPointer]++;
+                    Memory[_memoryPointer]++;
                     break;
                 case OpCodes.SUB:
-                    Memory[memoryPointer]--;
+                    Memory[_memoryPointer]--;
                     break;
                 case OpCodes.POINTER_R:
-                    if (memoryPointer++ >= Memory.Length)
+                    if (_memoryPointer++ >= Memory.Length)
                     { throw new BrainfuckRuntimeException($"Memory overflow", CurrentContext); }
                     break;
                 case OpCodes.POINTER_L:
-                    if (memoryPointer-- <= 0)
+                    if (_memoryPointer-- <= 0)
                     { throw new BrainfuckRuntimeException($"Memory underflow", CurrentContext); }
                     break;
                 case OpCodes.BRANCH_START:
-                    if (Memory[memoryPointer] == 0)
+                    if (Memory[_memoryPointer] == 0)
                     {
                         int depth = 0;
-                        while (!OutOfCode)
+                        while (!IsDone)
                         {
-                            codePointer++;
-                            if (OutOfCode) break;
-                            if (Code[codePointer] == OpCodes.BRANCH_END)
+                            _codePointer++;
+                            if (IsDone) break;
+                            if (Code[_codePointer] == OpCodes.BRANCH_END)
                             {
                                 if (depth == 0) return;
                                 if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
                                 depth--;
                             }
-                            else if (Code[codePointer] == OpCodes.BRANCH_START) depth++;
+                            else if (Code[_codePointer] == OpCodes.BRANCH_START) depth++;
                         }
                         throw new BrainfuckRuntimeException($"Unclosed bracket", CurrentContext);
                     }
                     break;
                 case OpCodes.BRANCH_END:
-                    if (Memory[memoryPointer] != 0)
+                    if (Memory[_memoryPointer] != 0)
                     {
                         int depth = 0;
-                        while (!OutOfCode)
+                        while (!IsDone)
                         {
-                            codePointer--;
-                            if (OutOfCode) break;
-                            if (Code[codePointer] == OpCodes.BRANCH_START)
+                            _codePointer--;
+                            if (IsDone) break;
+                            if (Code[_codePointer] == OpCodes.BRANCH_START)
                             {
                                 if (depth == 0) return;
                                 if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
                                 depth--;
                             }
-                            else if (Code[codePointer] == OpCodes.BRANCH_END) depth++;
+                            else if (Code[_codePointer] == OpCodes.BRANCH_END) depth++;
                         }
                         throw new BrainfuckRuntimeException($"Unexpected closing bracket", CurrentContext);
                     }
                     break;
                 case OpCodes.OUT:
-                    OnOutput?.Invoke(Memory[memoryPointer]);
+                    OnOutput?.Invoke(Memory[_memoryPointer]);
                     break;
                 case OpCodes.IN:
-                    Memory[memoryPointer] = OnInput?.Invoke() ?? 0;
+                    Memory[_memoryPointer] = OnInput?.Invoke() ?? 0;
                     break;
                 case OpCodes.DEBUG:
-                    isPaused = true;
+                    _isPaused = true;
                     break;
                 default:
-                    throw new BrainfuckRuntimeException($"Unknown instruction {Code[codePointer]}", CurrentContext);
+                    throw new BrainfuckRuntimeException($"Unknown instruction {Code[_codePointer]}", CurrentContext);
             }
         }
 
@@ -159,14 +159,14 @@ namespace LanguageCore.Brainfuck
             {
                 int line = 0;
 
-                int center = codePointer - halfWidth;
+                int center = _codePointer - halfWidth;
                 lastCodePosition = Math.Clamp(lastCodePosition, center - 20, center + 20);
                 int codePrintStart = Math.Max(0, lastCodePosition);
                 int codePrintEnd = Math.Min(Code.Length - 1, lastCodePosition + width - 1);
                 DrawCode(renderer, codePrintStart, codePrintEnd, 0, line++, width);
 
-                int memoryPrintStart = Math.Max(0, memoryPointer - halfWidth);
-                int memoryPrintEnd = Math.Min(Memory.Length - 1, memoryPointer + (halfWidth - 1));
+                int memoryPrintStart = Math.Max(0, _memoryPointer - halfWidth);
+                int memoryPrintEnd = Math.Min(Memory.Length - 1, _memoryPointer + (halfWidth - 1));
                 DrawMemoryChars(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
                 DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
                 DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
@@ -187,7 +187,7 @@ namespace LanguageCore.Brainfuck
 
                 if (DebugInfo != null)
                 {
-                    FunctionInformations functionInfo = DebugInfo.GetFunctionInformations(codePointer);
+                    FunctionInformations functionInfo = DebugInfo.GetFunctionInformations(_codePointer);
                     if (functionInfo.IsValid)
                     { renderer.Text(0, line++, functionInfo.ReadableIdentifier, CharColor.White); }
                 }
@@ -200,24 +200,24 @@ namespace LanguageCore.Brainfuck
             Thread.Sleep(100);
             inputBuffer.Clear();
 
-            if (!autoTick || isPaused)
+            if (!autoTick || _isPaused)
             {
                 while (inputBuffer.Count == 0)
                 { Thread.Sleep(100); }
                 inputBuffer.Dequeue();
-                isPaused = false;
+                _isPaused = false;
             }
 
             while (Step())
             {
                 Draw();
 
-                if (!autoTick || isPaused)
+                if (!autoTick || _isPaused)
                 {
                     while (inputBuffer.Count == 0)
                     { Thread.Sleep(100); }
                     inputBuffer.Dequeue();
-                    isPaused = false;
+                    _isPaused = false;
                 }
                 else if (wait > 0)
                 {
@@ -245,7 +245,7 @@ namespace LanguageCore.Brainfuck
             if (DebugInfo == null) return;
             if (OriginalCode == null) return;
 
-            if (!DebugInfo.TryGetSourceLocation(codePointer, out SourceCodeLocation sourceLocation)) return;
+            if (!DebugInfo.TryGetSourceLocation(_codePointer, out SourceCodeLocation sourceLocation)) return;
 
             for (int i = 0; i < OriginalCode.Length; i++)
             {
@@ -337,7 +337,7 @@ namespace LanguageCore.Brainfuck
         {
             for (int i = start; i <= end; i++)
             {
-                byte bg = (i == codePointer) ? CharColor.Silver : CharColor.Black;
+                byte bg = (i == _codePointer) ? CharColor.Silver : CharColor.Black;
                 byte fg = CompactCode.FromOpCode(Code[i]) switch
                 {
                     '>' or '<' => CharColor.BrightRed,
@@ -398,7 +398,7 @@ namespace LanguageCore.Brainfuck
             {
                 string textToPrint = Memory[m].ToString(CultureInfo.InvariantCulture).PadRight(4, ' ');
 
-                if (memoryPointer == m)
+                if (_memoryPointer == m)
                 { renderer.Text(x, y, textToPrint, CharColor.BrightRed); }
                 else if (Memory[m] == 0)
                 { renderer.Text(x, y, textToPrint, CharColor.Silver); }
@@ -423,7 +423,7 @@ namespace LanguageCore.Brainfuck
         {
             for (int m = start; m <= end; m++)
             {
-                if (memoryPointer == m)
+                if (_memoryPointer == m)
                 { renderer.Text(x, y, "^   ", CharColor.BrightRed); }
                 else
                 { renderer.Text(x, y, "    ", CharColor.White); }

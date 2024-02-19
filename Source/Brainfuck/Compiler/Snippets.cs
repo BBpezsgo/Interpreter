@@ -1071,5 +1071,69 @@ namespace LanguageCore.Brainfuck
         }
 
         #endregion
+
+        #region BITWIDTH_CONV
+
+        /// <summary>
+        /// <para>
+        /// <b>Cells used:</b> <c>_ a b _</c>
+        /// </para>
+        /// <para>
+        /// <b>Result:</b> <c>a + b * 255</c>
+        /// </para>
+        /// <para>
+        /// <see href="https://esolangs.org/wiki/Brainfuck_bitwidth_conversions"/>
+        /// </para>
+        /// </summary>
+        public static void Add16bit(this CompiledCode code)
+            => code.Append("+[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[->>+<<]>");
+            // => code.Append(">+<+[>-]>[->>+<]<<");
+
+        /// <summary>
+        /// <para>
+        /// <b>Cells used:</b> <c>_ a b _</c>
+        /// </para>
+        /// <para>
+        /// <b>Result:</b> <c>a + b * 255</c>
+        /// </para>
+        /// <para>
+        /// <see href="https://esolangs.org/wiki/Brainfuck_bitwidth_conversions"/>
+        /// </para>
+        /// </summary>
+        public static void Sub16bit(this CompiledCode code)
+            => code.Append("[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[->>-<<]>-");
+        // => code.Append(">+<[>-]>[->>-<]<<-");
+
+        /// <summary>
+        /// <para>
+        /// <b>Cells used:</b> <c>_ a b _ _ _ _</c>
+        /// </para>
+        /// <para>
+        /// <see href="https://esolangs.org/wiki/Brainfuck_bitwidth_conversions"/>
+        /// </para>
+        /// </summary>
+        public static void JumpStart16bit(this CompiledCode code)
+            => code.Append("[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<[[-]<<<+>>>]<[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<[[-]<<<+>>>]<<<[[-]>");
+
+        /// <summary>
+        /// <para>
+        /// <b>Cells used:</b> <c>_ a b _ _ _ _</c>
+        /// </para>
+        /// <para>
+        /// <see href="https://esolangs.org/wiki/Brainfuck_bitwidth_conversions"/>
+        /// </para>
+        /// </summary>
+        public static void JumpEnd16bit(this CompiledCode code)
+            => code.Append("[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<[[-]<<<+>>>]<[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<[[-]<<<+>>>]<<<]>");
+
+        /// <summary>
+        /// <para>
+        /// <b>Cells used:</b> <c>_ a b</c>
+        /// </para>
+        /// </summary>
+        public static void ClearCurrent16bit(this CompiledCode code)
+            => code.Append("[-]>[-]<");
+
+        #endregion
     }
 }

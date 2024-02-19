@@ -198,7 +198,7 @@ namespace LanguageCore.Brainfuck.Generator
                     ClearGlobalVariablesBeforeExit = true,
                     StackStart = 0,
                     HeapStart = 64,
-                    HeapSize = 16,
+                    HeapSize = 64,
                     GenerateDebugInformation = false,
                     ShowProgress = false,
                 };

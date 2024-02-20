@@ -4,8 +4,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 
-#pragma warning disable IDE0051
-
 namespace LanguageCore.Brainfuck.Generator
 {
     using Compiler;
@@ -443,7 +441,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 typeArguments = Utils.ConcatDictionary(typeArguments, indexer.Context?.CurrentTypeArguments);
 
-                GenerateCodeForMacro(indexer, new StatementWithValue[]
+                GenerateCodeForFunction(indexer, new StatementWithValue[]
                 {
                     statement.PrevStatement,
                     statement.Expression,
@@ -837,6 +835,64 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(ForLoop @for)
         {
+            CompiledCode codeSnapshot = Code;
+            GeneratorSnapshot genSnapshot = Snapshot();
+
+            if (IsUnrollable(@for))
+            {
+                Code = codeSnapshot.Duplicate();
+                if (GenerateCodeForStatement(@for, true))
+                {
+                    CompiledCode unrolledCode = Code;
+                    int unrolledLength = unrolledCode.GetFinalCode().Length - codeSnapshot.GetFinalCode().Length;
+                    GeneratorSnapshot unrolledSnapshot = Snapshot();
+
+                    Restore(genSnapshot);
+                    Code = codeSnapshot.Duplicate();
+
+                    GenerateCodeForStatement(@for, false);
+
+                    CompiledCode notUnrolledCode = Code;
+                    int notUnrolledLength = notUnrolledCode.GetFinalCode().Length - codeSnapshot.GetFinalCode().Length;
+                    GeneratorSnapshot notUnrolledSnapshot = Snapshot();
+
+                    if (unrolledLength <= notUnrolledLength)
+                    {
+                        Restore(unrolledSnapshot);
+                        Code = unrolledCode;
+                    }
+                    else
+                    {
+                        Restore(notUnrolledSnapshot);
+                        Code = notUnrolledCode;
+                    }
+
+                    return;
+                }
+            }
+
+            Restore(genSnapshot);
+            Code = codeSnapshot;
+
+            GenerateCodeForStatement(@for, false);
+        }
+        bool GenerateCodeForStatement(ForLoop @for, bool shouldUnroll)
+        {
+            if (shouldUnroll)
+            {
+                try
+                {
+                    Block[] unrolled = Unroll(@for, new Dictionary<StatementWithValue, DataItem>());
+
+                    for (int i = 0; i < unrolled.Length; i++)
+                    { GenerateCodeForStatement(unrolled[i]); }
+
+                    return true;
+                }
+                catch (CompilerException)
+                { }
+            }
+
             using (Code.Block($"For"))
             {
                 VariableCleanupStack.Push(PrecompileVariable(@for.VariableDeclaration));
@@ -907,6 +963,8 @@ namespace LanguageCore.Brainfuck.Generator
                 // ContinueReturnStatements();
                 // ContinueBreakStatements();
             }
+
+            return false;
         }
         void GenerateCodeForStatement(KeywordCall statement)
         {
@@ -1007,7 +1065,7 @@ namespace LanguageCore.Brainfuck.Generator
                         if (!TryGetBuiltinFunction("free", out CompiledFunction? function))
                         { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", statement, CurrentFile); }
 
-                        GenerateCodeForMacro(function, statement.Parameters, null, statement);
+                        GenerateCodeForFunction(function, statement.Parameters, null, statement);
 
                         if (!statement.SaveValue && function.ReturnSomething)
                         { Stack.Pop(); }
@@ -1033,7 +1091,7 @@ namespace LanguageCore.Brainfuck.Generator
                                     return;
                                 }
 
-                                GenerateCodeForMacro(deallocator, statement.Parameters, null, statement);
+                                GenerateCodeForFunction(deallocator, statement.Parameters, null, statement);
 
                                 if (!statement.SaveValue && deallocator.ReturnSomething)
                                 { Stack.Pop(); }
@@ -1071,7 +1129,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                     typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
 
-                    GenerateCodeForMacro(destructor, statement.Parameters, typeArguments, statement);
+                    GenerateCodeForFunction(destructor, statement.Parameters, typeArguments, statement);
 
                     if (!statement.SaveValue && destructor.ReturnSomething)
                     { Stack.Pop(); }
@@ -1382,7 +1440,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             typeArguments = Utils.ConcatDictionary(typeArguments, compiledFunction.Context?.CurrentTypeArguments);
 
-            GenerateCodeForMacro(compiledFunction, functionCall.MethodParameters, typeArguments, functionCall);
+            GenerateCodeForFunction(compiledFunction, functionCall.MethodParameters, typeArguments, functionCall);
 
             if (!functionCall.SaveValue && compiledFunction.ReturnSomething)
             { Stack.Pop(); }
@@ -1421,7 +1479,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             typeArguments = Utils.ConcatDictionary(typeArguments, constructor.Context?.CurrentTypeArguments);
 
-            GenerateCodeForMacro(constructor, constructorCall.Parameters, typeArguments, constructorCall);
+            GenerateCodeForFunction(constructor, constructorCall.Parameters, typeArguments, constructorCall);
 
             if (!constructorCall.SaveValue && constructor.ReturnSomething)
             { Stack.Pop(); }
@@ -1545,7 +1603,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                     typeArguments = Utils.ConcatDictionary(typeArguments, compiledOperator.Context?.CurrentTypeArguments);
 
-                    GenerateCodeForMacro(compiledOperator, statement.Parameters, typeArguments, statement);
+                    GenerateCodeForFunction(compiledOperator, statement.Parameters, typeArguments, statement);
 
                     if (!statement.SaveValue)
                     { Stack.Pop(); }
@@ -2566,7 +2624,7 @@ namespace LanguageCore.Brainfuck.Generator
             { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] not found", position, CurrentFile); }
 
             int pointerAddress = Stack.NextAddress;
-            GenerateCodeForMacro(allocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) }, null, position);
+            GenerateCodeForFunction(allocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) }, null, position);
             return pointerAddress;
         }
 
@@ -2585,7 +2643,7 @@ namespace LanguageCore.Brainfuck.Generator
                 {
                     if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                     {
-                        GenerateCodeForMacro(deallocator, new StatementWithValue[] { value }, null, value);
+                        GenerateCodeForFunction(deallocator, new StatementWithValue[] { value }, null, value);
                         return;
                     }
                     typeArguments = destructorTemplate.TypeArguments;
@@ -2600,7 +2658,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
 
-                GenerateCodeForMacro(destructor, new StatementWithValue[] { value }, typeArguments, value);
+                GenerateCodeForFunction(destructor, new StatementWithValue[] { value }, typeArguments, value);
 
                 if (destructor.ReturnSomething)
                 { Stack.Pop(); }
@@ -2608,7 +2666,7 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            GenerateCodeForMacro(deallocator, new StatementWithValue[] { value }, null, value);
+            GenerateCodeForFunction(deallocator, new StatementWithValue[] { value }, null, value);
         }
 
         int GenerateCodeForLiteralString(Literal literal)
@@ -2655,7 +2713,7 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
-        void GenerateCodeForMacro(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
+        void GenerateCodeForFunction(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
         {
             int instructionStart = 0;
             if (GenerateDebugInformation)
@@ -2867,44 +2925,12 @@ namespace LanguageCore.Brainfuck.Generator
                 throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
             }
 
-            TypeArguments? savedTypeArguments = null;
-            if (typeArguments != null)
-            { SetTypeArguments(typeArguments, out savedTypeArguments); }
-
-            int[] savedBreakTagStack = BreakTagStack.ToArray();
-            BreakTagStack.Clear();
-
-            int[] savedBreakCount = BreakCount.ToArray();
-            BreakCount.Clear();
-
-            Variable[] savedVariables = Variables.ToArray();
-            Variables.Clear();
-
-            if (CurrentMacro.Count == 1)
-            {
-                Variables.PushRange(savedVariables);
-                for (int i = 0; i < Variables.Count; i++)
-                { Variables[i] = new Variable(Variables[i].Name, Variables[i].Address, Variables[i].Scope, false, Variables[i].DeallocateOnClean, Variables[i].Type, Variables[i].Size); }
-            }
-
+            GeneratorStackFrame frame = PushStackFrame(typeArguments);
             Variables.PushIf(returnVariable);
-
             Variables.PushRange(compiledParameters);
-
-            string? savedFilePath = CurrentFile;
             CurrentFile = function.FilePath;
-
-            CompiledConstant[] savedConstants = CompiledConstants.ToArray();
-            CompiledConstants.Clear();
-
             CompiledConstants.PushRange(constantParameters);
-
-            for (int i = 0; i < savedConstants.Length; i++)
-            {
-                if (GetConstant(savedConstants[i].Identifier, out _))
-                { continue; }
-                CompiledConstants.Push(savedConstants[i]);
-            }
+            CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
             using (DebugBlock(function.Block.BracketStart))
             {
@@ -2957,25 +2983,10 @@ namespace LanguageCore.Brainfuck.Generator
                 }
             }
 
-            CurrentFile = savedFilePath;
+            PopStackFrame(frame);
 
             InMacro.Pop();
             CurrentMacro.Pop();
-
-            Variables.Set(savedVariables);
-
-            CompiledConstants.Set(savedConstants);
-
-            if (BreakCount.Count > 0 ||
-                BreakTagStack.Count > 0)
-            { throw new InternalException(); }
-
-            BreakCount.Set(savedBreakCount);
-
-            BreakTagStack.Set(savedBreakTagStack);
-
-            if (savedTypeArguments != null)
-            { SetTypeArguments(savedTypeArguments); }
 
             if (GenerateDebugInformation)
             {
@@ -2992,7 +3003,7 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
-        void GenerateCodeForMacro(CompiledOperator function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
+        void GenerateCodeForFunction(CompiledOperator function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
         {
             int instructionStart = 0;
             if (GenerateDebugInformation)
@@ -3204,37 +3215,12 @@ namespace LanguageCore.Brainfuck.Generator
                 throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
             }
 
-            TypeArguments? savedTypeArguments = null;
-            if (typeArguments != null)
-            { SetTypeArguments(typeArguments, out savedTypeArguments); }
-
-            int[] savedBreakTagStack = BreakTagStack.ToArray();
-            BreakTagStack.Clear();
-
-            int[] savedBreakCount = BreakCount.ToArray();
-            BreakCount.Clear();
-
-            Variable[] savedVariables = Variables.ToArray();
-            Variables.Clear();
-
+            GeneratorStackFrame frame = PushStackFrame(typeArguments);
             Variables.PushIf(returnVariable);
-
             Variables.PushRange(compiledParameters);
-
-            string? savedFilePath = CurrentFile;
             CurrentFile = function.FilePath;
-
-            CompiledConstant[] savedConstants = CompiledConstants.ToArray();
-            CompiledConstants.Clear();
-
             CompiledConstants.PushRange(constantParameters);
-
-            for (int i = 0; i < savedConstants.Length; i++)
-            {
-                if (GetConstant(savedConstants[i].Identifier, out _))
-                { continue; }
-                CompiledConstants.Push(savedConstants[i]);
-            }
+            CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
             using (DebugBlock(function.Block.BracketStart))
             {
@@ -3290,25 +3276,10 @@ namespace LanguageCore.Brainfuck.Generator
                 }
             }
 
-            CurrentFile = savedFilePath;
+            PopStackFrame(frame);
 
             InMacro.Pop();
             CurrentMacro.Pop();
-
-            Variables.Set(savedVariables);
-
-            CompiledConstants.Set(savedConstants);
-
-            if (BreakCount.Count > 0 ||
-                BreakTagStack.Count > 0)
-            { throw new InternalException(); }
-
-            BreakCount.Set(savedBreakCount);
-
-            BreakTagStack.Set(savedBreakTagStack);
-
-            if (savedTypeArguments != null)
-            { SetTypeArguments(savedTypeArguments); }
 
             if (GenerateDebugInformation)
             {
@@ -3325,7 +3296,7 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
-        void GenerateCodeForMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
+        void GenerateCodeForFunction(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
         {
             int instructionStart = 0;
             if (GenerateDebugInformation)
@@ -3459,34 +3430,11 @@ namespace LanguageCore.Brainfuck.Generator
                 }
             }
 
-            TypeArguments? savedTypeArguments = null;
-            if (typeArguments != null)
-            { SetTypeArguments(typeArguments, out savedTypeArguments); }
-
-            int[] savedBreakTagStack = BreakTagStack.ToArray();
-            BreakTagStack.Clear();
-
-            int[] savedBreakCount = BreakCount.ToArray();
-            BreakCount.Clear();
-
-            Variable[] savedVariables = Variables.ToArray();
-            Variables.Clear();
-
+            GeneratorStackFrame frame = PushStackFrame(typeArguments);
             Variables.PushIf(returnVariable);
-
             Variables.PushRange(compiledParameters);
-
-            CompiledConstant[] savedConstants = CompiledConstants.ToArray();
-            CompiledConstants.Clear();
-
             CompiledConstants.PushRange(constantParameters);
-
-            for (int i = 0; i < savedConstants.Length; i++)
-            {
-                if (GetConstant(savedConstants[i].Identifier, out _))
-                { continue; }
-                CompiledConstants.Push(savedConstants[i]);
-            }
+            CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
             using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
             {
@@ -3532,23 +3480,10 @@ namespace LanguageCore.Brainfuck.Generator
                 }
             }
 
+            PopStackFrame(frame);
+
             InMacro.Pop();
             CurrentMacro.Pop();
-
-            Variables.Set(savedVariables);
-
-            CompiledConstants.Set(savedConstants);
-
-            if (BreakCount.Count > 0 ||
-                BreakTagStack.Count > 0)
-            { throw new InternalException(); }
-
-            BreakCount.Set(savedBreakCount);
-
-            BreakTagStack.Set(savedBreakTagStack);
-
-            if (savedTypeArguments != null)
-            { SetTypeArguments(savedTypeArguments); }
 
             if (GenerateDebugInformation)
             {

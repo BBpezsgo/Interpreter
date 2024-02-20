@@ -57,7 +57,7 @@ namespace LanguageCore.Brainfuck
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    public class CompiledCode
+    public class CompiledCode : IDuplicatable<CompiledCode>
     {
         const int HALF_BYTE = byte.MaxValue / 2;
 
@@ -67,10 +67,8 @@ namespace LanguageCore.Brainfuck
         const int InitialSize = 1024;
 
         int indent;
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        int pointer;
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        int branchDepth;
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)] int pointer;
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)] int branchDepth;
 
         public int Pointer => pointer;
         public int BranchDepth => branchDepth;
@@ -650,6 +648,15 @@ namespace LanguageCore.Brainfuck
             this.Code.Append(code);
             this.CachedFinalCode.Append(code);
         }
+
+        public CompiledCode Duplicate() => new()
+        {
+            branchDepth = BranchDepth,
+            CachedFinalCode = new(CachedFinalCode.ToString()),
+            Code = new(Code.ToString()),
+            indent = indent,
+            pointer = pointer,
+        };
     }
 
     public readonly struct CodeBlock : IDisposable
@@ -880,6 +887,8 @@ namespace LanguageCore.Brainfuck
         public readonly int Start;
         public readonly int Size;
 
+        bool IsInitialized = false;
+
         public int OffsettedStart => GetOffsettedStart(Start);
 
         public static int GetOffsettedStart(int start) => start + BLOCK_SIZE;
@@ -903,6 +912,12 @@ namespace LanguageCore.Brainfuck
          *  c: Carrying value
          *  v: Value
          */
+
+        void ThrowIfNotInitialized()
+        {
+            if (!IsInitialized)
+            { throw new InternalException($"Heap isn't initialized"); }
+        }
 
         /// <summary>
         /// <b>Expected pointer:</b> <c>OFFSET_ADDRESS_CARRY</c>
@@ -990,12 +1005,17 @@ namespace LanguageCore.Brainfuck
 
         public void Init()
         {
+            if (IsInitialized) return;
+            if (Size <= 0) return;
+
             using (Code.Block("Initialize HEAP"))
             {
                 // SetAbsolute(0, 126);
                 Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_DATA, 126);
                 Code.SetPointer(0);
             }
+
+            IsInitialized = true;
         }
 
         public void Destroy()
@@ -1017,6 +1037,8 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public void Set(int pointerAddress, int valueAddress)
         {
+            ThrowIfNotInitialized();
+
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
             Code.MoveValue(pointerAddress, OffsettedStart);
@@ -1037,6 +1059,8 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public void SetAbsolute(int pointer, int value)
         {
+            ThrowIfNotInitialized();
+
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
             Code.SetValue(OffsettedStart, pointer);
@@ -1057,6 +1081,8 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public void Add(int pointerAddress, int valueAddress)
         {
+            ThrowIfNotInitialized();
+
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
             Code.MoveValue(pointerAddress, OffsettedStart);
@@ -1077,6 +1103,8 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public void Subtract(int pointerAddress, int valueAddress)
         {
+            ThrowIfNotInitialized();
+
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
             Code.MoveValue(pointerAddress, OffsettedStart);
@@ -1097,6 +1125,8 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public void Get(int pointerAddress, int resultAddress)
         {
+            ThrowIfNotInitialized();
+
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
             Code.MoveValue(pointerAddress, OffsettedStart);

@@ -206,6 +206,17 @@ namespace LanguageCore.Brainfuck.Generator
                 return result;
             }
         }
+
+        public BrainfuckGeneratorSettings(BrainfuckGeneratorSettings other)
+        {
+            ClearGlobalVariablesBeforeExit = other.ClearGlobalVariablesBeforeExit;
+            StackStart = other.StackStart;
+            StackSize = other.StackSize;
+            HeapStart = other.HeapStart;
+            HeapSize = other.HeapSize;
+            GenerateDebugInformation = other.GenerateDebugInformation;
+            ShowProgress = other.ShowProgress;
+        }
     }
 
     public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
@@ -252,6 +263,115 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
+        struct GeneratorSnapshot
+        {
+            public readonly Stack<Variable> Variables;
+
+            public readonly StackCodeHelper Stack;
+            public readonly BasicHeapCodeHelper Heap;
+
+            public readonly Stack<int> VariableCleanupStack;
+            public readonly Stack<int> ReturnCount;
+            public readonly Stack<int> BreakCount;
+            public readonly Stack<int> ReturnTagStack;
+            public readonly Stack<int> BreakTagStack;
+            public readonly Stack<bool> InMacro;
+
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            public int Optimizations;
+
+            public readonly Stack<FunctionThingDefinition> CurrentMacro;
+
+            public string? VariableCanBeDiscarded;
+
+            public readonly DebugInformation DebugInfo;
+
+            public GeneratorSnapshot(CodeGeneratorForBrainfuck v)
+            {
+                Variables = new Stack<Variable>(v.Variables);
+
+                Stack = v.Stack;
+                Heap = v.Heap;
+
+                VariableCleanupStack = new Stack<int>(v.VariableCleanupStack);
+                ReturnCount = new Stack<int>(v.ReturnCount);
+                BreakCount = new Stack<int>(v.BreakCount);
+                ReturnTagStack = new Stack<int>(v.ReturnTagStack);
+                BreakTagStack = new Stack<int>(v.BreakTagStack);
+                InMacro = new Stack<bool>(v.InMacro);
+
+                Optimizations = v.Optimizations;
+
+                CurrentMacro = new Stack<FunctionThingDefinition>(v.CurrentMacro);
+
+                VariableCanBeDiscarded = new string(v.VariableCanBeDiscarded);
+
+                DebugInfo = v.DebugInfo.Duplicate();
+            }
+        }
+
+        struct GeneratorStackFrame
+        {
+            public TypeArguments? savedTypeArguments;
+            public int[] savedBreakTagStack;
+            public int[] savedBreakCount;
+            public Variable[] savedVariables;
+            public string? savedFilePath;
+            public CompiledConstant[] savedConstants;
+        }
+
+        [SuppressMessage("Style", "IDE0017")]
+        GeneratorStackFrame PushStackFrame(TypeArguments? typeArguments)
+        {
+            GeneratorStackFrame newFrame = new();
+
+            newFrame.savedTypeArguments = null;
+            if (typeArguments != null)
+            { SetTypeArguments(typeArguments, out newFrame.savedTypeArguments); }
+
+            newFrame.savedBreakTagStack = BreakTagStack.ToArray();
+            BreakTagStack.Clear();
+
+            newFrame.savedBreakCount = BreakCount.ToArray();
+            BreakCount.Clear();
+
+            newFrame.savedVariables = Variables.ToArray();
+            Variables.Clear();
+
+            if (CurrentMacro.Count == 1)
+            {
+                Variables.PushRange(newFrame.savedVariables);
+                for (int i = 0; i < Variables.Count; i++)
+                { Variables[i] = new Variable(Variables[i].Name, Variables[i].Address, Variables[i].Scope, false, Variables[i].DeallocateOnClean, Variables[i].Type, Variables[i].Size); }
+            }
+
+            newFrame.savedFilePath = CurrentFile;
+
+            newFrame.savedConstants = CompiledConstants.ToArray();
+            CompiledConstants.Clear();
+
+            return newFrame;
+        }
+        void PopStackFrame(GeneratorStackFrame frame)
+        {
+            CurrentFile = frame.savedFilePath;
+
+            Variables.Set(frame.savedVariables);
+
+            CompiledConstants.Set(frame.savedConstants);
+
+            if (BreakCount.Count > 0 ||
+                BreakTagStack.Count > 0)
+            { throw new InternalException(); }
+
+            BreakCount.Set(frame.savedBreakCount);
+
+            BreakTagStack.Set(frame.savedBreakTagStack);
+
+            if (frame.savedTypeArguments != null)
+            { SetTypeArguments(frame.savedTypeArguments); }
+        }
+
         #region Fields
 
         CompiledCode Code;
@@ -279,7 +399,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         string? VariableCanBeDiscarded;
 
-        readonly DebugInformation DebugInfo;
+        DebugInformation DebugInfo;
 
         readonly bool ShowProgress;
 
@@ -345,6 +465,43 @@ namespace LanguageCore.Brainfuck.Generator
             }
 
             readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.SizeOnStack} bytes at {Address})";
+        }
+
+        GeneratorSnapshot Snapshot() => new(this);
+        void Restore(GeneratorSnapshot snapshot)
+        {
+            Variables.Clear();
+            Variables.AddRange(snapshot.Variables);
+
+            // Stack = snapshot.Stack;
+            // Heap = snapshot.Heap;
+
+            VariableCleanupStack.Clear();
+            VariableCleanupStack.AddRange(snapshot.VariableCleanupStack);
+
+            ReturnCount.Clear();
+            ReturnCount.AddRange(snapshot.ReturnCount);
+
+            BreakCount.Clear();
+            BreakCount.AddRange(snapshot.BreakCount);
+
+            ReturnTagStack.Clear();
+            ReturnTagStack.AddRange(snapshot.ReturnTagStack);
+
+            BreakTagStack.Clear();
+            BreakTagStack.AddRange(snapshot.BreakTagStack);
+
+            InMacro.Clear();
+            InMacro.AddRange(snapshot.InMacro);
+
+            Optimizations = snapshot.Optimizations;
+
+            CurrentMacro.Clear();
+            CurrentMacro.AddRange(snapshot.CurrentMacro);
+
+            VariableCanBeDiscarded = new string(snapshot.VariableCanBeDiscarded);
+
+            DebugInfo = snapshot.DebugInfo.Duplicate();
         }
 
         DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);

@@ -18,6 +18,7 @@ namespace TheProgram
 
         public LanguageCore.Compiler.CompilerSettings CompilerSettings;
         public LanguageCore.Compiler.GeneratorSettings GeneratorSettings;
+        public LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckGeneratorSettings;
         public BytecodeInterpreterSettings BytecodeInterpreterSettings;
 
         public bool ThrowErrors;
@@ -37,6 +38,7 @@ namespace TheProgram
             RunType = ProgramRunType.Normal,
             CompilerSettings = LanguageCore.Compiler.CompilerSettings.Default,
             GeneratorSettings = LanguageCore.Compiler.GeneratorSettings.Default,
+            BrainfuckGeneratorSettings = LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default,
             BytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
             ConsoleGUI = false,
             DoNotPause = false,
@@ -193,8 +195,11 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out arg, "--heap-size", "-hs"))
                     {
-                        if (!ExpectParam(args, ref i, out result.BytecodeInterpreterSettings.HeapSize))
+                        if (!ExpectParam(args, ref i, out int heapSize))
                         { throw new ArgumentException($"Expected number value after argument \"{arg}\""); }
+
+                        result.BytecodeInterpreterSettings.HeapSize = heapSize;
+                        result.BrainfuckGeneratorSettings.HeapSize = heapSize;
 
                         continue;
                     }

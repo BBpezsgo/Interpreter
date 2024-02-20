@@ -9,6 +9,7 @@ using System.Text;
 namespace LanguageCore.Parser.Statement
 {
     using Compiler;
+    using LanguageCore.Runtime;
     using Tokenizing;
 
     struct Stringify
@@ -611,7 +612,7 @@ namespace LanguageCore.Parser.Statement
 
                 result.Append(Parameters[i].ToString());
 
-                if (result.Length >= 10 && i - 1 != Parameters.Length)
+                if (result.Length >= 10 && i + 1 != Parameters.Length)
                 {
                     result.Append(", ...");
                     break;
@@ -1042,6 +1043,20 @@ namespace LanguageCore.Parser.Statement
             ValueToken = value;
         }
 
+        Literal(DataItem value, Token token)
+        {
+            Type = value.Type switch
+            {
+                RuntimeType.UInt8 => LiteralType.Integer,
+                RuntimeType.SInt32 => LiteralType.Integer,
+                RuntimeType.Single => LiteralType.Float,
+                RuntimeType.UInt16 => LiteralType.Integer,
+                _ => throw new NotImplementedException(),
+            };
+            Value = value.ToString();
+            ValueToken = token;
+        }
+
         public static Literal CreateAnonymous(LiteralType type, string value, IPositioned position)
             => Literal.CreateAnonymous(type, value, position.Position);
         public static Literal CreateAnonymous(LiteralType type, string value, Position position)
@@ -1056,6 +1071,24 @@ namespace LanguageCore.Parser.Statement
                 _ => TokenType.Identifier,
             };
             return new Literal(type, value, Token.CreateAnonymous(value, tokenType))
+            {
+                ImaginaryPosition = position,
+            };
+        }
+
+        public static Literal CreateAnonymous(DataItem value, IPositioned position)
+            => Literal.CreateAnonymous(value, position.Position);
+        public static Literal CreateAnonymous(DataItem value, Position position)
+        {
+            TokenType tokenType = value.Type switch
+            {
+                RuntimeType.UInt8 => TokenType.LiteralNumber,
+                RuntimeType.SInt32 => TokenType.LiteralNumber,
+                RuntimeType.Single => TokenType.LiteralFloat,
+                RuntimeType.UInt16 => TokenType.LiteralNumber,
+                _ => TokenType.Identifier,
+            };
+            return new Literal(value, Token.CreateAnonymous(value.ToString(), tokenType))
             {
                 ImaginaryPosition = position,
             };

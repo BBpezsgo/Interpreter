@@ -124,7 +124,7 @@ namespace LanguageCore.Runtime
         }
     }
 
-    public class DebugInformation
+    public class DebugInformation : IDuplicatable<DebugInformation>
     {
         public readonly List<SourceCodeLocation> SourceCodeLocations;
         public readonly List<FunctionInformations> FunctionInformations;
@@ -263,6 +263,18 @@ namespace LanguageCore.Runtime
             }
 
             return new CollectedScopeInfo(result.ToArray());
+        }
+
+        public DebugInformation Duplicate()
+        {
+            DebugInformation copy = new();
+
+            copy.SourceCodeLocations.AddRange(SourceCodeLocations);
+            copy.FunctionInformations.AddRange(FunctionInformations);
+            copy.ScopeInformations.AddRange(ScopeInformations);
+            copy.CodeComments.AddRange(CodeComments);
+
+            return copy;
         }
 
         /*

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -2578,6 +2579,18 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
+        protected static TypeCast InlineMacro(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                InlineMacro(statement.PrevStatement, parameters),
+                statement.Keyword,
+                statement.Type)
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+
+                CompiledType = statement.CompiledType,
+            };
+
         [return: NotNullIfNotNull(nameof(statement))]
         protected static StatementWithValue? InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
@@ -2592,6 +2605,7 @@ namespace LanguageCore.Compiler
             LiteralStatement literal => InlineMacro(literal, parameters),
             Field field => InlineMacro(field, parameters),
             IndexCall indexCall => InlineMacro(indexCall, parameters),
+            TypeCast typeCast => InlineMacro(typeCast, parameters),
             _ => throw new NotImplementedException()
         };
 
@@ -2630,16 +2644,24 @@ namespace LanguageCore.Compiler
             };
         }
 
-        protected bool TryCompute(OperatorCall @operator, RuntimeType? expectedType, out DataItem value)
+        protected bool TryCompute(OperatorCall @operator, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             if (GetOperator(@operator, out _))
             {
+                if (values is not null &&
+                    values.TryGetValue(@operator, out value))
+                { return true; }
+
                 value = DataItem.Null;
                 return false;
             }
 
-            if (!TryCompute(@operator.Left, expectedType, out DataItem leftValue))
+            if (!TryCompute(@operator.Left, expectedType, values, out DataItem leftValue))
             {
+                if (values is not null &&
+                    values.TryGetValue(@operator, out value))
+                { return true; }
+
                 value = DataItem.Null;
                 return false;
             }
@@ -2654,7 +2676,7 @@ namespace LanguageCore.Compiler
 
             if (@operator.Right != null)
             {
-                if (TryCompute(@operator.Right, expectedType, out DataItem rightValue))
+                if (TryCompute(@operator.Right, expectedType, values, out DataItem rightValue))
                 {
                     value = Compute(op, leftValue, rightValue);
                     return true;
@@ -2681,6 +2703,10 @@ namespace LanguageCore.Compiler
                         break;
                     }
                     default:
+                        if (values is not null &&
+                            values.TryGetValue(@operator, out value))
+                        { return true; }
+
                         value = DataItem.Null;
                         return false;
                 }
@@ -2739,29 +2765,37 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(AnyCall anyCall, RuntimeType? expectedType, out DataItem value)
+        protected bool TryCompute(AnyCall anyCall, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
-            { return TryCompute(functionCall, expectedType, out value); }
+            { return TryCompute(functionCall, expectedType, values, out value); }
+
+            if (values is not null &&
+                values.TryGetValue(anyCall, out value))
+            { return true; }
 
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(FunctionCall functionCall, RuntimeType? expectedType, out DataItem value)
+        protected bool TryCompute(FunctionCall functionCall, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             value = DataItem.Null;
 
-            if (!TryGetMacro(functionCall, out MacroDefinition? macro))
-            { return false; }
+            if (TryGetMacro(functionCall, out MacroDefinition? macro))
+            {
+                Statement inlined = InlineMacro(macro, functionCall.Parameters);
 
-            Statement inlined = InlineMacro(macro, functionCall.Parameters);
+                if (inlined is StatementWithValue statementWithValue)
+                { return TryCompute(statementWithValue, expectedType, values, out value); }
+            }
 
-            if (inlined is StatementWithValue statementWithValue)
-            { return TryCompute(statementWithValue, expectedType, out value); }
+            if (values is not null &&
+                values.TryGetValue(functionCall, out value))
+            { return true; }
 
             return false;
         }
-        protected bool TryCompute(Identifier identifier, RuntimeType? expectedType, out DataItem value)
+        protected bool TryCompute(Identifier identifier, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             if (GetConstant(identifier.Content, out DataItem constantValue))
             {
@@ -2770,10 +2804,14 @@ namespace LanguageCore.Compiler
                 return true;
             }
 
+            if (values is not null &&
+                values.TryGetValue(identifier, out value))
+            { return true; }
+
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(Field field, RuntimeType? expectedType, out DataItem value)
+        protected bool TryCompute(Field field, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             CompiledType prevType = FindStatementType(field.PrevStatement);
 
@@ -2784,11 +2822,28 @@ namespace LanguageCore.Compiler
                 return true;
             }
 
+            if (values is not null &&
+                values.TryGetValue(field, out value))
+            { return true; }
+
+            value = DataItem.Null;
+            return false;
+        }
+        protected bool TryCompute(TypeCast typeCast, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        {
+            if (TryCompute(typeCast.PrevStatement, null, values, out value))
+            {
+                CompiledType type = new(typeCast.Type, FindType, TryCompute);
+                if (!type.IsBuiltin) return false;
+                DataItem.Cast(ref value, type.RuntimeType);
+                return true;
+            }
+
             value = DataItem.Null;
             return false;
         }
 
-        protected bool TryCompute(StatementWithValue? statement, RuntimeType? expectedType, out DataItem value)
+        protected bool TryCompute(StatementWithValue? statement, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             if (statement is null)
             {
@@ -2796,27 +2851,36 @@ namespace LanguageCore.Compiler
                 return false;
             }
 
+            if (values is not null &&
+                values.TryGetValue(statement, out value))
+            { return true; }
+
             if (statement is LiteralStatement literal)
             { return TryCompute(literal, expectedType, out value); }
 
             if (statement is OperatorCall @operator)
-            { return TryCompute(@operator, expectedType, out value); }
+            { return TryCompute(@operator, expectedType, values, out value); }
 
             if (statement is KeywordCall keywordCall)
             { return TryCompute(keywordCall, expectedType, out value); }
 
             if (statement is FunctionCall functionCall)
-            { return TryCompute(functionCall, expectedType, out value); }
+            { return TryCompute(functionCall, expectedType, values, out value); }
 
             if (statement is AnyCall anyCall)
-            { return TryCompute(anyCall, expectedType, out value); }
+            { return TryCompute(anyCall, expectedType, values, out value); }
 
             if (statement is Identifier identifier)
-            { return TryCompute(identifier, expectedType, out value); }
+            { return TryCompute(identifier, expectedType, values, out value); }
+
+            if (statement is TypeCast typeCast)
+            { return TryCompute(typeCast, expectedType, values, out value); }
 
             value = DataItem.Null;
             return false;
         }
+        protected bool TryCompute(StatementWithValue? statement, RuntimeType? expectedType, out DataItem value)
+            => TryCompute(statement, expectedType, null, out value);
 
         public static bool TryComputeSimple(OperatorCall @operator, RuntimeType? expectedType, out DataItem value)
         {
@@ -3169,6 +3233,101 @@ namespace LanguageCore.Compiler
         }
 
         #endregion
+
+        protected bool IsUnrollable(ForLoop loop)
+        {
+            string iteratorVariable = loop.VariableDeclaration.VariableName.Content;
+            Dictionary<string, StatementWithValue> _params = new()
+            {
+                { iteratorVariable, Literal.CreateAnonymous(new DataItem(0), loop.VariableDeclaration) }
+            };
+
+            StatementWithValue condition = loop.Condition;
+            Assignment iteratorExpression = loop.Expression.ToAssignment();
+
+            if (iteratorExpression.Left is not Identifier iteratorExpressionLeft ||
+                iteratorExpressionLeft.Content != iteratorVariable)
+            { return false; }
+
+            condition = InlineMacro(condition, _params);
+            StatementWithValue iteratorExpressionRight = InlineMacro(iteratorExpression.Right, _params);
+
+            return
+                TryCompute(condition, null, null, out _) &&
+                TryCompute(iteratorExpressionRight, null, null, out _);
+        }
+
+        protected Block[] Unroll(ForLoop loop, Dictionary<StatementWithValue, DataItem> values)
+        {
+            VariableDeclaration iteratorVariable = loop.VariableDeclaration;
+            StatementWithValue condition = loop.Condition;
+            AnyAssignment iteratorExpression = loop.Expression;
+
+            DataItem iterator;
+            if (iteratorVariable.InitialValue is not null)
+            {
+                if (!TryCompute(iteratorVariable.InitialValue, null, out iterator))
+                { throw new CompilerException($"Failed to compute the iterator initial value (\"{iteratorVariable.InitialValue}\") for loop unrolling", iteratorVariable.InitialValue, CurrentFile); }
+            }
+            else
+            {
+                CompiledType iteratorType = new(iteratorVariable.Type, FindType, TryCompute);
+                iteratorVariable.Type.SetAnalyzedType(iteratorType);
+                iterator = GetInitialValue(iteratorType);
+            }
+
+            KeyValuePair<string, StatementWithValue> GetIteratorStatement()
+                => new(iteratorVariable.VariableName.Content, Literal.CreateAnonymous(iterator, Position.UnknownPosition));
+
+            DataItem ComputeIterator()
+            {
+                KeyValuePair<string, StatementWithValue> _yeah = GetIteratorStatement();
+                StatementWithValue _condition = InlineMacro(condition, new Dictionary<string, StatementWithValue>()
+                {
+                    {_yeah.Key, _yeah.Value }
+                });
+
+                if (!TryCompute(_condition, null, values, out DataItem result))
+                { throw new CompilerException($"Failed to compute the condition value (\"{_condition}\") for loop unrolling", condition, CurrentFile); }
+
+                return result;
+            }
+
+            DataItem ComputeExpression()
+            {
+                KeyValuePair<string, StatementWithValue> _yeah = GetIteratorStatement();
+                Assignment assignment = iteratorExpression.ToAssignment();
+
+                if (assignment.Left is not Identifier leftIdentifier)
+                { throw new CompilerException($"Failed to unroll for loop", assignment.Left, CurrentFile); }
+
+                StatementWithValue _value = InlineMacro(assignment.Right, new Dictionary<string, StatementWithValue>()
+                {
+                    { _yeah.Key, _yeah.Value }
+                });
+
+                if (!TryCompute(_value, null, values, out DataItem result))
+                { throw new CompilerException($"Failed to compute the condition value (\"{_value}\") for loop unrolling", condition, CurrentFile); }
+
+                return result;
+            }
+
+            List<Block> statements = new();
+
+            while (ComputeIterator())
+            {
+                KeyValuePair<string, StatementWithValue> _yeah = GetIteratorStatement();
+                Block subBlock = InlineMacro(loop.Block, new Dictionary<string, StatementWithValue>()
+                {
+                    { _yeah.Key, _yeah.Value }
+                });
+                statements.Add(subBlock);
+
+                iterator = ComputeExpression();
+            }
+
+            return statements.ToArray();
+        }
 
         protected static bool CanConvertImplicitly(CompiledType? from, CompiledType? to)
         {

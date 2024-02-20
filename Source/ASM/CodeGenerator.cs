@@ -385,7 +385,7 @@ namespace LanguageCore.ASM.Generator
 
             int size;
 
-            if (TryCompute(newVariable.InitialValue, null, out DataItem computedInitialValue))
+            if (TryCompute(newVariable.InitialValue, null, null, out DataItem computedInitialValue))
             {
                 size = 1;
 

@@ -833,7 +833,7 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForStatement(OperatorCall @operator)
         {
-            if (Settings.OptimizeCode && TryCompute(@operator, null, out DataItem predictedValue))
+            if (Settings.OptimizeCode && TryCompute(@operator, null, null, out DataItem predictedValue))
             {
                 OnGotStatementType(@operator, new CompiledType(predictedValue.Type));
 
@@ -1167,7 +1167,7 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForStatement(WhileLoop whileLoop)
         {
-            bool conditionIsComputed = TryCompute(whileLoop.Condition, null, out DataItem computedCondition);
+            bool conditionIsComputed = TryCompute(whileLoop.Condition, null, null, out DataItem computedCondition);
             if (conditionIsComputed && !(bool)computedCondition && TrimUnreachableCode)
             {
                 AddComment("Unreachable code not compiled");
@@ -1544,7 +1544,7 @@ namespace LanguageCore.BBCode.Generator
                 if (index.PrevStatement is not Identifier identifier)
                 { throw new NotSupportedException($"Only variables/parameters supported by now", index.PrevStatement, CurrentFile); }
 
-                if (TryCompute(index.Expression, RuntimeType.SInt32, out DataItem computedIndexData))
+                if (TryCompute(index.Expression, RuntimeType.SInt32, null, out DataItem computedIndexData))
                 {
                     if (computedIndexData.ValueSInt32 < 0 || computedIndexData.ValueSInt32 >= prevType.StackArraySize)
                     { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", index.Expression, CurrentFile)); }
@@ -1952,7 +1952,7 @@ namespace LanguageCore.BBCode.Generator
                 if (statementToSet.PrevStatement is not Identifier identifier)
                 { throw new NotSupportedException($"Only variables/parameters supported by now", statementToSet.PrevStatement, CurrentFile); }
 
-                if (TryCompute(statementToSet.Expression, RuntimeType.SInt32, out DataItem computedIndexData))
+                if (TryCompute(statementToSet.Expression, RuntimeType.SInt32, null, out DataItem computedIndexData))
                 {
                     if (computedIndexData.ValueSInt32 < 0 || computedIndexData.ValueSInt32 >= prevType.StackArraySize)
                     { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", statementToSet.Expression, CurrentFile)); }
@@ -2032,7 +2032,7 @@ namespace LanguageCore.BBCode.Generator
             AssignTypeCheck(variable.Type, valueType, value);
 
             if (variable.Type.IsBuiltin &&
-                TryCompute(value, null, out DataItem yeah))
+                TryCompute(value, null, null, out DataItem yeah))
             {
                 AddInstruction(Opcode.PUSH_VALUE, yeah);
             }
@@ -2221,7 +2221,7 @@ namespace LanguageCore.BBCode.Generator
 
             int size;
 
-            if (TryCompute(newVariable.InitialValue, null, out DataItem computedInitialValue))
+            if (TryCompute(newVariable.InitialValue, null, null, out DataItem computedInitialValue))
             {
                 AddComment($"Initial value {{");
 

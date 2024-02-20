@@ -164,13 +164,14 @@ namespace TheProgram
 
                     BrainfuckGeneratorResult generated;
                     Token[] tokens;
+                    BrainfuckGeneratorSettings generatorSettings =  arguments.BrainfuckGeneratorSettings;
 
                     AnalysisCollection analysisCollection = new();
                     if (arguments.ThrowErrors)
                     {
                         tokens = StreamTokenizer.Tokenize(arguments.File!.FullName);
                         CompilerResult compiled = Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
-                        generated = CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings.Default, Output.Log, analysisCollection);
+                        generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
                         Output.LogDebug($"Optimized {generated.Optimizations} statements");
@@ -181,7 +182,7 @@ namespace TheProgram
                         {
                             tokens = StreamTokenizer.Tokenize(arguments.File!.FullName);
                             CompilerResult compiled = Compiler.CompileFile(arguments.File!, null, arguments.CompilerSettings, Output.Log, analysisCollection);
-                            generated = CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings.Default, Output.Log, analysisCollection);
+                            generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                             analysisCollection.Throw();
                             analysisCollection.Print();
                             Output.LogDebug($"Optimized {generated.Optimizations} statements");

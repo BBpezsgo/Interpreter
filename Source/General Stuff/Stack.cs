@@ -98,6 +98,12 @@ namespace LanguageCore
 
         public void Add(T item) => stack.Add(item);
 
+        public void AddRange(IEnumerable<T> items)
+        {
+            foreach (T item in items)
+            { stack.Add(item); }
+        }
+
         /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void RemoveAt(int index) => stack.RemoveAt(index);
 

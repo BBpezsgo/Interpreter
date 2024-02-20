@@ -128,11 +128,6 @@ namespace LanguageCore.Brainfuck
                     { throw new NotImplementedException(); }
                     Memory[_memoryPointer] = OnInput?.Invoke() ?? 0;
                     break;
-                case OpCodes.DEBUG:
-                    if (instruction.Count != 1)
-                    { throw new NotImplementedException(); }
-                    _isPaused = true;
-                    break;
                 default:
                     throw new BrainfuckRuntimeException($"Unknown instruction {instruction}", CurrentContext);
             }
@@ -146,7 +141,7 @@ namespace LanguageCore.Brainfuck
             Draw();
 
             Thread.Sleep(10);
-            inputBuffer.Clear();
+            inputBuffer!.Clear();
 
             if (!autoTick || _isPaused)
             {
@@ -418,7 +413,6 @@ namespace LanguageCore.Brainfuck
                     OpCodes.BRANCH_END => "]",
                     OpCodes.OUT => ".",
                     OpCodes.IN => ",",
-                    OpCodes.DEBUG => "$",
                     OpCodesCompact.CLEAR => "[-]",
                     _ => string.Empty,
                 };

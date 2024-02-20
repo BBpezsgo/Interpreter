@@ -18,7 +18,6 @@ namespace LanguageCore.Brainfuck
             '<', '>',
             '[', ']',
             '.', ',',
-            '$', // IDK what it is
         };
 
         public static string RemoveNoncodes(string code)

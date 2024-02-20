@@ -113,9 +113,6 @@ namespace LanguageCore.Brainfuck
                 case OpCodes.IN:
                     Memory[_memoryPointer] = OnInput?.Invoke() ?? 0;
                     break;
-                case OpCodes.DEBUG:
-                    _isPaused = true;
-                    break;
                 default:
                     throw new BrainfuckRuntimeException($"Unknown instruction {Code[_codePointer]}", CurrentContext);
             }

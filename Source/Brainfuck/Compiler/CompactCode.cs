@@ -37,7 +37,6 @@ namespace LanguageCore.Brainfuck
         public const int BRANCH_END = 6;
         public const int OUT = 7;
         public const int IN = 8;
-        public const int DEBUG = 9;
     }
 
     public readonly struct OpCodesCompact
@@ -57,7 +56,6 @@ namespace LanguageCore.Brainfuck
             ']' => OpCodes.BRANCH_END,
             '.' => OpCodes.OUT,
             ',' => OpCodes.IN,
-            '$' => OpCodes.DEBUG,
             _ => 0,
         };
 
@@ -71,7 +69,6 @@ namespace LanguageCore.Brainfuck
             OpCodes.BRANCH_END => ']',
             OpCodes.OUT => '.',
             OpCodes.IN => ',',
-            OpCodes.DEBUG => '$',
             _ => '\0',
         };
 

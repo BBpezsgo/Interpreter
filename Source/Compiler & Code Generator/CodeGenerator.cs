@@ -437,71 +437,56 @@ namespace LanguageCore.Compiler
             return true;
         }
 
-        /// <param name="position">
-        /// Used for exceptions
-        /// </param>
+        /// <param name="position"> Used for exceptions </param>
         /// <exception cref="CompilerException"/>
-        protected bool TryFindReplacedType(string builtinName, [NotNullWhen(true)] out CompiledType? type)
+        protected CompiledType FindTypeReplacer(string typeName, IPositioned position)
         {
-            type = null;
+            CompiledType? replacedName = TryFindTypeReplacer(typeName);
 
-            string? replacedName = TypeDefinitionReplacer(builtinName);
+            if (replacedName is null)
+            { throw new CompilerException($"Type replacer \"{typeName}\" not found. Define a type with an attribute [Define(\"{typeName}\")] to use it as a {typeName}", position, CurrentFile); }
 
-            if (replacedName == null)
-            { return false; }
-
-            try { type = FindType(replacedName, null); }
-            catch (Exception) { }
-
-            return type is not null;
+            return replacedName;
         }
 
-        /// <param name="position">
-        /// Used for exceptions
-        /// </param>
-        /// <exception cref="CompilerException"/>
-        protected CompiledType FindReplacedType(string builtinName, IPositioned position)
+        protected bool TryFindTypeReplacer(string typeName, [NotNullWhen(true)] out CompiledType? replacedType)
         {
-            string? replacedName = TypeDefinitionReplacer(builtinName);
-
-            if (replacedName == null)
-            { throw new CompilerException($"Type replacer \"{builtinName}\" not found. Define a type with an attribute [Define(\"{builtinName}\")] to use it as a {builtinName}", position, CurrentFile); }
-
-            return FindType(replacedName, position);
+            replacedType = TryFindTypeReplacer(typeName);
+            return replacedType is not null;
         }
 
-        protected string? TypeDefinitionReplacer(string? typeName)
+        protected CompiledType? TryFindTypeReplacer(string typeName)
         {
             foreach (CompiledStruct @struct in CompiledStructs)
             {
-                if (@struct.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
-                {
-                    if (definedType == typeName)
-                    {
-                        return @struct.Identifier.Content;
-                    }
-                }
+                if (!@struct.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
+                { continue; }
+                if (!string.Equals(definedType, typeName, StringComparison.Ordinal))
+                { continue; }
+
+                return new CompiledType(@struct);
             }
+
             foreach (CompiledClass @class in CompiledClasses)
             {
-                if (@class.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
-                {
-                    if (definedType == typeName)
-                    {
-                        return @class.Identifier.Content;
-                    }
-                }
+                if (!@class.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
+                { continue; }
+                if (!string.Equals(definedType, typeName, StringComparison.Ordinal))
+                { continue; }
+
+                return new CompiledType(@class);
             }
+
             foreach (CompiledEnum @enum in CompiledEnums)
             {
-                if (@enum.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
-                {
-                    if (definedType == typeName)
-                    {
-                        return @enum.Identifier.Content;
-                    }
-                }
+                if (!@enum.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
+                { continue; }
+                if (!string.Equals(definedType, typeName, StringComparison.Ordinal))
+                { continue; }
+
+                return new CompiledType(@enum);
             }
+
             return null;
         }
 
@@ -685,7 +670,7 @@ namespace LanguageCore.Compiler
 
                 TemplateInfo template = (function.TemplateInfo ?? function.Context.TemplateInfo)!;
 
-                LanguageCore.Utils.Map(
+                Utils.Map(
                     template.TypeParameters,
                     new CompiledType(constructorCall.TypeName, FindType).TypeParameters,
                     (key, value) => (key.Content, value),
@@ -1113,6 +1098,7 @@ namespace LanguageCore.Compiler
             return success && compiledFunction is not null;
         }
 
+        /// <exception cref="CompilerException"/>
         protected bool GetOperator(OperatorCall @operator, [NotNullWhen(true)] out CompiledOperator? compiledOperator)
         {
             CompiledType[] parameters = FindStatementTypes(@operator.Parameters);
@@ -1607,19 +1593,14 @@ namespace LanguageCore.Compiler
 
         #region Addressing Helpers
 
-        protected ValueAddress GetDataAddress(StatementWithValue value)
+        /// <exception cref="NotImplementedException"/>
+        protected ValueAddress GetDataAddress(StatementWithValue value) => value switch
         {
-            if (value is IndexCall indexCall)
-            { return GetDataAddress(indexCall); }
-
-            if (value is Identifier identifier)
-            { return GetDataAddress(identifier); }
-
-            if (value is Field field)
-            { return GetDataAddress(field); }
-
-            throw new NotImplementedException();
-        }
+            IndexCall v => GetDataAddress(v),
+            Identifier v => GetDataAddress(v),
+            Field v => GetDataAddress(v),
+            _ => throw new NotImplementedException()
+        };
         protected ValueAddress GetDataAddress(Identifier variable)
         {
             if (GetConstant(variable.Content, out _))
@@ -1653,19 +1634,14 @@ namespace LanguageCore.Compiler
             return new ValueAddress(address.Address + currentOffset, address.AddressingMode, address.IsReference, address.InHeap);
         }
 
-        protected int GetDataOffset(StatementWithValue value)
+        /// <exception cref="NotImplementedException"/>
+        protected int GetDataOffset(StatementWithValue value) => value switch
         {
-            if (value is IndexCall indexCall)
-            { return GetDataOffset(indexCall); }
-
-            if (value is Field field)
-            { return GetDataOffset(field); }
-
-            if (value is Identifier)
-            { return 0; }
-
-            throw new NotImplementedException();
-        }
+            IndexCall v => GetDataOffset(v),
+            Field v => GetDataOffset(v),
+            Identifier => 0,
+            _ => throw new NotImplementedException()
+        };
         protected int GetDataOffset(Field field)
         {
             CompiledType prevType = FindStatementType(field.PrevStatement);
@@ -1709,22 +1685,18 @@ namespace LanguageCore.Compiler
             return prevOffset + offset;
         }
 
-        protected ValueAddress GetBaseAddress(StatementWithValue statement)
+        /// <exception cref="NotImplementedException"/>
+        protected ValueAddress GetBaseAddress(StatementWithValue statement) => statement switch
         {
-            if (statement is Identifier identifier)
-            { return GetBaseAddress(identifier); }
-
-            if (statement is Field field)
-            { return GetBaseAddress(field); }
-
-            if (statement is IndexCall indexCall)
-            { return GetBaseAddress(indexCall); }
-
-            throw new NotImplementedException();
-        }
+            Identifier v => GetBaseAddress(v),
+            Field v => GetBaseAddress(v),
+            IndexCall v => GetBaseAddress(v),
+            _ => throw new NotImplementedException()
+        };
         protected abstract ValueAddress GetBaseAddress(CompiledParameter parameter);
         protected abstract ValueAddress GetBaseAddress(CompiledParameter parameter, int offset);
         protected abstract ValueAddress GetGlobalVariableAddress(CompiledVariable variable);
+        /// <exception cref="CompilerException"/>
         protected ValueAddress GetBaseAddress(Identifier variable)
         {
             if (GetConstant(variable.Content, out _))
@@ -1741,12 +1713,14 @@ namespace LanguageCore.Compiler
 
             throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
         }
+        /// <exception cref="NotImplementedException"/>
         protected ValueAddress GetBaseAddress(Field statement)
         {
             ValueAddress address = GetBaseAddress(statement.PrevStatement);
             bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement).InHEAP;
             return new ValueAddress(address.Address, address.AddressingMode, address.IsReference, inHeap);
         }
+        /// <exception cref="NotImplementedException"/>
         protected ValueAddress GetBaseAddress(IndexCall statement)
         {
             ValueAddress address = GetBaseAddress(statement.PrevStatement!);
@@ -1754,27 +1728,22 @@ namespace LanguageCore.Compiler
             return new ValueAddress(address.Address, address.AddressingMode, address.IsReference, inHeap);
         }
 
-        protected bool IsItInHeap(StatementWithValue value)
+        /// <exception cref="NotImplementedException"/>
+        protected bool IsItInHeap(StatementWithValue value) => value switch
         {
-            if (value is Identifier)
-            { return false; }
+            Identifier => false,
+            Field field => IsItInHeap(field),
+            IndexCall indexCall => IsItInHeap(indexCall),
+            _ => throw new NotImplementedException()
+        };
 
-            if (value is Field field)
-            { return IsItInHeap(field); }
-
-            if (value is IndexCall indexCall)
-            { return IsItInHeap(indexCall); }
-
-            throw new NotImplementedException();
-        }
+        /// <exception cref="NotImplementedException"/>
         protected bool IsItInHeap(IndexCall indexCall)
-        {
-            return IsItInHeap(indexCall.PrevStatement!) || FindStatementType(indexCall.PrevStatement).InHEAP;
-        }
+            => IsItInHeap(indexCall.PrevStatement!) || FindStatementType(indexCall.PrevStatement).InHEAP;
+
+        /// <exception cref="NotImplementedException"/>
         protected bool IsItInHeap(Field field)
-        {
-            return IsItInHeap(field.PrevStatement) || FindStatementType(field.PrevStatement).InHEAP;
-        }
+            => IsItInHeap(field.PrevStatement) || FindStatementType(field.PrevStatement).InHEAP;
 
         #endregion
 
@@ -1828,18 +1797,15 @@ namespace LanguageCore.Compiler
         #region GetInitialValue()
 
         /// <exception cref="NotImplementedException"></exception>
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        protected static DataItem GetInitialValue(Type type)
-            => type switch
-            {
-                Type.Byte => new DataItem((byte)0),
-                Type.Integer => new DataItem((int)0),
-                Type.Float => new DataItem((float)0f),
-                Type.Char => new DataItem((char)'\0'),
+        protected static DataItem GetInitialValue(Type type) => type switch
+        {
+            Type.Byte => new DataItem((byte)0),
+            Type.Integer => new DataItem((int)0),
+            Type.Float => new DataItem((float)0f),
+            Type.Char => new DataItem((char)'\0'),
 
-                _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
-            };
+            _ => throw new NotImplementedException($"Initial value for type \"{type}\" isn't implemented"),
+        };
 
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
@@ -2062,9 +2028,9 @@ namespace LanguageCore.Compiler
                 case LiteralType.Float:
                     return OnGotStatementType(literal, new CompiledType(Type.Float));
                 case LiteralType.Boolean:
-                    return OnGotStatementType(literal, FindReplacedType("boolean", literal));
+                    return OnGotStatementType(literal, FindTypeReplacer("boolean", literal));
                 case LiteralType.String:
-                    CompiledType stringType = FindReplacedType("string", literal);
+                    CompiledType stringType = FindTypeReplacer("string", literal);
                     if (stringType.IsClass && expectedType == Type.Integer)
                     { return OnGotStatementType(literal, expectedType); }
                     return OnGotStatementType(literal, stringType);
@@ -2264,53 +2230,32 @@ namespace LanguageCore.Compiler
             throw new CompilerException($"Unimplemented modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
         }
 
-        protected CompiledType FindStatementType(StatementWithValue? statement)
+        [return: NotNullIfNotNull(nameof(statement))]
+        protected CompiledType? FindStatementType(StatementWithValue? statement)
             => FindStatementType(statement, null);
-        protected CompiledType FindStatementType(StatementWithValue? statement, CompiledType? expectedType)
+
+        [return: NotNullIfNotNull(nameof(statement))]
+        protected CompiledType? FindStatementType(StatementWithValue? statement, CompiledType? expectedType)
         {
-            if (statement is FunctionCall functionCall)
-            { return FindStatementType(functionCall); }
-
-            if (statement is OperatorCall @operator)
-            { return FindStatementType(@operator, expectedType); }
-
-            if (statement is LiteralStatement literal)
-            { return FindStatementType(literal, expectedType); }
-
-            if (statement is Identifier variable)
-            { return FindStatementType(variable, expectedType); }
-
-            if (statement is AddressGetter memoryAddressGetter)
-            { return FindStatementType(memoryAddressGetter); }
-
-            if (statement is Pointer memoryAddressFinder)
-            { return FindStatementType(memoryAddressFinder); }
-
-            if (statement is NewInstance newStruct)
-            { return FindStatementType(newStruct); }
-
-            if (statement is ConstructorCall constructorCall)
-            { return FindStatementType(constructorCall); }
-
-            if (statement is Field field)
-            { return FindStatementType(field); }
-
-            if (statement is TypeCast @as)
-            { return FindStatementType(@as); }
-
-            if (statement is KeywordCall keywordCall)
-            { return FindStatementType(keywordCall); }
-
-            if (statement is IndexCall index)
-            { return FindStatementType(index); }
-
-            if (statement is ModifiedStatement modifiedStatement)
-            { return FindStatementType(modifiedStatement, expectedType); }
-
-            if (statement is AnyCall anyCall)
-            { return FindStatementType(anyCall); }
-
-            throw new CompilerException($"Statement {(statement is null ? "null" : statement.GetType().Name)} does not have a type", statement, CurrentFile);
+            return statement switch
+            {
+                null => null,
+                FunctionCall v => FindStatementType(v),
+                OperatorCall v => FindStatementType(v, expectedType),
+                LiteralStatement v => FindStatementType(v, expectedType),
+                Identifier v => FindStatementType(v, expectedType),
+                AddressGetter v => FindStatementType(v),
+                Pointer v => FindStatementType(v),
+                NewInstance v => FindStatementType(v),
+                ConstructorCall v => FindStatementType(v),
+                Field v => FindStatementType(v),
+                TypeCast v => FindStatementType(v),
+                KeywordCall v => FindStatementType(v),
+                IndexCall v => FindStatementType(v),
+                ModifiedStatement v => FindStatementType(v, expectedType),
+                AnyCall v => FindStatementType(v),
+                _ => throw new CompilerException($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile)
+            };
         }
 
         protected CompiledType[] FindStatementTypes(StatementWithValue[] statements)
@@ -2396,7 +2341,7 @@ namespace LanguageCore.Compiler
 
         protected Statement InlineMacro(MacroDefinition macro, params StatementWithValue[] parameters)
         {
-            Dictionary<string, StatementWithValue> _parameters = LanguageCore.Utils.Map(
+            Dictionary<string, StatementWithValue> _parameters = Utils.Map(
                 macro.Parameters,
                 parameters,
                 (key, value) => (key.Content, value));
@@ -2414,6 +2359,39 @@ namespace LanguageCore.Compiler
             { result = InlineMacro(macro.Block.Statements[0], parameters); }
             else
             { result = InlineMacro(macro.Block, parameters); }
+
+            result = Collapse(result, parameters);
+
+            if (result is KeywordCall keywordCall &&
+                keywordCall.Identifier.Equals("return") &&
+                keywordCall.Parameters.Length == 1)
+            {
+                result = keywordCall.Parameters[0];
+            }
+
+            return result;
+        }
+
+        protected Statement InlineMacro(FunctionThingDefinition function, params StatementWithValue[] parameters)
+        {
+            Dictionary<string, StatementWithValue> _parameters = Utils.Map(
+                function.Parameters.ToArray(),
+                parameters,
+                (key, value) => (key.Identifier.Content, value));
+
+            return InlineMacro(function, _parameters);
+        }
+
+        protected Statement InlineMacro(FunctionThingDefinition function, Dictionary<string, StatementWithValue> parameters)
+        {
+            Statement result;
+
+            if (function.Block is null || function.Block.Statements.Length == 0)
+            { throw new CompilerException($"Function \"{function.ToReadable()}\" has no statements", function.Block, function.FilePath); }
+            else if (function.Block.Statements.Length == 1)
+            { result = InlineMacro(function.Block.Statements[0], parameters); }
+            else
+            { result = InlineMacro(function.Block, parameters); }
 
             result = Collapse(result, parameters);
 
@@ -2496,8 +2474,55 @@ namespace LanguageCore.Compiler
             Block block => InlineMacro(block, parameters),
             StatementWithValue statementWithValue => InlineMacro(statementWithValue, parameters),
             ForLoop forLoop => InlineMacro(forLoop, parameters),
+            IfContainer ifContainer => InlineMacro(ifContainer, parameters),
             _ => statement
         };
+
+        protected static IfContainer InlineMacro(IfContainer statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            BaseBranch[] branches = new BaseBranch[statement.Parts.Length];
+            for (int i = 0; i < branches.Length; i++)
+            { branches[i] = InlineMacro(statement.Parts[i], parameters); }
+            return new IfContainer(branches)
+            { Semicolon = statement.Semicolon, };
+        }
+
+        protected static BaseBranch InlineMacro(BaseBranch statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return statement switch
+            {
+                IfBranch ifBranch => InlineMacro(ifBranch, parameters),
+                ElseIfBranch elseIfBranch => InlineMacro(elseIfBranch, parameters),
+                ElseBranch elseBranch => InlineMacro(elseBranch, parameters),
+                _ => throw new NotImplementedException()
+            };
+        }
+
+        protected static IfBranch InlineMacro(IfBranch statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new IfBranch(
+                statement.Keyword,
+                InlineMacro(statement.Condition, parameters),
+                InlineMacro(statement.Block, parameters))
+            { Semicolon = statement.Semicolon };
+        }
+
+        protected static ElseIfBranch InlineMacro(ElseIfBranch statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new ElseIfBranch(
+                statement.Keyword,
+                InlineMacro(statement.Condition, parameters),
+                InlineMacro(statement.Block, parameters))
+            { Semicolon = statement.Semicolon };
+        }
+
+        protected static ElseBranch InlineMacro(ElseBranch statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new ElseBranch(
+                statement.Keyword,
+                InlineMacro(statement.Block, parameters))
+            { Semicolon = statement.Semicolon };
+        }
 
         protected static ForLoop InlineMacro(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
             => new(
@@ -2591,6 +2616,17 @@ namespace LanguageCore.Compiler
                 CompiledType = statement.CompiledType,
             };
 
+        protected static ModifiedStatement InlineMacro(ModifiedStatement modifiedStatement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                modifiedStatement.Modifier,
+                InlineMacro(modifiedStatement.Statement, parameters))
+            {
+                SaveValue = modifiedStatement.SaveValue,
+                Semicolon = modifiedStatement.Semicolon,
+
+                CompiledType = modifiedStatement.CompiledType,
+            };
+
         [return: NotNullIfNotNull(nameof(statement))]
         protected static StatementWithValue? InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
@@ -2606,12 +2642,14 @@ namespace LanguageCore.Compiler
             Field field => InlineMacro(field, parameters),
             IndexCall indexCall => InlineMacro(indexCall, parameters),
             TypeCast typeCast => InlineMacro(typeCast, parameters),
+            ModifiedStatement modifiedStatement => InlineMacro(modifiedStatement, parameters),
             _ => throw new NotImplementedException()
         };
 
         #endregion
 
         #region TryCompute()
+        /// <exception cref="NotImplementedException"/>
         public static DataItem Compute(string @operator, DataItem left, DataItem right)
         {
             return @operator switch
@@ -2644,6 +2682,41 @@ namespace LanguageCore.Compiler
             };
         }
 
+        protected bool TryCompute(Pointer pointer, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        {
+            {
+                if (pointer.PrevStatement is OperatorCall _operatorCall &&
+                    _operatorCall.Left is AddressGetter _addressGetter &&
+                    _addressGetter.PrevStatement is LiteralStatement _literal &&
+                    _literal.Type == LiteralType.String &&
+                    TryCompute(_operatorCall.Right, null, out DataItem _index))
+                {
+                    CompiledType stringType = FindTypeReplacer("string", _literal);
+                    _index -= stringType.Size;
+                    value = new DataItem(_literal.Value[(int)_index]);
+                    DataItem.TryCast(ref value, expectedType);
+                    return true;
+                }
+            }
+
+            {
+                if (pointer.PrevStatement is OperatorCall _operatorCall &&
+                    _operatorCall.Left is TypeCast _typeCast &&
+                    _typeCast.PrevStatement is LiteralStatement _literal &&
+                    _literal.Type == LiteralType.String &&
+                    TryCompute(_operatorCall.Right, null, out DataItem _index))
+                {
+                    CompiledType stringType = FindTypeReplacer("string", _literal);
+                    _index -= stringType.Size;
+                    value = new DataItem(_literal.Value[(int)_index]);
+                    DataItem.TryCast(ref value, expectedType);
+                    return true;
+                }
+            }
+
+            value = DataItem.Null;
+            return false;
+        }
         protected bool TryCompute(OperatorCall @operator, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             if (GetOperator(@operator, out _))
@@ -2779,7 +2852,21 @@ namespace LanguageCore.Compiler
         }
         protected bool TryCompute(FunctionCall functionCall, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
-            value = DataItem.Null;
+            if (functionCall.FunctionName == "sizeof")
+            {
+                if (functionCall.Parameters.Length != 1)
+                {
+                    value = DataItem.Null;
+                    return false;
+                }
+
+                StatementWithValue param0 = functionCall.Parameters[0];
+                CompiledType param0Type = FindStatementType(param0);
+
+                value = new DataItem(param0Type.Size);
+                DataItem.TryCast(ref value, expectedType);
+                return true;
+            }
 
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
             {
@@ -2793,6 +2880,7 @@ namespace LanguageCore.Compiler
                 values.TryGetValue(functionCall, out value))
             { return true; }
 
+            value = DataItem.Null;
             return false;
         }
         protected bool TryCompute(Identifier identifier, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
@@ -2813,6 +2901,21 @@ namespace LanguageCore.Compiler
         }
         protected bool TryCompute(Field field, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
+            if (field.PrevStatement is Literal _literal &&
+                _literal.Type == LiteralType.String)
+            {
+                CompiledType stringType = FindTypeReplacer("string", _literal);
+                if (stringType.IsClass &&
+                    stringType.Class.Fields.Length == 1 &&
+                    stringType.Class.Fields[0].Type.IsBuiltin &&
+                    stringType.Class.Fields[0].Identifier.Content == field.FieldName.Content)
+                {
+                    value = new DataItem(_literal.Value.Length);
+                    DataItem.TryCast(ref value, expectedType);
+                    return true;
+                }
+            }
+
             CompiledType prevType = FindStatementType(field.PrevStatement);
 
             if (prevType.IsStackArray && field.FieldName.Equals("Length"))
@@ -2861,6 +2964,9 @@ namespace LanguageCore.Compiler
             if (statement is OperatorCall @operator)
             { return TryCompute(@operator, expectedType, values, out value); }
 
+            if (statement is Pointer pointer)
+            { return TryCompute(pointer, expectedType, values, out value); }
+
             if (statement is KeywordCall keywordCall)
             { return TryCompute(keywordCall, expectedType, out value); }
 
@@ -2875,6 +2981,9 @@ namespace LanguageCore.Compiler
 
             if (statement is TypeCast typeCast)
             { return TryCompute(typeCast, expectedType, values, out value); }
+
+            if (statement is Field field)
+            { return TryCompute(field, expectedType, values, out value); }
 
             value = DataItem.Null;
             return false;
@@ -3117,8 +3226,14 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
         }
-        protected static WhileLoop Collapse(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
+        protected WhileLoop Collapse(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new WhileLoop(
+                 statement.Keyword,
+                 Collapse(statement.Condition, parameters),
+                 Block.CreateIfNotBlock(Collapse(statement.Block, parameters)))
+            { Semicolon = statement.Semicolon };
+        }
         protected Statement Collapse(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
         {
             ForLoop result = new(
@@ -3127,9 +3242,7 @@ namespace LanguageCore.Compiler
                 Collapse(statement.Condition, parameters),
                 Collapse(statement.Expression, parameters),
                 statement.Block)
-            {
-                Semicolon = statement.Semicolon,
-            };
+            { Semicolon = statement.Semicolon };
 
             if (TryComputeSimple(statement.Condition, null, out DataItem condition) &&
                 !condition.ToBoolean(null))
@@ -3220,10 +3333,41 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
         }
-        protected static TypeCast Collapse(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
-        protected static ModifiedStatement Collapse(ModifiedStatement statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
+        protected StatementWithValue Collapse(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            StatementWithValue prevStatement = statement.PrevStatement;
+            prevStatement = Collapse(prevStatement, parameters);
+            CompiledType prevType = FindStatementType(prevStatement);
+            CompiledType targetType = new(statement.Type, FindType, TryCompute);
+            if (targetType.Equals(prevType))
+            {
+                return prevStatement;
+            }
+            else
+            {
+                return new TypeCast(
+                    prevStatement,
+                    statement.Keyword,
+                    statement.Type)
+                {
+                    CompiledType = statement.CompiledType,
+                    Semicolon = statement.Semicolon,
+                    SaveValue = statement.SaveValue,
+                };
+            }
+        }
+        protected ModifiedStatement Collapse(ModifiedStatement statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new ModifiedStatement(
+                statement.Modifier,
+                Collapse(statement.Statement, parameters))
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+
+                CompiledType = statement.CompiledType,
+            };
+        }
         protected StatementWithValue Collapse(AnyCall statement, Dictionary<string, StatementWithValue> parameters)
         {
             if (statement.ToFunctionCall(out FunctionCall? functionCall))

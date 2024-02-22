@@ -22,6 +22,7 @@ namespace LanguageCore.Parser
         {
             "export",
             "adaptive",
+            "inline",
         };
 
         static readonly string[] FunctionModifiers = new string[]
@@ -29,6 +30,7 @@ namespace LanguageCore.Parser
             "export",
             "macro",
             "adaptive",
+            "inline",
         };
 
         static readonly string[] GeneralStatementModifiers = new string[]

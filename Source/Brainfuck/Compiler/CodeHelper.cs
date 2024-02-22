@@ -723,6 +723,14 @@ namespace LanguageCore.Brainfuck
             this.MaxSize = size;
         }
 
+        public StackCodeHelper(CompiledCode code, StackCodeHelper other)
+        {
+            this.Code = code;
+            this.TheStack = new Stack<int>(other.TheStack);
+            this.Start = other.Start;
+            this.MaxSize = other.MaxSize;
+        }
+
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
@@ -887,8 +895,9 @@ namespace LanguageCore.Brainfuck
         public readonly int Start;
         public readonly int Size;
 
-        bool IsInitialized = false;
+        bool _isInitialized = false;
 
+        public bool IsInitialized => _isInitialized;
         public int OffsettedStart => GetOffsettedStart(Start);
 
         public static int GetOffsettedStart(int start) => start + BLOCK_SIZE;
@@ -915,7 +924,7 @@ namespace LanguageCore.Brainfuck
 
         void ThrowIfNotInitialized()
         {
-            if (!IsInitialized)
+            if (!_isInitialized)
             { throw new InternalException($"Heap isn't initialized"); }
         }
 
@@ -1005,7 +1014,7 @@ namespace LanguageCore.Brainfuck
 
         public void Init()
         {
-            if (IsInitialized) return;
+            if (_isInitialized) return;
             if (Size <= 0) return;
 
             using (Code.Block("Initialize HEAP"))
@@ -1015,7 +1024,12 @@ namespace LanguageCore.Brainfuck
                 Code.SetPointer(0);
             }
 
-            IsInitialized = true;
+            _isInitialized = true;
+        }
+
+        public void InitVirtual()
+        {
+            _isInitialized = true;
         }
 
         public void Destroy()

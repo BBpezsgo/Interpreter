@@ -135,6 +135,7 @@ namespace LanguageCore.Tokenizing
             return (left, right);
         }
 
+        /// <exception cref="Exception"/>
         public static Token operator +(Token a, Token b)
         {
             if (a.TokenType != b.TokenType)

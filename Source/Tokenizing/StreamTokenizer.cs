@@ -11,26 +11,28 @@ namespace LanguageCore.Tokenizing
         StreamTokenizer(TokenizerSettings settings, TextReader stream) : base(settings)
         { Stream = stream; }
 
-        /// <inheritdoc cref="Tokenize(TextReader, TokenizerSettings)"/>
+        /// <inheritdoc cref="TokenizeInternal"/>
         public static TokenizerResult Tokenize(string filePath)
             => StreamTokenizer.Tokenize(new StreamReader(filePath), TokenizerSettings.Default);
 
-        /// <inheritdoc cref="Tokenize(TextReader, TokenizerSettings)"/>
+        /// <inheritdoc cref="TokenizeInternal"/>
         public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings)
             => StreamTokenizer.Tokenize(new StreamReader(filePath), settings);
 
-        /// <inheritdoc cref="Tokenize(TextReader, TokenizerSettings)"/>
+        /// <inheritdoc cref="TokenizeInternal"/>
         public static TokenizerResult Tokenize(TextReader stream)
             => StreamTokenizer.Tokenize(stream, TokenizerSettings.Default);
 
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
+        /// <inheritdoc cref="TokenizeInternal"/>
         public static TokenizerResult Tokenize(TextReader stream, TokenizerSettings settings)
         {
             using StreamTokenizer tokenizer = new(settings, stream);
             return tokenizer.TokenizeInternal();
         }
 
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
+        /// <exception cref="Exception"/>
         protected override TokenizerResult TokenizeInternal()
         {
             int offsetTotal = 0;

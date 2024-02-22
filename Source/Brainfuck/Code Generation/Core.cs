@@ -267,9 +267,6 @@ namespace LanguageCore.Brainfuck.Generator
         {
             public readonly Stack<Variable> Variables;
 
-            public readonly StackCodeHelper Stack;
-            public readonly BasicHeapCodeHelper Heap;
-
             public readonly Stack<int> VariableCleanupStack;
             public readonly Stack<int> ReturnCount;
             public readonly Stack<int> BreakCount;
@@ -290,9 +287,6 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 Variables = new Stack<Variable>(v.Variables);
 
-                Stack = v.Stack;
-                Heap = v.Heap;
-
                 VariableCleanupStack = new Stack<int>(v.VariableCleanupStack);
                 ReturnCount = new Stack<int>(v.ReturnCount);
                 BreakCount = new Stack<int>(v.BreakCount);
@@ -307,6 +301,21 @@ namespace LanguageCore.Brainfuck.Generator
                 VariableCanBeDiscarded = new string(v.VariableCanBeDiscarded);
 
                 DebugInfo = v.DebugInfo.Duplicate();
+            }
+        }
+
+        readonly struct CodeSnapshot
+        {
+            public readonly CompiledCode Code;
+            public readonly BasicHeapCodeHelper Heap;
+            public readonly StackCodeHelper Stack;
+
+            public CodeSnapshot(CodeGeneratorForBrainfuck generator)
+            {
+                Code = generator.Code.Duplicate();
+                Heap = new BasicHeapCodeHelper(Code, generator.Heap.Start, generator.Heap.Size);
+                if (generator.Heap.IsInitialized) Heap.InitVirtual();
+                Stack = new StackCodeHelper(Code, generator.Stack);
             }
         }
 
@@ -375,11 +384,10 @@ namespace LanguageCore.Brainfuck.Generator
         #region Fields
 
         CompiledCode Code;
+        StackCodeHelper Stack;
+        BasicHeapCodeHelper Heap;
 
         readonly Stack<Variable> Variables;
-
-        readonly StackCodeHelper Stack;
-        readonly BasicHeapCodeHelper Heap;
 
         readonly Stack<int> VariableCleanupStack;
         readonly Stack<int> ReturnCount;
@@ -504,6 +512,15 @@ namespace LanguageCore.Brainfuck.Generator
             DebugInfo = snapshot.DebugInfo.Duplicate();
         }
 
+        CodeSnapshot SnapshotCode() => new(this);
+        void RestoreCode(CodeSnapshot snapshot)
+        {
+            Code = snapshot.Code.Duplicate();
+            Heap = new BasicHeapCodeHelper(Code, snapshot.Heap.Start, snapshot.Heap.Size);
+            if (snapshot.Heap.IsInitialized) Heap.InitVirtual();
+            Stack = new StackCodeHelper(Code, snapshot.Stack);
+        }
+
         DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);
 
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
@@ -594,7 +611,7 @@ namespace LanguageCore.Brainfuck.Generator
                                     ),
                                 Tokenizing.Token.CreateAnonymous("as"),
                                 new TypeInstancePointer(
-                                    TypeInstanceSimple.CreateAnonymous("int", TypeDefinitionReplacer),
+                                    TypeInstanceSimple.CreateAnonymous("int"),
                                     Tokenizing.Token.CreateAnonymous("*", Tokenizing.TokenType.Operator))
                                 )
                             );
@@ -612,23 +629,20 @@ namespace LanguageCore.Brainfuck.Generator
 
             int usages = 0;
 
-            foreach (Statement _statement in statement)
+            foreach (Statement _statement in statement.GetStatementsRecursively(true))
             {
-                if (_statement == null) continue;
+                if (_statement is not Identifier identifier)
+                { continue; }
+                if (!CodeGeneratorForBrainfuck.GetVariable(Variables, identifier.Content, out Variable _variable))
+                { continue; }
+                if (_variable.Name != variable.Name)
+                { continue; }
 
-                if (_statement is Identifier identifier &&
-                    CodeGeneratorForBrainfuck.GetVariable(Variables, identifier.Content, out Variable _variable) &&
-                    _variable.Name == variable.Name
-                    )
-                {
-                    usages++;
-                    if (usages > 1)
-                    { return false; }
-                }
-
-                if (!SafeToDiscardVariable(_statement, variable))
+                usages++;
+                if (usages > 1)
                 { return false; }
             }
+
             return usages <= 1;
         }
 
@@ -755,19 +769,18 @@ namespace LanguageCore.Brainfuck.Generator
 
         bool TryGetRuntimeAddress(Statement statement, out int pointerAddress, out int size)
         {
-            if (statement is Identifier identifier)
-            { return TryGetRuntimeAddress(identifier, out pointerAddress, out size); }
+            pointerAddress = default;
+            size = default;
 
-            if (statement is Field field)
-            { return TryGetRuntimeAddress(field, out pointerAddress, out size); }
-
-            if (statement is ConstructorCall)
-            { pointerAddress = default; size = default; return false; }
-
-            if (statement is IndexCall)
-            { pointerAddress = default; size = default; return false; }
-
-            throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);
+            return statement switch
+            {
+                Identifier identifier => TryGetRuntimeAddress(identifier, out pointerAddress, out size),
+                Field field => TryGetRuntimeAddress(field, out pointerAddress, out size),
+                ConstructorCall => false,
+                IndexCall => false,
+                Literal => false,
+                _ => throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile)
+            };
         }
 
         bool TryGetRuntimeAddress(Field field, out int pointerAddress, out int size)
@@ -863,18 +876,20 @@ namespace LanguageCore.Brainfuck.Generator
 
             PrintCallback?.Invoke("  Finishing up ...", LogType.Debug);
 
+            FinishReturnStatements();
+
+            using (Code.Block($"Finish \"return\" block"))
             {
-                FinishReturnStatements();
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
                 { throw new InternalException(); }
                 Stack.Pop();
-
-                if (ReturnCount.Count > 0 ||
-                    ReturnTagStack.Count > 0 ||
-                    BreakCount.Count > 0 ||
-                    BreakTagStack.Count > 0)
-                { throw new InternalException(); }
             }
+
+            if (ReturnCount.Count > 0 ||
+                ReturnTagStack.Count > 0 ||
+                BreakCount.Count > 0 ||
+                BreakTagStack.Count > 0)
+            { throw new InternalException(); }
 
             if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
             { CleanupVariables(VariableCleanupStack.Pop()); }

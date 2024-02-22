@@ -21,7 +21,7 @@ namespace LanguageCore.Parser
         public double ParseTime;
     }
 
-    public readonly struct ParserResult : IEnumerable<Statement.Statement>
+    public readonly struct ParserResult
     {
         public readonly Error[] Errors;
 
@@ -139,63 +139,67 @@ namespace LanguageCore.Parser
             }
         }
 
-        public IEnumerator<Statement.Statement> GetEnumerator()
+        public IEnumerable<Statement.Statement> GetStatementsRecursively()
         {
             for (int i = 0; i < TopLevelStatements.Length; i++)
             {
-                yield return TopLevelStatements[i];
+                foreach (Statement.Statement statement in TopLevelStatements[i].GetStatementsRecursively(true))
+                { yield return statement; }
             }
 
             for (int i = 0; i < Functions.Length; i++)
             {
-                if (Functions[i].Block != null)
-                {
-                    yield return Functions[i].Block!;
-                    foreach (Statement.Statement statement in Functions[i].Block!)
-                    { yield return statement; }
-                }
+                FunctionDefinition function = Functions[i];
+
+                if (function.Block == null)
+                { continue; }
+
+                foreach (Statement.Statement statement in function.Block.GetStatementsRecursively(true))
+                { yield return statement; }
             }
 
             for (int i = 0; i < Macros.Length; i++)
             {
-                if (Macros[i].Block != null)
-                {
-                    yield return Macros[i].Block!;
-                    foreach (Statement.Statement statement in Macros[i].Block!)
-                    { yield return statement; }
-                }
+                MacroDefinition macro = Macros[i];
+
+                if (macro.Block == null)
+                { continue; }
+
+                foreach (Statement.Statement statement in macro.Block.GetStatementsRecursively(true))
+                { yield return statement; }
             }
 
             for (int i = 0; i < Classes.Length; i++)
             {
                 ClassDefinition @class = Classes[i];
+
                 foreach (GeneralFunctionDefinition method in @class.GeneralMethods)
                 {
-                    if (method.Block != null)
-                    {
-                        yield return method.Block!;
-                        foreach (Statement.Statement statement in method.Block!)
-                        { yield return statement; }
-                    }
+                    if (method.Block == null)
+                    { continue; }
+
+                    foreach (Statement.Statement statement in method.Block.GetStatementsRecursively(true))
+                    { yield return statement; }
                 }
+
                 foreach (FunctionDefinition method in @class.Methods)
                 {
-                    if (method.Block != null)
-                    {
-                        yield return method.Block!;
-                        foreach (Statement.Statement statement in method.Block!)
-                        { yield return statement; }
-                    }
+                    if (method.Block == null)
+                    { continue; }
+
+                    foreach (Statement.Statement statement in method.Block.GetStatementsRecursively(true))
+                    { yield return statement; }
                 }
+
                 foreach (FunctionDefinition method in @class.Operators)
                 {
-                    if (method.Block != null)
-                    {
-                        yield return method.Block!;
-                        foreach (Statement.Statement statement in method.Block!)
-                        { yield return statement; }
-                    }
+                    if (method.Block == null)
+                    { continue; }
+
+                    foreach (Statement.Statement statement in method.Block.GetStatementsRecursively(true))
+                    { yield return statement; }
                 }
+
                 foreach (Statement.Statement statement in @class.Statements)
                 {
                     yield return statement;
@@ -205,23 +209,22 @@ namespace LanguageCore.Parser
             for (int i = 0; i < Structs.Length; i++)
             {
                 StructDefinition @struct = Structs[i];
+
                 foreach (FunctionDefinition method in @struct.Methods)
                 {
-                    if (method.Block != null)
-                    {
-                        yield return method.Block!;
-                        foreach (Statement.Statement statement in method.Block!)
-                        { yield return statement; }
-                    }
+                    if (method.Block == null)
+                    { continue; }
+
+                    foreach (Statement.Statement statement in method.Block.GetStatementsRecursively(true))
+                    { yield return statement; }
                 }
+
                 foreach (Statement.Statement statement in @struct.Statements)
                 {
                     yield return statement;
                 }
             }
         }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     public readonly struct ParserResultHeader

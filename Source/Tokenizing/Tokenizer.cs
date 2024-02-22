@@ -5,6 +5,8 @@ namespace LanguageCore.Tokenizing
 {
     public abstract partial class Tokenizer
     {
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
         protected void ProcessCharacter(char currChar, int offsetTotal, out bool breakLine, out bool returnLine)
         {
             breakLine = false;

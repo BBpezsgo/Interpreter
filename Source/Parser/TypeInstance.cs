@@ -223,15 +223,7 @@ namespace LanguageCore.Parser
 
         public override int GetHashCode() => HashCode.Combine((byte)3, Identifier, GenericTypes);
 
-        public override Position Position
-        {
-            get
-            {
-                Position result = new(Identifier);
-                result.Union(GenericTypes);
-                return result;
-            }
-        }
+        public override Position Position => new Position(Identifier).Union(GenericTypes);
 
         public override void SetAnalyzedType(CompiledType type)
         {
@@ -239,25 +231,13 @@ namespace LanguageCore.Parser
             { this.Identifier.AnalyzedType = analyzedType; }
         }
 
-        public static TypeInstanceSimple CreateAnonymous(string name, Func<string, string?>? typeDefinitionReplacer)
-        {
-            string? definedType = typeDefinitionReplacer?.Invoke(name);
-            if (definedType == null)
-            { return new TypeInstanceSimple(Token.CreateAnonymous(name), null); }
-            else
-            { return new TypeInstanceSimple(Token.CreateAnonymous(definedType), null); }
-        }
+        public static TypeInstanceSimple CreateAnonymous(string name)
+            => new(Token.CreateAnonymous(name), null);
 
-        public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<TypeInstance>? genericTypes, Func<string, string?>? typeDefinitionReplacer)
-        {
-            string? definedType = typeDefinitionReplacer?.Invoke(name);
-            if (definedType == null)
-            { return new TypeInstanceSimple(Token.CreateAnonymous(name), genericTypes); }
-            else
-            { return new TypeInstanceSimple(Token.CreateAnonymous(definedType), genericTypes); }
-        }
+        public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<TypeInstance>? genericTypes)
+            => new(Token.CreateAnonymous(name), genericTypes);
 
-        public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<Token>? genericTypes, Func<string, string?>? typeDefinitionReplacer)
+        public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<Token>? genericTypes)
         {
             TypeInstance[]? genericTypesConverted;
             if (genericTypes == null)
@@ -268,15 +248,11 @@ namespace LanguageCore.Parser
                 genericTypesConverted = new TypeInstance[genericTypesA.Length];
                 for (int i = 0; i < genericTypesA.Length; i++)
                 {
-                    genericTypesConverted[i] = TypeInstanceSimple.CreateAnonymous(genericTypesA[i].Content, typeDefinitionReplacer);
+                    genericTypesConverted[i] = TypeInstanceSimple.CreateAnonymous(genericTypesA[i].Content);
                 }
             }
 
-            string? definedType = typeDefinitionReplacer?.Invoke(name);
-            if (definedType == null)
-            { return new TypeInstanceSimple(Token.CreateAnonymous(name), genericTypesConverted); }
-            else
-            { return new TypeInstanceSimple(Token.CreateAnonymous(definedType), genericTypesConverted); }
+            return new TypeInstanceSimple(Token.CreateAnonymous(name), genericTypesConverted); 
         }
 
         public override string ToString()

@@ -135,35 +135,14 @@ namespace LanguageCore.Brainfuck.Generator
 
         void GenerateCodeForSetter(Statement statement, StatementWithValue value)
         {
-            if (statement is Identifier variableIdentifier)
+            switch (statement)
             {
-                GenerateCodeForSetter(variableIdentifier, value);
-
-                return;
+                case Identifier v: GenerateCodeForSetter(v, value); break;
+                case Pointer v: GenerateCodeForSetter(v, value); break;
+                case IndexCall v: GenerateCodeForSetter(v, value); break;
+                case Field v: GenerateCodeForSetter(v, value); break;
+                default: throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, CurrentFile);
             }
-
-            if (statement is Pointer pointerToSet)
-            {
-                GenerateCodeForSetter(pointerToSet, value);
-
-                return;
-            }
-
-            if (statement is IndexCall index)
-            {
-                GenerateCodeForSetter(index, value);
-
-                return;
-            }
-
-            if (statement is Field field)
-            {
-                GenerateCodeForSetter(field, value);
-
-                return;
-            }
-
-            throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, CurrentFile);
         }
 
         void GenerateCodeForSetter(Identifier statement, StatementWithValue value)
@@ -506,52 +485,32 @@ namespace LanguageCore.Brainfuck.Generator
             if (GenerateDebugInformation)
             { start = Code.GetFinalCode().Length; }
 
-            if (statement is KeywordCall instructionStatement)
-            { GenerateCodeForStatement(instructionStatement); }
-            else if (statement is FunctionCall functionCall)
-            { GenerateCodeForStatement(functionCall); }
-            else if (statement is IfContainer @if)
-            { GenerateCodeForStatement(@if.ToLinks()); }
-            else if (statement is WhileLoop @while)
-            { GenerateCodeForStatement(@while); }
-            else if (statement is ForLoop @for)
-            { GenerateCodeForStatement(@for); }
-            else if (statement is Literal literal)
-            { GenerateCodeForStatement(literal); }
-            else if (statement is Identifier variable)
-            { GenerateCodeForStatement(variable); }
-            else if (statement is OperatorCall expression)
-            { GenerateCodeForStatement(expression); }
-            else if (statement is AddressGetter addressGetter)
-            { GenerateCodeForStatement(addressGetter); }
-            else if (statement is Pointer pointer)
-            { GenerateCodeForStatement(pointer); }
-            else if (statement is Assignment assignment)
-            { GenerateCodeForStatement(assignment); }
-            else if (statement is ShortOperatorCall shortOperatorCall)
-            { GenerateCodeForStatement(shortOperatorCall); }
-            else if (statement is CompoundAssignment compoundAssignment)
-            { GenerateCodeForStatement(compoundAssignment); }
-            else if (statement is VariableDeclaration variableDeclaration)
-            { GenerateCodeForStatement(variableDeclaration); }
-            else if (statement is TypeCast typeCast)
-            { GenerateCodeForStatement(typeCast); }
-            else if (statement is NewInstance newInstance)
-            { GenerateCodeForStatement(newInstance); }
-            else if (statement is ConstructorCall constructorCall)
-            { GenerateCodeForStatement(constructorCall); }
-            else if (statement is Field field)
-            { GenerateCodeForStatement(field); }
-            else if (statement is IndexCall indexCall)
-            { GenerateCodeForStatement(indexCall); }
-            else if (statement is AnyCall anyCall)
-            { GenerateCodeForStatement(anyCall); }
-            else if (statement is ModifiedStatement modifiedStatement)
-            { GenerateCodeForStatement(modifiedStatement); }
-            else if (statement is Block block)
-            { GenerateCodeForStatement(block); }
-            else
-            { throw new CompilerException($"Unknown statement \"{statement.GetType().Name}\"", statement, CurrentFile); }
+            switch (statement)
+            {
+                case KeywordCall v: GenerateCodeForStatement(v); break;
+                case FunctionCall v: GenerateCodeForStatement(v); break;
+                case IfContainer v: GenerateCodeForStatement(v.ToLinks()); break;
+                case WhileLoop v: GenerateCodeForStatement(v); break;
+                case ForLoop v: GenerateCodeForStatement(v); break;
+                case Literal v: GenerateCodeForStatement(v); break;
+                case Identifier v: GenerateCodeForStatement(v); break;
+                case OperatorCall v: GenerateCodeForStatement(v); break;
+                case AddressGetter v: GenerateCodeForStatement(v); break;
+                case Pointer v: GenerateCodeForStatement(v); break;
+                case Assignment v: GenerateCodeForStatement(v); break;
+                case ShortOperatorCall v: GenerateCodeForStatement(v); break;
+                case CompoundAssignment v: GenerateCodeForStatement(v); break;
+                case VariableDeclaration v: GenerateCodeForStatement(v); break;
+                case TypeCast v: GenerateCodeForStatement(v); break;
+                case NewInstance v: GenerateCodeForStatement(v); break;
+                case ConstructorCall v: GenerateCodeForStatement(v); break;
+                case Field v: GenerateCodeForStatement(v); break;
+                case IndexCall v: GenerateCodeForStatement(v); break;
+                case AnyCall v: GenerateCodeForStatement(v); break;
+                case ModifiedStatement v: GenerateCodeForStatement(v); break;
+                case Block v: GenerateCodeForStatement(v); break;
+                default: throw new CompilerException($"Unknown statement \"{statement.GetType().Name}\"", statement, CurrentFile);
+            }
 
             Code.SetPointer(0);
 
@@ -653,6 +612,35 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(LinkedIf @if, bool linked = false)
         {
+            if (TryCompute(@if.Condition, null, out DataItem computedCondition))
+            {
+                if (computedCondition)
+                { GenerateCodeForStatement(Block.CreateIfNotBlock(@if.Block)); }
+                else if (@if.NextLink is not null)
+                { GenerateCodeForStatement(@if.NextLink); }
+                return;
+            }
+
+            {
+                if (@if.Condition is TypeCast _typeCast &&
+                    new CompiledType(_typeCast.Type, FindType, TryCompute).IsBuiltin &&
+                    _typeCast.PrevStatement is Literal _literal &&
+                    _literal.Type == LiteralType.String)
+                {
+                    GenerateCodeForStatement(Block.CreateIfNotBlock(@if.Block));
+                    return;
+                }
+            }
+
+            {
+                if (@if.Condition is Literal _literal &&
+                    _literal.Type == LiteralType.String)
+                {
+                    GenerateCodeForStatement(Block.CreateIfNotBlock(@if.Block));
+                    return;
+                }
+            }
+
             using (Code.Block($"If ({@if.Condition})"))
             {
                 int conditionAddress = Stack.NextAddress;
@@ -835,44 +823,54 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(ForLoop @for)
         {
-            CompiledCode codeSnapshot = Code;
+            CodeSnapshot codeSnapshot = SnapshotCode();
             GeneratorSnapshot genSnapshot = Snapshot();
+            int initialCodeLength = codeSnapshot.Code.GetFinalCode().Length;
 
             if (IsUnrollable(@for))
             {
-                Code = codeSnapshot.Duplicate();
                 if (GenerateCodeForStatement(@for, true))
                 {
-                    CompiledCode unrolledCode = Code;
-                    int unrolledLength = unrolledCode.GetFinalCode().Length - codeSnapshot.GetFinalCode().Length;
+                    CodeSnapshot unrolledCode = SnapshotCode();
+
+                    int unrolledLength = unrolledCode.Code.GetFinalCode().Length - initialCodeLength;
                     GeneratorSnapshot unrolledSnapshot = Snapshot();
 
                     Restore(genSnapshot);
-                    Code = codeSnapshot.Duplicate();
+                    RestoreCode(codeSnapshot);
 
-                    GenerateCodeForStatement(@for, false);
-
-                    CompiledCode notUnrolledCode = Code;
-                    int notUnrolledLength = notUnrolledCode.GetFinalCode().Length - codeSnapshot.GetFinalCode().Length;
-                    GeneratorSnapshot notUnrolledSnapshot = Snapshot();
-
-                    if (unrolledLength <= notUnrolledLength)
+                    try
                     {
-                        Restore(unrolledSnapshot);
-                        Code = unrolledCode;
+                        GenerateCodeForStatement(@for, false);
+
+                        CodeSnapshot notUnrolledCode = SnapshotCode();
+                        int notUnrolledLength = notUnrolledCode.Code.GetFinalCode().Length - initialCodeLength;
+                        GeneratorSnapshot notUnrolledSnapshot = Snapshot();
+
+                        if (unrolledLength <= notUnrolledLength)
+                        {
+                            Restore(unrolledSnapshot);
+                            RestoreCode(unrolledCode);
+                        }
+                        else
+                        {
+                            Restore(notUnrolledSnapshot);
+                            RestoreCode(notUnrolledCode);
+                        }
+                        return;
                     }
-                    else
-                    {
-                        Restore(notUnrolledSnapshot);
-                        Code = notUnrolledCode;
-                    }
+                    catch (Exception)
+                    { }
+
+                    Restore(unrolledSnapshot);
+                    RestoreCode(unrolledCode);
 
                     return;
                 }
             }
 
             Restore(genSnapshot);
-            Code = codeSnapshot;
+            RestoreCode(codeSnapshot);
 
             GenerateCodeForStatement(@for, false);
         }
@@ -1611,6 +1609,13 @@ namespace LanguageCore.Brainfuck.Generator
                 }
             }
 
+            if (TryCompute(statement, null, out DataItem computed))
+            {
+                Stack.Push(computed);
+                Optimizations++;
+                return;
+            }
+
             using (Code.Block($"Expression {statement.Left} {statement.Operator} {statement.Right}"))
             {
                 switch (statement.Operator.Content)
@@ -2037,21 +2042,21 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(AddressGetter addressGetter)
         {
-            if (addressGetter.PrevStatement is Identifier identifier)
-            {
-                CompiledType type = FindStatementType(identifier);
+            CompiledType type = FindStatementType(addressGetter.PrevStatement);
 
-                if (!type.InHEAP)
-                { throw new CompilerException($"Type {type} isn't stored in the heap", addressGetter, CurrentFile); }
+            if (!type.InHEAP)
+            { throw new CompilerException($"Type {type} isn't stored in the heap", addressGetter, CurrentFile); }
 
-                GenerateCodeForStatement(identifier);
-                return;
-            }
-
-            throw new NotImplementedException();
+            GenerateCodeForStatement(addressGetter.PrevStatement);
         }
         void GenerateCodeForStatement(Pointer pointer)
         {
+            if (TryCompute(pointer, null, out DataItem computed))
+            {
+                Stack.Push(computed);
+                return;
+            }
+
             int pointerAddress = Stack.NextAddress;
             GenerateCodeForStatement(pointer.PrevStatement);
 
@@ -2257,6 +2262,12 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
+            if (TryCompute(field, null, out DataItem computed))
+            {
+                Stack.Push(computed);
+                return;
+            }
+
             if (TryGetAddress(field, out int address, out int size))
             {
                 using (Code.Block($"Load field {field} (from {address})"))
@@ -2330,6 +2341,14 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(TypeCast typeCast)
         {
+            CompiledType statementType = FindStatementType(typeCast.PrevStatement);
+            CompiledType targetType = new(typeCast.Type, FindType, TryCompute);
+            typeCast.Type.SetAnalyzedType(targetType);
+            OnGotStatementType(typeCast, targetType);
+
+            if (statementType.SizeOnStack != targetType.SizeOnStack)
+            { throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.SizeOnStack}) to {targetType} (size of {targetType.SizeOnStack})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
+
             AnalysisCollection?.Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
 
             GenerateCodeForStatement(typeCast.PrevStatement);
@@ -2444,6 +2463,13 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForValuePrinter(StatementWithValue value, CompiledType valueType)
         {
+            if (value is Literal literalValue &&
+                literalValue.Type == LiteralType.String)
+            {
+                GenerateCodeForPrinter(literalValue.Value);
+                return;
+            }
+
             if (valueType.SizeOnStack != 1)
             { throw new NotSupportedException($"Only value of size 1 (not {valueType.SizeOnStack}) supported by the output printer in brainfuck", value, CurrentFile); }
 
@@ -2713,7 +2739,77 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
+        bool IsFunctionInlineable(FunctionThingDefinition function, StatementWithValue[] parameters)
+        {
+            if (function.Block is null ||
+                !function.IsInlineable)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                if (TryCompute(parameters[i], null, out _))
+                { continue; }
+                if (parameters[i] is Literal)
+                { continue; }
+                return false;
+            }
+
+            return true;
+        }
+
         void GenerateCodeForFunction(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
+        {
+            if (!IsFunctionInlineable(function, parameters))
+            {
+                GenerateCodeForFunction_(function, parameters, typeArguments, callerPosition);
+                return;
+            }
+
+            CodeSnapshot originalCode = SnapshotCode();
+            GeneratorSnapshot originalSnapshot = Snapshot();
+            int originalCodeLength = originalCode.Code.GetFinalCode().Length;
+
+            CodeSnapshot? inlinedCode = null;
+            int inlinedLength = default;
+            GeneratorSnapshot inlinedSnapshot = default;
+
+            try
+            {
+                Statement inlined = InlineMacro(function, parameters);
+                GenerateCodeForStatement(inlined);
+
+                inlinedCode = SnapshotCode();
+                inlinedLength = inlinedCode.Value.Code.GetFinalCode().Length - originalCodeLength;
+                inlinedSnapshot = Snapshot();
+            }
+            catch (Exception)
+            { }
+
+            Restore(originalSnapshot);
+            RestoreCode(originalCode);
+
+            GenerateCodeForFunction_(function, parameters, typeArguments, callerPosition);
+
+            CodeSnapshot notInlinedCode = SnapshotCode();
+            int notInlinedLength = notInlinedCode.Code.GetFinalCode().Length - originalCodeLength;
+            GeneratorSnapshot notInlinedSnapshot = Snapshot();
+
+            if (inlinedCode is not null &&
+                inlinedLength <= notInlinedLength)
+            {
+                Restore(inlinedSnapshot);
+                RestoreCode(inlinedCode.Value);
+            }
+            else
+            {
+                Restore(notInlinedSnapshot);
+                RestoreCode(notInlinedCode);
+            }
+        }
+
+        void GenerateCodeForFunction_(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
         {
             int instructionStart = 0;
             if (GenerateDebugInformation)
@@ -2933,16 +3029,17 @@ namespace LanguageCore.Brainfuck.Generator
             CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
             using (DebugBlock(function.Block.BracketStart))
+            using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
             {
-                using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
-                {
-                    ReturnTagStack.Push(Stack.Push(1));
-                }
+                int tagAddress = Stack.Push(1);
+                Code.CommentLine($"Tag address is {tagAddress}");
+                ReturnTagStack.Push(tagAddress);
             }
 
             GenerateCodeForStatement(function.Block);
 
             using (DebugBlock(function.Block.BracketEnd))
+            using (Code.Block($"Finish \"return\" block"))
             {
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
                 { throw new InternalException(string.Empty, function.Block, function.FilePath); }
@@ -2964,7 +3061,7 @@ namespace LanguageCore.Brainfuck.Generator
                                 new TypeCast(
                                     new Identifier(Token.CreateAnonymous(variable.Name)),
                                     Token.CreateAnonymous("as"),
-                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int", null), Token.CreateAnonymous("*", TokenType.Operator))
+                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int"), Token.CreateAnonymous("*", TokenType.Operator))
                                     )
                                 );
                         }
@@ -3226,7 +3323,9 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
                 {
-                    ReturnTagStack.Push(Stack.Push(1));
+                    int tagAddress = Stack.Push(1);
+                    Code.CommentLine($"Tag address is {tagAddress}");
+                    ReturnTagStack.Push(tagAddress);
                 }
             }
 
@@ -3254,7 +3353,7 @@ namespace LanguageCore.Brainfuck.Generator
                                 new TypeCast(
                                     new Identifier(Token.CreateAnonymous(variable.Name)),
                                     Token.CreateAnonymous("as"),
-                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int", null), Token.CreateAnonymous("*", TokenType.Operator))
+                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int"), Token.CreateAnonymous("*", TokenType.Operator))
                                     )
                                 );
                         }
@@ -3438,7 +3537,9 @@ namespace LanguageCore.Brainfuck.Generator
 
             using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
             {
-                ReturnTagStack.Push(Stack.Push(1));
+                int tagAddress = Stack.Push(1);
+                Code.CommentLine($"Tag address is {tagAddress}");
+                ReturnTagStack.Push(tagAddress);
             }
 
             GenerateCodeForStatement(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body"));
@@ -3464,7 +3565,7 @@ namespace LanguageCore.Brainfuck.Generator
                                 new TypeCast(
                                     new Identifier(Token.CreateAnonymous(variable.Name)),
                                     Token.CreateAnonymous("as"),
-                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int", null), Token.CreateAnonymous("*", TokenType.Operator))
+                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int"), Token.CreateAnonymous("*", TokenType.Operator))
                                     )
                                 );
                         }

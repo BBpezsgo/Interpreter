@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -45,7 +44,7 @@ namespace LanguageCore.Parser.Statement
 
         public static IEnumerable<T> GetStatements<T>(this ParserResult parserResult)
         {
-            foreach (Statement statement in parserResult)
+            foreach (Statement statement in parserResult.GetStatementsRecursively())
             {
                 if (statement is T _statement)
                 { yield return _statement; }
@@ -54,7 +53,7 @@ namespace LanguageCore.Parser.Statement
 
         public static IEnumerable<T> GetStatements<T>(this ParserResult parserResult, Func<T, bool> condition)
         {
-            foreach (Statement statement in parserResult)
+            foreach (Statement statement in parserResult.GetStatementsRecursively())
             {
                 if (statement is T _statement && condition.Invoke(_statement))
                 { yield return _statement; }
@@ -63,7 +62,7 @@ namespace LanguageCore.Parser.Statement
 
         public static IEnumerable<T> GetStatements<T>(this Statement statement)
         {
-            foreach (Statement subStatement in statement)
+            foreach (Statement subStatement in statement.GetStatementsRecursively(true))
             {
                 if (subStatement is T _subStatement)
                 { yield return _subStatement; }
@@ -72,7 +71,7 @@ namespace LanguageCore.Parser.Statement
 
         public static IEnumerable<T> GetStatements<T>(this Statement statement, Func<T, bool> condition)
         {
-            foreach (Statement subStatement in statement)
+            foreach (Statement subStatement in statement.GetStatementsRecursively(true))
             {
                 if (subStatement is T _subStatement && condition.Invoke(_subStatement))
                 { yield return _subStatement; }
@@ -81,7 +80,7 @@ namespace LanguageCore.Parser.Statement
 
         public static T? GetStatement<T>(this ParserResult parserResult)
         {
-            foreach (Statement statement in parserResult)
+            foreach (Statement statement in parserResult.GetStatementsRecursively())
             {
                 if (statement is T _statement)
                 { return _statement; }
@@ -91,14 +90,14 @@ namespace LanguageCore.Parser.Statement
 
         public static Statement? GetStatement(this ParserResult parserResult)
         {
-            foreach (Statement statement in parserResult)
+            foreach (Statement statement in parserResult.GetStatementsRecursively())
             { return statement; }
             return default;
         }
 
         public static T? GetStatement<T>(this ParserResult parserResult, Func<T, bool> condition)
         {
-            foreach (Statement statement in parserResult)
+            foreach (Statement statement in parserResult.GetStatementsRecursively())
             {
                 if (statement is T statement_ && condition.Invoke(statement_))
                 { return statement_; }
@@ -108,7 +107,7 @@ namespace LanguageCore.Parser.Statement
 
         public static Statement? GetStatement(this ParserResult parserResult, Func<Statement, bool> condition)
         {
-            foreach (Statement statement in parserResult)
+            foreach (Statement statement in parserResult.GetStatementsRecursively())
             {
                 if (condition.Invoke(statement))
                 { return statement; }
@@ -127,7 +126,7 @@ namespace LanguageCore.Parser.Statement
 
         public static T? GetStatement<T>(this Statement statement)
         {
-            foreach (Statement subStatement in statement)
+            foreach (Statement subStatement in statement.GetStatementsRecursively(true))
             {
                 if (subStatement is T _subStatement)
                 { return _subStatement; }
@@ -137,7 +136,7 @@ namespace LanguageCore.Parser.Statement
 
         public static T? GetStatement<T>(this Statement statement, Func<T, bool> condition)
         {
-            foreach (Statement subStatement in statement)
+            foreach (Statement subStatement in statement.GetStatementsRecursively(true))
             {
                 if (subStatement is T _subStatement && condition.Invoke(_subStatement))
                 { return _subStatement; }
@@ -152,7 +151,7 @@ namespace LanguageCore.Parser.Statement
             => (result = GetStatement<T>(statement, condition)) != null;
     }
 
-    public abstract class Statement : IPositioned, IEnumerable<Statement>
+    public abstract class Statement : IPositioned
     {
         public Token? Semicolon;
 
@@ -171,8 +170,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{GetType().Name}{Semicolon}";
 
-        public abstract IEnumerator<Statement> GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        public abstract IEnumerable<Statement> GetStatementsRecursively(bool includeThis);
     }
 
     public abstract class AnyAssignment : Statement
@@ -231,7 +229,7 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
         {
-            StringBuilder result = new(3);
+            StringBuilder result = new();
             result.Append('{');
 
             if (Statements.Length > 0)
@@ -243,12 +241,13 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            foreach (Statement statement in Statements)
+            if (includeThis) yield return this;
+
+            for (int i = 0; i < Statements.Length; i++)
             {
-                yield return statement;
-                foreach (Statement substatement in statement)
+                foreach (Statement substatement in Statements[i].GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -290,20 +289,19 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Keyword} ({Condition}) {Block}{(NextLink != null ? " ..." : string.Empty)}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return Condition;
-            foreach (Statement substatement in Condition)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in Condition.GetStatementsRecursively(true))
             { yield return substatement; }
 
-            yield return Block;
-            foreach (Statement substatement in Block)
+            foreach (Statement substatement in Block.GetStatementsRecursively(true))
             { yield return substatement; }
 
             if (NextLink != null)
             {
-                yield return NextLink;
-                foreach (Statement substatement in NextLink)
+                foreach (Statement substatement in NextLink.GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -319,10 +317,11 @@ namespace LanguageCore.Parser.Statement
 
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return Block;
-            foreach (Statement substatement in Block)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in Block.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }
@@ -348,12 +347,13 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{HashToken}{HashName}{(Parameters.Length > 0 ? string.Join<Literal>(' ', Parameters) : string.Empty)}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            foreach (Literal parameter in Parameters)
+            if (includeThis) yield return this;
+
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                yield return parameter;
-                foreach (Statement substatement in parameter)
+                foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -375,12 +375,13 @@ namespace LanguageCore.Parser.Statement
             Values = values;
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            foreach (StatementWithValue value in Values)
+            if (includeThis) yield return this;
+
+            for (int i = 0; i < Values.Length; i++)
             {
-                yield return value;
-                foreach (Statement substatement in value)
+                foreach (Statement substatement in Values[i].GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -445,12 +446,13 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
+            if (includeThis) yield return this;
+
             if (InitialValue != null)
             {
-                yield return InitialValue;
-                foreach (Statement substatement in InitialValue)
+                foreach (Statement substatement in InitialValue.GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -542,19 +544,16 @@ namespace LanguageCore.Parser.Statement
             return false;
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            if (PrevStatement != null)
-            {
-                yield return PrevStatement;
-                foreach (Statement substatement in PrevStatement)
-                { yield return substatement; }
-            }
+            if (includeThis) yield return this;
 
-            foreach (StatementWithValue parameter in Parameters)
+            foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
+            { yield return substatement; }
+
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                yield return parameter;
-                foreach (Statement substatement in parameter)
+                foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -641,19 +640,19 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
+            if (includeThis) yield return this;
+
             if (PrevStatement != null)
             {
-                yield return PrevStatement;
-                foreach (Statement substatement in PrevStatement)
+                foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
                 { yield return substatement; }
             }
 
-            foreach (StatementWithValue parameter in Parameters)
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                yield return parameter;
-                foreach (Statement substatement in parameter)
+                foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -715,12 +714,13 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            foreach (StatementWithValue parameter in Parameters)
+            if (includeThis) yield return this;
+
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                yield return parameter;
-                foreach (Statement substatement in parameter)
+                foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -733,6 +733,7 @@ namespace LanguageCore.Parser.Statement
         public StatementWithValue? Right;
         public bool InsideBracelet;
 
+        /// <exception cref="InternalException"/>
         public StatementWithValue[] Parameters
         {
             get
@@ -820,19 +821,16 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            if (Left != null)
-            {
-                yield return Left;
-                foreach (Statement substatement in Left)
-                { yield return substatement; }
-            }
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in Left.GetStatementsRecursively(true))
+            { yield return substatement; }
 
             if (Right != null)
             {
-                yield return Right;
-                foreach (Statement substatement in Right)
+                foreach (Statement substatement in Right.GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -891,6 +889,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
+        /// <exception cref="NotImplementedException"/>
         public override Assignment ToAssignment()
         {
             OperatorCall operatorCall = GetOperatorCall();
@@ -898,16 +897,15 @@ namespace LanguageCore.Parser.Statement
             return new Assignment(assignmentToken, Left, operatorCall);
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            if (Left != null)
-            {
-                yield return Left;
-                foreach (Statement substatement in Left)
-                { yield return substatement; }
-            }
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in Left.GetStatementsRecursively(true))
+            { yield return substatement; }
         }
 
+        /// <exception cref="NotImplementedException"/>
         public OperatorCall GetOperatorCall()
         {
             switch (Operator.Content)
@@ -953,21 +951,15 @@ namespace LanguageCore.Parser.Statement
 
         public override Assignment ToAssignment() => this;
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            if (Left != null)
-            {
-                yield return Left;
-                foreach (Statement substatement in Left)
-                { yield return substatement; }
-            }
+            if (includeThis) yield return this;
 
-            if (Right != null)
-            {
-                yield return Right;
-                foreach (Statement substatement in Right)
-                { yield return substatement; }
-            }
+            foreach (Statement substatement in Left.GetStatementsRecursively(true))
+            { yield return substatement; }
+
+            foreach (Statement substatement in Right.GetStatementsRecursively(true))
+            { yield return substatement; }
         }
     }
 
@@ -1001,21 +993,15 @@ namespace LanguageCore.Parser.Statement
             Left,
             Right);
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            if (Left != null)
-            {
-                yield return Left;
-                foreach (Statement substatement in Left)
-                { yield return substatement; }
-            }
+            if (includeThis) yield return this;
 
-            if (Right != null)
-            {
-                yield return Right;
-                foreach (Statement substatement in Right)
-                { yield return substatement; }
-            }
+            foreach (Statement substatement in Left.GetStatementsRecursively(true))
+            { yield return substatement; }
+
+            foreach (Statement substatement in Right.GetStatementsRecursively(true))
+            { yield return substatement; }
         }
     }
 
@@ -1043,6 +1029,7 @@ namespace LanguageCore.Parser.Statement
             ValueToken = value;
         }
 
+        /// <exception cref="NotImplementedException"/>
         Literal(DataItem value, Token token)
         {
             Type = value.Type switch
@@ -1076,8 +1063,10 @@ namespace LanguageCore.Parser.Statement
             };
         }
 
+        /// <exception cref="NotImplementedException"/>
         public static Literal CreateAnonymous(DataItem value, IPositioned position)
             => Literal.CreateAnonymous(value, position.Position);
+        /// <exception cref="NotImplementedException"/>
         public static Literal CreateAnonymous(DataItem value, Position position)
         {
             TokenType tokenType = value.Type switch
@@ -1135,8 +1124,10 @@ namespace LanguageCore.Parser.Statement
         public float GetFloat() => Literal.GetFloat(Value);
         public bool GetBoolean() => Literal.GetBoolean(Value);
 
-        public override IEnumerator<Statement> GetEnumerator()
-        { yield break; }
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+        {
+            if (includeThis) yield return this;
+        }
     }
 
     public class Identifier : StatementWithValue, IReferenceableTo
@@ -1157,8 +1148,10 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString() => Token.Content;
 
-        public override IEnumerator<Statement> GetEnumerator()
-        { yield break; }
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+        {
+            if (includeThis) yield return this;
+        }
     }
 
     public class AddressGetter : StatementWithValue
@@ -1178,14 +1171,12 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            if (PrevStatement != null)
-            {
-                yield return PrevStatement;
-                foreach (Statement substatement in PrevStatement)
-                { yield return substatement; }
-            }
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
+            { yield return substatement; }
         }
     }
 
@@ -1206,14 +1197,12 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            if (PrevStatement != null)
-            {
-                yield return PrevStatement;
-                foreach (Statement substatement in PrevStatement)
-                { yield return substatement; }
-            }
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
+            { yield return substatement; }
         }
     }
 
@@ -1235,14 +1224,14 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Keyword} ({Condition}) {Block}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return Condition;
-            foreach (Statement substatement in Condition)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in Condition.GetStatementsRecursively(true))
             { yield return substatement; }
 
-            yield return Block;
-            foreach (Statement substatement in Block)
+            foreach (Statement substatement in Block.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }
@@ -1269,22 +1258,20 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Keyword} (...) {Block}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return VariableDeclaration;
-            foreach (Statement substatement in VariableDeclaration)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in VariableDeclaration.GetStatementsRecursively(true))
             { yield return substatement; }
 
-            yield return Condition;
-            foreach (Statement substatement in Condition)
+            foreach (Statement substatement in Condition.GetStatementsRecursively(true))
             { yield return substatement; }
 
-            yield return Expression;
-            foreach (Statement substatement in Expression)
+            foreach (Statement substatement in Expression.GetStatementsRecursively(true))
             { yield return substatement; }
 
-            yield return Block;
-            foreach (Statement substatement in Block)
+            foreach (Statement substatement in Block.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }
@@ -1301,6 +1288,7 @@ namespace LanguageCore.Parser.Statement
             Parts = parts.ToArray();
         }
 
+        /// <exception cref="NotImplementedException"/>
         LinkedIfThing? ToLinks(int i)
         {
             if (i >= Parts.Length)
@@ -1322,6 +1310,8 @@ namespace LanguageCore.Parser.Statement
             throw new NotImplementedException();
         }
 
+        /// <exception cref="InternalException"/>
+        /// <exception cref="NotImplementedException"/>
         public LinkedIf ToLinks()
         {
             if (Parts.Length == 0) throw new InternalException();
@@ -1332,12 +1322,13 @@ namespace LanguageCore.Parser.Statement
             };
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            foreach (BaseBranch part in Parts)
+            if (includeThis) yield return this;
+
+            for (int i = 0; i < Parts.Length; i++)
             {
-                yield return part;
-                foreach (Statement substatement in part)
+                foreach (Statement substatement in Parts[i].GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -1379,14 +1370,14 @@ namespace LanguageCore.Parser.Statement
             this.Condition = condition;
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return Condition;
-            foreach (Statement substatement in Condition)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in Condition.GetStatementsRecursively(true))
             { yield return substatement; }
 
-            yield return Block;
-            foreach (Statement substatement in Block)
+            foreach (Statement substatement in Block.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }
@@ -1401,14 +1392,14 @@ namespace LanguageCore.Parser.Statement
             this.Condition = condition;
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return Condition;
-            foreach (Statement substatement in Condition)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in Condition.GetStatementsRecursively(true))
             { yield return substatement; }
 
-            yield return Block;
-            foreach (Statement substatement in Block)
+            foreach (Statement substatement in Block.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }
@@ -1419,10 +1410,11 @@ namespace LanguageCore.Parser.Statement
             : base(keyword, IfPart.Else, block)
         { }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return Block;
-            foreach (Statement substatement in Block)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in Block.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }
@@ -1444,8 +1436,10 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Keyword} {TypeName}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
-        { yield break; }
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+        {
+            if (includeThis) yield return this;
+        }
     }
 
     public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledGeneralFunction>
@@ -1518,12 +1512,13 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            foreach (StatementWithValue parameter in Parameters)
+            if (includeThis) yield return this;
+
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                yield return parameter;
-                foreach (Statement substatement in parameter)
+                foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
                 { yield return substatement; }
             }
         }
@@ -1574,14 +1569,14 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return PrevStatement;
-            foreach (Statement substatement in PrevStatement)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
             { yield return substatement; }
 
-            yield return Expression;
-            foreach (Statement substatement in Expression)
+            foreach (Statement substatement in Expression.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }
@@ -1604,10 +1599,11 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{PrevStatement}.{FieldName}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return PrevStatement;
-            foreach (Statement substatement in PrevStatement)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }
@@ -1631,10 +1627,11 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{PrevStatement} {Keyword} {Type}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return PrevStatement;
-            foreach (Statement substatement in PrevStatement)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }
@@ -1656,10 +1653,11 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Modifier} {Statement}{Semicolon}";
 
-        public override IEnumerator<Statement> GetEnumerator()
+        public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
         {
-            yield return Statement;
-            foreach (Statement substatement in Statement)
+            if (includeThis) yield return this;
+
+            foreach (Statement substatement in Statement.GetStatementsRecursively(true))
             { yield return substatement; }
         }
     }

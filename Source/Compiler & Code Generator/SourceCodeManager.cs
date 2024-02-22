@@ -177,7 +177,7 @@ namespace LanguageCore.Compiler
                 parserResult2 = Parser.Parse(tokenizerResult.Tokens);
 
                 if (parserResult2.Errors.Length > 0)
-                { throw new LanguageException("Failed to parse", parserResult2.Errors[0].ToException()); }
+                { throw parserResult2.Errors[0].ToException(); }
 
                 Print?.Invoke($"  Parsed in {(System.DateTime.Now - parseStarted).TotalMilliseconds} ms", LogType.Debug);
             }

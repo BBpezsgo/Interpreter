@@ -48,20 +48,11 @@ export void Print(bool message)
     { Print("false"); }
 }
 
-[StandardOutput]
-export void Print(temp String message)
+export inline void Print(temp String message)
 {
-    if (&message <= 0)
+    for (int i; i < message.length; i++)
     {
-        Print("null");
-    }
-    else
-    {
-        int length = message.length;
-        for (int i; i < length; i++)
-        {
-            Print(*(&message + sizeof(String) + i) as char);
-        }
+        Print(*((message as int) + (sizeof(String) + i)) as char);
     }
 }
 

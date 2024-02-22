@@ -39,8 +39,13 @@ public readonly struct TestFile
     public BrainfuckResult DoBrainfuck(bool memoryShouldBeEmpty = true, int? expectedMemoryPointer = 0)
     {
         BrainfuckResult result = Utils.RunBrainfuck(new FileInfo(SourceFile), GetInput());
+        BrainfuckResult resultCompact = Utils.RunBrainfuckCompact(new FileInfo(SourceFile), GetInput());
+
         ExpectedResult expected = GetExpectedResult();
+
         expected.Assert(result, memoryShouldBeEmpty, expectedMemoryPointer);
+        expected.Assert(resultCompact, memoryShouldBeEmpty, expectedMemoryPointer);
+
         return result;
     }
 
@@ -327,6 +332,28 @@ public struct Utils
     }
 
     public static BrainfuckResult RunBrainfuck(FileInfo file, string input)
+    {
+        InputBuffer inputBuffer = new(input);
+        StringBuilder stdOutput = new();
+
+        void OutputCallback(byte data) => stdOutput.Append(LanguageCore.Brainfuck.CharCode.GetChar(data));
+        byte InputCallback() => LanguageCore.Brainfuck.CharCode.GetByte(inputBuffer.Read());
+
+        AnalysisCollection analysisCollection = new();
+
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath }, null, analysisCollection);
+        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default, null, analysisCollection);
+
+        analysisCollection.Throw();
+
+        LanguageCore.Brainfuck.Interpreter interpreter = new(generated.Code, OutputCallback, InputCallback);
+
+        interpreter.Run();
+
+        return new BrainfuckResult(stdOutput.ToString(), interpreter);
+    }
+
+    public static BrainfuckResult RunBrainfuckCompact(FileInfo file, string input)
     {
         InputBuffer inputBuffer = new(input);
         StringBuilder stdOutput = new();

@@ -1004,7 +1004,7 @@ ExitBreak:
                             parameters.Insert(0,
                                 new ParameterDefinition(
                                     new Token[1] { Token.CreateAnonymous("this") },
-                                    TypeInstanceSimple.CreateAnonymous(compiledClass.Identifier.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
+                                    TypeInstanceSimple.CreateAnonymous(compiledClass.Identifier.Content, compiledClass.TemplateInfo?.TypeParameters),
                                     Token.CreateAnonymous("this"))
                                 );
                             method.Parameters = new ParameterDefinitionCollection(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
@@ -1031,7 +1031,7 @@ ExitBreak:
                         parameters.Insert(0,
                             new ParameterDefinition(
                                 new Token[1] { Token.CreateAnonymous("this") },
-                                TypeInstanceSimple.CreateAnonymous(compiledClass.Identifier.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
+                                TypeInstanceSimple.CreateAnonymous(compiledClass.Identifier.Content, compiledClass.TemplateInfo?.TypeParameters),
                                 Token.CreateAnonymous("this"))
                             );
                         method.Parameters = new ParameterDefinitionCollection(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);

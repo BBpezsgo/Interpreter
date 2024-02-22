@@ -995,37 +995,43 @@ namespace LanguageCore.BBCode.Generator
             switch (literal.Type)
             {
                 case LiteralType.Integer:
+                {
                     OnGotStatementType(literal, new CompiledType(Type.Integer));
 
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.GetInt()));
                     break;
+                }
                 case LiteralType.Float:
+                {
                     OnGotStatementType(literal, new CompiledType(Type.Float));
 
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.GetFloat()));
                     break;
+                }
                 case LiteralType.String:
-                    try
-                    { OnGotStatementType(literal, FindReplacedType("string", literal)); }
-                    catch (CompilerException)
-                    { }
+                {
+                    if (TryFindTypeReplacer("string", out CompiledType? replacedType))
+                    { OnGotStatementType(literal, replacedType); }
 
                     GenerateCodeForLiteralString(literal.Value);
                     break;
+                }
                 case LiteralType.Boolean:
-                    try
-                    { OnGotStatementType(literal, FindReplacedType("boolean", literal)); }
-                    catch (CompilerException)
-                    { }
+                {
+                    if (TryFindTypeReplacer("boolean", out CompiledType? replacedType))
+                    { OnGotStatementType(literal, replacedType); }
 
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(bool.Parse(literal.Value) ? 1 : 0));
                     break;
+                }
                 case LiteralType.Char:
+                {
                     OnGotStatementType(literal, new CompiledType(Type.Char));
 
                     if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", CurrentFile);
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.Value[0]));
                     break;
+                }
                 default: throw new UnreachableException();
             }
         }
@@ -1681,19 +1687,23 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForStatement(LiteralList listValue)
         { throw new NotImplementedException(); }
-        void GenerateCodeForStatement(TypeCast @as)
+        void GenerateCodeForStatement(TypeCast typeCast)
         {
-            CompiledType targetType = new(@as.Type, FindType);
-            @as.Type.SetAnalyzedType(targetType);
-            OnGotStatementType(@as, targetType);
+            CompiledType statementType = FindStatementType(typeCast.PrevStatement);
+            CompiledType targetType = new(typeCast.Type, FindType, TryCompute);
+            typeCast.Type.SetAnalyzedType(targetType);
+            OnGotStatementType(typeCast, targetType);
 
-            GenerateCodeForStatement(@as.PrevStatement, targetType);
+            if (statementType.SizeOnStack != targetType.SizeOnStack)
+            { throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.SizeOnStack}) to {targetType} (size of {targetType.SizeOnStack})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
 
-            CompiledType type = FindStatementType(@as.PrevStatement, targetType);
+            GenerateCodeForStatement(typeCast.PrevStatement, targetType);
+
+            CompiledType type = FindStatementType(typeCast.PrevStatement, targetType);
 
             if (!targetType.IsFunction && type == targetType)
             {
-                AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", @as.Keyword, CurrentFile));
+                AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", typeCast.Keyword, CurrentFile));
                 return;
             }
 
@@ -1734,50 +1744,31 @@ namespace LanguageCore.BBCode.Generator
         {
             int startInstruction = GeneratedCode.Count;
 
-            if (statement is LiteralList listValue)
-            { GenerateCodeForStatement(listValue); }
-            else if (statement is VariableDeclaration newVariable)
-            { GenerateCodeForStatement(newVariable); }
-            else if (statement is FunctionCall functionCall)
-            { GenerateCodeForStatement(functionCall); }
-            else if (statement is KeywordCall keywordCall)
-            { GenerateCodeForStatement(keywordCall); }
-            else if (statement is OperatorCall @operator)
-            { GenerateCodeForStatement(@operator); }
-            else if (statement is AnyAssignment setter)
-            { GenerateCodeForStatement(setter.ToAssignment()); }
-            else if (statement is LiteralStatement literal)
-            { GenerateCodeForStatement(literal); }
-            else if (statement is Identifier variable)
-            { GenerateCodeForStatement(variable, expectedType); }
-            else if (statement is AddressGetter memoryAddressGetter)
-            { GenerateCodeForStatement(memoryAddressGetter); }
-            else if (statement is Pointer memoryAddressFinder)
-            { GenerateCodeForStatement(memoryAddressFinder); }
-            else if (statement is WhileLoop whileLoop)
-            { GenerateCodeForStatement(whileLoop); }
-            else if (statement is ForLoop forLoop)
-            { GenerateCodeForStatement(forLoop); }
-            else if (statement is IfContainer @if)
-            { GenerateCodeForStatement(@if); }
-            else if (statement is NewInstance newStruct)
-            { GenerateCodeForStatement(newStruct); }
-            else if (statement is ConstructorCall constructorCall)
-            { GenerateCodeForStatement(constructorCall); }
-            else if (statement is IndexCall indexStatement)
-            { GenerateCodeForStatement(indexStatement); }
-            else if (statement is Field field)
-            { GenerateCodeForStatement(field); }
-            else if (statement is TypeCast @as)
-            { GenerateCodeForStatement(@as); }
-            else if (statement is ModifiedStatement modifiedStatement)
-            { GenerateCodeForStatement(modifiedStatement); }
-            else if (statement is AnyCall anyCall)
-            { GenerateCodeForStatement(anyCall); }
-            else if (statement is Block block)
-            { GenerateCodeForStatement(block); }
-            else
-            { throw new InternalException($"Unimplemented statement {statement.GetType().Name}"); }
+            switch (statement)
+            {
+                case LiteralList v: GenerateCodeForStatement(v); break;
+                case VariableDeclaration v: GenerateCodeForStatement(v); break;
+                case FunctionCall v: GenerateCodeForStatement(v); break;
+                case KeywordCall v: GenerateCodeForStatement(v); break;
+                case OperatorCall v: GenerateCodeForStatement(v); break;
+                case AnyAssignment v: GenerateCodeForStatement(v.ToAssignment()); break;
+                case LiteralStatement v: GenerateCodeForStatement(v); break;
+                case Identifier v: GenerateCodeForStatement(v, expectedType); break;
+                case AddressGetter v: GenerateCodeForStatement(v); break;
+                case Pointer v: GenerateCodeForStatement(v); break;
+                case WhileLoop v: GenerateCodeForStatement(v); break;
+                case ForLoop v: GenerateCodeForStatement(v); break;
+                case IfContainer v: GenerateCodeForStatement(v); break;
+                case NewInstance v: GenerateCodeForStatement(v); break;
+                case ConstructorCall v: GenerateCodeForStatement(v); break;
+                case IndexCall v: GenerateCodeForStatement(v); break;
+                case Field v: GenerateCodeForStatement(v); break;
+                case TypeCast v: GenerateCodeForStatement(v); break;
+                case ModifiedStatement v: GenerateCodeForStatement(v); break;
+                case AnyCall v: GenerateCodeForStatement(v); break;
+                case Block v: GenerateCodeForStatement(v); break;
+                default: throw new InternalException($"Unimplemented statement {statement.GetType().Name}");
+            }
 
             GeneratedDebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
             {
@@ -1830,16 +1821,14 @@ namespace LanguageCore.BBCode.Generator
 
         void GenerateCodeForValueSetter(Statement statementToSet, StatementWithValue value)
         {
-            if (statementToSet is Identifier variable)
-            { GenerateCodeForValueSetter(variable, value); }
-            else if (statementToSet is Field field)
-            { GenerateCodeForValueSetter(field, value); }
-            else if (statementToSet is IndexCall index)
-            { GenerateCodeForValueSetter(index, value); }
-            else if (statementToSet is Pointer memoryAddressGetter)
-            { GenerateCodeForValueSetter(memoryAddressGetter, value); }
-            else
-            { throw new CompilerException($"The left side of the assignment operator should be a variable, field or memory address. Passed {statementToSet.GetType().Name}", statementToSet, CurrentFile); }
+            switch (statementToSet)
+            {
+                case Identifier v: GenerateCodeForValueSetter(v, value); break;
+                case Field v: GenerateCodeForValueSetter(v, value); break;
+                case IndexCall v: GenerateCodeForValueSetter(v, value); break;
+                case Pointer v: GenerateCodeForValueSetter(v, value); break;
+                default: throw new CompilerException($"The left side of the assignment operator should be a variable, field or memory address. Passed {statementToSet.GetType().Name}", statementToSet, CurrentFile);
+            }
         }
         void GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value)
         {

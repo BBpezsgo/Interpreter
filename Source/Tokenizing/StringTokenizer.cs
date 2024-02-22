@@ -9,15 +9,17 @@
             Text = text ?? string.Empty;
         }
 
-        /// <inheritdoc cref="Tokenize(string?, TokenizerSettings)"/>
+        /// <inheritdoc cref="TokenizeInternal"/>
         public static TokenizerResult Tokenize(string? text)
             => Tokenize(text, TokenizerSettings.Default);
 
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
+        /// <inheritdoc cref="TokenizeInternal"/>
         public static TokenizerResult Tokenize(string? text, TokenizerSettings settings)
             => new StringTokenizer(settings, text).TokenizeInternal();
 
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
+        /// <exception cref="System.Exception"/>
         protected override TokenizerResult TokenizeInternal()
         {
             for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)

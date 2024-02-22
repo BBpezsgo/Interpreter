@@ -286,6 +286,8 @@ namespace LanguageCore.Parser
 
         public bool IsMacro => Modifiers.Contains("macro");
 
+        public bool IsInlineable => Modifiers.Contains("inline");
+
         public virtual bool IsTemplate => TemplateInfo is not null;
 
         public string? FilePath { get; set; }

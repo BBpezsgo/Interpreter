@@ -60,6 +60,7 @@ namespace LanguageCore.Tokenizing
 
         public override string ToString() => Content.ToString();
 
+        /// <exception cref="InternalException"/>
         public Token Instantiate() => new(TokenType switch
         {
             PreparationTokenType.Whitespace => Tokenizing.TokenType.Whitespace,

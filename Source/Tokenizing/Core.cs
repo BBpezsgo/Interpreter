@@ -134,6 +134,7 @@ namespace LanguageCore.Tokenizing
             CurrentToken.Position.AbsoluteRange.End = offsetTotal;
         }
 
+        /// <exception cref="Exception"/>
         protected static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
         {
             List<Token> result = new(tokens.Count);

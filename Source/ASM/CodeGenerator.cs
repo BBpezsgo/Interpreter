@@ -698,7 +698,7 @@ namespace LanguageCore.ASM.Generator
                 }
 
                 if (valueToPrintType.IsClass &&
-                    valueToPrintType == FindReplacedType("string", valueToPrint) &&
+                    valueToPrintType == FindTypeReplacer("string", valueToPrint) &&
                     valueToPrint is LiteralStatement stringLiteral)
                 {
                     string dataLabel = Builder.DataBuilder.NewString(stringLiteral.Value);

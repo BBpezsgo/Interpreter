@@ -17,6 +17,14 @@ namespace LanguageCore
 
     public static partial class Utils
     {
+        public static bool TryReplace(ref string @string, string oldValue, string? newValue)
+        {
+            string result = @string.Replace(oldValue, newValue, StringComparison.Ordinal);
+            bool replaced = !object.ReferenceEquals(result, @string);
+            @string = result;
+            return replaced;
+        }
+
         /// <summary>
         /// Source: <see href="https://stackoverflow.com/questions/3855956/check-if-an-executable-exists-in-the-windows-path"/>
         /// </summary>

@@ -77,7 +77,7 @@ namespace LanguageCore
 
             result.Append(line.Replace('\t', ' '));
             result.AppendLine();
-            result.Append(' ', Math.Max(0, position.Range.Start.Character - 2));
+            result.Append(' ', Math.Max(0, position.Range.Start.Character));
             result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
             return result.ToString();
         }

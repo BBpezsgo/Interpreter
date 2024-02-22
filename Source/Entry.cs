@@ -24,6 +24,10 @@ namespace TheProgram
         /// <exception cref="NotImplementedException"/>
         public static void Run(ProgramArguments arguments)
         {
+            Output.SetProgramArguments(arguments);
+            ConsoleProgressBar.SetProgramArguments(arguments);
+            ConsoleProgressLabel.SetProgramArguments(arguments);
+
             if (arguments.IsEmpty)
             {
                 new LanguageCore.Interactive.Interactive().Run();
@@ -155,6 +159,8 @@ namespace TheProgram
                 }
                 case ProgramRunType.Brainfuck:
                 {
+                    Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
+
                     BrainfuckPrintFlags printFlags = BrainfuckPrintFlags.PrintMemory;
 
                     BrainfuckCompilerFlags compileOptions =
@@ -164,7 +170,7 @@ namespace TheProgram
 
                     BrainfuckGeneratorResult generated;
                     Token[] tokens;
-                    BrainfuckGeneratorSettings generatorSettings =  arguments.BrainfuckGeneratorSettings;
+                    BrainfuckGeneratorSettings generatorSettings = arguments.BrainfuckGeneratorSettings;
 
                     AnalysisCollection analysisCollection = new();
                     if (arguments.ThrowErrors)
@@ -209,17 +215,23 @@ namespace TheProgram
                         Output.WriteLine();
                     }
 
-                    generated.Code = Minifier.Minify(generated.Code);
-
                     if ((compileOptions & BrainfuckCompilerFlags.PrintCompiledMinimized) != 0)
                     {
+                        Output.LogDebug($"Minify code ...");
+                        generated.Code = Minifier.Minify(generated.Code);
+
                         Output.WriteLine();
                         Output.WriteLine($" === MINIFIED ===");
                         BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
                         Output.WriteLine();
                     }
 
-                    generated.Code = Minifier.Minify(BrainfuckCode.RemoveNoncodes(generated.Code));
+                    generated.Code = BrainfuckCode.RemoveNoncodes(generated.Code, true);
+
+                    Output.LogDebug($"Minify code ...");
+                    int prevCodeLength = generated.Code.Length;
+                    generated.Code = Minifier.Minify(generated.Code);
+                    Output.LogDebug($"Minification: {prevCodeLength} -> {generated.Code.Length} ({((float)generated.Code.Length - prevCodeLength) / (float)generated.Code.Length * 100f:#} %)");
 
                     if ((compileOptions & BrainfuckCompilerFlags.PrintFinal) != 0)
                     {
@@ -300,7 +312,7 @@ namespace TheProgram
 
                             for (int i = 0; i < finalIndex; i++)
                             {
-                                if (i % 16 == 0 && i > 0)
+                                if (i % 15 == 0 && i > 0)
                                 { Console.WriteLine(); }
 
                                 byte cell = interpreter.Memory[i];
@@ -345,7 +357,7 @@ namespace TheProgram
                                 Console.ForegroundColor = fg;
                                 Console.BackgroundColor = bg;
 
-                                Console.Write($" {cell} ");
+                                Console.Write($"{cell,3} ");
                                 Console.ResetColor();
                             }
 

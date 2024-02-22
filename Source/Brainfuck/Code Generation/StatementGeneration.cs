@@ -231,7 +231,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (SafeToDiscardVariable(value, variable))
             { VariableCanBeDiscarded = variable.Name; }
 
-            using (Code.Block($"Set variable \"{variable.Name}\" (at {variable.Address}) to {value}"))
+            using (CommentBlock($"Set variable \"{variable.Name}\" (at {variable.Address}) to {value}"))
             {
                 if (TryCompute(value, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out DataItem constantValue))
                 {
@@ -303,12 +303,12 @@ namespace LanguageCore.Brainfuck.Generator
                     { throw new CompilerException($"Variable and value size mismatch ({variable.Size} != {valueSize})", value, CurrentFile); }
                 }
 
-                using (Code.Block($"Compute value"))
+                using (CommentBlock($"Compute value"))
                 {
                     GenerateCodeForStatement(value);
                 }
 
-                using (Code.Block($"Store computed value (from {Stack.LastAddress}) to {variable.Address}"))
+                using (CommentBlock($"Store computed value (from {Stack.LastAddress}) to {variable.Address}"))
                 { Stack.PopAndStore(variable.Address); }
 
                 UndiscardVariable(Variables, variable.Name);
@@ -367,7 +367,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         void CompileSetter(int address, StatementWithValue value)
         {
-            using (Code.Block($"Set value {value} to address {address}"))
+            using (CommentBlock($"Set value {value} to address {address}"))
             {
                 if (TryCompute(value, null, out DataItem constantValue))
                 {
@@ -383,14 +383,14 @@ namespace LanguageCore.Brainfuck.Generator
 
                 int stackSize = Stack.Size;
 
-                using (Code.Block($"Compute value"))
+                using (CommentBlock($"Compute value"))
                 {
                     GenerateCodeForStatement(value);
                 }
 
                 int variableSize = Stack.Size - stackSize;
 
-                using (Code.Block($"Store computed value (from {Stack.LastAddress}) to {address}"))
+                using (CommentBlock($"Store computed value (from {Stack.LastAddress}) to {address}"))
                 { Stack.PopAndStore(address); }
             }
         }
@@ -442,7 +442,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (variable.IsDiscarded)
             { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", _variableIdentifier, CurrentFile); }
 
-            using (Code.Block($"Set array (variable {variable.Name}) index ({statement.Expression}) (at {variable.Address}) to {value}"))
+            using (CommentBlock($"Set array (variable {variable.Name}) index ({statement.Expression}) (at {variable.Address}) to {value}"))
             {
                 if (!variable.Type.IsStackArray)
                 { throw new CompilerException($"Index setter for type \"{variable.Type}\" not found", statement, CurrentFile); }
@@ -458,11 +458,11 @@ namespace LanguageCore.Brainfuck.Generator
                 { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", value, CurrentFile); }
 
                 int indexAddress = Stack.NextAddress;
-                using (Code.Block($"Compute index"))
+                using (CommentBlock($"Compute index"))
                 { GenerateCodeForStatement(statement.Expression); }
 
                 int valueAddress = Stack.NextAddress;
-                using (Code.Block($"Compute value"))
+                using (CommentBlock($"Compute value"))
                 { GenerateCodeForStatement(value); }
 
                 int temp0 = Stack.PushVirtual(1);
@@ -587,7 +587,7 @@ namespace LanguageCore.Brainfuck.Generator
                 int resultAddress = Stack.PushVirtual(elementSize);
 
                 int indexAddress = Stack.NextAddress;
-                using (Code.Block($"Compute index"))
+                using (CommentBlock($"Compute index"))
                 { GenerateCodeForStatement(indexCall.Expression); }
 
                 Code.ARRAY_GET(arrayAddress, indexAddress, resultAddress);
@@ -641,10 +641,10 @@ namespace LanguageCore.Brainfuck.Generator
                 }
             }
 
-            using (Code.Block($"If ({@if.Condition})"))
+            using (CommentBlock($"If ({@if.Condition})"))
             {
                 int conditionAddress = Stack.NextAddress;
-                using (Code.Block("Compute condition"))
+                using (CommentBlock("Compute condition"))
                 { GenerateCodeForStatement(@if.Condition); }
 
                 using (this.DebugBlock(@if.Condition))
@@ -659,7 +659,7 @@ namespace LanguageCore.Brainfuck.Generator
                     Code.JumpStart(conditionAddress);
                 }
 
-                using (Code.Block("The if statements"))
+                using (CommentBlock("The if statements"))
                 {
                     GenerateCodeForStatement(Block.CreateIfNotBlock(@if.Block));
                 }
@@ -670,7 +670,7 @@ namespace LanguageCore.Brainfuck.Generator
                 {
                     // using (this.DebugBlock(@if.Block.BracketEnd))
                     // {
-                    using (Code.Block("Cleanup condition"))
+                    using (CommentBlock("Cleanup condition"))
                     {
                         Code.ClearValue(conditionAddress);
                         Code.JumpEnd(conditionAddress);
@@ -680,11 +680,11 @@ namespace LanguageCore.Brainfuck.Generator
                 }
                 else
                 {
-                    using (Code.Block("Else"))
+                    using (CommentBlock("Else"))
                     {
                         // using (this.DebugBlock(@if.Block.BracketEnd))
                         // {
-                        using (Code.Block("Finish if statement"))
+                        using (CommentBlock("Finish if statement"))
                         {
                             Code.MoveValue(conditionAddress, conditionAddress + 1);
                             Code.JumpEnd(conditionAddress);
@@ -694,7 +694,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                         using (this.DebugBlock(@if.NextLink.Keyword))
                         {
-                            // using (Code.Block($"Invert condition (at {conditionAddress}) result (to {conditionAddress + 1})"))
+                            // using (CommentBlock($"Invert condition (at {conditionAddress}) result (to {conditionAddress + 1})"))
                             // { Code.LOGIC_NOT(conditionAddress, conditionAddress + 1); }
 
                             Code.CommentLine($"Pointer: {Code.Pointer}");
@@ -703,17 +703,17 @@ namespace LanguageCore.Brainfuck.Generator
 
                             Code.CommentLine($"ELSE flag is at {elseFlagAddress}");
 
-                            using (Code.Block("Set ELSE flag"))
+                            using (CommentBlock("Set ELSE flag"))
                             { Code.SetValue(elseFlagAddress, 1); }
 
-                            using (Code.Block("If previous \"if\" condition is true"))
+                            using (CommentBlock("If previous \"if\" condition is true"))
                             {
                                 Code.JumpStart(conditionAddress);
 
-                                using (Code.Block("Reset ELSE flag"))
+                                using (CommentBlock("Reset ELSE flag"))
                                 { Code.ClearValue(elseFlagAddress); }
 
-                                using (Code.Block("Reset condition"))
+                                using (CommentBlock("Reset condition"))
                                 { Code.ClearValue(conditionAddress); }
 
                                 Code.JumpEnd(conditionAddress);
@@ -724,24 +724,24 @@ namespace LanguageCore.Brainfuck.Generator
                             Code.CommentLine($"Pointer: {Code.Pointer}");
                         }
 
-                        using (Code.Block($"If ELSE flag set (previous \"if\" condition is false)"))
+                        using (CommentBlock($"If ELSE flag set (previous \"if\" condition is false)"))
                         {
                             Code.JumpStart(conditionAddress);
 
                             if (@if.NextLink is LinkedElse elseBlock)
                             {
-                                using (Code.Block("Block (else)"))
+                                using (CommentBlock("Block (else)"))
                                 { GenerateCodeForStatement(Block.CreateIfNotBlock(elseBlock.Block)); }
                             }
                             else if (@if.NextLink is LinkedIf elseIf)
                             {
-                                using (Code.Block("Block (else if)"))
+                                using (CommentBlock("Block (else if)"))
                                 { GenerateCodeForStatement(elseIf, true); }
                             }
                             else
                             { throw new UnreachableException(); }
 
-                            using (Code.Block($"Reset ELSE flag"))
+                            using (CommentBlock($"Reset ELSE flag"))
                             { Code.ClearValue(conditionAddress); }
 
                             Code.JumpEnd(conditionAddress);
@@ -766,24 +766,24 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(WhileLoop @while)
         {
-            using (Code.Block($"While ({@while.Condition})"))
+            using (CommentBlock($"While ({@while.Condition})"))
             {
                 int conditionAddress = Stack.NextAddress;
-                using (Code.Block("Compute condition"))
+                using (CommentBlock("Compute condition"))
                 { GenerateCodeForStatement(@while.Condition); }
 
                 Code.CommentLine($"Condition result at {conditionAddress}");
 
                 BreakTagStack.Push(Stack.Push(1));
 
-                using (Code.Jump(conditionAddress))
+                using (JumpBlock(conditionAddress))
                 {
-                    using (Code.Block("The while statements"))
+                    using (CommentBlock("The while statements"))
                     {
                         GenerateCodeForStatement(Block.CreateIfNotBlock(@while.Block));
                     }
 
-                    using (Code.Block("Compute condition again"))
+                    using (CommentBlock("Compute condition again"))
                     {
                         GenerateCodeForStatement(@while.Condition);
                         Stack.PopAndStore(conditionAddress);
@@ -794,7 +794,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                         Code.CopyValue(ReturnTagStack[^1], tempAddress);
                         Code.LOGIC_NOT(tempAddress, tempAddress + 1);
-                        using (Code.Jump(tempAddress))
+                        using (JumpBlock(tempAddress))
                         {
                             Code.SetValue(conditionAddress, 0);
                             Code.ClearValue(tempAddress);
@@ -802,7 +802,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                         Code.CopyValue(BreakTagStack[^1], tempAddress);
                         Code.LOGIC_NOT(tempAddress, tempAddress + 1);
-                        using (Code.Jump(tempAddress))
+                        using (JumpBlock(tempAddress))
                         {
                             Code.SetValue(conditionAddress, 0);
                             Code.ClearValue(tempAddress);
@@ -891,15 +891,15 @@ namespace LanguageCore.Brainfuck.Generator
                 { }
             }
 
-            using (Code.Block($"For"))
+            using (CommentBlock($"For"))
             {
                 VariableCleanupStack.Push(PrecompileVariable(@for.VariableDeclaration));
 
-                using (Code.Block("Variable Declaration"))
+                using (CommentBlock("Variable Declaration"))
                 { GenerateCodeForStatement(@for.VariableDeclaration); }
 
                 int conditionAddress = Stack.NextAddress;
-                using (Code.Block("Compute condition"))
+                using (CommentBlock("Compute condition"))
                 { GenerateCodeForStatement(@for.Condition); }
 
                 Code.CommentLine($"Condition result at {conditionAddress}");
@@ -908,17 +908,17 @@ namespace LanguageCore.Brainfuck.Generator
 
                 Code.JumpStart(conditionAddress);
 
-                using (Code.Block("The while statements"))
+                using (CommentBlock("The while statements"))
                 {
                     GenerateCodeForStatement(Block.CreateIfNotBlock(@for.Block));
                 }
 
-                using (Code.Block("Compute expression"))
+                using (CommentBlock("Compute expression"))
                 {
                     GenerateCodeForStatement(@for.Expression);
                 }
 
-                using (Code.Block("Compute condition again"))
+                using (CommentBlock("Compute condition again"))
                 {
                     GenerateCodeForStatement(@for.Condition);
                     Stack.PopAndStore(conditionAddress);
@@ -1219,14 +1219,14 @@ namespace LanguageCore.Brainfuck.Generator
                         return;
                     }
 
-                    using (Code.Block($"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
+                    using (CommentBlock($"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
                     {
-                        using (Code.Block($"Compute value"))
+                        using (CommentBlock($"Compute value"))
                         {
                             GenerateCodeForStatement(statement.Right);
                         }
 
-                        using (Code.Block($"Set computed value to {variable.Address}"))
+                        using (CommentBlock($"Set computed value to {variable.Address}"))
                         {
                             Stack.Pop(address => Code.MoveAddValue(address, variable.Address));
                         }
@@ -1277,14 +1277,14 @@ namespace LanguageCore.Brainfuck.Generator
                         return;
                     }
 
-                    using (Code.Block($"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
+                    using (CommentBlock($"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
                     {
-                        using (Code.Block($"Compute value"))
+                        using (CommentBlock($"Compute value"))
                         {
                             GenerateCodeForStatement(statement.Right);
                         }
 
-                        using (Code.Block($"Set computed value to {variable.Address}"))
+                        using (CommentBlock($"Set computed value to {variable.Address}"))
                         {
                             Stack.Pop(address => Code.MoveSubValue(address, variable.Address));
                         }
@@ -1324,7 +1324,7 @@ namespace LanguageCore.Brainfuck.Generator
                         if (variable.Size != 1)
                         { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
 
-                        using (Code.Block($"Increment variable {variable.Name} (at {variable.Address})"))
+                        using (CommentBlock($"Increment variable {variable.Name} (at {variable.Address})"))
                         {
                             Code.AddValue(variable.Address, 1);
                         }
@@ -1349,7 +1349,7 @@ namespace LanguageCore.Brainfuck.Generator
                         if (variable.Size != 1)
                         { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
 
-                        using (Code.Block($"Decrement variable {variable.Name} (at {variable.Address})"))
+                        using (CommentBlock($"Decrement variable {variable.Name} (at {variable.Address})"))
                         {
                             Code.AddValue(variable.Address, -1);
                         }
@@ -1484,7 +1484,7 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(Literal statement)
         {
-            using (Code.Block($"Set {statement} to address {Stack.NextAddress}"))
+            using (CommentBlock($"Set {statement} to address {Stack.NextAddress}"))
             {
                 switch (statement.Type)
                 {
@@ -1537,7 +1537,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 int loadTarget = Stack.PushVirtual(variableSize);
 
-                using (Code.Block($"Load variable \"{variable.Name}\" (from {variable.Address}) to {loadTarget}"))
+                using (CommentBlock($"Load variable \"{variable.Name}\" (from {variable.Address}) to {loadTarget}"))
                 {
                     for (int offset = 0; offset < variableSize; offset++)
                     {
@@ -1562,7 +1562,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             if (GetConstant(statement.Content, out DataItem constant))
             {
-                using (Code.Block($"Load constant {statement.Content} (with value {constant})"))
+                using (CommentBlock($"Load constant {statement.Content} (with value {constant})"))
                 {
                     Stack.Push(constant);
                 }
@@ -1616,21 +1616,21 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            using (Code.Block($"Expression {statement.Left} {statement.Operator} {statement.Right}"))
+            using (CommentBlock($"Expression {statement.Left} {statement.Operator} {statement.Right}"))
             {
                 switch (statement.Operator.Content)
                 {
                     case "==":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block("Compute equality"))
+                        using (CommentBlock("Compute equality"))
                         {
                             Code.LOGIC_EQ(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
                         }
@@ -1642,14 +1642,14 @@ namespace LanguageCore.Brainfuck.Generator
                     case "+":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Move & add right-side (from {rightAddress}) to left-side (to {leftAddress})"))
+                        using (CommentBlock($"Move & add right-side (from {rightAddress}) to left-side (to {leftAddress})"))
                         { Code.MoveAddValue(rightAddress, leftAddress); }
 
                         Stack.PopVirtual();
@@ -1678,14 +1678,14 @@ namespace LanguageCore.Brainfuck.Generator
                         }
 
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Move & sub right-side (from {rightAddress}) from left-side (to {leftAddress})"))
+                        using (CommentBlock($"Move & sub right-side (from {rightAddress}) from left-side (to {leftAddress})"))
                         { Code.MoveSubValue(rightAddress, leftAddress); }
 
                         Stack.PopVirtual();
@@ -1700,10 +1700,10 @@ namespace LanguageCore.Brainfuck.Generator
                                 string.Equals(identifier1.Content, identifier2.Content))
                             {
                                 int leftAddress_ = Stack.NextAddress;
-                                using (Code.Block("Compute left-side value (right-side is the same)"))
+                                using (CommentBlock("Compute left-side value (right-side is the same)"))
                                 { GenerateCodeForStatement(statement.Left); }
 
-                                using (Code.Block($"Snippet MATH_MUL_SELF({leftAddress_})"))
+                                using (CommentBlock($"Snippet MATH_MUL_SELF({leftAddress_})"))
                                 {
                                     Code.MATH_MUL_SELF(leftAddress_, leftAddress_ + 1, leftAddress_ + 2);
                                     Optimizations++;
@@ -1713,14 +1713,14 @@ namespace LanguageCore.Brainfuck.Generator
                         }
 
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet MULTIPLY({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet MULTIPLY({leftAddress} {rightAddress})"))
                         {
                             Code.MULTIPLY(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
                         }
@@ -1732,14 +1732,14 @@ namespace LanguageCore.Brainfuck.Generator
                     case "/":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet DIVIDE({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet DIVIDE({leftAddress} {rightAddress})"))
                         {
                             Code.MATH_DIV(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3, rightAddress + 4);
                         }
@@ -1751,14 +1751,14 @@ namespace LanguageCore.Brainfuck.Generator
                     case "%":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet MOD({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet MOD({leftAddress} {rightAddress})"))
                         {
                             Code.MATH_MOD(leftAddress, rightAddress, rightAddress + 1);
                         }
@@ -1770,14 +1770,14 @@ namespace LanguageCore.Brainfuck.Generator
                     case "<":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet LT({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet LT({leftAddress} {rightAddress})"))
                         {
                             Code.LOGIC_LT(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
                         }
@@ -1789,14 +1789,14 @@ namespace LanguageCore.Brainfuck.Generator
                     case ">":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet MT({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet MT({leftAddress} {rightAddress})"))
                         {
                             Code.LOGIC_MT(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3);
                         }
@@ -1810,14 +1810,14 @@ namespace LanguageCore.Brainfuck.Generator
                     case ">=":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet LTEQ({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet LTEQ({leftAddress} {rightAddress})"))
                         {
                             Code.LOGIC_LT(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
                             Stack.Pop();
@@ -1830,14 +1830,14 @@ namespace LanguageCore.Brainfuck.Generator
                     case "<=":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet LTEQ({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet LTEQ({leftAddress} {rightAddress})"))
                         {
                             Code.LOGIC_LTEQ(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
                         }
@@ -1849,14 +1849,14 @@ namespace LanguageCore.Brainfuck.Generator
                     case "!=":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet NEQ({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet NEQ({leftAddress} {rightAddress})"))
                         {
                             Code.LOGIC_NEQ(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
                         }
@@ -1868,7 +1868,7 @@ namespace LanguageCore.Brainfuck.Generator
                     case "&&":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int tempLeftAddress = Stack.PushVirtual(1);
@@ -1877,10 +1877,10 @@ namespace LanguageCore.Brainfuck.Generator
                         Code.JumpStart(tempLeftAddress);
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet AND({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet AND({leftAddress} {rightAddress})"))
                         { Code.LOGIC_AND(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2); }
 
                         Stack.Pop(); // Pop rightAddress
@@ -1893,7 +1893,7 @@ namespace LanguageCore.Brainfuck.Generator
                     case "||":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         int tempLeftAddress = Stack.PushVirtual(1);
@@ -1903,10 +1903,10 @@ namespace LanguageCore.Brainfuck.Generator
                         Code.JumpStart(tempLeftAddress);
 
                         int rightAddress = Stack.NextAddress;
-                        using (Code.Block("Compute right-side value"))
+                        using (CommentBlock("Compute right-side value"))
                         { GenerateCodeForStatement(statement.Right!); }
 
-                        using (Code.Block($"Snippet AND({leftAddress} {rightAddress})"))
+                        using (CommentBlock($"Snippet AND({leftAddress} {rightAddress})"))
                         { Code.LOGIC_OR(leftAddress, rightAddress, rightAddress + 1); }
 
                         Stack.Pop(); // Pop rightAddress
@@ -1919,7 +1919,7 @@ namespace LanguageCore.Brainfuck.Generator
                     case "<<":
                     {
                         int valueAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         if (!TryCompute(statement.Right, null, out DataItem offsetConst))
@@ -1932,7 +1932,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                             int offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
 
-                            using (Code.Block($"Snippet MULTIPLY({valueAddress} {offsetAddress})"))
+                            using (CommentBlock($"Snippet MULTIPLY({valueAddress} {offsetAddress})"))
                             {
                                 Code.MULTIPLY(valueAddress, offsetAddress, offsetAddress + 1, offsetAddress + 2);
                             }
@@ -1945,7 +1945,7 @@ namespace LanguageCore.Brainfuck.Generator
                     case ">>":
                     {
                         int valueAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         if (!TryCompute(statement.Right, null, out DataItem offsetConst))
@@ -1958,7 +1958,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                             int offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
 
-                            using (Code.Block($"Snippet MATH_DIV({valueAddress} {offsetAddress})"))
+                            using (CommentBlock($"Snippet MATH_DIV({valueAddress} {offsetAddress})"))
                             {
                                 Code.MATH_DIV(valueAddress, offsetAddress, offsetAddress + 1, offsetAddress + 2, offsetAddress + 3, offsetAddress + 4);
                             }
@@ -1971,7 +1971,7 @@ namespace LanguageCore.Brainfuck.Generator
                     case "!":
                     {
                         int leftAddress = Stack.NextAddress;
-                        using (Code.Block("Compute left-side value"))
+                        using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
                         Code.LOGIC_NOT(leftAddress, leftAddress + 1);
@@ -1983,12 +1983,12 @@ namespace LanguageCore.Brainfuck.Generator
                         if (TryCompute(statement.Right, null, out DataItem right) && right == 1)
                         {
                             int leftAddress = Stack.NextAddress;
-                            using (Code.Block("Compute left-side value"))
+                            using (CommentBlock("Compute left-side value"))
                             { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.Push(2);
 
-                            using (Code.Block($"Snippet MOD({leftAddress} {rightAddress})"))
+                            using (CommentBlock($"Snippet MOD({leftAddress} {rightAddress})"))
                             {
                                 Code.MATH_MOD(leftAddress, rightAddress, rightAddress + 1);
                             }
@@ -2071,16 +2071,16 @@ namespace LanguageCore.Brainfuck.Generator
                     { throw new CompilerException($"Address value must be a byte (not {constant.Value.Type})", identifier); }
 
                     byte address = (byte)constant.Value;
-                    using (Code.Block($"Load value from address {address}"))
+                    using (CommentBlock($"Load value from address {address}"))
                     {
                         this.Stack.PushVirtual(1);
 
                         int nextAddress = Stack.NextAddress;
 
-                        using (Code.Block($"Move {address} to {nextAddress} and {nextAddress + 1}"))
+                        using (CommentBlock($"Move {address} to {nextAddress} and {nextAddress + 1}"))
                         { Code.MoveValue(address, nextAddress, nextAddress + 1); }
 
-                        using (Code.Block($"Move {nextAddress + 1} to {address}"))
+                        using (CommentBlock($"Move {nextAddress + 1} to {address}"))
                         { Code.MoveValue(nextAddress + 1, address); }
                     }
 
@@ -2168,7 +2168,7 @@ namespace LanguageCore.Brainfuck.Generator
                     if (fieldType.IsGeneric && !instanceType.Class.CurrentTypeArguments.TryGetValue(fieldType.Name, out fieldType))
                     { throw new CompilerException($"Type argument \"{fieldType?.Name}\" not found", field, instanceType.Class.FilePath); }
 
-                    using (Code.Block($"Create Field '{field.Identifier.Content}' ({fieldIndex})"))
+                    using (CommentBlock($"Create Field '{field.Identifier.Content}' ({fieldIndex})"))
                     {
                         GenerateInitialValue(fieldType, j =>
                         {
@@ -2199,11 +2199,11 @@ namespace LanguageCore.Brainfuck.Generator
                     int requiredSizeAddress = Stack.Push(@class.Size);
                     int tempAddressesStart = Stack.PushVirtual(1);
 
-                    using (Code.Block($"Allocate (size: {@class.Size} (at {requiredSizeAddress}) result at: {pointerAddress})"))
+                    using (CommentBlock($"Allocate (size: {@class.Size} (at {requiredSizeAddress}) result at: {pointerAddress})"))
                     {
                         Heap.Allocate(pointerAddress, requiredSizeAddress, tempAddressesStart);
 
-                        using (Code.Block("Clear temps (5x pop)"))
+                        using (CommentBlock("Clear temps (5x pop)"))
                         {
                             Stack.Pop();
                             Stack.Pop();
@@ -2211,19 +2211,19 @@ namespace LanguageCore.Brainfuck.Generator
                     }
                 }
 
-                using (Code.Block($"Generate fields"))
+                using (CommentBlock($"Generate fields"))
                 {
                     int currentOffset = 0;
                     for (int fieldIndex = 0; fieldIndex < @class.Fields.Length; fieldIndex++)
                     {
                         CompiledField field = @class.Fields[fieldIndex];
-                        using (Code.Block($"Field #{fieldIndex} (\"{field.Identifier.Content}\")"))
+                        using (CommentBlock($"Field #{fieldIndex} (\"{field.Identifier.Content}\")"))
                         {
                             var initialValue = GetInitialValue(field.Type);
 
                             int fieldPointerAddress = Stack.PushVirtual(1);
 
-                            using (Code.Block($"Compute field address (at {fieldPointerAddress})"))
+                            using (CommentBlock($"Compute field address (at {fieldPointerAddress})"))
                             {
                                 Code.CopyValue(pointerAddress, fieldPointerAddress);
                                 Code.AddValue(fieldPointerAddress, currentOffset);
@@ -2231,13 +2231,13 @@ namespace LanguageCore.Brainfuck.Generator
 
                             int initialValueAddress;
 
-                            using (Code.Block($"Push initial value"))
+                            using (CommentBlock($"Push initial value"))
                             { initialValueAddress = Stack.Push(initialValue); }
 
-                            using (Code.Block($"Heap.Set({fieldPointerAddress} {initialValueAddress})"))
+                            using (CommentBlock($"Heap.Set({fieldPointerAddress} {initialValueAddress})"))
                             { Heap.Set(fieldPointerAddress, initialValueAddress); }
 
-                            using (Code.Block("Cleanup"))
+                            using (CommentBlock("Cleanup"))
                             {
                                 Stack.Pop();
                                 Stack.Pop();
@@ -2270,7 +2270,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             if (TryGetAddress(field, out int address, out int size))
             {
-                using (Code.Block($"Load field {field} (from {address})"))
+                using (CommentBlock($"Load field {field} (from {address})"))
                 {
                     if (size <= 0)
                     { throw new CompilerException($"Can't load field \"{field}\" because it's size is {size} (bruh)", field, CurrentFile); }
@@ -2381,7 +2381,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (value.Type == RuntimeType.UInt16)
             {
                 int tempAddress = Stack.NextAddress;
-                using (Code.Block($"Print character '{value.ValueUInt16}' (on address {tempAddress})"))
+                using (CommentBlock($"Print character '{value.ValueUInt16}' (on address {tempAddress})"))
                 {
                     Code.SetValue(tempAddress, value.ValueUInt16);
                     Code.SetPointer(tempAddress);
@@ -2395,12 +2395,12 @@ namespace LanguageCore.Brainfuck.Generator
             if (value.Type == RuntimeType.UInt8)
             {
                 int tempAddress = Stack.NextAddress;
-                using (Code.Block($"Print number {value.ValueUInt8} as text (on address {tempAddress})"))
+                using (CommentBlock($"Print number {value.ValueUInt8} as text (on address {tempAddress})"))
                 {
                     Code.SetValue(tempAddress, value.ValueUInt8);
                     Code.SetPointer(tempAddress);
 
-                    using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                    using (CommentBlock($"SNIPPET OUT_AS_STRING"))
                     { Code += Snippets.OUT_AS_STRING; }
                     Code.ClearValue(tempAddress);
                     Code.SetPointer(0);
@@ -2411,12 +2411,12 @@ namespace LanguageCore.Brainfuck.Generator
             if (value.Type == RuntimeType.SInt32)
             {
                 int tempAddress = Stack.NextAddress;
-                using (Code.Block($"Print number {value.ValueSInt32} as text (on address {tempAddress})"))
+                using (CommentBlock($"Print number {value.ValueSInt32} as text (on address {tempAddress})"))
                 {
                     Code.SetValue(tempAddress, value.ValueSInt32);
                     Code.SetPointer(tempAddress);
 
-                    using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                    using (CommentBlock($"SNIPPET OUT_AS_STRING"))
                     { Code += Snippets.OUT_AS_STRING; }
                     Code.ClearValue(tempAddress);
                     Code.SetPointer(0);
@@ -2428,7 +2428,7 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForPrinter(string value)
         {
-            using (Code.Block($"Print string value \"{value}\""))
+            using (CommentBlock($"Print string value \"{value}\""))
             {
                 int address = Stack.NextAddress;
 
@@ -2476,11 +2476,11 @@ namespace LanguageCore.Brainfuck.Generator
             if (!valueType.IsBuiltin)
             { throw new NotSupportedException($"Only built-in types or string literals (not \"{valueType}\") supported by the output printer in brainfuck", value, CurrentFile); }
 
-            using (Code.Block($"Print value {value} as text"))
+            using (CommentBlock($"Print value {value} as text"))
             {
                 int address = Stack.NextAddress;
 
-                using (Code.Block($"Compute value"))
+                using (CommentBlock($"Compute value"))
                 { GenerateCodeForStatement(value); }
 
                 Code.CommentLine($"Computed value is on {address}");
@@ -2490,15 +2490,15 @@ namespace LanguageCore.Brainfuck.Generator
                 switch (valueType.BuiltinType)
                 {
                     case Type.Byte:
-                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                        using (CommentBlock($"SNIPPET OUT_AS_STRING"))
                         { Code += Snippets.OUT_AS_STRING; }
                         break;
                     case Type.Integer:
-                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                        using (CommentBlock($"SNIPPET OUT_AS_STRING"))
                         { Code += Snippets.OUT_AS_STRING; }
                         break;
                     case Type.Float:
-                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                        using (CommentBlock($"SNIPPET OUT_AS_STRING"))
                         { Code += Snippets.OUT_AS_STRING; }
                         break;
                     case Type.Char:
@@ -2511,7 +2511,7 @@ namespace LanguageCore.Brainfuck.Generator
                         throw new CompilerException($"Invalid type {valueType.BuiltinType}");
                 }
 
-                using (Code.Block($"Clear address {address}"))
+                using (CommentBlock($"Clear address {address}"))
                 { Code.ClearValue(address); }
 
                 Stack.PopVirtual();
@@ -2556,7 +2556,7 @@ namespace LanguageCore.Brainfuck.Generator
         {
             if (value.Type == RuntimeType.BYTE)
             {
-                using (Code.Block($"Print value {value.ValueByte}"))
+                using (CommentBlock($"Print value {value.ValueByte}"))
                 {
                     Code.SetPointer(Stack.NextAddress);
                     Code.ClearCurrent();
@@ -2572,7 +2572,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             if (value.Type == RuntimeType.INT)
             {
-                using (Code.Block($"Print value {value.ValueInt}"))
+                using (CommentBlock($"Print value {value.ValueInt}"))
                 {
                     Code.SetPointer(Stack.NextAddress);
                     Code.ClearCurrent();
@@ -2588,7 +2588,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             if (value.Type == RuntimeType.CHAR)
             {
-                using (Code.Block($"Print value '{value.ValueChar}'"))
+                using (CommentBlock($"Print value '{value.ValueChar}'"))
                 {
                     Code.SetPointer(Stack.NextAddress);
                     Code.ClearCurrent();
@@ -2609,7 +2609,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (variable.IsDiscarded)
             { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", symbolPosition, CurrentFile); }
 
-            using (Code.Block($"Print variable (\"{variable.Name}\") (from {variable.Address}) value"))
+            using (CommentBlock($"Print variable (\"{variable.Name}\") (from {variable.Address}) value"))
             {
                 int size = variable.Size;
                 for (int offset = 0; offset < size; offset++)
@@ -2623,12 +2623,12 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void CompileRawValuePrinter(StatementWithValue value)
         {
-            using (Code.Block($"Print {value} as raw"))
+            using (CommentBlock($"Print {value} as raw"))
             {
-                using (Code.Block($"Compute value"))
+                using (CommentBlock($"Compute value"))
                 { Compile(value); }
 
-                using (Code.Block($"Print computed value"))
+                using (CommentBlock($"Print computed value"))
                 {
                     Stack.Pop(address =>
                     {
@@ -2699,13 +2699,13 @@ namespace LanguageCore.Brainfuck.Generator
             => GenerateCodeForLiteralString(literal.Value, literal);
         int GenerateCodeForLiteralString(string literal, IPositioned position)
         {
-            using (Code.Block($"Create String \"{literal}\""))
+            using (CommentBlock($"Create String \"{literal}\""))
             {
                 int pointerAddress = Stack.NextAddress;
-                using (Code.Block("Allocate String object {"))
+                using (CommentBlock("Allocate String object {"))
                 { Allocate(1 + literal.Length, position); }
 
-                using (Code.Block("Set String.length {"))
+                using (CommentBlock("Set String.length {"))
                 {
                     int valueAddress = Stack.Push(literal.Length);
                     int pointerAddressCopy = valueAddress + 1;
@@ -2717,7 +2717,7 @@ namespace LanguageCore.Brainfuck.Generator
                     Stack.Pop();
                 }
 
-                using (Code.Block("Set string data {"))
+                using (CommentBlock("Set string data {"))
                 {
                     for (int i = 0; i < literal.Length; i++)
                     {
@@ -3008,11 +3008,11 @@ namespace LanguageCore.Brainfuck.Generator
                     if (compiledParameter.Type != definedType)
                     { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
-                    using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
+                    using (CommentBlock($"SET {defined.Identifier.Content} TO _something_"))
                     {
                         GenerateCodeForStatement(value);
 
-                        using (Code.Block($"STORE LAST TO {compiledParameter.Address}"))
+                        using (CommentBlock($"STORE LAST TO {compiledParameter.Address}"))
                         { Stack.PopAndStore(compiledParameter.Address); }
                     }
                     continue;
@@ -3029,7 +3029,7 @@ namespace LanguageCore.Brainfuck.Generator
             CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
             using (DebugBlock(function.Block.BracketStart))
-            using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
+            using (CommentBlock($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
             {
                 int tagAddress = Stack.Push(1);
                 Code.CommentLine($"Tag address is {tagAddress}");
@@ -3039,7 +3039,7 @@ namespace LanguageCore.Brainfuck.Generator
             GenerateCodeForStatement(function.Block);
 
             using (DebugBlock(function.Block.BracketEnd))
-            using (Code.Block($"Finish \"return\" block"))
+            using (CommentBlock($"Finish \"return\" block"))
             {
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
                 { throw new InternalException(string.Empty, function.Block, function.FilePath); }
@@ -3048,7 +3048,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
             {
-                using (Code.Block($"Deallocate macro variables ({Variables.Count})"))
+                using (CommentBlock($"Deallocate macro variables ({Variables.Count})"))
                 {
                     for (int i = 0; i < Variables.Count; i++)
                     {
@@ -3068,7 +3068,7 @@ namespace LanguageCore.Brainfuck.Generator
                     }
                 }
 
-                using (Code.Block($"Clean up macro variables ({Variables.Count})"))
+                using (CommentBlock($"Clean up macro variables ({Variables.Count})"))
                 {
                     int n = Variables.Count;
                     for (int i = 0; i < n; i++)
@@ -3299,11 +3299,11 @@ namespace LanguageCore.Brainfuck.Generator
                     if (compiledParameter.Type != definedType)
                     { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
-                    using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
+                    using (CommentBlock($"SET {defined.Identifier.Content} TO _something_"))
                     {
                         GenerateCodeForStatement(value);
 
-                        using (Code.Block($"STORE LAST TO {compiledParameter.Address}"))
+                        using (CommentBlock($"STORE LAST TO {compiledParameter.Address}"))
                         { Stack.PopAndStore(compiledParameter.Address); }
                     }
                     continue;
@@ -3321,7 +3321,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             using (DebugBlock(function.Block.BracketStart))
             {
-                using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
+                using (CommentBlock($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
                 {
                     int tagAddress = Stack.Push(1);
                     Code.CommentLine($"Tag address is {tagAddress}");
@@ -3340,7 +3340,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
             {
-                using (Code.Block($"Deallocate macro variables ({Variables.Count})"))
+                using (CommentBlock($"Deallocate macro variables ({Variables.Count})"))
                 {
                     for (int i = 0; i < Variables.Count; i++)
                     {
@@ -3360,7 +3360,7 @@ namespace LanguageCore.Brainfuck.Generator
                     }
                 }
 
-                using (Code.Block($"Clean up macro variables ({Variables.Count})"))
+                using (CommentBlock($"Clean up macro variables ({Variables.Count})"))
                 {
                     int n = Variables.Count;
                     for (int i = 0; i < n; i++)
@@ -3515,11 +3515,11 @@ namespace LanguageCore.Brainfuck.Generator
                     if (compiledParameter.Type != definedType)
                     { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
-                    using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
+                    using (CommentBlock($"SET {defined.Identifier.Content} TO _something_"))
                     {
                         GenerateCodeForStatement(value);
 
-                        using (Code.Block($"STORE LAST TO {compiledParameter.Address}"))
+                        using (CommentBlock($"STORE LAST TO {compiledParameter.Address}"))
                         { Stack.PopAndStore(compiledParameter.Address); }
                     }
                 }
@@ -3535,7 +3535,7 @@ namespace LanguageCore.Brainfuck.Generator
             CompiledConstants.PushRange(constantParameters);
             CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
-            using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
+            using (CommentBlock($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
             {
                 int tagAddress = Stack.Push(1);
                 Code.CommentLine($"Tag address is {tagAddress}");
@@ -3550,9 +3550,9 @@ namespace LanguageCore.Brainfuck.Generator
                 Stack.Pop();
             }
 
-            using (Code.Block($"Clean up macro variables ({Variables.Count})"))
+            using (CommentBlock($"Clean up macro variables ({Variables.Count})"))
             {
-                using (Code.Block($"Deallocate macro variables ({Variables.Count})"))
+                using (CommentBlock($"Deallocate macro variables ({Variables.Count})"))
                 {
                     for (int i = 0; i < Variables.Count; i++)
                     {
@@ -3638,7 +3638,7 @@ namespace LanguageCore.Brainfuck.Generator
         void FinishReturnStatements()
         {
             int accumulatedReturnCount = ReturnCount.Pop();
-            using (Code.Block($"Finish {accumulatedReturnCount} \"return\" statements"))
+            using (CommentBlock($"Finish {accumulatedReturnCount} \"return\" statements"))
             {
                 Code.ClearValue(Stack.NextAddress);
                 Code.CommentLine($"Pointer: {Code.Pointer}");
@@ -3655,7 +3655,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (ReturnTagStack.Count <= 0)
             { return; }
 
-            using (Code.Block("Continue \"return\" statements"))
+            using (CommentBlock("Continue \"return\" statements"))
             {
                 Code.CopyValue(ReturnTagStack[^1], Stack.NextAddress);
                 Code.JumpStart(Stack.NextAddress);
@@ -3666,7 +3666,7 @@ namespace LanguageCore.Brainfuck.Generator
         void FinishBreakStatements()
         {
             int accumulatedBreakCount = BreakCount.Pop();
-            using (Code.Block($"Finish {accumulatedBreakCount} \"break\" statements"))
+            using (CommentBlock($"Finish {accumulatedBreakCount} \"break\" statements"))
             {
                 Code.ClearValue(Stack.NextAddress);
                 Code.CommentLine($"Pointer: {Code.Pointer}");
@@ -3683,7 +3683,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (BreakTagStack.Count <= 0)
             { return; }
 
-            using (Code.Block("Continue \"break\" statements"))
+            using (CommentBlock("Continue \"break\" statements"))
             {
                 Code.CopyValue(BreakTagStack[^1], Stack.NextAddress);
 

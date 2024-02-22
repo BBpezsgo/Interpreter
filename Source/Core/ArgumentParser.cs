@@ -30,11 +30,12 @@ namespace TheProgram
         public bool ConsoleGUI;
 
         public bool DoNotPause;
+        public bool ShowProgress;
 
         public static ProgramArguments Default => new()
         {
             ThrowErrors = false,
-            LogFlags = LogType.System | LogType.Debug | LogType.Normal | LogType.Warning | LogType.Error,
+            LogFlags = LogType.Debug | LogType.Normal | LogType.Warning | LogType.Error,
             RunType = ProgramRunType.Normal,
             CompilerSettings = LanguageCore.Compiler.CompilerSettings.Default,
             GeneratorSettings = LanguageCore.Compiler.GeneratorSettings.Default,
@@ -43,6 +44,7 @@ namespace TheProgram
             ConsoleGUI = false,
             DoNotPause = false,
             File = null,
+            ShowProgress = false,
         };
     }
 
@@ -176,6 +178,12 @@ namespace TheProgram
                 int i = 0;
                 while (i < args.Length - 1)
                 {
+                    if (ExpectArg(args, ref i, out _, "--show-progress", "-sp"))
+                    {
+                        result.ShowProgress = true;
+                        continue;
+                    }
+
                     if (ExpectArg(args, ref i, out _, "--dont-normalize-args", "-nna"))
                     {
                         continue;
@@ -254,12 +262,6 @@ namespace TheProgram
                     if (ExpectArg(args, ref i, out _, "--hide-debug", "-hd"))
                     {
                         result.LogFlags &= ~LogType.Debug;
-                        continue;
-                    }
-
-                    if (ExpectArg(args, ref i, out _, "--hide-system", "-hs"))
-                    {
-                        result.LogFlags &= ~LogType.System;
                         continue;
                     }
 

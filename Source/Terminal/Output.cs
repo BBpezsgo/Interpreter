@@ -12,7 +12,6 @@ namespace LanguageCore
 
         public static bool LogDebugs => (arguments.LogFlags & LogType.Debug) != 0;
         public static bool LogInfos => (arguments.LogFlags & LogType.Normal) != 0;
-        public static bool LogSystems => (arguments.LogFlags & LogType.System) != 0;
         public static bool LogWarnings => (arguments.LogFlags & LogType.Warning) != 0;
 
         public static void SetProgramArguments(ProgramArguments arguments) => Output.arguments = arguments;
@@ -21,9 +20,6 @@ namespace LanguageCore
         {
             switch (logType)
             {
-                case LogType.System:
-                    if (LogSystems) Console.WriteLine(message);
-                    break;
                 case LogType.Normal:
                     Output.LogInfo(message);
                     break;
@@ -131,7 +127,6 @@ namespace LanguageCore
     [Flags]
     public enum LogType
     {
-        System = 0b_00001,
         Normal = 0b_00010,
         Warning = 0b_00100,
         Error = 0b_01000,

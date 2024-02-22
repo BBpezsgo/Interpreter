@@ -30,126 +30,6 @@ namespace LanguageCore.Brainfuck.Generator
         }
     }
 
-    readonly struct ConsoleProgressBar : IDisposable
-    {
-        readonly int Line;
-        readonly ConsoleColor Color;
-        readonly bool Show;
-
-        public ConsoleProgressBar(ConsoleColor color, bool show)
-        {
-            Line = 0;
-            Color = color;
-            Show = show;
-
-            if (!Show) return;
-
-            Line = Console.GetCursorPosition().Top;
-            Console.WriteLine();
-        }
-
-        public void Print(int iterator, int count) => Print((float)(iterator) / (float)count);
-        public void Print(float progress)
-        {
-            if (!Show) return;
-
-            (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
-
-            Console.SetCursorPosition(0, Line);
-
-            int width = Console.WindowWidth;
-            Console.ForegroundColor = Color;
-            for (int i = 0; i < width; i++)
-            {
-                float v = (float)(i + 1) / (float)(width);
-                if (v <= progress)
-                { Console.Write('═'); }
-                else
-                { Console.Write(' '); }
-            }
-            Console.ResetColor();
-
-            Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top);
-        }
-
-        public void Clear()
-        {
-            if (!Show) return;
-
-            (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
-
-            Console.SetCursorPosition(0, Line);
-
-            int width = Console.WindowWidth;
-            for (int i = 0; i < width; i++)
-            { Console.Write(' '); }
-
-            Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top - 1);
-        }
-
-        public void Dispose() => Clear();
-    }
-
-    readonly struct ConsoleProgressLabel : IDisposable
-    {
-        readonly int Line;
-        readonly string Label;
-        readonly ConsoleColor Color;
-        readonly bool Show;
-
-        public ConsoleProgressLabel(string label, ConsoleColor color, bool show)
-        {
-            Line = 0;
-            Label = label;
-            Color = color;
-            Show = show;
-
-            if (!Show) return;
-
-            Line = Console.GetCursorPosition().Top;
-            Console.WriteLine();
-        }
-
-        public void Print()
-        {
-            if (!Show) return;
-
-            (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
-
-            Console.SetCursorPosition(0, Line);
-
-            int width = Console.WindowWidth;
-            Console.ForegroundColor = Color;
-            for (int i = 0; i < width; i++)
-            {
-                if (i < Label.Length)
-                { Console.Write(Label[i]); }
-                else
-                { Console.Write(' '); }
-            }
-            Console.ResetColor();
-
-            Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top);
-        }
-
-        public void Clear()
-        {
-            if (!Show) return;
-
-            (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
-
-            Console.SetCursorPosition(0, Line);
-
-            int width = Console.WindowWidth;
-            for (int i = 0; i < width; i++)
-            { Console.Write(' '); }
-
-            Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top - 1);
-        }
-
-        public void Dispose() => Clear();
-    }
-
     public struct BrainfuckGeneratorResult
     {
         public string Code;
@@ -200,7 +80,7 @@ namespace LanguageCore.Brainfuck.Generator
                     HeapStart = 64,
                     HeapSize = 64,
                     GenerateDebugInformation = false,
-                    ShowProgress = false,
+                    ShowProgress = true,
                 };
                 result.StackSize = result.HeapStart - 1;
                 return result;
@@ -222,6 +102,38 @@ namespace LanguageCore.Brainfuck.Generator
     public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         const string ReturnVariableName = "@return";
+
+        public readonly struct GeneratorCodeBlock : IDisposable
+        {
+            readonly CodeGeneratorForBrainfuck Generator;
+
+            public GeneratorCodeBlock(CodeGeneratorForBrainfuck generator)
+            {
+                this.Generator = generator;
+            }
+
+            public void Dispose()
+            {
+                this.Generator.Code.EndBlock();
+            }
+        }
+
+        public readonly struct GeneratorJumpBlock : IDisposable
+        {
+            readonly CodeGeneratorForBrainfuck Generator;
+            readonly int ConditionAddress;
+
+            public GeneratorJumpBlock(CodeGeneratorForBrainfuck generator, int conditionAddress)
+            {
+                this.Generator = generator;
+                this.ConditionAddress = conditionAddress;
+            }
+
+            public void Dispose()
+            {
+                this.Generator.Code.JumpEnd(this.ConditionAddress);
+            }
+        }
 
         readonly struct DebugInfoBlock : IDisposable
         {
@@ -521,6 +433,26 @@ namespace LanguageCore.Brainfuck.Generator
             Stack = new StackCodeHelper(Code, snapshot.Stack);
         }
 
+        /// <summary>
+        /// <b>Pointer:</b> <paramref name="conditionAddress"/>
+        /// </summary>
+        public GeneratorJumpBlock JumpBlock(int conditionAddress)
+        {
+            Code.JumpStart(conditionAddress);
+            return new GeneratorJumpBlock(this, conditionAddress);
+        }
+
+        public GeneratorCodeBlock CommentBlock()
+        {
+            Code.StartBlock();
+            return new GeneratorCodeBlock(this);
+        }
+        public GeneratorCodeBlock CommentBlock(string label)
+        {
+            Code.StartBlock(label);
+            return new GeneratorCodeBlock(this);
+        }
+
         DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);
 
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
@@ -589,7 +521,7 @@ namespace LanguageCore.Brainfuck.Generator
         void CleanupVariables(int n)
         {
             if (n == 0) return;
-            using (Code.Block($"Clean up variables ({n})"))
+            using (CommentBlock($"Clean up variables ({n})"))
             {
                 for (int i = 0; i < n; i++)
                 {
@@ -854,7 +786,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             Heap.Init();
 
-            using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
+            using (CommentBlock($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
             {
                 ReturnCount.Push(0);
                 ReturnTagStack.Push(Stack.Push(1));
@@ -878,7 +810,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             FinishReturnStatements();
 
-            using (Code.Block($"Finish \"return\" block"))
+            using (CommentBlock($"Finish \"return\" block"))
             {
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
                 { throw new InternalException(); }

@@ -12,8 +12,6 @@
 
             if (ArgumentParser.Parse(out ProgramArguments arguments, args))
             {
-                LanguageCore.Output.SetProgramArguments(arguments);
-
                 try
                 { Entry.Run(arguments); }
                 catch (System.Exception exception)

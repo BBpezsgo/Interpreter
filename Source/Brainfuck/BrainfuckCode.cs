@@ -20,15 +20,39 @@ namespace LanguageCore.Brainfuck
             '.', ',',
         };
 
-        public static string RemoveNoncodes(string code)
+        public static string RemoveNoncodes(string code, bool showProgress)
         {
-            StringBuilder result = new(code.Length);
-            for (int i = 0; i < code.Length; i++)
+            if (showProgress)
             {
-                if (!CodeCharacters.Contains(code[i])) continue;
-                result.Append(code[i]);
+                using ConsoleProgressLabel label = new($"Remove comments ...", ConsoleColor.DarkGray, true);
+                label.Print();
+
+                using ConsoleProgressBar progress = new(ConsoleColor.DarkGray, true);
+                StringBuilder result = new(code.Length);
+
+                for (int i = 0; i < code.Length; i++)
+                {
+                    if ((i & 0b_0011_1111_1111_1111) == 0)
+                    { progress.Print(i, code.Length); }
+
+                    if (!CodeCharacters.Contains(code[i])) continue;
+                    result.Append(code[i]);
+                }
+
+                return result.ToString();
             }
-            return result.ToString();
+            else
+            {
+                StringBuilder result = new(code.Length);
+
+                for (int i = 0; i < code.Length; i++)
+                {
+                    if (!CodeCharacters.Contains(code[i])) continue;
+                    result.Append(code[i]);
+                }
+
+                return result.ToString();
+            }
         }
 
         public static string RemoveCodes(string code)
@@ -100,7 +124,7 @@ namespace LanguageCore.Brainfuck
                         {
                             if (Console.ForegroundColor != ConsoleColor.Yellow) Console.ForegroundColor = ConsoleColor.Yellow;
                         }
-                        else if (LanguageCore.Brainfuck.BrainfuckCode.CodeCharacters.Contains(code[i]))
+                        else if (CodeCharacters.Contains(code[i]))
                         {
                             expectNumber = false;
                             if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
@@ -138,7 +162,7 @@ namespace LanguageCore.Brainfuck
                     if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
                     break;
                 default:
-                    if (LanguageCore.Brainfuck.BrainfuckCode.CodeCharacters.Contains(code))
+                    if (CodeCharacters.Contains(code))
                     { if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta; }
                     else
                     { if (Console.ForegroundColor != ConsoleColor.DarkGray) Console.ForegroundColor = ConsoleColor.DarkGray; }

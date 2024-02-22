@@ -123,16 +123,6 @@ namespace LanguageCore.Brainfuck
             Code.Append('}');
             LineBreak();
         }
-        public CodeBlock Block()
-        {
-            this.StartBlock();
-            return new CodeBlock(this);
-        }
-        public CodeBlock Block(string label)
-        {
-            this.StartBlock(label);
-            return new CodeBlock(this);
-        }
 
         #endregion
 
@@ -356,15 +346,6 @@ namespace LanguageCore.Brainfuck
             for (int offset = 0; offset < size; offset++)
             { this.ClearValue(start + offset); }
             this.SetPointer(start);
-        }
-
-        /// <summary>
-        /// <b>Pointer:</b> <paramref name="conditionAddress"/>
-        /// </summary>
-        public JumpBlock Jump(int conditionAddress)
-        {
-            this.JumpStart(conditionAddress);
-            return new JumpBlock(this, conditionAddress);
         }
 
         /// <summary>
@@ -633,7 +614,7 @@ namespace LanguageCore.Brainfuck
 
         public string GetFinalCode()
         {
-            string result = Minifier.Minify(BrainfuckCode.RemoveNoncodes(CachedFinalCode.ToString()));
+            string result = Minifier.Minify(BrainfuckCode.RemoveNoncodes(CachedFinalCode.ToString(), true));
             CachedFinalCode = new StringBuilder(result);
             return result;
         }
@@ -657,38 +638,6 @@ namespace LanguageCore.Brainfuck
             indent = indent,
             pointer = pointer,
         };
-    }
-
-    public readonly struct CodeBlock : IDisposable
-    {
-        readonly CompiledCode reference;
-
-        public CodeBlock(CompiledCode reference)
-        {
-            this.reference = reference;
-        }
-
-        public void Dispose()
-        {
-            this.reference.EndBlock();
-        }
-    }
-
-    public readonly struct JumpBlock : IDisposable
-    {
-        readonly CompiledCode Code;
-        readonly int ConditionAddress;
-
-        public JumpBlock(CompiledCode code, int conditionAddress)
-        {
-            this.Code = code;
-            this.ConditionAddress = conditionAddress;
-        }
-
-        public void Dispose()
-        {
-            this.Code.JumpEnd(this.ConditionAddress);
-        }
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -1017,14 +966,15 @@ namespace LanguageCore.Brainfuck
             if (_isInitialized) return;
             if (Size <= 0) return;
 
-            using (Code.Block("Initialize HEAP"))
-            {
-                // SetAbsolute(0, 126);
-                Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_DATA, 126);
-                Code.SetPointer(0);
-            }
+            Code.StartBlock("Initialize HEAP");
+
+            // SetAbsolute(0, 126);
+            Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_DATA, 126);
+            Code.SetPointer(0);
 
             _isInitialized = true;
+
+            Code.EndBlock();
         }
 
         public void InitVirtual()
@@ -1034,16 +984,17 @@ namespace LanguageCore.Brainfuck
 
         public void Destroy()
         {
-            using (Code.Block("Destroy HEAP"))
-            {
-                int start = OffsettedStart;
-                int end = start + (BLOCK_SIZE * (Size + 4));
+            Code.StartBlock("Destroy HEAP");
 
-                for (int i = start; i < end; i += BLOCK_SIZE)
-                { Code.ClearValue(i + OFFSET_DATA); }
+            int start = OffsettedStart;
+            int end = start + (BLOCK_SIZE * (Size + 4));
 
-                Code.SetPointer(0);
-            }
+            for (int i = start; i < end; i += BLOCK_SIZE)
+            { Code.ClearValue(i + OFFSET_DATA); }
+
+            Code.SetPointer(0);
+
+            Code.EndBlock();
         }
 
         /// <summary>
@@ -1277,22 +1228,24 @@ namespace LanguageCore.Brainfuck
 
         public void Init()
         {
-            using (Code.Block("Initialize HEAP"))
-            {
-                Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY, 1);
-                Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_STATUS, 1);
-                Code.SetPointer(0);
-            }
+            Code.StartBlock("Initialize HEAP");
+
+            Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY, 1);
+            Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_STATUS, 1);
+            Code.SetPointer(0);
+
+            Code.EndBlock();
         }
 
         public void Destroy()
         {
-            using (Code.Block("Destroy HEAP"))
-            {
-                Code.ClearValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY);
-                Code.ClearValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_STATUS);
-                Code.SetPointer(0);
-            }
+            Code.StartBlock("Destroy HEAP");
+
+            Code.ClearValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY);
+            Code.ClearValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_STATUS);
+            Code.SetPointer(0);
+
+            Code.EndBlock();
         }
 
         /// <summary>

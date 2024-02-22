@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 
 namespace LanguageCore.Brainfuck
 {
@@ -7,39 +8,64 @@ namespace LanguageCore.Brainfuck
         public static string Minify(string code)
         {
             string result = code;
+            int pass = 1;
+            int prevLength = result.Length;
+
+            ConsoleProgressLabel label = new("Minify ...", ConsoleColor.DarkGray, true);
+
             while (true)
             {
-                if (result.Contains("<>", StringComparison.Ordinal))
-                { result = result.Replace("<>", string.Empty, StringComparison.Ordinal); }
-                else if (result.Contains("><", StringComparison.Ordinal))
-                { result = result.Replace("><", string.Empty, StringComparison.Ordinal); }
-                else if (result.Contains("+-", StringComparison.Ordinal))
-                { result = result.Replace("+-", string.Empty, StringComparison.Ordinal); }
-                else if (result.Contains("-+", StringComparison.Ordinal))
-                { result = result.Replace("-+", string.Empty, StringComparison.Ordinal); }
-                else if (result.Contains("[-][-]", StringComparison.Ordinal))
-                { result = result.Replace("[-][-]", "[-]", StringComparison.Ordinal); }
-                else if (result.Contains("][-]", StringComparison.Ordinal))
-                { result = result.Replace("][-]", "]", StringComparison.Ordinal); }
-                else if (MinifyPrints(ref result))
-                { }
-                else break;
+                label.Label = $"Minify ... (pass: {pass++} length: {result.Length} - {prevLength - result.Length})";
+                prevLength = result.Length;
+                label.Print();
+
+                if (Utils.TryReplace(ref result, "<>", string.Empty))
+                { continue; }
+
+                if (Utils.TryReplace(ref result, "><", string.Empty))
+                { continue; }
+
+                if (Utils.TryReplace(ref result, "+-", string.Empty))
+                { continue; }
+
+                if (Utils.TryReplace(ref result, "-+", string.Empty))
+                { continue; }
+
+                if (Utils.TryReplace(ref result, "[-][-]", "[-]"))
+                { continue; }
+
+                if (Utils.TryReplace(ref result, "][-]", "]"))
+                { continue; }
+
+                if (RemoveRedundantClears(ref result))
+                { continue; }
+
+                break;
             }
+
+            label.Dispose();
 
             return result;
         }
 
-        static bool MinifyPrints(ref string result)
+        static bool RemoveRedundantClears(ref string result)
+        {
+            ReadOnlySpan<char> span = result.AsSpan();
+            bool res = RemoveRedundantClears(ref span);
+            result = span.ToString();
+            return res;
+        }
+        static bool RemoveRedundantClears(ref ReadOnlySpan<char> result)
         {
             PredictedNumber<int> alreadyThere = 0;
             for (int i = 0; i < result.Length; i++)
             {
                 if (result[i] == '[' &&
                     i + 3 + 1 < result.Length &&
-                    result.Substring(i, 3) == "[-]" &&
+                    result.Slice(i, 3) == "[-]" &&
                     !alreadyThere.IsUnknown)
                 {
-                    string slice = result[(i + 3)..];
+                    ReadOnlySpan<char> slice = result[(i + 3)..];
 
                     string yeah;
                     if (alreadyThere.Value > 0)
@@ -51,7 +77,13 @@ namespace LanguageCore.Brainfuck
                     {
                         slice = slice[yeah.Length..];
                         result = result[..i];
-                        result += slice;
+
+                        Span<char> final = new char[result.Length + slice.Length];
+
+                        result.CopyTo(final[..result.Length]);
+                        slice.CopyTo(final[result.Length..]);
+
+                        result = final;
                         return true;
                     }
                 }

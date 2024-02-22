@@ -167,7 +167,6 @@ namespace ConsoleGUI
             {
                 ConsolePanel.Write(message, logType switch
                 {
-                    LogType.System => CharColor.Silver,
                     LogType.Normal => CharColor.Silver,
                     LogType.Warning => CharColor.BrightYellow,
                     LogType.Error => CharColor.BrightRed,

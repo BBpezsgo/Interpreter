@@ -127,7 +127,6 @@ namespace TheProgram
                 // "--throw-errors",
                 "--basepath \"../StandardLibrary/\"",
                 // "--hide-debug",
-                "--hide-system",
                 // "--dont-optimize",
                 // "--console-gui",
                 // "--print-instructions",
@@ -137,6 +136,7 @@ namespace TheProgram
                 // "--no-nullcheck",
                 // "--heap-size 0",
                 "--no-pause",
+                "--show-progress",
                 $"\"{path}\""
             ];
 

@@ -25,6 +25,17 @@ namespace LanguageCore
 
     public static partial class Utils
     {
+        internal static void GenerateTestFiles(string directoryPath, int n)
+        {
+            for (int i = 1; i <= n; i++)
+            {
+                string name = $"{n.ToString().PadLeft(2, '0')}.bbc";
+                string path = System.IO.Path.Combine(directoryPath, name);
+                if (System.IO.File.Exists(path)) continue;
+                System.IO.File.WriteAllText(path, string.Empty);
+            }
+        }
+
         /// <exception cref="NotImplementedException"/>
         public static CompiledLiteralType ConvertType(System.Type type)
         {

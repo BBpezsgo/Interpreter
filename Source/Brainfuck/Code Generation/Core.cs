@@ -367,7 +367,7 @@ namespace LanguageCore.Brainfuck.Generator
             public bool IsDiscarded;
             public bool IsInitialValueSet;
 
-            public readonly bool IsInitialized => Type.SizeOnStack > 0;
+            public readonly bool IsInitialized => Type.Size > 0;
 
             public Variable(string name, int address, FunctionThingDefinition? scope, bool haveToClean, bool deallocateOnClean, CompiledType type, int size)
             {
@@ -384,7 +384,7 @@ namespace LanguageCore.Brainfuck.Generator
                 IsInitialValueSet = false;
             }
 
-            readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.SizeOnStack} bytes at {Address})";
+            readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.Size} bytes at {Address})";
         }
 
         GeneratorSnapshot Snapshot() => new(this);
@@ -534,7 +534,7 @@ namespace LanguageCore.Brainfuck.Generator
                     }
 
                     if (variable.DeallocateOnClean &&
-                        variable.Type.InHEAP)
+                        variable.Type.IsPointer)
                     {
                         GenerateDeallocator(
                             new TypeCast(
@@ -586,7 +586,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (statementType == Type.Void)
             { throw new CompilerException($"Statement \"{statement}\" (with type \"{statementType}\") does not have a size", statement, CurrentFile); }
 
-            return statementType.SizeOnStack;
+            return statementType.Size;
         }
         #endregion
 
@@ -626,7 +626,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             if (variable.Type.IsStackArray)
             {
-                size = variable.Type.StackArrayOf.SizeOnStack;
+                size = variable.Type.StackArrayOf.Size;
                 address = variable.Address;
 
                 if (size != 1)
@@ -634,7 +634,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 if (TryCompute(index.Expression, RuntimeType.SInt32, out DataItem indexValue))
                 {
-                    address = variable.Address + (indexValue.ValueSInt32 * 2 * variable.Type.StackArrayOf.SizeOnStack);
+                    address = variable.Address + (indexValue.ValueSInt32 * 2 * variable.Type.StackArrayOf.Size);
                     return true;
                 }
 
@@ -662,7 +662,7 @@ namespace LanguageCore.Brainfuck.Generator
                 CompiledStruct @struct = type.Struct;
 
                 address = @struct.FieldOffsets[field.FieldName.Content] + prevAddress;
-                size = fieldType.SizeOnStack;
+                size = fieldType.Size;
                 return true;
             }
 
@@ -692,77 +692,6 @@ namespace LanguageCore.Brainfuck.Generator
 
             address = variable.Address;
             size = variable.Size;
-            return true;
-        }
-
-        #endregion
-
-        #region TryGetRuntimeAddress
-
-        bool TryGetRuntimeAddress(Statement statement, out int pointerAddress, out int size)
-        {
-            pointerAddress = default;
-            size = default;
-
-            return statement switch
-            {
-                Identifier identifier => TryGetRuntimeAddress(identifier, out pointerAddress, out size),
-                Field field => TryGetRuntimeAddress(field, out pointerAddress, out size),
-                ConstructorCall => false,
-                IndexCall => false,
-                Literal => false,
-                _ => throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile)
-            };
-        }
-
-        bool TryGetRuntimeAddress(Field field, out int pointerAddress, out int size)
-        {
-            CompiledType type = FindStatementType(field.PrevStatement);
-
-            if (!type.IsClass)
-            {
-                pointerAddress = default;
-                size = default;
-                return false;
-            }
-
-            if (!TryGetRuntimeAddress(field.PrevStatement, out pointerAddress, out _))
-            {
-                pointerAddress = default;
-                size = default;
-                return false;
-            }
-
-            CompiledType fieldType = FindStatementType(field);
-            size = fieldType.SizeOnStack;
-
-            if (!type.TryGetFieldOffsets(out IReadOnlyDictionary<string, int>? fieldOffsets))
-            { throw new InternalException(); }
-
-            int fieldOffset = fieldOffsets[field.FieldName.Content];
-
-            Code.AddValue(pointerAddress, fieldOffset);
-
-            return true;
-        }
-
-        bool TryGetRuntimeAddress(Identifier identifier, out int pointerAddress, out int size)
-        {
-            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, identifier.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
-
-            if (!variable.Type.IsClass)
-            {
-                pointerAddress = default;
-                size = default;
-                return false;
-            }
-
-            pointerAddress = Stack.PushVirtual(1);
-            size = variable.Type.Size;
-
-            Code.CopyValue(variable.Address, pointerAddress);
-
             return true;
         }
 

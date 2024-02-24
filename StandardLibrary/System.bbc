@@ -15,15 +15,15 @@ enum bool
     true = 1,
 }
 
-export String ToString(this bool v)
+export char* ToString(this bool v)
 {
     if (v) { return "true"; }
     else { return "false"; }
 }
 
-export String ToString(this byte number)
+export char* ToString(this byte number)
 {
-	String result = new String(0);
+	char* result = "";
 
 	if (number == 0)
     {
@@ -38,27 +38,27 @@ export String ToString(this byte number)
 	{
         byte rem = v % 10;
 		
-		String newResult = new String(result.length + 1);
+		char* newResult = Alloc((result.Length() + 1) * sizeof(char)) as char*;
 		CopyString(result, newResult);
-		newResult[result.length] = (rem + 48) as char;
+		newResult[result.Length()] = (rem + 48) as char;
 		delete result;
 		result = newResult;
 
 		v = v / 10;
 	}
 
-	String reversed = result.Reverse();
+	char* reversed = result.Reverse();
 	delete result;
 
 	return reversed;
 }
 
-export String ToString(this int number)
+export char* ToString(this int number)
 {
 	if (number == 0)
     { return "0"; }
     
-	String result = new String(0);
+	char* result = "";
 
 	int v = number;
 
@@ -69,26 +69,20 @@ export String ToString(this int number)
 	while (v > 0)
 	{
         int rem = v % 10;
-		
-		String newResult = new String(result.length + 1);
-		CopyString(result, newResult);
-		newResult[result.length] = (rem + 48) as char;
-		delete result;
-		result = newResult;
-
+        result = (temp result) + ((rem + 48) as char);
 		v = v / 10;
 	}
 
     if (isNegative)
     {
-        String newResult = new String(result.length + 1);
+        char* newResult = Alloc((result.Length() + 1) * sizeof(char)) as char*;
 		CopyString(result, newResult);
-        newResult[result.length] = '-';
+        newResult[result.Length()] = '-';
         delete result;
         result = newResult;
     }
 
-	String reversed = result.Reverse();
+	char* reversed = result.Reverse();
 	delete result;
 
 	return reversed;
@@ -97,18 +91,18 @@ export String ToString(this int number)
 [External("sleep")]
 export void Sleep(int ms);
 
-export int ParseInt(temp String v)
+export int ParseInt(temp char* v)
 {
-    if (v.length == 0)
+    if (v.IsNullOrEmpty())
     { return 0; }
 
     bool IsNegative = (v[0] == '-');
-    temp String parsing = v;
+    temp char* parsing = v;
 
     if (IsNegative)
     {
         parsing = parsing.Substring(1);
-        String reversed = parsing.Reverse();
+        char* reversed = parsing.Reverse();
         delete parsing;
         parsing = reversed;
     }
@@ -118,7 +112,7 @@ export int ParseInt(temp String v)
     }
 
     int result = 0;
-    for (int i = 0; i < parsing.length; i++)
+    for (int i = 0; parsing[i]; i++)
     {
         char digit = parsing[i];
         result += (Pow(10, i) * (digit - '0'));
@@ -130,15 +124,18 @@ export int ParseInt(temp String v)
     return result;
 }
 
-export byte ParseByte(temp String v)
+export byte ParseByte(temp char* v)
 {
+    if (v.IsNullOrEmpty())
+    { return 0; }
+
     bool IsNegative = (v[0] == '-');
-    temp String parsing = v;
+    temp char* parsing = v;
 
     if (IsNegative)
     {
         parsing = parsing.Substring(1);
-        String reversed = parsing.Reverse();
+        char* reversed = parsing.Reverse();
         delete parsing;
         parsing = reversed;
     }
@@ -148,7 +145,7 @@ export byte ParseByte(temp String v)
     }
 
     int result = 0;
-    for (int i = 0; i < parsing.length; i++)
+    for (int i = 0; parsing[i]; i++)
     {
         char digit = parsing[i];
         result += (Pow(10, i) * (digit - '0'));

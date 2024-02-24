@@ -162,9 +162,6 @@ namespace LanguageCore.Compiler
 
                 CompiledType prevType = FindStatementType(index.PrevStatement);
 
-                if (!prevType.IsClass)
-                { return; }
-
                 if (GetIndexGetter(prevType, out CompiledFunction? indexer))
                 {
                     indexer.AddReference(index, CurrentFile);
@@ -227,9 +224,6 @@ namespace LanguageCore.Compiler
                     CompiledType prevType = FindStatementType(indexSetter.PrevStatement);
                     CompiledType valueType = FindStatementType(compoundAssignment.Right);
 
-                    if (!prevType.IsClass)
-                    { return; }
-
                     if (GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
                     {
                         indexer.AddReference(indexSetter, CurrentFile);
@@ -267,9 +261,6 @@ namespace LanguageCore.Compiler
 
                     CompiledType prevType = FindStatementType(indexSetter.PrevStatement);
                     CompiledType valueType = FindStatementType(setter.Right);
-
-                    if (!prevType.IsClass)
-                    { return; }
 
                     if (GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
                     {
@@ -385,32 +376,10 @@ namespace LanguageCore.Compiler
 
                 if (keywordCall.FunctionName == "delete")
                 {
-                    if (keywordCall.Parameters.Length != 1)
-                    { return; }
-
                     CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
-
-                    if (paramType == Type.Integer)
+                    
+                    if (GetGeneralFunction(paramType, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                     {
-                        if (TryGetBuiltinFunction("free", out CompiledFunction? function))
-                        {
-                            function.AddReference(keywordCall, CurrentFile);
-
-                            if (CurrentFunction == null || !function.IsSame(CurrentFunction))
-                            { function.TimesUsed++; }
-                            function.TimesUsedTotal++;
-                        }
-                        return;
-                    }
-
-                    if (!paramType.IsClass)
-                    { return; }
-
-                    if (GetGeneralFunction(paramType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
-                    {
-                        if (!destructor.CanUse(CurrentFile))
-                        { return; }
-
                         destructor.AddReference(keywordCall, CurrentFile);
 
                         if (CurrentFunction == null || !destructor.IsSame(CurrentFunction))
@@ -419,11 +388,8 @@ namespace LanguageCore.Compiler
 
                         return;
                     }
-                    else if (GetGeneralFunctionTemplate(paramType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
+                    else if (GetGeneralFunctionTemplate(paramType, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                     {
-                        if (!compilableGeneralFunction.OriginalFunction.CanUse(CurrentFile))
-                        { return; }
-
                         compilableGeneralFunction.OriginalFunction.AddReference(keywordCall, CurrentFile);
 
                         if (CurrentFunction == null || !compilableGeneralFunction.OriginalFunction.IsSame(CurrentFunction))
@@ -436,31 +402,6 @@ namespace LanguageCore.Compiler
 
                         AddCompilable(compilableGeneralFunction);
                     }
-                }
-
-                if (keywordCall.FunctionName == "clone")
-                {
-                    if (keywordCall.Parameters.Length != 1)
-                    { return; }
-
-                    CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
-
-                    if (!paramType.IsClass)
-                    { return; }
-
-                    if (!GetGeneralFunction(paramType.Class, BuiltinFunctionNames.Cloner, out CompiledGeneralFunction? cloner))
-                    { return; }
-
-                    if (!cloner.CanUse(CurrentFile))
-                    { return; }
-
-                    cloner.AddReference(keywordCall, CurrentFile);
-
-                    if (CurrentFunction == null || !cloner.IsSame(CurrentFunction))
-                    { cloner.TimesUsed++; }
-                    cloner.TimesUsedTotal++;
-
-                    return;
                 }
             }
             else if (statement is Field field)
@@ -478,12 +419,12 @@ namespace LanguageCore.Compiler
             { }
             else if (statement is ConstructorCall constructorCall)
             {
+                CompiledType type = new(constructorCall.TypeName, FindType, TryCompute);
                 AnalyzeStatements(constructorCall.Parameters);
 
-                if (!GetClass(constructorCall, out CompiledClass? @class))
-                { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
+                CompiledType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
-                if (GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+                if (GetConstructor(type, parameters, out CompiledConstructor? constructor))
                 {
                     constructor.AddReference(constructorCall, CurrentFile);
 
@@ -491,7 +432,7 @@ namespace LanguageCore.Compiler
                     { constructor.TimesUsed++; }
                     constructor.TimesUsedTotal++;
                 }
-                else if (GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
+                else if (GetConstructorTemplate(type, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction))
                 {
                     compilableGeneralFunction.OriginalFunction.AddReference(constructorCall, CurrentFile);
 
@@ -624,6 +565,26 @@ namespace LanguageCore.Compiler
                 CompiledParameters.Clear();
             }
 
+            for (int i = 0; i < this.CompiledConstructors.Length; i++)
+            {
+                CompiledConstructor function = this.CompiledConstructors[i];
+
+                if (function.IsTemplate)
+                { continue; }
+
+                CompiledParameters.Clear();
+                foreach (ParameterDefinition parameter in function.Parameters)
+                { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                CurrentFile = function.FilePath;
+                CurrentFunction = function;
+
+                AnalyzeStatements(function.Block?.Statements);
+
+                CurrentFunction = null;
+                CurrentFile = null;
+                CompiledParameters.Clear();
+            }
+
             for (int i = 0; i < this.CompilableFunctions.Count; i++)
             {
                 CompliableTemplate<CompiledFunction> function = this.CompilableFunctions[i];
@@ -685,6 +646,28 @@ namespace LanguageCore.Compiler
                 CompiledParameters.Clear();
                 TypeArguments.Clear();
             }
+
+            for (int i = 0; i < this.CompilableConstructors.Count; i++)
+            {
+                CompliableTemplate<CompiledConstructor> function = this.CompilableConstructors[i];
+
+                SetTypeArguments(function.TypeArguments);
+
+                CompiledParameters.Clear();
+                for (int j = 0; j < function.Function.Parameters.Count; j++)
+                {
+                    CompiledParameters.Add(new CompiledParameter(function.Function.ParameterTypes[j], function.Function.Parameters[j]));
+                }
+                CurrentFile = function.Function.FilePath;
+                CurrentFunction = function.Function;
+
+                AnalyzeStatements(function.Function.Block?.Statements);
+
+                CurrentFunction = null;
+                CurrentFile = null;
+                CompiledParameters.Clear();
+                TypeArguments.Clear();
+            }
         }
 
         void ClearReferences()
@@ -708,6 +691,13 @@ namespace LanguageCore.Compiler
                 this.CompiledOperators[i].ClearReferences();
                 this.CompiledOperators[i].TimesUsed = 0;
                 this.CompiledOperators[i].TimesUsedTotal = 0;
+            }
+
+            for (int i = 0; i < this.CompiledConstructors.Length; i++)
+            {
+                this.CompiledConstructors[i].ClearReferences();
+                this.CompiledConstructors[i].TimesUsed = 0;
+                this.CompiledConstructors[i].TimesUsedTotal = 0;
             }
         }
 

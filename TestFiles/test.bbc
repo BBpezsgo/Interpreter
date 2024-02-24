@@ -1,0 +1,26 @@
+using System;
+
+// template<T>
+// struct Vector2
+// {
+// 	T X;
+// 	T Y;
+// }
+// 
+// Vector2<int> vec = new Vector2<int>;
+// vec.X = 6;
+// vec.Y = 9;
+
+// char* yeah = "yeah";
+// 
+// int* ptr = new int*;
+// *ptr = yeah.Length();
+// // 
+// Print("bruh");
+
+// Print(55);
+
+List<int>* list = new List<int>*;
+list.Add(77);
+list.Add(55);
+Print(temp list.ToString());

@@ -26,9 +26,9 @@ namespace LanguageCore.Parser
         public readonly Error[] Errors;
 
         public readonly FunctionDefinition[] Functions;
+        public readonly FunctionDefinition[] Operators;
         public readonly MacroDefinition[] Macros;
         public readonly StructDefinition[] Structs;
-        public readonly ClassDefinition[] Classes;
         public readonly UsingDefinition[] Usings;
         public readonly Statement.CompileTag[] Hashes;
         public readonly List<UsingAnalysis> UsingsAnalytics;
@@ -38,25 +38,25 @@ namespace LanguageCore.Parser
         public static ParserResult Empty => new(
             new List<Error>(),
             new List<FunctionDefinition>(),
+            new List<FunctionDefinition>(),
             new List<MacroDefinition>(),
             new List<StructDefinition>(),
             new List<UsingDefinition>(),
             new List<Statement.CompileTag>(),
-            new List<ClassDefinition>(),
             new List<Statement.Statement>(),
             new List<EnumDefinition>());
 
-        public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
+        public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<FunctionDefinition> operators, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
         {
             Errors = errors.ToArray();
 
             Functions = functions.ToArray();
+            Operators = operators.ToArray();
             Macros = macros.ToArray();
             Structs = structs.ToArray();
             Usings = usings.ToArray();
             UsingsAnalytics = new();
             Hashes = hashes.ToArray();
-            Classes = classes.ToArray();
             TopLevelStatements = topLevelStatements.ToArray();
             Enums = enums.ToArray();
         }
@@ -81,20 +81,6 @@ namespace LanguageCore.Parser
 
                 foreach (FunctionDefinition method in this.Structs[i].Methods)
                 { method.FilePath = path; }
-            }
-
-            for (int i = 0; i < this.Classes.Length; i++)
-            {
-                this.Classes[i].FilePath = path;
-
-                for (int j = 0; j < this.Classes[i].Methods.Count; j++)
-                { this.Classes[i].Methods[j].FilePath = path; }
-
-                for (int j = 0; j < this.Classes[i].Operators.Count; j++)
-                { this.Classes[i].Operators[j].FilePath = path; }
-
-                for (int j = 0; j < this.Classes[i].GeneralMethods.Count; j++)
-                { this.Classes[i].GeneralMethods[j].FilePath = path; }
             }
 
             for (int i = 0; i < this.Hashes.Length; i++)
@@ -158,6 +144,17 @@ namespace LanguageCore.Parser
                 { yield return statement; }
             }
 
+            for (int i = 0; i < Operators.Length; i++)
+            {
+                FunctionDefinition @operator = Operators[i];
+
+                if (@operator.Block == null)
+                { continue; }
+
+                foreach (Statement.Statement statement in @operator.Block.GetStatementsRecursively(true))
+                { yield return statement; }
+            }
+
             for (int i = 0; i < Macros.Length; i++)
             {
                 MacroDefinition macro = Macros[i];
@@ -169,48 +166,11 @@ namespace LanguageCore.Parser
                 { yield return statement; }
             }
 
-            for (int i = 0; i < Classes.Length; i++)
-            {
-                ClassDefinition @class = Classes[i];
-
-                foreach (GeneralFunctionDefinition method in @class.GeneralMethods)
-                {
-                    if (method.Block == null)
-                    { continue; }
-
-                    foreach (Statement.Statement statement in method.Block.GetStatementsRecursively(true))
-                    { yield return statement; }
-                }
-
-                foreach (FunctionDefinition method in @class.Methods)
-                {
-                    if (method.Block == null)
-                    { continue; }
-
-                    foreach (Statement.Statement statement in method.Block.GetStatementsRecursively(true))
-                    { yield return statement; }
-                }
-
-                foreach (FunctionDefinition method in @class.Operators)
-                {
-                    if (method.Block == null)
-                    { continue; }
-
-                    foreach (Statement.Statement statement in method.Block.GetStatementsRecursively(true))
-                    { yield return statement; }
-                }
-
-                foreach (Statement.Statement statement in @class.Statements)
-                {
-                    yield return statement;
-                }
-            }
-
             for (int i = 0; i < Structs.Length; i++)
             {
-                StructDefinition @struct = Structs[i];
+                StructDefinition structs = Structs[i];
 
-                foreach (FunctionDefinition method in @struct.Methods)
+                foreach (GeneralFunctionDefinition method in structs.GeneralMethods)
                 {
                     if (method.Block == null)
                     { continue; }
@@ -219,9 +179,31 @@ namespace LanguageCore.Parser
                     { yield return statement; }
                 }
 
-                foreach (Statement.Statement statement in @struct.Statements)
+                foreach (FunctionDefinition method in structs.Methods)
                 {
-                    yield return statement;
+                    if (method.Block == null)
+                    { continue; }
+
+                    foreach (Statement.Statement statement in method.Block.GetStatementsRecursively(true))
+                    { yield return statement; }
+                }
+
+                foreach (FunctionDefinition method in structs.Operators)
+                {
+                    if (method.Block == null)
+                    { continue; }
+
+                    foreach (Statement.Statement statement in method.Block.GetStatementsRecursively(true))
+                    { yield return statement; }
+                }
+
+                foreach (ConstructorDefinition constructor in structs.Constructors)
+                {
+                    if (constructor.Block == null)
+                    { continue; }
+
+                    foreach (Statement.Statement statement in constructor.Block.GetStatementsRecursively(true))
+                    { yield return statement; }
                 }
             }
         }

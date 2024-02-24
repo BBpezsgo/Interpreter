@@ -16,7 +16,8 @@ namespace LanguageCore.Parser
     public class ParameterDefinitionCollection :
         IPositioned,
         IReadOnlyCollection<ParameterDefinition>,
-        IEquatable<ParameterDefinitionCollection>
+        IEquatable<ParameterDefinitionCollection>,
+        IDuplicatable<ParameterDefinitionCollection>
     {
         public readonly Token LeftParenthesis;
         public readonly Token RightParenthesis;
@@ -79,6 +80,8 @@ namespace LanguageCore.Parser
 
         public static ParameterDefinitionCollection CreateAnonymous(IEnumerable<ParameterDefinition> parameterDefinitions)
             => new(parameterDefinitions, Token.CreateAnonymous("(", TokenType.Operator), Token.CreateAnonymous(")", TokenType.Operator));
+
+        public ParameterDefinitionCollection Duplicate() => new(Parameters, LeftParenthesis, RightParenthesis);
     }
 
     public class ParameterDefinition : IPositioned
@@ -598,6 +601,12 @@ namespace LanguageCore.Parser
             }
             return null;
         }
+
+        public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), TemplateInfo)
+        {
+            Block = Block,
+            FilePath = FilePath,
+        };
     }
 
     public class GeneralFunctionDefinition : FunctionThingDefinition
@@ -613,6 +622,12 @@ namespace LanguageCore.Parser
             ParameterDefinitionCollection parameters)
             : base(modifiers, identifier, parameters, null)
         { }
+
+        public GeneralFunctionDefinition Duplicate() => new(Identifier, Modifiers, Parameters.Duplicate())
+        {
+            Block = Block,
+            FilePath = FilePath,
+        };
 
         public override string ToString()
         {
@@ -638,93 +653,127 @@ namespace LanguageCore.Parser
         }
     }
 
-    public class ClassDefinition : IExportable, IInFile, IPositioned
+#pragma warning disable CS0659 // Type overrides Object.Equals(object o) but does not override Object.GetHashCode()
+    public class ConstructorDefinition : FunctionThingDefinition, ISimpleReadable
+#pragma warning restore CS0659 // Type overrides Object.Equals(object o) but does not override Object.GetHashCode()
     {
-        public readonly AttributeUsage[] Attributes;
-        public readonly Token Identifier;
-        public readonly Token BracketStart;
-        public readonly Token BracketEnd;
-        public readonly List<Statement.Statement> Statements;
-        public string? FilePath { get; set; }
-        public readonly FieldDefinition[] Fields;
-        public Token[] Modifiers;
-        public TemplateInfo? TemplateInfo;
+        public new TypeInstance Identifier;
 
-        public IReadOnlyList<FunctionDefinition> Methods => methods;
-        public IReadOnlyList<GeneralFunctionDefinition> GeneralMethods => generalMethods;
-        public IReadOnlyList<FunctionDefinition> Operators => operators;
-
-        public bool IsExport => Modifiers.Contains("export");
-
-        readonly FunctionDefinition[] methods;
-        readonly GeneralFunctionDefinition[] generalMethods;
-        readonly FunctionDefinition[] operators;
-
-        public ClassDefinition(ClassDefinition other)
+        public ConstructorDefinition(ConstructorDefinition other) : base(other)
         {
-            Attributes = other.Attributes;
             Identifier = other.Identifier;
-            BracketStart = other.BracketStart;
-            BracketEnd = other.BracketEnd;
-            Statements = other.Statements;
-            FilePath = other.FilePath;
-            Fields = other.Fields;
-            Modifiers = other.Modifiers;
-            TemplateInfo = other.TemplateInfo;
-            methods = other.methods;
-            generalMethods = other.generalMethods;
-            operators = other.operators;
         }
 
-        public ClassDefinition(
-            Token name,
-            Token bracketStart,
-            Token bracketEnd,
-            IEnumerable<AttributeUsage> attributes,
+        public ConstructorDefinition(
+            TypeInstance type,
             IEnumerable<Token> modifiers,
-            IEnumerable<FieldDefinition> fields,
-            IEnumerable<FunctionDefinition> methods,
-            IEnumerable<GeneralFunctionDefinition> generalMethods,
-            IEnumerable<FunctionDefinition> operators)
+            ParameterDefinitionCollection parameters)
+            : base(modifiers, null!, parameters, null)
         {
-            this.Identifier = name;
-            this.BracketStart = bracketStart;
-            this.BracketEnd = bracketEnd;
-            this.Fields = fields.ToArray();
-            this.methods = methods.ToArray();
-            this.generalMethods = generalMethods.ToArray();
-            this.Attributes = attributes.ToArray();
-            this.Statements = new List<Statement.Statement>();
-            this.operators = operators.ToArray();
-            this.Modifiers = modifiers.ToArray();
+            Identifier = type;
         }
 
         public override string ToString()
         {
             StringBuilder result = new();
-            result.Append("class ");
+            if (IsExport)
+            { result.Append("export "); }
+            result.Append(Identifier);
 
-            result.Append(Identifier.Content);
-            if (TemplateInfo is not null)
+            result.Append('(');
+            if (Parameters.Count > 0)
             {
-                result.Append('<');
-                result.Append(string.Join<Token>(", ", TemplateInfo.TypeParameters));
-                result.Append('>');
+                for (int i = 0; i < Parameters.Count; i++)
+                {
+                    if (i > 0) result.Append(", ");
+                    result.Append(Parameters[i].Type);
+                }
             }
+            result.Append(')');
+
+            result.Append(Block?.ToString() ?? ";");
+
             return result.ToString();
         }
 
-        public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
-
-        public virtual Position Position
+        string ISimpleReadable.ToReadable() => ToReadable();
+        public new string ToReadable(ToReadableFlags flags = ToReadableFlags.None)
         {
-            get
+            StringBuilder result = new();
+            result.Append(Identifier.ToString());
+            result.Append('(');
+            for (int j = 0; j < Parameters.Count; j++)
             {
-                Position result = new(Identifier);
-                result.Union(BracketStart);
-                result.Union(BracketEnd);
-                return result;
+                if (j > 0) result.Append(", ");
+                if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
+                {
+                    result.Append(string.Join<Token>(' ', Parameters[j].Modifiers));
+                    result.Append(' ');
+                }
+
+                result.Append(Parameters[j].Type.ToString());
+
+                if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
+                {
+                    result.Append(' ');
+                    result.Append(Parameters[j].Identifier.ToString());
+                }
             }
+            result.Append(')');
+            return result.ToString();
+        }
+
+        public new string ToReadable(TypeArguments? typeArguments, ToReadableFlags flags = ToReadableFlags.None)
+        {
+            if (typeArguments == null) return ToReadable(flags);
+            StringBuilder result = new();
+            result.Append(Identifier.ToString(typeArguments));
+
+            result.Append('(');
+            for (int j = 0; j < Parameters.Count; j++)
+            {
+                if (j > 0) { result.Append(", "); }
+                if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
+                {
+                    result.Append(string.Join<Token>(' ', Parameters[j].Modifiers));
+                    result.Append(' ');
+                }
+
+                result.Append(Parameters[j].Type.ToString(typeArguments));
+
+                if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
+                {
+                    result.Append(' ');
+                    result.Append(Parameters[j].Identifier.ToString());
+                }
+            }
+            result.Append(')');
+            return result.ToString();
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj is not ConstructorDefinition other) return false;
+            return Equals(other);
+        }
+
+        public bool Equals(ConstructorDefinition? other)
+        {
+            if (other is null) return false;
+            if (!this.Identifier.Equals(other.Identifier)) return false;
+
+            if (!this.Parameters.TypeEquals(other.Parameters)) return false;
+
+            if (this.Modifiers.Length != other.Modifiers.Length) return false;
+            for (int i = 0; i < this.Modifiers.Length; i++)
+            {
+                if (!string.Equals(this.Modifiers[i].Content, other.Modifiers[i].Content)) return false;
+            }
+
+            if (!TemplateInfo.Equals(this.TemplateInfo, other.TemplateInfo))
+            { return false; }
+
+            return true;
         }
     }
 
@@ -734,16 +783,22 @@ namespace LanguageCore.Parser
         public readonly Token Identifier;
         public readonly Token BracketStart;
         public readonly Token BracketEnd;
-        public readonly List<Statement.Statement> Statements;
-        public readonly Token[] Modifiers;
-
         public string? FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
+        public Token[] Modifiers;
+        public TemplateInfo? TemplateInfo;
+
+        public IReadOnlyList<FunctionDefinition> Methods => methods;
+        public IReadOnlyList<GeneralFunctionDefinition> GeneralMethods => generalMethods;
+        public IReadOnlyList<FunctionDefinition> Operators => operators;
+        public IReadOnlyList<ConstructorDefinition> Constructors => constructors;
 
         public bool IsExport => Modifiers.Contains("export");
 
-        public IReadOnlyCollection<FunctionDefinition> Methods => methods;
         readonly FunctionDefinition[] methods;
+        readonly GeneralFunctionDefinition[] generalMethods;
+        readonly FunctionDefinition[] operators;
+        readonly ConstructorDefinition[] constructors;
 
         public virtual Position Position => new(Identifier, BracketStart, BracketEnd);
 
@@ -753,11 +808,14 @@ namespace LanguageCore.Parser
             Identifier = other.Identifier;
             BracketStart = other.BracketStart;
             BracketEnd = other.BracketEnd;
-            Statements = other.Statements;
-            Modifiers = other.Modifiers;
             FilePath = other.FilePath;
             Fields = other.Fields;
+            Modifiers = other.Modifiers;
+            TemplateInfo = other.TemplateInfo;
             methods = other.methods;
+            generalMethods = other.generalMethods;
+            operators = other.operators;
+            constructors = other.constructors;
         }
 
         public StructDefinition(
@@ -765,17 +823,22 @@ namespace LanguageCore.Parser
             Token bracketStart,
             Token bracketEnd,
             IEnumerable<AttributeUsage> attributes,
+            IEnumerable<Token> modifiers,
             IEnumerable<FieldDefinition> fields,
             IEnumerable<FunctionDefinition> methods,
-            IEnumerable<Token> modifiers)
+            IEnumerable<GeneralFunctionDefinition> generalMethods,
+            IEnumerable<FunctionDefinition> operators,
+            IEnumerable<ConstructorDefinition> constructors)
         {
             this.Identifier = name;
             this.BracketStart = bracketStart;
             this.BracketEnd = bracketEnd;
             this.Fields = fields.ToArray();
             this.methods = methods.ToArray();
+            this.generalMethods = generalMethods.ToArray();
             this.Attributes = attributes.ToArray();
-            this.Statements = new List<Statement.Statement>();
+            this.operators = operators.ToArray();
+            this.constructors = constructors.ToArray();
             this.Modifiers = modifiers.ToArray();
         }
 

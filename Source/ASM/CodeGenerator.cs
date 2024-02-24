@@ -184,7 +184,7 @@ namespace LanguageCore.ASM.Generator
 
                 for (int i = 0; i < CompiledParameters.Count; i++)
                 {
-                    sum += CompiledParameters[i].Type.SizeOnStack;
+                    sum += CompiledParameters[i].Type.Size;
                 }
 
                 return sum;
@@ -198,7 +198,7 @@ namespace LanguageCore.ASM.Generator
             {
                 if (CompiledParameters[i].Index < beforeThis) continue;
 
-                sum += CompiledParameters[i].Type.SizeOnStack;
+                sum += CompiledParameters[i].Type.Size;
             }
 
             return sum;
@@ -256,11 +256,6 @@ namespace LanguageCore.ASM.Generator
                     throw new NotImplementedException();
                 }
 
-                if (instanceType.IsClass)
-                {
-                    throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly");
-                }
-
                 if (instanceType.IsEnum)
                 {
                     if (instanceType.Enum.Members.Length == 0)
@@ -295,11 +290,6 @@ namespace LanguageCore.ASM.Generator
                 return size;
             }
 
-            if (type.IsClass)
-            {
-                throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly");
-            }
-
             if (type.IsStackArray)
             {
                 int stackSize = type.StackArraySize;
@@ -332,13 +322,6 @@ namespace LanguageCore.ASM.Generator
                 throw new NotImplementedException();
             }
 
-            if (type.IsClass)
-            {
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                afterValue?.Invoke(0);
-                throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly");
-            }
-
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(type));
             afterValue?.Invoke(0);
             return 1;
@@ -353,7 +336,7 @@ namespace LanguageCore.ASM.Generator
             {
                 int sum = 0;
                 for (int i = 0; i < CompiledVariables.Count; i++)
-                { sum += CompiledVariables[i].Type.SizeOnStack; }
+                { sum += CompiledVariables[i].Type.Size; }
                 return sum;
             }
         }
@@ -404,8 +387,8 @@ namespace LanguageCore.ASM.Generator
                 { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
             }
 
-            if (size != compiledVariable.Type.SizeOnStack)
-            { throw new InternalException($"Variable size ({compiledVariable.Type.SizeOnStack}) and initial value size ({size}) mismatch"); }
+            if (size != compiledVariable.Type.Size)
+            { throw new InternalException($"Variable size ({compiledVariable.Type.Size}) and initial value size ({size}) mismatch"); }
 
             if (FunctionFrameSize.Count > 0)
             { FunctionFrameSize.Last += size; }
@@ -472,7 +455,7 @@ namespace LanguageCore.ASM.Generator
 
                 GenerateCodeForStatement(value);
 
-                StackStore(new ValueAddress(variable), variable.Type.SizeOnStack);
+                StackStore(new ValueAddress(variable), variable.Type.Size);
             }
             else
             {
@@ -518,7 +501,7 @@ namespace LanguageCore.ASM.Generator
                 StatementWithValue passedParameter = functionCall.PrevStatement;
                 CompiledType passedParameterType = FindStatementType(passedParameter);
                 GenerateCodeForStatement(functionCall.PrevStatement);
-                parameterCleanup.Push((passedParameterType.SizeOnStack, false, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
             }
 
             for (int i = 0; i < functionCall.Parameters.Length; i++)
@@ -530,7 +513,7 @@ namespace LanguageCore.ASM.Generator
 
                 bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
-                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
+                canDeallocate = canDeallocate && passedParameterType.IsPointer;
 
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
@@ -546,7 +529,7 @@ namespace LanguageCore.ASM.Generator
 
                 GenerateCodeForStatement(passedParameter); // TODO: expectedType = definedParameterType
 
-                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
             }
 
             return parameterCleanup;
@@ -561,7 +544,7 @@ namespace LanguageCore.ASM.Generator
                 StatementWithValue passedParameter = functionCall.PrevStatement;
                 CompiledType passedParameterType = FindStatementType(passedParameter);
                 GenerateCodeForStatement(functionCall.PrevStatement);
-                parameterCleanup.Push((passedParameterType.SizeOnStack, false, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
             }
 
             for (int i = 0; i < functionCall.Parameters.Length; i++)
@@ -582,7 +565,7 @@ namespace LanguageCore.ASM.Generator
 
                 GenerateCodeForStatement(passedParameter); // TODO: expectedType = definedParameterType
 
-                parameterCleanup.Push((passedParameterType.SizeOnStack, false, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
             }
 
             return parameterCleanup;
@@ -601,7 +584,7 @@ namespace LanguageCore.ASM.Generator
 
                 bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
-                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
+                canDeallocate = canDeallocate && passedParameterType.IsPointer;
 
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
@@ -617,7 +600,7 @@ namespace LanguageCore.ASM.Generator
 
                 GenerateCodeForStatement(passedParameter); // TODO: expectedType = definedParameterType
 
-                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
             }
 
             return parameterCleanup;
@@ -697,9 +680,8 @@ namespace LanguageCore.ASM.Generator
                     return;
                 }
 
-                if (valueToPrintType.IsClass &&
-                    valueToPrintType == FindTypeReplacer("string", valueToPrint) &&
-                    valueToPrint is LiteralStatement stringLiteral)
+                if (valueToPrint is LiteralStatement stringLiteral &&
+                    stringLiteral.Type == LiteralType.String)
                 {
                     string dataLabel = Builder.DataBuilder.NewString(stringLiteral.Value);
 
@@ -869,16 +851,6 @@ namespace LanguageCore.ASM.Generator
         }
         void GenerateCodeForStatement(IndexCall indexCall)
         {
-            CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
-
-            if (!arrayType.IsClass)
-            { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
-
-            if (arrayType.Class.CompiledAttributes.HasAttribute("Define", "array"))
-            {
-                throw new NotImplementedException();
-            }
-
             GenerateCodeForStatement(new FunctionCall(
                 indexCall.PrevStatement,
                 Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
@@ -977,7 +949,7 @@ namespace LanguageCore.ASM.Generator
                         GenerateCodeForStatement(returnValue);
 
                         int offset = ReturnValueOffset;
-                        StackStore(new ValueAddress(offset, AddressingMode.BasePointerRelative), returnValueType.SizeOnStack);
+                        StackStore(new ValueAddress(offset, AddressingMode.BasePointerRelative), returnValueType.Size);
                     }
 
                     if (InFunction)
@@ -1139,41 +1111,6 @@ namespace LanguageCore.ASM.Generator
         }
         void GenerateCodeForStatement(ConstructorCall constructorCall)
         {
-            CompiledType instanceType = FindType(constructorCall.TypeName);
-
-            if (instanceType.IsStruct)
-            { throw new NotImplementedException(); }
-
-            if (!instanceType.IsClass)
-            { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
-
-            instanceType.Class.AddReference(constructorCall.TypeName, CurrentFile);
-
-            if (!GetClass(constructorCall, out CompiledClass? @class))
-            { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
-
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
-            {
-                if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
-                {
-                    throw new CompilerException($"Function {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
-                }
-                else
-                {
-                    compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
-                    constructor = compilableGeneralFunction.Function;
-                }
-            }
-
-            if (!constructor.CanUse(CurrentFile))
-            {
-                AnalysisCollection?.Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
-                return;
-            }
-
-            if (constructorCall.Parameters.Length != constructor.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: required {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
-
             throw new NotImplementedException();
         }
         void GenerateCodeForStatement(LiteralStatement statement)
@@ -1210,14 +1147,14 @@ namespace LanguageCore.ASM.Generator
                 if (statement.Content != "this")
                 { statement.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
                 ValueAddress address = GetBaseAddress(compiledParameter);
-                StackLoad(address, compiledParameter.Type.SizeOnStack);
+                StackLoad(address, compiledParameter.Type.Size);
                 return;
             }
 
             if (GetVariable(statement.Content, out CompiledVariable? val))
             {
                 statement.Token.AnalyzedType = TokenAnalyzedType.VariableName;
-                StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
+                StackLoad(new ValueAddress(val), val.Type.Size);
                 return;
             }
 
@@ -1645,7 +1582,7 @@ namespace LanguageCore.ASM.Generator
 
                 this.CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));
 
-                paramsSize += parameterType.SizeOnStack;
+                paramsSize += parameterType.Size;
             }
         }
 

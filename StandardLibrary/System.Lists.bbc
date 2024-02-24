@@ -2,68 +2,19 @@ using System;
 using System.Memory;
 
 template<T>
-class Array
-{
-    private int capacity;
-
-    export int Length() { return this.capacity; }
-
-    export String ToString()
-    {
-        int capacity = this.capacity;
-        String result = "";
-        for (int i; i < capacity; i++)
-        {
-            if (i > 0)
-            { result = (temp result) + ", "; }
-
-            result = (temp result) + (temp this[i].ToString());
-        }
-        return "{ " + (temp result) + " }";
-    }
-    
-    export T indexer_get(int index)
-    {
-        if (index < 0 || index >= this.capacity)
-        { throw "Index out of range exception"; }
-        return *((&this) + 1 + index * sizeof(T));
-    }
-
-    export void indexer_set(int index, T value)
-    {
-        if (index < 0 || index >= this.capacity)
-        { throw "Index out of range exception"; }
-        *((&this) + 1 + index * sizeof(T)) = value;
-    }
-    
-    export constructor(int capacity)
-    {
-        int* pointer = Alloc(1 + capacity * sizeof(T));
-        Array<T> result = pointer as Array<T>;
-        result.capacity = capacity;
-        return result;
-    }
-
-    export destructor()
-    {
-        delete &this;
-    }
-}
-
-template<T>
-class List
+struct List
 {
     private int _capacity;
     private int _length;
-    private Array<T> _ptr;
+    private T* _ptr;
 
     export int Length() { return this._length; }
     
     export void Clear() { this._length = 0; }
 
-    export String ToString()
+    export char* ToString()
     {
-        String result = "";
+        char* result = "";
         
         int length = this._length;
         for (int i; i < length; i++)
@@ -71,7 +22,7 @@ class List
             if (i > 0)
             { result = (temp result) + ", "; }
 
-            result = (temp result) + (temp this[i].ToString());
+            result = (temp result) + (temp this._ptr[i].ToString());
         }
         
         return "{ " + (temp result) + " }";
@@ -91,29 +42,29 @@ class List
         this._ptr[index] = value;
     }
     
-    export constructor(int capacity)
+    export List<T>*(int capacity)
     {
-        List<T> result = new List<T>;
-        result._capacity = capacity;
-        result._length = 0;
-        result._ptr = new Array<T>(capacity);
-        return result;
+        this._capacity = capacity;
+        this._length = 0;
+        this._ptr = Alloc(capacity * sizeof(T));
     }
 
     export destructor()
     {
         delete this._ptr as int*;
-        delete &this as int*;
     }
 
     export void Add(T item)
     {
         if (this._length + 1 >= this._capacity)
         {
-            this.EnsureCapacity(this._capacity * 2);
+            if (this._capacity)
+            { this.EnsureCapacity(this._capacity * 2); }
+            else
+            { this.EnsureCapacity(4); }
         }
         this._length++;
-        this[this._length - 1] = item;
+        this._ptr[this._length - 1] = item;
     }
 
     export T Remove(int index)
@@ -137,86 +88,20 @@ class List
         if (this._capacity < capacity)
         {
             var old = this._ptr;
-            this._ptr = new Array<T>(capacity);
+            this._ptr = Alloc(capacity * sizeof(T));
             this._capacity = capacity;
 
-            int length = this._length;
-            for (int i = 0; i < length; i++)
+            if (old)
             {
-                this._ptr[i] = old[i];
+                int length = this._length;
+                for (int i = 0; i < length; i++)
+                {
+                    this._ptr[i] = old[i];
+                }
+
+                delete old as int*;
             }
-
-            delete old as int*;
         }
-    }
-}
-
-class Map
-{
-    private int* pointer;
-    int length;
-    int width;
-
-    export int Get(int x, int y)
-    {
-        int index = y * this.width + x;
-        if (index < 0 || index >= this.length)
-        { throw "Index out of range exception"; }
-        return *(this.pointer + index);
-    }
-
-    int Get(int index)
-    {
-        if (index < 0 || index >= this.length)
-        { throw "Index out of range exception"; }
-        return *(this.pointer + index);
-    }
-  
-    export void Set(int x, int y, int element)
-    {
-        int index = y * this.width + x;
-        if (index < 0 || index >= this.length)
-        { throw "Index out of range exception"; }
-        *(this.pointer + index) = element;
-    }
-    
-    export String ToString()
-    {
-        int length = this.length;
-        String result = "";
-        for (int i; i < length; i++)
-        {
-            if (i > 0)
-            { result = result + ", "; }
-            int element = this.Get(i);
-            result = result + element.ToString();
-        };
-        return "{ " + result + " }";
-    }
-
-    export constructor(int width, int height)
-    {
-        int length = height * width;
-        Map result = new Map;
-        result.pointer = Alloc(length);
-        result.length = length;
-        result.width = width;
-        for (int i = 0; i < length; i++)
-        {
-            *(result.pointer + i) = 0;
-        }
-        return result;
-    }
-
-    export destructor()
-    {
-        delete this.pointer;
-        delete &this;
-    }
-
-    export bool OutOf(int x, int y)
-    {
-        return (x < 0 || y < 0 || x > this.width || y > (this.length / this.width));
     }
 }
 
@@ -225,7 +110,7 @@ class Stack
 {
     private int length;
     private int capacity;
-    private Array<T> array;
+    private T* array;
     
     export T indexer_get(int index)
     {
@@ -245,7 +130,7 @@ class Stack
     {
         Stack<T> result = new Stack<T>;
         result.capacity = capacity;
-        result.array = new Array<T>(capacity);
+        result.array = Alloc(capacity * sizeof(T));
         result.length = 0;
         return result;
     }
@@ -254,7 +139,7 @@ class Stack
     {
         if (this.capacity <= this.length)
         {
-            Array<T> newArray = new Array<T>(this.capacity + 1);
+            T* newArray = Alloc((this.capacity + 1) * sizeof(T));
             for (int i; i < this.capacity; i++)
             {
                 newArray[i] = this.array[i];
@@ -282,11 +167,11 @@ class Stack
         return result;
     }
     
-    export String ToString()
+    export char* ToString()
     {
         if (this.length)
         {
-            String result = "{ ";
+            char* result = "{ ";
 
             for (int i; i < this.length; i++)
             {
@@ -364,13 +249,13 @@ class LinkedList
         }
     }
     
-    export String ToString()
+    export char* ToString()
     {
         if (this.Root)
         {
             LinkedNode<T> current = this.Root;
             
-            String result = current.Value.ToString();
+            char* result = current.Value.ToString();
 
             while (current.Next) {
                 current = current.Next;

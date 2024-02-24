@@ -327,25 +327,22 @@ namespace LanguageCore.Runtime
             return result;
         }
 
-        public static string GetString(this IReadOnlyHeap heap, int start, int length)
+        public static string GetString(this IReadOnlyHeap heap, int start)
         {
-            int end = start + length;
-            StringBuilder result = new(length);
-            for (int i = start; i < end; i++)
+            StringBuilder result = new();
+            int i = start;
+            while (heap[i])
             {
-                if (i < 0 || i >= heap.Size)
-                { result.Append('\0'); }
-                else
-                { result.Append(heap[i].ToChar(null)); }
+                result.Append((char)heap[i]);
+                i++;
             }
             return result.ToString();
         }
         public static string? GetStringByPointer(this IReadOnlyHeap heap, int pointer)
         {
-            if (pointer < 0 || pointer >= heap.Size)
+            if (pointer == 0)
             { return null; }
-            int length = heap[pointer].ToInt32(null);
-            return heap.GetString(pointer + 1, length);
+            return heap.GetString(pointer);
         }
     }
 

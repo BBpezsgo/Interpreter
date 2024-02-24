@@ -4,29 +4,27 @@ using System.Text;
 
 namespace LanguageCore.Compiler
 {
-    using LanguageCore.Tokenizing;
     using Parser;
     using Parser.Statement;
 
-    public class CompiledGeneralFunction :
-        GeneralFunctionDefinition,
+    public class CompiledConstructor :
+        ConstructorDefinition,
         ISameCheck,
-        ISameCheck<CompiledGeneralFunction>,
+        ISameCheck<CompiledConstructor>,
         IReferenceable<KeywordCall>,
         IReferenceable<ConstructorCall>,
-        IDuplicatable<CompiledGeneralFunction>
+        IDuplicatable<CompiledConstructor>
     {
-        public CompiledType[] ParameterTypes;
         readonly List<Reference<Statement>> references;
         public CompiledStruct? Context;
+
+        public CompiledType[] ParameterTypes;
         public CompiledType Type;
 
         public int TimesUsed;
         public int TimesUsedTotal;
 
         public int InstructionOffset = -1;
-
-        public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
 
         public IReadOnlyList<Reference<Statement>> References => references;
 
@@ -40,7 +38,7 @@ namespace LanguageCore.Compiler
             }
         }
 
-        public CompiledGeneralFunction(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
+        public CompiledConstructor(CompiledType type, CompiledType[] parameterTypes, ConstructorDefinition functionDefinition) : base(functionDefinition)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
@@ -52,19 +50,18 @@ namespace LanguageCore.Compiler
         public void AddReference(ConstructorCall referencedBy, string? file) => references.Add(new Reference<Statement>(referencedBy, file));
         public void ClearReferences() => references.Clear();
 
-        public bool IsSame(CompiledGeneralFunction other)
+        public bool IsSame(CompiledConstructor other)
         {
             if (this.Type != other.Type) return false;
-            if (this.Identifier.Content != other.Identifier.Content) return false;
             if (this.ParameterTypes.Length != other.ParameterTypes.Length) return false;
             for (int i = 0; i < this.ParameterTypes.Length; i++)
             { if (this.ParameterTypes[i] != other.ParameterTypes[i]) return false; }
 
             return true;
         }
-        public bool IsSame(ISameCheck? other) => other is CompiledGeneralFunction other2 && IsSame(other2);
+        public bool IsSame(ISameCheck? other) => other is CompiledConstructor other2 && IsSame(other2);
 
-        public new CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, this)
+        public CompiledConstructor Duplicate() => new(Type, ParameterTypes, this)
         {
             TimesUsed = TimesUsed,
             TimesUsedTotal = TimesUsedTotal,
@@ -78,7 +75,7 @@ namespace LanguageCore.Compiler
             if (IsExport)
             { result.Append("export "); }
 
-            result.Append(this.Identifier.Content);
+            result.Append(Type);
 
             result.Append('(');
             if (this.ParameterTypes.Length > 0)
@@ -86,11 +83,6 @@ namespace LanguageCore.Compiler
                 for (int i = 0; i < ParameterTypes.Length; i++)
                 {
                     if (i > 0) result.Append(", ");
-                    if (Parameters[i].Modifiers.Length >0)
-                    {
-                        result.Append(string.Join<Token>(' ', Parameters[i].Modifiers));
-                        result.Append(' ');
-                    }
                     result.Append(ParameterTypes[i].ToString());
                 }
             }
@@ -101,9 +93,9 @@ namespace LanguageCore.Compiler
             return result.ToString();
         }
 
-        public CompiledGeneralFunctionTemplateInstance InstantiateTemplate(TypeArguments typeParameters)
+        public CompiledConstructorTemplateInstance InstantiateTemplate(TypeArguments typeParameters)
         {
-            CompiledGeneralFunctionTemplateInstance result = new(Type, ParameterTypes, this, this)
+            CompiledConstructorTemplateInstance result = new(Type, ParameterTypes, this, this)
             {
                 TimesUsed = TimesUsed,
                 TimesUsedTotal = TimesUsedTotal,

@@ -11,9 +11,6 @@ namespace TheProgram
     using LanguageCore.Brainfuck;
     using LanguageCore.Brainfuck.Generator;
     using LanguageCore.Compiler;
-#if !AOT
-    using LanguageCore.IL.Generator;
-#endif
     using LanguageCore.Parser;
     using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
@@ -231,7 +228,7 @@ namespace TheProgram
                     Output.LogDebug($"Minify code ...");
                     int prevCodeLength = generated.Code.Length;
                     generated.Code = Minifier.Minify(generated.Code);
-                    Output.LogDebug($"Minification: {prevCodeLength} -> {generated.Code.Length} ({((float)generated.Code.Length - prevCodeLength) / (float)generated.Code.Length * 100f:#} %)");
+                    Output.LogDebug($"Minification: {prevCodeLength} -> {generated.Code.Length} ({((float)generated.Code.Length - prevCodeLength) / (float)generated.Code.Length * 100f:#}%)");
 
                     if ((compileOptions & BrainfuckCompilerFlags.PrintFinal) != 0)
                     {
@@ -262,7 +259,7 @@ namespace TheProgram
                         Output.Write("Press any key to start the interpreter");
                         Console.ReadKey();
 
-                        interpreter.RunWithUI(true, 10);
+                        interpreter.RunWithUI(true, 1);
 
                         Console.ReadKey();
                     }
@@ -383,24 +380,6 @@ namespace TheProgram
                         }
                     }
                     break;
-                }
-                case ProgramRunType.IL:
-                {
-#if AOT
-                    throw new NotSupportedException($"The compiler compiled in AOT mode so IL generation isn't available");
-#else
-                    AnalysisCollection analysisCollection = new();
-
-                    CompilerResult compiled = Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
-
-                    ILGeneratorResult generated = CodeGeneratorForIL.Generate(compiled, arguments.CompilerSettings, default, Output.Log, analysisCollection);
-
-                    analysisCollection.Throw();
-                    analysisCollection.Print();
-
-                    generated.Invoke();
-                    break;
-#endif
                 }
                 case ProgramRunType.ASM:
                 {

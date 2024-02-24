@@ -198,5 +198,12 @@ namespace LanguageCore
             Utils.Map(keys, values, result);
             return result;
         }
+
+        public static T[] Duplicate<T>(T[] array)
+        {
+            T[] result = new T[array.Length];
+            Array.Copy(array, result, array.Length);
+            return result;
+        }
     }
 }

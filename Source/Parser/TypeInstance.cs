@@ -43,11 +43,6 @@ namespace LanguageCore.Parser
         protected static bool TryGetAnalyzedType(CompiledType type, out TokenAnalyzedType analyzedType)
         {
             analyzedType = default;
-            if (type.IsClass)
-            {
-                analyzedType = TokenAnalyzedType.Class;
-                return true;
-            }
 
             if (type.IsStruct)
             {
@@ -312,5 +307,7 @@ namespace LanguageCore.Parser
 
         public override string ToString() => $"{To}{Operator}";
         public override string ToString(TypeArguments typeArguments) => $"{To.ToString(typeArguments)}{Operator}";
+
+        public static TypeInstancePointer CreateAnonymous(TypeInstance to) => new(to, Token.CreateAnonymous("*", TokenType.Operator));
     }
 }

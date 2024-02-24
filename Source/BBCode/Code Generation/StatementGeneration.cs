@@ -82,7 +82,7 @@ namespace LanguageCore.BBCode.Generator
                     if (InFunction || InMacro.Last)
                     {
                         int offset = ReturnValueOffset;
-                        for (int i = 0; i < returnValueType.SizeOnStack; i++)
+                        for (int i = 0; i < returnValueType.Size; i++)
                         { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, offset - i); }
                     }
                     else
@@ -159,29 +159,23 @@ namespace LanguageCore.BBCode.Generator
                 if (keywordCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"delete\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
-                CompiledType valueType = FindStatementType(keywordCall.Parameters[0]);
+                CompiledType deletableType = FindStatementType(keywordCall.Parameters[0]);
 
-                if (valueType.IsPointer)
+                if (!deletableType.IsPointer)
                 {
-                    GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
-                    AddInstruction(Opcode.HEAP_FREE);
-
+                    AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on pointers or pointer so I skip this", keywordCall.Parameters[0], CurrentFile));
                     return;
                 }
 
-                if (!valueType.IsClass)
+                if (!GetGeneralFunction(deletableType, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                 {
-                    AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on type class or pointer so I skip this", keywordCall.Parameters[0], CurrentFile));
-                    return;
-                }
-
-                if (!GetGeneralFunction(valueType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
-                {
-                    if (!GetGeneralFunctionTemplate(valueType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
+                    if (!GetGeneralFunctionTemplate(deletableType, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                     {
                         GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
                         AddInstruction(Opcode.HEAP_FREE);
                         AddComment("}");
+
+                        AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deletableType}\" not found", keywordCall.Identifier, CurrentFile));
 
                         return;
                     }
@@ -191,13 +185,13 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!destructor.CanUse(CurrentFile))
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{valueType.Class.Identifier.Content}\" function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{deletableType}\" function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
                     AddComment("}");
                     return;
                 }
 
                 AddComment(" Param0:");
-                GenerateCodeForStatement(keywordCall.Parameters[0], valueType);
+                GenerateCodeForStatement(keywordCall.Parameters[0], deletableType);
 
                 AddComment(" .:");
 
@@ -208,62 +202,7 @@ namespace LanguageCore.BBCode.Generator
 
                 AddComment(" Clear Param0:");
 
-                AddInstruction(Opcode.POP_VALUE);
-
-                AddComment("}");
-
-                return;
-            }
-
-            if (keywordCall.FunctionName == "clone")
-            {
-                if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"clone\": required {1} passed {0}", keywordCall, CurrentFile); }
-
-                CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
-
-                if (!paramType.IsClass)
-                {
-                    AnalysisCollection?.Warnings.Add(new Warning($"The 'clone' function is only working on type class so I skip this shit", keywordCall.Parameters[0], CurrentFile));
-                    return;
-                }
-
-                if (!GetGeneralFunction(paramType.Class, BuiltinFunctionNames.Cloner, out CompiledGeneralFunction? cloner))
-                { throw new CompilerException($"Cloner for type \"{paramType.Class.Identifier}\" not found. Check if you defined a general function with name \"clone\" in class \"{paramType.Class.Identifier}\"", keywordCall.Identifier, CurrentFile); }
-
-                if (!cloner.CanUse(CurrentFile))
-                {
-                    AnalysisCollection?.Errors.Add(new Error($"Cloner for type \"{paramType.Class.Identifier.Content}\" function could not be called due to its protection level.", keywordCall.Identifier, CurrentFile));
-                    AddComment("}");
-                    return;
-                }
-
-                int returnValueSize = 0;
-                if (cloner.ReturnSomething)
-                {
-                    returnValueSize = GenerateInitialValue(cloner.Type);
-                }
-
-                AddComment($" Param {0}:");
-                GenerateCodeForStatement(keywordCall.Parameters[0], paramType);
-
-                AddComment(" .:");
-
-                int jumpInstruction = Call(cloner.InstructionOffset);
-
-                if (cloner.InstructionOffset == -1)
-                { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, keywordCall, cloner, CurrentFile)); }
-
-                AddComment(" Clear Params:");
-
-                AddInstruction(Opcode.POP_VALUE);
-
-                if (cloner.ReturnSomething && !keywordCall.SaveValue)
-                {
-                    AddComment(" Clear Return Value:");
-                    for (int i = 0; i < returnValueSize; i++)
-                    { AddInstruction(Opcode.POP_VALUE); }
-                }
+                AddInstruction(Opcode.HEAP_FREE);
 
                 AddComment("}");
 
@@ -325,7 +264,7 @@ namespace LanguageCore.BBCode.Generator
                 functionCall.Reference = macro;
 
                 string? prevFile = CurrentFile;
-                IAmInContext<CompiledClass>? prevContext = CurrentContext;
+                FunctionThingDefinition? prevContext = CurrentContext;
 
                 CurrentFile = macro.FilePath;
                 CurrentContext = null;
@@ -375,7 +314,7 @@ namespace LanguageCore.BBCode.Generator
                 CompiledType passedParameterType = FindStatementType(passedParameter);
                 AddComment(" Param prev:");
                 GenerateCodeForStatement(functionCall.PrevStatement);
-                parameterCleanup.Push((passedParameterType.SizeOnStack, false, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
             }
 
             for (int i = 0; i < functionCall.Parameters.Length; i++)
@@ -389,7 +328,7 @@ namespace LanguageCore.BBCode.Generator
 
                 bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
-                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
+                canDeallocate = canDeallocate && passedParameterType.IsPointer;
 
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
@@ -405,7 +344,7 @@ namespace LanguageCore.BBCode.Generator
 
                 GenerateCodeForStatement(passedParameter, definedParameterType);
 
-                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
             }
 
             return parameterCleanup;
@@ -421,7 +360,7 @@ namespace LanguageCore.BBCode.Generator
                 CompiledType passedParameterType = FindStatementType(passedParameter);
                 AddComment(" Param prev:");
                 GenerateCodeForStatement(functionCall.PrevStatement);
-                parameterCleanup.Push((passedParameterType.SizeOnStack, false, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
             }
 
             for (int i = 0; i < functionCall.Parameters.Length; i++)
@@ -434,7 +373,7 @@ namespace LanguageCore.BBCode.Generator
 
                 bool canDeallocate = true; // temp type maybe?
 
-                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
+                canDeallocate = canDeallocate && passedParameterType.IsPointer;
 
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
@@ -450,7 +389,7 @@ namespace LanguageCore.BBCode.Generator
 
                 GenerateCodeForStatement(passedParameter, definedParameterType);
 
-                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
             }
 
             return parameterCleanup;
@@ -471,7 +410,7 @@ namespace LanguageCore.BBCode.Generator
 
                 bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
-                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
+                canDeallocate = canDeallocate && passedParameterType.IsPointer;
 
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
@@ -487,7 +426,44 @@ namespace LanguageCore.BBCode.Generator
 
                 GenerateCodeForStatement(passedParameter, definedParameterType);
 
-                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
+                parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
+            }
+
+            return parameterCleanup;
+        }
+
+        Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(ConstructorCall constructorCall, CompiledConstructor constructor)
+        {
+            Stack<ParameterCleanupItem> parameterCleanup = new();
+
+            for (int i = 0; i < constructorCall.Parameters.Length; i++)
+            {
+                StatementWithValue passedParameter = constructorCall.Parameters[i];
+                CompiledType passedParameterType = FindStatementType(passedParameter);
+                ParameterDefinition definedParameter = constructor.Parameters[constructor.IsMethod ? (i + 1) : i];
+                CompiledType definedParameterType = constructor.ParameterTypes[constructor.IsMethod ? (i + 1) : i];
+
+                AddComment($" Param {i}:");
+
+                bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+
+                canDeallocate = canDeallocate && passedParameterType.IsPointer;
+
+                if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
+                {
+                    if (explicitDeallocate && !canDeallocate)
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                }
+                else
+                {
+                    if (explicitDeallocate)
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    canDeallocate = false;
+                }
+
+                GenerateCodeForStatement(passedParameter, definedParameterType);
+
+                parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
             }
 
             return parameterCleanup;
@@ -671,8 +647,8 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForFunctionCall_Variable(FunctionCall functionCall, CompiledVariable compiledVariable)
         {
-            FunctionType functionType = compiledVariable.Type.Function;
-            OnGotStatementType(functionCall, compiledVariable.Type.Function.ReturnType);
+            FunctionType functionType = compiledVariable.Type.Function!;
+            OnGotStatementType(functionCall, compiledVariable.Type.Function!.ReturnType);
 
             if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
@@ -710,8 +686,8 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForFunctionCall_Variable(FunctionCall functionCall, CompiledParameter compiledParameter)
         {
-            FunctionType functionType = compiledParameter.Type.Function;
-            OnGotStatementType(functionCall, compiledParameter.Type.Function.ReturnType);
+            FunctionType functionType = compiledParameter.Type.Function!;
+            OnGotStatementType(functionCall, compiledParameter.Type.Function!.ReturnType);
 
             if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
@@ -809,7 +785,7 @@ namespace LanguageCore.BBCode.Generator
                 AddComment($" Param {i}:");
                 GenerateCodeForStatement(passedParameter, definedParameterType);
 
-                paramsSize += definedParameterType.SizeOnStack;
+                paramsSize += definedParameterType.Size;
             }
 
             AddComment(" .:");
@@ -1010,9 +986,6 @@ namespace LanguageCore.BBCode.Generator
                 }
                 case LiteralType.String:
                 {
-                    if (TryFindTypeReplacer("string", out CompiledType? replacedType))
-                    { OnGotStatementType(literal, replacedType); }
-
                     GenerateCodeForLiteralString(literal.Value);
                     break;
                 }
@@ -1047,16 +1020,17 @@ namespace LanguageCore.BBCode.Generator
 
             AddComment("}");
 
-            AddComment("Set String.length {");
-            // Set String.length
-            {
-                AddInstruction(Opcode.PUSH_VALUE, literal.Length);
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-                AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
-            }
-            AddComment("}");
+            // AddComment("Set String.length {");
+            // // Set String.length
+            // {
+            //     AddInstruction(Opcode.PUSH_VALUE, literal.Length);
+            //     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
+            //     AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+            // }
+            // AddComment("}");
 
             AddComment("Set string data {");
+
             for (int i = 0; i < literal.Length; i++)
             {
                 // Prepare value
@@ -1064,12 +1038,26 @@ namespace LanguageCore.BBCode.Generator
 
                 // Calculate pointer
                 AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-                AddInstruction(Opcode.PUSH_VALUE, 1 + i);
+                AddInstruction(Opcode.PUSH_VALUE, i);
                 AddInstruction(Opcode.MATH_ADD);
 
                 // Set value
                 AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
             }
+
+            {
+                // Prepare value
+                AddInstruction(Opcode.PUSH_VALUE, new DataItem('\0'));
+
+                // Calculate pointer
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
+                AddInstruction(Opcode.PUSH_VALUE, literal.Length);
+                AddInstruction(Opcode.MATH_ADD);
+
+                // Set value
+                AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+            }
+
             AddComment("}");
 
             AddComment("}");
@@ -1107,7 +1095,7 @@ namespace LanguageCore.BBCode.Generator
                 variable.Reference = val;
                 OnGotStatementType(variable, val.Type);
 
-                StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
+                StackLoad(new ValueAddress(val), val.Type.Size);
                 return;
             }
 
@@ -1117,7 +1105,7 @@ namespace LanguageCore.BBCode.Generator
                 variable.Reference = globalVariable;
                 OnGotStatementType(variable, globalVariable.Type);
 
-                StackLoad(GetGlobalVariableAddress(globalVariable), globalVariable.Type.SizeOnStack);
+                StackLoad(GetGlobalVariableAddress(globalVariable), globalVariable.Type.Size);
                 return;
             }
 
@@ -1144,11 +1132,10 @@ namespace LanguageCore.BBCode.Generator
             {
                 CompiledType type = FindStatementType(identifier);
 
-                if (!type.InHEAP)
-                { throw new CompilerException($"Variable \"{identifier}\" (type of {type}) is stored on the stack", addressGetter, CurrentFile); }
+                throw new CompilerException($"Variable \"{identifier}\" (type of {type}) is stored on the stack", addressGetter, CurrentFile);
 
-                GenerateCodeForStatement(identifier);
-                return;
+                // GenerateCodeForStatement(identifier);
+                // return;
             }
 
             if (addressGetter.PrevStatement is Field field)
@@ -1156,12 +1143,11 @@ namespace LanguageCore.BBCode.Generator
                 int offset = GetDataOffset(field);
                 ValueAddress pointerOffset = GetBaseAddress(field);
 
-                if (!pointerOffset.InHeap)
-                { throw new CompilerException($"Field \"{field}\" is on the stack", addressGetter, CurrentFile); }
+                throw new CompilerException($"Field \"{field}\" is on the stack", addressGetter, CurrentFile);
 
-                StackLoad(pointerOffset);
-                AddInstruction(Opcode.MATH_ADD, offset);
-                return;
+                // StackLoad(pointerOffset);
+                // AddInstruction(Opcode.MATH_ADD, offset);
+                // return;
             }
 
             throw new NotImplementedException();
@@ -1319,161 +1305,84 @@ namespace LanguageCore.BBCode.Generator
         {
             AddComment($"new {newObject.TypeName} {{");
 
-            if (newObject.TypeName is not TypeInstanceSimple newObjectType)
-            { throw new NotImplementedException(); }
+            CompiledType instanceType = FindType(newObject.TypeName);
 
-            CompiledType instanceType = FindType(newObjectType);
-            newObjectType.SetAnalyzedType(instanceType);
+            newObject.TypeName.SetAnalyzedType(instanceType);
             OnGotStatementType(newObject, instanceType);
 
-            if (instanceType.IsStruct)
+            if (instanceType.IsPointer)
             {
-                instanceType.Struct.AddReference(newObjectType, CurrentFile);
+                AddInstruction(Opcode.PUSH_VALUE, instanceType.PointerTo.Size);
+                AddInstruction(Opcode.HEAP_ALLOC);
+
+                for (int offset = 0; offset < instanceType.PointerTo.Size; offset++)
+                {
+                    AddInstruction(Opcode.PUSH_VALUE, 0);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
+                    AddInstruction(Opcode.PUSH_VALUE, offset);
+                    AddInstruction(Opcode.MATH_ADD);
+                    AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+                }
+            }
+            else if (instanceType.IsStruct)
+            {
+                instanceType.Struct.AddReference(newObject.TypeName, CurrentFile);
 
                 GenerateInitialValue(instanceType);
             }
-            else if (instanceType.IsClass)
-            {
-                instanceType.Class.AddReference(newObjectType, CurrentFile);
-
-                if (instanceType.Class.TemplateInfo != null)
-                {
-                    if (newObjectType.GenericTypes is null)
-                    { throw new CompilerException($"No type arguments specified for class instance \"{instanceType}\"", newObjectType, CurrentFile); }
-
-                    if (instanceType.Class.TemplateInfo.TypeParameters.Length != newObjectType.GenericTypes.Length)
-                    { throw new CompilerException($"Wrong number of type arguments specified for class instance \"{instanceType}\": require {instanceType.Class.TemplateInfo.TypeParameters.Length} specified {newObjectType.GenericTypes.Length}", newObjectType, CurrentFile); }
-
-                    CompiledType[] genericParameters = newObjectType.GenericTypes!.Select(v => new CompiledType(v, FindType)).ToArray();
-                    instanceType.Class.AddTypeArguments(genericParameters);
-                }
-                else
-                {
-                    if (newObjectType.GenericTypes is not null)
-                    { throw new CompilerException($"You should not specify type arguments for class instance \"{instanceType}\"", newObjectType, CurrentFile); }
-                }
-
-                AddInstruction(Opcode.PUSH_VALUE, instanceType.Class.SizeOnHeap);
-                AddInstruction(Opcode.HEAP_ALLOC);
-
-                int currentOffset = 0;
-                for (int fieldIndex = 0; fieldIndex < instanceType.Class.Fields.Length; fieldIndex++)
-                {
-                    CompiledField field = instanceType.Class.Fields[fieldIndex];
-                    AddComment($"Create Field '{field.Identifier.Content}' ({fieldIndex}) {{");
-
-                    CompiledType? fieldType = field.Type;
-
-                    if (fieldType.IsGeneric && !instanceType.Class.CurrentTypeArguments.TryGetValue(fieldType.Name, out fieldType))
-                    { throw new CompilerException($"Type argument \"{fieldType?.Name}\" not found", field, instanceType.Class.FilePath); }
-
-                    GenerateInitialValue2(fieldType, j =>
-                    {
-                        AddComment($"Save Chunk {j}:");
-                        AddInstruction(Opcode.PUSH_VALUE, currentOffset);
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -3);
-                        AddInstruction(Opcode.MATH_ADD);
-                        AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
-                        currentOffset++;
-                    });
-                    AddComment("}");
-                }
-
-                instanceType.Class.ClearTypeArguments();
-            }
             else
-            { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", newObject.TypeName, CurrentFile); }
+            { throw new CompilerException($"Unknown type definition {instanceType}", newObject.TypeName, CurrentFile); }
             AddComment("}");
         }
         void GenerateCodeForStatement(ConstructorCall constructorCall)
         {
-            AddComment($"new {constructorCall.TypeName}(...): {{");
+            CompiledType instanceType = new(constructorCall.TypeName, FindType, TryCompute);
+            CompiledType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
-            CompiledType instanceType = FindType(constructorCall.TypeName);
-            constructorCall.TypeName.SetAnalyzedType(instanceType);
-            OnGotStatementType(constructorCall, instanceType);
-
-            if (instanceType.IsStruct)
-            { throw new NotImplementedException(); }
-
-            if (!instanceType.IsClass)
-            { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
-
-            instanceType.Class.AddReference(constructorCall.TypeName, CurrentFile);
-
-            if (!GetClass(constructorCall, out CompiledClass? @class))
-            { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
-
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+            if (!GetConstructor(instanceType, parameters, out CompiledConstructor? compiledFunction))
             {
-                if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
-                {
-                    throw new CompilerException($"Function {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
-                }
-                else
-                {
-                    compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
-                    constructor = compilableGeneralFunction.Function;
-                }
+                if (!GetConstructorTemplate(instanceType, parameters, out CompliableTemplate<CompiledConstructor> compilableFunction))
+                { throw new CompilerException($"Constructor {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.TypeName, CurrentFile); }
+
+                compilableFunction = AddCompilable(compilableFunction);
+                compiledFunction = compilableFunction.Function;
             }
 
-            constructor.AddReference(constructorCall, CurrentFile);
-            constructorCall.Reference = constructor;
+            compiledFunction.AddReference(constructorCall, CurrentFile);
+            OnGotStatementType(constructorCall, compiledFunction.Type);
 
-            if (!constructor.CanUse(CurrentFile))
+            if (!compiledFunction.CanUse(CurrentFile))
             {
-                AnalysisCollection?.Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
-                AddComment("}");
+                AnalysisCollection?.Errors.Add(new Error($"Constructor {compiledFunction.ToReadable()} could not be called due to its protection level", constructorCall.TypeName, CurrentFile));
                 return;
             }
 
-            if (constructorCall.Parameters.Length != constructor.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: required {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
+            if (compiledFunction.IsMacro)
+            { throw new NotImplementedException(); }
 
-            int returnValueSize = 0;
-            if (constructor.ReturnSomething)
-            {
-                returnValueSize = GenerateInitialValue(constructor.Type);
-            }
+            AddComment($"Call {compiledFunction.ToReadable()} {{");
 
-            int paramsSize = 0;
+            Stack<ParameterCleanupItem> parameterCleanup;
 
-            for (int i = 0; i < constructorCall.Parameters.Length; i++)
-            {
-                Statement passedParameter = constructorCall.Parameters[i];
-                CompiledType passedParameterType = FindStatementType(constructorCall.Parameters[i]);
+            NewInstance newInstance = constructorCall.ToInstantiation();
+            CompiledType newInstanceType = FindStatementType(newInstance);
+            if (newInstanceType.Size != 1)
+            { throw new NotImplementedException(); }
+            GenerateCodeForStatement(newInstance);
 
-                CompiledType parameterType = constructor.ParameterTypes[constructor.IsMethod ? (i + 1) : i];
-                ParameterDefinition parameterDefinition = constructor.Parameters[constructor.IsMethod ? (i + 1) : i];
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -1);
 
-                if (parameterType != passedParameterType)
-                { }
-
-                AddComment($" Param {i}:");
-                GenerateCodeForStatement(passedParameter);
-
-                paramsSize += parameterType.SizeOnStack;
-            }
+            parameterCleanup = GenerateCodeForParameterPassing(constructorCall, compiledFunction);
+            parameterCleanup.Insert(0, (newInstanceType.Size, false, newInstanceType));
 
             AddComment(" .:");
 
-            int jumpInstruction = Call(constructor.InstructionOffset);
+            int jumpInstruction = Call(compiledFunction.InstructionOffset);
 
-            if (constructor.InstructionOffset == -1)
-            { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, constructorCall, constructor, CurrentFile)); }
+            if (compiledFunction.InstructionOffset == -1)
+            { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructor>(jumpInstruction, false, constructorCall, compiledFunction, CurrentFile)); }
 
-            AddComment(" Clear Params:");
-            for (int i = 0; i < paramsSize; i++)
-            {
-                AddInstruction(Opcode.POP_VALUE);
-            }
-
-            if (constructor.ReturnSomething && !constructorCall.SaveValue)
-            {
-                AddComment(" Clear Return Value:");
-                for (int i = 0; i < returnValueSize; i++)
-                { AddInstruction(Opcode.POP_VALUE); }
-            }
+            GenerateCodeForParameterCleanup(parameterCleanup);
 
             AddComment("}");
         }
@@ -1502,7 +1411,26 @@ namespace LanguageCore.BBCode.Generator
                 return;
             }
 
-            if (!prevType.IsStruct && !prevType.IsClass) throw new NotImplementedException();
+            if (prevType.IsPointer)
+            {
+                if (!prevType.PointerTo.TryGetFieldOffsets(out IReadOnlyDictionary<string, int>? fieldOffsets))
+                { throw new CompilerException($"Could not get the field offsets of type {prevType}", field.PrevStatement, CurrentFile); }
+
+                if (!fieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
+                { throw new CompilerException($"Could not get the field offset of field \"{field.FieldName}\"", field.FieldName, CurrentFile); }
+
+                GenerateCodeForStatement(field.PrevStatement);
+
+                CheckPointerNull();
+
+                AddInstruction(Opcode.PUSH_VALUE, fieldOffset);
+                AddInstruction(Opcode.MATH_ADD);
+                AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
+
+                return;
+            }
+
+            if (!prevType.IsStruct) throw new NotImplementedException();
 
             CompiledType type = FindStatementType(field);
 
@@ -1511,25 +1439,25 @@ namespace LanguageCore.BBCode.Generator
 
             field.Reference = compiledField;
 
-            if (CurrentContext?.Context != null)
-            {
-                switch (compiledField.Protection)
-                {
-                    case Protection.Private:
-                        if (CurrentContext.Context.Identifier.Content != compiledField.Class!.Identifier.Content)
-                        { throw new CompilerException($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Identifier}\" due to it's protection level", field, CurrentFile); }
-                        break;
-                    case Protection.Public:
-                        break;
-                    default: throw new UnreachableException();
-                }
-            }
+            // if (CurrentContext?.Context != null)
+            // {
+            //     switch (compiledField.Protection)
+            //     {
+            //         case Protection.Private:
+            //             if (CurrentContext.Context.Identifier.Content != compiledField.Class!.Identifier.Content)
+            //             { throw new CompilerException($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Identifier}\" due to it's protection level", field, CurrentFile); }
+            //             break;
+            //         case Protection.Public:
+            //             break;
+            //         default: throw new UnreachableException();
+            //     }
+            // }
 
             if (IsItInHeap(field))
             {
                 int offset = GetDataOffset(field);
                 ValueAddress pointerOffset = GetBaseAddress(field);
-                for (int i = 0; i < type.SizeOnStack; i++)
+                for (int i = 0; i < type.Size; i++)
                 {
                     AddComment($"{i}:");
                     HeapLoad(pointerOffset, offset + i);
@@ -1538,7 +1466,7 @@ namespace LanguageCore.BBCode.Generator
             else
             {
                 ValueAddress offset = GetDataAddress(field);
-                StackLoad(offset, compiledField.Type.SizeOnStack);
+                StackLoad(offset, compiledField.Type.Size);
             }
         }
         void GenerateCodeForStatement(IndexCall index)
@@ -1560,7 +1488,7 @@ namespace LanguageCore.BBCode.Generator
                         if (param.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        ValueAddress offset = GetBaseAddress(param, (computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack));
+                        ValueAddress offset = GetBaseAddress(param, (computedIndexData.ValueSInt32 * prevType.StackArrayOf.Size));
                         AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, offset.Address);
 
                         if (offset.IsReference)
@@ -1574,13 +1502,10 @@ namespace LanguageCore.BBCode.Generator
                         if (val.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        if (val.Type.InHEAP)
-                        { throw new NotImplementedException(); }
-
-                        int offset = (computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack);
+                        int offset = computedIndexData.ValueSInt32 * prevType.StackArrayOf.Size;
                         ValueAddress address = new(val);
 
-                        StackLoad(address + offset, prevType.StackArrayOf.SizeOnStack);
+                        StackLoad(address + offset, prevType.StackArrayOf.Size);
 
                         return;
                     }
@@ -1618,12 +1543,35 @@ namespace LanguageCore.BBCode.Generator
 
             if (!GetIndexGetter(prevType, out CompiledFunction? indexer))
             {
-                if (!GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index getter \"{prevType}[]\" not found", index, CurrentFile); }
-
-                indexerTemplate = AddCompilable(indexerTemplate);
-                indexer = indexerTemplate.Function;
+                if (GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
+                {
+                    indexerTemplate = AddCompilable(indexerTemplate);
+                    indexer = indexerTemplate.Function;
+                }
             }
+
+            if (indexer == null && prevType.IsPointer)
+            {
+                GenerateCodeForStatement(index.PrevStatement);
+
+                AddInstruction(Opcode.PUSH_VALUE, prevType.PointerTo.Size);
+                CompiledType indexType = FindStatementType(index.Expression);
+                if (!indexType.IsBuiltin)
+                { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", index.Expression, CurrentFile); }
+                GenerateCodeForStatement(index.Expression);
+                AddInstruction(Opcode.MATH_MULT);
+
+                AddInstruction(Opcode.MATH_ADD);
+
+                CheckPointerNull();
+
+                AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
+
+                return;
+            }
+
+            if (indexer == null)
+            { throw new CompilerException($"Index getter \"{prevType}[]\" not found", index, CurrentFile); }
 
             GenerateCodeForFunctionCall_Function(new FunctionCall(
                     index.PrevStatement,
@@ -1635,8 +1583,6 @@ namespace LanguageCore.BBCode.Generator
                     },
                     index.BracketRight
                 ), indexer);
-
-            return;
         }
         void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
         {
@@ -1694,8 +1640,8 @@ namespace LanguageCore.BBCode.Generator
             typeCast.Type.SetAnalyzedType(targetType);
             OnGotStatementType(typeCast, targetType);
 
-            if (statementType.SizeOnStack != targetType.SizeOnStack)
-            { throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.SizeOnStack}) to {targetType} (size of {targetType.SizeOnStack})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
+            if (statementType.Size != targetType.Size)
+            { throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.Size}) to {targetType} (size of {targetType.Size})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
 
             GenerateCodeForStatement(typeCast.PrevStatement, targetType);
 
@@ -1895,7 +1841,25 @@ namespace LanguageCore.BBCode.Generator
 
             CompiledType prevType = FindStatementType(statementToSet.PrevStatement);
 
-            if (!prevType.IsStruct && !prevType.IsClass)
+            if (prevType.IsPointer)
+            {
+                if (!prevType.PointerTo.TryGetFieldOffsets(out IReadOnlyDictionary<string, int>? fieldOffsets))
+                { throw new CompilerException($"Failed to get the field offsets of type {prevType.PointerTo}", statementToSet.PrevStatement, CurrentFile); }
+
+                if (!fieldOffsets.TryGetValue(statementToSet.FieldName.Content, out int fieldOffset))
+                { throw new CompilerException($"Failed to get the field offset for \"{statementToSet.FieldName}\" in type {prevType.PointerTo}", statementToSet.FieldName, CurrentFile); }
+
+                GenerateCodeForStatement(statementToSet.PrevStatement);
+
+                GenerateCodeForStatement(value);
+                ValueAddress pointerAddress = new(-valueType.Size - 1, AddressingMode.StackRelative);
+                HeapStore(pointerAddress, fieldOffset);
+
+                AddInstruction(Opcode.POP_VALUE);
+                return;
+            }
+
+            if (!prevType.IsStruct)
             { throw new NotImplementedException(); }
 
             CompiledType type = FindStatementType(statementToSet);
@@ -1903,15 +1867,15 @@ namespace LanguageCore.BBCode.Generator
             if (type != valueType)
             { throw new CompilerException($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, CurrentFile); }
 
-            if (prevType.IsClass)
-            { prevType.Class.AddTypeArguments(prevType.TypeParameters); }
+            if (prevType.IsStruct)
+            { prevType.Struct.AddTypeArguments(prevType.TypeParameters); }
 
             GenerateCodeForStatement(value);
 
             bool _inHeap = IsItInHeap(statementToSet);
 
-            if (prevType.IsClass)
-            { prevType.Class.ClearTypeArguments(); }
+            if (prevType.IsStruct)
+            { prevType.Struct.ClearTypeArguments(); }
 
             if (_inHeap)
             {
@@ -1924,7 +1888,7 @@ namespace LanguageCore.BBCode.Generator
             else
             {
                 ValueAddress offset = GetDataAddress(statementToSet);
-                StackStore(offset, valueType.SizeOnStack);
+                StackStore(offset, valueType.Size);
 
                 return;
             }
@@ -1956,11 +1920,8 @@ namespace LanguageCore.BBCode.Generator
                         if (variable.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        if (variable.Type.InHEAP)
-                        { throw new NotImplementedException(); }
-
-                        int offset = computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack;
-                        StackStore(new ValueAddress(variable) + offset, prevType.StackArrayOf.SizeOnStack);
+                        int offset = computedIndexData.ValueSInt32 * prevType.StackArrayOf.Size;
+                        StackStore(new ValueAddress(variable) + offset, prevType.StackArrayOf.Size);
                         return;
                     }
                 }
@@ -1968,37 +1929,62 @@ namespace LanguageCore.BBCode.Generator
                 throw new NotImplementedException();
             }
 
-            if (!prevType.IsClass)
-            { throw new CompilerException($"Index setter for type \"{prevType.Name}\" not found", statementToSet, CurrentFile); }
-
             if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
             {
-                if (!GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index setter \"{prevType.Class.Identifier}[] = {valueType}\" not found", statementToSet, CurrentFile); }
-
-                indexerTemplate = AddCompilable(indexerTemplate);
-                indexer = indexerTemplate.Function;
+                if (GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
+                {
+                    indexerTemplate = AddCompilable(indexerTemplate);
+                    indexer = indexerTemplate.Function;
+                }
             }
 
-            GenerateCodeForFunctionCall_Function(new FunctionCall(
-                    statementToSet.PrevStatement,
-                    Token.CreateAnonymous(BuiltinFunctionNames.IndexerSet),
-                    statementToSet.BracketLeft,
-                    new StatementWithValue[]
-                    {
+            if (indexer == null && prevType.IsPointer)
+            {
+                AssignTypeCheck(prevType.PointerTo, valueType, value);
+
+                GenerateCodeForStatement(value);
+
+                GenerateCodeForStatement(statementToSet.PrevStatement);
+
+                AddInstruction(Opcode.PUSH_VALUE, prevType.PointerTo.Size);
+                CompiledType indexType = FindStatementType(statementToSet.Expression);
+                if (!indexType.IsBuiltin)
+                { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", statementToSet.Expression, CurrentFile); }
+                GenerateCodeForStatement(statementToSet.Expression);
+                AddInstruction(Opcode.MATH_MULT);
+
+                AddInstruction(Opcode.MATH_ADD);
+
+                CheckPointerNull();
+
+                AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+
+                return;
+            }
+
+            if (indexer != null)
+            {
+                GenerateCodeForFunctionCall_Function(new FunctionCall(
+                        statementToSet.PrevStatement,
+                        Token.CreateAnonymous(BuiltinFunctionNames.IndexerSet),
+                        statementToSet.BracketLeft,
+                        new StatementWithValue[]
+                        {
                         statementToSet.Expression,
                         value,
-                    },
-                    statementToSet.BracketRight
-                ), indexer);
+                        },
+                        statementToSet.BracketRight
+                    ), indexer);
+                return;
+            }
 
-            return;
+            throw new CompilerException($"Index setter \"{prevType}[...] = {valueType}\" not found", statementToSet, CurrentFile);
         }
         void GenerateCodeForValueSetter(Pointer statementToSet, StatementWithValue value)
         {
             CompiledType targetType = FindStatementType(statementToSet);
 
-            if (targetType.SizeOnStack != 1) throw new NotImplementedException();
+            if (targetType.Size != 1) throw new NotImplementedException();
 
             GenerateCodeForStatement(value);
             GenerateCodeForStatement(statementToSet.PrevStatement);
@@ -2049,7 +2035,7 @@ namespace LanguageCore.BBCode.Generator
             variable.IsInitialized = true;
 
             int destination = variable.MemoryAddress;
-            int size = variable.Type.SizeOnStack;
+            int size = variable.Type.Size;
             for (int offset = 1; offset <= size; offset++)
             { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, destination + size - offset); }
         }
@@ -2058,18 +2044,19 @@ namespace LanguageCore.BBCode.Generator
         {
             AddComment($"Deallocate \"{deallocateableType}\" {{");
 
-            if (deallocateableType == Type.Integer)
+            if (deallocateableType.IsPointer)
             {
                 AddInstruction(Opcode.HEAP_FREE);
                 AddComment("}");
                 return;
             }
 
+            /*
             if (deallocateableType.IsClass)
             {
-                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
+                if (!GetGeneralFunction(deallocateableType, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                 {
-                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
+                    if (!GetGeneralFunctionTemplate(deallocateableType, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                     {
                         AddInstruction(Opcode.HEAP_FREE);
                         AddComment("}");
@@ -2105,6 +2092,8 @@ namespace LanguageCore.BBCode.Generator
 
             AddInstruction(Opcode.HEAP_FREE);
             AddComment("}");
+            */
+            throw new NotImplementedException();
         }
 
         void GenerateCodeForInlinedMacro(Statement inlinedMacro)
@@ -2194,10 +2183,10 @@ namespace LanguageCore.BBCode.Generator
                 Tag = compiledVariable.VariableName.Content,
                 Address = offset,
                 BasepointerRelative = true,
-                Size = compiledVariable.Type.SizeOnStack,
+                Size = compiledVariable.Type.Size,
             };
 
-            if (compiledVariable.Type.InHEAP)
+            if (compiledVariable.Type.IsPointer)
             { debugInfo.Type = StackElementType.HeapPointer; }
             else
             { debugInfo.Type = StackElementType.Value; }
@@ -2250,8 +2239,8 @@ namespace LanguageCore.BBCode.Generator
                 AddComment("}");
             }
 
-            if (size != compiledVariable.Type.SizeOnStack)
-            { throw new InternalException($"Variable size ({compiledVariable.Type.SizeOnStack}) and initial value size ({size}) mismatch"); }
+            if (size != compiledVariable.Type.Size)
+            { throw new InternalException($"Variable size ({compiledVariable.Type.Size}) and initial value size ({size}) mismatch"); }
 
             return new CleanupItem(size, newVariable.Modifiers.Contains("temp"), compiledVariable.Type);
         }
@@ -2280,7 +2269,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 int sum = 0;
                 for (int i = 0; i < CompiledVariables.Count; i++)
-                { sum += CompiledVariables[i].Type.SizeOnStack; }
+                { sum += CompiledVariables[i].Type.Size; }
                 return sum;
             }
         }
@@ -2297,10 +2286,11 @@ namespace LanguageCore.BBCode.Generator
 
         void GenerateCodeForFunction(FunctionThingDefinition function)
         {
-            if (LanguageConstants.Keywords.Contains(function.Identifier.Content))
-            { throw new CompilerException($"The identifier \"{function.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
+            if (LanguageConstants.Keywords.Contains(function.Identifier?.ToString()))
+            { throw new CompilerException($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
 
-            function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
+            if (function.Identifier is not null)
+            { function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName; }
 
             if (function is FunctionDefinition functionDefinition)
             {
@@ -2311,10 +2301,12 @@ namespace LanguageCore.BBCode.Generator
                 }
             }
 
-            AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
+            if (function.Identifier is not null)
+            { AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }")); }
+            else
+            { AddComment("null" + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }")); }
 
-            if (function is IAmInContext<CompiledClass> functionInContext)
-            { CurrentContext = functionInContext; }
+            CurrentContext = function;
             InFunction = true;
 
             TagCount.Push(0);
@@ -2373,12 +2365,12 @@ namespace LanguageCore.BBCode.Generator
                     Address = GetBaseAddress(p).Address,
                     Kind = StackElementKind.Parameter,
                     BasepointerRelative = true,
-                    Size = p.Type.SizeOnStack,
+                    Size = p.Type.Size,
                     Tag = p.Identifier.Content,
                 };
                 if (p.IsRef)
                 { debugInfo.Type = StackElementType.StackPointer; }
-                else if (p.Type.InHEAP)
+                else if (p.Type.IsPointer)
                 { debugInfo.Type = StackElementType.HeapPointer; }
                 else
                 { debugInfo.Type = StackElementType.Value; }
@@ -2404,16 +2396,19 @@ namespace LanguageCore.BBCode.Generator
 
             if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
 
-            GeneratedDebugInfo.FunctionInformations.Add(new FunctionInformations()
+            if (function.Identifier is not null)
             {
-                IsValid = true,
-                IsMacro = false,
-                SourcePosition = function.Identifier.Position,
-                Identifier = function.Identifier.Content,
-                File = function.FilePath,
-                ReadableIdentifier = function.ToReadable(),
-                Instructions = (instructionStart, GeneratedCode.Count),
-            });
+                GeneratedDebugInfo.FunctionInformations.Add(new FunctionInformations()
+                {
+                    IsValid = true,
+                    IsMacro = false,
+                    SourcePosition = function.Identifier.Position,
+                    Identifier = function.Identifier.Content,
+                    File = function.FilePath,
+                    ReadableIdentifier = function.ToReadable(),
+                    Instructions = (instructionStart, GeneratedCode.Count),
+                });
+            }
 
             CompiledParameters.Clear();
             CompiledVariables.Clear();
@@ -2427,7 +2422,7 @@ namespace LanguageCore.BBCode.Generator
         }
 
         void GenerateCodeForCompilableFunction<T>(CompliableTemplate<T> function)
-            where T : FunctionThingDefinition, IDuplicatable<T>, IAmInContext<CompiledClass>
+            where T : FunctionThingDefinition, IDuplicatable<T>
         {
             SetTypeArguments(function.TypeArguments);
 
@@ -2537,7 +2532,7 @@ namespace LanguageCore.BBCode.Generator
 
                 this.CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));
 
-                paramsSize += parameterType.SizeOnStack;
+                paramsSize += parameterType.Size;
             }
         }
 

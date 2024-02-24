@@ -1,7 +1,7 @@
 using System;
 using System.Lists;
 
-List<int> list = new List<int>(4);
+List<int>* list = new List<int>*;
 list.Add(66);
 list.Add(67);
 list.Add(68);

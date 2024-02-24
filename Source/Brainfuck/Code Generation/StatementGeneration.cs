@@ -6,6 +6,7 @@ using System.Linq;
 
 namespace LanguageCore.Brainfuck.Generator
 {
+    using System.ComponentModel;
     using Compiler;
     using Parser;
     using Parser.Statement;
@@ -102,11 +103,11 @@ namespace LanguageCore.Brainfuck.Generator
                 }
                 else
                 {
-                    if (initialValueType.SizeOnStack != type.SizeOnStack)
+                    if (initialValueType.Size != type.Size)
                     { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
 
-                    int address = Stack.PushVirtual(type.SizeOnStack);
-                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, type.SizeOnStack));
+                    int address = Stack.PushVirtual(type.Size);
+                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, type.Size));
                 }
             }
             else
@@ -122,8 +123,8 @@ namespace LanguageCore.Brainfuck.Generator
                 }
                 else
                 {
-                    int address = Stack.PushVirtual(type.SizeOnStack);
-                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, type.SizeOnStack));
+                    int address = Stack.PushVirtual(type.Size);
+                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, type.Size));
                 }
             }
 
@@ -158,33 +159,37 @@ namespace LanguageCore.Brainfuck.Generator
 
         void GenerateCodeForSetter(Field field, StatementWithValue value)
         {
-            if (TryGetRuntimeAddress(field, out int pointerAddress, out int size))
+            CompiledType prevType = FindStatementType(field.PrevStatement);
+            CompiledType type = FindStatementType(field);
+
+            if (prevType.IsPointer)
             {
-                if (size != GetValueSize(value))
+                if (!prevType.PointerTo.TryGetFieldOffsets(out IReadOnlyDictionary<string, int>? fieldOffsets))
+                { throw new CompilerException($"Could not get the field offsets of type {prevType}", field.PrevStatement, CurrentFile); }
+
+                if (!fieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
+                { throw new CompilerException($"Could not get the field offset of field \"{field.FieldName}\"", field.FieldName, CurrentFile); }
+
+                if (type.Size != GetValueSize(value))
                 { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
+
+                int _pointerAddress = Stack.NextAddress;
+                GenerateCodeForStatement(field.PrevStatement);
+
+                Code.AddValue(_pointerAddress, fieldOffset);
 
                 int valueAddress = Stack.NextAddress;
                 GenerateCodeForStatement(value);
 
-                int _pointerAddress = Stack.PushVirtual(1);
-                Code.CopyValue(pointerAddress, _pointerAddress);
+                Heap.Set(_pointerAddress, valueAddress);
 
-                for (int offset = 0; offset < size; offset++)
-                {
-                    Code.CopyValue(pointerAddress, _pointerAddress);
-                    Code.AddValue(_pointerAddress, offset);
-
-                    Heap.Set(_pointerAddress, valueAddress + offset);
-                }
-
-                Stack.Pop(); // _pointerAddress
                 Stack.Pop(); // valueAddress
-                Stack.Pop(); // pointerAddress
+                Stack.Pop(); // _pointerAddress
 
                 return;
             }
 
-            if (!TryGetAddress(field, out int address, out size))
+            if (!TryGetAddress(field, out int address, out int size))
             { throw new CompilerException($"Failed to get field address", field, CurrentFile); }
 
             if (size != GetValueSize(value))
@@ -433,6 +438,41 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
+            if (prevType.IsPointer)
+            {
+                int valueAddress = Stack.NextAddress;
+                GenerateCodeForStatement(value);
+
+                if (prevType.PointerTo != valueType)
+                { throw new CompilerException("Bruh", value, CurrentFile); }
+
+                int pointerAddress = Stack.NextAddress;
+                GenerateCodeForStatement(statement.PrevStatement);
+
+                CompiledType indexType = FindStatementType(statement.Expression);
+                if (!indexType.IsBuiltin)
+                { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", statement.Expression, CurrentFile); }
+                int indexAddress = Stack.NextAddress;
+                GenerateCodeForStatement(statement.Expression);
+
+                {
+                    int multiplierAddress = Stack.Push(prevType.PointerTo.Size);
+
+                    Code.MULTIPLY(indexAddress, multiplierAddress, multiplierAddress + 1, multiplierAddress + 2);
+
+                    Stack.Pop(); // multiplierAddress
+                }
+
+                Stack.PopAndAdd(pointerAddress); // indexAddress
+
+                Heap.Set(pointerAddress, valueAddress);
+
+                Stack.Pop(); // pointerAddress
+                Stack.Pop(); // valueAddress
+
+                return;
+            }
+
             if (statement.PrevStatement is not Identifier _variableIdentifier)
             { throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement, CurrentFile); }
 
@@ -452,7 +492,7 @@ namespace LanguageCore.Brainfuck.Generator
                 if (elementType != valueType)
                 { throw new CompilerException("Bruh", value, CurrentFile); }
 
-                int elementSize = elementType.SizeOnStack;
+                int elementSize = elementType.Size;
 
                 if (elementSize != 1)
                 { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", value, CurrentFile); }
@@ -579,7 +619,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 CompiledType elementType = arrayType.StackArrayOf;
 
-                int elementSize = elementType.SizeOnStack;
+                int elementSize = elementType.Size;
 
                 if (elementSize != 1)
                 { throw new CompilerException($"Array element size must be 1 :(", indexCall, CurrentFile); }
@@ -597,8 +637,35 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            if (!arrayType.IsClass)
-            { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
+            if (arrayType.IsPointer)
+            {
+                int resultAddress = Stack.Push(0);
+
+                int pointerAddress = Stack.NextAddress;
+                GenerateCodeForStatement(indexCall.PrevStatement);
+
+                CompiledType indexType = FindStatementType(indexCall.Expression);
+                if (!indexType.IsBuiltin)
+                { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", indexCall.Expression, CurrentFile); }
+                int indexAddress = Stack.NextAddress;
+                GenerateCodeForStatement(indexCall.Expression);
+
+                {
+                    int multiplierAddress = Stack.Push(arrayType.PointerTo.Size);
+
+                    Code.MULTIPLY(indexAddress, multiplierAddress, multiplierAddress + 1, multiplierAddress + 2);
+
+                    Stack.Pop(); // multiplierAddress
+                }
+
+                Stack.PopAndAdd(pointerAddress); // indexAddress
+
+                Heap.Get(pointerAddress, resultAddress);
+
+                Stack.Pop(); // pointerAddress
+
+                return;
+            }
 
             GenerateCodeForStatement(new FunctionCall(
                 indexCall.PrevStatement,
@@ -987,7 +1054,7 @@ namespace LanguageCore.Brainfuck.Generator
                         CompileSetter(returnVariable, statement.Parameters[0]);
                     }
 
-                    AnalysisCollection?.Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
+                    // AnalysisCollection?.Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
 
                     if (ReturnTagStack.Count <= 0)
                     { throw new CompilerException($"Can't return for some reason :(", statement.Identifier, CurrentFile); }
@@ -1013,7 +1080,7 @@ namespace LanguageCore.Brainfuck.Generator
                     if (BreakTagStack.Count <= 0)
                     { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop. Am i wrong? Of course not! Haha", statement.Identifier, CurrentFile); }
 
-                    AnalysisCollection?.Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
+                    // AnalysisCollection?.Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
 
                     Code.SetValue(BreakTagStack[^1], 0);
 
@@ -1056,81 +1123,8 @@ namespace LanguageCore.Brainfuck.Generator
                     { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                     StatementWithValue deletable = statement.Parameters[0];
-                    CompiledType deletableType = FindStatementType(deletable);
 
-                    if (deletableType.IsPointer)
-                    {
-                        if (!TryGetBuiltinFunction("free", out CompiledFunction? function))
-                        { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", statement, CurrentFile); }
-
-                        GenerateCodeForFunction(function, statement.Parameters, null, statement);
-
-                        if (!statement.SaveValue && function.ReturnSomething)
-                        { Stack.Pop(); }
-                        return;
-                    }
-
-                    TypeArguments typeArguments = new();
-
-                    if (!GetGeneralFunction(deletableType.Class, FindStatementTypes(statement.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
-                    {
-                        if (!GetGeneralFunctionTemplate(deletableType.Class, FindStatementTypes(statement.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
-                        {
-                            if (!TryGetRuntimeAddress(deletable, out int pointerAddress, out int size))
-                            {
-                                // throw new CompilerException($"I tried to get the address of \"{deletable}\" but I failed", deletable, CurrentFile);
-
-                                if (!TryGetBuiltinFunction("free", out CompiledFunction? deallocator))
-                                { throw new CompilerException($"No function found with attribute [Builtin({"free"})]", statement, CurrentFile); }
-
-                                if (!deallocator.CanUse(CurrentFile))
-                                {
-                                    AnalysisCollection?.Errors.Add(new Error($"Function \"{deletableType.Class.Identifier.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
-                                    return;
-                                }
-
-                                GenerateCodeForFunction(deallocator, statement.Parameters, null, statement);
-
-                                if (!statement.SaveValue && deallocator.ReturnSomething)
-                                { Stack.Pop(); }
-                                return;
-                            }
-                            else
-                            {
-                                int _pointerAddress = Stack.PushVirtual(1);
-
-                                for (int offset = 0; offset < size; offset++)
-                                {
-                                    Code.CopyValue(pointerAddress, _pointerAddress);
-                                    Code.AddValue(_pointerAddress, offset);
-
-                                    Heap.Set(_pointerAddress, 0);
-                                    // Heap.Free(_pointerAddress);
-                                }
-
-                                Stack.Pop();
-
-                                Stack.Pop();
-                                return;
-                            }
-                        }
-
-                        destructor = destructorTemplate.Function;
-                        typeArguments = destructorTemplate.TypeArguments;
-                    }
-
-                    if (!destructor.CanUse(CurrentFile))
-                    {
-                        AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{deletableType.Class.Identifier.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
-                        return;
-                    }
-
-                    typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
-
-                    GenerateCodeForFunction(destructor, statement.Parameters, typeArguments, statement);
-
-                    if (!statement.SaveValue && destructor.ReturnSomething)
-                    { Stack.Pop(); }
+                    GenerateDeallocator(deletable);
 
                     break;
                 }
@@ -1390,7 +1384,7 @@ namespace LanguageCore.Brainfuck.Generator
                 CompiledType param0Type = FindStatementType(param0);
 
                 if (functionCall.SaveValue)
-                { Stack.Push(param0Type.SizeOnStack); }
+                { Stack.Push(param0Type.Size); }
 
                 return;
             }
@@ -1446,41 +1440,33 @@ namespace LanguageCore.Brainfuck.Generator
         void GenerateCodeForStatement(ConstructorCall constructorCall)
         {
             CompiledType instanceType = FindType(constructorCall.TypeName);
+            CompiledType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
-            if (instanceType.IsStruct)
-            { throw new NotImplementedException(); }
-
-            if (!instanceType.IsClass)
-            { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
-
-            instanceType.Class.AddReference(constructorCall.TypeName, CurrentFile);
-
-            if (!GetClass(constructorCall, out CompiledClass? @class))
-            { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
+            instanceType.Struct?.AddReference(constructorCall.TypeName, CurrentFile);
 
             TypeArguments typeArguments = new();
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+            if (!GetConstructor(instanceType, parameters, out CompiledConstructor? constructor))
             {
-                if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
-                { throw new CompilerException($"Function {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Keyword, CurrentFile); }
+                if (!GetConstructorTemplate(instanceType, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction))
+                { throw new CompilerException($"Constructor {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Keyword, CurrentFile); }
 
                 constructor = compilableGeneralFunction.Function;
                 typeArguments = compilableGeneralFunction.TypeArguments;
             }
 
+            constructor.AddReference(constructorCall, CurrentFile);
+            OnGotStatementType(constructorCall, constructor.Type);
+
             if (!constructor.CanUse(CurrentFile))
             {
-                AnalysisCollection?.Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
+                AnalysisCollection?.Errors.Add(new Error($"Constructor {constructor.ToReadable()} could not be called due to its protection level", constructorCall.TypeName, CurrentFile));
                 return;
             }
 
             typeArguments = Utils.ConcatDictionary(typeArguments, constructor.Context?.CurrentTypeArguments);
 
             GenerateCodeForFunction(constructor, constructorCall.Parameters, typeArguments, constructorCall);
-
-            if (!constructorCall.SaveValue && constructor.ReturnSomething)
-            { Stack.Pop(); }
         }
         void GenerateCodeForStatement(Literal statement)
         {
@@ -1510,7 +1496,6 @@ namespace LanguageCore.Brainfuck.Generator
                         throw new NotSupportedException($"Floats not supported by the brainfuck compiler", statement, CurrentFile);
                     case LiteralType.String:
                     {
-                        // throw new NotSupportedException($"String literals not supported by the brainfuck compiler", statement, CurrentFile);
                         GenerateCodeForLiteralString(statement);
                         break;
                     }
@@ -2044,10 +2029,9 @@ namespace LanguageCore.Brainfuck.Generator
         {
             CompiledType type = FindStatementType(addressGetter.PrevStatement);
 
-            if (!type.InHEAP)
-            { throw new CompilerException($"Type {type} isn't stored in the heap", addressGetter, CurrentFile); }
+            throw new CompilerException($"Type {type} isn't stored in the heap", addressGetter, CurrentFile);
 
-            GenerateCodeForStatement(addressGetter.PrevStatement);
+            // GenerateCodeForStatement(addressGetter.PrevStatement);
         }
         void GenerateCodeForStatement(Pointer pointer)
         {
@@ -2093,14 +2077,19 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(NewInstance newInstance)
         {
-            if (newInstance.TypeName is not TypeInstanceSimple instanceTypeSimple)
-            { throw new NotImplementedException(); }
+            CompiledType instanceType = FindType(newInstance.TypeName);
 
-            CompiledType instanceType = FindType(instanceTypeSimple);
-
-            if (instanceType.IsStruct)
+            if (instanceType.IsPointer)
             {
-                instanceType.Struct.AddReference(instanceTypeSimple, CurrentFile);
+                // int pointerAddress = Stack.NextAddress;
+                Allocate(instanceType.PointerTo.Size, newInstance);
+
+                if (!newInstance.SaveValue)
+                { Stack.Pop(); }
+            }
+            else if (instanceType.IsStruct)
+            {
+                instanceType.Struct.AddReference(newInstance.TypeName, CurrentFile);
 
                 int address = Stack.PushVirtual(instanceType.Struct.SizeOnStack);
 
@@ -2135,122 +2124,8 @@ namespace LanguageCore.Brainfuck.Generator
                     }
                 }
             }
-            else if (instanceType.IsClass)
-            {
-                instanceType.Class.AddReference(instanceTypeSimple, CurrentFile);
-
-                if (instanceType.Class.TemplateInfo != null)
-                {
-                    if (instanceTypeSimple.GenericTypes is null)
-                    { throw new CompilerException($"No type arguments specified for class instance \"{instanceType}\"", instanceTypeSimple, CurrentFile); }
-
-                    if (instanceType.Class.TemplateInfo.TypeParameters.Length != instanceTypeSimple.GenericTypes.Length)
-                    { throw new CompilerException($"Wrong number of type arguments specified for class instance \"{instanceType}\": require {instanceType.Class.TemplateInfo.TypeParameters.Length} specified {instanceTypeSimple.GenericTypes.Length}", instanceTypeSimple, CurrentFile); }
-
-                    CompiledType[] genericParameters = instanceTypeSimple.GenericTypes!.Select(v => new CompiledType(v, FindType)).ToArray();
-                    instanceType.Class.AddTypeArguments(genericParameters);
-                }
-                else
-                {
-                    if (instanceTypeSimple.GenericTypes is not null)
-                    { throw new CompilerException($"You should not specify type arguments for class instance \"{instanceType}\"", instanceTypeSimple, CurrentFile); }
-                }
-
-                int pointerAddress = Stack.NextAddress;
-                Allocate(instanceType.Class.SizeOnHeap, newInstance);
-
-                /*
-                int currentOffset = 0;
-                for (int fieldIndex = 0; fieldIndex < instanceType.Class.Fields.Length; fieldIndex++)
-                {
-                    CompiledField field = instanceType.Class.Fields[fieldIndex];
-                    CompiledType? fieldType = field.Type;
-                    if (fieldType.IsGeneric && !instanceType.Class.CurrentTypeArguments.TryGetValue(fieldType.Name, out fieldType))
-                    { throw new CompilerException($"Type argument \"{fieldType?.Name}\" not found", field, instanceType.Class.FilePath); }
-
-                    using (CommentBlock($"Create Field '{field.Identifier.Content}' ({fieldIndex})"))
-                    {
-                        GenerateInitialValue(fieldType, j =>
-                        {
-                            AddComment($"Save Chunk {j}:");
-                            AddInstruction(Opcode.PUSH_VALUE, currentOffset);
-                            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -3);
-                            AddInstruction(Opcode.MATH_ADD);
-                            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-                            currentOffset++;
-                        });
-                    }
-                }
-                */
-
-                instanceType.Class.ClearTypeArguments();
-                // throw new NotSupportedException($"Not supported :(", newInstance, CurrentFile);
-
-                if (!newInstance.SaveValue)
-                { Stack.Pop(); }
-
-                /*
-                newInstance.TypeName = newInstance.TypeName.Class(@class);
-                @class.References?.Add(new DefinitionReference(newInstance.TypeName, CurrentFile));
-
-                int pointerAddress = Stack.PushVirtual(1);
-
-                {
-                    int requiredSizeAddress = Stack.Push(@class.Size);
-                    int tempAddressesStart = Stack.PushVirtual(1);
-
-                    using (CommentBlock($"Allocate (size: {@class.Size} (at {requiredSizeAddress}) result at: {pointerAddress})"))
-                    {
-                        Heap.Allocate(pointerAddress, requiredSizeAddress, tempAddressesStart);
-
-                        using (CommentBlock("Clear temps (5x pop)"))
-                        {
-                            Stack.Pop();
-                            Stack.Pop();
-                        }
-                    }
-                }
-
-                using (CommentBlock($"Generate fields"))
-                {
-                    int currentOffset = 0;
-                    for (int fieldIndex = 0; fieldIndex < @class.Fields.Length; fieldIndex++)
-                    {
-                        CompiledField field = @class.Fields[fieldIndex];
-                        using (CommentBlock($"Field #{fieldIndex} (\"{field.Identifier.Content}\")"))
-                        {
-                            var initialValue = GetInitialValue(field.Type);
-
-                            int fieldPointerAddress = Stack.PushVirtual(1);
-
-                            using (CommentBlock($"Compute field address (at {fieldPointerAddress})"))
-                            {
-                                Code.CopyValue(pointerAddress, fieldPointerAddress);
-                                Code.AddValue(fieldPointerAddress, currentOffset);
-                            }
-
-                            int initialValueAddress;
-
-                            using (CommentBlock($"Push initial value"))
-                            { initialValueAddress = Stack.Push(initialValue); }
-
-                            using (CommentBlock($"Heap.Set({fieldPointerAddress} {initialValueAddress})"))
-                            { Heap.Set(fieldPointerAddress, initialValueAddress); }
-
-                            using (CommentBlock("Cleanup"))
-                            {
-                                Stack.Pop();
-                                Stack.Pop();
-                            }
-
-                            currentOffset++;
-                        }
-                    }
-                }
-                */
-            }
             else
-            { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", newInstance.TypeName, CurrentFile); }
+            { throw new CompilerException($"Unknown type definition {instanceType}", newInstance.TypeName, CurrentFile); }
         }
         void GenerateCodeForStatement(Field field)
         {
@@ -2268,76 +2143,46 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            if (TryGetAddress(field, out int address, out int size))
+            if (prevType.IsPointer)
             {
-                using (CommentBlock($"Load field {field} (from {address})"))
-                {
-                    if (size <= 0)
-                    { throw new CompilerException($"Can't load field \"{field}\" because it's size is {size} (bruh)", field, CurrentFile); }
+                if (!prevType.PointerTo.TryGetFieldOffsets(out IReadOnlyDictionary<string, int>? fieldOffsets))
+                { throw new CompilerException($"Could not get the field offsets of type {prevType}", field.PrevStatement, CurrentFile); }
 
-                    int loadTarget = Stack.PushVirtual(size);
+                if (!fieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
+                { throw new CompilerException($"Could not get the field offset of field \"{field.FieldName}\"", field.FieldName, CurrentFile); }
 
-                    for (int offset = 0; offset < size; offset++)
-                    {
-                        int offsettedSource = address + offset;
-                        int offsettedTarget = loadTarget + offset;
+                int resultAddress = Stack.Push(0);
 
-                        Code.CopyValue(offsettedSource, offsettedTarget);
-                    }
-                }
+                int pointerAddress = Stack.NextAddress;
+                GenerateCodeForStatement(field.PrevStatement);
+
+                Code.AddValue(pointerAddress, fieldOffset);
+
+                Heap.Get(pointerAddress, resultAddress, prevType.PointerTo.Size);
+
+                Stack.Pop();
+
+                return;
             }
-            else if (TryGetRuntimeAddress(field, out int pointerAddress, out size))
+
+            if (!TryGetAddress(field, out int address, out int size))
+            { throw new CompilerException($"Failed to get field memory address", field, CurrentFile); }
+
+            if (size <= 0)
+            { throw new CompilerException($"Can't load field \"{field}\" because it's size is {size} (bruh)", field, CurrentFile); }
+
+            using (CommentBlock($"Load field {field} (from {address})"))
             {
-                /*
-                 *      pointerAddress
-                 */
-
-                Stack.PopVirtual();
-
-                /*
-                 *      pointerAddress (deleted)
-                 */
-
-                int resultAddress = Stack.PushVirtual(size);
-
-                /*
-                 *      pointerAddress (now resultAddress ... )
-                 */
-
-                {
-                    int temp = Stack.PushVirtual(1);
-                    Code.MoveValue(pointerAddress, temp);
-                    pointerAddress = temp;
-                }
-
-                /*
-                 *      resultAddress
-                 *      ...
-                 *      pointerAddress
-                 */
-
-                int _pointerAddress = Stack.PushVirtual(1);
-
-                /*
-                 *      resultAddress
-                 *      ...
-                 *      pointerAddress
-                 *      _pointerAddress
-                 */
+                int loadTarget = Stack.PushVirtual(size);
 
                 for (int offset = 0; offset < size; offset++)
                 {
-                    Code.CopyValue(pointerAddress, _pointerAddress);
-                    Code.AddValue(_pointerAddress, offset);
+                    int offsettedSource = address + offset;
+                    int offsettedTarget = loadTarget + offset;
 
-                    Heap.Get(_pointerAddress, resultAddress + offset);
+                    Code.CopyValue(offsettedSource, offsettedTarget);
                 }
-
-                Stack.Pop(); // _pointerAddress
-                Stack.Pop(); // pointerAddress
             }
-            else
-            { throw new CompilerException($"Failed to get field memory address", field, CurrentFile); }
         }
         void GenerateCodeForStatement(TypeCast typeCast)
         {
@@ -2346,10 +2191,10 @@ namespace LanguageCore.Brainfuck.Generator
             typeCast.Type.SetAnalyzedType(targetType);
             OnGotStatementType(typeCast, targetType);
 
-            if (statementType.SizeOnStack != targetType.SizeOnStack)
-            { throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.SizeOnStack}) to {targetType} (size of {targetType.SizeOnStack})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
+            if (statementType.Size != targetType.Size)
+            { throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.Size}) to {targetType} (size of {targetType.Size})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
 
-            AnalysisCollection?.Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
+            // AnalysisCollection?.Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
 
             GenerateCodeForStatement(typeCast.PrevStatement);
         }
@@ -2470,8 +2315,8 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            if (valueType.SizeOnStack != 1)
-            { throw new NotSupportedException($"Only value of size 1 (not {valueType.SizeOnStack}) supported by the output printer in brainfuck", value, CurrentFile); }
+            if (valueType.Size != 1)
+            { throw new NotSupportedException($"Only value of size 1 (not {valueType.Size}) supported by the output printer in brainfuck", value, CurrentFile); }
 
             if (!valueType.IsBuiltin)
             { throw new NotSupportedException($"Only built-in types or string literals (not \"{valueType}\") supported by the output printer in brainfuck", value, CurrentFile); }
@@ -2532,7 +2377,7 @@ namespace LanguageCore.Brainfuck.Generator
             return CanGenerateCodeForValuePrinter(valueType);
         }
         static bool CanGenerateCodeForValuePrinter(CompiledType valueType) =>
-            valueType.SizeOnStack == 1 &&
+            valueType.Size == 1 &&
             valueType.IsBuiltin;
 
         /*
@@ -2646,11 +2491,13 @@ namespace LanguageCore.Brainfuck.Generator
 
         int Allocate(int size, IPositioned position)
         {
-            if (!TryGetBuiltinFunction("alloc", out CompiledFunction? allocator))
+            StatementWithValue[] parameters = new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) };
+
+            if (!TryGetBuiltinFunction("alloc", FindStatementTypes(parameters), out CompiledFunction? allocator))
             { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] not found", position, CurrentFile); }
 
             int pointerAddress = Stack.NextAddress;
-            GenerateCodeForFunction(allocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) }, null, position);
+            GenerateCodeForFunction(allocator, parameters, null, position);
             return pointerAddress;
         }
 
@@ -2658,41 +2505,43 @@ namespace LanguageCore.Brainfuck.Generator
         {
             CompiledType deallocateableType = FindStatementType(value);
 
-            if (!TryGetBuiltinFunction("free", out CompiledFunction? deallocator))
+            StatementWithValue[] parameters = new StatementWithValue[] { value };
+            CompiledType[] parameterTypes = FindStatementTypes(parameters);
+
+            if (!TryGetBuiltinFunction("free", parameterTypes, out CompiledFunction? deallocator))
             { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", value, CurrentFile); }
 
-            if (deallocateableType.IsClass)
+            if (!deallocateableType.IsPointer)
             {
-                TypeArguments typeArguments = new();
-
-                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
-                {
-                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
-                    {
-                        GenerateCodeForFunction(deallocator, new StatementWithValue[] { value }, null, value);
-                        return;
-                    }
-                    typeArguments = destructorTemplate.TypeArguments;
-                    destructor = destructorTemplate.Function;
-                }
-
-                if (!destructor.CanUse(CurrentFile))
-                {
-                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Identifier.Content}' function cannot be called due to its protection level", null, CurrentFile));
-                    return;
-                }
-
-                typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
-
-                GenerateCodeForFunction(destructor, new StatementWithValue[] { value }, typeArguments, value);
-
-                if (destructor.ReturnSomething)
-                { Stack.Pop(); }
-
+                AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on pointers or pointer so I skip this", value, CurrentFile));
                 return;
             }
 
-            GenerateCodeForFunction(deallocator, new StatementWithValue[] { value }, null, value);
+            TypeArguments typeArguments = new();
+
+            if (!GetGeneralFunction(deallocateableType, parameterTypes, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
+            {
+                if (!GetGeneralFunctionTemplate(deallocateableType, parameterTypes, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
+                {
+                    GenerateCodeForFunction(deallocator, parameters, null, value);
+                    return;
+                }
+                typeArguments = destructorTemplate.TypeArguments;
+                destructor = destructorTemplate.Function;
+            }
+
+            if (!destructor.CanUse(CurrentFile))
+            {
+                AnalysisCollection?.Errors.Add(new Error($"Destructor for type {deallocateableType} cannot be called due to its protection level", null, CurrentFile));
+                return;
+            }
+
+            typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
+
+            GenerateCodeForFunction(destructor, new StatementWithValue[] { value }, typeArguments, value);
+
+            if (destructor.ReturnSomething)
+            { Stack.Pop(); }
         }
 
         int GenerateCodeForLiteralString(Literal literal)
@@ -2705,18 +2554,6 @@ namespace LanguageCore.Brainfuck.Generator
                 using (CommentBlock("Allocate String object {"))
                 { Allocate(1 + literal.Length, position); }
 
-                using (CommentBlock("Set String.length {"))
-                {
-                    int valueAddress = Stack.Push(literal.Length);
-                    int pointerAddressCopy = valueAddress + 1;
-
-                    Code.CopyValue(pointerAddress, pointerAddressCopy);
-
-                    Heap.Set(pointerAddressCopy, valueAddress);
-
-                    Stack.Pop();
-                }
-
                 using (CommentBlock("Set string data {"))
                 {
                     for (int i = 0; i < literal.Length; i++)
@@ -2727,7 +2564,22 @@ namespace LanguageCore.Brainfuck.Generator
 
                         // Calculate pointer
                         Code.CopyValue(pointerAddress, pointerAddressCopy);
-                        Code.AddValue(pointerAddressCopy, 1 + i);
+                        Code.AddValue(pointerAddressCopy, i);
+
+                        // Set value
+                        Heap.Set(pointerAddressCopy, valueAddress);
+
+                        Stack.Pop();
+                    }
+
+                    {
+                        // Prepare value
+                        int valueAddress = Stack.Push('\0');
+                        int pointerAddressCopy = valueAddress + 1;
+
+                        // Calculate pointer
+                        Code.CopyValue(pointerAddress, pointerAddressCopy);
+                        Code.AddValue(pointerAddressCopy, literal.Length);
 
                         // Set value
                         Heap.Set(pointerAddressCopy, valueAddress);
@@ -2862,7 +2714,7 @@ namespace LanguageCore.Brainfuck.Generator
                 }
                 else
                 {
-                    if (function.Type.SizeOnStack != 1)
+                    if (function.Type.Size != 1)
                     {
                         throw new CompilerException($"Function with \"{"StandardInput"}\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
                     }
@@ -2901,7 +2753,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (function.ReturnSomething)
             {
                 CompiledType returnType = function.Type;
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, false, returnType, returnType.Size);
             }
 
             if (!DoRecursivityStuff(function, callerPosition))
@@ -3055,7 +2907,7 @@ namespace LanguageCore.Brainfuck.Generator
                         Variable variable = Variables[i];
                         if (!variable.HaveToClean) continue;
                         if (variable.DeallocateOnClean &&
-                            variable.Type.InHEAP)
+                            variable.Type.IsPointer)
                         {
                             GenerateDeallocator(
                                 new TypeCast(
@@ -3153,7 +3005,7 @@ namespace LanguageCore.Brainfuck.Generator
                 }
                 else
                 {
-                    if (function.Type.SizeOnStack != 1)
+                    if (function.Type.Size != 1)
                     {
                         throw new CompilerException($"Function with \"{"StandardInput"}\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
                     }
@@ -3192,7 +3044,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (true) // always returns something
             {
                 CompiledType returnType = function.Type;
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, false, returnType, returnType.Size);
             }
 
             if (!DoRecursivityStuff(function, callerPosition))
@@ -3347,7 +3199,7 @@ namespace LanguageCore.Brainfuck.Generator
                         Variable variable = Variables[i];
                         if (!variable.HaveToClean) continue;
                         if (variable.DeallocateOnClean &&
-                            variable.Type.InHEAP)
+                            variable.Type.IsPointer)
                         {
                             GenerateDeallocator(
                                 new TypeCast(
@@ -3368,7 +3220,7 @@ namespace LanguageCore.Brainfuck.Generator
                         Variable variable = Variables.Pop();
                         if (!variable.HaveToClean) continue;
                         if (variable.DeallocateOnClean &&
-                            variable.Type.InHEAP)
+                            variable.Type.IsPointer)
                         { }
                         Stack.Pop();
                     }
@@ -3409,7 +3261,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (function.ReturnSomething)
             {
                 CompiledType returnType = new(function.Type, typeArguments);
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, false, returnType, returnType.Size);
             }
 
             if (!DoRecursivityStuff(function, callerPosition))
@@ -3559,7 +3411,7 @@ namespace LanguageCore.Brainfuck.Generator
                         Variable variable = Variables[i];
                         if (!variable.HaveToClean) continue;
                         if (variable.DeallocateOnClean &&
-                            variable.Type.InHEAP)
+                            variable.Type.IsPointer)
                         {
                             GenerateDeallocator(
                                 new TypeCast(
@@ -3592,6 +3444,217 @@ namespace LanguageCore.Brainfuck.Generator
                 {
                     File = function.FilePath,
                     Identifier = function.Identifier.Content,
+                    ReadableIdentifier = function.ToReadable(),
+                    Instructions = (instructionStart, Code.GetFinalCode().Length),
+                    IsMacro = false,
+                    IsValid = true,
+                    SourcePosition = function.Position,
+                });
+            }
+        }
+
+        void GenerateCodeForFunction(CompiledConstructor function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
+        {
+            int instructionStart = 0;
+            if (GenerateDebugInformation)
+            { instructionStart = Code.GetFinalCode().Length; }
+
+            if (function.ParameterCount != parameters.Length)
+            { throw new CompilerException($"Wrong number of parameters passed to constructor \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
+
+            if (function.Block is null)
+            { throw new CompilerException($"Constructor \"{function.ToReadable()}\" does not have any body definition", callerPosition, CurrentFile); }
+
+            using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ToReadable(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
+
+            progressLabel.Print();
+
+            if (!DoRecursivityStuff(function, callerPosition))
+            { return; }
+
+            Stack<Variable> compiledParameters = new();
+            List<CompiledConstant> constantParameters = new();
+
+            CurrentMacro.Push(function);
+            InMacro.Push(false);
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                StatementWithValue passed = parameters[i];
+                ParameterDefinition defined = function.Parameters[i];
+
+                CompiledType definedType = function.ParameterTypes[i];
+                CompiledType passedType = FindStatementType(passed, definedType);
+
+                if (passedType != definedType)
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
+
+                foreach (Variable compiledParameter in compiledParameters)
+                {
+                    if (compiledParameter.Name == defined.Identifier.Content)
+                    { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
+                }
+
+                foreach (CompiledConstant constantParameter in constantParameters)
+                {
+                    if (constantParameter.Identifier == defined.Identifier.Content)
+                    { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
+                }
+
+                if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
+                { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
+
+                bool deallocateOnClean = false;
+
+                if (passed is ModifiedStatement modifiedStatement)
+                {
+                    if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
+                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, CurrentFile); }
+
+                    switch (modifiedStatement.Modifier.Content)
+                    {
+                        case "ref":
+                        {
+                            Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
+
+                            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, modifiedVariable.Content, out Variable v))
+                            { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
+
+                            if (v.Type != definedType)
+                            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+
+                            compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
+                            continue;
+                        }
+                        case "const":
+                        {
+                            StatementWithValue valueStatement = modifiedStatement.Statement;
+                            if (!TryCompute(valueStatement, null, out DataItem constValue))
+                            { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
+
+                            constantParameters.Add(new CompiledParameterConstant(defined, constValue));
+                            continue;
+                        }
+                        case "temp":
+                        {
+                            deallocateOnClean = true;
+                            passed = modifiedStatement.Statement;
+                            break;
+                        }
+                        default:
+                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
+                    }
+                }
+
+                if (passed is StatementWithValue value)
+                {
+                    if (defined.Modifiers.Contains("ref"))
+                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
+
+                    if (defined.Modifiers.Contains("const"))
+                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
+
+                    PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
+
+                    bool parameterFound = false;
+                    Variable compiledParameter = default;
+                    foreach (Variable compiledParameter_ in compiledParameters)
+                    {
+                        if (compiledParameter_.Name == defined.Identifier.Content)
+                        {
+                            parameterFound = true;
+                            compiledParameter = compiledParameter_;
+                        }
+                    }
+
+                    if (!parameterFound)
+                    { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
+
+                    if (compiledParameter.Type != definedType)
+                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
+
+                    using (CommentBlock($"SET {defined.Identifier.Content} TO _something_"))
+                    {
+                        GenerateCodeForStatement(value);
+
+                        using (CommentBlock($"STORE LAST TO {compiledParameter.Address}"))
+                        { Stack.PopAndStore(compiledParameter.Address); }
+                    }
+                    continue;
+                }
+
+                throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
+            }
+
+            GeneratorStackFrame frame = PushStackFrame(typeArguments);
+            Variables.PushRange(compiledParameters);
+            CurrentFile = function.FilePath;
+            CompiledConstants.PushRange(constantParameters);
+            CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
+
+            using (DebugBlock(function.Block.BracketStart))
+            using (CommentBlock($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
+            {
+                int tagAddress = Stack.Push(1);
+                Code.CommentLine($"Tag address is {tagAddress}");
+                ReturnTagStack.Push(tagAddress);
+            }
+
+            GenerateCodeForStatement(function.Block);
+
+            using (DebugBlock(function.Block.BracketEnd))
+            using (CommentBlock($"Finish \"return\" block"))
+            {
+                if (ReturnTagStack.Pop() != Stack.LastAddress)
+                { throw new InternalException(string.Empty, function.Block, function.FilePath); }
+                Stack.Pop();
+            }
+
+            using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
+            {
+                using (CommentBlock($"Deallocate macro variables ({Variables.Count})"))
+                {
+                    for (int i = 0; i < Variables.Count; i++)
+                    {
+                        Variable variable = Variables[i];
+                        if (!variable.HaveToClean) continue;
+                        if (variable.DeallocateOnClean &&
+                            variable.Type.IsPointer)
+                        {
+                            GenerateDeallocator(
+                                new TypeCast(
+                                    new Identifier(Token.CreateAnonymous(variable.Name)),
+                                    Token.CreateAnonymous("as"),
+                                    new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int"), Token.CreateAnonymous("*", TokenType.Operator))
+                                    )
+                                );
+                        }
+                    }
+                }
+
+                using (CommentBlock($"Clean up macro variables ({Variables.Count})"))
+                {
+                    int n = Variables.Count;
+                    for (int i = 0; i < n; i++)
+                    {
+                        Variable variable = Variables.Pop();
+                        if (!variable.HaveToClean) continue;
+                        Stack.Pop();
+                    }
+                }
+            }
+
+            PopStackFrame(frame);
+
+            InMacro.Pop();
+            CurrentMacro.Pop();
+
+            if (GenerateDebugInformation)
+            {
+                DebugInfo.FunctionInformations.Add(new FunctionInformations()
+                {
+                    File = function.FilePath,
+                    Identifier = function.Identifier.ToString(),
                     ReadableIdentifier = function.ToReadable(),
                     Instructions = (instructionStart, Code.GetFinalCode().Length),
                     IsMacro = false,

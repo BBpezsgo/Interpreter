@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using LanguageCore.Compiler;
 
 namespace LanguageCore
 {
@@ -158,6 +159,8 @@ namespace LanguageCore
         public void CopyTo(T[] array, int arrayIndex) => stack.CopyTo(array, arrayIndex);
 
         public bool Remove(T item) => stack.Remove(item);
+
+        public void Insert(int index, T item) => stack.Insert(index, item);
     }
 
     public interface IReadOnlyStack<T> : IReadOnlyList<T>

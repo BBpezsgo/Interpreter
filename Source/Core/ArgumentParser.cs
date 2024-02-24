@@ -52,7 +52,6 @@ namespace TheProgram
     {
         Normal,
         Brainfuck,
-        IL,
         ASM,
     }
 
@@ -227,15 +226,6 @@ namespace TheProgram
                         { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.ASM}"); }
 
                         result.RunType = ProgramRunType.ASM;
-                        continue;
-                    }
-
-                    if (ExpectArg(args, ref i, out _, "--il"))
-                    {
-                        if (result.RunType != ProgramRunType.Normal)
-                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.IL}"); }
-
-                        result.RunType = ProgramRunType.IL;
                         continue;
                     }
 

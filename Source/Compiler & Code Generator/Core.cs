@@ -34,14 +34,6 @@ namespace LanguageCore.BBCode.Generator
             InHeap = false;
         }
 
-        public ValueAddress(CompiledVariable variable, bool basepointerRelative)
-        {
-            Address = variable.MemoryAddress;
-            AddressingMode = basepointerRelative ? AddressingMode.BasePointerRelative : AddressingMode.Absolute;
-            IsReference = false;
-            InHeap = false;
-        }
-
         public ValueAddress(CompiledParameter parameter, int address)
         {
             Address = address;
@@ -247,14 +239,12 @@ namespace LanguageCore.Compiler
         IEquatable<Type>,
         IEquatable<RuntimeType>,
         System.Numerics.IEqualityOperators<CompiledType?, CompiledType?, bool>,
-        System.Numerics.IEqualityOperators<CompiledType?, TypeInstance?, bool>,
         System.Numerics.IEqualityOperators<CompiledType?, Type, bool>,
         System.Numerics.IEqualityOperators<CompiledType?, RuntimeType, bool>
     {
         Type builtinType;
 
         CompiledStruct? @struct;
-        CompiledClass? @class;
         CompiledEnum? @enum;
         FunctionType? function;
         CompiledType? pointerTo;
@@ -277,11 +267,10 @@ namespace LanguageCore.Compiler
             _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
         };
 
-        public CompiledStruct Struct => @struct ?? throw new InternalException($"This isn't a struct");
-        public CompiledClass Class => @class ?? throw new InternalException($"This isn't a class");
-        public CompiledEnum Enum => @enum ?? throw new InternalException($"This isn't an enum");
-        public FunctionType Function => function ?? throw new InternalException($"This isn't a function");
-        public CompiledType PointerTo => pointerTo ?? throw new InternalException($"This isn't a pointer");
+        public CompiledStruct? Struct => @struct;
+        public CompiledEnum? Enum => @enum;
+        public FunctionType? Function => function;
+        public CompiledType? PointerTo => pointerTo;
         public CompiledType[] TypeParameters => typeParameters;
 
         string? genericName;
@@ -314,7 +303,6 @@ namespace LanguageCore.Compiler
                 };
 
                 if (@struct is not null) return @struct.Identifier.Content;
-                if (@class is not null) return @class.Identifier.Content;
                 if (@enum is not null) return @enum.Identifier.Content;
                 if (function is not null) return function.ToString();
                 if (pointerTo is not null) return $"{pointerTo.Name}*";
@@ -322,24 +310,21 @@ namespace LanguageCore.Compiler
                 throw new UnreachableException();
             }
         }
-        /// <summary><c><see cref="Class"/> != <see langword="null"/></c></summary>
-        [MemberNotNullWhen(true, nameof(@class))]
-        public bool IsClass => @class is not null;
 
-        /// <summary><c><see cref="Enum"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(@enum))]
+        [MemberNotNullWhen(true, nameof(Enum))]
         public bool IsEnum => @enum is not null;
 
-        /// <summary><c><see cref="Struct"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(@struct))]
+        [MemberNotNullWhen(true, nameof(Struct))]
         public bool IsStruct => @struct is not null;
 
-        /// <summary><c><see cref="Function"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(function))]
+        [MemberNotNullWhen(true, nameof(Function))]
         public bool IsFunction => function is not null;
 
-        /// <summary><c><see cref="PointerTo"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(pointerTo))]
+        [MemberNotNullWhen(true, nameof(PointerTo))]
         public bool IsPointer => pointerTo is not null;
 
         public bool IsBuiltin => builtinType != Type.NotBuiltin;
@@ -348,14 +333,14 @@ namespace LanguageCore.Compiler
         {
             get
             {
-                if (builtinType != Type.NotBuiltin) return true;
+                if (IsBuiltin) return true;
                 if (IsEnum) return true;
                 if (IsPointer) return true;
 
                 return false;
             }
         }
-        public bool InHEAP => IsClass;
+
         [MemberNotNullWhen(true, nameof(genericName))]
         public bool IsGeneric => !string.IsNullOrEmpty(genericName);
         [MemberNotNullWhen(true, nameof(stackArrayOf))]
@@ -367,33 +352,19 @@ namespace LanguageCore.Compiler
             get
             {
                 if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
-                if (IsStruct) return @struct.SizeOnStack;
-                if (IsClass)
+                if (IsStruct)
                 {
-                    TypeArguments saved = new(@class.CurrentTypeArguments);
+                    TypeArguments saved = new(@struct.CurrentTypeArguments);
 
-                    @class.SetTypeArguments(typeParameters);
+                    @struct.SetTypeArguments(typeParameters);
 
-                    int size = @class.SizeOnHeap;
+                    int size = @struct.SizeOnStack;
 
-                    @class.SetTypeArguments(saved);
+                    @struct.SetTypeArguments(saved);
 
                     return size;
                 }
-                if (IsStackArray) return (stackArraySize * new DataItem(stackArrayOf.SizeOnStack)).Integer ?? throw new InternalException(); ;
-                return 1;
-            }
-        }
-        /// <summary>
-        /// Returns the struct size or 1 if it is not a struct
-        /// </summary>
-        public int SizeOnStack
-        {
-            get
-            {
-                if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
-                if (IsStruct) return @struct.SizeOnStack;
-                if (IsStackArray) return (stackArraySize * new DataItem(stackArrayOf.SizeOnStack)).ValueSInt32;
+                if (IsStackArray) return (stackArraySize * new DataItem(stackArrayOf.Size)).Integer ?? throw new InternalException(); ;
                 return 1;
             }
         }
@@ -440,7 +411,6 @@ namespace LanguageCore.Compiler
         {
             this.builtinType = Type.NotBuiltin;
             this.@struct = null;
-            this.@class = null;
             this.@enum = null;
             this.function = null;
             this.genericName = null;
@@ -458,22 +428,21 @@ namespace LanguageCore.Compiler
 
             if (IsBuiltin) return;
             if (IsEnum) return;
-            if (IsStruct) return;
 
             if (IsFunction)
             {
                 function = new FunctionType(
-                    new CompiledType(other.Function.ReturnType, typeArguments),
+                    new CompiledType(other.Function!.ReturnType, typeArguments),
                     CompiledType.FromArray(other.Function.Parameters, typeArguments)
                     );
                 return;
             }
 
-            if (IsClass)
+            if (IsStruct)
             {
-                if (typeArguments != null && @class.TemplateInfo is not null)
+                if (typeArguments != null && @struct.TemplateInfo is not null)
                 {
-                    string[] keys = @class.TemplateInfo.TypeParameterNames;
+                    string[] keys = @struct.TemplateInfo.TypeParameterNames;
                     CompiledType[] typeArgumentValues = new CompiledType[keys.Length];
                     for (int i = 0; i < keys.Length; i++)
                     {
@@ -506,25 +475,21 @@ namespace LanguageCore.Compiler
         public CompiledType(CompiledStruct @struct) : this()
         {
             this.@struct = @struct;
+            if (@struct.TemplateInfo is not null)
+            { typeParameters = @struct.TemplateInfo.TypeParameterNames.Select(CreateGeneric).ToArray(); }
+        }
+
+        public CompiledType(CompiledStruct @struct, params CompiledType[][] typeParameters) : this(@struct)
+        {
+            List<CompiledType> typeParameters1 = new();
+            for (int i = 0; i < typeParameters.Length; i++)
+            { typeParameters1.AddRange(typeParameters[i]); }
+            this.typeParameters = typeParameters1.ToArray();
         }
 
         public CompiledType(FunctionType function) : this()
         {
             this.function = function;
-        }
-
-        public CompiledType(CompiledClass @class) : this()
-        {
-            this.@class = @class;
-        }
-
-        public CompiledType(CompiledClass @class, params CompiledType[][] typeParameters) : this()
-        {
-            this.@class = @class;
-            List<CompiledType> typeParameters1 = new();
-            for (int i = 0; i < typeParameters.Length; i++)
-            { typeParameters1.AddRange(typeParameters[i]); }
-            this.typeParameters = typeParameters1.ToArray();
         }
 
         public CompiledType(CompiledEnum @enum) : this()
@@ -694,7 +659,6 @@ namespace LanguageCore.Compiler
         {
             this.typeInstance = other.typeInstance;
             this.builtinType = other.builtinType;
-            this.@class = other.@class;
             this.@enum = other.@enum;
             this.function = other.function;
             this.genericName = other.genericName;
@@ -750,8 +714,8 @@ namespace LanguageCore.Compiler
 
             if (TypeParameters.Length > 0)
             { result.Append($"<{string.Join<CompiledType>(", ", TypeParameters)}>"); }
-            else if (@class != null && @class.TemplateInfo is not null)
-            { result.Append($"<{string.Join<Token>(", ", @class.TemplateInfo.TypeParameters)}>"); }
+            else if (@struct != null && @struct.TemplateInfo is not null)
+            { result.Append($"<{string.Join<Token>(", ", @struct.TemplateInfo.TypeParameters)}>"); }
 
             return result.ToString();
         }
@@ -772,15 +736,6 @@ namespace LanguageCore.Compiler
         public static bool operator ==(CompiledType? a, Type b) => a is not null && a.Equals(b);
         public static bool operator !=(CompiledType? a, Type b) => !(a == b);
 
-        public static bool operator ==(CompiledType? a, TypeInstance? b)
-        {
-            if (a is null && b is null) return true;
-            if (a is null || b is null) return false;
-
-            return a.Equals(b);
-        }
-        public static bool operator !=(CompiledType? a, TypeInstance? b) => !(a == b);
-
         public override bool Equals(object? obj) =>
             obj is not null &&
             obj is CompiledType other &&
@@ -791,7 +746,6 @@ namespace LanguageCore.Compiler
             if (other is null) return false;
 
             if (this.IsBuiltin != other.IsBuiltin) return false;
-            if (this.IsClass != other.IsClass) return false;
             if (this.IsStruct != other.IsStruct) return false;
             if (this.IsFunction != other.IsFunction) return false;
             if (this.IsStackArray != other.IsStackArray) return false;
@@ -800,7 +754,6 @@ namespace LanguageCore.Compiler
 
             if (!CompiledType.Equals(this.typeParameters, other.typeParameters)) return false;
 
-            if (this.IsClass && other.IsClass) return this.@class.Identifier.Content == other.@class.Identifier.Content;
             if (this.IsStruct && other.IsStruct) return this.@struct.Identifier.Content == other.@struct.Identifier.Content;
             if (this.IsEnum && other.IsEnum) return this.@enum.Identifier.Content == other.@enum.Identifier.Content;
             if (this.IsFunction && other.IsFunction) return this.@function == other.@function;
@@ -851,9 +804,6 @@ namespace LanguageCore.Compiler
             { return type == this.builtinType; }
 
             if (this.@struct != null && this.@struct.Identifier.Content == otherSimple.Identifier.Content)
-            { return true; }
-
-            if (this.@class != null && this.@class.Identifier.Content == otherSimple.Identifier.Content)
             { return true; }
 
             if (this.@enum != null && this.@enum.Identifier.Content == otherSimple.Identifier.Content)
@@ -922,58 +872,71 @@ namespace LanguageCore.Compiler
         }
 
         /// <exception cref="NotImplementedException"/>
-        public static bool TryGetTypeParameters(CompiledType[]? definedParameters, CompiledType[]? passedParameters, [NotNullWhen(true)] out TypeArguments? typeParameters)
+        public static bool TryGetTypeParameters(CompiledType[]? definedParameters, CompiledType[]? passedParameters, TypeArguments typeParameters)
         {
-            typeParameters = null;
             if (definedParameters is null || passedParameters is null) return false;
             if (definedParameters.Length != passedParameters.Length) return false;
 
-            typeParameters = new TypeArguments();
-
             for (int i = 0; i < definedParameters.Length; i++)
             {
-                CompiledType passed = passedParameters[i];
-                CompiledType defined = definedParameters[i];
-
-                if (passed.IsGeneric) throw new NotImplementedException($"This should be non-generic");
-
-                if (defined.IsGeneric)
-                {
-                    if (typeParameters.TryGetValue(defined.Name, out CompiledType? addedTypeParameter))
-                    {
-                        if (addedTypeParameter != passed) return false;
-                    }
-                    else
-                    {
-                        typeParameters.Add(defined.Name, passed);
-                    }
-
-                    continue;
-                }
-
-                if (defined.IsClass && passed.IsClass)
-                {
-                    if (defined.Class.Identifier.Content != passed.Class.Identifier.Content) return false;
-                    if (defined.Class.TemplateInfo is not null && passed.Class.TemplateInfo is not null)
-                    {
-                        if (defined.Class.TemplateInfo.TypeParameters.Length != passed.TypeParameters.Length)
-                        { throw new NotImplementedException(); }
-                        for (int j = 0; j < defined.Class.TemplateInfo.TypeParameters.Length; j++)
-                        {
-                            string typeParamName = defined.Class.TemplateInfo.TypeParameters[i].Content;
-                            CompiledType typeParamValue = passed.TypeParameters[i];
-
-                            if (typeParameters.TryGetValue(typeParamName, out CompiledType? addedTypeParameter))
-                            { if (addedTypeParameter != typeParamValue) return false; }
-                            else
-                            { typeParameters.Add(typeParamName, typeParamValue); }
-                        }
-                        continue;
-                    }
-                }
-
-                if (defined != passed) return false;
+                if (!TryGetTypeParameters(definedParameters[i], passedParameters[i], typeParameters))
+                { return false; }
             }
+
+            return true;
+        }
+
+        public static bool TryGetTypeParameters(CompiledType defined, CompiledType passed, TypeArguments typeParameters)
+        {
+            if (passed.IsGeneric)
+            {
+                if (typeParameters.ContainsKey(passed.genericName))
+                { return false; }
+                throw new NotImplementedException($"This should be non-generic");
+            }
+
+            if (defined.IsGeneric)
+            {
+                if (typeParameters.TryGetValue(defined.Name, out CompiledType? addedTypeParameter))
+                {
+                    if (addedTypeParameter != passed) return false;
+                }
+                else
+                {
+                    typeParameters.Add(defined.Name, passed);
+                }
+
+                return true;
+            }
+
+            if (defined.IsPointer && passed.IsPointer)
+            {
+                return TryGetTypeParameters(defined.PointerTo, passed.PointerTo, typeParameters);
+            }
+
+            if (defined.IsStruct && passed.IsStruct)
+            {
+                if (defined.Struct.Identifier.Content != passed.Struct.Identifier.Content) return false;
+                if (defined.Struct.TemplateInfo is not null && passed.Struct.TemplateInfo is not null)
+                {
+                    if (defined.Struct.TemplateInfo.TypeParameters.Length != passed.TypeParameters.Length)
+                    { throw new NotImplementedException(); }
+                    for (int j = 0; j < defined.Struct.TemplateInfo.TypeParameters.Length; j++)
+                    {
+                        string typeParamName = defined.Struct.TemplateInfo.TypeParameters[j].Content;
+                        CompiledType typeParamValue = passed.TypeParameters[j];
+
+                        if (typeParameters.TryGetValue(typeParamName, out CompiledType? addedTypeParameter))
+                        { if (addedTypeParameter != typeParamValue) return false; }
+                        else
+                        { typeParameters.Add(typeParamName, typeParamValue); }
+                    }
+
+                    return true;
+                }
+            }
+
+            if (defined != passed) return false;
 
             return true;
         }
@@ -983,11 +946,10 @@ namespace LanguageCore.Compiler
         {
             if (IsBuiltin) return HashCode.Combine((byte)0, builtinType);
             if (IsEnum) return HashCode.Combine((byte)1, Enum);
-            if (IsClass) return HashCode.Combine((byte)2, Class);
-            if (IsStruct) return HashCode.Combine((byte)3, Struct);
-            if (IsStackArray) return HashCode.Combine((byte)4, StackArrayOf, StackArraySize);
-            if (IsFunction) return HashCode.Combine((byte)5, function);
-            if (IsPointer) return HashCode.Combine((byte)6, pointerTo);
+            if (IsStruct) return HashCode.Combine((byte)2, Struct);
+            if (IsStackArray) return HashCode.Combine((byte)3, StackArrayOf, StackArraySize);
+            if (IsFunction) return HashCode.Combine((byte)4, function);
+            if (IsPointer) return HashCode.Combine((byte)5, pointerTo);
             throw new NotImplementedException();
         }
 
@@ -1021,9 +983,6 @@ namespace LanguageCore.Compiler
 
         public bool IsReplacedType(string v)
         {
-            if (@class != null)
-            { return @class.CompiledAttributes.HasAttribute("Define", v); }
-
             if (@struct != null)
             { return @struct.CompiledAttributes.HasAttribute("Define", v); }
 
@@ -1035,22 +994,16 @@ namespace LanguageCore.Compiler
 
         public bool TryGetFieldOffsets([NotNullWhen(true)] out IReadOnlyDictionary<string, int>? fieldOffsets)
         {
-            if (IsClass)
-            {
-                TypeArguments saved = new(@class.CurrentTypeArguments);
-
-                @class.SetTypeArguments(typeParameters);
-
-                fieldOffsets = @class.FieldOffsets;
-
-                @class.SetTypeArguments(saved);
-
-                return true;
-            }
-
             if (IsStruct)
             {
+                TypeArguments saved = new(@struct.CurrentTypeArguments);
+
+                @struct.SetTypeArguments(typeParameters);
+
                 fieldOffsets = @struct.FieldOffsets;
+
+                @struct.SetTypeArguments(saved);
+
                 return true;
             }
 
@@ -1067,7 +1020,7 @@ namespace LanguageCore.Compiler
 
             if (IsEnum) return true;
 
-            if (IsPointer) return pointerTo.AllGenericsDefined();
+            if (IsPointer) return PointerTo.AllGenericsDefined();
 
             if (IsStackArray) return StackArrayOf.AllGenericsDefined();
 
@@ -1075,17 +1028,15 @@ namespace LanguageCore.Compiler
             {
                 for (int i = 0; i < Function.Parameters.Length; i++)
                 {
-                    if (!function.Parameters[i].AllGenericsDefined())
+                    if (!Function.Parameters[i].AllGenericsDefined())
                     { return false; }
                 }
                 return Function.ReturnType.AllGenericsDefined();
             }
 
-            if (IsStruct) return true;
-
-            if (IsClass)
+            if (IsStruct)
             {
-                if (Class.TemplateInfo == null) return true;
+                if (Struct.TemplateInfo == null) return true;
                 return TypeParameters.Length > 0;
             }
 
@@ -1096,11 +1047,74 @@ namespace LanguageCore.Compiler
         {
             pointerTo = to,
         };
-    }
 
-    public interface IAmInContext<T>
-    {
-        public T? Context { get; set; }
+        public static CompiledType ArrayOf(CompiledType of, DataItem size, StatementWithValue? sizeStatement) => new()
+        {
+            stackArrayOf = of,
+            stackArraySize = size,
+            stackArraySizeStatement = sizeStatement,
+        };
+
+        public static CompiledType? InsertTypeParameters(CompiledType type, TypeArguments? typeArguments)
+        {
+            if (typeArguments is null) return null;
+
+            if (type.IsGeneric)
+            {
+                if (!typeArguments.TryGetValue(type.Name, out CompiledType? passedTypeArgument))
+                { throw new InternalException(); }
+
+                return passedTypeArgument;
+            }
+
+            if (type.IsPointer)
+            {
+                CompiledType? pointerTo = CompiledType.InsertTypeParameters(type.pointerTo, typeArguments);
+                if (pointerTo is null)
+                { return null; }
+                return CompiledType.Pointer(pointerTo);
+            }
+
+            if (type.IsStackArray)
+            {
+                CompiledType? stackArrayOf = CompiledType.InsertTypeParameters(type.stackArrayOf, typeArguments);
+                if (stackArrayOf is null)
+                { return null; }
+                return CompiledType.ArrayOf(stackArrayOf, type.stackArraySize, type.stackArraySizeStatement);
+            }
+
+            if (type.IsStruct && type.Struct.TemplateInfo != null)
+            {
+                CompiledType[] structTypeParameterValues = new CompiledType[type.Struct.TemplateInfo.TypeParameters.Length];
+
+                foreach (KeyValuePair<string, CompiledType> item in typeArguments)
+                {
+                    if (type.Struct.TryGetTypeArgumentIndex(item.Key, out int j))
+                    { structTypeParameterValues[j] = item.Value; }
+                }
+
+                for (int j = 0; j < structTypeParameterValues.Length; j++)
+                {
+                    if (structTypeParameterValues[j] is null ||
+                        structTypeParameterValues[j].IsGeneric)
+                    { return null; }
+                }
+
+                return new CompiledType(type.Struct, structTypeParameterValues);
+            }
+
+            return null;
+        }
+
+        public static void InsertTypeParameters(CompiledType[] types, TypeArguments? typeArguments)
+        {
+            if (typeArguments is null) return;
+
+            for (int i = 0; i < types.Length; i++)
+            {
+                types[i] = CompiledType.InsertTypeParameters(types[i], typeArguments) ?? types[i];
+            }
+        }
     }
 
     public interface ISameCheck

@@ -5,6 +5,7 @@ using System.Diagnostics;
 namespace LanguageCore.BBCode.Generator
 {
     using Compiler;
+    using LanguageCore.Parser;
     using Runtime;
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -73,7 +74,7 @@ namespace LanguageCore.BBCode.Generator
         readonly Dictionary<string, int> ExternalFunctionsCache;
 
         readonly Stack<CleanupItem[]> CleanupStack;
-        IAmInContext<CompiledClass>? CurrentContext;
+        FunctionThingDefinition? CurrentContext;
 
         readonly Stack<List<int>> ReturnInstructions;
         readonly Stack<List<int>> BreakInstructions;
@@ -84,6 +85,7 @@ namespace LanguageCore.BBCode.Generator
         readonly List<UndefinedOffset<CompiledFunction>> UndefinedFunctionOffsets;
         readonly List<UndefinedOffset<CompiledOperator>> UndefinedOperatorFunctionOffsets;
         readonly List<UndefinedOffset<CompiledGeneralFunction>> UndefinedGeneralFunctionOffsets;
+        readonly List<UndefinedOffset<CompiledConstructor>> UndefinedConstructorOffsets;
 
         readonly bool TrimUnreachableCode = true;
 
@@ -106,6 +108,7 @@ namespace LanguageCore.BBCode.Generator
             this.UndefinedFunctionOffsets = new List<UndefinedOffset<CompiledFunction>>();
             this.UndefinedOperatorFunctionOffsets = new List<UndefinedOffset<CompiledOperator>>();
             this.UndefinedGeneralFunctionOffsets = new List<UndefinedOffset<CompiledGeneralFunction>>();
+            this.UndefinedConstructorOffsets = new List<UndefinedOffset<CompiledConstructor>>();
             this.InMacro = new Stack<bool>();
 
             this.TagCount = new Stack<int>();
@@ -146,15 +149,6 @@ namespace LanguageCore.BBCode.Generator
                     ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count + 1);
                     offset += function.Length;
 
-                    // Prepare value
-                    AddInstruction(Opcode.PUSH_VALUE, function.Length);
-
-                    // Calculate pointer
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-
-                    // Set value
-                    AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
-
                     for (int i = 0; i < function.Length; i++)
                     {
                         // Prepare value
@@ -162,7 +156,20 @@ namespace LanguageCore.BBCode.Generator
 
                         // Calculate pointer
                         AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-                        AddInstruction(Opcode.PUSH_VALUE, i + 1);
+                        AddInstruction(Opcode.PUSH_VALUE, i);
+                        AddInstruction(Opcode.MATH_ADD);
+
+                        // Set value
+                        AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+                    }
+
+                    {
+                        // Prepare value
+                        AddInstruction(Opcode.PUSH_VALUE, new DataItem('\0'));
+
+                        // Calculate pointer
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
+                        AddInstruction(Opcode.PUSH_VALUE, function.Length);
                         AddInstruction(Opcode.MATH_ADD);
 
                         // Set value
@@ -228,6 +235,18 @@ namespace LanguageCore.BBCode.Generator
                 }
             }
 
+            {
+                int i = 0;
+                while (i < CompilableConstructors.Count)
+                {
+                    CompliableTemplate<CompiledConstructor> function = CompilableConstructors[i];
+                    i++;
+
+                    function.Function.InstructionOffset = GeneratedCode.Count;
+                    GenerateCodeForCompilableFunction(function);
+                }
+            }
+
             foreach (CompliableTemplate<CompiledOperator> function in this.CompilableOperators)
             {
                 function.Function.InstructionOffset = GeneratedCode.Count;
@@ -255,6 +274,15 @@ namespace LanguageCore.BBCode.Generator
                 GeneratedCode[item.InstructionIndex].Parameter = offset;
             }
 
+            foreach (UndefinedOffset<CompiledConstructor> item in UndefinedConstructorOffsets)
+            {
+                if (item.Called.InstructionOffset == -1)
+                { throw new InternalException($"Constructor {item.Called.ToReadable()} does not have instruction offset", item.CurrentFile); }
+
+                int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
+                GeneratedCode[item.InstructionIndex].Parameter = offset;
+            }
+
             foreach (UndefinedOffset<CompiledOperator> item in UndefinedOperatorFunctionOffsets)
             {
                 if (item.Called.InstructionOffset == -1)
@@ -270,11 +298,10 @@ namespace LanguageCore.BBCode.Generator
                 {
                     throw item.Called.Identifier.Content switch
                     {
-                        BuiltinFunctionNames.Cloner => new InternalException($"Cloner for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
-                        BuiltinFunctionNames.Constructor => new InternalException($"Constructor for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
-                        BuiltinFunctionNames.Destructor => new InternalException($"Destructor for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
-                        BuiltinFunctionNames.IndexerGet => new InternalException($"Index getter for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
-                        BuiltinFunctionNames.IndexerSet => new InternalException($"Index setter for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
+                        // TODO: Show item.Called.Context instead of item.Called
+                        BuiltinFunctionNames.Destructor => new InternalException($"Destructor for \"{item.Called}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.IndexerGet => new InternalException($"Index getter for \"{item.Called}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.IndexerSet => new InternalException($"Index setter for \"{item.Called}\" does not have instruction offset", item.CurrentFile),
                         _ => new NotImplementedException(),
                     };
                 }

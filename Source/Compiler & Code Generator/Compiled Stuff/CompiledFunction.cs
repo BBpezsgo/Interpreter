@@ -12,7 +12,6 @@ namespace LanguageCore.Compiler
         FunctionDefinition,
         ISameCheck,
         ISameCheck<CompiledFunction>,
-        IAmInContext<CompiledClass>,
         IReferenceable<FunctionCall>,
         IReferenceable<IndexCall>,
         IReferenceable<Identifier>,
@@ -23,6 +22,8 @@ namespace LanguageCore.Compiler
         public readonly CompiledType[] ParameterTypes;
         public CompiledAttributeCollection CompiledAttributes;
         readonly List<Reference<Statement>> references;
+
+        public CompiledStruct? Context;
 
         public int TimesUsed;
         public int TimesUsedTotal;
@@ -75,8 +76,6 @@ namespace LanguageCore.Compiler
             }
         }
 
-        public CompiledClass? Context { get; set; }
-
         public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition)
         {
             this.Type = type;
@@ -103,7 +102,7 @@ namespace LanguageCore.Compiler
         }
         public bool IsSame(ISameCheck? other) => other is CompiledFunction other2 && IsSame(other2);
 
-        public CompiledFunction Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
+        public new CompiledFunction Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
         {
             CompiledAttributes = this.CompiledAttributes,
             Context = this.Context,

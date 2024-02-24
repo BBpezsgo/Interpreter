@@ -25,13 +25,12 @@ namespace LanguageCore.BBCode.Generator
 
             int functionsRemoved = 0;
 
-            List<CompiledFunction> newFunctions;
-            List<CompiledOperator> newOperators;
-            List<CompiledGeneralFunction> newGeneralFunctions;
+            List<CompiledFunction> newFunctions = new(compilerResult.Functions);
+            List<CompiledOperator> newOperators = new(compilerResult.Operators);
+            List<CompiledGeneralFunction> newGeneralFunctions = new(compilerResult.GeneralFunctions);
+            List<CompiledConstructor> newConstructors = new(compilerResult.Constructors);
 
             {
-                newFunctions = new(compilerResult.Functions);
-
                 for (int i = newFunctions.Count - 1; i >= 0; i--)
                 {
                     CompiledFunction function = newFunctions[i];
@@ -54,8 +53,6 @@ namespace LanguageCore.BBCode.Generator
             }
 
             {
-                newOperators = new(compilerResult.Operators);
-
                 for (int i = newOperators.Count - 1; i >= 0; i--)
                 {
                     CompiledOperator @operator = newOperators[i];
@@ -76,8 +73,6 @@ namespace LanguageCore.BBCode.Generator
             }
 
             {
-                newGeneralFunctions = new(compilerResult.GeneralFunctions);
-
                 for (int i = newGeneralFunctions.Count - 1; i >= 0; i--)
                 {
                     CompiledGeneralFunction generalFunction = newGeneralFunctions[i];
@@ -97,14 +92,34 @@ namespace LanguageCore.BBCode.Generator
                 }
             }
 
+            {
+                for (int i = newConstructors.Count - 1; i >= 0; i--)
+                {
+                    CompiledConstructor constructor = newConstructors[i];
+
+                    if (constructor.TimesUsed > 0) continue;
+
+                    if (CompileLevel == CompileLevel.All) continue;
+                    if (CompileLevel == CompileLevel.Exported && constructor.IsExport) continue;
+
+                    string readableID = constructor.ToReadable();
+
+                    Print?.Invoke($"      Remove constructor {readableID}", LogType.Debug);
+                    AnalysisCollection?.Informations.Add(new Information($"Unused constructor {readableID} is not compiled", constructor.Identifier, constructor.FilePath));
+
+                    newConstructors.RemoveAt(i);
+                    functionsRemoved++;
+                }
+            }
+
             compilerResult = new CompilerResult(
                 newFunctions.ToArray(),
                 compilerResult.Macros,
                 newGeneralFunctions.ToArray(),
                 newOperators.ToArray(),
+                newConstructors.ToArray(),
                 compilerResult.ExternalFunctions,
                 compilerResult.Structs,
-                compilerResult.Classes,
                 compilerResult.Hashes,
                 compilerResult.Enums,
                 compilerResult.TopLevelStatements,

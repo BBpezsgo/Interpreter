@@ -2,15 +2,15 @@ using System;
 using System.Memory;
 using System.Lists;
 
-export void Split(this String string, char separator, List<String> result)
+export void Split(this char* string, char separator, List<char*>* result)
 {
-	String current = "";
+	char* current = "";
 
-	for (int i = 0; i < string.length; i++)
+	for (int i = 0; string[i]; i++)
 	{
 		if (string[i] == separator)
 		{
-			if (current.length > 0)
+	        if (!current.IsNullOrEmpty())
 			{
 				result.Add(current);
 				current = "";
@@ -22,7 +22,7 @@ export void Split(this String string, char separator, List<String> result)
 		}
 	}
 
-	if (current.length > 0)
+	if (!current.IsNullOrEmpty())
 	{
 		result.Add(current);
 	}
@@ -38,167 +38,114 @@ macro UnsafeSet(list, index, value)
     *(&list + 1 + index) = value;
 }
 
-[Define("string")]
-class String
+export int IsNullOrEmpty(this char* text)
 {
-    int length;
-
-    export constructor(int length)
+    if (text)
     {
-        int* pointer = Alloc(sizeof(String) + length);
-        
-        *pointer = length;
-
-        return pointer as String;
+        if (text[0])
+        { return 0; }
+        else
+        { return 1; }
     }
-
-    export constructor(int length, char character)
-    {
-        int* pointer = Alloc(sizeof(String) + length);
-
-        *pointer = length;
-
-        for (int offset; offset < length; offset++)
-        {
-            *(pointer + sizeof(String) + offset) = character;
-        }
-
-        return pointer as String;
-    }
-
-    export clone(temp String other)
-    {
-        String result = new String(other.length);
-
-        for (int i; i < other.length; i++)
-        {
-            UnsafeSet(result, i, UnsafeGet(other, i));
-        }
-
-        return result;
-    }
-
-    export String +(temp String a, temp String b)
-    {
-        int al = a.length;
-        int bl = b.length;
-
-        int lengthSum = al + bl;
-
-        String result = new String(lengthSum);
-  
-        for (int i; i < al; i++)
-        {
-            UnsafeSet(result, i, UnsafeGet(a, i));
-        }
-  
-        for (int i; i < bl; i++)
-        {
-            UnsafeSet(result, al + i, UnsafeGet(b, i));
-        }
-
-        return result;
-    }
-    
-    export String +(temp String a, int b)
-    {
-        return a + temp b.ToString();
-    }
-    
-    export String +(temp String a, char b)
-    {
-        String result = new String(a.length + 1);
-        
-        for (int i; i < a.length; i++)
-        {
-            UnsafeSet(result, i, UnsafeGet(a, i));
-        }
-
-        result[a.length] = b;
-  
-        return result;
-    }
-    
-    export String +(int a, temp String b)
-    {
-        return temp a.ToString() + b;
-    }
-    
-    export bool ==(temp String a, temp String b)
-    {
-        int length = a.length;
-
-        if (length != b.length) { return false; };
-
-        for (int i = 0; i < length; i++)
-        {
-            char _a = UnsafeGet(a, i) as char;
-            char _b = UnsafeGet(b, i) as char;
-            
-            if (_a != _b)
-            { return false; }
-        }
-
-        return true;
-    }
-    
-    export char indexer_get(int index)
-    {
-        if (index < 0 || index >= this.length)
-        { throw "Index out of range exception"; }
-        return *((&this) + sizeof(String) + index);
-    }
-    
-    export void indexer_set(int index, char element)
-    {
-        if (index < 0 || index >= this.length)
-        { throw "Index out of range exception"; }
-        *((&this) + sizeof(String) + index) = element;
-    }
-
-    export String ToString() { return this; }
+    else
+    { return 1; }
 }
 
-export void CopyString(temp String from, String to)
+export char* +(temp char* a, temp char* b)
 {
-    int newLength = Min(from.length, to.length);
-    for (int i; i < newLength; i++)
+    int al = a.Length();
+    int bl = b.Length();
+
+    int lengthSum = al + bl;
+
+    char* result = Alloc((lengthSum + 1) * sizeof(char)) as char*;
+  
+    for (int i; i < al; i++)
     {
-        UnsafeSet(to, i, UnsafeGet(from, i));
+        result[i] = a[i];
+    }
+  
+    for (int i; i < bl; i++)
+    {
+        result[al + i] = b[i];
+    }
+
+    result[lengthSum] = '\0';
+
+    return result;
+}
+
+export char* +(temp char* a, char b)
+{
+    int length = a.Length();
+
+    char* result = Alloc((length + 2) * sizeof(char)) as char*;
+  
+    for (int i; i < length; i++)
+    {
+        result[i] = a[i];
+    }
+  
+    result[length] = b;
+
+    result[length + 1] = '\0';
+
+    return result;
+}
+
+export int Length(this char* v)
+{
+	int i = 0;
+	while (v[i])
+	{ i++; }
+	return i;
+}
+
+export void CopyString(temp char* from, char* to)
+{
+    int i = 0;
+    while (from[i] && to[i])
+    {
+        to[i] = from[i];
+        i++;
     }
 }
 
-export String Substring(temp this String v, int start)
+export char* Substring(temp this char* v, int start)
 {
     int newLength = 0;
-    for (int i = start; i < v.length; i++)
+    int length = v.Length();
+    for (int i = start; i < length; i++)
     {
         newLength++;
     }
-    String newV = new String(newLength);
-    for (int i = start; i < v.length; i++)
+    char* newV = Alloc(newLength * sizeof(char)) as char*;
+    for (int i = start; i < length; i++)
     {
-        UnsafeSet(newV, i - start, UnsafeGet(v, i));
+        newV[i - start] = v[i];
     }
     return newV;
 }
 
-export String Substring(temp this String v, int start, int length)
+export char* Substring(temp this char* v, int start, int length)
 {
-    String newV = new String(Min(v.length, start + length));
-    for (int i = start; i < Min(v.length, start + length); i++)
+    int _length = v.Length();
+    char* newV = Alloc(Min(_length, start + length) * sizeof(char)) as char*;
+    for (int i = start; i < Min(_length, start + length); i++)
     {
-        UnsafeSet(newV, i - start, UnsafeGet(v, i));
+        newV[i - start] = v[i];
     }
     return newV;
 }
 
-export String Reverse(temp this String v)
+export char* Reverse(temp this char* v)
 {
-    String newV = new String(v.length);
-    for (int i = 0; i < v.length; i++)
+    int length = v.Length();
+    char* newV = Alloc((length + 1) * sizeof(char)) as char*;
+    for (int i = 0; i < length; i++)
     {
-        UnsafeSet(newV, i, UnsafeGet(v, v.length - 1 - i));
+        newV[i] = v[length - 1 - i];
     }
+    newV[length] = '\0';
     return newV;
 }

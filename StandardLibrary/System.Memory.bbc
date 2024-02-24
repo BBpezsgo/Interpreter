@@ -102,9 +102,10 @@ export int* Alloc(int sizeNeed)
 }
 
 [Builtin("free")]
-export void Dealloc(int* ptr)
+template<T>
+export void Dealloc(T* ptr)
 {
-	int* position = ptr;
+	int* position = ptr as int*;
 
     int size;
     int allocated;

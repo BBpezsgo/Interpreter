@@ -182,7 +182,7 @@ namespace LanguageCore.Runtime
             string? value = null;
             try
             {
-                value = Memory.Heap.GetString(pointer + 1, (int)Memory.Heap[pointer]);
+                value = Memory.Heap.GetString(pointer);
                 Memory.Heap.Deallocate(pointer);
             }
             catch (Exception) { }
@@ -542,7 +542,7 @@ namespace LanguageCore.Runtime
             if (functionNameDataItem.Type != RuntimeType.SInt32)
             { throw new InternalException($"Instruction CALL_EXTERNAL need a String pointer (int) DataItem parameter from the stack, received {functionNameDataItem.Type} {functionNameDataItem}"); }
 
-            string functionName = Memory.Heap.GetString((int)functionNameDataItem + 1, (int)Memory.Heap[(int)functionNameDataItem]);
+            string functionName = Memory.Heap.GetString((int)functionNameDataItem);
 
             if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase? function))
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }

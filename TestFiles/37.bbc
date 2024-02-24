@@ -1,6 +1,6 @@
 using System;
 
-temp String a = "a";
-temp String b = "b";
+temp char* a = "a";
+temp char* b = "b";
 
 Print(a + b);

@@ -1086,6 +1086,23 @@ namespace LanguageCore.Brainfuck
         }
 
         /// <summary>
+        /// <para>
+        /// <b>Pointer:</b> <paramref name="resultAddress"/>
+        /// </para>
+        /// <para>
+        /// <b>Note:</b> This will discard <paramref name="pointerAddress"/>
+        /// </para>
+        /// </summary>
+        public void Get(int pointerAddress, int resultAddress, int size)
+        {
+            for (int offset = 0; offset < size; offset++)
+            {
+                Code.AddValue(pointerAddress, 1);
+                Get(pointerAddress, resultAddress + offset);
+            }
+        }
+
+        /// <summary>
         /// <b>Pointer:</b> <paramref name="resultAddress"/>
         /// </summary>
         public void Get(int pointerAddress, int resultAddress)

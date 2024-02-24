@@ -120,7 +120,7 @@ namespace TheProgram
             */
 
             // string path = Path.Combine(TestConstants.TestFilesPath, "..", "Examples", "calc.bbc");
-            string path = Path.Combine(TestConstants.TestFilesPath, "34.bbc");
+            string path = Path.Combine(TestConstants.TestFilesPath, "15.bbc");
 
             string[] generatedArgs =
             [
@@ -128,7 +128,7 @@ namespace TheProgram
                 "--basepath \"../StandardLibrary/\"",
                 // "--hide-debug",
                 // "--dont-optimize",
-                // "--console-gui",
+                "--console-gui",
                 // "--print-instructions",
                 // "--brainfuck",
                 // "--il",
@@ -136,7 +136,7 @@ namespace TheProgram
                 // "--no-nullcheck",
                 // "--heap-size 0",
                 "--no-pause",
-                "--show-progress",
+                // "--show-progress",
                 $"\"{path}\""
             ];
 

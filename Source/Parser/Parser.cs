@@ -94,10 +94,10 @@ namespace LanguageCore.Parser
         // === Result ===
         readonly List<Error> Errors = new();
         readonly List<FunctionDefinition> Functions = new();
+        readonly List<FunctionDefinition> Operators = new();
         readonly List<MacroDefinition> Macros = new();
         readonly List<EnumDefinition> Enums = new();
         readonly Dictionary<string, StructDefinition> Structs = new();
-        readonly Dictionary<string, ClassDefinition> Classes = new();
         readonly List<UsingDefinition> Usings = new();
         readonly List<CompileTag> Hashes = new();
         readonly List<Statement.Statement> TopLevelStatements = new();
@@ -149,11 +149,11 @@ namespace LanguageCore.Parser
             return new ParserResult(
                 Errors,
                 Functions,
+                Operators,
                 Macros,
                 Structs.Values,
                 Usings,
                 Hashes,
-                Classes.Values,
                 TopLevelStatements,
                 Enums);
         }
@@ -300,6 +300,8 @@ namespace LanguageCore.Parser
             { Macros.Add(macroDefinition); }
             else if (ExpectFunctionDefinition(out FunctionDefinition? functionDefinition))
             { Functions.Add(functionDefinition); }
+            else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
+            { Operators.Add(operatorDefinition); }
             else if (ExpectEnumDefinition(out EnumDefinition? enumDefinition))
             { Enums.Add(enumDefinition); }
             else if (ExpectStatement(out Statement.Statement? statement))
@@ -650,13 +652,70 @@ namespace LanguageCore.Parser
             return true;
         }
 
+        bool ExpectConstructorDefinition([NotNullWhen(true)] out ConstructorDefinition? function)
+        {
+            int parseStart = CurrentTokenIndex;
+            function = null;
+
+            Token[] modifiers = ParseModifiers();
+
+            if (!ExpectType(AllowedType.None, out TypeInstance? type))
+            { CurrentTokenIndex = parseStart; return false; }
+
+            if (!ExpectOperator("(", out Token? leftParenthesis))
+            { CurrentTokenIndex = parseStart; return false; }
+
+            List<ParameterDefinition> parameters = new();
+
+            bool expectParameter = false;
+            Token? rightParenthesis;
+            while (!ExpectOperator(")", out rightParenthesis) || expectParameter)
+            {
+                Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
+                CheckModifiers(parameterModifiers, "temp");
+
+                if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
+                { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After()); }
+
+                if (!ExpectIdentifier(out Token? parameterIdentifier))
+                { throw new SyntaxException("Expected a parameter name", parameterType.Position.After()); }
+
+                parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
+
+                ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
+                parameters.Add(parameterDefinition);
+
+                if (ExpectOperator(")", out rightParenthesis))
+                { break; }
+
+                if (!ExpectOperator(","))
+                { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken?.Position.After()); }
+                else
+                { expectParameter = true; }
+            }
+
+            CheckModifiers(modifiers, "export");
+
+            function = new ConstructorDefinition(
+                type,
+                modifiers,
+                new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis));
+
+            if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out Block? block))
+            { throw new SyntaxException($"Body is required for constructor definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After()); }
+
+            function.Block = block;
+
+            return true;
+        }
+
         bool ExpectClassDefinition()
         {
             int startTokenIndex = CurrentTokenIndex;
 
-            AttributeUsage[] attributes = ExpectAttributes();
+            ExpectAttributes();
 
-            ExpectTemplateInfo(out TemplateInfo? templateInfo);
+            ExpectTemplateInfo(out _);
 
             Token[] modifiers = ParseModifiers();
 
@@ -666,7 +725,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier(out Token? possibleClassName))
             { throw new SyntaxException($"Expected class identifier after keyword \"{keyword}\"", keyword.Position.After()); }
 
-            if (!ExpectOperator("{", out Token? braceletStart))
+            if (!ExpectOperator("{", out _))
             { throw new SyntaxException("Expected \"{\" after class identifier", possibleClassName.Position.After()); }
 
             possibleClassName.AnalyzedType = TokenAnalyzedType.Class;
@@ -678,8 +737,7 @@ namespace LanguageCore.Parser
             List<GeneralFunctionDefinition> generalMethods = new();
 
             int endlessSafe = 0;
-            Token? braceletEnd;
-            while (!ExpectOperator("}", out braceletEnd))
+            while (!ExpectOperator("}", out _))
             {
                 if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
                 {
@@ -699,6 +757,10 @@ namespace LanguageCore.Parser
                     if (ExpectOperator(";", out Token? semicolon))
                     { field.Semicolon = semicolon; }
                 }
+                else if (ExpectConstructorDefinition(out _))
+                {
+
+                }
                 else
                 {
                     throw new SyntaxException($"Expected field definition or \"}}\"", CurrentToken?.Position ?? PreviousToken?.Position.After());
@@ -713,15 +775,6 @@ namespace LanguageCore.Parser
 
             CheckModifiers(modifiers, "export");
 
-            ClassDefinition classDefinition = new(possibleClassName, braceletStart, braceletEnd, attributes, modifiers, fields, methods, generalMethods, operators)
-            {
-                TemplateInfo = templateInfo,
-            };
-
-            Classes.Add(classDefinition.Identifier.Content, classDefinition);
-
-            // Warnings.Add(new Warning($"Class is experimental feature!", keyword, classDefinition.FilePath));
-
             return true;
         }
 
@@ -730,6 +783,8 @@ namespace LanguageCore.Parser
             int startTokenIndex = CurrentTokenIndex;
 
             AttributeUsage[] attributes = ExpectAttributes();
+
+            ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
             Token[] modifiers = ParseModifiers();
 
@@ -740,23 +795,47 @@ namespace LanguageCore.Parser
             { throw new SyntaxException($"Expected struct identifier after keyword \"{keyword}\"", keyword.Position.After()); }
 
             if (!ExpectOperator("{", out Token? braceletStart))
-            { throw new SyntaxException($"Expected \"{{\" after struct identifier", possibleStructName.Position.After()); }
+            { throw new SyntaxException("Expected \"{\" after struct identifier", possibleStructName.Position.After()); }
 
+            possibleStructName.AnalyzedType = TokenAnalyzedType.Struct;
             keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
             List<FieldDefinition> fields = new();
             List<FunctionDefinition> methods = new();
+            List<FunctionDefinition> operators = new();
+            List<GeneralFunctionDefinition> generalMethods = new();
+            List<ConstructorDefinition> constructors = new();
 
             int endlessSafe = 0;
             Token? braceletEnd;
             while (!ExpectOperator("}", out braceletEnd))
             {
-                if (!ExpectField(out FieldDefinition? field))
-                { throw new SyntaxException($"Expected field definition or \"}}\"", CurrentToken?.Position ?? PreviousToken?.Position.After()); }
-
-                fields.Add(field);
-                if (ExpectOperator(";", out Token? semicolon))
-                { field.Semicolon = semicolon; }
+                if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
+                {
+                    operators.Add(operatorDefinition);
+                }
+                else if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition))
+                {
+                    methods.Add(methodDefinition);
+                }
+                else if (ExpectGeneralFunctionDefinition(out GeneralFunctionDefinition? generalMethodDefinition))
+                {
+                    generalMethods.Add(generalMethodDefinition);
+                }
+                else if (ExpectConstructorDefinition(out ConstructorDefinition? constructorDefinition))
+                {
+                    constructors.Add(constructorDefinition);
+                }
+                else if (ExpectField(out FieldDefinition? field))
+                {
+                    fields.Add(field);
+                    if (ExpectOperator(";", out Token? semicolon))
+                    { field.Semicolon = semicolon; }
+                }
+                else
+                {
+                    throw new SyntaxException("Expected field definition or \"}\"", CurrentToken?.Position ?? PreviousToken?.Position.After());
+                }
 
                 endlessSafe++;
                 if (endlessSafe > 50)
@@ -767,7 +846,20 @@ namespace LanguageCore.Parser
 
             CheckModifiers(modifiers, "export");
 
-            StructDefinition structDefinition = new(possibleStructName, braceletStart, braceletEnd, attributes, fields, methods, modifiers);
+            StructDefinition structDefinition = new(
+                possibleStructName,
+                braceletStart,
+                braceletEnd,
+                attributes,
+                modifiers,
+                fields,
+                methods,
+                generalMethods,
+                operators,
+                constructors)
+            {
+                TemplateInfo = templateInfo,
+            };
 
             Structs.Add(structDefinition.Identifier.Content, structDefinition);
 
@@ -938,13 +1030,6 @@ namespace LanguageCore.Parser
         bool ExpectOneValue([NotNullWhen(true)] out StatementWithValue? statementWithValue, bool allowAsStatement = true)
         {
             statementWithValue = null;
-
-            {
-                if (ExpectKeywordCall("clone", 1, out KeywordCall? keywordCallClone))
-                {
-                    statementWithValue = keywordCallClone;
-                }
-            }
 
             if (statementWithValue != null)
             { }
@@ -1391,12 +1476,6 @@ namespace LanguageCore.Parser
             if (ExpectKeywordCall("delete", 1, out KeywordCall? keywordCallDelete))
             {
                 statement = keywordCallDelete;
-                return true;
-            }
-
-            if (ExpectKeywordCall("clone", 1, out KeywordCall? keywordCallClone))
-            {
-                statement = keywordCallClone;
                 return true;
             }
 
@@ -2031,6 +2110,7 @@ namespace LanguageCore.Parser
             { possibleType.AnalyzedType = TokenAnalyzedType.Keyword; }
 
             int afterIdentifier = CurrentTokenIndex;
+            bool withGenerics = false;
 
             while (true)
             {
@@ -2070,9 +2150,9 @@ namespace LanguageCore.Parser
                     }
 
                     type = new TypeInstanceSimple(possibleType, genericTypes);
-                    return true;
+                    withGenerics = true;
                 }
-                else if (ExpectOperator("("))
+                else if (!withGenerics && ExpectOperator("("))
                 {
                     if (!flags.HasFlag(AllowedType.FunctionPointer))
                     {

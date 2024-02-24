@@ -6,7 +6,6 @@ using System.Linq;
 
 namespace LanguageCore.Compiler
 {
-    using BBCode.Generator;
     using Parser;
     using Parser.Statement;
     using Runtime;
@@ -15,8 +14,6 @@ namespace LanguageCore.Compiler
     public readonly struct BuiltinFunctionNames
     {
         public const string Destructor = "destructor";
-        public const string Cloner = "clone";
-        public const string Constructor = "constructor";
         public const string IndexerGet = "indexer_get";
         public const string IndexerSet = "indexer_set";
     }
@@ -27,11 +24,11 @@ namespace LanguageCore.Compiler
         public readonly MacroDefinition[] Macros;
         public readonly CompiledGeneralFunction[] GeneralFunctions;
         public readonly CompiledOperator[] Operators;
+        public readonly CompiledConstructor[] Constructors;
 
         public readonly ExternalFunctionCollection ExternalFunctions;
 
         public readonly CompiledStruct[] Structs;
-        public readonly CompiledClass[] Classes;
         public readonly CompileTag[] Hashes;
         public readonly CompiledEnum[] Enums;
 
@@ -95,16 +92,6 @@ namespace LanguageCore.Compiler
                     }
                 }
 
-                foreach (CompiledClass @class in Classes)
-                {
-                    string? file = @class.FilePath;
-                    if (file is not null && !alreadyExists.Contains(file))
-                    {
-                        alreadyExists.Add(file);
-                        yield return file;
-                    }
-                }
-
                 foreach (CompiledEnum @enum in Enums)
                 {
                     string? file = @enum.FilePath;
@@ -149,11 +136,11 @@ namespace LanguageCore.Compiler
         public readonly ParserResult AST => new(
             Enumerable.Empty<Error>(),
             Functions,
+            Operators,
             Macros,
             Structs,
             Enumerable.Empty<UsingDefinition>(),
             Enumerable.Empty<CompileTag>(),
-            Classes,
             TopLevelStatements,
             Enums);
 
@@ -162,37 +149,37 @@ namespace LanguageCore.Compiler
             Array.Empty<MacroDefinition>(),
             Array.Empty<CompiledGeneralFunction>(),
             Array.Empty<CompiledOperator>(),
+            Array.Empty<CompiledConstructor>(),
             new ExternalFunctionCollection(),
             Array.Empty<CompiledStruct>(),
-            Array.Empty<CompiledClass>(),
             Array.Empty<CompileTag>(),
             Array.Empty<CompiledEnum>(),
             Array.Empty<Statement>(),
             null);
 
         public CompilerResult(
-            CompiledFunction[] functions,
-            MacroDefinition[] macros,
-            CompiledGeneralFunction[] generalFunctions,
-            CompiledOperator[] operators,
+            IEnumerable<CompiledFunction> functions,
+            IEnumerable<MacroDefinition> macros,
+            IEnumerable<CompiledGeneralFunction> generalFunctions,
+            IEnumerable<CompiledOperator> operators,
+            IEnumerable<CompiledConstructor> constructors,
             ExternalFunctionCollection externalFunctions,
-            CompiledStruct[] structs,
-            CompiledClass[] classes,
-            CompileTag[] hashes,
-            CompiledEnum[] enums,
-            Statement[] topLevelStatements,
+            IEnumerable<CompiledStruct> structs,
+            IEnumerable<CompileTag> hashes,
+            IEnumerable<CompiledEnum> enums,
+            IEnumerable<Statement> topLevelStatements,
             FileInfo? file)
         {
-            Functions = functions;
-            Macros = macros;
-            GeneralFunctions = generalFunctions;
-            Operators = operators;
+            Functions = functions.ToArray();
+            Macros = macros.ToArray();
+            GeneralFunctions = generalFunctions.ToArray();
+            Operators = operators.ToArray();
+            Constructors = constructors.ToArray();
             ExternalFunctions = externalFunctions;
-            Structs = structs;
-            Classes = classes;
-            Hashes = hashes;
-            Enums = enums;
-            TopLevelStatements = topLevelStatements;
+            Structs = structs.ToArray();
+            Hashes = hashes.ToArray();
+            Enums = enums.ToArray();
+            TopLevelStatements = topLevelStatements.ToArray();
             File = file;
         }
 
@@ -237,21 +224,6 @@ namespace LanguageCore.Compiler
                 { continue; }
 
                 return Operators[i];
-            }
-            return null;
-        }
-
-        public CompiledClass? GetClassAt(string file, SinglePosition position)
-        {
-            for (int i = 0; i < Classes.Length; i++)
-            {
-                if (Classes[i].FilePath != file)
-                { continue; }
-
-                if (!Classes[i].Identifier.Position.Range.Contains(position))
-                { continue; }
-
-                return Classes[i];
             }
             return null;
         }
@@ -311,23 +283,23 @@ namespace LanguageCore.Compiler
 
     public class Compiler
     {
-        CompiledClass[] CompiledClasses;
         CompiledStruct[] CompiledStructs;
         CompiledOperator[] CompiledOperators;
+        CompiledConstructor[] CompiledConstructors;
         CompiledFunction[] CompiledFunctions;
         CompiledGeneralFunction[] CompiledGeneralFunctions;
         CompiledEnum[] CompiledEnums;
 
         readonly List<FunctionDefinition> Operators;
         readonly List<FunctionDefinition> Functions;
+        readonly List<ConstructorDefinition> Constructors;
         readonly List<MacroDefinition> Macros;
         readonly List<StructDefinition> Structs;
-        readonly List<ClassDefinition> Classes;
         readonly List<EnumDefinition> Enums;
 
         readonly Stack<Token[]> GenericParameters;
 
-        readonly List<CompileTag> Hashes;
+        readonly List<CompileTag> Tags;
 
         readonly CompilerSettings Settings;
         readonly ExternalFunctionCollection ExternalFunctions;
@@ -346,15 +318,15 @@ namespace LanguageCore.Compiler
             Functions = new List<FunctionDefinition>();
             Macros = new List<MacroDefinition>();
             Operators = new List<FunctionDefinition>();
+            Constructors = new List<ConstructorDefinition>();
             Structs = new List<StructDefinition>();
-            Classes = new List<ClassDefinition>();
             Enums = new List<EnumDefinition>();
-            Hashes = new List<CompileTag>();
+            Tags = new List<CompileTag>();
             GenericParameters = new Stack<Token[]>();
 
-            CompiledClasses = Array.Empty<CompiledClass>();
             CompiledStructs = Array.Empty<CompiledStruct>();
             CompiledOperators = Array.Empty<CompiledOperator>();
+            CompiledConstructors = Array.Empty<CompiledConstructor>();
             CompiledFunctions = Array.Empty<CompiledFunction>();
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
@@ -368,7 +340,6 @@ namespace LanguageCore.Compiler
         CompiledType FindType(Token name)
         {
             if (CodeGenerator.GetStruct(CompiledStructs, name.Content, out CompiledStruct? @struct)) return new CompiledType(@struct);
-            if (CodeGenerator.GetClass(CompiledClasses, name.Content, out CompiledClass? @class)) return new CompiledType(@class);
             if (CodeGenerator.GetEnum(CompiledEnums, name.Content, out CompiledEnum? @enum)) return new CompiledType(@enum);
 
             for (int i = 0; i < GenericParameters.Count; i++)
@@ -398,16 +369,6 @@ namespace LanguageCore.Compiler
                     if (definedType == typeName)
                     {
                         return @struct.Identifier.Content;
-                    }
-                }
-            }
-            foreach (CompiledClass @class in CompiledClasses)
-            {
-                if (@class.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
-                {
-                    if (definedType == typeName)
-                    {
-                        return @class.Identifier.Content;
                     }
                 }
             }
@@ -477,21 +438,6 @@ namespace LanguageCore.Compiler
             return new CompiledStruct(attributes, new CompiledField[@struct.Fields.Length], @struct);
         }
 
-        CompiledClass CompileClass(ClassDefinition @class)
-        {
-            if (LanguageConstants.Keywords.Contains(@class.Identifier.Content))
-            { throw new CompilerException($"Illegal class name '{@class.Identifier.Content}'", @class.Identifier, @class.FilePath); }
-
-            @class.Identifier.AnalyzedType = TokenAnalyzedType.Class;
-
-            if (CodeGenerator.GetClass(CompiledClasses, @class.Identifier.Content, out _))
-            { throw new CompilerException($"Class with name '{@class.Identifier.Content}' already exist", @class.Identifier, @class.FilePath); }
-
-            CompiledAttributeCollection attributes = CompileAttributes(@class.Attributes);
-
-            return new CompiledClass(attributes, new CompiledField[@class.Fields.Length], @class);
-        }
-
         CompiledFunction CompileFunction(FunctionDefinition function)
         {
             CompiledAttributeCollection attributes = CompileAttributes(function.Attributes);
@@ -524,9 +470,6 @@ namespace LanguageCore.Compiler
                         function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                         if (passedParameterType == definedParameterType)
-                        { continue; }
-
-                        if (passedParameterType.IsClass && definedParameterType == Type.Integer)
                         { continue; }
 
                         throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLowerInvariant()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
@@ -563,7 +506,7 @@ namespace LanguageCore.Compiler
                         if (passedParameterType == definedParameterType)
                         { continue; }
 
-                        if (passedParameterType.IsClass && definedParameterType == Type.Integer)
+                        if (passedParameterType.IsPointer && definedParameterType.IsPointer)
                         { continue; }
 
                         throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLowerInvariant()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
@@ -641,6 +584,29 @@ namespace LanguageCore.Compiler
                 );
         }
 
+        CompiledConstructor CompileConstructor(ConstructorDefinition function)
+        {
+            if (function.TemplateInfo != null)
+            {
+                GenericParameters.Push(function.TemplateInfo.TypeParameters);
+                foreach (Token typeParameter in function.TemplateInfo.TypeParameters)
+                { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
+            }
+
+            CompiledType type = new(function.Identifier, FindType);
+            function.Identifier.SetAnalyzedType(type);
+
+            CompiledConstructor result = new(
+                type,
+                CompileTypes(function.Parameters.ToArray(), FindType),
+                function);
+
+            if (function.TemplateInfo != null)
+            { GenericParameters.Pop(); }
+
+            return result;
+        }
+
         static CompiledEnum CompileEnum(EnumDefinition @enum)
         {
             CompiledAttributeCollection attributes = new();
@@ -686,14 +652,6 @@ namespace LanguageCore.Compiler
 
         bool IsSymbolExists(string symbol, [NotNullWhen(true)] out Token? where)
         {
-            foreach (ClassDefinition @class in Classes)
-            {
-                if (@class.Identifier.Content == symbol)
-                {
-                    where = @class.Identifier;
-                    return true;
-                }
-            }
             foreach (StructDefinition @struct in Structs)
             {
                 if (@struct.Identifier.Content == symbol)
@@ -740,6 +698,14 @@ namespace LanguageCore.Compiler
                 Functions.Add(function);
             }
 
+            foreach (FunctionDefinition @operator in collectedAST.ParserResult.Operators)
+            {
+                if (Operators.Any(@operator.IsSame))
+                { AnalysisCollection?.Errors.Add(new Error($"Operator {@operator.ToReadable()} already defined", @operator.Identifier, @operator.FilePath)); continue; }
+
+                Operators.Add(@operator);
+            }
+
             foreach (MacroDefinition macro in collectedAST.ParserResult.Macros)
             {
                 if (Macros.Any(macro.IsSame))
@@ -766,22 +732,6 @@ namespace LanguageCore.Compiler
                 { Structs.Add(@struct); }
             }
 
-            foreach (ClassDefinition @class in collectedAST.ParserResult.Classes)
-            {
-                if (IsSymbolExists(@class.Identifier.Content, out _))
-                { AnalysisCollection?.Errors.Add(new Error($"Symbol {@class.Identifier} already defined", @class.Identifier, @class.FilePath)); continue; }
-                else
-                { Classes.Add(@class); }
-
-                foreach (FunctionDefinition @operator in @class.Operators)
-                {
-                    if (Operators.Any(@operator.IsSame))
-                    { AnalysisCollection?.Errors.Add(new Error($"Operator {@operator.ToReadable()} already defined", @operator.Identifier, @operator.FilePath)); continue; }
-                    else
-                    { Operators.Add(@operator); }
-                }
-            }
-
             foreach (EnumDefinition @enum in collectedAST.ParserResult.Enums)
             {
                 if (IsSymbolExists(@enum.Identifier.Content, out _))
@@ -790,14 +740,14 @@ namespace LanguageCore.Compiler
                 { Enums.Add(@enum); }
             }
 
-            Hashes.AddRange(collectedAST.ParserResult.Hashes);
+            Tags.AddRange(collectedAST.ParserResult.Hashes);
         }
 
         CompilerResult CompileMainFile(ParserResult parserResult, FileInfo? file)
         {
             Structs.AddRange(parserResult.Structs);
-            Classes.AddRange(parserResult.Classes);
             Functions.AddRange(parserResult.Functions);
+            Operators.AddRange(parserResult.Operators);
             Macros.AddRange(parserResult.Macros);
             Enums.AddRange(parserResult.Enums);
 
@@ -816,10 +766,10 @@ namespace LanguageCore.Compiler
                 Macros.ToArray(),
                 CompiledGeneralFunctions,
                 CompiledOperators,
+                CompiledConstructors,
                 ExternalFunctions,
                 CompiledStructs,
-                CompiledClasses,
-                Hashes.ToArray(),
+                Tags.ToArray(),
                 CompiledEnums,
                 parserResult.TopLevelStatements,
                 file);
@@ -839,32 +789,32 @@ namespace LanguageCore.Compiler
                 Macros.ToArray(),
                 CompiledGeneralFunctions,
                 CompiledOperators,
+                CompiledConstructors,
                 ExternalFunctions,
                 CompiledStructs,
-                CompiledClasses,
-                Hashes.ToArray(),
+                Tags.ToArray(),
                 CompiledEnums,
                 [statement],
                 null);
         }
 
-        void CompileInternal()
+        void CompileTags()
         {
-            foreach (CompileTag hash in Hashes)
+            foreach (CompileTag tag in Tags)
             {
-                switch (hash.HashName.Content)
+                switch (tag.HashName.Content)
                 {
                     case "bf":
                     {
-                        if (hash.Parameters.Length < 2)
-                        { AnalysisCollection?.Errors.Add(new Error($"Hash '{hash.HashName}' requires minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
-                        string name = hash.Parameters[0].Value;
+                        if (tag.Parameters.Length < 2)
+                        { AnalysisCollection?.Errors.Add(new Error($"Hash '{tag.HashName}' requires minimum 2 parameter", tag.HashName, tag.FilePath)); break; }
+                        string name = tag.Parameters[0].Value;
 
                         if (ExternalFunctions.ContainsKey(name)) break;
 
-                        string[] bfParams = new string[hash.Parameters.Length - 1];
-                        for (int i = 1; i < hash.Parameters.Length; i++)
-                        { bfParams[i - 1] = hash.Parameters[i].Value; }
+                        string[] bfParams = new string[tag.Parameters.Length - 1];
+                        for (int i = 1; i < tag.Parameters.Length; i++)
+                        { bfParams[i - 1] = tag.Parameters[i].Value; }
 
                         Type[] parameterTypes = new Type[bfParams.Length];
                         for (int i = 0; i < bfParams.Length; i++)
@@ -874,11 +824,11 @@ namespace LanguageCore.Compiler
                                 parameterTypes[i] = paramType;
 
                                 if (paramType == Type.Void && i > 0)
-                                { AnalysisCollection?.Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath)); goto ExitBreak; }
+                                { AnalysisCollection?.Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", tag.Parameters[i + 1].ValueToken, tag.FilePath)); goto ExitBreak; }
                             }
                             else
                             {
-                                AnalysisCollection?.Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath));
+                                AnalysisCollection?.Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", tag.Parameters[i + 1].ValueToken, tag.FilePath));
                                 goto ExitBreak;
                             }
                         }
@@ -906,162 +856,239 @@ namespace LanguageCore.Compiler
                     }
                     break;
                     default:
-                        AnalysisCollection?.Warnings.Add(new Warning($"Hash \"{hash.HashName}\" does not exists, so this is ignored", hash.HashName, hash.FilePath));
+                        AnalysisCollection?.Warnings.Add(new Warning($"Hash \"{tag.HashName}\" does not exists, so this is ignored", tag.HashName, tag.FilePath));
                         break;
                 }
 
 ExitBreak:
                 continue;
             }
+        }
 
-            this.CompiledClasses = new CompiledClass[Classes.Count];
-            for (int i = 0; i < Classes.Count; i++)
-            { this.CompiledClasses[i] = CompileClass(Classes[i]); }
+        void CompileOperators()
+        {
+            List<CompiledOperator> compiledOperators = new();
 
-            this.CompiledEnums = new CompiledEnum[Enums.Count];
-            for (int i = 0; i < Enums.Count; i++)
-            { this.CompiledEnums[i] = CompileEnum(Enums[i]); }
+            foreach (FunctionDefinition @operator in Operators)
+            {
+                CompiledOperator compiledOperator = CompileOperator(@operator);
 
-            this.CompiledStructs = new CompiledStruct[Structs.Count];
-            for (int i = 0; i < Structs.Count; i++)
-            { this.CompiledStructs[i] = CompileStruct(Structs[i]); }
+                if (compiledOperators.Any(compiledOperator.IsSame))
+                { throw new CompilerException($"Operator {compiledOperator.ToReadable()} already defined", @operator.Identifier, @operator.FilePath); }
+
+                compiledOperators.Add(compiledOperator);
+            }
+
+            CompiledOperators = compiledOperators.ToArray();
+        }
+
+        void CompileFunctions()
+        {
+            List<CompiledFunction> compiledFunctions = new();
+
+            foreach (FunctionDefinition function in Functions)
+            {
+                CompiledFunction compiledFunction = CompileFunction(function);
+
+                if (compiledFunctions.Any(compiledFunction.IsSame))
+                { throw new CompilerException($"Function {compiledFunction.ToReadable()} already defined", function.Identifier, function.FilePath); }
+
+                compiledFunctions.Add(compiledFunction);
+            }
+
+            CompiledFunctions = compiledFunctions.ToArray();
+        }
+
+        void CompileInternal()
+        {
+            CompileTags();
+
+            CompiledEnums = Enums.Select(CompileEnum).ToArray();
+            CompiledStructs = Structs.Select(CompileStruct).ToArray();
 
             for (int i = 0; i < CompiledStructs.Length; i++)
             {
-                for (int j = 0; j < CompiledStructs[i].Fields.Length; j++)
+                CompiledStruct @struct = CompiledStructs[i];
+                if (@struct.TemplateInfo != null)
                 {
-                    FieldDefinition field = ((StructDefinition)CompiledStructs[i]).Fields[j];
-                    CompiledField compiledField = new(new CompiledType(field.Type, FindType), null, field);
-                    field.Type.SetAnalyzedType(compiledField.Type);
-                    CompiledStructs[i].Fields[j] = compiledField;
-                }
-            }
-
-            for (int i = 0; i < CompiledClasses.Length; i++)
-            {
-                CompiledClass @class = CompiledClasses[i];
-                if (@class.TemplateInfo != null)
-                {
-                    GenericParameters.Push(@class.TemplateInfo.TypeParameters);
-                    foreach (Token typeParameter in @class.TemplateInfo.TypeParameters)
+                    GenericParameters.Push(@struct.TemplateInfo.TypeParameters);
+                    foreach (Token typeParameter in @struct.TemplateInfo.TypeParameters)
                     { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
                 }
 
-                for (int j = 0; j < @class.Fields.Length; j++)
+                for (int j = 0; j < @struct.Fields.Length; j++)
                 {
-                    FieldDefinition field = ((ClassDefinition)@class).Fields[j];
-                    CompiledField newField = new(new CompiledType(field.Type, FindType), @class, field);
+                    FieldDefinition field = ((StructDefinition)@struct).Fields[j];
+                    CompiledField newField = new(new CompiledType(field.Type, FindType), null, field);
                     field.Type.SetAnalyzedType(newField.Type);
-                    @class.Fields[j] = newField;
+                    @struct.Fields[j] = newField;
                 }
 
-                if (@class.TemplateInfo != null)
+                if (@struct.TemplateInfo != null)
                 { GenericParameters.Pop(); }
             }
 
-            {
-                List<CompiledOperator> compiledOperators = new();
+            CompileOperators();
+            CompileFunctions();
 
-                foreach (FunctionDefinition function in Operators)
-                {
-                    CompiledOperator compiledFunction = CompileOperator(function);
-
-                    if (compiledOperators.Any(compiledFunction.IsSame))
-                    { throw new CompilerException($"Operator '{compiledFunction.ToReadable()}' already defined", function.Identifier, function.FilePath); }
-
-                    compiledOperators.Add(compiledFunction);
-                }
-
-                this.CompiledOperators = compiledOperators.ToArray();
-            }
+            List<CompiledFunction> compiledFunctions = new(CompiledFunctions);
+            List<CompiledGeneralFunction> compiledGeneralFunctions = new(CompiledGeneralFunctions);
+            List<CompiledConstructor> compiledConstructors = new(CompiledConstructors);
 
             {
-                List<CompiledFunction> compiledFunctions = new();
-                List<CompiledGeneralFunction> compiledGeneralFunctions = new();
-
-                foreach (CompiledClass compiledClass in CompiledClasses)
+                foreach (CompiledStruct compiledStruct in CompiledStructs)
                 {
-                    if (compiledClass.TemplateInfo != null)
+                    if (compiledStruct.TemplateInfo != null)
                     {
-                        GenericParameters.Push(compiledClass.TemplateInfo.TypeParameters);
-                        foreach (Token typeParameter in compiledClass.TemplateInfo.TypeParameters)
+                        GenericParameters.Push(compiledStruct.TemplateInfo.TypeParameters);
+                        foreach (Token typeParameter in compiledStruct.TemplateInfo.TypeParameters)
                         { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
                     }
 
-                    foreach (GeneralFunctionDefinition method in compiledClass.GeneralMethods)
+                    foreach (GeneralFunctionDefinition method in compiledStruct.GeneralMethods)
                     {
                         foreach (ParameterDefinition parameter in method.Parameters)
                         {
                             if (parameter.Modifiers.Contains("this"))
-                            { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledClass.FilePath); }
+                            { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledStruct.FilePath); }
                         }
 
-                        CompiledType returnType = new(compiledClass);
+                        CompiledType returnType = new(compiledStruct);
 
-                        if (method.Identifier.Content == "destructor")
+                        if (method.Identifier.Content == BuiltinFunctionNames.Destructor)
                         {
-                            List<ParameterDefinition> parameters = method.Parameters.ToList();
+                            GeneralFunctionDefinition copy = method.Duplicate();
+
+                            List<ParameterDefinition> parameters = copy.Parameters.ToList();
                             parameters.Insert(0,
                                 new ParameterDefinition(
-                                    new Token[1] { Token.CreateAnonymous("this") },
-                                    TypeInstanceSimple.CreateAnonymous(compiledClass.Identifier.Content, compiledClass.TemplateInfo?.TypeParameters),
+                                    new Token[] { Token.CreateAnonymous("ref"), Token.CreateAnonymous("this") },
+                                    TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters),
                                     Token.CreateAnonymous("this"))
                                 );
-                            method.Parameters = new ParameterDefinitionCollection(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
+                            copy.Parameters = new ParameterDefinitionCollection(parameters, copy.Parameters.LeftParenthesis, copy.Parameters.RightParenthesis);
                             returnType = new CompiledType(Type.Void);
+
+                            CompiledGeneralFunction methodWithRef = CompileGeneralFunction(copy, returnType);
+                            methodWithRef.Context = compiledStruct;
+
+                            copy = method.Duplicate();
+
+                            parameters = copy.Parameters.ToList();
+                            parameters.Insert(0,
+                                new ParameterDefinition(
+                                    new Token[] { Token.CreateAnonymous("this") },
+                                    TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters)),
+                                    Token.CreateAnonymous("this"))
+                                );
+                            copy.Parameters = new ParameterDefinitionCollection(parameters, copy.Parameters.LeftParenthesis, copy.Parameters.RightParenthesis);
+
+                            CompiledGeneralFunction methodWithPointer = CompileGeneralFunction(copy, returnType);
+                            methodWithPointer.Context = compiledStruct;
+
+                            if (compiledGeneralFunctions.Any(methodWithRef.IsSame))
+                            { throw new CompilerException($"Function with name '{methodWithRef.ToReadable()}' already defined", copy.Identifier, compiledStruct.FilePath); }
+
+                            if (compiledGeneralFunctions.Any(methodWithPointer.IsSame))
+                            { throw new CompilerException($"Function with name '{methodWithPointer.ToReadable()}' already defined", copy.Identifier, compiledStruct.FilePath); }
+
+                            compiledGeneralFunctions.Add(methodWithRef);
+                            compiledGeneralFunctions.Add(methodWithPointer);
                         }
+                        else
+                        {
+                            List<ParameterDefinition> parameters = method.Parameters.ToList();
 
-                        CompiledGeneralFunction methodInfo = CompileGeneralFunction(method, returnType);
+                            CompiledGeneralFunction methodWithRef = CompileGeneralFunction(method, returnType);
+                            methodWithRef.Context = compiledStruct;
 
-                        if (compiledGeneralFunctions.Any(methodInfo.IsSame))
-                        { throw new CompilerException($"Function with name '{methodInfo.ToReadable()}' already defined", method.Identifier, compiledClass.FilePath); }
+                            if (compiledGeneralFunctions.Any(methodWithRef.IsSame))
+                            { throw new CompilerException($"Function with name '{methodWithRef.ToReadable()}' already defined", method.Identifier, compiledStruct.FilePath); }
 
-                        methodInfo.Context = compiledClass;
-                        compiledGeneralFunctions.Add(methodInfo);
+                            compiledGeneralFunctions.Add(methodWithRef);
+                        }
                     }
 
-                    foreach (FunctionDefinition method in compiledClass.Methods)
+                    foreach (FunctionDefinition method in compiledStruct.Methods)
                     {
                         foreach (ParameterDefinition parameter in method.Parameters)
                         {
                             if (parameter.Modifiers.Contains("this"))
-                            { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledClass.FilePath); }
+                            { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledStruct.FilePath); }
                         }
-                        List<ParameterDefinition> parameters = method.Parameters.ToList();
+
+                        FunctionDefinition copy = method.Duplicate();
+
+                        List<ParameterDefinition> parameters = copy.Parameters.ToList();
                         parameters.Insert(0,
                             new ParameterDefinition(
-                                new Token[1] { Token.CreateAnonymous("this") },
-                                TypeInstanceSimple.CreateAnonymous(compiledClass.Identifier.Content, compiledClass.TemplateInfo?.TypeParameters),
+                                new Token[] { Token.CreateAnonymous("ref"), Token.CreateAnonymous("this") },
+                                TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters),
                                 Token.CreateAnonymous("this"))
                             );
-                        method.Parameters = new ParameterDefinitionCollection(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
+                        copy.Parameters = new ParameterDefinitionCollection(parameters, copy.Parameters.LeftParenthesis, copy.Parameters.RightParenthesis);
 
-                        CompiledFunction methodInfo = CompileFunction(method);
+                        CompiledFunction methodWithRef = CompileFunction(copy);
 
-                        if (compiledFunctions.Any(methodInfo.IsSame))
-                        { throw new CompilerException($"Function with name '{methodInfo.ToReadable()}' already defined", method.Identifier, compiledClass.FilePath); }
+                        copy = method.Duplicate();
 
-                        methodInfo.Context = compiledClass;
-                        compiledFunctions.Add(methodInfo);
+                        parameters = copy.Parameters.ToList();
+                        parameters.Insert(0,
+                            new ParameterDefinition(
+                                new Token[] { Token.CreateAnonymous("this") },
+                                TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters)),
+                                Token.CreateAnonymous("this"))
+                            );
+                        copy.Parameters = new ParameterDefinitionCollection(parameters, copy.Parameters.LeftParenthesis, copy.Parameters.RightParenthesis);
+
+                        CompiledFunction methodWithPointer = CompileFunction(copy);
+
+                        if (compiledFunctions.Any(methodWithRef.IsSame))
+                        { throw new CompilerException($"Function with name '{methodWithRef.ToReadable()}' already defined", copy.Identifier, compiledStruct.FilePath); }
+
+                        if (compiledFunctions.Any(methodWithPointer.IsSame))
+                        { throw new CompilerException($"Function with name '{methodWithPointer.ToReadable()}' already defined", copy.Identifier, compiledStruct.FilePath); }
+
+                        methodWithRef.Context = compiledStruct;
+                        methodWithPointer.Context = compiledStruct;
+                        compiledFunctions.Add(methodWithRef);
+                        compiledFunctions.Add(methodWithPointer);
                     }
 
-                    if (compiledClass.TemplateInfo != null)
+                    foreach (ConstructorDefinition constructor in compiledStruct.Constructors)
+                    {
+                        foreach (ParameterDefinition parameter in constructor.Parameters)
+                        {
+                            if (parameter.Modifiers.Contains("this"))
+                            { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledStruct.FilePath); }
+                        }
+
+                        List<ParameterDefinition> parameters = constructor.Parameters.ToList();
+                        parameters.Insert(0,
+                            new ParameterDefinition(
+                                new Token[] { Token.CreateAnonymous("this") },
+                                constructor.Identifier,
+                                Token.CreateAnonymous("this"))
+                            );
+                        constructor.Parameters = new ParameterDefinitionCollection(parameters, constructor.Parameters.LeftParenthesis, constructor.Parameters.RightParenthesis);
+
+                        CompiledConstructor methodInfo = CompileConstructor(constructor);
+
+                        if (compiledConstructors.Any(methodInfo.IsSame))
+                        { throw new CompilerException($"Constructor with name '{methodInfo.ToReadable()}' already defined", constructor.Identifier, compiledStruct.FilePath); }
+
+                        methodInfo.Context = compiledStruct;
+                        compiledConstructors.Add(methodInfo);
+                    }
+
+                    if (compiledStruct.TemplateInfo != null)
                     { GenericParameters.Pop(); }
                 }
-
-                foreach (FunctionDefinition function in Functions)
-                {
-                    CompiledFunction compiledFunction = CompileFunction(function);
-
-                    if (compiledFunctions.Any(compiledFunction.IsSame))
-                    { throw new CompilerException($"Function with name '{compiledFunction.ToReadable()}' already defined", function.Identifier, function.FilePath); }
-
-                    compiledFunctions.Add(compiledFunction);
-                }
-
-                this.CompiledFunctions = compiledFunctions.ToArray();
-                this.CompiledGeneralFunctions = compiledGeneralFunctions.ToArray();
             }
+
+            CompiledFunctions = compiledFunctions.ToArray();
+            CompiledGeneralFunctions = compiledGeneralFunctions.ToArray();
+            CompiledConstructors = compiledConstructors.ToArray();
         }
 
         /// <exception cref="EndlessLoopException"/>

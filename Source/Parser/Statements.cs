@@ -1523,12 +1523,14 @@ namespace LanguageCore.Parser.Statement
             }
         }
 
-        public FunctionCall ToFunctionCall() => new(
-            null,
-            new Token(TokenType.Identifier, BuiltinFunctionNames.Constructor, false, Keyword.Position),
-            BracketLeft,
-            Parameters,
-            BracketRight);
+        public NewInstance ToInstantiation() => new(
+            Keyword,
+            TypeName)
+        {
+            CompiledType = CompiledType,
+            SaveValue = true,
+            Semicolon = null,
+        };
     }
 
     public class IndexCall : StatementWithValue, IReadable

@@ -48,11 +48,11 @@ export void Print(bool message)
     { Print("false"); }
 }
 
-export inline void Print(temp String message)
+export inline void Print(temp char* message)
 {
-    for (int i; i < message.length; i++)
+    for (int i = 0; message[i]; i++)
     {
-        Print(*((message as int) + (sizeof(String) + i)) as char);
+        Print(message[i]);
     }
 }
 
@@ -111,25 +111,18 @@ export char ReadKey()
     return in;
 }
 
-export String ReadLine()
+export char* ReadLine()
 {
-    String result = new String(0);
+    char* result = "";
     while (true)
     {
         char inpChar = ReadKey();
         if (inpChar == '\n') { break; };
         if (inpChar == '\r') { break; };
 
-        String newResult = new String(result.length + 1);
-
-        CopyString(result, newResult);
-
-        newResult[result.length] = inpChar;
-      
-        delete result;
-
-        result = newResult;
+        result = (temp result) + inpChar;
     }
+
     Print('\n');
     return result;
 }

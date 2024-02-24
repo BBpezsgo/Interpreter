@@ -56,7 +56,7 @@ namespace ConsoleGUI
             LanguageCore.Range<int> range = GetRange.Invoke(sender);
             if (e.EventFlags.HasFlag(MouseEventFlags.MouseWheeled))
             {
-                offset = Math.Clamp(offset + Math.Sign(e.Scroll), range.Start, range.End);
+                offset = Math.Clamp(offset - Math.Sign(e.Scroll), range.Start, range.End);
                 return;
             }
 

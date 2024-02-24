@@ -10,7 +10,6 @@ namespace LanguageCore.Compiler
         FunctionDefinition,
         ISameCheck,
         ISameCheck<CompiledOperator>,
-        IAmInContext<CompiledClass>,
         IReferenceable<OperatorCall>,
         IDuplicatable<CompiledOperator>
     {
@@ -18,7 +17,7 @@ namespace LanguageCore.Compiler
         public new CompiledType Type;
         public CompiledAttributeCollection CompiledAttributes;
         readonly List<Reference<OperatorCall>> references;
-        public CompiledClass? Context { get; set; }
+        public CompiledStruct? Context;
 
         public int TimesUsed;
         public int TimesUsedTotal;
@@ -66,21 +65,23 @@ namespace LanguageCore.Compiler
         }
         public bool IsSame(ISameCheck? other) => other is CompiledOperator other2 && IsSame(other2);
 
-        public CompiledOperator Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
+        public new CompiledOperator Duplicate() => new (Type, new List<CompiledType>(ParameterTypes).ToArray(), this)
         {
-            CompiledAttributes = this.CompiledAttributes,
-            Modifiers = this.Modifiers,
+            CompiledAttributes = CompiledAttributes,
+            Modifiers = Modifiers,
             TimesUsed = TimesUsed,
             TimesUsedTotal = TimesUsedTotal,
+            Context = Context,
         };
         public CompiledOperatorTemplateInstance InstantiateTemplate(TypeArguments typeParameters)
         {
             CompiledOperatorTemplateInstance result = new(Type, ParameterTypes, this, this)
             {
-                CompiledAttributes = this.CompiledAttributes,
-                Modifiers = this.Modifiers,
+                CompiledAttributes = CompiledAttributes,
+                Modifiers = Modifiers,
                 TimesUsed = TimesUsed,
                 TimesUsedTotal = TimesUsedTotal,
+                Context = Context,
             };
 
             Utils.SetTypeParameters(result.ParameterTypes, typeParameters);

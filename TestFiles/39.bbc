@@ -1,5 +1,5 @@
 using System;
 
-temp String txt = "62";
+temp char* txt = "62";
 int val = ParseInt(txt);
 return val;

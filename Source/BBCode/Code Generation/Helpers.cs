@@ -13,7 +13,7 @@ namespace LanguageCore.BBCode.Generator
 
         int CallRuntime(CompiledVariable address)
         {
-            if (address.Type != Type.Integer && !address.Type.IsFunction)
+            if (!address.Type.IsFunction)
             { throw new CompilerException($"This should be an \"{new CompiledType(Type.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
@@ -21,10 +21,7 @@ namespace LanguageCore.BBCode.Generator
 
             AddInstruction(Opcode.GET_BASEPOINTER);
 
-            if (address.Type.InHEAP)
-            { AddInstruction(Opcode.HEAP_GET, AddressingMode.Absolute, address.MemoryAddress); }
-            else
-            { StackLoad(new ValueAddress(address), address.Type.SizeOnStack); }
+            StackLoad(new ValueAddress(address), address.Type.Size);
 
             AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 3);
 
@@ -124,20 +121,23 @@ namespace LanguageCore.BBCode.Generator
         {
             if (type.IsStruct)
             {
+                TypeArguments? typeParameters = type.Struct.TemplateInfo?.ToDictionary(type.TypeParameters); ;
                 int size = 0;
                 foreach (CompiledField field in type.Struct.Fields)
                 {
-                    size += GenerateInitialValue(field.Type, afterValue);
+                    if (field.Type.IsGeneric &&
+                        typeParameters is not null &&
+                        typeParameters.TryGetValue(field.Type.Name, out CompiledType? yeah))
+                    {
+                        size += GenerateInitialValue(yeah, afterValue);
+                    }
+                    else
+                    {
+                        size += GenerateInitialValue(field.Type, afterValue);
+                    }
                     afterValue?.Invoke(size);
                 }
                 return size;
-            }
-
-            if (type.IsClass)
-            {
-                AddInstruction(Opcode.PUSH_VALUE, 0);
-                afterValue?.Invoke(0);
-                return 1;
             }
 
             if (type.IsStackArray)
@@ -158,39 +158,13 @@ namespace LanguageCore.BBCode.Generator
             return 1;
         }
 
-        int GenerateInitialValue2(CompiledType type, Action<int> afterValue)
-        {
-            if (type.IsStruct)
-            {
-                int size = 0;
-                foreach (CompiledField field in type.Struct.Fields)
-                {
-                    size++;
-                    AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(field.Type));
-                    afterValue?.Invoke(size);
-                }
-                return size;
-            }
-
-            if (type.IsClass)
-            {
-                AddInstruction(Opcode.PUSH_VALUE, 0);
-                afterValue?.Invoke(0);
-                return 1;
-            }
-
-            AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(type));
-            afterValue?.Invoke(0);
-            return 1;
-        }
-
         #endregion
 
         #region Memory Helpers
 
         protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
         {
-            return new ValueAddress(variable, false) + (ExternalFunctionsCache.Count + 2);
+            return new ValueAddress(variable.MemoryAddress, AddressingMode.Absolute) + (ExternalFunctionsCache.Count + 2);
         }
 
         protected override void StackLoad(ValueAddress address)
@@ -300,21 +274,22 @@ namespace LanguageCore.BBCode.Generator
             AddComment($"}}");
         }
 
-        void HeapLoad(ValueAddress pointerAddress, int offset)
+        void HeapLoad(ValueAddress pointerAddress, int offset, string nullExceptionMessage = "null pointer")
         {
             StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.AddressingMode, pointerAddress.IsReference));
 
-            CheckPointerNull();
+            CheckPointerNull(exceptionMessage: nullExceptionMessage);
 
             AddInstruction(Opcode.PUSH_VALUE, offset);
             AddInstruction(Opcode.MATH_ADD);
             AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
         }
-        void HeapStore(ValueAddress pointerAddress, int offset)
+
+        void HeapStore(ValueAddress pointerAddress, int offset, string nullExceptionMessage = "null pointer")
         {
             StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.AddressingMode, pointerAddress.IsReference));
 
-            CheckPointerNull();
+            CheckPointerNull(exceptionMessage: nullExceptionMessage);
 
             AddInstruction(Opcode.PUSH_VALUE, offset);
             AddInstruction(Opcode.MATH_ADD);
@@ -343,7 +318,7 @@ namespace LanguageCore.BBCode.Generator
 
                 for (int i = 0; i < CompiledParameters.Count; i++)
                 {
-                    sum += CompiledParameters[i].Type.SizeOnStack;
+                    sum += CompiledParameters[i].Type.Size;
                 }
 
                 return sum;
@@ -357,7 +332,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 if (CompiledParameters[i].Index < beforeThis) continue;
 
-                sum += CompiledParameters[i].Type.SizeOnStack;
+                sum += CompiledParameters[i].Type.Size;
             }
 
             return sum;

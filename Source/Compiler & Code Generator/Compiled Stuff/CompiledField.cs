@@ -5,7 +5,7 @@
     public class CompiledField : FieldDefinition
     {
         public new CompiledType Type;
-        public CompiledClass? Class;
+        public CompiledStruct? Class;
 
         public Protection Protection
         {
@@ -21,10 +21,10 @@
             }
         }
 
-        public CompiledField(CompiledType type, CompiledClass? context, FieldDefinition definition) : base(definition)
+        public CompiledField(CompiledType type, CompiledStruct? @struct, FieldDefinition definition) : base(definition)
         {
             Type = type;
-            Class = context;
+            Class = @struct;
         }
     }
 }

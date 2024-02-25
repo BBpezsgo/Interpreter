@@ -3,7 +3,7 @@ using TheProgram;
 
 namespace LanguageCore;
 
-readonly struct ConsoleProgressBar : IDisposable
+public readonly struct ConsoleProgressBar : IDisposable
 {
     static bool IsEnabled;
     public static void SetProgramArguments(ProgramArguments arguments) => IsEnabled = arguments.ShowProgress;
@@ -64,7 +64,7 @@ readonly struct ConsoleProgressBar : IDisposable
     }
 }
 
-struct ConsoleProgressLabel : IDisposable
+public struct ConsoleProgressLabel : IDisposable
 {
     static bool IsEnabled;
     public static void SetProgramArguments(ProgramArguments arguments) => IsEnabled = arguments.ShowProgress;

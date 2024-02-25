@@ -846,12 +846,12 @@ namespace ConsoleGUI
                             DrawElement(i, item);
 
                             b.ForegroundColor = CharColor.Gray;
-                            b.AddText($" ({itemDebugInfo.Kind.ToString().ToLowerInvariant()}) {itemDebugInfo.Tag}");
+                            b.AddText($" ({itemDebugInfo.Kind}) {itemDebugInfo.Tag}");
                         }
                         else if (range.Start == i)
                         {
                             b.ForegroundColor = CharColor.Gray;
-                            b.AddText($" ({itemDebugInfo.Kind.ToString().ToLowerInvariant()}) {itemDebugInfo.Tag} {{");
+                            b.AddText($" ({itemDebugInfo.Kind}) {itemDebugInfo.Tag} {{");
 
                             b.BackgroundColor = CharColor.Black;
                             b.FinishLine(sender.Rect.Width);

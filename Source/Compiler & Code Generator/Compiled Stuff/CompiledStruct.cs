@@ -4,6 +4,7 @@ using System.Text;
 
 namespace LanguageCore.Compiler
 {
+    using System;
     using Parser;
     using Tokenizing;
 
@@ -184,7 +185,7 @@ namespace LanguageCore.Compiler
             return result.ToString();
         }
 
-        public void AddReference(TypeInstance referencedBy, string? file) => references.Add(new Reference<TypeInstance>(referencedBy, file));
+        public void AddReference(TypeInstance referencedBy, Uri? file) => references.Add(new Reference<TypeInstance>(referencedBy, file));
         public void ClearReferences() => references.Clear();
     }
 }

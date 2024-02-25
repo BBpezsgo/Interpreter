@@ -12,7 +12,7 @@ namespace LanguageCore
     public class LanguageException : Exception
     {
         public readonly Position Position;
-        public readonly string? File;
+        public readonly Uri? Uri;
 
         public override string? StackTrace
         {
@@ -25,10 +25,16 @@ namespace LanguageCore
 
         readonly System.Diagnostics.StackTrace? _capturedStackTrace;
 
-        protected LanguageException(string message, Position position, string? file) : base(message)
+        protected LanguageException(string message, Position position) : base(message)
         {
             this.Position = position;
-            this.File = file;
+            this.Uri = null;
+        }
+
+        protected LanguageException(string message, Position position, Uri? uri) : base(message)
+        {
+            this.Position = position;
+            this.Uri = uri;
         }
 
         public LanguageException(Error error) : this(error.Message, error.Position, error.File)
@@ -44,8 +50,8 @@ namespace LanguageCore
 
             result.Append(Position.ToStringCool(" (at ", ")"));
 
-            if (File != null)
-            { result.Append(CultureInfo.InvariantCulture, $" (in {File})"); }
+            if (Uri != null)
+            { result.Append(CultureInfo.InvariantCulture, $" (in {Uri})"); }
 
             if (InnerException != null)
             { result.Append(CultureInfo.InvariantCulture, $" {InnerException}"); }
@@ -55,8 +61,9 @@ namespace LanguageCore
 
         public string? GetArrows()
         {
-            if (File == null) return null;
-            return GetArrows(Position, System.IO.File.ReadAllText(File));
+            if (Uri == null) return null;
+            if (!Uri.IsFile) return null;
+            return GetArrows(Position, System.IO.File.ReadAllText(Uri.LocalPath));
         }
 
         public static string? GetArrows(Position position, string text)
@@ -85,31 +92,33 @@ namespace LanguageCore
 
     public class CompilerException : LanguageException
     {
-        public CompilerException(string message, Position position, string? file) : base(message, position, file) { }
-        public CompilerException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
-        public CompilerException(string message) : base(message, Position.UnknownPosition, null) { }
-        public CompilerException(string message, IPositioned? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public CompilerException(string message) : base(message, Position.UnknownPosition) { }
+        public CompilerException(string message, Uri? uri) : base(message, Position.UnknownPosition, uri) { }
+        public CompilerException(string message, Position position) : base(message, position) { }
+        public CompilerException(string message, Position position, Uri? uri) : base(message, position, uri) { }
+        public CompilerException(string message, IPositioned? position) : base(message, position?.Position ?? Position.UnknownPosition) { }
+        public CompilerException(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
     }
 
     public class NotSupportedException : CompilerException
     {
-        public NotSupportedException(string message, Position position, string? file) : base(message, position, file) { }
-        public NotSupportedException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public NotSupportedException(string message) : base(message) { }
-        public NotSupportedException(string message, IPositioned? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public NotSupportedException(string message, Uri? uri) : base(message, uri) { }
+        public NotSupportedException(string message, Position position, Uri? file) : base(message, position, file) { }
+        public NotSupportedException(string message, IPositioned? position, Uri? uri) : base(message, position, uri) { }
     }
 
     public class TokenizerException : LanguageException
     {
-        public TokenizerException(string message, Position position) : base(message, position, null) { }
+        public TokenizerException(string message, Position position) : base(message, position) { }
     }
 
     public class SyntaxException : LanguageException
     {
-        public SyntaxException(string message, Position position) : base(message, position, null) { }
-        public SyntaxException(string message, Position? position) : base(message, position ?? Position.UnknownPosition, null) { }
-        public SyntaxException(string message, IPositioned? position) : base(message, position?.Position ?? Position.UnknownPosition, null) { }
-        public SyntaxException(string message, IPositioned? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public SyntaxException(string message, Position position) : base(message, position) { }
+        public SyntaxException(string message, Position? position) : base(message, position ?? Position.UnknownPosition) { }
+        public SyntaxException(string message, IPositioned? position) : base(message, position?.Position ?? Position.UnknownPosition) { }
+        public SyntaxException(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
     }
 
     public class ProcessRuntimeException : Exception
@@ -140,7 +149,7 @@ namespace LanguageCore
     {
         public RuntimeContext? Context;
         public Position SourcePosition;
-        public string? SourceFile;
+        public Uri? SourceFile;
         public FunctionInformations[]? CallStack;
         public FunctionInformations? CurrentFrame;
 
@@ -161,9 +170,9 @@ namespace LanguageCore
             SourceFile = CallStack.Length > 0 ? CallStack[^1].File : null;
         }
 
-        public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
+        public RuntimeException(string message) : base(message, Position.UnknownPosition) { }
         public RuntimeException(string message, Exception inner) : base(message, inner) { }
-        public RuntimeException(string message, RuntimeContext context) : base(message, Position.UnknownPosition, null)
+        public RuntimeException(string message, RuntimeContext context) : base(message, Position.UnknownPosition)
         {
             this.Context = context;
         }
@@ -289,10 +298,10 @@ namespace LanguageCore
     /// <summary> If this exception raised, it's a <b>big</b> problem. </summary>
     public class InternalException : LanguageException
     {
-        public InternalException() : base(string.Empty, Position.UnknownPosition, null) { }
-        public InternalException(string message) : base(message, Position.UnknownPosition, null) { }
-        public InternalException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
-        public InternalException(string message, IPositioned position, string? file) : base(message, position.Position, file) { }
+        public InternalException() : base(string.Empty, Position.UnknownPosition) { }
+        public InternalException(string message) : base(message, Position.UnknownPosition) { }
+        public InternalException(string message, Uri? uri) : base(message, Position.UnknownPosition, uri) { }
+        public InternalException(string message, IPositioned position, Uri? uri) : base(message, position.Position, uri) { }
     }
 
     /// <inheritdoc/>
@@ -309,24 +318,27 @@ namespace LanguageCore
     {
         public readonly string Message;
         public readonly Position Position;
-        public readonly string? File;
+        public readonly Uri? File;
 
         public readonly System.Diagnostics.StackTrace StackTrace;
 
-        protected NotExceptionBut(string message, Position position) : this(message, position, null)
-        { }
-        protected NotExceptionBut(string message, Position position, string? file)
+        protected NotExceptionBut(string message, Position position)
         {
             this.Message = message;
             this.Position = position;
-            this.File = file;
+            this.File = null;
             this.StackTrace = new System.Diagnostics.StackTrace(0, true);
+        }
+        protected NotExceptionBut(string message, Position position, Uri? file) : this(message, position)
+        {
+            this.File = file;
         }
 
         public string? GetArrows()
         {
             if (File == null) return null;
-            return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(File));
+            if (!File.IsFile) return null;
+            return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(File.LocalPath));
         }
 
         public override string ToString()
@@ -349,37 +361,32 @@ namespace LanguageCore
 
     public class Warning : NotExceptionBut
     {
-        public Warning(string message, Position position, string? file)
-            : base(message, position, file) { }
-        public Warning(string message, IPositioned? position, string? file)
-            : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public Warning(string message, Position position, Uri? uri) : base(message, position, uri) { }
+        public Warning(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
     }
 
     /// <summary> It's an exception, but not. </summary>
     public class Error : NotExceptionBut
     {
-        public Error(string message, Position position, string? file = null)
-            : base(message, position, file) { }
+        public Error(string message, Uri uri) : base(message, Position.UnknownPosition, uri) { }
 
-        public Error(string message, IPositioned? position, string? file = null)
-            : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public Error(string message, Position position) : base(message, position) { }
+        public Error(string message, Position position, Uri? uri) : base(message, position, uri) { }
 
-        public Error(string message, string file)
-            : base(message, Position.UnknownPosition, file) { }
+        public Error(string message, IPositioned? position) : base(message, position?.Position ?? Position.UnknownPosition) { }
+        public Error(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
 
         public LanguageException ToException() => new(this);
     }
 
     public class Hint : NotExceptionBut
     {
-        public Hint(string message, IPositioned? position, string? file)
-            : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public Hint(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
     }
 
     public class Information : NotExceptionBut
     {
-        public Information(string message, IPositioned? position, string? file)
-            : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public Information(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
     }
 
     #endregion

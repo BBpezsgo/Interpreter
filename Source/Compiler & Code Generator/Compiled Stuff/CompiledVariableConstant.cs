@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Compiler
 {
+    using System;
     using Parser.Statement;
     using Runtime;
 
@@ -8,7 +9,7 @@
         public readonly VariableDeclaration Declaration;
 
         public override string Identifier => Declaration.VariableName.Content;
-        public override string? FilePath => Declaration.FilePath;
+        public override Uri? FilePath => Declaration.FilePath;
         public override Position Position => Declaration.Position;
 
         public CompiledVariableConstant(VariableDeclaration declaration, DataItem value) : base(value)

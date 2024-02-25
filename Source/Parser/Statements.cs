@@ -232,10 +232,16 @@ namespace LanguageCore.Parser.Statement
             StringBuilder result = new();
             result.Append('{');
 
-            if (Statements.Length > 0)
-            { result.Append("..."); }
-            else
+            if (Statements.Length == 0)
             { result.Append(' '); }
+            else if (Statements.Length == 1)
+            {
+                result.Append(' ');
+                result.Append(Statements[0].ToString());
+                result.Append(' ');
+            }
+            else
+            { result.Append("..."); }
 
             result.Append('}');
             return result.ToString();
@@ -332,7 +338,7 @@ namespace LanguageCore.Parser.Statement
         public readonly Token HashName;
         public readonly Literal[] Parameters;
 
-        public string? FilePath { get; set; }
+        public Uri? FilePath { get; set; }
 
         public override Position Position
             => new Position(HashToken, HashName).Union(Parameters);
@@ -420,7 +426,7 @@ namespace LanguageCore.Parser.Statement
         public readonly Token[] Modifiers;
         public CompiledType? CompiledType;
 
-        public string? FilePath { get; set; }
+        public Uri? FilePath { get; set; }
 
         public override Position Position
             => new Position(Type, VariableName, InitialValue).Union(Modifiers);
@@ -1331,6 +1337,12 @@ namespace LanguageCore.Parser.Statement
                 foreach (Statement substatement in Parts[i].GetStatementsRecursively(true))
                 { yield return substatement; }
             }
+        }
+
+        public override string ToString()
+        {
+            if (Parts.Length == 0) return "null";
+            return Parts[0].ToString();
         }
     }
 

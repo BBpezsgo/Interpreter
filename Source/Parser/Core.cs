@@ -61,11 +61,8 @@ namespace LanguageCore.Parser
             Enums = enums.ToArray();
         }
 
-        public void SetFile(string path)
+        public void SetFile(Uri path)
         {
-            if (string.IsNullOrEmpty(path))
-            { throw new ArgumentException($"'{nameof(path)}' cannot be null or empty.", nameof(path)); }
-
             for (int i = 0; i < this.Functions.Length; i++)
             { this.Functions[i].FilePath = path; }
 
@@ -89,39 +86,6 @@ namespace LanguageCore.Parser
             foreach (IInFile item in Statement.StatementExtensions.GetStatements<IInFile>(this))
             {
                 item.FilePath = path;
-            }
-        }
-
-        public void CheckFilePaths(Action<string> NotSetCallback)
-        {
-            for (int i = 0; i < this.Functions.Length; i++)
-            {
-                if (string.IsNullOrEmpty(this.Functions[i].FilePath))
-                { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {this.Functions[i]} is null"); }
-                else
-                { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {this.Functions[i]} : {this.Functions[i].FilePath}"); }
-            }
-            for (int i = 0; i < this.Structs.Length; i++)
-            {
-                if (string.IsNullOrEmpty(this.Structs[i].FilePath))
-                { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs[i]} is null"); }
-                else
-                { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs[i]} : {this.Structs[i].FilePath}"); }
-            }
-            for (int i = 0; i < this.Hashes.Length; i++)
-            {
-                if (string.IsNullOrEmpty(this.Hashes[i].FilePath))
-                { NotSetCallback?.Invoke($"Hash.FilePath {this.Hashes[i]} is null"); }
-                else
-                { NotSetCallback?.Invoke($"Hash.FilePath {this.Hashes[i]} : {this.Hashes[i].FilePath}"); }
-            }
-
-            foreach (IInFile def in Statement.StatementExtensions.GetStatements<IInFile>(this))
-            {
-                if (string.IsNullOrEmpty(def.FilePath))
-                { NotSetCallback?.Invoke($"IDefinition.FilePath {def} is null"); }
-                else
-                { NotSetCallback?.Invoke($"IDefinition.FilePath {def} : {def.FilePath}"); }
             }
         }
 

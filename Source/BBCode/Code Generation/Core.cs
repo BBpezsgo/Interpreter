@@ -181,9 +181,11 @@ namespace LanguageCore.BBCode.Generator
                 AddComment("}");
             }
 
-            CurrentFile = compilerResult.File?.FullName;
+            CurrentFile = compilerResult.File;
+#if DEBUG
             if (CurrentFile == null)
-            { AnalysisCollection?.Warnings.Add(new Warning($"{nameof(CurrentFile)} is null", null, null)); }
+            { Debugger.Break(); }
+#endif
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
             if (ExternalFunctionsCache.Count > 0)

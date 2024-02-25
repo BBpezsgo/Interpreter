@@ -89,9 +89,9 @@ namespace LanguageCore.Brainfuck.Generator
                             int size = Snippets.ARRAY_SIZE(arraySize);
 
                             int address = Stack.PushVirtual(size);
-                            variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, size)
+                            variables.Push(new Variable(name, address, true, deallocateOnClean, type, size)
                             {
-                                IsInitialValueSet = true
+                                IsInitialized = true
                             });
 
                             for (int i = 0; i < literal.Value.Length; i++)
@@ -107,7 +107,7 @@ namespace LanguageCore.Brainfuck.Generator
                     { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
 
                     int address = Stack.PushVirtual(type.Size);
-                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, type.Size));
+                    variables.Push(new Variable(name, address, true, deallocateOnClean, type));
                 }
             }
             else
@@ -119,12 +119,12 @@ namespace LanguageCore.Brainfuck.Generator
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
                     int address = Stack.PushVirtual(size);
-                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, size));
+                    variables.Push(new Variable(name, address, true, deallocateOnClean, type, size));
                 }
                 else
                 {
                     int address = Stack.PushVirtual(type.Size);
-                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, type.Size));
+                    variables.Push(new Variable(name, address, true, deallocateOnClean, type));
                 }
             }
 
@@ -233,12 +233,12 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            if (SafeToDiscardVariable(value, variable))
+            if (VariableUses(value, variable) == 0)
             { VariableCanBeDiscarded = variable.Name; }
 
             using (CommentBlock($"Set variable \"{variable.Name}\" (at {variable.Address}) to {value}"))
             {
-                if (TryCompute(value, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out DataItem constantValue))
+                if (TryCompute(value, out DataItem constantValue))
                 {
                     AssignTypeCheck(variable.Type, constantValue, value);
 
@@ -950,7 +950,9 @@ namespace LanguageCore.Brainfuck.Generator
                     Block[] unrolled = Unroll(@for, new Dictionary<StatementWithValue, DataItem>());
 
                     for (int i = 0; i < unrolled.Length; i++)
-                    { GenerateCodeForStatement(unrolled[i]); }
+                    {
+                        GenerateCodeForStatement(unrolled[i]);
+                    }
 
                     return true;
                 }
@@ -1033,7 +1035,7 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(KeywordCall statement)
         {
-            switch (statement.Identifier.Content.ToLowerInvariant())
+            switch (statement.Identifier.Content)
             {
                 case "return":
                 {
@@ -1078,7 +1080,7 @@ namespace LanguageCore.Brainfuck.Generator
                     { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                     if (BreakTagStack.Count <= 0)
-                    { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop. Am i wrong? Of course not! Haha", statement.Identifier, CurrentFile); }
+                    { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, CurrentFile); }
 
                     // AnalysisCollection?.Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
 
@@ -1187,8 +1189,11 @@ namespace LanguageCore.Brainfuck.Generator
                     if (statement.Right == null)
                     { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                    if (TryCompute(statement.Right, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out DataItem constantValue))
+                    if (TryCompute(statement.Right, out DataItem constantValue))
                     {
+                        if (variable.Type.IsBuiltin)
+                        { DataItem.TryCast(ref constantValue, variable.Type.RuntimeType); }
+
                         if (variable.Type != constantValue.Type)
                         { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
 
@@ -1245,8 +1250,11 @@ namespace LanguageCore.Brainfuck.Generator
                     if (statement.Right == null)
                     { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                    if (TryCompute(statement.Right, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out DataItem constantValue))
+                    if (TryCompute(statement.Right, out DataItem constantValue))
                     {
+                        if (variable.Type.IsBuiltin)
+                        { DataItem.TryCast(ref constantValue, variable.Type.RuntimeType); }
+
                         if (variable.Type != constantValue.Type)
                         { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
 
@@ -1366,7 +1374,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (!CodeGeneratorForBrainfuck.GetVariable(Variables, statement.VariableName.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{statement.VariableName.Content}\" not found", statement.VariableName, CurrentFile); }
 
-            if (variable.IsInitialValueSet)
+            if (variable.IsInitialized)
             { return; }
 
             CompileSetter(variable, statement.InitialValue);
@@ -1393,7 +1401,7 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
-                string? prevFile = CurrentFile;
+                Uri? prevFile = CurrentFile;
                 CurrentFile = macro.FilePath;
 
                 InMacro.Push(true);
@@ -1509,9 +1517,6 @@ namespace LanguageCore.Brainfuck.Generator
         {
             if (GetVariable(Variables, statement.Content, out Variable variable))
             {
-                if (!variable.IsInitialized)
-                { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
-
                 if (variable.IsDiscarded)
                 { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement, CurrentFile); }
 
@@ -2753,7 +2758,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (function.ReturnSomething)
             {
                 CompiledType returnType = function.Type;
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, false, returnType, returnType.Size);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), false, false, returnType);
             }
 
             if (!DoRecursivityStuff(function, callerPosition))
@@ -2810,7 +2815,7 @@ namespace LanguageCore.Brainfuck.Generator
                             if (v.Type != definedType)
                             { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                            compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
+                            compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
                             continue;
                         }
                         case "const":
@@ -3044,7 +3049,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (true) // always returns something
             {
                 CompiledType returnType = function.Type;
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, false, returnType, returnType.Size);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), false, false, returnType);
             }
 
             if (!DoRecursivityStuff(function, callerPosition))
@@ -3101,7 +3106,7 @@ namespace LanguageCore.Brainfuck.Generator
                             if (v.Type != definedType)
                             { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                            compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
+                            compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
                             continue;
                         }
                         case "const":
@@ -3261,7 +3266,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (function.ReturnSomething)
             {
                 CompiledType returnType = new(function.Type, typeArguments);
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, false, returnType, returnType.Size);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), false, false, returnType);
             }
 
             if (!DoRecursivityStuff(function, callerPosition))
@@ -3318,7 +3323,7 @@ namespace LanguageCore.Brainfuck.Generator
                             if (v.Type != definedType)
                             { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                            compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
+                            compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
                             continue;
                         }
                         case "const":
@@ -3453,14 +3458,14 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
-        void GenerateCodeForFunction(CompiledConstructor function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
+        void GenerateCodeForFunction(CompiledConstructor function, StatementWithValue[] parameters, TypeArguments? typeArguments, ConstructorCall callerPosition)
         {
             int instructionStart = 0;
             if (GenerateDebugInformation)
             { instructionStart = Code.GetFinalCode().Length; }
 
-            if (function.ParameterCount != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to constructor \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
+            if (function.ParameterCount - 1 != parameters.Length)
+            { throw new CompilerException($"Wrong number of parameters passed to constructor \"{function.ToReadable()}\" (required {function.ParameterCount - 1} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             if (function.Block is null)
             { throw new CompilerException($"Constructor \"{function.ToReadable()}\" does not have any body definition", callerPosition, CurrentFile); }
@@ -3478,9 +3483,20 @@ namespace LanguageCore.Brainfuck.Generator
             CurrentMacro.Push(function);
             InMacro.Push(false);
 
-            for (int i = 0; i < parameters.Length; i++)
+            NewInstance newInstance = callerPosition.ToInstantiation();
+
+            int newInstanceAddress = Stack.NextAddress;
+            CompiledType newInstanceType = FindStatementType(newInstance);
+            GenerateCodeForStatement(newInstance);
+
+            if (newInstanceType != function.ParameterTypes[0])
+            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {0}: Expected {function.ParameterTypes[0]}, passed {newInstanceType}", newInstance, CurrentFile); }
+
+            compiledParameters.Add(new Variable(function.Parameters[0].Identifier.Content, newInstanceAddress, false, false, newInstanceType));
+
+            for (int i = 1; i < function.Parameters.Count; i++)
             {
-                StatementWithValue passed = parameters[i];
+                StatementWithValue passed = parameters[i - 1];
                 ParameterDefinition defined = function.Parameters[i];
 
                 CompiledType definedType = function.ParameterTypes[i];
@@ -3523,7 +3539,7 @@ namespace LanguageCore.Brainfuck.Generator
                             if (v.Type != definedType)
                             { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                            compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
+                            compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
                             continue;
                         }
                         case "const":

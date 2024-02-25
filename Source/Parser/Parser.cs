@@ -116,7 +116,7 @@ namespace LanguageCore.Parser
         {
             TokenizerResult tokens = StreamTokenizer.Tokenize(filePath);
             ParserResult result = new Parser(tokens.Tokens).ParseInternal();
-            result.SetFile(filePath);
+            result.SetFile(new Uri(filePath, UriKind.Absolute));
             return result;
         }
 
@@ -187,7 +187,7 @@ namespace LanguageCore.Parser
             hashT.AnalyzedType = TokenAnalyzedType.Hash;
 
             if (!ExpectIdentifier(out Token? hashName))
-            { throw new SyntaxException($"There should be an identifier (after \"#\"), but you wrote {CurrentToken?.TokenType.ToString().ToLowerInvariant()} \"{CurrentToken?.Content}\"", hashT); }
+            { throw new SyntaxException($"There should be an identifier (after \"#\"), but you wrote {CurrentToken?.TokenType} \"{CurrentToken?.Content}\"", hashT); }
 
             hashName.AnalyzedType = TokenAnalyzedType.Hash;
 
@@ -204,7 +204,7 @@ namespace LanguageCore.Parser
                     }
                     else
                     {
-                        throw new SyntaxException($"There should be a literal or \";\", but you wrote {CurrentToken.TokenType.ToString().ToLowerInvariant()} \"{CurrentToken.Content}\"", CurrentToken.Position);
+                        throw new SyntaxException($"There should be a literal or \";\", but you wrote {CurrentToken.TokenType} \"{CurrentToken.Content}\"", CurrentToken.Position);
                     }
                 }
 
@@ -2139,7 +2139,7 @@ namespace LanguageCore.Parser
                         {
                             (Token? newA, Token? newB) = doubleEnd.Slice(1);
                             if (newA == null || newB == null)
-                            { throw new InternalException($"I failed at token splitting :(", doubleEnd, null); }
+                            { throw new InternalException($"I failed at token splitting :("); }
                             CurrentTokenIndex--;
                             Tokens[CurrentTokenIndex] = newB;
                             break;

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 
@@ -90,7 +91,7 @@ namespace LanguageCore.Runtime
         public bool IsValid;
         public Position SourcePosition;
         public string Identifier;
-        public string? File;
+        public Uri? File;
         public string ReadableIdentifier;
         public bool IsMacro;
         public Range<int> Instructions;

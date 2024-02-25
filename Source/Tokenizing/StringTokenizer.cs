@@ -17,25 +17,39 @@
         public static TokenizerResult Tokenize(string? text, TokenizerSettings settings)
             => new StringTokenizer(settings, text).TokenizeInternal();
 
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
-        /// <exception cref="System.Exception"/>
-        protected override TokenizerResult TokenizeInternal()
+        /// <inheritdoc cref="TokenizeInternal"/>
+        public static TokenizerResult Tokenize(string? text, ConsoleProgressBar progress)
+            => Tokenize(text, TokenizerSettings.Default, progress);
+
+        /// <inheritdoc cref="TokenizeInternal"/>
+        public static TokenizerResult Tokenize(string? text, TokenizerSettings settings, ConsoleProgressBar progress)
+            => new StringTokenizer(settings, text).TokenizeInternal(progress);
+
+        TokenizerResult TokenizeInternal()
         {
             for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
             {
-                ProcessCharacter(Text[offsetTotal], offsetTotal, out bool breakLine, out bool returnLine);
-
-                CurrentColumn++;
-                if (breakLine) CurrentLine++;
-                if (returnLine) CurrentColumn = 0;
+                ProcessCharacter(Text[offsetTotal], offsetTotal);
             }
 
             EndToken(Text.Length);
 
-            CheckTokens(Tokens.ToArray());
+            return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+        }
 
-            return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToArray(), UnicodeCharacters.ToArray(), Warnings.ToArray());
+        TokenizerResult TokenizeInternal(ConsoleProgressBar progress)
+        {
+            for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
+            {
+                progress.Print(offsetTotal, Text.Length);
+                ProcessCharacter(Text[offsetTotal], offsetTotal);
+            }
+
+            EndToken(Text.Length);
+
+            progress.Print(1f);
+
+            return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
         }
     }
 }

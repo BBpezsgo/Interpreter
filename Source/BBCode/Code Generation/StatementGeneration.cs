@@ -263,7 +263,7 @@ namespace LanguageCore.BBCode.Generator
                 functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
                 functionCall.Reference = macro;
 
-                string? prevFile = CurrentFile;
+                Uri? prevFile = CurrentFile;
                 FunctionThingDefinition? prevContext = CurrentContext;
 
                 CurrentFile = macro.FilePath;
@@ -809,7 +809,7 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForStatement(OperatorCall @operator)
         {
-            if (Settings.OptimizeCode && TryCompute(@operator, null, null, out DataItem predictedValue))
+            if (Settings.OptimizeCode && TryCompute(@operator, null, out DataItem predictedValue))
             {
                 OnGotStatementType(@operator, new CompiledType(predictedValue.Type));
 
@@ -1159,7 +1159,7 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForStatement(WhileLoop whileLoop)
         {
-            bool conditionIsComputed = TryCompute(whileLoop.Condition, null, null, out DataItem computedCondition);
+            bool conditionIsComputed = TryCompute(whileLoop.Condition, null, out DataItem computedCondition);
             if (conditionIsComputed && !(bool)computedCondition && TrimUnreachableCode)
             {
                 AddComment("Unreachable code not compiled");
@@ -1478,9 +1478,9 @@ namespace LanguageCore.BBCode.Generator
                 if (index.PrevStatement is not Identifier identifier)
                 { throw new NotSupportedException($"Only variables/parameters supported by now", index.PrevStatement, CurrentFile); }
 
-                if (TryCompute(index.Expression, RuntimeType.SInt32, null, out DataItem computedIndexData))
+                if (TryCompute(index.Expression, null, out DataItem computedIndexData))
                 {
-                    if (computedIndexData.ValueSInt32 < 0 || computedIndexData.ValueSInt32 >= prevType.StackArraySize)
+                    if (computedIndexData < 0 || computedIndexData >= prevType.StackArraySize)
                     { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", index.Expression, CurrentFile)); }
 
                     if (GetParameter(identifier.Content, out CompiledParameter? param))
@@ -1488,7 +1488,7 @@ namespace LanguageCore.BBCode.Generator
                         if (param.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        ValueAddress offset = GetBaseAddress(param, (computedIndexData.ValueSInt32 * prevType.StackArrayOf.Size));
+                        ValueAddress offset = GetBaseAddress(param, (int)computedIndexData * prevType.StackArrayOf.Size);
                         AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, offset.Address);
 
                         if (offset.IsReference)
@@ -1905,9 +1905,9 @@ namespace LanguageCore.BBCode.Generator
                 if (statementToSet.PrevStatement is not Identifier identifier)
                 { throw new NotSupportedException($"Only variables/parameters supported by now", statementToSet.PrevStatement, CurrentFile); }
 
-                if (TryCompute(statementToSet.Expression, RuntimeType.SInt32, null, out DataItem computedIndexData))
+                if (TryCompute(statementToSet.Expression, null, out DataItem computedIndexData))
                 {
-                    if (computedIndexData.ValueSInt32 < 0 || computedIndexData.ValueSInt32 >= prevType.StackArraySize)
+                    if (computedIndexData < 0 || computedIndexData >= prevType.StackArraySize)
                     { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", statementToSet.Expression, CurrentFile)); }
 
                     GenerateCodeForStatement(value);
@@ -1920,7 +1920,7 @@ namespace LanguageCore.BBCode.Generator
                         if (variable.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        int offset = computedIndexData.ValueSInt32 * prevType.StackArrayOf.Size;
+                        int offset = (int)computedIndexData * prevType.StackArrayOf.Size;
                         StackStore(new ValueAddress(variable) + offset, prevType.StackArrayOf.Size);
                         return;
                     }
@@ -2007,7 +2007,7 @@ namespace LanguageCore.BBCode.Generator
             AssignTypeCheck(variable.Type, valueType, value);
 
             if (variable.Type.IsBuiltin &&
-                TryCompute(value, null, null, out DataItem yeah))
+                TryCompute(value, null, out DataItem yeah))
             {
                 AddInstruction(Opcode.PUSH_VALUE, yeah);
             }
@@ -2199,7 +2199,7 @@ namespace LanguageCore.BBCode.Generator
 
             int size;
 
-            if (TryCompute(newVariable.InitialValue, null, null, out DataItem computedInitialValue))
+            if (TryCompute(newVariable.InitialValue, null, out DataItem computedInitialValue))
             {
                 AddComment($"Initial value {{");
 

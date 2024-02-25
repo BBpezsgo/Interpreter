@@ -94,9 +94,9 @@ namespace LanguageCore.Compiler
         public readonly Statement? Caller;
         public readonly T Called;
 
-        public readonly string? CurrentFile;
+        public readonly Uri? CurrentFile;
 
-        public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Statement? caller, T called, string? file)
+        public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Statement? caller, T called, Uri? file)
         {
             InstructionIndex = callInstructionIndex;
             IsAbsoluteAddress = isAbsoluteAddress;
@@ -111,9 +111,9 @@ namespace LanguageCore.Compiler
     public readonly struct Reference<T>
     {
         public readonly T Source;
-        public readonly string? SourceFile;
+        public readonly Uri? SourceFile;
 
-        public Reference(T source, string? sourceFile)
+        public Reference(T source, Uri? sourceFile)
         {
             Source = source;
             SourceFile = sourceFile;
@@ -122,7 +122,7 @@ namespace LanguageCore.Compiler
 
     public interface IReferenceable<T>
     {
-        public void AddReference(T referencedBy, string? file);
+        public void AddReference(T referencedBy, Uri? file);
         public void ClearReferences();
     }
 
@@ -230,7 +230,8 @@ namespace LanguageCore.Compiler
         }
     }
 
-    public delegate bool ComputeValue(StatementWithValue value, RuntimeType? expectedType, out DataItem computedValue);
+    public delegate bool ComputeValue(StatementWithValue value, out DataItem computedValue);
+    public delegate bool FindType(Token token, [NotNullWhen(true)] out CompiledType? computedValue);
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public class CompiledType :
@@ -522,30 +523,21 @@ namespace LanguageCore.Compiler
         }
 
         /// <exception cref="InternalException"/>
-        public CompiledType(string type, Func<string, CompiledType>? typeFinder) : this()
-        {
-            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type, out this.builtinType))
-            { return; }
-
-            if (typeFinder == null) throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}");
-
-            Set(typeFinder.Invoke(type));
-        }
-
-        /// <exception cref="InternalException"/>
-        public CompiledType(Token type, Func<Token, CompiledType>? typeFinder) : this()
+        public CompiledType(Token type, FindType? typeFinder) : this()
         {
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Content, out this.builtinType))
             { return; }
 
-            if (typeFinder == null) throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}", type, null);
+            if (typeFinder == null ||
+                !typeFinder.Invoke(type, out CompiledType? result))
+            { throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}"); }
 
-            Set(typeFinder.Invoke(type));
+            Set(result);
         }
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstance type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstance type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
         {
             if (type is TypeInstanceSimple simpleType)
             {
@@ -575,7 +567,7 @@ namespace LanguageCore.Compiler
         }
 
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceSimple type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstanceSimple type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
         {
             typeInstance = type;
 
@@ -608,9 +600,11 @@ namespace LanguageCore.Compiler
                 return;
             }
 
-            if (typeFinder == null) throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}", type, null);
+            if (typeFinder == null ||
+                !typeFinder.Invoke(type.Identifier, out CompiledType? result))
+            { throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}"); }
 
-            Set(typeFinder.Invoke(type.Identifier));
+            Set(result);
 
             typeInstance = type;
             typeParameters = CompiledType.FromArray(type.GenericTypes, typeFinder);
@@ -618,7 +612,7 @@ namespace LanguageCore.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceFunction type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstanceFunction type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
         {
             CompiledType returnType = new(type.FunctionReturnType, typeFinder, constComputer);
             CompiledType[] parameterTypes = CompiledType.FromArray(type.FunctionParameterTypes, typeFinder);
@@ -629,7 +623,7 @@ namespace LanguageCore.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceStackArray type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstanceStackArray type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
         {
             ArgumentNullException.ThrowIfNull(constComputer, nameof(constComputer));
 
@@ -637,13 +631,13 @@ namespace LanguageCore.Compiler
             stackArrayOf = new CompiledType(type.StackArrayOf, typeFinder, constComputer);
             stackArraySizeStatement = type.StackArraySize!;
 
-            if (!constComputer.Invoke(type.StackArraySize!, RuntimeType.SInt32, out stackArraySize))
-            { throw new CompilerException($"Failed to compute value", type.StackArraySize, null); }
+            if (!constComputer.Invoke(type.StackArraySize!, out stackArraySize))
+            { throw new CompilerException($"Failed to compute value"); }
         }
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstancePointer type, Func<Token, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstancePointer type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
         {
             typeInstance = type;
             pointerTo = new CompiledType(type.To, typeFinder, constComputer);
@@ -958,9 +952,9 @@ namespace LanguageCore.Compiler
             genericName = content,
         };
 
-        public static CompiledType[] FromArray(IEnumerable<TypeInstance> types, Func<Token, CompiledType> typeFinder)
+        public static CompiledType[] FromArray(IEnumerable<TypeInstance> types, FindType typeFinder)
             => CompiledType.FromArray(types.ToArray(), typeFinder);
-        public static CompiledType[] FromArray(TypeInstance[]? types, Func<Token, CompiledType>? typeFinder)
+        public static CompiledType[] FromArray(TypeInstance[]? types, FindType? typeFinder)
         {
             if (types is null || types.Length == 0) return Array.Empty<CompiledType>();
 

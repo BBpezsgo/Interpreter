@@ -237,7 +237,7 @@ namespace LanguageCore.Brainfuck.Generator
             public int[] savedBreakTagStack;
             public int[] savedBreakCount;
             public Variable[] savedVariables;
-            public string? savedFilePath;
+            public Uri? savedFilePath;
             public CompiledConstant[] savedConstants;
         }
 
@@ -263,7 +263,7 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 Variables.PushRange(newFrame.savedVariables);
                 for (int i = 0; i < Variables.Count; i++)
-                { Variables[i] = new Variable(Variables[i].Name, Variables[i].Address, Variables[i].Scope, false, Variables[i].DeallocateOnClean, Variables[i].Type, Variables[i].Size); }
+                { Variables[i] = new Variable(Variables[i].Name, Variables[i].Address, false, Variables[i].DeallocateOnClean, Variables[i].Type, Variables[i].Size); }
             }
 
             newFrame.savedFilePath = CurrentFile;
@@ -357,23 +357,22 @@ namespace LanguageCore.Brainfuck.Generator
         {
             public readonly string Name;
             public readonly int Address;
-            public readonly FunctionThingDefinition? Scope;
 
             public readonly bool HaveToClean;
             public readonly bool DeallocateOnClean;
 
             public readonly CompiledType Type;
             public readonly int Size;
+
             public bool IsDiscarded;
-            public bool IsInitialValueSet;
+            public bool IsInitialized;
 
-            public readonly bool IsInitialized => Type.Size > 0;
-
-            public Variable(string name, int address, FunctionThingDefinition? scope, bool haveToClean, bool deallocateOnClean, CompiledType type, int size)
+            public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, CompiledType type)
+                : this(name, address, haveToClean, deallocateOnClean, type, type.Size) { }
+            public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, CompiledType type, int size)
             {
                 Name = name;
                 Address = address;
-                Scope = scope;
 
                 HaveToClean = haveToClean;
                 DeallocateOnClean = deallocateOnClean;
@@ -381,7 +380,7 @@ namespace LanguageCore.Brainfuck.Generator
                 Type = type;
                 IsDiscarded = false;
                 Size = size;
-                IsInitialValueSet = false;
+                IsInitialized = false;
             }
 
             readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.Size} bytes at {Address})";
@@ -555,10 +554,8 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
-        bool SafeToDiscardVariable(Statement statement, Variable variable)
+        int VariableUses(Statement statement, Variable variable)
         {
-            return false;
-
             int usages = 0;
 
             foreach (Statement _statement in statement.GetStatementsRecursively(true))
@@ -571,11 +568,9 @@ namespace LanguageCore.Brainfuck.Generator
                 { continue; }
 
                 usages++;
-                if (usages > 1)
-                { return false; }
             }
 
-            return usages <= 1;
+            return usages;
         }
 
         #region GetValueSize
@@ -632,9 +627,9 @@ namespace LanguageCore.Brainfuck.Generator
                 if (size != 1)
                 { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", index, CurrentFile); }
 
-                if (TryCompute(index.Expression, RuntimeType.SInt32, out DataItem indexValue))
+                if (TryCompute(index.Expression, out DataItem indexValue))
                 {
-                    address = variable.Address + (indexValue.ValueSInt32 * 2 * variable.Type.StackArrayOf.Size);
+                    address = variable.Address + ((int)indexValue * 2 * variable.Type.StackArrayOf.Size);
                     return true;
                 }
 
@@ -701,11 +696,11 @@ namespace LanguageCore.Brainfuck.Generator
         {
             PrintCallback?.Invoke("  Precompiling ...", LogType.Debug);
 
-            CurrentFile = compilerResult.File?.FullName;
+            CurrentFile = compilerResult.File;
 
             int constantCount = CompileConstants(compilerResult.TopLevelStatements);
 
-            Variable returnVariable = new(ReturnVariableName, Stack.PushVirtual(1), null, false, false, new CompiledType(Type.Integer), 1);
+            Variable returnVariable = new(ReturnVariableName, Stack.PushVirtual(1), false, false, new CompiledType(Type.Integer));
             Variables.Add(returnVariable);
 
             if (GeneratorSettings.ClearGlobalVariablesBeforeExit)

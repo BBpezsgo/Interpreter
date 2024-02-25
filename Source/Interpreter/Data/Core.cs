@@ -285,9 +285,9 @@ namespace LanguageCore.Runtime
             Compiler.Type.Integer => new DataItem((int)0),
             Compiler.Type.Float => new DataItem((float)0f),
             Compiler.Type.Char => new DataItem((char)'\0'),
-            Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type.ToString().ToLowerInvariant()}\" does not have a default value"),
-            Compiler.Type.Void => throw new InternalException($"Type \"{type.ToString().ToLowerInvariant()}\" does not have a default value"),
-            Compiler.Type.Unknown => throw new InternalException($"Type \"{type.ToString().ToLowerInvariant()}\" does not have a default value"),
+            Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type}\" does not have a default value"),
+            Compiler.Type.Void => throw new InternalException($"Type \"{type}\" does not have a default value"),
+            Compiler.Type.Unknown => throw new InternalException($"Type \"{type}\" does not have a default value"),
             _ => DataItem.Null,
         };
 

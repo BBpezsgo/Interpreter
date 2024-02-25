@@ -7,10 +7,10 @@ namespace LanguageCore.Tokenizing
     {
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        protected void ProcessCharacter(char currChar, int offsetTotal, out bool breakLine, out bool returnLine)
+        protected void ProcessCharacter(char currChar, int offsetTotal)
         {
-            breakLine = false;
-            returnLine = false;
+            bool breakLine = false;
+            bool returnLine = false;
 
             char prevChar = PreviousChar;
             PreviousChar = currChar;
@@ -21,13 +21,6 @@ namespace LanguageCore.Tokenizing
 
             if (currChar is '\r' or '\n')
             { returnLine = true; }
-
-            // if (breakLine && CurrentToken.TokenType == PreparationTokenType.CommentMultiline)
-            // {
-            //     EndToken(offsetTotal);
-            //     CurrentToken.Content.Clear();
-            //     CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
-            // }
 
             if (CurrentToken.TokenType == PreparationTokenType.STRING_UnicodeCharacter)
             {
@@ -53,7 +46,7 @@ namespace LanguageCore.Tokenizing
                 else
                 {
                     SavedUnicode += currChar;
-                    return;
+                    goto FinishCharacter;
                 }
             }
             else if (CurrentToken.TokenType == PreparationTokenType.CHAR_UnicodeCharacter)
@@ -80,7 +73,7 @@ namespace LanguageCore.Tokenizing
                 else
                 {
                     SavedUnicode += currChar;
-                    return;
+                    goto FinishCharacter;
                 }
             }
 
@@ -105,7 +98,7 @@ namespace LanguageCore.Tokenizing
                     });
                     CurrentToken.TokenType = PreparationTokenType.LiteralString;
                 }
-                return;
+                goto FinishCharacter;
             }
             else if (CurrentToken.TokenType == PreparationTokenType.CHAR_EscapeSequence)
             {
@@ -128,7 +121,7 @@ namespace LanguageCore.Tokenizing
                     });
                     CurrentToken.TokenType = PreparationTokenType.LiteralCharacter;
                 }
-                return;
+                goto FinishCharacter;
             }
             else if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_COMMENT && currChar != '/' && currChar != '*')
             {
@@ -136,12 +129,12 @@ namespace LanguageCore.Tokenizing
                 if (currChar == '=')
                 { CurrentToken.Content.Append(currChar); }
                 EndToken(offsetTotal);
-                return;
+                goto FinishCharacter;
             }
             else if (CurrentToken.TokenType == PreparationTokenType.Comment && (currChar is not '\n' and not '\r'))
             {
                 CurrentToken.Content.Append(currChar);
-                return;
+                goto FinishCharacter;
             }
             else if (CurrentToken.TokenType == PreparationTokenType.LiteralString && currChar != '"')
             {
@@ -149,7 +142,7 @@ namespace LanguageCore.Tokenizing
                 { CurrentToken.TokenType = PreparationTokenType.STRING_EscapeSequence; }
                 else
                 { CurrentToken.Content.Append(currChar); }
-                return;
+                goto FinishCharacter;
             }
             else if (CurrentToken.TokenType == PreparationTokenType.LiteralCharacter && currChar != '\'')
             {
@@ -157,7 +150,7 @@ namespace LanguageCore.Tokenizing
                 { CurrentToken.TokenType = PreparationTokenType.CHAR_EscapeSequence; }
                 else
                 { CurrentToken.Content.Append(currChar); }
-                return;
+                goto FinishCharacter;
             }
 
             if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_END_MULTILINE_COMMENT)
@@ -171,13 +164,13 @@ namespace LanguageCore.Tokenizing
                     CurrentToken.Content.Remove(0, 2);
                     CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
                     EndToken(offsetTotal, true);
-                    return;
+                    goto FinishCharacter;
                 }
                 else
                 {
                     CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
-                    return;
+                    goto FinishCharacter;
                 }
             }
 
@@ -192,7 +185,7 @@ namespace LanguageCore.Tokenizing
                 {
                     CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
                 }
-                return;
+                goto FinishCharacter;
             }
 
             if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_FLOAT && !char.IsAsciiDigit(currChar))
@@ -426,8 +419,16 @@ namespace LanguageCore.Tokenizing
                     CurrentToken.Content.Append(currChar);
                 }
             }
+
+FinishCharacter:
+            CurrentColumn++;
+            if (breakLine) CurrentLine++;
+            if (returnLine) CurrentColumn = 0;
+            return;
         }
 
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
         protected void EndToken(int offsetTotal, bool inFuture = false)
         {
             CurrentToken.Position.Range.End = new SinglePosition(CurrentLine, CurrentColumn);
@@ -463,7 +464,7 @@ namespace LanguageCore.Tokenizing
                     (PreparationToken? number, PreparationToken? op) = CurrentToken.Slice(CurrentToken.Content.Length - 1);
 
                     if (number is null || op is null)
-                    { throw new InternalException($"I failed at token splitting :(", CurrentToken, null); }
+                    { throw new InternalException($"I failed at token splitting :("); }
 
                     number.TokenType = PreparationTokenType.LiteralNumber;
                     op.TokenType = PreparationTokenType.Operator;
@@ -472,6 +473,14 @@ namespace LanguageCore.Tokenizing
                     Tokens.Add(op.Instantiate());
                     goto Finish;
                 }
+            }
+
+            if (CurrentToken.TokenType == PreparationTokenType.LiteralCharacter)
+            {
+                if (CurrentToken.Content.Length > 1)
+                { throw new TokenizerException($"I think there are more characters than there should be ({CurrentToken.Content.Length})", CurrentToken.Position); }
+                else if (CurrentToken.Content.Length < 1)
+                { throw new TokenizerException($"I think there are less characters than there should be ({CurrentToken.Content.Length})", CurrentToken.Position); }
             }
 
             if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_FLOAT)

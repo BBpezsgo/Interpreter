@@ -34,17 +34,17 @@ namespace LanguageCore.Compiler
 
         public readonly Statement[] TopLevelStatements;
 
-        public readonly FileInfo? File;
+        public readonly Uri? File;
 
-        public readonly IEnumerable<string> Files
+        public readonly IEnumerable<Uri> Files
         {
             get
             {
-                HashSet<string> alreadyExists = new();
+                HashSet<Uri> alreadyExists = new();
 
                 foreach (CompiledFunction function in Functions)
                 {
-                    string? file = function.FilePath;
+                    Uri? file = function.FilePath;
                     if (file is not null && !alreadyExists.Contains(file))
                     {
                         alreadyExists.Add(file);
@@ -54,7 +54,7 @@ namespace LanguageCore.Compiler
 
                 foreach (MacroDefinition macro in Macros)
                 {
-                    string? file = macro.FilePath;
+                    Uri? file = macro.FilePath;
                     if (file is not null && !alreadyExists.Contains(file))
                     {
                         alreadyExists.Add(file);
@@ -64,7 +64,7 @@ namespace LanguageCore.Compiler
 
                 foreach (CompiledGeneralFunction generalFunction in GeneralFunctions)
                 {
-                    string? file = generalFunction.FilePath;
+                    Uri? file = generalFunction.FilePath;
                     if (file is not null && !alreadyExists.Contains(file))
                     {
                         alreadyExists.Add(file);
@@ -74,7 +74,7 @@ namespace LanguageCore.Compiler
 
                 foreach (CompiledOperator @operator in Operators)
                 {
-                    string? file = @operator.FilePath;
+                    Uri? file = @operator.FilePath;
                     if (file is not null && !alreadyExists.Contains(file))
                     {
                         alreadyExists.Add(file);
@@ -84,7 +84,7 @@ namespace LanguageCore.Compiler
 
                 foreach (CompiledStruct @struct in Structs)
                 {
-                    string? file = @struct.FilePath;
+                    Uri? file = @struct.FilePath;
                     if (file is not null && !alreadyExists.Contains(file))
                     {
                         alreadyExists.Add(file);
@@ -94,7 +94,7 @@ namespace LanguageCore.Compiler
 
                 foreach (CompiledEnum @enum in Enums)
                 {
-                    string? file = @enum.FilePath;
+                    Uri? file = @enum.FilePath;
                     if (file is not null && !alreadyExists.Contains(file))
                     {
                         alreadyExists.Add(file);
@@ -168,7 +168,7 @@ namespace LanguageCore.Compiler
             IEnumerable<CompileTag> hashes,
             IEnumerable<CompiledEnum> enums,
             IEnumerable<Statement> topLevelStatements,
-            FileInfo? file)
+            Uri? file)
         {
             Functions = functions.ToArray();
             Macros = macros.ToArray();
@@ -183,7 +183,7 @@ namespace LanguageCore.Compiler
             File = file;
         }
 
-        public CompiledFunction? GetFunctionAt(string file, SinglePosition position)
+        public CompiledFunction? GetFunctionAt(Uri file, SinglePosition position)
         {
             for (int i = 0; i < Functions.Length; i++)
             {
@@ -198,7 +198,7 @@ namespace LanguageCore.Compiler
             return null;
         }
 
-        public CompiledGeneralFunction? GetGeneralFunctionAt(string file, SinglePosition position)
+        public CompiledGeneralFunction? GetGeneralFunctionAt(Uri file, SinglePosition position)
         {
             for (int i = 0; i < GeneralFunctions.Length; i++)
             {
@@ -213,7 +213,7 @@ namespace LanguageCore.Compiler
             return null;
         }
 
-        public CompiledOperator? GetOperatorAt(string file, SinglePosition position)
+        public CompiledOperator? GetOperatorAt(Uri file, SinglePosition position)
         {
             for (int i = 0; i < Operators.Length; i++)
             {
@@ -228,7 +228,7 @@ namespace LanguageCore.Compiler
             return null;
         }
 
-        public CompiledStruct? GetStructAt(string file, SinglePosition position)
+        public CompiledStruct? GetStructAt(Uri file, SinglePosition position)
         {
             for (int i = 0; i < Structs.Length; i++)
             {
@@ -243,7 +243,7 @@ namespace LanguageCore.Compiler
             return null;
         }
 
-        public CompiledEnum? GetEnumAt(string file, SinglePosition position)
+        public CompiledEnum? GetEnumAt(Uri file, SinglePosition position)
         {
             for (int i = 0; i < Enums.Length; i++)
             {
@@ -337,10 +337,19 @@ namespace LanguageCore.Compiler
             AnalysisCollection = analysisCollection;
         }
 
-        CompiledType FindType(Token name)
+        bool FindType(Token name, [NotNullWhen(true)] out CompiledType? result)
         {
-            if (CodeGenerator.GetStruct(CompiledStructs, name.Content, out CompiledStruct? @struct)) return new CompiledType(@struct);
-            if (CodeGenerator.GetEnum(CompiledEnums, name.Content, out CompiledEnum? @enum)) return new CompiledType(@enum);
+            if (CodeGenerator.GetStruct(CompiledStructs, name.Content, out CompiledStruct? @struct))
+            {
+                result = new CompiledType(@struct);
+                return true;
+            }
+
+            if (CodeGenerator.GetEnum(CompiledEnums, name.Content, out CompiledEnum? @enum))
+            {
+                result = new CompiledType(@enum);
+                return true;
+            }
 
             for (int i = 0; i < GenericParameters.Count; i++)
             {
@@ -349,15 +358,20 @@ namespace LanguageCore.Compiler
                     if (GenericParameters[i][j].Content == name.Content)
                     {
                         GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
-                        return CompiledType.CreateGeneric(GenericParameters[i][j].Content);
+                        result = CompiledType.CreateGeneric(GenericParameters[i][j].Content);
+                        return true;
                     }
                 }
             }
 
             if (CodeGenerator.GetFunction(CompiledFunctions, name, out CompiledFunction? function))
-            { return new CompiledType(new FunctionType(function)); }
+            {
+                result = new CompiledType(new FunctionType(function));
+                return true;
+            }
 
-            throw new InternalException($"Type \"{name}\" not found", name, null);
+            result = null;
+            return false;
         }
 
         protected string? TypeDefinitionReplacer(string? typeName)
@@ -412,7 +426,7 @@ namespace LanguageCore.Compiler
             return result;
         }
 
-        static CompiledType[] CompileTypes(ParameterDefinition[] parameters, Func<Token, CompiledType> unknownTypeCallback)
+        static CompiledType[] CompileTypes(ParameterDefinition[] parameters, FindType unknownTypeCallback)
         {
             CompiledType[] result = new CompiledType[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
@@ -472,7 +486,7 @@ namespace LanguageCore.Compiler
                         if (passedParameterType == definedParameterType)
                         { continue; }
 
-                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLowerInvariant()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
                     }
 
                     if (function.TemplateInfo != null)
@@ -509,7 +523,7 @@ namespace LanguageCore.Compiler
                         if (passedParameterType.IsPointer && definedParameterType.IsPointer)
                         { continue; }
 
-                        throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLowerInvariant()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
                     }
                 }
             }
@@ -550,10 +564,10 @@ namespace LanguageCore.Compiler
                         if (LanguageConstants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.ToString(), out Type builtinType))
                         {
                             if (externalFunction.ParameterTypes[i] != builtinType)
-                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLowerInvariant()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
+                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i]} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
                         }
                         else
-                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLowerInvariant()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
+                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i]} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
                     }
 
                     return new CompiledOperator(type, externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(), function)
@@ -641,7 +655,7 @@ namespace LanguageCore.Compiler
                 EnumMemberDefinition member = @enum.Members[i];
                 CompiledEnumMember compiledMember = new(member);
 
-                if (!CodeGenerator.TryComputeSimple(member.Value, null, out compiledMember.ComputedValue))
+                if (!CodeGenerator.TryComputeSimple(member.Value, out compiledMember.ComputedValue))
                 { throw new CompilerException($"I can't compute this. The developer should make a better preprocessor for this case I think...", member.Value, @enum.FilePath); }
 
                 compiledEnum.Members[i] = compiledMember;
@@ -743,7 +757,7 @@ namespace LanguageCore.Compiler
             Tags.AddRange(collectedAST.ParserResult.Hashes);
         }
 
-        CompilerResult CompileMainFile(ParserResult parserResult, FileInfo? file)
+        CompilerResult CompileMainFile(ParserResult parserResult, Uri? file)
         {
             Structs.AddRange(parserResult.Structs);
             Functions.AddRange(parserResult.Functions);
@@ -777,7 +791,7 @@ namespace LanguageCore.Compiler
 
         CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings)
         {
-            CollectorResult collectorResult = SourceCodeManager.Collect(usings, null, PrintCallback, Settings.BasePath, AnalysisCollection);
+            CollectorResult collectorResult = SourceCodeManager.Collect(usings, (Uri?)null, PrintCallback, Settings.BasePath, AnalysisCollection);
 
             for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
             { CompileFile(collectorResult.CollectedASTs[i]); }
@@ -1101,12 +1115,14 @@ ExitBreak:
         public static CompilerResult Compile(
             ParserResult parserResult,
             ExternalFunctionCollection? externalFunctions,
-            FileInfo? file,
+            Uri? file,
             CompilerSettings settings,
             PrintCallback? printCallback = null,
             AnalysisCollection? analysisCollection = null)
-            => new Compiler(externalFunctions, printCallback, settings, analysisCollection).CompileMainFile(parserResult, file);
-
+        {
+            Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection);
+            return compiler.CompileMainFile(parserResult, file);
+        }
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
         /// <exception cref="CompilerException"/>
@@ -1122,7 +1138,8 @@ ExitBreak:
             AnalysisCollection? analysisCollection = null)
         {
             ParserResult ast = Parser.ParseFile(file.FullName);
-            return new Compiler(externalFunctions, printCallback, settings, analysisCollection).CompileMainFile(ast, file);
+            Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection);
+            return compiler.CompileMainFile(ast, new Uri(file.FullName, UriKind.Absolute));
         }
 
         public static CompilerResult CompileInteractive(

@@ -23,27 +23,17 @@ export char* ToString(this bool v)
 
 export char* ToString(this byte number)
 {
-	char* result = "";
-
 	if (number == 0)
-    {
-	      delete result;
-	      result = "0";
-	      return result;
-	}
+    { return "0"; }
+
+	char* result = "";
 
 	byte v = number;
 
 	while (v > 0)
 	{
         byte rem = v % 10;
-		
-		char* newResult = Alloc((result.Length() + 1) * sizeof(char)) as char*;
-		CopyString(result, newResult);
-		newResult[result.Length()] = (rem + 48) as char;
-		delete result;
-		result = newResult;
-
+        result = (temp result) + ((rem + 48) as char);
 		v = v / 10;
 	}
 

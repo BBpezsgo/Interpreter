@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -140,7 +139,7 @@ namespace LanguageCore.Compiler
 
         protected readonly AnalysisCollection? AnalysisCollection;
 
-        protected string? CurrentFile;
+        protected Uri? CurrentFile;
         protected bool InFunction;
 
         protected readonly GeneratorSettings Settings;
@@ -204,7 +203,9 @@ namespace LanguageCore.Compiler
 
                 if (variableDeclaration.InitialValue == null)
                 { throw new CompilerException($"Constant value must have initial value", variableDeclaration, variableDeclaration.FilePath); }
-                RuntimeType? expectedType = null;
+
+                if (!TryCompute(variableDeclaration.InitialValue, out DataItem constantValue))
+                { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.FilePath); }
 
                 if (variableDeclaration.Type != "var")
                 {
@@ -214,11 +215,8 @@ namespace LanguageCore.Compiler
                     if (!constantType.IsBuiltin)
                     { throw new NotSupportedException($"Only builtin types supported as a constant value"); }
 
-                    expectedType = constantType.RuntimeType;
+                    DataItem.TryCast(ref constantValue, constantType.RuntimeType);
                 }
-
-                if (!TryCompute(variableDeclaration.InitialValue, expectedType, out DataItem constantValue))
-                { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.FilePath); }
 
                 if (GetConstant(variableDeclaration.VariableName.Content, out _))
                 { throw new CompilerException($"Constant \"{variableDeclaration.VariableName}\" already defined", variableDeclaration.VariableName, variableDeclaration.FilePath); }
@@ -543,7 +541,6 @@ namespace LanguageCore.Compiler
                 BuiltinFunctionNames.IndexerGet,
                 new CompiledType[] { prevType, new(Type.Integer) },
                 out compiledFunction);
-
 
         protected bool GetIndexSetterTemplate(CompiledType prevType, CompiledType elementType, out CompliableTemplate<CompiledFunction> compiledFunction)
         {
@@ -928,7 +925,7 @@ namespace LanguageCore.Compiler
                 if (!function.Identifier.Equals(name.Content)) continue;
 
                 if (compiledFunction is not null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, null); }
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name); }
 
                 compiledFunction = function;
             }
@@ -1207,69 +1204,66 @@ namespace LanguageCore.Compiler
         #region FindType()
 
         /// <exception cref="CompilerException"/>
-        protected CompiledType FindType(string name, IPositioned? position) => FindType(name, position?.Position ?? Position.UnknownPosition);
-
-        /// <exception cref="CompilerException"/>
-        protected CompiledType FindType(string name) => FindType(name, Position.UnknownPosition);
-
-        /// <param name="position">Used for exceptions</param>
-        /// <exception cref="CompilerException"/>
-        protected CompiledType FindType(string name, Position position)
-        {
-            if (GetStruct(name, out CompiledStruct? @struct)) return new CompiledType(@struct);
-            if (GetEnum(name, out CompiledEnum? @enum)) return new CompiledType(@enum);
-
-            if (TypeArguments.TryGetValue(name, out CompiledType? typeArgument))
-            { return typeArgument; }
-
-            if (GetFunction(name, out CompiledFunction? function))
-            { return new CompiledType(new FunctionType(function)); }
-
-            if (GetGlobalVariable(name, out CompiledVariable? globalVariable))
-            { return globalVariable.Type; }
-
-            throw new CompilerException($"Type \"{name}\" not found", position, CurrentFile);
-        }
-
-        /// <exception cref="CompilerException"/>
         protected CompiledType FindType(Token name)
         {
+            if (!FindType(name, out CompiledType? result))
+            { throw new CompilerException($"Type \"{name}\" not found", name, CurrentFile); }
+
+            return result;
+        }
+
+        protected bool FindType(Token name, [NotNullWhen(true)] out CompiledType? result)
+        {
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(name.Content, out Type builtinType))
-            { return new CompiledType(builtinType); }
+            {
+                result = new CompiledType(builtinType);
+                return true;
+            }
 
             if (GetStruct(name.Content, out CompiledStruct? @struct))
             {
                 name.AnalyzedType = TokenAnalyzedType.Struct;
                 @struct.AddReference(new TypeInstanceSimple(name), CurrentFile);
 
-                return new CompiledType(@struct);
+                result = new CompiledType(@struct);
+                return true;
             }
 
             if (GetEnum(name.Content, out CompiledEnum? @enum))
             {
                 name.AnalyzedType = TokenAnalyzedType.Enum;
-                return new CompiledType(@enum);
+                result = new CompiledType(@enum);
+                return true;
             }
 
             if (TypeArguments.TryGetValue(name.Content, out CompiledType? typeArgument))
-            { return typeArgument; }
+            {
+                result = typeArgument;
+                return true;
+            }
 
             if (GetFunction(name, out CompiledFunction? function))
             {
                 name.AnalyzedType = TokenAnalyzedType.FunctionName;
                 function.AddReference(new Identifier(name), CurrentFile);
-                return new CompiledType(new FunctionType(function));
+                result = new CompiledType(new FunctionType(function));
+                return true;
             }
 
             if (GetGlobalVariable(name.Content, out CompiledVariable? globalVariable))
-            { return globalVariable.Type; }
+            {
+                result = globalVariable.Type;
+                return true;
+            }
 
-            throw new CompilerException($"Type \"{name}\" not found", name, CurrentFile);
+            result = null;
+            return false;
         }
 
         /// <exception cref="InternalException"/>
+        /// <exception cref="CompilerException"/>
         protected CompiledType FindType(TypeInstance name)
-            => new(name, FindType);
+            => new(name, FindType, TryCompute);
 
         #endregion
 
@@ -1484,11 +1478,11 @@ namespace LanguageCore.Compiler
             if (!prevType.IsStackArray)
             { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
 
-            if (!TryCompute(indexCall.Expression, RuntimeType.SInt32, out DataItem index))
+            if (!TryCompute(indexCall.Expression, out DataItem index))
             { throw new CompilerException($"Can't compute the index value", indexCall.Expression, CurrentFile); }
 
             int prevOffset = GetDataOffset(indexCall.PrevStatement);
-            int offset = index.ValueSInt32 * prevType.StackArrayOf.Size;
+            int offset = (int)index * prevType.StackArrayOf.Size;
             return prevOffset + offset;
         }
 
@@ -1641,8 +1635,8 @@ namespace LanguageCore.Compiler
                 "float" => new DataItem((float)0f),
                 "char" => new DataItem((char)'\0'),
 
-                "var" => throw new CompilerException("Undefined type", type, null),
-                "void" => throw new CompilerException("Invalid type", type, null),
+                "var" => throw new CompilerException("Undefined type", type),
+                "void" => throw new CompilerException("Invalid type", type),
                 _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
             };
 
@@ -1787,19 +1781,10 @@ namespace LanguageCore.Compiler
             if (!leftType.CanBeBuiltin || !rightType.CanBeBuiltin || leftType.BuiltinType == Type.Void || rightType.BuiltinType == Type.Void)
             { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
 
-            if ((expectedType is not null && expectedType.IsBuiltin) ?
-                TryCompute(@operator, expectedType.RuntimeType, out DataItem predictedValue) :
-                TryCompute(@operator, null, out predictedValue))
-            {
+            DataItem leftValue = GetInitialValue(leftType);
+            DataItem rightValue = GetInitialValue(rightType);
 
-            }
-            else
-            {
-                DataItem leftValue = GetInitialValue(leftType);
-                DataItem rightValue = GetInitialValue(rightType);
-
-                predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
-            }
+            DataItem predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
 
             CompiledType result = new(predictedValue.Type);
 
@@ -1882,10 +1867,8 @@ namespace LanguageCore.Compiler
                 return OnGotStatementType(identifier, new CompiledType(function));
             }
 
-            try
-            { return OnGotStatementType(identifier, FindType(identifier.Token)); }
-            catch (CompilerException)
-            { }
+            if (FindType(identifier.Token, out CompiledType? result))
+            { return OnGotStatementType(identifier, result); }
 
             throw new CompilerException($"Symbol \"{identifier.Content}\" not found", identifier, CurrentFile);
         }
@@ -2162,9 +2145,7 @@ namespace LanguageCore.Compiler
             if (result is KeywordCall keywordCall &&
                 keywordCall.Identifier.Equals("return") &&
                 keywordCall.Parameters.Length == 1)
-            {
-                result = keywordCall.Parameters[0];
-            }
+            { result = keywordCall.Parameters[0]; }
 
             return result;
         }
@@ -2195,9 +2176,7 @@ namespace LanguageCore.Compiler
             if (result is KeywordCall keywordCall &&
                 keywordCall.Identifier.Equals("return") &&
                 keywordCall.Parameters.Length == 1)
-            {
-                result = keywordCall.Parameters[0];
-            }
+            { result = keywordCall.Parameters[0]; }
 
             return result;
         }
@@ -2214,25 +2193,35 @@ namespace LanguageCore.Compiler
                     keywordCall.Identifier.Equals("return"))
                 { break; }
             }
-            return new Block(block.BracketStart, statements, block.BracketEnd);
+            return new Block(block.BracketStart, statements, block.BracketEnd)
+            {
+                Semicolon = block.Semicolon,
+            };
         }
 
         protected static OperatorCall InlineMacro(OperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
-        {
-            StatementWithValue left = InlineMacro(operatorCall.Left, parameters);
-            StatementWithValue? right = InlineMacro(operatorCall.Right, parameters);
-            return new OperatorCall(operatorCall.Operator, left, right);
-        }
+            => new(
+                op: operatorCall.Operator,
+                left: InlineMacro(operatorCall.Left, parameters),
+                right: InlineMacro(operatorCall.Right, parameters))
+            {
+                InsideBracelet = operatorCall.InsideBracelet,
+                SaveValue = operatorCall.SaveValue,
+                Semicolon = operatorCall.Semicolon,
+            };
 
         protected static KeywordCall InlineMacro(KeywordCall keywordCall, Dictionary<string, StatementWithValue> parameters)
-        {
-            StatementWithValue[] _parameters = InlineMacro(keywordCall.Parameters, parameters);
-            return new KeywordCall(keywordCall.Identifier, _parameters);
-        }
+            => new(
+                identifier: keywordCall.Identifier,
+                parameters: InlineMacro(keywordCall.Parameters, parameters))
+            {
+                SaveValue = keywordCall.SaveValue,
+                Semicolon = keywordCall.Semicolon,
+            };
 
         protected static FunctionCall InlineMacro(FunctionCall functionCall, Dictionary<string, StatementWithValue> parameters)
         {
-            StatementWithValue[] _parameters = InlineMacro(functionCall.Parameters, parameters);
+            IEnumerable<StatementWithValue> _parameters = InlineMacro(functionCall.Parameters, parameters);
             StatementWithValue? prevStatement = functionCall.PrevStatement;
             if (prevStatement != null)
             { prevStatement = InlineMacro(prevStatement, parameters); }
@@ -2240,39 +2229,29 @@ namespace LanguageCore.Compiler
         }
 
         protected static AnyCall InlineMacro(AnyCall anyCall, Dictionary<string, StatementWithValue> parameters)
-        {
-            StatementWithValue[] _parameters = InlineMacro(anyCall.Parameters, parameters);
-            StatementWithValue prevStatement = anyCall.PrevStatement;
-            prevStatement = InlineMacro(prevStatement, parameters);
-            return new AnyCall(prevStatement, anyCall.BracketLeft, _parameters, anyCall.BracketRight);
-        }
+            => new(
+                prevStatement: InlineMacro(anyCall.PrevStatement, parameters),
+                bracketLeft: anyCall.BracketLeft,
+                parameters: InlineMacro(anyCall.Parameters, parameters),
+                bracketRight: anyCall.BracketRight)
+            {
+                SaveValue = anyCall.SaveValue,
+                Semicolon = anyCall.Semicolon,
+            };
 
-        protected static StatementWithValue[] InlineMacro(StatementWithValue[] statements, Dictionary<string, StatementWithValue> parameters)
-        {
-            StatementWithValue[] _parameters = new StatementWithValue[statements.Length];
-            for (int i = 0; i < _parameters.Length; i++)
-            {
-                _parameters[i] = InlineMacro(statements[i], parameters);
-            }
-            return _parameters;
-        }
-        protected static Statement[] InlineMacro(Statement[] statements, Dictionary<string, StatementWithValue> parameters)
-        {
-            Statement[] _parameters = new Statement[statements.Length];
-            for (int i = 0; i < _parameters.Length; i++)
-            {
-                _parameters[i] = InlineMacro(statements[i], parameters);
-            }
-            return _parameters;
-        }
+        protected static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
+        { return statements.Select(statement => InlineMacro(statement, parameters)); }
+        protected static IEnumerable<Statement> InlineMacro(IEnumerable<Statement> statements, Dictionary<string, StatementWithValue> parameters)
+        { return statements.Select(statement => InlineMacro(statement, parameters)); }
 
         protected static Statement InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
-            Block block => InlineMacro(block, parameters),
-            StatementWithValue statementWithValue => InlineMacro(statementWithValue, parameters),
-            ForLoop forLoop => InlineMacro(forLoop, parameters),
-            IfContainer ifContainer => InlineMacro(ifContainer, parameters),
-            _ => statement
+            Block v => InlineMacro(v, parameters),
+            StatementWithValue v => InlineMacro(v, parameters),
+            ForLoop v => InlineMacro(v, parameters),
+            IfContainer v => InlineMacro(v, parameters),
+            AnyAssignment v => InlineMacro(v, parameters),
+            _ => throw new NotImplementedException(),
         };
 
         protected static IfContainer InlineMacro(IfContainer statement, Dictionary<string, StatementWithValue> parameters)
@@ -2284,50 +2263,47 @@ namespace LanguageCore.Compiler
             { Semicolon = statement.Semicolon, };
         }
 
-        protected static BaseBranch InlineMacro(BaseBranch statement, Dictionary<string, StatementWithValue> parameters)
+        protected static BaseBranch InlineMacro(BaseBranch statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
-            return statement switch
-            {
-                IfBranch ifBranch => InlineMacro(ifBranch, parameters),
-                ElseIfBranch elseIfBranch => InlineMacro(elseIfBranch, parameters),
-                ElseBranch elseBranch => InlineMacro(elseBranch, parameters),
-                _ => throw new NotImplementedException()
-            };
-        }
+            IfBranch v => InlineMacro(v, parameters),
+            ElseIfBranch v => InlineMacro(v, parameters),
+            ElseBranch v => InlineMacro(v, parameters),
+            _ => throw new UnreachableException()
+        };
 
         protected static IfBranch InlineMacro(IfBranch statement, Dictionary<string, StatementWithValue> parameters)
-        {
-            return new IfBranch(
-                statement.Keyword,
-                InlineMacro(statement.Condition, parameters),
-                InlineMacro(statement.Block, parameters))
-            { Semicolon = statement.Semicolon };
-        }
+            => new(
+                keyword: statement.Keyword,
+                condition: InlineMacro(statement.Condition, parameters),
+                block: InlineMacro(statement.Block, parameters))
+            {
+                Semicolon = statement.Semicolon,
+            };
 
         protected static ElseIfBranch InlineMacro(ElseIfBranch statement, Dictionary<string, StatementWithValue> parameters)
-        {
-            return new ElseIfBranch(
-                statement.Keyword,
-                InlineMacro(statement.Condition, parameters),
-                InlineMacro(statement.Block, parameters))
-            { Semicolon = statement.Semicolon };
-        }
+            => new(
+                keyword: statement.Keyword,
+                condition: InlineMacro(statement.Condition, parameters),
+                block: InlineMacro(statement.Block, parameters))
+            {
+                Semicolon = statement.Semicolon,
+            };
 
         protected static ElseBranch InlineMacro(ElseBranch statement, Dictionary<string, StatementWithValue> parameters)
-        {
-            return new ElseBranch(
-                statement.Keyword,
-                InlineMacro(statement.Block, parameters))
-            { Semicolon = statement.Semicolon };
-        }
+            => new(
+                keyword: statement.Keyword,
+                block: InlineMacro(statement.Block, parameters))
+            {
+                Semicolon = statement.Semicolon,
+            };
 
         protected static ForLoop InlineMacro(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
             => new(
-                statement.Keyword,
-                InlineMacro(statement.VariableDeclaration, parameters),
-                InlineMacro(statement.Condition, parameters),
-                InlineMacro(statement.Expression, parameters),
-                InlineMacro(statement.Block, parameters)
+                keyword: statement.Keyword,
+                variableDeclaration: InlineMacro(statement.VariableDeclaration, parameters),
+                condition: InlineMacro(statement.Condition, parameters),
+                expression: InlineMacro(statement.Expression, parameters),
+                block: InlineMacro(statement.Block, parameters)
                 )
             {
                 Semicolon = statement.Semicolon,
@@ -2335,32 +2311,62 @@ namespace LanguageCore.Compiler
 
         protected static AnyAssignment InlineMacro(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
-            Assignment assignment => new Assignment(assignment.Operator, InlineMacro(assignment.Left, parameters), InlineMacro(assignment.Right, parameters)),
-            ShortOperatorCall shortOperatorCall => new ShortOperatorCall(shortOperatorCall.Operator, InlineMacro(shortOperatorCall.Left, parameters)),
-            CompoundAssignment compoundAssignment => new CompoundAssignment(compoundAssignment.Operator, InlineMacro(compoundAssignment.Left, parameters), InlineMacro(compoundAssignment.Right, parameters)),
-            _ => throw new NotImplementedException()
+            Assignment v => InlineMacro(v, parameters),
+            ShortOperatorCall v => InlineMacro(v, parameters),
+            CompoundAssignment v => InlineMacro(v, parameters),
+            _ => throw new UnreachableException()
         };
+
+        protected static Assignment InlineMacro(Assignment statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                @operator: statement.Operator,
+                left: InlineMacro(statement.Left, parameters),
+                right: InlineMacro(statement.Right, parameters))
+            {
+                Semicolon = statement.Semicolon,
+            };
+
+        protected static ShortOperatorCall InlineMacro(ShortOperatorCall statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                op: statement.Operator,
+                left: InlineMacro(statement.Left, parameters))
+            {
+                Semicolon = statement.Semicolon,
+            };
+
+        protected static CompoundAssignment InlineMacro(CompoundAssignment statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                @operator: statement.Operator,
+                left: InlineMacro(statement.Left, parameters),
+                right: InlineMacro(statement.Right, parameters))
+            {
+                Semicolon = statement.Semicolon,
+            };
 
         protected static VariableDeclaration InlineMacro(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
             => new(
-                statement.Modifiers,
-                statement.Type,
-                statement.VariableName,
-                InlineMacro(statement.InitialValue, parameters)
+                modifiers: statement.Modifiers,
+                type: statement.Type,
+                variableName: statement.VariableName,
+                initialValue: InlineMacro(statement.InitialValue, parameters)
                 )
             {
                 Semicolon = statement.Semicolon,
             };
 
         protected static Pointer InlineMacro(Pointer statement, Dictionary<string, StatementWithValue> parameters)
-            => new(statement.OperatorToken, InlineMacro(statement.PrevStatement, parameters))
+            => new(
+                operatorToken: statement.OperatorToken,
+                prevStatement: InlineMacro(statement.PrevStatement, parameters))
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
             };
 
         protected static AddressGetter InlineMacro(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
-            => new(statement.OperatorToken, InlineMacro(statement.PrevStatement, parameters))
+            => new(
+                operatorToken: statement.OperatorToken,
+                prevStatement: InlineMacro(statement.PrevStatement, parameters))
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
@@ -2370,11 +2376,14 @@ namespace LanguageCore.Compiler
         {
             if (parameters.TryGetValue(statement.Content, out StatementWithValue? inlinedStatement))
             { return inlinedStatement; }
-            return new Identifier(statement.Token);
+            return statement;
         }
 
         protected static LiteralStatement InlineMacro(LiteralStatement statement, Dictionary<string, StatementWithValue> _)
-            => new(statement.Type, statement.Value, statement.ValueToken)
+            => new(
+                type: statement.Type,
+                value: statement.Value,
+                valueToken: statement.ValueToken)
             {
                 ImaginaryPosition = statement.ImaginaryPosition,
                 SaveValue = statement.SaveValue,
@@ -2383,8 +2392,8 @@ namespace LanguageCore.Compiler
 
         protected static Field InlineMacro(Field statement, Dictionary<string, StatementWithValue> parameters)
             => new(
-                InlineMacro(statement.PrevStatement, parameters),
-                statement.FieldName)
+                prevStatement: InlineMacro(statement.PrevStatement, parameters),
+                fieldName: statement.FieldName)
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
@@ -2392,10 +2401,10 @@ namespace LanguageCore.Compiler
 
         protected static IndexCall InlineMacro(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
             => new(
-                InlineMacro(statement.PrevStatement, parameters),
-                statement.BracketLeft,
-                InlineMacro(statement.Expression, parameters),
-                statement.BracketRight)
+                prevStatement: InlineMacro(statement.PrevStatement, parameters),
+                bracketLeft: statement.BracketLeft,
+                indexStatement: InlineMacro(statement.Expression, parameters),
+                bracketRight: statement.BracketRight)
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
@@ -2403,9 +2412,9 @@ namespace LanguageCore.Compiler
 
         protected static TypeCast InlineMacro(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
             => new(
-                InlineMacro(statement.PrevStatement, parameters),
-                statement.Keyword,
-                statement.Type)
+                prevStatement: InlineMacro(statement.PrevStatement, parameters),
+                keyword: statement.Keyword,
+                type: statement.Type)
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
@@ -2415,8 +2424,8 @@ namespace LanguageCore.Compiler
 
         protected static ModifiedStatement InlineMacro(ModifiedStatement modifiedStatement, Dictionary<string, StatementWithValue> parameters)
             => new(
-                modifiedStatement.Modifier,
-                InlineMacro(modifiedStatement.Statement, parameters))
+                modifier: modifiedStatement.Modifier,
+                statement: InlineMacro(modifiedStatement.Statement, parameters))
             {
                 SaveValue = modifiedStatement.SaveValue,
                 Semicolon = modifiedStatement.Semicolon,
@@ -2428,19 +2437,19 @@ namespace LanguageCore.Compiler
         protected static StatementWithValue? InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
             null => null,
-            Identifier identifier => InlineMacro(identifier, parameters),
-            OperatorCall operatorCall => InlineMacro(operatorCall, parameters),
-            KeywordCall keywordCall => InlineMacro(keywordCall, parameters),
-            FunctionCall functionCall => InlineMacro(functionCall, parameters),
-            AnyCall anyCall => InlineMacro(anyCall, parameters),
-            Pointer pointer => InlineMacro(pointer, parameters),
-            AddressGetter addressGetter => InlineMacro(addressGetter, parameters),
-            LiteralStatement literal => InlineMacro(literal, parameters),
-            Field field => InlineMacro(field, parameters),
-            IndexCall indexCall => InlineMacro(indexCall, parameters),
-            TypeCast typeCast => InlineMacro(typeCast, parameters),
-            ModifiedStatement modifiedStatement => InlineMacro(modifiedStatement, parameters),
-            _ => throw new NotImplementedException()
+            Identifier v => InlineMacro(v, parameters),
+            OperatorCall v => InlineMacro(v, parameters),
+            KeywordCall v => InlineMacro(v, parameters),
+            FunctionCall v => InlineMacro(v, parameters),
+            AnyCall v => InlineMacro(v, parameters),
+            Pointer v => InlineMacro(v, parameters),
+            AddressGetter v => InlineMacro(v, parameters),
+            LiteralStatement v => InlineMacro(v, parameters),
+            Field v => InlineMacro(v, parameters),
+            IndexCall v => InlineMacro(v, parameters),
+            TypeCast v => InlineMacro(v, parameters),
+            ModifiedStatement v => InlineMacro(v, parameters),
+            _ => throw new NotImplementedException(),
         };
 
         #endregion
@@ -2479,7 +2488,7 @@ namespace LanguageCore.Compiler
             };
         }
 
-        protected bool TryCompute(Pointer pointer, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        protected bool TryCompute(Pointer pointer, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             {
                 if (pointer.PrevStatement is OperatorCall _operatorCall &&
@@ -2491,7 +2500,6 @@ namespace LanguageCore.Compiler
                     CompiledType stringType = FindTypeReplacer("string", _literal);
                     _index -= stringType.Size;
                     value = new DataItem(_literal.Value[(int)_index]);
-                    DataItem.TryCast(ref value, expectedType);
                     return true;
                 }
             }
@@ -2506,7 +2514,6 @@ namespace LanguageCore.Compiler
                     CompiledType stringType = FindTypeReplacer("string", _literal);
                     _index -= stringType.Size;
                     value = new DataItem(_literal.Value[(int)_index]);
-                    DataItem.TryCast(ref value, expectedType);
                     return true;
                 }
             }
@@ -2514,7 +2521,7 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(OperatorCall @operator, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        protected bool TryCompute(OperatorCall @operator, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             if (GetOperator(@operator, out _))
             {
@@ -2526,7 +2533,7 @@ namespace LanguageCore.Compiler
                 return false;
             }
 
-            if (!TryCompute(@operator.Left, expectedType, values, out DataItem leftValue))
+            if (!TryCompute(@operator.Left, values, out DataItem leftValue))
             {
                 if (values is not null &&
                     values.TryGetValue(@operator, out value))
@@ -2546,7 +2553,7 @@ namespace LanguageCore.Compiler
 
             if (@operator.Right != null)
             {
-                if (TryCompute(@operator.Right, expectedType, values, out DataItem rightValue))
+                if (TryCompute(@operator.Right, values, out DataItem rightValue))
                 {
                     value = Compute(op, leftValue, rightValue);
                     return true;
@@ -2585,7 +2592,7 @@ namespace LanguageCore.Compiler
             value = leftValue;
             return true;
         }
-        public static bool TryCompute(LiteralStatement literal, RuntimeType? expectedType, out DataItem value)
+        public static bool TryCompute(LiteralStatement literal, out DataItem value)
         {
             switch (literal.Type)
             {
@@ -2611,10 +2618,9 @@ namespace LanguageCore.Compiler
                     value = DataItem.Null;
                     return false;
             }
-            DataItem.TryCast(ref value, expectedType);
             return true;
         }
-        protected bool TryCompute(KeywordCall keywordCall, RuntimeType? expectedType, out DataItem value)
+        protected bool TryCompute(KeywordCall keywordCall, out DataItem value)
         {
             if (keywordCall.FunctionName == "sizeof")
             {
@@ -2628,17 +2634,16 @@ namespace LanguageCore.Compiler
                 CompiledType param0Type = FindStatementType(param0);
 
                 value = new DataItem(param0Type.Size);
-                DataItem.TryCast(ref value, expectedType);
                 return true;
             }
 
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(AnyCall anyCall, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        protected bool TryCompute(AnyCall anyCall, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
-            { return TryCompute(functionCall, expectedType, values, out value); }
+            { return TryCompute(functionCall, values, out value); }
 
             if (values is not null &&
                 values.TryGetValue(anyCall, out value))
@@ -2647,7 +2652,7 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(FunctionCall functionCall, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        protected bool TryCompute(FunctionCall functionCall, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             if (functionCall.FunctionName == "sizeof")
             {
@@ -2661,7 +2666,6 @@ namespace LanguageCore.Compiler
                 CompiledType param0Type = FindStatementType(param0);
 
                 value = new DataItem(param0Type.Size);
-                DataItem.TryCast(ref value, expectedType);
                 return true;
             }
 
@@ -2670,7 +2674,7 @@ namespace LanguageCore.Compiler
                 Statement inlined = InlineMacro(macro, functionCall.Parameters);
 
                 if (inlined is StatementWithValue statementWithValue)
-                { return TryCompute(statementWithValue, expectedType, values, out value); }
+                { return TryCompute(statementWithValue, values, out value); }
             }
 
             if (values is not null &&
@@ -2680,12 +2684,11 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(Identifier identifier, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        protected bool TryCompute(Identifier identifier, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
             if (GetConstant(identifier.Content, out DataItem constantValue))
             {
                 value = constantValue;
-                DataItem.TryCast(ref value, expectedType);
                 return true;
             }
 
@@ -2696,20 +2699,13 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(Field field, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        protected bool TryCompute(Field field, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
-            if (field.PrevStatement is LiteralStatement _literal &&
-                _literal.Type == LiteralType.String)
-            {
-
-            }
-
             CompiledType prevType = FindStatementType(field.PrevStatement);
 
             if (prevType.IsStackArray && field.FieldName.Equals("Length"))
             {
                 value = new DataItem(prevType.StackArraySize);
-                DataItem.TryCast(ref value, expectedType);
                 return true;
             }
 
@@ -2720,9 +2716,9 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(TypeCast typeCast, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        protected bool TryCompute(TypeCast typeCast, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
-            if (TryCompute(typeCast.PrevStatement, null, values, out value))
+            if (TryCompute(typeCast.PrevStatement, values, out value))
             {
                 CompiledType type = new(typeCast.Type, FindType, TryCompute);
                 if (!type.IsBuiltin) return false;
@@ -2733,55 +2729,55 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-
-        protected bool TryCompute(StatementWithValue? statement, RuntimeType? expectedType, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        protected bool TryCompute(IndexCall indexCall, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
         {
-            if (statement is null)
+            if (indexCall.PrevStatement is LiteralStatement literal &&
+                literal.Type == LiteralType.String &&
+                TryCompute(indexCall.Expression, values, out DataItem index))
             {
-                value = DataItem.Null;
-                return false;
+                if (index == literal.Value.Length)
+                { value = new DataItem('\0'); }
+                else
+                { value = new DataItem(literal.Value[(int)index]); }
+                return true;
             }
+
+            value = DataItem.Null;
+            return false;
+        }
+
+        protected bool TryCompute(StatementWithValue? statement, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        {
+            value = DataItem.Null;
+
+            if (statement is null)
+            { return false; }
 
             if (values is not null &&
                 values.TryGetValue(statement, out value))
             { return true; }
 
-            if (statement is LiteralStatement literal)
-            { return TryCompute(literal, expectedType, out value); }
-
-            if (statement is OperatorCall @operator)
-            { return TryCompute(@operator, expectedType, values, out value); }
-
-            if (statement is Pointer pointer)
-            { return TryCompute(pointer, expectedType, values, out value); }
-
-            if (statement is KeywordCall keywordCall)
-            { return TryCompute(keywordCall, expectedType, out value); }
-
-            if (statement is FunctionCall functionCall)
-            { return TryCompute(functionCall, expectedType, values, out value); }
-
-            if (statement is AnyCall anyCall)
-            { return TryCompute(anyCall, expectedType, values, out value); }
-
-            if (statement is Identifier identifier)
-            { return TryCompute(identifier, expectedType, values, out value); }
-
-            if (statement is TypeCast typeCast)
-            { return TryCompute(typeCast, expectedType, values, out value); }
-
-            if (statement is Field field)
-            { return TryCompute(field, expectedType, values, out value); }
-
-            value = DataItem.Null;
-            return false;
+            return statement switch
+            {
+                LiteralStatement v => TryCompute(v, out value),
+                OperatorCall v => TryCompute(v, values, out value),
+                Pointer v => TryCompute(v, values, out value),
+                KeywordCall v => TryCompute(v, out value),
+                FunctionCall v => TryCompute(v, values, out value),
+                AnyCall v => TryCompute(v, values, out value),
+                Identifier v => TryCompute(v, values, out value),
+                TypeCast v => TryCompute(v, values, out value),
+                Field v => TryCompute(v, values, out value),
+                IndexCall v => TryCompute(v, values, out value),
+                _ => false,
+            };
         }
-        protected bool TryCompute(StatementWithValue? statement, RuntimeType? expectedType, out DataItem value)
-            => TryCompute(statement, expectedType, null, out value);
+        protected bool TryCompute(StatementWithValue? statement, out DataItem value)
+            => TryCompute(statement, null, out value);
 
-        public static bool TryComputeSimple(OperatorCall @operator, RuntimeType? expectedType, out DataItem value)
+        public static bool TryComputeSimple(OperatorCall @operator, out DataItem value)
         {
-            if (!TryComputeSimple(@operator.Left, expectedType, out DataItem leftValue))
+            if (!TryComputeSimple(@operator.Left, out DataItem leftValue))
             {
                 value = DataItem.Null;
                 return false;
@@ -2797,7 +2793,7 @@ namespace LanguageCore.Compiler
 
             if (@operator.Right != null)
             {
-                if (TryComputeSimple(@operator.Right, expectedType, out DataItem rightValue))
+                if (TryComputeSimple(@operator.Right, out DataItem rightValue))
                 {
                     value = Compute(op, leftValue, rightValue);
                     return true;
@@ -2807,7 +2803,7 @@ namespace LanguageCore.Compiler
                 {
                     case "&&":
                     {
-                        if (!(bool)leftValue)
+                        if (!leftValue)
                         {
                             value = new DataItem(false);
                             return true;
@@ -2816,7 +2812,7 @@ namespace LanguageCore.Compiler
                     }
                     case "||":
                     {
-                        if ((bool)leftValue)
+                        if (leftValue)
                         {
                             value = new DataItem(true);
                             return true;
@@ -2832,71 +2828,93 @@ namespace LanguageCore.Compiler
             value = leftValue;
             return true;
         }
-        public static bool TryComputeSimple(StatementWithValue? statement, RuntimeType? expectedType, out DataItem value)
+        public static bool TryComputeSimple(IndexCall indexCall, out DataItem value)
         {
-            if (statement is null)
+            if (indexCall.PrevStatement is LiteralStatement literal &&
+                literal.Type == LiteralType.String &&
+                TryComputeSimple(indexCall.Expression, out DataItem index))
             {
-                value = DataItem.Null;
-                return false;
+                if (index == literal.Value.Length)
+                { value = new DataItem('\0'); }
+                else
+                { value = new DataItem(literal.Value[(int)index]); }
+                return true;
             }
-
-            if (statement is LiteralStatement literal)
-            { return TryCompute(literal, expectedType, out value); }
-
-            if (statement is OperatorCall @operator)
-            { return TryComputeSimple(@operator, expectedType, out value); }
 
             value = DataItem.Null;
             return false;
+        }
+        public static bool TryComputeSimple(StatementWithValue? statement, out DataItem value)
+        {
+            value = DataItem.Null;
+            return statement switch
+            {
+                LiteralStatement v => TryCompute(v, out value),
+                OperatorCall v => TryComputeSimple(v, out value),
+                IndexCall v => TryComputeSimple(v, out value),
+                _ => false
+            };
         }
         #endregion
 
         #region Collapse()
 
-        protected Statement Collapse(Statement statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+        [return: NotNullIfNotNull(nameof(statement))]
+        protected Statement? Collapse(Statement? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
-            VariableDeclaration newVariable => Collapse(newVariable, parameters),
-            Block block => Collapse(block, parameters),
-            AnyAssignment setter => Collapse(setter.ToAssignment(), parameters),
-            WhileLoop whileLoop => Collapse(whileLoop, parameters),
-            ForLoop forLoop => Collapse(forLoop, parameters),
-            IfContainer @if => Collapse(@if, parameters),
-            StatementWithValue statementWithValue => Collapse(statementWithValue, parameters),
+            null => null,
+            VariableDeclaration v => Collapse(v, parameters),
+            Block v => Collapse(v, parameters),
+            AnyAssignment v => Collapse(v.ToAssignment(), parameters),
+            WhileLoop v => Collapse(v, parameters),
+            ForLoop v => Collapse(v, parameters),
+            IfContainer v => Collapse(v, parameters),
+            StatementWithValue v => Collapse(v, parameters),
             _ => throw new InternalException($"Statement \"{statement.GetType().Name}\" isn't collapsible")
         };
+
+        protected IEnumerable<Statement> Collapse(IEnumerable<Statement>? statements, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statements is null) yield break;
+            foreach (Statement statement in statements)
+            { yield return Collapse(statement, parameters); }
+        }
 
         [return: NotNullIfNotNull(nameof(statement))]
         protected StatementWithValue? Collapse(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
             null => null,
-            FunctionCall functionCall => Collapse(functionCall, parameters),
-            KeywordCall keywordCall => Collapse(keywordCall, parameters),
-            OperatorCall @operator => Collapse(@operator, parameters),
-            LiteralStatement literal => literal,
-            Identifier variable => Collapse(variable, parameters),
-            AddressGetter memoryAddressGetter => Collapse(memoryAddressGetter, parameters),
-            Pointer memoryAddressFinder => Collapse(memoryAddressFinder, parameters),
-            NewInstance newStruct => Collapse(newStruct, parameters),
-            ConstructorCall constructorCall => Collapse(constructorCall, parameters),
-            IndexCall indexStatement => Collapse(indexStatement, parameters),
-            Field field => Collapse(field, parameters),
-            TypeCast @as => Collapse(@as, parameters),
-            ModifiedStatement modifiedStatement => Collapse(modifiedStatement, parameters),
-            AnyCall anyCall => Collapse(anyCall, parameters),
+            FunctionCall v => Collapse(v, parameters),
+            KeywordCall v => Collapse(v, parameters),
+            OperatorCall v => Collapse(v, parameters),
+            LiteralStatement v => v,
+            Identifier v => Collapse(v, parameters),
+            AddressGetter v => Collapse(v, parameters),
+            Pointer v => Collapse(v, parameters),
+            NewInstance v => Collapse(v, parameters),
+            ConstructorCall v => Collapse(v, parameters),
+            IndexCall v => Collapse(v, parameters),
+            Field v => Collapse(v, parameters),
+            TypeCast v => Collapse(v, parameters),
+            ModifiedStatement v => Collapse(v, parameters),
+            AnyCall v => Collapse(v, parameters),
             _ => throw new InternalException($"Statement \"{statement.GetType().Name}\" isn't collapsible")
         };
 
+        protected IEnumerable<StatementWithValue> Collapse(IEnumerable<StatementWithValue>? statements, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statements is null) yield break;
+            foreach (StatementWithValue statement in statements)
+            { yield return Collapse(statement, parameters); }
+        }
+
         protected Statement Collapse(Block block, Dictionary<string, StatementWithValue> parameters)
         {
-            if (block.Statements.Length == 1)
+            if (block.Statements.Length == 1 &&
+                block.Statements[0] is not VariableDeclaration)
             { return Collapse(block.Statements[0], parameters); }
 
-            List<Statement> newStatements = new();
-
-            foreach (Statement statement in block.Statements)
-            { newStatements.Add(Collapse(statement, parameters)); }
-
-            return new Block(block.BracketStart, newStatements, block.BracketEnd)
+            return new Block(block.BracketStart, Collapse(block.Statements, parameters), block.BracketEnd)
             {
                 Semicolon = block.Semicolon,
             };
@@ -2928,21 +2946,17 @@ namespace LanguageCore.Compiler
             return statement;
         }
         protected KeywordCall Collapse(KeywordCall statement, Dictionary<string, StatementWithValue> parameters)
-        {
-            List<StatementWithValue> newParameters = new();
-            foreach (StatementWithValue parameter in statement.Parameters)
-            { newParameters.Add(Collapse(parameter, parameters)); }
-
-            return new KeywordCall(statement.Identifier, newParameters)
+            => new(
+                identifier: statement.Identifier,
+                parameters: Collapse(statement.Parameters, parameters))
             {
                 Semicolon = statement.Semicolon,
                 SaveValue = statement.SaveValue,
             };
-        }
         protected OperatorCall Collapse(OperatorCall statement, Dictionary<string, StatementWithValue> parameters)
         {
             StatementWithValue left = Collapse(statement.Left, parameters);
-            StatementWithValue? right = statement.Right is not null ? Collapse(statement.Right, parameters) : null;
+            StatementWithValue? right = Collapse(statement.Right, parameters);
             return new OperatorCall(statement.Operator, left, right)
             {
                 Semicolon = statement.Semicolon,
@@ -2981,16 +2995,13 @@ namespace LanguageCore.Compiler
         }
         protected AnyAssignment Collapse(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters)
         {
-            if (statement is Assignment assignment)
-            { return Collapse(assignment, parameters); }
-
-            if (statement is CompoundAssignment compoundAssignment)
-            { return Collapse(compoundAssignment, parameters); }
-
-            if (statement is ShortOperatorCall shortOperatorCall)
-            { return Collapse(shortOperatorCall, parameters); }
-
-            throw new NotImplementedException();
+            return statement switch
+            {
+                Assignment v => Collapse(v, parameters),
+                CompoundAssignment v => Collapse(v, parameters),
+                ShortOperatorCall v => Collapse(v, parameters),
+                _ => throw new NotImplementedException()
+            };
         }
         protected static StatementWithValue Collapse(Identifier statement, Dictionary<string, StatementWithValue> parameters)
         {
@@ -3007,21 +3018,21 @@ namespace LanguageCore.Compiler
             };
         }
         protected Pointer Collapse(Pointer statement, Dictionary<string, StatementWithValue> parameters)
-        {
-            return new Pointer(statement.OperatorToken, Collapse(statement.PrevStatement, parameters))
+            => new(
+                operatorToken: statement.OperatorToken,
+                prevStatement: Collapse(statement.PrevStatement, parameters))
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
             };
-        }
         protected WhileLoop Collapse(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
-        {
-            return new WhileLoop(
-                 statement.Keyword,
-                 Collapse(statement.Condition, parameters),
-                 Block.CreateIfNotBlock(Collapse(statement.Block, parameters)))
-            { Semicolon = statement.Semicolon };
-        }
+            => new(
+                 keyword: statement.Keyword,
+                 condition: Collapse(statement.Condition, parameters),
+                 block: Block.CreateIfNotBlock(Collapse(statement.Block, parameters)))
+            {
+                Semicolon = statement.Semicolon
+            };
         protected Statement Collapse(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
         {
             ForLoop result = new(
@@ -3032,8 +3043,8 @@ namespace LanguageCore.Compiler
                 statement.Block)
             { Semicolon = statement.Semicolon };
 
-            if (TryComputeSimple(statement.Condition, null, out DataItem condition) &&
-                !condition.ToBoolean(null))
+            if (TryComputeSimple(statement.Condition, out DataItem condition) &&
+                !condition)
             { return result.VariableDeclaration; }
 
             return result;
@@ -3050,7 +3061,7 @@ namespace LanguageCore.Compiler
                     condition = Collapse(condition, parameters);
                     if (TryCompute(condition, null, out DataItem conditionValue))
                     {
-                        if ((bool)conditionValue)
+                        if (conditionValue)
                         {
                             Statement result = ifBranch.Block;
                             result = Collapse(result, parameters);
@@ -3071,7 +3082,7 @@ namespace LanguageCore.Compiler
                     condition = Collapse(condition, parameters);
                     if (prevIsCollapsed && TryCompute(condition, null, out DataItem conditionValue))
                     {
-                        if ((bool)conditionValue)
+                        if (conditionValue)
                         {
                             Statement result = elseIfBranch.Block;
                             result = Collapse(result, parameters);
@@ -3108,60 +3119,79 @@ namespace LanguageCore.Compiler
             return new IfContainer(branches) { Semicolon = statement.Semicolon };
         }
         protected static NewInstance Collapse(NewInstance statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
-        protected static ConstructorCall Collapse(ConstructorCall statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
-        protected static IndexCall Collapse(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
-        protected Field Collapse(Field statement, Dictionary<string, StatementWithValue> parameters)
         {
-            return new Field(Collapse(statement.PrevStatement, parameters), statement.FieldName)
+            return statement;
+        }
+        protected ConstructorCall Collapse(ConstructorCall statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                keyword: statement.Keyword,
+                typeName: statement.TypeName,
+                bracketLeft: statement.BracketLeft,
+                parameters: Collapse(statement.Parameters, parameters),
+                bracketRight: statement.BracketRight)
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
             };
-        }
+        protected IndexCall Collapse(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                prevStatement: Collapse(statement.PrevStatement, parameters),
+                bracketLeft: statement.BracketLeft,
+                indexStatement: Collapse(statement.Expression, parameters),
+                bracketRight: statement.BracketRight)
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
+        protected Field Collapse(Field statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                prevStatement: Collapse(statement.PrevStatement, parameters),
+                fieldName: statement.FieldName)
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
         protected StatementWithValue Collapse(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
         {
-            StatementWithValue prevStatement = statement.PrevStatement;
-            prevStatement = Collapse(prevStatement, parameters);
+            StatementWithValue prevStatement = Collapse(statement.PrevStatement, parameters);
             CompiledType prevType = FindStatementType(prevStatement);
             CompiledType targetType = new(statement.Type, FindType, TryCompute);
             if (targetType.Equals(prevType))
+            { return prevStatement; }
+
+            return new TypeCast(
+                prevStatement: prevStatement,
+                keyword: statement.Keyword,
+                type: statement.Type)
             {
-                return prevStatement;
-            }
-            else
-            {
-                return new TypeCast(
-                    prevStatement,
-                    statement.Keyword,
-                    statement.Type)
-                {
-                    CompiledType = statement.CompiledType,
-                    Semicolon = statement.Semicolon,
-                    SaveValue = statement.SaveValue,
-                };
-            }
+                CompiledType = statement.CompiledType,
+                Semicolon = statement.Semicolon,
+                SaveValue = statement.SaveValue,
+            };
         }
         protected ModifiedStatement Collapse(ModifiedStatement statement, Dictionary<string, StatementWithValue> parameters)
-        {
-            return new ModifiedStatement(
-                statement.Modifier,
-                Collapse(statement.Statement, parameters))
+            => new(
+                modifier: statement.Modifier,
+                statement: Collapse(statement.Statement, parameters))
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
-
                 CompiledType = statement.CompiledType,
             };
-        }
         protected StatementWithValue Collapse(AnyCall statement, Dictionary<string, StatementWithValue> parameters)
         {
             if (statement.ToFunctionCall(out FunctionCall? functionCall))
             { return Collapse(functionCall, parameters); }
 
-            throw new NotImplementedException();
+            return new AnyCall(
+                prevStatement: Collapse(statement.PrevStatement, parameters),
+                bracketLeft: statement.BracketLeft,
+                parameters: Collapse(statement.Parameters, parameters),
+                bracketRight: statement.BracketRight)
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
         }
 
         #endregion
@@ -3184,9 +3214,15 @@ namespace LanguageCore.Compiler
             condition = InlineMacro(condition, _params);
             StatementWithValue iteratorExpressionRight = InlineMacro(iteratorExpression.Right, _params);
 
-            return
-                TryCompute(condition, null, null, out _) &&
-                TryCompute(iteratorExpressionRight, null, null, out _);
+            if (!TryCompute(condition, null, out _) ||
+                !TryCompute(iteratorExpressionRight, null, out _))
+            { return false; }
+
+            // TODO: return and break in unrolled loop
+            if (loop.Block.TryGetStatement<KeywordCall>(out _, (statement) => statement.Identifier.Content is "break" or "return"))
+            { return false; }
+
+            return true;
         }
 
         protected Block[] Unroll(ForLoop loop, Dictionary<StatementWithValue, DataItem> values)
@@ -3219,7 +3255,7 @@ namespace LanguageCore.Compiler
                     {_yeah.Key, _yeah.Value }
                 });
 
-                if (!TryCompute(_condition, null, values, out DataItem result))
+                if (!TryCompute(_condition, values, out DataItem result))
                 { throw new CompilerException($"Failed to compute the condition value (\"{_condition}\") for loop unrolling", condition, CurrentFile); }
 
                 return result;
@@ -3238,7 +3274,7 @@ namespace LanguageCore.Compiler
                     { _yeah.Key, _yeah.Value }
                 });
 
-                if (!TryCompute(_value, null, values, out DataItem result))
+                if (!TryCompute(_value, values, out DataItem result))
                 { throw new CompilerException($"Failed to compute the condition value (\"{_value}\") for loop unrolling", condition, CurrentFile); }
 
                 return result;

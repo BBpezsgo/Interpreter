@@ -50,7 +50,7 @@ namespace LanguageCore.Compiler
             this.Context = null;
         }
 
-        public void AddReference(OperatorCall referencedBy, string? file) => references.Add(new Reference<OperatorCall>(referencedBy, file));
+        public void AddReference(OperatorCall referencedBy, Uri? file) => references.Add(new Reference<OperatorCall>(referencedBy, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledOperator other)

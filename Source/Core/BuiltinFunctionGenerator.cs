@@ -59,7 +59,7 @@ namespace LanguageCore.Runtime
             for (int i = 0; i < ParameterTypes.Length; i++)
             {
                 if (i > 0) result.Append(", ");
-                result.Append(ParameterTypes[i].ToString().ToLowerInvariant());
+                result.Append(ParameterTypes[i]);
             }
             result.Append(')');
             return result.ToString();
@@ -419,7 +419,7 @@ namespace LanguageCore.Runtime
             {
                 if (values[i].Type != types[i])
                 {
-                    throw new RuntimeException($"Invalid parameter type {values[i].Type.ToString().ToLowerInvariant()}: expected {types[i].ToString().ToLowerInvariant()}");
+                    throw new RuntimeException($"Invalid parameter type {values[i].Type}: expected {types[i]}");
                 }
             }
         }
@@ -432,7 +432,7 @@ namespace LanguageCore.Runtime
             {
                 if (values[i].Type.Convert() != types[i])
                 {
-                    throw new RuntimeException($"Invalid parameter type {values[i].Type.ToString().ToLowerInvariant()}: expected {types[i].ToString().ToLowerInvariant()}");
+                    throw new RuntimeException($"Invalid parameter type {values[i].Type}: expected {types[i]}");
                 }
             }
         }

@@ -84,10 +84,10 @@ namespace LanguageCore.Compiler
             this.references = new List<Reference<Statement>>();
         }
 
-        public void AddReference(FunctionCall referencedBy, string? file) => references.Add(new Reference<Statement>(referencedBy, file));
-        public void AddReference(Identifier referencedBy, string? file) => references.Add(new Reference<Statement>(referencedBy, file));
-        public void AddReference(KeywordCall referencedBy, string? file) => references.Add(new Reference<Statement>(referencedBy, file));
-        public void AddReference(IndexCall referencedBy, string? file) => references.Add(new Reference<Statement>(referencedBy, file));
+        public void AddReference(FunctionCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
+        public void AddReference(Identifier referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
+        public void AddReference(KeywordCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
+        public void AddReference(IndexCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledFunction other)

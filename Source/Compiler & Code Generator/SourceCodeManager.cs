@@ -1,9 +1,13 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
 
 namespace LanguageCore.Compiler
 {
-    using System.Linq;
+    using System.Diagnostics.CodeAnalysis;
     using Parser;
     using Tokenizing;
 
@@ -11,13 +15,13 @@ namespace LanguageCore.Compiler
     {
         public readonly ParserResult ParserResult;
         public readonly string Path;
-        public readonly UsingDefinition UsingDefinition;
+        public readonly UsingDefinition Using;
 
-        public CollectedAST(ParserResult parserResult, string path, UsingDefinition usingDefinition)
+        public CollectedAST(ParserResult parserResult, string path, UsingDefinition @using)
         {
             ParserResult = parserResult;
             Path = path;
-            UsingDefinition = usingDefinition;
+            Using = @using;
         }
     }
 
@@ -25,178 +29,232 @@ namespace LanguageCore.Compiler
     {
         public readonly CollectedAST[] CollectedASTs;
 
-        public CollectorResult(IEnumerable<CollectedAST> collectedASTs)
+        public CollectorResult(
+            IEnumerable<CollectedAST> collectedASTs)
         {
             CollectedASTs = collectedASTs.ToArray();
         }
 
-        public static CollectorResult Empty => new([]);
+        public static CollectorResult Empty => new(
+            Enumerable.Empty<CollectedAST>());
     }
 
     public class SourceCodeManager
     {
-        readonly List<string> AlreadyCompiledCodes;
+        readonly List<Uri> AlreadyLoadedCodes;
         readonly AnalysisCollection? AnalysisCollection;
         readonly PrintCallback? Print;
 
         public SourceCodeManager(AnalysisCollection? analysisCollection, PrintCallback? printCallback)
         {
-            AlreadyCompiledCodes = new List<string>();
+            AlreadyLoadedCodes = new List<Uri>();
             AnalysisCollection = analysisCollection;
             Print = printCallback;
         }
 
-        (string? Text, string? Path) LoadSourceCode(
-            UsingDefinition @using,
-            FileInfo? file,
-            string? basePath)
+        bool IsAlreadyLoaded(Uri uri)
         {
-            if (@using.IsUrl)
+            foreach (Uri item in AlreadyLoadedCodes)
             {
-                if (!System.Uri.TryCreate(@using.Path[0].Content, System.UriKind.Absolute, out System.Uri? uri))
-                { throw new SyntaxException($"Invalid uri \"{@using.Path[0].Content}\"", @using.Path[0], file?.FullName); }
+                if (uri.Equals(item))
+                { return true; }
+            }
+            return false;
+        }
 
-                string path = uri.ToString();
+        static JsonDocument? LoadConfigFile(string? directoryPath)
+        {
+            if (string.IsNullOrEmpty(directoryPath))
+            { return null; }
 
-                @using.CompiledUri = path;
+            if (!Directory.Exists(directoryPath))
+            { return null; }
 
-                if (AlreadyCompiledCodes.Contains(path))
-                {
-                    Print?.Invoke($" Skip file \"{path}\" ...", LogType.Debug);
-                    return (null, path);
-                }
-                AlreadyCompiledCodes.Add(path);
+            string[]? configFiles = Directory.GetFiles(directoryPath, "config.json", SearchOption.TopDirectoryOnly);
 
-                Print?.Invoke($" Download file \"{path}\" ...", LogType.Debug);
-                System.DateTime started = System.DateTime.Now;
-                using System.Net.Http.HttpClient httpClient = new();
-                System.Threading.Tasks.Task<string> req;
-                try
-                {
-                    req = httpClient.GetStringAsync(uri);
-                }
-                catch (System.Net.Http.HttpRequestException ex)
-                {
-                    throw new LanguageException($"HTTP GET Error", ex);
-                }
-                req.Wait();
-                @using.DownloadTime = (System.DateTime.Now - started).TotalMilliseconds;
+            if (configFiles is null || configFiles.Length != 1)
+            { return null; }
 
-                Print?.Invoke($" File \"{path}\" downloaded", LogType.Debug);
+            return JsonDocument.Parse(File.ReadAllText(configFiles[0]));
+        }
 
-                return (req.Result, path);
+        bool FromWeb(Uri uri, out ParserResult ast)
+        {
+            Print?.Invoke($" Download file \"{uri}\" ...", LogType.Debug);
+
+            using HttpClient client = new();
+            using HttpResponseMessage res = client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead).Result;
+            res.EnsureSuccessStatusCode();
+
+            TokenizerResult tokens;
+            if (res.Content.Headers.ContentLength.HasValue)
+            {
+                using ConsoleProgressBar progress = new(ConsoleColor.DarkGray, true);
+                tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), progress, (int)res.Content.Headers.ContentLength.Value);
             }
             else
             {
-                if (string.IsNullOrEmpty(basePath))
-                {
-                    FileInfo[]? configFiles = file?.Directory?.GetFiles("config.json");
-                    if (configFiles != null && configFiles.Length == 1)
-                    {
-                        System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(configFiles[0].FullName));
-                        if (document.RootElement.TryGetProperty("base", out System.Text.Json.JsonElement v))
-                        {
-                            string? b = v.GetString();
-                            if (b != null) basePath = b;
-                        }
-                    }
-                }
-
-                string filename = @using.PathString;
-                if (!filename.EndsWith(".bbc", System.StringComparison.Ordinal)) filename += ".bbc";
-
-                List<string> searchForThese = new();
-
-                if (file != null)
-                {
-                    if (basePath != null)
-                    { searchForThese.Add(Path.Combine(Path.GetFullPath(basePath, file.Directory!.FullName), filename)); }
-
-                    searchForThese.Add(Path.GetFullPath(filename, file.Directory!.FullName));
-                }
-                else
-                {
-                    if (basePath != null)
-                    { searchForThese.Add(Path.Combine(Path.GetFullPath(basePath, System.Environment.CurrentDirectory), filename)); }
-
-                    searchForThese.Add(Path.GetFullPath(filename, System.Environment.CurrentDirectory));
-                }
-
-                string? path = null;
-
-                for (int i = 0; i < searchForThese.Count; i++)
-                {
-                    if (File.Exists(searchForThese[i]))
-                    {
-                        path = searchForThese[i];
-                        break;
-                    }
-                }
-
-                if (path == null)
-                {
-                    AnalysisCollection?.Errors.Add(new Error($"File \"{@using.PathString}\" not found", new Position(@using.Path), file?.FullName));
-                    return (null, path);
-                }
-
-                @using.CompiledUri = path;
-
-                if (AlreadyCompiledCodes.Contains(path))
-                {
-                    Print?.Invoke($" Skip file \"{path}\" ...", LogType.Debug);
-                    return (null, path);
-                }
-                AlreadyCompiledCodes.Add(path);
-
-                return (File.ReadAllText(path), path);
+                tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream());
             }
+
+            AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
+
+            ast = Parser.Parse(tokens);
+            AnalysisCollection?.Errors.AddRange(ast.Errors);
+
+            return true;
+        }
+
+        bool FromFile(string path, out ParserResult ast)
+        {
+            ast = default;
+
+            if (!File.Exists(path))
+            { return false; }
+
+            Print?.Invoke($" Load local file \"{path}\" ...", LogType.Debug);
+
+            TokenizerResult tokens = StreamTokenizer.Tokenize(path);
+            AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
+
+            ast = Parser.Parse(tokens);
+            AnalysisCollection?.Errors.AddRange(ast.Errors);
+
+            return true;
+        }
+
+        bool FromAnywhere(UsingDefinition @using, Uri uri, out ParserResult? ast)
+        {
+            if (uri.IsFile)
+            { @using.CompiledUri = uri.LocalPath; }
+            else
+            { @using.CompiledUri = uri.ToString(); }
+            ast = null;
+
+            if (IsAlreadyLoaded(uri))
+            { return true; }
+
+            bool success;
+
+            if (uri.IsFile)
+            {
+                string filePath = uri.LocalPath;
+                success = FromFile(filePath, out ParserResult _ast);
+                if (success)
+                {
+                    _ast.SetFile(uri);
+                    ast = _ast;
+                }
+            }
+            else
+            {
+                success = FromWeb(uri, out ParserResult _ast);
+                if (success)
+                {
+                    _ast.SetFile(uri);
+                    ast = _ast;
+                }
+            }
+
+            if (success)
+            {
+                AlreadyLoadedCodes.Add(uri);
+            }
+
+            return success;
+        }
+
+        static IEnumerable<Uri> GetSearches(UsingDefinition @using, Uri? parent, string? basePath)
+        {
+            if (parent is not null &&
+                parent.IsFile)
+            {
+                FileInfo file = new(parent.LocalPath);
+                JsonDocument? config = LoadConfigFile(file.Directory?.FullName);
+                if (config != null &&
+                    config.RootElement.TryGetProperty("base", out JsonElement v))
+                {
+                    string? b = v.GetString();
+                    if (b != null) basePath = b;
+                }
+            }
+
+            string filename = @using.PathString;
+            if (!filename.EndsWith(".bbc", StringComparison.Ordinal)) filename += ".bbc";
+
+            if (Uri.TryCreate(parent, filename, out Uri? uri))
+            { yield return uri; }
+
+            if (parent is not null &&
+                basePath is not null &&
+                Uri.TryCreate(new Uri(parent, basePath), filename, out uri))
+            { yield return uri; }
+
+            if (parent is not null &&
+                !parent.IsFile)
+            { yield break; }
+
+            if (parent != null)
+            {
+                FileInfo file = new(parent.LocalPath);
+
+                if (basePath != null)
+                { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, file.Directory!.FullName), filename), UriKind.Absolute); }
+
+                yield return new Uri(Path.GetFullPath(filename, file.Directory!.FullName), UriKind.Absolute);
+            }
+            else
+            {
+                if (basePath != null)
+                { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, Environment.CurrentDirectory), filename), UriKind.Absolute); }
+
+                yield return new Uri(Path.GetFullPath(filename, Environment.CurrentDirectory), UriKind.Absolute);
+            }
+        }
+
+        bool ProcessFiles(UsingDefinition @using, IEnumerable<Uri> searchForThese, out ParserResult? ast, [NotNullWhen(true)] out Uri? uri)
+        {
+            foreach (Uri item in searchForThese)
+            {
+                if (FromAnywhere(@using, item, out ast))
+                {
+                    uri = item;
+                    return true;
+                }
+            }
+
+            ast = default;
+            uri = default;
+            return false;
         }
 
         CollectedAST[] ProcessFile(
             UsingDefinition @using,
-            FileInfo? file,
+            Uri? parent,
             string? basePath)
         {
-            (string? content, string? path) = LoadSourceCode(@using, file, basePath);
+            if (!ProcessFiles(@using, GetSearches(@using, parent, basePath), out ParserResult? ast, out Uri? path))
+            {
+                AnalysisCollection?.Errors.Add(new Error($"File \"{@using.PathString}\" not found", new Position(@using.Path), parent));
+                return Array.Empty<CollectedAST>();
+            }
 
-            if (content == null) return System.Array.Empty<CollectedAST>();
-            if (path == null) throw new InternalException($"Collected source code file does not have a path (wtf?)");
+            if (!ast.HasValue)
+            { return Array.Empty<CollectedAST>(); }
 
             List<CollectedAST> collectedASTs = new();
 
-            Print?.Invoke($" Parse file \"{path}\" ...", LogType.Debug);
-            ParserResult parserResult2;
-            {
+            collectedASTs.Add(new CollectedAST(ast.Value, path.ToString(), @using));
 
-                TokenizerResult tokenizerResult = StringTokenizer.Tokenize(content);
-                AnalysisCollection?.Warnings.AddRange(tokenizerResult.Warnings);
-
-                System.DateTime parseStarted = System.DateTime.Now;
-                Print?.Invoke("  Parsing ...", LogType.Debug);
-
-                parserResult2 = Parser.Parse(tokenizerResult.Tokens);
-
-                if (parserResult2.Errors.Length > 0)
-                { throw parserResult2.Errors[0].ToException(); }
-
-                Print?.Invoke($"  Parsed in {(System.DateTime.Now - parseStarted).TotalMilliseconds} ms", LogType.Debug);
-            }
-
-            parserResult2.SetFile(path);
-
-            collectedASTs.Add(new CollectedAST(parserResult2, path, @using));
-
-            foreach (UsingDefinition using_ in parserResult2.Usings)
-            {
-                collectedASTs.AddRange(ProcessFile(using_, file, basePath));
-            }
+            foreach (UsingDefinition using_ in ast.Value.Usings)
+            { collectedASTs.AddRange(ProcessFile(using_, path, null)); }
 
             return collectedASTs.ToArray();
         }
 
         CollectorResult Entry(
             UsingDefinition[] usings,
-            FileInfo? file,
+            Uri? file,
             string? basePath)
         {
             if (usings.Length > 0)
@@ -205,11 +263,23 @@ namespace LanguageCore.Compiler
             List<CollectedAST> collectedASTs = new();
 
             foreach (UsingDefinition usingItem in usings)
-            {
-                collectedASTs.AddRange(ProcessFile(usingItem, file, basePath));
-            }
+            { collectedASTs.AddRange(ProcessFile(usingItem, file, basePath)); }
+
+            AnalysisCollection?.Throw();
 
             return new CollectorResult(collectedASTs);
+        }
+
+        public static CollectorResult Collect(
+            UsingDefinition[] usings,
+            Uri? file,
+            PrintCallback? printCallback = null,
+            string? basePath = null,
+            AnalysisCollection? analysisCollection = null)
+        {
+            SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback);
+            if (file != null) sourceCodeManager.AlreadyLoadedCodes.Add(file);
+            return sourceCodeManager.Entry(usings, file, basePath);
         }
 
         public static CollectorResult Collect(
@@ -219,12 +289,10 @@ namespace LanguageCore.Compiler
             string? basePath = null,
             AnalysisCollection? analysisCollection = null)
         {
+            Uri? fileUri = file is null ? null : new Uri(file.FullName, UriKind.Absolute);
             SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback);
-            if (file != null) sourceCodeManager.AlreadyCompiledCodes.Add(file.FullName);
-            return sourceCodeManager.Entry(
-                usings,
-                file,
-                basePath);
+            if (fileUri != null) sourceCodeManager.AlreadyLoadedCodes.Add(fileUri);
+            return sourceCodeManager.Entry(usings, fileUri, basePath);
         }
     }
 }

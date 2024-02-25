@@ -1,5 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace LanguageCore.Tokenizing
 {
@@ -48,22 +48,24 @@ namespace LanguageCore.Tokenizing
 
     public readonly struct TokenizerResult
     {
-        public readonly Warning[] Warnings;
-
         public readonly Token[] Tokens;
         public readonly SimpleToken[] UnicodeCharacterTokens;
+        public readonly Warning[] Warnings;
 
-        public TokenizerResult(Token[] tokens, SimpleToken[] unicodeCharacterTokens, Warning[] warnings)
+        public TokenizerResult(
+            IEnumerable<Token> tokens,
+            IEnumerable<SimpleToken> unicodeCharacterTokens,
+            IEnumerable<Warning> warnings)
         {
-            Tokens = tokens;
-            UnicodeCharacterTokens = unicodeCharacterTokens;
-            Warnings = warnings;
+            Tokens = tokens.ToArray();
+            UnicodeCharacterTokens = unicodeCharacterTokens.ToArray();
+            Warnings = warnings.ToArray();
         }
 
         public static TokenizerResult Empty => new(
-            Array.Empty<Token>(),
-            Array.Empty<SimpleToken>(),
-            Array.Empty<Warning>());
+            Enumerable.Empty<Token>(),
+            Enumerable.Empty<SimpleToken>(),
+            Enumerable.Empty<Warning>());
 
         public static implicit operator Token[](TokenizerResult result) => result.Tokens;
     }
@@ -75,18 +77,15 @@ namespace LanguageCore.Tokenizing
         static readonly string[] DoubleOperators = ["++", "--", "<<", ">>", "&&", "||"];
         static readonly char[] SimpleOperators = [';', ',', '#'];
 
-        readonly PreparationToken CurrentToken;
-        protected int CurrentColumn;
-        protected int CurrentLine;
-        char PreviousChar;
-
         protected readonly List<Token> Tokens;
         protected readonly List<SimpleToken> UnicodeCharacters;
-
         protected readonly List<Warning> Warnings;
-
         protected readonly TokenizerSettings Settings;
 
+        readonly PreparationToken CurrentToken;
+        int CurrentColumn;
+        int CurrentLine;
+        char PreviousChar;
         string? SavedUnicode;
 
         protected Tokenizer(TokenizerSettings settings)
@@ -106,26 +105,7 @@ namespace LanguageCore.Tokenizing
             SavedUnicode = null;
         }
 
-        protected abstract TokenizerResult TokenizeInternal();
-
         Position GetCurrentPosition(int offsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(offsetTotal, offsetTotal + 1));
-
-        protected static void CheckTokens(Token[] tokens)
-        {
-            for (int i = 0; i < tokens.Length; i++)
-            { CheckToken(tokens[i]); }
-        }
-
-        static void CheckToken(Token token)
-        {
-            if (token.TokenType == TokenType.LiteralCharacter)
-            {
-                if (token.Content.Length > 1)
-                { throw new TokenizerException($"I think there are more characters than there should be ({token.Content.Length})", token.Position); }
-                else if (token.Content.Length < 1)
-                { throw new TokenizerException($"I think there are less characters than there should be ({token.Content.Length})", token.Position); }
-            }
-        }
 
         void RefreshTokenPosition(int offsetTotal)
         {
@@ -134,15 +114,12 @@ namespace LanguageCore.Tokenizing
             CurrentToken.Position.AbsoluteRange.End = offsetTotal;
         }
 
-        /// <exception cref="Exception"/>
-        protected static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
+        protected static Token[] NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
         {
             List<Token> result = new(tokens.Count);
 
-            for (int i = 0; i < tokens.Count; i++)
+            foreach (Token token in tokens)
             {
-                Token token = tokens[i];
-
                 if (result.Count == 0)
                 {
                     result.Add(token);
@@ -169,7 +146,7 @@ namespace LanguageCore.Tokenizing
                 result.Add(token);
             }
 
-            return result;
+            return result.ToArray();
         }
     }
 }

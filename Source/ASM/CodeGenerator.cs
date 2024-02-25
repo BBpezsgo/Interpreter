@@ -368,7 +368,7 @@ namespace LanguageCore.ASM.Generator
 
             int size;
 
-            if (TryCompute(newVariable.InitialValue, null, null, out DataItem computedInitialValue))
+            if (TryCompute(newVariable.InitialValue, null, out DataItem computedInitialValue))
             {
                 size = 1;
 
@@ -934,7 +934,7 @@ namespace LanguageCore.ASM.Generator
         }
         void GenerateCodeForStatement(KeywordCall statement)
         {
-            switch (statement.Identifier.Content.ToLowerInvariant())
+            switch (statement.Identifier.Content)
             {
                 case "return":
                 {
@@ -1088,7 +1088,7 @@ namespace LanguageCore.ASM.Generator
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
-                string? prevFile = CurrentFile;
+                Uri? prevFile = CurrentFile;
 
                 CurrentFile = macro.FilePath;
 

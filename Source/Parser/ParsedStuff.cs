@@ -10,7 +10,7 @@ namespace LanguageCore.Parser
 
     public interface IInFile
     {
-        public string? FilePath { get; set; }
+        public Uri? FilePath { get; set; }
     }
 
     public class ParameterDefinitionCollection :
@@ -170,7 +170,7 @@ namespace LanguageCore.Parser
         public readonly EnumMemberDefinition[] Members;
         public readonly AttributeUsage[] Attributes;
 
-        public string? FilePath { get; set; }
+        public Uri? FilePath { get; set; }
 
         public Position Position =>
             new Position(Identifier)
@@ -269,7 +269,8 @@ namespace LanguageCore.Parser
         IExportable,
         IEquatable<FunctionThingDefinition>,
         IPositioned,
-        ISimpleReadable
+        ISimpleReadable,
+        IInFile
     {
         public Token[] Modifiers;
         public readonly Token Identifier;
@@ -293,7 +294,7 @@ namespace LanguageCore.Parser
 
         public virtual bool IsTemplate => TemplateInfo is not null;
 
-        public string? FilePath { get; set; }
+        public Uri? FilePath { get; set; }
 
         public virtual Position Position => new Position(Identifier)
             .Union(Parameters)
@@ -322,7 +323,7 @@ namespace LanguageCore.Parser
             TemplateInfo = templateInfo;
         }
 
-        public bool CanUse(string? sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
+        public bool CanUse(Uri? sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
         string ISimpleReadable.ToReadable() => ToReadable();
         public string ToReadable(ToReadableFlags flags = ToReadableFlags.None)
@@ -416,7 +417,8 @@ namespace LanguageCore.Parser
     public class MacroDefinition :
         IExportable,
         IEquatable<MacroDefinition>,
-        ISimpleReadable
+        ISimpleReadable,
+        IInFile
     {
         public readonly Token Keyword;
         public readonly Token[] Modifiers;
@@ -428,7 +430,7 @@ namespace LanguageCore.Parser
 
         public bool IsExport => Modifiers.Contains("export");
 
-        public string? FilePath { get; set; }
+        public Uri? FilePath { get; set; }
 
         public MacroDefinition(MacroDefinition other)
         {
@@ -450,7 +452,7 @@ namespace LanguageCore.Parser
             Modifiers = modifiers.ToArray();
         }
 
-        public bool CanUse(string sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
+        public bool CanUse(Uri sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
         public string ToReadable()
         {
@@ -783,7 +785,7 @@ namespace LanguageCore.Parser
         public readonly Token Identifier;
         public readonly Token BracketStart;
         public readonly Token BracketEnd;
-        public string? FilePath { get; set; }
+        public Uri? FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
         public Token[] Modifiers;
         public TemplateInfo? TemplateInfo;
@@ -844,7 +846,7 @@ namespace LanguageCore.Parser
 
         public override string ToString() => $"struct {Identifier.Content}";
 
-        public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
+        public bool CanUse(Uri sourceFile) => IsExport || sourceFile == FilePath;
     }
 
     public class UsingDefinition : IPositioned
@@ -869,7 +871,6 @@ namespace LanguageCore.Parser
                 return result.ToString();
             }
         }
-        public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].Content, UriKind.Absolute, out Uri? uri) && uri.Scheme != "file:";
 
         public Position Position => new Position(Path).Union(Keyword);
 
@@ -897,8 +898,10 @@ namespace LanguageCore.Parser
         {
             return new UsingDefinition(Token.CreateAnonymous("using"), new Token[]
             {
-                Token.CreateAnonymous(uri.ToString())
+                Token.CreateAnonymous(uri.ToString(), TokenType.LiteralString)
             });
         }
+
+        public override string ToString() => $"{Keyword} {string.Join('.', Path.Select(token => token.ToOriginalString()))};";
     }
 }

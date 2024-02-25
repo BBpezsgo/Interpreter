@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Compiler
 {
+    using System;
     using Parser;
     using Runtime;
 
@@ -7,7 +8,7 @@
     {
         public readonly ParameterDefinition Declaration;
         public override string Identifier => Declaration.Identifier.Content;
-        public override string? FilePath => null;
+        public override Uri? FilePath => null;
         public override Position Position => Declaration.Position;
 
         public CompiledParameterConstant(ParameterDefinition declaration, DataItem value) : base(value)

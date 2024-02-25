@@ -51,6 +51,19 @@ export int IsNullOrEmpty(this char* text)
     { return 1; }
 }
 
+export char* ToString(this char* text)
+{
+    char* res = Alloc(text.Length() * sizeof(char) + 1) as char*;
+    int i = 0;
+    while (text[i])
+    {
+        res[i] = text[i];
+        i++;
+    }
+    res[i] = '\0';
+    return res;
+}
+
 export char* +(temp char* a, temp char* b)
 {
     int al = a.Length();

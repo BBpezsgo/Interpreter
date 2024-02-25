@@ -62,7 +62,7 @@ namespace LanguageCore.Brainfuck
             {
                 if (result[i] == '[' &&
                     i + 3 + 1 < result.Length &&
-                    result.Slice(i, 3) == "[-]" &&
+                    result.Slice(i, 3).Equals("[-]", StringComparison.Ordinal) &&
                     !alreadyThere.IsUnknown)
                 {
                     ReadOnlySpan<char> slice = result[(i + 3)..];

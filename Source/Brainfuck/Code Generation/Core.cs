@@ -668,7 +668,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         bool TryGetAddress(Pointer pointer, out int address, out int size)
         {
-            if (!TryCompute(pointer.PrevStatement, null, out DataItem addressToSet))
+            if (!TryCompute(pointer.PrevStatement, out DataItem addressToSet))
             { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.PrevStatement, CurrentFile); }
 
             if (!DataItem.TryShrinkToByte(ref addressToSet))

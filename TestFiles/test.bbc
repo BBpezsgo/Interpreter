@@ -20,7 +20,22 @@ using System;
 
 // Print(55);
 
-List<int>* list = new List<int>*;
-list.Add(77);
-list.Add(55);
-Print(temp list.ToString());
+// List<int>* list = new List<int>*;
+// list.Add(77);
+// list.Add(55);
+// Print(temp list.ToString());
+
+Print(77);
+
+// inline int Yeah(int a, int b)
+// {
+// 	int result;
+// 	while (a)
+// 	{
+// 		result += b;
+// 		a--;
+// 	}
+// 	return result;
+// }
+// 
+// int br = Yeah(5, 8);

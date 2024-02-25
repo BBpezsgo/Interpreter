@@ -374,7 +374,7 @@ namespace LanguageCore.Brainfuck.Generator
         {
             using (CommentBlock($"Set value {value} to address {address}"))
             {
-                if (TryCompute(value, null, out DataItem constantValue))
+                if (TryCompute(value, out DataItem constantValue))
                 {
                     // if (constantValue.Size != 1)
                     // { throw new CompilerException($"Value size can be only 1", value, CurrentFile); }
@@ -679,7 +679,7 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(LinkedIf @if, bool linked = false)
         {
-            if (TryCompute(@if.Condition, null, out DataItem computedCondition))
+            if (TryCompute(@if.Condition, out DataItem computedCondition))
             {
                 if (computedCondition)
                 { GenerateCodeForStatement(Block.CreateIfNotBlock(@if.Block)); }
@@ -1406,7 +1406,8 @@ namespace LanguageCore.Brainfuck.Generator
 
                 InMacro.Push(true);
 
-                Statement inlinedMacro = InlineMacro(macro, functionCall.Parameters);
+                if (!InlineMacro(macro, out Statement? inlinedMacro, functionCall.Parameters))
+                { throw new CompilerException($"Failed to inline the macro", functionCall, CurrentFile); }
 
                 if (inlinedMacro is Block inlinedMacroBlock)
                 { GenerateCodeForStatement(inlinedMacroBlock); }
@@ -1436,6 +1437,22 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledFunction.ToReadable()}\" cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
                 return;
+            }
+
+            if (TryEvaluate(compiledFunction, functionCall.MethodParameters, out DataItem? returnValue, out Statement[]? runtimeStatements))
+            {
+                if (functionCall.SaveValue && returnValue.HasValue && runtimeStatements.Length == 0)
+                {
+                    Stack.Push(returnValue.Value);
+                    return;
+                }
+
+                if (!functionCall.SaveValue)
+                {
+                    foreach (Statement runtimeStatement in runtimeStatements)
+                    { GenerateCodeForStatement(runtimeStatement); }
+                    return;
+                }
             }
 
             typeArguments = Utils.ConcatDictionary(typeArguments, compiledFunction.Context?.CurrentTypeArguments);
@@ -1599,7 +1616,7 @@ namespace LanguageCore.Brainfuck.Generator
                 }
             }
 
-            if (TryCompute(statement, null, out DataItem computed))
+            if (TryCompute(statement, out DataItem computed))
             {
                 Stack.Push(computed);
                 Optimizations++;
@@ -1652,7 +1669,7 @@ namespace LanguageCore.Brainfuck.Generator
                             if (statement.Left is Identifier _left &&
                                 CodeGeneratorForBrainfuck.GetVariable(Variables, _left.Content, out Variable left) &&
                                 !left.IsDiscarded &&
-                                TryCompute(statement.Right, null, out DataItem right) &&
+                                TryCompute(statement.Right, out DataItem right) &&
                                 right.Type == RuntimeType.UInt8)
                             {
                                 int resultAddress = Stack.PushVirtual(1);
@@ -1912,7 +1929,7 @@ namespace LanguageCore.Brainfuck.Generator
                         using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
-                        if (!TryCompute(statement.Right, null, out DataItem offsetConst))
+                        if (!TryCompute(statement.Right, out DataItem offsetConst))
                         { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
                         if (offsetConst != 0)
@@ -1938,7 +1955,7 @@ namespace LanguageCore.Brainfuck.Generator
                         using (CommentBlock("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
-                        if (!TryCompute(statement.Right, null, out DataItem offsetConst))
+                        if (!TryCompute(statement.Right, out DataItem offsetConst))
                         { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
                         if (offsetConst != 0)
@@ -1970,7 +1987,7 @@ namespace LanguageCore.Brainfuck.Generator
                     }
                     case "&":
                     {
-                        if (TryCompute(statement.Right, null, out DataItem right) && right == 1)
+                        if (TryCompute(statement.Right, out DataItem right) && right == 1)
                         {
                             int leftAddress = Stack.NextAddress;
                             using (CommentBlock("Compute left-side value"))
@@ -2040,7 +2057,7 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(Pointer pointer)
         {
-            if (TryCompute(pointer, null, out DataItem computed))
+            if (TryCompute(pointer, out DataItem computed))
             {
                 Stack.Push(computed);
                 return;
@@ -2142,7 +2159,7 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            if (TryCompute(field, null, out DataItem computed))
+            if (TryCompute(field, out DataItem computed))
             {
                 Stack.Push(computed);
                 return;
@@ -2209,7 +2226,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         void GenerateCodeForPrinter(StatementWithValue value)
         {
-            if (TryCompute(value, null, out DataItem constantToPrint))
+            if (TryCompute(value, out DataItem constantToPrint))
             {
                 GenerateCodeForPrinter(constantToPrint);
                 return;
@@ -2372,7 +2389,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         bool CanGenerateCodeForPrinter(StatementWithValue value)
         {
-            if (TryCompute(value, null, out _)) return true;
+            if (TryCompute(value, out _)) return true;
 
             CompiledType valueType = FindStatementType(value);
             bool isString = valueType.IsReplacedType("string");
@@ -2606,7 +2623,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             for (int i = 0; i < parameters.Length; i++)
             {
-                if (TryCompute(parameters[i], null, out _))
+                if (TryCompute(parameters[i], out _))
                 { continue; }
                 if (parameters[i] is Literal)
                 { continue; }
@@ -2634,12 +2651,14 @@ namespace LanguageCore.Brainfuck.Generator
 
             try
             {
-                Statement inlined = InlineMacro(function, parameters);
-                GenerateCodeForStatement(inlined);
+                if (InlineMacro(function, out Statement? inlined, parameters))
+                {
+                    GenerateCodeForStatement(inlined);
 
-                inlinedCode = SnapshotCode();
-                inlinedLength = inlinedCode.Value.Code.GetFinalCode().Length - originalCodeLength;
-                inlinedSnapshot = Snapshot();
+                    inlinedCode = SnapshotCode();
+                    inlinedLength = inlinedCode.Value.Code.GetFinalCode().Length - originalCodeLength;
+                    inlinedSnapshot = Snapshot();
+                }
             }
             catch (Exception)
             { }
@@ -2821,7 +2840,7 @@ namespace LanguageCore.Brainfuck.Generator
                         case "const":
                         {
                             StatementWithValue valueStatement = modifiedStatement.Statement;
-                            if (!TryCompute(valueStatement, null, out DataItem constValue))
+                            if (!TryCompute(valueStatement, out DataItem constValue))
                             { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
                             constantParameters.Add(new CompiledParameterConstant(defined, constValue));
@@ -3112,7 +3131,7 @@ namespace LanguageCore.Brainfuck.Generator
                         case "const":
                         {
                             StatementWithValue valueStatement = modifiedStatement.Statement;
-                            if (!TryCompute(valueStatement, null, out DataItem constValue))
+                            if (!TryCompute(valueStatement, out DataItem constValue))
                             { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
                             constantParameters.Add(new CompiledParameterConstant(defined, constValue));
@@ -3329,7 +3348,7 @@ namespace LanguageCore.Brainfuck.Generator
                         case "const":
                         {
                             StatementWithValue valueStatement = modifiedStatement.Statement;
-                            if (!TryCompute(valueStatement, null, out DataItem constValue))
+                            if (!TryCompute(valueStatement, out DataItem constValue))
                             { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
                             constantParameters.Add(new CompiledParameterConstant(defined, constValue));
@@ -3545,7 +3564,7 @@ namespace LanguageCore.Brainfuck.Generator
                         case "const":
                         {
                             StatementWithValue valueStatement = modifiedStatement.Statement;
-                            if (!TryCompute(valueStatement, null, out DataItem constValue))
+                            if (!TryCompute(valueStatement, out DataItem constValue))
                             { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
                             constantParameters.Add(new CompiledParameterConstant(defined, constValue));

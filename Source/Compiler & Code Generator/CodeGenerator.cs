@@ -10,6 +10,7 @@ using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
+using Microsoft.VisualBasic;
 using LiteralStatement = LanguageCore.Parser.Statement.Literal;
 
 namespace LanguageCore.Compiler
@@ -1348,7 +1349,7 @@ namespace LanguageCore.Compiler
 
             if (destination.IsBuiltin &&
                 destination.BuiltinType == Type.Byte &&
-                TryCompute(value, null, out DataItem yeah) &&
+                TryCompute(value, out DataItem yeah) &&
                 yeah.Type == RuntimeType.SInt32)
             { return; }
 
@@ -1784,7 +1785,35 @@ namespace LanguageCore.Compiler
             DataItem leftValue = GetInitialValue(leftType);
             DataItem rightValue = GetInitialValue(rightType);
 
-            DataItem predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
+            DataItem predictedValue = @operator.Operator.Content switch
+            {
+                "!" => !leftValue,
+
+                "+" => leftValue + rightValue,
+                "-" => leftValue - rightValue,
+                "*" => leftValue * rightValue,
+                "/" => leftValue,
+                "%" => leftValue,
+
+                "&&" => new DataItem((bool)leftValue && (bool)rightValue),
+                "||" => new DataItem((bool)leftValue || (bool)rightValue),
+
+                "&" => leftValue & rightValue,
+                "|" => leftValue | rightValue,
+                "^" => leftValue ^ rightValue,
+
+                "<<" => leftValue << rightValue,
+                ">>" => leftValue >> rightValue,
+
+                "<" => new DataItem(leftValue < rightValue),
+                ">" => new DataItem(leftValue > rightValue),
+                "==" => new DataItem(leftValue == rightValue),
+                "!=" => new DataItem(leftValue != rightValue),
+                "<=" => new DataItem(leftValue <= rightValue),
+                ">=" => new DataItem(leftValue >= rightValue),
+
+                _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
+            };
 
             CompiledType result = new(predictedValue.Type);
 
@@ -1865,6 +1894,12 @@ namespace LanguageCore.Compiler
             {
                 identifier.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
                 return OnGotStatementType(identifier, new CompiledType(function));
+            }
+
+            for (int i = CurrentEvaluationContext.Count - 1; i >= 0; i--)
+            {
+                if (CurrentEvaluationContext[i].TryGetType(identifier, out CompiledType? _type))
+                { return _type; }
             }
 
             if (FindType(identifier.Token, out CompiledType? result))
@@ -2060,7 +2095,8 @@ namespace LanguageCore.Compiler
 
         protected CompiledType FindMacroType(MacroDefinition macro, params StatementWithValue[] parameters)
         {
-            Statement inlinedMacro = InlineMacro(macro, parameters);
+            if (!InlineMacro(macro, out Statement? inlinedMacro, parameters))
+            { throw new CompilerException($"Failed to inline the macro", new Position(parameters), CurrentFile); }
 
             if (inlinedMacro is StatementWithValue statementWithValue)
             { return FindStatementType(statementWithValue); }
@@ -2091,6 +2127,11 @@ namespace LanguageCore.Compiler
 
         #region InlineMacro()
 
+        protected class InlineException : Exception
+        {
+
+        }
+
         protected bool TryInlineMacro(StatementWithValue statement, [NotNullWhen(true)] out Statement? inlined)
         {
             if (statement is AnyCall anyCall)
@@ -2111,25 +2152,34 @@ namespace LanguageCore.Compiler
         {
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
             {
-                inlined = InlineMacro(macro, functionCall.MethodParameters);
-                return true;
+                return InlineMacro(macro, out inlined, functionCall.MethodParameters);
             }
 
             inlined = null;
             return false;
         }
 
-        protected Statement InlineMacro(MacroDefinition macro, params StatementWithValue[] parameters)
+        protected bool InlineMacro(MacroDefinition macro, [NotNullWhen(true)] out Statement? inlined, params StatementWithValue[] parameters)
         {
             Dictionary<string, StatementWithValue> _parameters = Utils.Map(
                 macro.Parameters,
                 parameters,
                 (key, value) => (key.Content, value));
 
-            return InlineMacro(macro, _parameters);
+            try
+            {
+                inlined = InlineMacro(macro, _parameters);
+                return true;
+            }
+            catch (InlineException)
+            {
+                inlined = null;
+                return false;
+            }
         }
 
-        protected Statement InlineMacro(MacroDefinition macro, Dictionary<string, StatementWithValue> parameters)
+        /// <exception cref="InlineException"/>
+        Statement InlineMacro(MacroDefinition macro, Dictionary<string, StatementWithValue> parameters)
         {
             Statement result;
 
@@ -2150,17 +2200,27 @@ namespace LanguageCore.Compiler
             return result;
         }
 
-        protected Statement InlineMacro(FunctionThingDefinition function, params StatementWithValue[] parameters)
+        protected bool InlineMacro(FunctionThingDefinition function, [NotNullWhen(true)] out Statement? inlined, params StatementWithValue[] parameters)
         {
             Dictionary<string, StatementWithValue> _parameters = Utils.Map(
                 function.Parameters.ToArray(),
                 parameters,
                 (key, value) => (key.Identifier.Content, value));
 
-            return InlineMacro(function, _parameters);
+            try
+            {
+                inlined = InlineMacro(function, _parameters);
+                return true;
+            }
+            catch (InlineException)
+            {
+                inlined = null;
+                return false;
+            }
         }
 
-        protected Statement InlineMacro(FunctionThingDefinition function, Dictionary<string, StatementWithValue> parameters)
+        /// <exception cref="InlineException"/>
+        Statement InlineMacro(FunctionThingDefinition function, Dictionary<string, StatementWithValue> parameters)
         {
             Statement result;
 
@@ -2181,7 +2241,8 @@ namespace LanguageCore.Compiler
             return result;
         }
 
-        protected static Block InlineMacro(Block block, Dictionary<string, StatementWithValue> parameters)
+        /// <exception cref="InlineException"/>
+        static Block InlineMacro(Block block, Dictionary<string, StatementWithValue> parameters)
         {
             Statement[] statements = new Statement[block.Statements.Length];
             for (int i = 0; i < block.Statements.Length; i++)
@@ -2199,7 +2260,7 @@ namespace LanguageCore.Compiler
             };
         }
 
-        protected static OperatorCall InlineMacro(OperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
+        static OperatorCall InlineMacro(OperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
             => new(
                 op: operatorCall.Operator,
                 left: InlineMacro(operatorCall.Left, parameters),
@@ -2210,7 +2271,7 @@ namespace LanguageCore.Compiler
                 Semicolon = operatorCall.Semicolon,
             };
 
-        protected static KeywordCall InlineMacro(KeywordCall keywordCall, Dictionary<string, StatementWithValue> parameters)
+        static KeywordCall InlineMacro(KeywordCall keywordCall, Dictionary<string, StatementWithValue> parameters)
             => new(
                 identifier: keywordCall.Identifier,
                 parameters: InlineMacro(keywordCall.Parameters, parameters))
@@ -2219,7 +2280,7 @@ namespace LanguageCore.Compiler
                 Semicolon = keywordCall.Semicolon,
             };
 
-        protected static FunctionCall InlineMacro(FunctionCall functionCall, Dictionary<string, StatementWithValue> parameters)
+        static FunctionCall InlineMacro(FunctionCall functionCall, Dictionary<string, StatementWithValue> parameters)
         {
             IEnumerable<StatementWithValue> _parameters = InlineMacro(functionCall.Parameters, parameters);
             StatementWithValue? prevStatement = functionCall.PrevStatement;
@@ -2228,7 +2289,7 @@ namespace LanguageCore.Compiler
             return new FunctionCall(prevStatement, functionCall.Identifier, functionCall.BracketLeft, _parameters, functionCall.BracketRight);
         }
 
-        protected static AnyCall InlineMacro(AnyCall anyCall, Dictionary<string, StatementWithValue> parameters)
+        static AnyCall InlineMacro(AnyCall anyCall, Dictionary<string, StatementWithValue> parameters)
             => new(
                 prevStatement: InlineMacro(anyCall.PrevStatement, parameters),
                 bracketLeft: anyCall.BracketLeft,
@@ -2239,22 +2300,28 @@ namespace LanguageCore.Compiler
                 Semicolon = anyCall.Semicolon,
             };
 
-        protected static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
-        { return statements.Select(statement => InlineMacro(statement, parameters)); }
-        protected static IEnumerable<Statement> InlineMacro(IEnumerable<Statement> statements, Dictionary<string, StatementWithValue> parameters)
+        static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
         { return statements.Select(statement => InlineMacro(statement, parameters)); }
 
-        protected static Statement InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+        /// <exception cref="InlineException"/>
+        static IEnumerable<Statement> InlineMacro(IEnumerable<Statement> statements, Dictionary<string, StatementWithValue> parameters)
+        { return statements.Select(statement => InlineMacro(statement, parameters)); }
+
+        /// <exception cref="InlineException"/>
+        static Statement InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
             Block v => InlineMacro(v, parameters),
             StatementWithValue v => InlineMacro(v, parameters),
             ForLoop v => InlineMacro(v, parameters),
             IfContainer v => InlineMacro(v, parameters),
             AnyAssignment v => InlineMacro(v, parameters),
-            _ => throw new NotImplementedException(),
+            VariableDeclaration v => InlineMacro(v, parameters),
+            WhileLoop v => InlineMacro(v, parameters),
+            _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
 
-        protected static IfContainer InlineMacro(IfContainer statement, Dictionary<string, StatementWithValue> parameters)
+        /// <exception cref="InlineException"/>
+        static IfContainer InlineMacro(IfContainer statement, Dictionary<string, StatementWithValue> parameters)
         {
             BaseBranch[] branches = new BaseBranch[statement.Parts.Length];
             for (int i = 0; i < branches.Length; i++)
@@ -2263,7 +2330,8 @@ namespace LanguageCore.Compiler
             { Semicolon = statement.Semicolon, };
         }
 
-        protected static BaseBranch InlineMacro(BaseBranch statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+        /// <exception cref="InlineException"/>
+        static BaseBranch InlineMacro(BaseBranch statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
             IfBranch v => InlineMacro(v, parameters),
             ElseIfBranch v => InlineMacro(v, parameters),
@@ -2271,7 +2339,8 @@ namespace LanguageCore.Compiler
             _ => throw new UnreachableException()
         };
 
-        protected static IfBranch InlineMacro(IfBranch statement, Dictionary<string, StatementWithValue> parameters)
+        /// <exception cref="InlineException"/>
+        static IfBranch InlineMacro(IfBranch statement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 keyword: statement.Keyword,
                 condition: InlineMacro(statement.Condition, parameters),
@@ -2280,7 +2349,8 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
-        protected static ElseIfBranch InlineMacro(ElseIfBranch statement, Dictionary<string, StatementWithValue> parameters)
+        /// <exception cref="InlineException"/>
+        static ElseIfBranch InlineMacro(ElseIfBranch statement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 keyword: statement.Keyword,
                 condition: InlineMacro(statement.Condition, parameters),
@@ -2289,7 +2359,8 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
-        protected static ElseBranch InlineMacro(ElseBranch statement, Dictionary<string, StatementWithValue> parameters)
+        /// <exception cref="InlineException"/>
+        static ElseBranch InlineMacro(ElseBranch statement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 keyword: statement.Keyword,
                 block: InlineMacro(statement.Block, parameters))
@@ -2297,7 +2368,19 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
-        protected static ForLoop InlineMacro(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
+        /// <exception cref="InlineException"/>
+        static WhileLoop InlineMacro(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                keyword: statement.Keyword,
+                condition: InlineMacro(statement.Condition, parameters),
+                block: InlineMacro(statement.Block, parameters)
+                )
+            {
+                Semicolon = statement.Semicolon,
+            };
+
+        /// <exception cref="InlineException"/>
+        static ForLoop InlineMacro(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 keyword: statement.Keyword,
                 variableDeclaration: InlineMacro(statement.VariableDeclaration, parameters),
@@ -2309,7 +2392,8 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
-        protected static AnyAssignment InlineMacro(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+        /// <exception cref="InlineException"/>
+        static AnyAssignment InlineMacro(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
             Assignment v => InlineMacro(v, parameters),
             ShortOperatorCall v => InlineMacro(v, parameters),
@@ -2317,44 +2401,71 @@ namespace LanguageCore.Compiler
             _ => throw new UnreachableException()
         };
 
-        protected static Assignment InlineMacro(Assignment statement, Dictionary<string, StatementWithValue> parameters)
-            => new(
+        /// <exception cref="InlineException"/>
+        static Assignment InlineMacro(Assignment statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statement.Left is Identifier identifier &&
+                parameters.ContainsKey(identifier.Content))
+            { throw new InlineException(); }
+
+            return new Assignment(
                 @operator: statement.Operator,
-                left: InlineMacro(statement.Left, parameters),
+                left: statement.Left,
                 right: InlineMacro(statement.Right, parameters))
             {
                 Semicolon = statement.Semicolon,
             };
+        }
 
-        protected static ShortOperatorCall InlineMacro(ShortOperatorCall statement, Dictionary<string, StatementWithValue> parameters)
-            => new(
-                op: statement.Operator,
-                left: InlineMacro(statement.Left, parameters))
+        /// <exception cref="InlineException"/>
+        static ShortOperatorCall InlineMacro(ShortOperatorCall statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statement.Left is Identifier identifier &&
+                parameters.ContainsKey(identifier.Content))
+            { throw new InlineException(); }
+
+            return new ShortOperatorCall(
+                 op: statement.Operator,
+                 left: statement.Left)
             {
                 Semicolon = statement.Semicolon,
             };
+        }
 
-        protected static CompoundAssignment InlineMacro(CompoundAssignment statement, Dictionary<string, StatementWithValue> parameters)
-            => new(
+        /// <exception cref="InlineException"/>
+        static CompoundAssignment InlineMacro(CompoundAssignment statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statement.Left is Identifier identifier &&
+                parameters.ContainsKey(identifier.Content))
+            { throw new InlineException(); }
+
+            return new CompoundAssignment(
                 @operator: statement.Operator,
-                left: InlineMacro(statement.Left, parameters),
+                left: statement.Left,
                 right: InlineMacro(statement.Right, parameters))
             {
                 Semicolon = statement.Semicolon,
             };
+        }
 
-        protected static VariableDeclaration InlineMacro(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
-            => new(
+        /// <exception cref="InlineException"/>
+        static VariableDeclaration InlineMacro(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (parameters.ContainsKey(statement.VariableName.Content))
+            { throw new InlineException(); }
+
+            return new VariableDeclaration(
                 modifiers: statement.Modifiers,
                 type: statement.Type,
                 variableName: statement.VariableName,
-                initialValue: InlineMacro(statement.InitialValue, parameters)
-                )
+                initialValue: InlineMacro(statement.InitialValue, parameters))
             {
+                FilePath = statement.FilePath,
                 Semicolon = statement.Semicolon,
             };
+        }
 
-        protected static Pointer InlineMacro(Pointer statement, Dictionary<string, StatementWithValue> parameters)
+        static Pointer InlineMacro(Pointer statement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 operatorToken: statement.OperatorToken,
                 prevStatement: InlineMacro(statement.PrevStatement, parameters))
@@ -2363,7 +2474,7 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
-        protected static AddressGetter InlineMacro(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
+        static AddressGetter InlineMacro(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 operatorToken: statement.OperatorToken,
                 prevStatement: InlineMacro(statement.PrevStatement, parameters))
@@ -2372,14 +2483,14 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
-        protected static StatementWithValue InlineMacro(Identifier statement, Dictionary<string, StatementWithValue> parameters)
+        static StatementWithValue InlineMacro(Identifier statement, Dictionary<string, StatementWithValue> parameters)
         {
             if (parameters.TryGetValue(statement.Content, out StatementWithValue? inlinedStatement))
             { return inlinedStatement; }
             return statement;
         }
 
-        protected static LiteralStatement InlineMacro(LiteralStatement statement, Dictionary<string, StatementWithValue> _)
+        static LiteralStatement InlineMacro(LiteralStatement statement, Dictionary<string, StatementWithValue> _)
             => new(
                 type: statement.Type,
                 value: statement.Value,
@@ -2390,7 +2501,7 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
-        protected static Field InlineMacro(Field statement, Dictionary<string, StatementWithValue> parameters)
+        static Field InlineMacro(Field statement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 prevStatement: InlineMacro(statement.PrevStatement, parameters),
                 fieldName: statement.FieldName)
@@ -2399,7 +2510,7 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
-        protected static IndexCall InlineMacro(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
+        static IndexCall InlineMacro(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 prevStatement: InlineMacro(statement.PrevStatement, parameters),
                 bracketLeft: statement.BracketLeft,
@@ -2410,7 +2521,7 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
 
-        protected static TypeCast InlineMacro(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
+        static TypeCast InlineMacro(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 prevStatement: InlineMacro(statement.PrevStatement, parameters),
                 keyword: statement.Keyword,
@@ -2422,7 +2533,7 @@ namespace LanguageCore.Compiler
                 CompiledType = statement.CompiledType,
             };
 
-        protected static ModifiedStatement InlineMacro(ModifiedStatement modifiedStatement, Dictionary<string, StatementWithValue> parameters)
+        static ModifiedStatement InlineMacro(ModifiedStatement modifiedStatement, Dictionary<string, StatementWithValue> parameters)
             => new(
                 modifier: modifiedStatement.Modifier,
                 statement: InlineMacro(modifiedStatement.Statement, parameters))
@@ -2434,7 +2545,7 @@ namespace LanguageCore.Compiler
             };
 
         [return: NotNullIfNotNull(nameof(statement))]
-        protected static StatementWithValue? InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+        static StatementWithValue? InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
             null => null,
             Identifier v => InlineMacro(v, parameters),
@@ -2449,53 +2560,153 @@ namespace LanguageCore.Compiler
             IndexCall v => InlineMacro(v, parameters),
             TypeCast v => InlineMacro(v, parameters),
             ModifiedStatement v => InlineMacro(v, parameters),
-            _ => throw new NotImplementedException(),
+            _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
 
         #endregion
 
-        #region TryCompute()
-        /// <exception cref="NotImplementedException"/>
-        public static DataItem Compute(string @operator, DataItem left, DataItem right)
+        protected class EvaluationContext
         {
-            return @operator switch
+            readonly Dictionary<StatementWithValue, DataItem> _values;
+            readonly Stack<Stack<Dictionary<string, DataItem>>>? _frames;
+
+            public readonly List<Statement> RuntimeStatements;
+            public Dictionary<string, DataItem>? LastScope => _frames?.Last.Last;
+            public bool IsReturning;
+
+            public static EvaluationContext Empty => new(null, null);
+
+            public EvaluationContext(IDictionary<StatementWithValue, DataItem>? values, IDictionary<string, DataItem>? variables)
             {
-                "!" => !left,
+                if (values != null)
+                { _values = new Dictionary<StatementWithValue, DataItem>(values); }
+                else
+                { _values = new Dictionary<StatementWithValue, DataItem>(); }
 
-                "+" => left + right,
-                "-" => left - right,
-                "*" => left * right,
-                "/" => left,
-                "%" => left,
+                if (variables != null)
+                { _frames = new Stack<Stack<Dictionary<string, DataItem>>>() { new() { new Dictionary<string, DataItem>(variables) } }; }
+                else
+                { _frames = null; }
 
-                "&&" => new DataItem((bool)left && (bool)right),
-                "||" => new DataItem((bool)left || (bool)right),
+                RuntimeStatements = new List<Statement>();
+            }
 
-                "&" => left & right,
-                "|" => left | right,
-                "^" => left ^ right,
+            public bool TryGetValue(StatementWithValue statement, out DataItem value)
+            {
+                if (_values.TryGetValue(statement, out value))
+                { return true; }
 
-                "<<" => left << right,
-                ">>" => left >> right,
+                if (statement is Identifier identifier &&
+                    TryGetVariable(identifier.Content, out value))
+                { return true; }
 
-                "<" => new DataItem(left < right),
-                ">" => new DataItem(left > right),
-                "==" => new DataItem(left == right),
-                "!=" => new DataItem(left != right),
-                "<=" => new DataItem(left <= right),
-                ">=" => new DataItem(left >= right),
-                _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
-            };
+                value = default;
+                return false;
+            }
+
+            public bool TryGetVariable(string name, out DataItem value)
+            {
+                value = default;
+
+                if (_frames == null)
+                { return false; }
+
+                Stack<Dictionary<string, DataItem>> frame = _frames.Last;
+                foreach (Dictionary<string, DataItem> scope in frame)
+                {
+                    if (scope.TryGetValue(name, out value))
+                    { return true; }
+                }
+
+                return false;
+            }
+
+            public bool TrySetVariable(string name, DataItem value)
+            {
+                if (_frames == null)
+                { return false; }
+
+                Stack<Dictionary<string, DataItem>> frame = _frames.Last;
+                foreach (Dictionary<string, DataItem> scope in frame)
+                {
+                    if (scope.ContainsKey(name))
+                    {
+                        scope[name] = value;
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            public bool TryGetType(StatementWithValue statement, [NotNullWhen(true)] out CompiledType? type)
+            {
+                if (!TryGetValue(statement, out DataItem value))
+                {
+                    type = null;
+                    return false;
+                }
+
+                type = new CompiledType(value.Type);
+                return true;
+            }
+
+            public void PushScope(IDictionary<string, DataItem>? variables = null)
+            {
+                if (_frames is null) return;
+                if (variables is null)
+                { _frames?.Last.Push(new Dictionary<string, DataItem>()); }
+                else
+                { _frames?.Last.Push(new Dictionary<string, DataItem>(variables)); }
+            }
+
+            public void PopScope()
+            {
+                if (_frames is null) return;
+                _frames.Last.Pop();
+            }
         }
 
-        protected bool TryCompute(Pointer pointer, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        #region TryCompute()
+        /// <exception cref="NotImplementedException"/>
+        public static DataItem Compute(string @operator, DataItem left, DataItem right) => @operator switch
+        {
+            "!" => !left,
+
+            "+" => left + right,
+            "-" => left - right,
+            "*" => left * right,
+            "/" => left / right,
+            "%" => left % right,
+
+            "&&" => new DataItem((bool)left && (bool)right),
+            "||" => new DataItem((bool)left || (bool)right),
+
+            "&" => left & right,
+            "|" => left | right,
+            "^" => left ^ right,
+
+            "<<" => left << right,
+            ">>" => left >> right,
+
+            "<" => new DataItem(left < right),
+            ">" => new DataItem(left > right),
+            "==" => new DataItem(left == right),
+            "!=" => new DataItem(left != right),
+            "<=" => new DataItem(left <= right),
+            ">=" => new DataItem(left >= right),
+
+            _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
+        };
+
+        bool TryCompute(Pointer pointer, EvaluationContext context, out DataItem value)
         {
             {
                 if (pointer.PrevStatement is OperatorCall _operatorCall &&
                     _operatorCall.Left is AddressGetter _addressGetter &&
                     _addressGetter.PrevStatement is LiteralStatement _literal &&
                     _literal.Type == LiteralType.String &&
-                    TryCompute(_operatorCall.Right, null, out DataItem _index))
+                    TryCompute(_operatorCall.Right, context, out DataItem _index))
                 {
                     CompiledType stringType = FindTypeReplacer("string", _literal);
                     _index -= stringType.Size;
@@ -2509,7 +2720,7 @@ namespace LanguageCore.Compiler
                     _operatorCall.Left is TypeCast _typeCast &&
                     _typeCast.PrevStatement is LiteralStatement _literal &&
                     _literal.Type == LiteralType.String &&
-                    TryCompute(_operatorCall.Right, null, out DataItem _index))
+                    TryCompute(_operatorCall.Right, context, out DataItem _index))
                 {
                     CompiledType stringType = FindTypeReplacer("string", _literal);
                     _index -= stringType.Size;
@@ -2521,22 +2732,22 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(OperatorCall @operator, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        bool TryCompute(OperatorCall @operator, EvaluationContext context, out DataItem value)
         {
             if (GetOperator(@operator, out _))
             {
-                if (values is not null &&
-                    values.TryGetValue(@operator, out value))
+                if (context is not null &&
+                    context.TryGetValue(@operator, out value))
                 { return true; }
 
                 value = DataItem.Null;
                 return false;
             }
 
-            if (!TryCompute(@operator.Left, values, out DataItem leftValue))
+            if (!TryCompute(@operator.Left, context, out DataItem leftValue))
             {
-                if (values is not null &&
-                    values.TryGetValue(@operator, out value))
+                if (context is not null &&
+                    context.TryGetValue(@operator, out value))
                 { return true; }
 
                 value = DataItem.Null;
@@ -2553,7 +2764,7 @@ namespace LanguageCore.Compiler
 
             if (@operator.Right != null)
             {
-                if (TryCompute(@operator.Right, values, out DataItem rightValue))
+                if (TryCompute(@operator.Right, context, out DataItem rightValue))
                 {
                     value = Compute(op, leftValue, rightValue);
                     return true;
@@ -2580,8 +2791,8 @@ namespace LanguageCore.Compiler
                         break;
                     }
                     default:
-                        if (values is not null &&
-                            values.TryGetValue(@operator, out value))
+                        if (context is not null &&
+                            context.TryGetValue(@operator, out value))
                         { return true; }
 
                         value = DataItem.Null;
@@ -2592,7 +2803,7 @@ namespace LanguageCore.Compiler
             value = leftValue;
             return true;
         }
-        public static bool TryCompute(LiteralStatement literal, out DataItem value)
+        static bool TryCompute(LiteralStatement literal, out DataItem value)
         {
             switch (literal.Type)
             {
@@ -2620,7 +2831,7 @@ namespace LanguageCore.Compiler
             }
             return true;
         }
-        protected bool TryCompute(KeywordCall keywordCall, out DataItem value)
+        bool TryCompute(KeywordCall keywordCall, out DataItem value)
         {
             if (keywordCall.FunctionName == "sizeof")
             {
@@ -2640,19 +2851,19 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(AnyCall anyCall, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        bool TryCompute(AnyCall anyCall, EvaluationContext context, out DataItem value)
         {
             if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
-            { return TryCompute(functionCall, values, out value); }
+            { return TryCompute(functionCall, context, out value); }
 
-            if (values is not null &&
-                values.TryGetValue(anyCall, out value))
+            if (context is not null &&
+                context.TryGetValue(anyCall, out value))
             { return true; }
 
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(FunctionCall functionCall, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        bool TryCompute(FunctionCall functionCall, EvaluationContext context, out DataItem value)
         {
             if (functionCall.FunctionName == "sizeof")
             {
@@ -2671,20 +2882,52 @@ namespace LanguageCore.Compiler
 
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
             {
-                Statement inlined = InlineMacro(macro, functionCall.Parameters);
+                if (!InlineMacro(macro, out Statement? inlined, functionCall.Parameters))
+                { throw new CompilerException($"Failed to inline the macro", functionCall, CurrentFile); }
 
                 if (inlined is StatementWithValue statementWithValue)
-                { return TryCompute(statementWithValue, values, out value); }
+                { return TryCompute(statementWithValue, context, out value); }
             }
 
-            if (values is not null &&
-                values.TryGetValue(functionCall, out value))
+            if (GetFunction(functionCall, out CompiledFunction? function))
+            {
+                if (function.IsExternal &&
+                    !functionCall.SaveValue &&
+                    TryCompute(functionCall.MethodParameters, context, out DataItem[]? parameters))
+                {
+                    FunctionCall newFunctionCall = new(
+                        null,
+                        functionCall.Identifier,
+                        functionCall.BracketLeft,
+                        parameters.Select(v => Literal.CreateAnonymous(v, Position.UnknownPosition)),
+                        functionCall.BracketRight)
+                    {
+                        SaveValue = functionCall.SaveValue,
+                        Semicolon = functionCall.Semicolon,
+                    };
+                    context.RuntimeStatements.Add(newFunctionCall);
+                    value = DataItem.Null;
+                    return true;
+                }
+
+                if (function.IsInlineable &&
+                    TryCompute(functionCall.MethodParameters, context, out parameters) &&
+                    TryEvaluate(function, parameters, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+                    returnValue.HasValue &&
+                    runtimeStatements.Length == 0)
+                {
+                    value = returnValue.Value;
+                    return true;
+                }
+            }
+
+            if (context.TryGetValue(functionCall, out value))
             { return true; }
 
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(Identifier identifier, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        bool TryCompute(Identifier identifier, EvaluationContext context, out DataItem value)
         {
             if (GetConstant(identifier.Content, out DataItem constantValue))
             {
@@ -2692,14 +2935,13 @@ namespace LanguageCore.Compiler
                 return true;
             }
 
-            if (values is not null &&
-                values.TryGetValue(identifier, out value))
+            if (context.TryGetValue(identifier, out value))
             { return true; }
 
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(Field field, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        bool TryCompute(Field field, EvaluationContext context, out DataItem value)
         {
             CompiledType prevType = FindStatementType(field.PrevStatement);
 
@@ -2709,16 +2951,15 @@ namespace LanguageCore.Compiler
                 return true;
             }
 
-            if (values is not null &&
-                values.TryGetValue(field, out value))
+            if (context.TryGetValue(field, out value))
             { return true; }
 
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(TypeCast typeCast, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        bool TryCompute(TypeCast typeCast, EvaluationContext context, out DataItem value)
         {
-            if (TryCompute(typeCast.PrevStatement, values, out value))
+            if (TryCompute(typeCast.PrevStatement, context, out value))
             {
                 CompiledType type = new(typeCast.Type, FindType, TryCompute);
                 if (!type.IsBuiltin) return false;
@@ -2729,11 +2970,11 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
-        protected bool TryCompute(IndexCall indexCall, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+        bool TryCompute(IndexCall indexCall, EvaluationContext context, out DataItem value)
         {
             if (indexCall.PrevStatement is LiteralStatement literal &&
                 literal.Type == LiteralType.String &&
-                TryCompute(indexCall.Expression, values, out DataItem index))
+                TryCompute(indexCall.Expression, context, out DataItem index))
             {
                 if (index == literal.Value.Length)
                 { value = new DataItem('\0'); }
@@ -2745,35 +2986,232 @@ namespace LanguageCore.Compiler
             value = DataItem.Null;
             return false;
         }
+        protected bool TryEvaluate(CompiledFunction function, StatementWithValue[] parameters, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+        {
+            value = null;
+            runtimeStatements = null;
 
-        protected bool TryCompute(StatementWithValue? statement, Dictionary<StatementWithValue, DataItem>? values, out DataItem value)
+            if (function.ReturnSomething &&
+                !function.Type.IsBuiltin)
+            { return false; }
+
+            if (function.Block is null)
+            { return false; }
+
+            if (!TryCompute(parameters, new EvaluationContext(null, null), out DataItem[]? parameterValues))
+            { return false; }
+
+            return TryEvaluate(function, parameterValues, out value, out runtimeStatements);
+        }
+        protected bool TryEvaluate(CompiledFunction function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+        {
+            value = null;
+            runtimeStatements = null;
+
+            if (function.ReturnSomething &&
+                !function.Type.IsBuiltin)
+            { return false; }
+
+            if (function.Block is null)
+            { return false; }
+
+            Dictionary<string, DataItem> variables = new();
+
+            if (function.ReturnSomething)
+            { variables.Add("@return", GetInitialValue(function.Type.BuiltinType)); }
+
+            for (int i = 0; i < parameterValues.Length; i++)
+            { variables.Add(function.Parameters[i].Identifier.Content, parameterValues[i]); }
+
+            EvaluationContext context = new(null, variables);
+
+            CurrentEvaluationContext.Push(context);
+
+            if (!TryEvaluate(function.Block, context))
+            {
+                CurrentEvaluationContext.Pop();
+                return false;
+            }
+
+            CurrentEvaluationContext.Pop();
+
+            if (function.ReturnSomething)
+            { value = context.LastScope!["@return"]; }
+
+            runtimeStatements = context.RuntimeStatements.ToArray();
+
+            return true;
+        }
+        bool TryCompute(StatementWithValue[]? statements, EvaluationContext context, [NotNullWhen(true)] out DataItem[]? values)
+        {
+            if (statements is null)
+            {
+                values = null;
+                return false;
+            }
+
+            values = new DataItem[statements.Length];
+
+            for (int i = 0; i < statements.Length; i++)
+            {
+                StatementWithValue statement = statements[i];
+
+                if (!TryCompute(statement, context, out DataItem value))
+                {
+                    values = null;
+                    return false;
+                }
+
+                values[i] = value;
+            }
+
+            return true;
+        }
+
+        bool TryEvaluate(WhileLoop whileLoop, EvaluationContext context)
+        {
+            int iterations = 64;
+
+            while (true)
+            {
+                if (!TryCompute(whileLoop.Condition, context, out DataItem condition))
+                { return false; }
+
+                if (!condition)
+                { return true; }
+
+                if (iterations-- < 0)
+                { return false; }
+
+                if (!TryEvaluate(whileLoop.Block, context))
+                { return false; }
+            }
+        }
+        bool TryEvaluate(Block block, EvaluationContext context)
+        {
+            context.PushScope();
+            bool result = TryEvaluate(block.Statements, context);
+            context.PopScope();
+            return result;
+        }
+        bool TryEvaluate(VariableDeclaration variableDeclaration, EvaluationContext context)
+        {
+            DataItem value;
+
+            if (context.LastScope is null)
+            { return false; }
+
+            if (variableDeclaration.InitialValue is null &&
+                variableDeclaration.Type.ToString() != "var")
+            {
+                value = GetInitialValue(variableDeclaration.Type);
+            }
+            else
+            {
+                if (!TryCompute(variableDeclaration.InitialValue, context, out value))
+                { return false; }
+            }
+
+            if (!context.LastScope.TryAdd(variableDeclaration.VariableName.Content, value))
+            { return false; }
+
+            return true;
+        }
+        bool TryEvaluate(AnyAssignment anyAssignment, EvaluationContext context)
+        {
+            Assignment assignment = anyAssignment.ToAssignment();
+
+            if (assignment.Left is not Identifier identifier)
+            { return false; }
+
+            if (!TryCompute(assignment.Right, context, out DataItem value))
+            { return false; }
+
+            if (!context.TrySetVariable(identifier.Content, value))
+            { return false; }
+
+            return true;
+        }
+        bool TryEvaluate(KeywordCall keywordCall, EvaluationContext context)
+        {
+            if (keywordCall.Identifier.Content == "return")
+            {
+                context.IsReturning = true;
+
+                if (keywordCall.Parameters.Length == 0)
+                { return true; }
+
+                if (keywordCall.Parameters.Length == 1)
+                {
+                    if (!TryCompute(keywordCall.Parameters[0], context, out DataItem returnValue))
+                    { return false; }
+
+                    if (!context.TrySetVariable("@return", returnValue))
+                    { return false; }
+
+                    return true;
+                }
+
+                return false;
+            }
+
+            return false;
+        }
+        bool TryEvaluate(Statement statement, EvaluationContext context) => statement switch
+        {
+            Block v => TryEvaluate(v, context),
+            VariableDeclaration v => TryEvaluate(v, context),
+            WhileLoop v => TryEvaluate(v, context),
+            AnyAssignment v => TryEvaluate(v, context),
+            KeywordCall v => TryEvaluate(v, context),
+            StatementWithValue v => TryCompute(v, context, out _),
+            IfContainer => false,
+            _ => throw new NotImplementedException(statement.GetType().ToString()),
+        };
+        bool TryEvaluate(IEnumerable<Statement> statements, EvaluationContext context)
+        {
+            foreach (Statement statement in statements)
+            {
+                if (!TryEvaluate(statement, context))
+                { return false; }
+                if (context.IsReturning)
+                { break; }
+            }
+            return true;
+        }
+
+        protected bool TryCompute(StatementWithValue? statement, out DataItem value)
+            => TryCompute(statement, EvaluationContext.Empty, out value);
+
+        readonly Stack<EvaluationContext> CurrentEvaluationContext = new();
+
+        protected bool TryCompute(StatementWithValue? statement, EvaluationContext context, out DataItem value)
         {
             value = DataItem.Null;
 
             if (statement is null)
             { return false; }
 
-            if (values is not null &&
-                values.TryGetValue(statement, out value))
+            if (context.TryGetValue(statement, out value))
             { return true; }
 
             return statement switch
             {
                 LiteralStatement v => TryCompute(v, out value),
-                OperatorCall v => TryCompute(v, values, out value),
-                Pointer v => TryCompute(v, values, out value),
+                OperatorCall v => TryCompute(v, context, out value),
+                Pointer v => TryCompute(v, context, out value),
                 KeywordCall v => TryCompute(v, out value),
-                FunctionCall v => TryCompute(v, values, out value),
-                AnyCall v => TryCompute(v, values, out value),
-                Identifier v => TryCompute(v, values, out value),
-                TypeCast v => TryCompute(v, values, out value),
-                Field v => TryCompute(v, values, out value),
-                IndexCall v => TryCompute(v, values, out value),
-                _ => false,
+                FunctionCall v => TryCompute(v, context, out value),
+                AnyCall v => TryCompute(v, context, out value),
+                Identifier v => TryCompute(v, context, out value),
+                TypeCast v => TryCompute(v, context, out value),
+                Field v => TryCompute(v, context, out value),
+                IndexCall v => TryCompute(v, context, out value),
+                ModifiedStatement => false,
+                NewInstance => false,
+                _ => throw new NotImplementedException(statement.GetType().ToString()),
             };
         }
-        protected bool TryCompute(StatementWithValue? statement, out DataItem value)
-            => TryCompute(statement, null, out value);
 
         public static bool TryComputeSimple(OperatorCall @operator, out DataItem value)
         {
@@ -2852,7 +3290,7 @@ namespace LanguageCore.Compiler
                 LiteralStatement v => TryCompute(v, out value),
                 OperatorCall v => TryComputeSimple(v, out value),
                 IndexCall v => TryComputeSimple(v, out value),
-                _ => false
+                _ => false,
             };
         }
         #endregion
@@ -3059,7 +3497,7 @@ namespace LanguageCore.Compiler
                 {
                     StatementWithValue condition = ifBranch.Condition;
                     condition = Collapse(condition, parameters);
-                    if (TryCompute(condition, null, out DataItem conditionValue))
+                    if (TryCompute(condition, EvaluationContext.Empty, out DataItem conditionValue))
                     {
                         if (conditionValue)
                         {
@@ -3080,7 +3518,7 @@ namespace LanguageCore.Compiler
                 {
                     StatementWithValue condition = elseIfBranch.Condition;
                     condition = Collapse(condition, parameters);
-                    if (prevIsCollapsed && TryCompute(condition, null, out DataItem conditionValue))
+                    if (prevIsCollapsed && TryCompute(condition, EvaluationContext.Empty, out DataItem conditionValue))
                     {
                         if (conditionValue)
                         {
@@ -3214,8 +3652,8 @@ namespace LanguageCore.Compiler
             condition = InlineMacro(condition, _params);
             StatementWithValue iteratorExpressionRight = InlineMacro(iteratorExpression.Right, _params);
 
-            if (!TryCompute(condition, null, out _) ||
-                !TryCompute(iteratorExpressionRight, null, out _))
+            if (!TryCompute(condition, EvaluationContext.Empty, out _) ||
+                !TryCompute(iteratorExpressionRight, EvaluationContext.Empty, out _))
             { return false; }
 
             // TODO: return and break in unrolled loop
@@ -3234,7 +3672,7 @@ namespace LanguageCore.Compiler
             DataItem iterator;
             if (iteratorVariable.InitialValue is not null)
             {
-                if (!TryCompute(iteratorVariable.InitialValue, null, out iterator))
+                if (!TryCompute(iteratorVariable.InitialValue, EvaluationContext.Empty, out iterator))
                 { throw new CompilerException($"Failed to compute the iterator initial value (\"{iteratorVariable.InitialValue}\") for loop unrolling", iteratorVariable.InitialValue, CurrentFile); }
             }
             else
@@ -3255,7 +3693,7 @@ namespace LanguageCore.Compiler
                     {_yeah.Key, _yeah.Value }
                 });
 
-                if (!TryCompute(_condition, values, out DataItem result))
+                if (!TryCompute(_condition, new EvaluationContext(values, null), out DataItem result))
                 { throw new CompilerException($"Failed to compute the condition value (\"{_condition}\") for loop unrolling", condition, CurrentFile); }
 
                 return result;
@@ -3274,7 +3712,7 @@ namespace LanguageCore.Compiler
                     { _yeah.Key, _yeah.Value }
                 });
 
-                if (!TryCompute(_value, values, out DataItem result))
+                if (!TryCompute(_value, new EvaluationContext(values, null), out DataItem result))
                 { throw new CompilerException($"Failed to compute the condition value (\"{_value}\") for loop unrolling", condition, CurrentFile); }
 
                 return result;

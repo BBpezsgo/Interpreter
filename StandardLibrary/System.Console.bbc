@@ -33,10 +33,30 @@ export void Print(byte message)
     Print(temp message.ToString());
 }
 
-[StandardOutput]
-export void Print(int message)
+// https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+inline int _FindMaxPowOf10(int num)
 {
-    Print(temp message.ToString());
+    int result = 1;
+    num /= 10;
+    while (num)
+    {
+        result *= 10;
+        num /= 10;
+    }
+    return result;
+}
+
+// https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+export inline void Print(int message)
+{
+    int pow10 = _FindMaxPowOf10(message);
+    while (pow10)
+    {
+        int digit = message / pow10;
+        Print((digit + '0') as char);
+        message -= digit * pow10;
+        pow10 /= 10;
+    }
 }
 
 [StandardOutput]

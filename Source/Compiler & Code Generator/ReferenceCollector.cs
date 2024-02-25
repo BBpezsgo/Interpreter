@@ -63,7 +63,9 @@ namespace LanguageCore.Compiler
                 if (anyCall.ToFunctionCall(out FunctionCall? functionCall) &&
                     TryGetMacro(functionCall, out MacroDefinition? macro))
                 {
-                    Statement inlined = InlineMacro(macro, functionCall.Parameters);
+                    if (!InlineMacro(macro, out Statement? inlined, functionCall.Parameters))
+                    { throw new CompilerException($"Failed to inline the macro", functionCall, CurrentFile); }
+
                     variablesAdded += AnalyzeNewVariable(inlined);
                 }
             }
@@ -319,7 +321,9 @@ namespace LanguageCore.Compiler
 
                 if (TryGetMacro(functionCall, out MacroDefinition? macro))
                 {
-                    Statement inlinedMacro = InlineMacro(macro, functionCall.Parameters);
+                    if (!InlineMacro(macro, out Statement? inlinedMacro, functionCall.Parameters))
+                    { throw new CompilerException($"Failed to inline the macro", functionCall, CurrentFile); }
+
                     AnalyzeStatement(inlinedMacro, expectedType);
 
                     if (inlinedMacro is StatementWithBlock blockStatement)

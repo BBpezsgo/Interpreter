@@ -270,7 +270,10 @@ namespace LanguageCore.BBCode.Generator
                 CurrentContext = null;
                 int instructionsStart = GeneratedCode.Count;
 
-                GenerateCodeForInlinedMacro(InlineMacro(macro, functionCall.Parameters));
+                if (!InlineMacro(macro, out Statement? inlinedMacro, functionCall.Parameters))
+                { throw new CompilerException($"Failed to inline the macro", functionCall, CurrentFile); }
+
+                GenerateCodeForInlinedMacro(inlinedMacro);
 
                 GeneratedDebugInfo.FunctionInformations.Add(new FunctionInformations()
                 {
@@ -809,7 +812,7 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForStatement(OperatorCall @operator)
         {
-            if (Settings.OptimizeCode && TryCompute(@operator, null, out DataItem predictedValue))
+            if (Settings.OptimizeCode && TryCompute(@operator, out DataItem predictedValue))
             {
                 OnGotStatementType(@operator, new CompiledType(predictedValue.Type));
 
@@ -1159,7 +1162,7 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForStatement(WhileLoop whileLoop)
         {
-            bool conditionIsComputed = TryCompute(whileLoop.Condition, null, out DataItem computedCondition);
+            bool conditionIsComputed = TryCompute(whileLoop.Condition, out DataItem computedCondition);
             if (conditionIsComputed && !(bool)computedCondition && TrimUnreachableCode)
             {
                 AddComment("Unreachable code not compiled");
@@ -1478,7 +1481,7 @@ namespace LanguageCore.BBCode.Generator
                 if (index.PrevStatement is not Identifier identifier)
                 { throw new NotSupportedException($"Only variables/parameters supported by now", index.PrevStatement, CurrentFile); }
 
-                if (TryCompute(index.Expression, null, out DataItem computedIndexData))
+                if (TryCompute(index.Expression, out DataItem computedIndexData))
                 {
                     if (computedIndexData < 0 || computedIndexData >= prevType.StackArraySize)
                     { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", index.Expression, CurrentFile)); }
@@ -1905,7 +1908,7 @@ namespace LanguageCore.BBCode.Generator
                 if (statementToSet.PrevStatement is not Identifier identifier)
                 { throw new NotSupportedException($"Only variables/parameters supported by now", statementToSet.PrevStatement, CurrentFile); }
 
-                if (TryCompute(statementToSet.Expression, null, out DataItem computedIndexData))
+                if (TryCompute(statementToSet.Expression, out DataItem computedIndexData))
                 {
                     if (computedIndexData < 0 || computedIndexData >= prevType.StackArraySize)
                     { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", statementToSet.Expression, CurrentFile)); }
@@ -2007,7 +2010,7 @@ namespace LanguageCore.BBCode.Generator
             AssignTypeCheck(variable.Type, valueType, value);
 
             if (variable.Type.IsBuiltin &&
-                TryCompute(value, null, out DataItem yeah))
+                TryCompute(value, out DataItem yeah))
             {
                 AddInstruction(Opcode.PUSH_VALUE, yeah);
             }
@@ -2199,7 +2202,7 @@ namespace LanguageCore.BBCode.Generator
 
             int size;
 
-            if (TryCompute(newVariable.InitialValue, null, out DataItem computedInitialValue))
+            if (TryCompute(newVariable.InitialValue, out DataItem computedInitialValue))
             {
                 AddComment($"Initial value {{");
 

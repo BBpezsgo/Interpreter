@@ -368,7 +368,7 @@ namespace LanguageCore.ASM.Generator
 
             int size;
 
-            if (TryCompute(newVariable.InitialValue, null, out DataItem computedInitialValue))
+            if (TryCompute(newVariable.InitialValue, out DataItem computedInitialValue))
             {
                 size = 1;
 
@@ -1092,7 +1092,10 @@ namespace LanguageCore.ASM.Generator
 
                 CurrentFile = macro.FilePath;
 
-                GenerateCodeForInlinedMacro(InlineMacro(macro, functionCall.Parameters));
+                if (!InlineMacro(macro, out Statement? inlinedMacro, functionCall.Parameters))
+                { throw new CompilerException($"Failed to inline the macro", functionCall, CurrentFile); }
+
+                GenerateCodeForInlinedMacro(inlinedMacro);
 
                 CurrentFile = prevFile;
 

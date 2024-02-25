@@ -223,6 +223,11 @@ public class BrainfuckSnippets
     [DataRow(6, 3, 2)]
     [DataRow(6, 6, 1)]
     [DataRow(255, 16, 16)]
+    [DataRow(77, 10, 7)]
+    [DataRow(7, 10, 0)]
+    [DataRow(77, 77, 1)]
+    [DataRow(77, 78, 0)]
+    [DataRow(77, 76, 1)]
     public void MATH_DIV(int x, int y, int expected)
     {
         CompiledCode code = new();

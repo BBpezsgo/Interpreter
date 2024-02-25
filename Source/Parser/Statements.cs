@@ -1043,7 +1043,7 @@ namespace LanguageCore.Parser.Statement
                 RuntimeType.UInt8 => LiteralType.Integer,
                 RuntimeType.SInt32 => LiteralType.Integer,
                 RuntimeType.Single => LiteralType.Float,
-                RuntimeType.UInt16 => LiteralType.Integer,
+                RuntimeType.UInt16 => LiteralType.Char,
                 _ => throw new NotImplementedException(),
             };
             Value = value.ToString();
@@ -1080,7 +1080,7 @@ namespace LanguageCore.Parser.Statement
                 RuntimeType.UInt8 => TokenType.LiteralNumber,
                 RuntimeType.SInt32 => TokenType.LiteralNumber,
                 RuntimeType.Single => TokenType.LiteralFloat,
-                RuntimeType.UInt16 => TokenType.LiteralNumber,
+                RuntimeType.UInt16 => TokenType.LiteralCharacter,
                 _ => TokenType.Identifier,
             };
             return new Literal(value, Token.CreateAnonymous(value.ToString(), tokenType))

@@ -2060,11 +2060,6 @@ public abstract class CodeGenerator
 
     #region InlineMacro()
 
-    protected class InlineException : Exception
-    {
-
-    }
-
     protected bool TryInlineMacro(StatementWithValue statement, [NotNullWhen(true)] out Statement? inlined)
     {
         if (statement is AnyCall anyCall)
@@ -2099,38 +2094,38 @@ public abstract class CodeGenerator
             parameters,
             (key, value) => (key.Content, value));
 
-        try
-        {
-            inlined = InlineMacro(macro, _parameters);
-            return true;
-        }
-        catch (InlineException)
-        {
-            inlined = null;
-            return false;
-        }
+        return InlineMacro(macro, _parameters, out inlined);
     }
 
-    /// <exception cref="InlineException"/>
-    Statement InlineMacro(MacroDefinition macro, Dictionary<string, StatementWithValue> parameters)
+    bool InlineMacro(MacroDefinition macro, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
-        Statement result;
+        inlined = null;
 
         if (macro.Block.Statements.Length == 0)
-        { throw new CompilerException($"Macro \"{macro.ToReadable()}\" has no statements", macro.Block, macro.FilePath); }
-        else if (macro.Block.Statements.Length == 1)
-        { result = InlineMacro(macro.Block.Statements[0], parameters); }
+        {
+            // throw new CompilerException($"Macro \"{macro.ToReadable()}\" has no statements", macro.Block, macro.FilePath);
+            return false;
+        }
+
+        if (macro.Block.Statements.Length == 1)
+        {
+            if (!InlineMacro(macro.Block.Statements[0], parameters, out inlined))
+            { return false; }
+        }
         else
-        { result = InlineMacro(macro.Block, parameters); }
+        {
+            if (!InlineMacro(macro.Block, parameters, out inlined))
+            { return false; }
+        }
 
-        result = Collapse(result, parameters);
+        inlined = Collapse(inlined, parameters);
 
-        if (result is KeywordCall keywordCall &&
+        if (inlined is KeywordCall keywordCall &&
             keywordCall.Identifier.Equals("return") &&
             keywordCall.Parameters.Length == 1)
-        { result = keywordCall.Parameters[0]; }
+        { inlined = keywordCall.Parameters[0]; }
 
-        return result;
+        return true;
     }
 
     protected bool InlineMacro(FunctionThingDefinition function, [NotNullWhen(true)] out Statement? inlined, params StatementWithValue[] parameters)
@@ -2140,57 +2135,64 @@ public abstract class CodeGenerator
             parameters,
             (key, value) => (key.Identifier.Content, value));
 
-        try
-        {
-            inlined = InlineMacro(function, _parameters);
-            return true;
-        }
-        catch (InlineException)
-        {
-            inlined = null;
-            return false;
-        }
+        return InlineMacro(function, _parameters, out inlined);
     }
 
     /// <exception cref="InlineException"/>
-    Statement InlineMacro(FunctionThingDefinition function, Dictionary<string, StatementWithValue> parameters)
+    bool InlineMacro(FunctionThingDefinition function, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
-        Statement result;
+        inlined = default;
 
-        if (function.Block is null || function.Block.Statements.Length == 0)
-        { throw new CompilerException($"Function \"{function.ToReadable()}\" has no statements", function.Block, function.FilePath); }
-        else if (function.Block.Statements.Length == 1)
-        { result = InlineMacro(function.Block.Statements[0], parameters); }
+        if (function.Block is null ||
+            function.Block.Statements.Length == 0)
+        {
+            return false;
+            // throw new CompilerException($"Function \"{function.ToReadable()}\" has no statements", function.Block, function.FilePath);
+        }
+
+        if (function.Block.Statements.Length == 1)
+        {
+            if (!InlineMacro(function.Block.Statements[0], parameters, out inlined))
+            { return false; }
+        }
         else
-        { result = InlineMacro(function.Block, parameters); }
+        {
+            if (!InlineMacro(function.Block, parameters, out inlined))
+            { return false; }
+        }
 
-        result = Collapse(result, parameters);
+        inlined = Collapse(inlined, parameters);
 
-        if (result is KeywordCall keywordCall &&
+        if (inlined is KeywordCall keywordCall &&
             keywordCall.Identifier.Equals("return") &&
             keywordCall.Parameters.Length == 1)
-        { result = keywordCall.Parameters[0]; }
+        { inlined = keywordCall.Parameters[0]; }
 
-        return result;
+        return true;
     }
 
-    /// <exception cref="InlineException"/>
-    static Block InlineMacro(Block block, Dictionary<string, StatementWithValue> parameters)
+    static bool InlineMacro(Block block, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Block? inlined)
     {
-        Statement[] statements = new Statement[block.Statements.Length];
+        inlined = null;
+
+        List<Statement> statements = new(block.Statements.Length);
         for (int i = 0; i < block.Statements.Length; i++)
         {
             Statement statement = block.Statements[i];
-            statements[i] = InlineMacro(statement, parameters);
+            if (!InlineMacro(statement, parameters, out Statement? inlinedStatement))
+            { return false; }
+
+            statements.Add(inlinedStatement);
 
             if (statement is KeywordCall keywordCall &&
                 keywordCall.Identifier.Equals("return"))
             { break; }
         }
-        return new Block(block.BracketStart, statements, block.BracketEnd)
+        inlined = new Block(block.BracketStart, statements.ToArray(), block.BracketEnd)
         {
             Semicolon = block.Semicolon,
         };
+        return true;
     }
 
     static OperatorCall InlineMacro(OperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
@@ -2236,154 +2238,309 @@ public abstract class CodeGenerator
     static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
     { return statements.Select(statement => InlineMacro(statement, parameters)); }
 
-    /// <exception cref="InlineException"/>
-    static Statement InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+    static bool InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
-        Block v => InlineMacro(v, parameters),
-        StatementWithValue v => InlineMacro(v, parameters),
-        ForLoop v => InlineMacro(v, parameters),
-        IfContainer v => InlineMacro(v, parameters),
-        AnyAssignment v => InlineMacro(v, parameters),
-        VariableDeclaration v => InlineMacro(v, parameters),
-        WhileLoop v => InlineMacro(v, parameters),
-        _ => throw new NotImplementedException(statement.GetType().ToString()),
-    };
+        inlined = null;
 
-    /// <exception cref="InlineException"/>
-    static IfContainer InlineMacro(IfContainer statement, Dictionary<string, StatementWithValue> parameters)
+        switch (statement)
+        {
+            case Block v:
+            {
+                if (InlineMacro(v, parameters, out Block? inlined_))
+                {
+                    inlined = inlined_;
+                    return true;
+                }
+                break;
+            }
+
+            case StatementWithValue v:
+            {
+                inlined = InlineMacro(v, parameters);
+                return true;
+            }
+
+            case ForLoop v:
+            {
+                if (InlineMacro(v, parameters, out ForLoop? inlined_))
+                {
+                    inlined = inlined_;
+                    return true;
+                }
+                break;
+            }
+
+            case IfContainer v:
+            {
+                if (InlineMacro(v, parameters, out IfContainer? inlined_))
+                {
+                    inlined = inlined_;
+                    return true;
+                }
+                break;
+            }
+
+            case AnyAssignment v:
+            {
+                if (InlineMacro(v, parameters, out AnyAssignment? inlined_))
+                {
+                    inlined = inlined_;
+                    return true;
+                }
+                break;
+            }
+
+            case VariableDeclaration v:
+            {
+                if (InlineMacro(v, parameters, out VariableDeclaration? inlined_))
+                {
+                    inlined = inlined_;
+                    return true;
+                }
+                break;
+            }
+
+            case WhileLoop v:
+            {
+                if (InlineMacro(v, parameters, out WhileLoop? inlined_))
+                {
+                    inlined = inlined_;
+                    return true;
+                }
+                break;
+            }
+
+            default: throw new NotImplementedException(statement.GetType().ToString());
+        }
+
+        return false;
+    }
+
+    static bool InlineMacro(IfContainer statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out IfContainer? inlined)
     {
+        inlined = null;
         BaseBranch[] branches = new BaseBranch[statement.Parts.Length];
         for (int i = 0; i < branches.Length; i++)
-        { branches[i] = InlineMacro(statement.Parts[i], parameters); }
-        return new IfContainer(branches)
+        {
+            if (!InlineMacro(statement.Parts[i], parameters, out BaseBranch? inlinedBranch))
+            { return false; }
+            branches[i] = inlinedBranch;
+        }
+        inlined = new IfContainer(branches)
         { Semicolon = statement.Semicolon, };
+        return true;
+    }
+
+    static bool InlineMacro(BaseBranch statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out BaseBranch? inlined) => statement switch
+    {
+        IfBranch v => InlineMacro(v, parameters, out inlined),
+        ElseIfBranch v => InlineMacro(v, parameters, out inlined),
+        ElseBranch v => InlineMacro(v, parameters, out inlined),
+        _ => throw new UnreachableException()
+    };
+
+    static bool InlineMacro(IfBranch statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out BaseBranch? inlined)
+    {
+        inlined = null;
+
+        StatementWithValue condition = InlineMacro(statement.Condition, parameters);
+
+        if (!InlineMacro(statement.Block, parameters, out Statement? block))
+        { return false; }
+
+        inlined = new IfBranch(
+             keyword: statement.Keyword,
+             condition: condition,
+             block: block)
+        {
+            Semicolon = statement.Semicolon,
+        };
+        return true;
+    }
+
+    static bool InlineMacro(ElseIfBranch statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out BaseBranch? inlined)
+    {
+        inlined = null;
+
+        StatementWithValue condition = InlineMacro(statement.Condition, parameters);
+
+        if (!InlineMacro(statement.Block, parameters, out Statement? block))
+        { return false; }
+
+        inlined = new ElseIfBranch(
+             keyword: statement.Keyword,
+              condition: condition,
+              block: block)
+        {
+            Semicolon = statement.Semicolon,
+        };
+        return true;
+    }
+
+    static bool InlineMacro(ElseBranch statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out BaseBranch? inlined)
+    {
+        inlined = null;
+
+        if (!InlineMacro(statement.Block, parameters, out Statement? block))
+        { return false; }
+
+        inlined = new ElseBranch(
+            keyword: statement.Keyword,
+            block: block)
+        {
+            Semicolon = statement.Semicolon,
+        };
+        return true;
     }
 
     /// <exception cref="InlineException"/>
-    static BaseBranch InlineMacro(BaseBranch statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+    static bool InlineMacro(WhileLoop statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out WhileLoop? inlined)
     {
-        IfBranch v => InlineMacro(v, parameters),
-        ElseIfBranch v => InlineMacro(v, parameters),
-        ElseBranch v => InlineMacro(v, parameters),
-        _ => throw new UnreachableException()
-    };
+        inlined = null;
 
-    /// <exception cref="InlineException"/>
-    static IfBranch InlineMacro(IfBranch statement, Dictionary<string, StatementWithValue> parameters)
-        => new(
+        StatementWithValue condition = InlineMacro(statement.Condition, parameters);
+
+        if (!InlineMacro(statement.Block, parameters, out Block? block))
+        { return false; }
+
+        inlined = new WhileLoop(
             keyword: statement.Keyword,
-            condition: InlineMacro(statement.Condition, parameters),
-            block: InlineMacro(statement.Block, parameters))
+            condition: condition,
+            block: block)
         {
             Semicolon = statement.Semicolon,
         };
+        return true;
+    }
 
     /// <exception cref="InlineException"/>
-    static ElseIfBranch InlineMacro(ElseIfBranch statement, Dictionary<string, StatementWithValue> parameters)
-        => new(
-            keyword: statement.Keyword,
-            condition: InlineMacro(statement.Condition, parameters),
-            block: InlineMacro(statement.Block, parameters))
-        {
-            Semicolon = statement.Semicolon,
-        };
-
-    /// <exception cref="InlineException"/>
-    static ElseBranch InlineMacro(ElseBranch statement, Dictionary<string, StatementWithValue> parameters)
-        => new(
-            keyword: statement.Keyword,
-            block: InlineMacro(statement.Block, parameters))
-        {
-            Semicolon = statement.Semicolon,
-        };
-
-    /// <exception cref="InlineException"/>
-    static WhileLoop InlineMacro(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
-        => new(
-            keyword: statement.Keyword,
-            condition: InlineMacro(statement.Condition, parameters),
-            block: InlineMacro(statement.Block, parameters)
-            )
-        {
-            Semicolon = statement.Semicolon,
-        };
-
-    /// <exception cref="InlineException"/>
-    static ForLoop InlineMacro(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
-        => new(
-            keyword: statement.Keyword,
-            variableDeclaration: InlineMacro(statement.VariableDeclaration, parameters),
-            condition: InlineMacro(statement.Condition, parameters),
-            expression: InlineMacro(statement.Expression, parameters),
-            block: InlineMacro(statement.Block, parameters)
-            )
-        {
-            Semicolon = statement.Semicolon,
-        };
-
-    /// <exception cref="InlineException"/>
-    static AnyAssignment InlineMacro(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+    static bool InlineMacro(ForLoop statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out ForLoop? inlined)
     {
-        Assignment v => InlineMacro(v, parameters),
-        ShortOperatorCall v => InlineMacro(v, parameters),
-        CompoundAssignment v => InlineMacro(v, parameters),
-        _ => throw new UnreachableException()
-    };
+        inlined = null;
+
+        if (!InlineMacro(statement.VariableDeclaration, parameters, out VariableDeclaration? variableDeclaration))
+        { return false; }
+
+        StatementWithValue condition = InlineMacro(statement.Condition, parameters);
+
+        if (!InlineMacro(statement.Expression, parameters, out AnyAssignment? expression))
+        { return false; }
+
+        if (!InlineMacro(statement.Block, parameters, out Block? block))
+        { return false; }
+
+        inlined = new ForLoop(
+            keyword: statement.Keyword,
+            variableDeclaration: variableDeclaration,
+            condition: condition,
+            expression: expression,
+            block: block)
+        {
+            Semicolon = statement.Semicolon,
+        };
+        return true;
+    }
 
     /// <exception cref="InlineException"/>
-    static Assignment InlineMacro(Assignment statement, Dictionary<string, StatementWithValue> parameters)
+    static bool InlineMacro(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out AnyAssignment? inlined)
     {
+        inlined = null;
+
+        switch (statement)
+        {
+            case Assignment v:
+            {
+                if (InlineMacro(v, parameters, out Assignment? inlined_))
+                {
+                    inlined = inlined_;
+                    return true;
+                }
+                break;
+            }
+            case ShortOperatorCall v:
+            {
+                if (InlineMacro(v, parameters, out ShortOperatorCall? inlined_))
+                {
+                    inlined = inlined_;
+                    return true;
+                }
+                break;
+            }
+            case CompoundAssignment v:
+            {
+                if (InlineMacro(v, parameters, out CompoundAssignment? inlined_))
+                {
+                    inlined = inlined_;
+                    return true;
+                }
+                break;
+            }
+            default: throw new UnreachableException();
+        }
+
+        return false;
+    }
+
+    /// <exception cref="InlineException"/>
+    static bool InlineMacro(Assignment statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Assignment? inlined)
+    {
+        inlined = null;
         if (statement.Left is Identifier identifier &&
             parameters.ContainsKey(identifier.Content))
-        { throw new InlineException(); }
+        { return false; }
 
-        return new Assignment(
+        inlined = new Assignment(
             @operator: statement.Operator,
             left: statement.Left,
             right: InlineMacro(statement.Right, parameters))
         {
             Semicolon = statement.Semicolon,
         };
+        return true;
     }
 
     /// <exception cref="InlineException"/>
-    static ShortOperatorCall InlineMacro(ShortOperatorCall statement, Dictionary<string, StatementWithValue> parameters)
+    static bool InlineMacro(ShortOperatorCall statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out ShortOperatorCall? inlined)
     {
+        inlined = null;
         if (statement.Left is Identifier identifier &&
             parameters.ContainsKey(identifier.Content))
-        { throw new InlineException(); }
+        { return false; }
 
-        return new ShortOperatorCall(
+        inlined = new ShortOperatorCall(
              op: statement.Operator,
              left: statement.Left)
         {
             Semicolon = statement.Semicolon,
         };
+        return true;
     }
 
-    /// <exception cref="InlineException"/>
-    static CompoundAssignment InlineMacro(CompoundAssignment statement, Dictionary<string, StatementWithValue> parameters)
+    static bool InlineMacro(CompoundAssignment statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out CompoundAssignment? inlined)
     {
+        inlined = null;
         if (statement.Left is Identifier identifier &&
             parameters.ContainsKey(identifier.Content))
-        { throw new InlineException(); }
+        { return false; }
 
-        return new CompoundAssignment(
+        inlined = new CompoundAssignment(
             @operator: statement.Operator,
             left: statement.Left,
             right: InlineMacro(statement.Right, parameters))
         {
             Semicolon = statement.Semicolon,
         };
+        return true;
     }
 
-    /// <exception cref="InlineException"/>
-    static VariableDeclaration InlineMacro(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
+    static bool InlineMacro(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out VariableDeclaration? inlined)
     {
-        if (parameters.ContainsKey(statement.VariableName.Content))
-        { throw new InlineException(); }
+        inlined = null;
 
-        return new VariableDeclaration(
+        if (parameters.ContainsKey(statement.VariableName.Content))
+        { return false; }
+
+        inlined = new VariableDeclaration(
             modifiers: statement.Modifiers,
             type: statement.Type,
             variableName: statement.VariableName,
@@ -2392,6 +2549,7 @@ public abstract class CodeGenerator
             FilePath = statement.FilePath,
             Semicolon = statement.Semicolon,
         };
+        return true;
     }
 
     static Pointer InlineMacro(Pointer statement, Dictionary<string, StatementWithValue> parameters)
@@ -3379,12 +3537,13 @@ public abstract class CodeGenerator
     {
         if (TryGetMacro(statement, out MacroDefinition? macro))
         {
-            Statement inlined = InlineMacro(macro, parameters);
-
-            if (inlined is StatementWithValue statementWithValue)
-            { return statementWithValue; }
-            else
-            { throw new NotImplementedException(); }
+            if (InlineMacro(macro, parameters, out Statement? inlined))
+            {
+                if (inlined is StatementWithValue statementWithValue)
+                { return statementWithValue; }
+                else
+                { throw new NotImplementedException(); }
+            }
         }
         return statement;
     }
@@ -3727,11 +3886,15 @@ public abstract class CodeGenerator
 
         while (ComputeIterator())
         {
-            KeyValuePair<string, StatementWithValue> _yeah = GetIteratorStatement();
-            Block subBlock = InlineMacro(loop.Block, new Dictionary<string, StatementWithValue>()
+            KeyValuePair<string, StatementWithValue> iteratorStatement = GetIteratorStatement();
+            Dictionary<string, StatementWithValue> parameters = new()
             {
-                { _yeah.Key, _yeah.Value }
-            });
+                { iteratorStatement.Key, iteratorStatement.Value }
+            };
+
+            if (!InlineMacro(loop.Block, parameters, out Block? subBlock))
+            { throw new CompilerException($"Failed to inline"); }
+
             statements.Add(subBlock);
 
             iterator = ComputeExpression();

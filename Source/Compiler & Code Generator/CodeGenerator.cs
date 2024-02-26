@@ -368,52 +368,6 @@ public abstract class CodeGenerator
         return true;
     }
 
-    #region FindTypeReplacer()
-
-    /// <param name="position"> Used for exceptions </param>
-    /// <exception cref="CompilerException"/>
-    protected CompiledType FindTypeReplacer(string typeName, IPositioned position)
-    {
-        CompiledType? replacedName = TryFindTypeReplacer(typeName);
-
-        if (replacedName is null)
-        { throw new CompilerException($"Type replacer \"{typeName}\" not found. Define a type with an attribute [Define(\"{typeName}\")] to use it as a {typeName}", position, CurrentFile); }
-
-        return replacedName;
-    }
-
-    protected bool TryFindTypeReplacer(string typeName, [NotNullWhen(true)] out CompiledType? replacedType)
-    {
-        replacedType = TryFindTypeReplacer(typeName);
-        return replacedType is not null;
-    }
-
-    protected CompiledType? TryFindTypeReplacer(string typeName)
-    {
-        foreach (CompiledStruct @struct in CompiledStructs)
-        {
-            if (!@struct.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
-            { continue; }
-            if (!string.Equals(definedType, typeName, StringComparison.Ordinal))
-            { continue; }
-
-            return new CompiledType(@struct);
-        }
-        foreach (CompiledEnum @enum in CompiledEnums)
-        {
-            if (!@enum.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
-            { continue; }
-            if (!string.Equals(definedType, typeName, StringComparison.Ordinal))
-            { continue; }
-
-            return new CompiledType(@enum);
-        }
-
-        return null;
-    }
-
-    #endregion
-
     #region GetEnum()
 
     protected bool GetEnum(string name, [NotNullWhen(true)] out CompiledEnum? @enum)
@@ -2677,34 +2631,6 @@ public abstract class CodeGenerator
 
     bool TryCompute(Pointer pointer, EvaluationContext context, out DataItem value)
     {
-        {
-            if (pointer.PrevStatement is OperatorCall _operatorCall &&
-                _operatorCall.Left is AddressGetter _addressGetter &&
-                _addressGetter.PrevStatement is LiteralStatement _literal &&
-                _literal.Type == LiteralType.String &&
-                TryCompute(_operatorCall.Right, context, out DataItem _index))
-            {
-                CompiledType stringType = FindTypeReplacer("string", _literal);
-                _index -= stringType.Size;
-                value = new DataItem(_literal.Value[(int)_index]);
-                return true;
-            }
-        }
-
-        {
-            if (pointer.PrevStatement is OperatorCall _operatorCall &&
-                _operatorCall.Left is TypeCast _typeCast &&
-                _typeCast.PrevStatement is LiteralStatement _literal &&
-                _literal.Type == LiteralType.String &&
-                TryCompute(_operatorCall.Right, context, out DataItem _index))
-            {
-                CompiledType stringType = FindTypeReplacer("string", _literal);
-                _index -= stringType.Size;
-                value = new DataItem(_literal.Value[(int)_index]);
-                return true;
-            }
-        }
-
         value = DataItem.Null;
         return false;
     }

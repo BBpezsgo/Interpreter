@@ -60,7 +60,7 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 ## Hello World:
 ```cs
-using "../StandardLibrary/System";
+using "https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/StandardLibrary/System.bbc";
 
 PrintLine("hello, world");
 ```

@@ -2224,15 +2224,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        CompiledType valueType = FindStatementType(value);
-        bool isString = valueType.IsReplacedType("string");
-
-        if (value is Literal literal && isString)
+        if (value is Literal literal &&
+            literal.Type == LiteralType.String)
         {
             GenerateCodeForPrinter(literal.Value);
             return;
         }
 
+        CompiledType valueType = FindStatementType(value);
         GenerateCodeForValuePrinter(value, valueType);
     }
     void GenerateCodeForPrinter(DataItem value)
@@ -2383,11 +2382,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         if (TryCompute(value, out _)) return true;
 
+        if (value is Literal literal && literal.Type == LiteralType.String) return true;
+
         CompiledType valueType = FindStatementType(value);
-        bool isString = valueType.IsReplacedType("string");
-
-        if (value is Literal && isString) return true;
-
         return CanGenerateCodeForValuePrinter(valueType);
     }
     static bool CanGenerateCodeForValuePrinter(CompiledType valueType) =>

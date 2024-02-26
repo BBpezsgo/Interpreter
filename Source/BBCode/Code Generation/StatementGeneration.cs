@@ -308,8 +308,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
         functionCall.Reference = compiledFunction;
 
-        if (TryCompute(functionCall.MethodParameters, out var parameterValues) &&
-            TryEvaluate(compiledFunction, parameterValues, out var returnValue, out var runtimeStatements) &&
+        if (TryCompute(functionCall.MethodParameters, out DataItem[]? parameterValues) &&
+            TryEvaluate(compiledFunction, parameterValues, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {

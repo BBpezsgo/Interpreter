@@ -292,7 +292,6 @@ public class Compiler
 
     readonly List<FunctionDefinition> Operators;
     readonly List<FunctionDefinition> Functions;
-    readonly List<ConstructorDefinition> Constructors;
     readonly List<MacroDefinition> Macros;
     readonly List<StructDefinition> Structs;
     readonly List<EnumDefinition> Enums;
@@ -318,7 +317,6 @@ public class Compiler
         Functions = new List<FunctionDefinition>();
         Macros = new List<MacroDefinition>();
         Operators = new List<FunctionDefinition>();
-        Constructors = new List<ConstructorDefinition>();
         Structs = new List<StructDefinition>();
         Enums = new List<EnumDefinition>();
         Tags = new List<CompileTag>();
@@ -372,31 +370,6 @@ public class Compiler
 
         result = null;
         return false;
-    }
-
-    protected string? TypeDefinitionReplacer(string? typeName)
-    {
-        foreach (CompiledStruct @struct in CompiledStructs)
-        {
-            if (@struct.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
-            {
-                if (definedType == typeName)
-                {
-                    return @struct.Identifier.Content;
-                }
-            }
-        }
-        foreach (CompiledEnum @enum in CompiledEnums)
-        {
-            if (@enum.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
-            {
-                if (definedType == typeName)
-                {
-                    return @enum.Identifier.Content;
-                }
-            }
-        }
-        return null;
     }
 
     static CompiledAttributeCollection CompileAttributes(AttributeUsage[] attributes)

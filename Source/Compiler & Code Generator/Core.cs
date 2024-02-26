@@ -541,7 +541,7 @@ namespace LanguageCore.Compiler
         {
             if (type is TypeInstanceSimple simpleType)
             {
-                Set(new CompiledType(simpleType, typeFinder, constComputer));
+                Set(new CompiledType(simpleType, typeFinder));
                 return;
             }
 
@@ -567,7 +567,7 @@ namespace LanguageCore.Compiler
         }
 
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceSimple type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
+        public CompiledType(TypeInstanceSimple type, FindType? typeFinder) : this()
         {
             typeInstance = type;
 
@@ -973,17 +973,6 @@ namespace LanguageCore.Compiler
             { result[i] = new CompiledType(types[i], typeArguments); }
 
             return result;
-        }
-
-        public bool IsReplacedType(string v)
-        {
-            if (@struct != null)
-            { return @struct.CompiledAttributes.HasAttribute("Define", v); }
-
-            if (@enum != null)
-            { return @enum.CompiledAttributes.HasAttribute("Define", v); }
-
-            return false;
         }
 
         public bool TryGetFieldOffsets([NotNullWhen(true)] out IReadOnlyDictionary<string, int>? fieldOffsets)

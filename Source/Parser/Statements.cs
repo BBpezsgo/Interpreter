@@ -182,6 +182,7 @@ public abstract class StatementWithValue : Statement
 {
     public bool SaveValue = true;
     public CompiledType? CompiledType { get; internal set; }
+    public DataItem? PredictedValue { get; internal set; }
 
     public StatementWithValue() : base()
     {
@@ -472,10 +473,6 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
     public readonly Token BracketRight;
 
     public override Position Position => new(PrevStatement, BracketLeft, BracketRight);
-
-    public bool IsFunctionCall => PrevStatement is Identifier;
-    public bool IsMethodCall => PrevStatement is Field;
-    public bool IsFunctionOrMethodCall => IsFunctionCall || IsMethodCall;
 
     public object? Reference { get; set; }
 
@@ -1052,13 +1049,13 @@ public class Literal : StatementWithValue
 
     public static Literal CreateAnonymous(LiteralType type, string value, IPositioned position)
         => Literal.CreateAnonymous(type, value, position.Position);
+
     public static Literal CreateAnonymous(LiteralType type, string value, Position position)
     {
         TokenType tokenType = type switch
         {
             LiteralType.Integer => TokenType.LiteralNumber,
             LiteralType.Float => TokenType.LiteralFloat,
-            LiteralType.Boolean => TokenType.Identifier,
             LiteralType.String => TokenType.LiteralString,
             LiteralType.Char => TokenType.LiteralCharacter,
             _ => TokenType.Identifier,
@@ -1072,6 +1069,7 @@ public class Literal : StatementWithValue
     /// <exception cref="NotImplementedException"/>
     public static Literal CreateAnonymous(DataItem value, IPositioned position)
         => Literal.CreateAnonymous(value, position.Position);
+
     /// <exception cref="NotImplementedException"/>
     public static Literal CreateAnonymous(DataItem value, Position position)
     {
@@ -1087,6 +1085,24 @@ public class Literal : StatementWithValue
         {
             ImaginaryPosition = position,
         };
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static Literal[] CreateAnonymous(DataItem[] values, IPositioned[] positions)
+    {
+        Literal[] result = new Literal[values.Length];
+        for (int i = 0; i < values.Length; i++)
+        { result[i] = Literal.CreateAnonymous(values[i], positions[i]); }
+        return result;
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static Literal[] CreateAnonymous(DataItem[] values, Position[] positions)
+    {
+        Literal[] result = new Literal[values.Length];
+        for (int i = 0; i < values.Length; i++)
+        { result[i] = Literal.CreateAnonymous(values[i], positions[i]); }
+        return result;
     }
 
     public override string ToString() => Type switch

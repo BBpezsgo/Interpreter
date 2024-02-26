@@ -8,19 +8,6 @@ using System.String;
 using System.Memory;
 using System.Math;
 
-[Define("boolean")]
-enum bool
-{
-    false = 0,
-    true = 1,
-}
-
-export char* ToString(this bool v)
-{
-    if (v) { return "true"; }
-    else { return "false"; }
-}
-
 export char* ToString(this byte number)
 {
 	if (number == 0)
@@ -52,7 +39,7 @@ export char* ToString(this int number)
 
 	int v = number;
 
-	bool isNegative = v < 0;
+	int isNegative = v < 0;
 	if (isNegative)
 	{ v = 0 - v; }
 
@@ -86,7 +73,7 @@ export int ParseInt(temp char* v)
     if (v.IsNullOrEmpty())
     { return 0; }
 
-    bool IsNegative = (v[0] == '-');
+    int IsNegative = (v[0] == '-');
     temp char* parsing = v;
 
     if (IsNegative)
@@ -119,7 +106,7 @@ export byte ParseByte(temp char* v)
     if (v.IsNullOrEmpty())
     { return 0; }
 
-    bool IsNegative = (v[0] == '-');
+    int IsNegative = (v[0] == '-');
     temp char* parsing = v;
 
     if (IsNegative)

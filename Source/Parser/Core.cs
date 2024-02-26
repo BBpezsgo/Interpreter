@@ -8,7 +8,6 @@ public enum LiteralType
 {
     Integer,
     Float,
-    Boolean,
     String,
     Char,
 }

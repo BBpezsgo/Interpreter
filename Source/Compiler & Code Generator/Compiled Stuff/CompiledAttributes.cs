@@ -120,10 +120,6 @@ public readonly struct CompiledLiteral : IPositioned
                 type = CompiledLiteralType.String;
                 ValueString = value.Value;
                 break;
-            case Parser.LiteralType.Boolean:
-                type = CompiledLiteralType.Boolean;
-                ValueBool = value.GetBoolean();
-                break;
             default:
                 throw new InternalException($"Invalid type \"{value.Type}\"");
         }

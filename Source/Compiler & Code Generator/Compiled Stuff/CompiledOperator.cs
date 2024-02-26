@@ -24,6 +24,8 @@ public class CompiledOperator :
 
     public int InstructionOffset = -1;
 
+    public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
+
     public IReadOnlyList<Reference<OperatorCall>> ReferencesOperator => references;
 
     public TypeInstance TypeToken => base.Type;

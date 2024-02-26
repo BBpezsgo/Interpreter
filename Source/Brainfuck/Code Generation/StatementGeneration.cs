@@ -62,7 +62,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (CodeGeneratorForBrainfuck.GetVariable(variables, name, out _))
         { return 0; }
 
-        FunctionThingDefinition? scope = (CurrentMacro.Count == 0) ? null : CurrentMacro[^1];
+        // FunctionThingDefinition? scope = (CurrentMacro.Count == 0) ? null : CurrentMacro[^1];
 
         if (initialValue != null)
         {
@@ -1436,7 +1436,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (TryEvaluate(compiledFunction, functionCall.MethodParameters, out DataItem? returnValue, out Statement[]? runtimeStatements))
+        if (TryCompute(functionCall.MethodParameters, out DataItem[]? parameterValues) &&
+            TryEvaluate(compiledFunction, parameterValues, out DataItem? returnValue, out Statement[]? runtimeStatements))
         {
             if (functionCall.SaveValue && returnValue.HasValue && runtimeStatements.Length == 0)
             {
@@ -1505,12 +1506,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 case LiteralType.Char:
                 {
                     Stack.Push(statement.Value[0]);
-                    break;
-                }
-                case LiteralType.Boolean:
-                {
-                    bool value = bool.Parse(statement.Value);
-                    Stack.Push(value ? 1 : 0);
                     break;
                 }
 

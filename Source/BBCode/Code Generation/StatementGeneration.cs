@@ -149,6 +149,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             StatementWithValue value = keywordCall.Parameters[0];
             CompiledType valueType = FindStatementType(value);
 
+            OnGotStatementType(keywordCall, new CompiledType(Type.Integer));
+            keywordCall.PredictedValue = valueType.Size;
+
             AddInstruction(Opcode.PUSH_VALUE, valueType.Size);
 
             return;
@@ -224,6 +227,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CompiledType param0Type = FindStatementType(param0);
 
             OnGotStatementType(functionCall, new CompiledType(Type.Integer));
+            functionCall.PredictedValue = param0Type.Size;
 
             AddInstruction(Opcode.PUSH_VALUE, param0Type.Size);
 
@@ -303,6 +307,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
         functionCall.Reference = compiledFunction;
+
+        if (TryCompute(functionCall.MethodParameters, out var parameterValues) &&
+            TryEvaluate(compiledFunction, parameterValues, out var returnValue, out var runtimeStatements) &&
+            returnValue.HasValue &&
+            runtimeStatements.Length == 0)
+        {
+            functionCall.PredictedValue = returnValue.Value;
+            AddInstruction(Opcode.PUSH_VALUE, returnValue.Value);
+            return;
+        }
 
         GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
     }
@@ -733,6 +747,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             GenerateCodeForStatement(functionCall);
 
+            anyCall.PredictedValue = functionCall.PredictedValue;
+
             if (functionCall.CompiledType is not null)
             { OnGotStatementType(anyCall, functionCall.CompiledType); }
 
@@ -815,9 +831,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (Settings.OptimizeCode && TryCompute(@operator, out DataItem predictedValue))
         {
             OnGotStatementType(@operator, new CompiledType(predictedValue.Type));
+            @operator.PredictedValue = predictedValue;
 
             AddInstruction(Opcode.PUSH_VALUE, predictedValue);
-            AnalysisCollection?.Informations.Add(new Information($"Predicted value: {predictedValue}", @operator, CurrentFile));
             return;
         }
 
@@ -992,14 +1008,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 GenerateCodeForLiteralString(literal.Value);
                 break;
             }
-            case LiteralType.Boolean:
-            {
-                if (TryFindTypeReplacer("boolean", out CompiledType? replacedType))
-                { OnGotStatementType(literal, replacedType); }
-
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem(bool.Parse(literal.Value) ? 1 : 0));
-                break;
-            }
             case LiteralType.Char:
             {
                 OnGotStatementType(literal, new CompiledType(Type.Char));
@@ -1071,6 +1079,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (GetConstant(variable.Content, out DataItem constant))
         {
             OnGotStatementType(variable, new CompiledType(constant.Type));
+            variable.PredictedValue = constant;
+
             AddInstruction(Opcode.PUSH_VALUE, constant);
             return;
         }
@@ -1143,8 +1153,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (addressGetter.PrevStatement is Field field)
         {
-            int offset = GetDataOffset(field);
-            ValueAddress pointerOffset = GetBaseAddress(field);
+            // int offset = GetDataOffset(field);
+            // ValueAddress pointerOffset = GetBaseAddress(field);
 
             throw new CompilerException($"Field \"{field}\" is on the stack", addressGetter, CurrentFile);
 
@@ -1409,6 +1419,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (prevType.IsStackArray && field.FieldName.Equals("Length"))
         {
             OnGotStatementType(field, new CompiledType(Type.Integer));
+            field.PredictedValue = prevType.StackArraySize;
 
             AddInstruction(Opcode.PUSH_VALUE, prevType.StackArraySize);
             return;
@@ -1483,6 +1494,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (TryCompute(index.Expression, out DataItem computedIndexData))
             {
+                index.Expression.PredictedValue = computedIndexData;
+
                 if (computedIndexData < 0 || computedIndexData >= prevType.StackArraySize)
                 { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", index.Expression, CurrentFile)); }
 
@@ -1910,6 +1923,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (TryCompute(statementToSet.Expression, out DataItem computedIndexData))
             {
+                statementToSet.Expression.PredictedValue = computedIndexData;
+
                 if (computedIndexData < 0 || computedIndexData >= prevType.StackArraySize)
                 { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", statementToSet.Expression, CurrentFile)); }
 
@@ -2012,6 +2027,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (variable.Type.IsBuiltin &&
             TryCompute(value, out DataItem yeah))
         {
+            value.PredictedValue = yeah;
             AddInstruction(Opcode.PUSH_VALUE, yeah);
         }
         else if (variable.Type.IsStackArray)
@@ -2204,6 +2220,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (TryCompute(newVariable.InitialValue, out DataItem computedInitialValue))
         {
+            newVariable.InitialValue.PredictedValue = computedInitialValue;
+
             AddComment($"Initial value {{");
 
             size = 1;

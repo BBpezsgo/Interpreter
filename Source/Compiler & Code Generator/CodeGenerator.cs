@@ -877,25 +877,6 @@ public abstract class CodeGenerator
         return compiledFunction is not null;
     }
 
-    bool GetFunction(string name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
-    {
-        compiledFunction = null;
-
-        for (int i = 0; i < this.CompiledFunctions.Length; i++)
-        {
-            CompiledFunction function = this.CompiledFunctions[i];
-
-            if (!function.Identifier.Equals(name)) continue;
-
-            if (compiledFunction is not null)
-            { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", CurrentFile); }
-
-            compiledFunction = function;
-        }
-
-        return compiledFunction is not null;
-    }
-
     protected bool GetFunction(Token name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
     {
         compiledFunction = null;
@@ -1841,8 +1822,6 @@ public abstract class CodeGenerator
                 return OnGotStatementType(literal, new CompiledType(Type.Integer));
             case LiteralType.Float:
                 return OnGotStatementType(literal, new CompiledType(Type.Float));
-            case LiteralType.Boolean:
-                return OnGotStatementType(literal, FindTypeReplacer("boolean", literal));
             case LiteralType.String:
                 return OnGotStatementType(literal, CompiledType.Pointer(new CompiledType(Type.Char)));
             case LiteralType.Char:
@@ -2304,10 +2283,6 @@ public abstract class CodeGenerator
     { return statements.Select(statement => InlineMacro(statement, parameters)); }
 
     /// <exception cref="InlineException"/>
-    static IEnumerable<Statement> InlineMacro(IEnumerable<Statement> statements, Dictionary<string, StatementWithValue> parameters)
-    { return statements.Select(statement => InlineMacro(statement, parameters)); }
-
-    /// <exception cref="InlineException"/>
     static Statement InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters) => statement switch
     {
         Block v => InlineMacro(v, parameters),
@@ -2573,6 +2548,7 @@ public abstract class CodeGenerator
         public readonly List<Statement> RuntimeStatements;
         public Dictionary<string, DataItem>? LastScope => _frames?.Last.Last;
         public bool IsReturning;
+        public bool IsBreaking;
 
         public static EvaluationContext Empty => new(null, null);
 
@@ -2734,11 +2710,19 @@ public abstract class CodeGenerator
     }
     bool TryCompute(OperatorCall @operator, EvaluationContext context, out DataItem value)
     {
-        if (GetOperator(@operator, out _))
+        if (context.TryGetValue(@operator, out value))
+        { return true; }
+
+        if (GetOperator(@operator, out CompiledOperator? compiledOperator))
         {
-            if (context is not null &&
-                context.TryGetValue(@operator, out value))
-            { return true; }
+            if (TryCompute(@operator.Parameters, context, out DataItem[]? parameterValues) &&
+                TryEvaluate(compiledOperator, parameterValues, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+                returnValue.HasValue &&
+                runtimeStatements.Length == 0)
+            {
+                value = returnValue.Value;
+                return true;
+            }
 
             value = DataItem.Null;
             return false;
@@ -2746,10 +2730,6 @@ public abstract class CodeGenerator
 
         if (!TryCompute(@operator.Left, context, out DataItem leftValue))
         {
-            if (context is not null &&
-                context.TryGetValue(@operator, out value))
-            { return true; }
-
             value = DataItem.Null;
             return false;
         }
@@ -2813,9 +2793,6 @@ public abstract class CodeGenerator
             case LiteralType.Float:
                 value = new DataItem(literal.GetFloat());
                 break;
-            case LiteralType.Boolean:
-                value = new DataItem(bool.Parse(literal.Value));
-                break;
             case LiteralType.Char:
                 if (literal.Value.Length != 1)
                 {
@@ -2856,8 +2833,7 @@ public abstract class CodeGenerator
         if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
         { return TryCompute(functionCall, context, out value); }
 
-        if (context is not null &&
-            context.TryGetValue(anyCall, out value))
+        if (context.TryGetValue(anyCall, out value))
         { return true; }
 
         value = DataItem.Null;
@@ -2891,6 +2867,12 @@ public abstract class CodeGenerator
 
         if (GetFunction(functionCall, out CompiledFunction? function))
         {
+            if (!function.CanUse(CurrentFile))
+            {
+                value = default;
+                return false;
+            }
+
             if (function.IsExternal &&
                 !functionCall.SaveValue &&
                 TryCompute(functionCall.MethodParameters, context, out DataItem[]? parameters))
@@ -2899,7 +2881,7 @@ public abstract class CodeGenerator
                     null,
                     functionCall.Identifier,
                     functionCall.BracketLeft,
-                    parameters.Select(v => Literal.CreateAnonymous(v, Position.UnknownPosition)),
+                    Literal.CreateAnonymous(parameters, functionCall.MethodParameters),
                     functionCall.BracketRight)
                 {
                     SaveValue = functionCall.SaveValue,
@@ -2910,8 +2892,7 @@ public abstract class CodeGenerator
                 return true;
             }
 
-            if (function.IsInlineable &&
-                TryCompute(functionCall.MethodParameters, context, out parameters) &&
+            if (TryCompute(functionCall.MethodParameters, context, out parameters) &&
                 TryEvaluate(function, parameters, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
@@ -2986,7 +2967,35 @@ public abstract class CodeGenerator
         value = DataItem.Null;
         return false;
     }
-    protected bool TryEvaluate(CompiledFunction function, StatementWithValue[] parameters, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+    bool TryCompute(StatementWithValue[]? statements, EvaluationContext context, [NotNullWhen(true)] out DataItem[]? values)
+    {
+        if (statements is null)
+        {
+            values = null;
+            return false;
+        }
+
+        values = new DataItem[statements.Length];
+
+        for (int i = 0; i < statements.Length; i++)
+        {
+            StatementWithValue statement = statements[i];
+
+            if (!TryCompute(statement, context, out DataItem value))
+            {
+                values = null;
+                return false;
+            }
+
+            values[i] = value;
+        }
+
+        return true;
+    }
+    protected bool TryCompute(StatementWithValue[]? statements, [NotNullWhen(true)] out DataItem[]? values)
+        => TryCompute(statements, EvaluationContext.Empty, out values);
+
+    protected bool TryEvaluate(CompiledFunction function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
     {
         value = null;
         runtimeStatements = null;
@@ -2998,12 +3007,36 @@ public abstract class CodeGenerator
         if (function.Block is null)
         { return false; }
 
-        if (!TryCompute(parameters, new EvaluationContext(null, null), out DataItem[]? parameterValues))
+        Dictionary<string, DataItem> variables = new();
+
+        if (function.ReturnSomething)
+        { variables.Add("@return", GetInitialValue(function.Type.BuiltinType)); }
+
+        for (int i = 0; i < parameterValues.Length; i++)
+        { variables.Add(function.Parameters[i].Identifier.Content, parameterValues[i]); }
+
+        EvaluationContext context = new(null, variables);
+
+        CurrentEvaluationContext.Push(context);
+        Uri? prevFile = CurrentFile;
+        CurrentFile = function.FilePath;
+
+        bool success = TryEvaluate(function.Block, context);
+
+        CurrentFile = prevFile;
+        CurrentEvaluationContext.Pop();
+
+        if (!success)
         { return false; }
 
-        return TryEvaluate(function, parameterValues, out value, out runtimeStatements);
+        if (function.ReturnSomething)
+        { value = context.LastScope!["@return"]; }
+
+        runtimeStatements = context.RuntimeStatements.ToArray();
+
+        return true;
     }
-    protected bool TryEvaluate(CompiledFunction function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+    bool TryEvaluate(CompiledOperator function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
     {
         value = null;
         runtimeStatements = null;
@@ -3042,31 +3075,6 @@ public abstract class CodeGenerator
 
         return true;
     }
-    bool TryCompute(StatementWithValue[]? statements, EvaluationContext context, [NotNullWhen(true)] out DataItem[]? values)
-    {
-        if (statements is null)
-        {
-            values = null;
-            return false;
-        }
-
-        values = new DataItem[statements.Length];
-
-        for (int i = 0; i < statements.Length; i++)
-        {
-            StatementWithValue statement = statements[i];
-
-            if (!TryCompute(statement, context, out DataItem value))
-            {
-                values = null;
-                return false;
-            }
-
-            values[i] = value;
-        }
-
-        return true;
-    }
 
     bool TryEvaluate(WhileLoop whileLoop, EvaluationContext context)
     {
@@ -3084,8 +3092,67 @@ public abstract class CodeGenerator
             { return false; }
 
             if (!TryEvaluate(whileLoop.Block, context))
-            { return false; }
+            {
+                context.IsBreaking = false;
+                return false;
+            }
+
+            if (context.IsBreaking)
+            {
+                context.IsBreaking = false;
+                return true;
+            }
+
+            context.IsBreaking = false;
         }
+    }
+    bool TryEvaluate(IfContainer ifContainer, EvaluationContext context)
+    {
+        foreach (BaseBranch _branch in ifContainer.Parts)
+        {
+            switch (_branch)
+            {
+                case IfBranch branch:
+                {
+                    if (!TryCompute(branch.Condition, context, out DataItem condition))
+                    { return false; }
+
+                    if (!condition)
+                    { continue; }
+
+                    if (!TryEvaluate(branch.Block, context))
+                    { return false; }
+
+                    return true;
+                }
+
+                case ElseIfBranch branch:
+                {
+                    if (!TryCompute(branch.Condition, context, out DataItem condition))
+                    { return false; }
+
+                    if (!condition)
+                    { continue; }
+
+                    if (!TryEvaluate(branch.Block, context))
+                    { return false; }
+
+                    return true;
+                }
+
+                case ElseBranch branch:
+                {
+                    if (!TryEvaluate(branch.Block, context))
+                    { return false; }
+
+                    return true;
+                }
+
+                default: throw new UnreachableException();
+            }
+        }
+
+        return true;
     }
     bool TryEvaluate(Block block, EvaluationContext context)
     {
@@ -3155,6 +3222,16 @@ public abstract class CodeGenerator
             return false;
         }
 
+        if (keywordCall.Identifier.Content == "break")
+        {
+            context.IsBreaking = true;
+
+            if (keywordCall.Parameters.Length != 0)
+            { return false; }
+
+            return true;
+        }
+
         return false;
     }
     bool TryEvaluate(Statement statement, EvaluationContext context) => statement switch
@@ -3164,8 +3241,8 @@ public abstract class CodeGenerator
         WhileLoop v => TryEvaluate(v, context),
         AnyAssignment v => TryEvaluate(v, context),
         KeywordCall v => TryEvaluate(v, context),
+        IfContainer v => TryEvaluate(v, context),
         StatementWithValue v => TryCompute(v, context, out _),
-        IfContainer => false,
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
     bool TryEvaluate(IEnumerable<Statement> statements, EvaluationContext context)
@@ -3176,16 +3253,18 @@ public abstract class CodeGenerator
             { return false; }
             if (context.IsReturning)
             { break; }
+            if (context.IsBreaking)
+            { break; }
         }
         return true;
     }
 
-    protected bool TryCompute(StatementWithValue? statement, out DataItem value)
+    protected bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, out DataItem value)
         => TryCompute(statement, EvaluationContext.Empty, out value);
 
     readonly Stack<EvaluationContext> CurrentEvaluationContext = new();
 
-    protected bool TryCompute(StatementWithValue? statement, EvaluationContext context, out DataItem value)
+    protected bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, EvaluationContext context, out DataItem value)
     {
         value = DataItem.Null;
 

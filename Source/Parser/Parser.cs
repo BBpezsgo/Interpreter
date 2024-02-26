@@ -981,24 +981,6 @@ public class Parser
             statement = literal;
             return true;
         }
-        else if (ExpectIdentifier("true", out Token? tTrue))
-        {
-            Literal literal = new(LiteralType.Boolean, tTrue.Content, tTrue);
-
-            tTrue.AnalyzedType = TokenAnalyzedType.Keyword;
-
-            statement = literal;
-            return true;
-        }
-        else if (ExpectIdentifier("false", out Token? tFalse))
-        {
-            Literal literal = new(LiteralType.Boolean, tFalse.Content, tFalse);
-
-            tFalse.AnalyzedType = TokenAnalyzedType.Keyword;
-
-            statement = literal;
-            return true;
-        }
 
         CurrentTokenIndex = savedToken;
 

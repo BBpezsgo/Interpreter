@@ -1125,9 +1125,6 @@ public class CodeGeneratorForAsm : CodeGenerator
                 break;
             case LiteralType.Float:
                 throw new NotImplementedException();
-            case LiteralType.Boolean:
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, bool.Parse(statement.Value) ? 1 : 0);
-                break;
             case LiteralType.String:
                 throw new NotImplementedException();
             case LiteralType.Char:

@@ -13,7 +13,7 @@ public partial struct DataItem
 
     public readonly RuntimeType Type => type;
 
-    [FieldOffset(0)] RuntimeType type;
+    [FieldOffset(0)] readonly RuntimeType type;
 
     #region Value Fields
 

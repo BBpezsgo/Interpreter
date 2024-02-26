@@ -1,139 +1,100 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Text;
-using DataUtilities.ReadableFileFormat;
-using DataUtilities.Serializer;
 
-namespace LanguageCore.Runtime
+namespace LanguageCore.Runtime;
+
+public enum AddressingMode : byte
 {
-    public enum AddressingMode : byte
+    /// <summary>
+    /// <c>CurrentInstruction.ParameterInt</c>
+    /// </summary>
+    Absolute,
+
+    /// <summary>
+    /// <c>Memory.Stack.Pop().ToInt32(null)</c>
+    /// </summary>
+    Runtime,
+
+    /// <summary>
+    /// <b>Only for stack!</b>
+    /// <br/>
+    /// <c>BasePointer + CurrentInstruction.ParameterInt</c>
+    /// </summary>
+    BasePointerRelative,
+
+    /// <summary>
+    /// <b>Only for stack!</b>
+    /// <br/>
+    /// <c>Memory.Stack.Count + CurrentInstruction.ParameterInt</c>
+    /// </summary>
+    StackRelative,
+}
+
+[Serializable]
+[DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+public class Instruction
+{
+    public AddressingMode AddressingMode;
+    public Opcode opcode;
+    DataItem parameter;
+
+    public DataItem Parameter
     {
-        /// <summary>
-        /// <c>CurrentInstruction.ParameterInt</c>
-        /// </summary>
-        Absolute,
-
-        /// <summary>
-        /// <c>Memory.Stack.Pop().ToInt32(null)</c>
-        /// </summary>
-        Runtime,
-
-        /// <summary>
-        /// <b>Only for stack!</b>
-        /// <br/>
-        /// <c>BasePointer + CurrentInstruction.ParameterInt</c>
-        /// </summary>
-        BasePointerRelative,
-
-        /// <summary>
-        /// <b>Only for stack!</b>
-        /// <br/>
-        /// <c>Memory.Stack.Count + CurrentInstruction.ParameterInt</c>
-        /// </summary>
-        StackRelative,
+        get => parameter;
+        set => parameter = value;
     }
 
-    [Serializable]
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Instruction : ISerializable<Instruction>, IFullySerializableText
+    [Obsolete("Only for deserialization", true)]
+    public Instruction()
     {
-        public AddressingMode AddressingMode;
-        public Opcode opcode;
-        DataItem parameter;
+        this.opcode = Opcode.UNKNOWN;
+        this.AddressingMode = AddressingMode.Absolute;
+        this.parameter = DataItem.Null;
+    }
 
-        public DataItem Parameter
+    public Instruction(Opcode opcode)
+    {
+        this.opcode = opcode;
+        this.AddressingMode = AddressingMode.Absolute;
+        this.parameter = DataItem.Null;
+    }
+    public Instruction(Opcode opcode, DataItem parameter)
+    {
+        this.opcode = opcode;
+        this.AddressingMode = AddressingMode.Absolute;
+        this.parameter = parameter;
+    }
+
+    public Instruction(Opcode opcode, AddressingMode addressingMode)
+    {
+        this.opcode = opcode;
+        this.AddressingMode = addressingMode;
+        this.parameter = DataItem.Null;
+    }
+    public Instruction(Opcode opcode, AddressingMode addressingMode, DataItem parameter)
+    {
+        this.opcode = opcode;
+        this.AddressingMode = addressingMode;
+        this.parameter = parameter;
+    }
+
+    public override string ToString()
+    {
+        StringBuilder result = new();
+
+        result.Append(opcode.ToString());
+
+        if (opcode == Opcode.LOAD_VALUE ||
+            opcode == Opcode.STORE_VALUE)
         {
-            get => parameter;
-            set => parameter = value;
+            result.Append(' ');
+            result.Append(AddressingMode.ToString());
         }
 
-        [Obsolete("Only for deserialization", true)]
-        public Instruction()
-        {
-            this.opcode = Opcode.UNKNOWN;
-            this.AddressingMode = AddressingMode.Absolute;
-            this.parameter = DataItem.Null;
-        }
+        if (!this.parameter.IsNull)
+        { result.Append($" {{ {parameter} }}"); }
 
-        public Instruction(Opcode opcode)
-        {
-            this.opcode = opcode;
-            this.AddressingMode = AddressingMode.Absolute;
-            this.parameter = DataItem.Null;
-        }
-        public Instruction(Opcode opcode, DataItem parameter)
-        {
-            this.opcode = opcode;
-            this.AddressingMode = AddressingMode.Absolute;
-            this.parameter = parameter;
-        }
-
-        public Instruction(Opcode opcode, AddressingMode addressingMode)
-        {
-            this.opcode = opcode;
-            this.AddressingMode = addressingMode;
-            this.parameter = DataItem.Null;
-        }
-        public Instruction(Opcode opcode, AddressingMode addressingMode, DataItem parameter)
-        {
-            this.opcode = opcode;
-            this.AddressingMode = addressingMode;
-            this.parameter = parameter;
-        }
-
-        public override string ToString()
-        {
-            StringBuilder result = new();
-
-            result.Append(opcode.ToString());
-
-            if (opcode == Opcode.LOAD_VALUE ||
-                opcode == Opcode.STORE_VALUE)
-            {
-                result.Append(' ');
-                result.Append(AddressingMode.ToString());
-            }
-
-            if (!this.parameter.IsNull)
-            { result.Append($" {{ {parameter} }}"); }
-
-            return result.ToString();
-        }
-
-        #region Serialize
-        public void Serialize(Serializer serializer)
-        {
-            serializer.Serialize((byte)this.opcode);
-            serializer.Serialize((byte)this.AddressingMode);
-            serializer.Serialize(this.parameter);
-        }
-
-        public void Deserialize(Deserializer deserializer)
-        {
-            this.opcode = (Opcode)deserializer.DeserializeByte();
-            this.AddressingMode = (AddressingMode)deserializer.DeserializeByte();
-            DataItem dataItem = new();
-            dataItem.Deserialize(deserializer);
-            this.parameter = dataItem;
-        }
-
-        public Value SerializeText()
-        {
-            Value result = Value.Object();
-
-            result["OpCode"] = Value.Literal(opcode.ToString());
-            result["AddressingMode"] = Value.Literal(AddressingMode.ToString());
-            result["Parameter"] = Value.Object(parameter);
-            return result;
-        }
-
-        public void DeserializeText(Value data)
-        {
-            opcode = data["OpCode"].Enum<Opcode>();
-            AddressingMode = data["AddressingMode"].Enum<AddressingMode>();
-            DataItem dataItem = new();
-            dataItem.DeserializeText(data["Parameter"]);
-            parameter = dataItem;
-        }
-        #endregion
+        return result.ToString();
     }
 }

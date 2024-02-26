@@ -2,133 +2,132 @@
 using System.IO;
 using System.Text;
 
-namespace LanguageCore.Tokenizing
+namespace LanguageCore.Tokenizing;
+
+public class StreamTokenizer : Tokenizer, IDisposable
 {
-    public class StreamTokenizer : Tokenizer, IDisposable
+    readonly Stream Stream;
+    bool IsDisposed;
+
+    StreamTokenizer(TokenizerSettings settings, Stream stream) : base(settings)
+    { Stream = stream; }
+
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(string filePath)
+        => StreamTokenizer.Tokenize(File.OpenRead(filePath), TokenizerSettings.Default);
+
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings)
+        => StreamTokenizer.Tokenize(File.OpenRead(filePath), settings);
+
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(Stream stream)
+        => StreamTokenizer.Tokenize(stream, TokenizerSettings.Default);
+
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(Stream stream, TokenizerSettings settings)
     {
-        readonly Stream Stream;
-        bool IsDisposed;
+        using StreamTokenizer tokenizer = new(settings, stream);
+        return tokenizer.TokenizeInternal();
+    }
 
-        StreamTokenizer(TokenizerSettings settings, Stream stream) : base(settings)
-        { Stream = stream; }
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(string filePath, ConsoleProgressBar progress)
+    {
+        FileStream stream = File.OpenRead(filePath);
+        return StreamTokenizer.Tokenize(stream, TokenizerSettings.Default, progress, (int)stream.Length);
+    }
 
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(string filePath)
-            => StreamTokenizer.Tokenize(File.OpenRead(filePath), TokenizerSettings.Default);
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings, ConsoleProgressBar progress)
+    {
+        FileStream stream = File.OpenRead(filePath);
+        return StreamTokenizer.Tokenize(stream, settings, progress, (int)stream.Length);
+    }
 
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings)
-            => StreamTokenizer.Tokenize(File.OpenRead(filePath), settings);
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(Stream stream, ConsoleProgressBar progress, int totalBytes)
+        => StreamTokenizer.Tokenize(stream, TokenizerSettings.Default, progress, totalBytes);
 
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(Stream stream)
-            => StreamTokenizer.Tokenize(stream, TokenizerSettings.Default);
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(Stream stream, TokenizerSettings settings, ConsoleProgressBar progress, int totalBytes)
+    {
+        using StreamTokenizer tokenizer = new(settings, stream);
+        return tokenizer.TokenizeInternal(progress, totalBytes);
+    }
 
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(Stream stream, TokenizerSettings settings)
+    TokenizerResult TokenizeInternal()
+    {
+        int offsetTotal = 0;
+        Span<byte> buffer = stackalloc byte[64];
+
+        while (true)
         {
-            using StreamTokenizer tokenizer = new(settings, stream);
-            return tokenizer.TokenizeInternal();
-        }
+            int read = Stream.Read(buffer);
+            if (read == 0)
+            { break; }
 
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(string filePath, ConsoleProgressBar progress)
-        {
-            FileStream stream = File.OpenRead(filePath);
-            return StreamTokenizer.Tokenize(stream, TokenizerSettings.Default, progress, (int)stream.Length);
-        }
+            UTF8Encoding temp = new(true);
+            string block = temp.GetString(buffer[..read]);
 
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings, ConsoleProgressBar progress)
-        {
-            FileStream stream = File.OpenRead(filePath);
-            return StreamTokenizer.Tokenize(stream, settings, progress, (int)stream.Length);
-        }
-
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(Stream stream, ConsoleProgressBar progress, int totalBytes)
-            => StreamTokenizer.Tokenize(stream, TokenizerSettings.Default, progress, totalBytes);
-
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(Stream stream, TokenizerSettings settings, ConsoleProgressBar progress, int totalBytes)
-        {
-            using StreamTokenizer tokenizer = new(settings, stream);
-            return tokenizer.TokenizeInternal(progress, totalBytes);
-        }
-
-        TokenizerResult TokenizeInternal()
-        {
-            int offsetTotal = 0;
-            Span<byte> buffer = stackalloc byte[64];
-
-            while (true)
+            for (int i = 0; i < block.Length; i++)
             {
-                int read = Stream.Read(buffer);
-                if (read == 0)
-                { break; }
+                offsetTotal++;
+                ProcessCharacter(block[i], offsetTotal);
+            }
+        }
 
-                UTF8Encoding temp = new(true);
-                string block = temp.GetString(buffer[..read]);
+        EndToken(offsetTotal);
 
-                for (int i = 0; i < block.Length; i++)
-                {
-                    offsetTotal++;
-                    ProcessCharacter(block[i], offsetTotal);
-                }
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+    }
+
+    TokenizerResult TokenizeInternal(ConsoleProgressBar progress, int total)
+    {
+        int offsetTotal = 0;
+        int totalBytesRead = 0;
+        Span<byte> buffer = stackalloc byte[64];
+
+        while (true)
+        {
+            int read = Stream.Read(buffer);
+            if (read == 0)
+            { break; }
+
+            UTF8Encoding temp = new(true);
+            string block = temp.GetString(buffer[..read]);
+
+            for (int i = 0; i < block.Length; i++)
+            {
+                offsetTotal++;
+                ProcessCharacter(block[i], offsetTotal);
             }
 
-            EndToken(offsetTotal);
+            totalBytesRead += read;
 
-            return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+            progress.Print(totalBytesRead, total);
         }
 
-        TokenizerResult TokenizeInternal(ConsoleProgressBar progress, int total)
-        {
-            int offsetTotal = 0;
-            int totalBytesRead = 0;
-            Span<byte> buffer = stackalloc byte[64];
+        EndToken(offsetTotal);
 
-            while (true)
-            {
-                int read = Stream.Read(buffer);
-                if (read == 0)
-                { break; }
+        progress.Print(1f);
 
-                UTF8Encoding temp = new(true);
-                string block = temp.GetString(buffer[..read]);
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+    }
 
-                for (int i = 0; i < block.Length; i++)
-                {
-                    offsetTotal++;
-                    ProcessCharacter(block[i], offsetTotal);
-                }
+    protected virtual void Dispose(bool disposing)
+    {
+        if (IsDisposed) return;
 
-                totalBytesRead += read;
+        if (disposing)
+        { Stream.Dispose(); }
 
-                progress.Print(totalBytesRead, total);
-            }
+        IsDisposed = true;
+    }
 
-            EndToken(offsetTotal);
-
-            progress.Print(1f);
-
-            return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (IsDisposed) return;
-
-            if (disposing)
-            { Stream.Dispose(); }
-
-            IsDisposed = true;
-        }
-
-        public void Dispose()
-        {
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
-        }
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }

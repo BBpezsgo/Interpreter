@@ -1,30 +1,29 @@
-﻿namespace LanguageCore.Compiler
+﻿namespace LanguageCore.Compiler;
+
+using Parser;
+
+public class CompiledField : FieldDefinition
 {
-    using Parser;
+    public new CompiledType Type;
+    public CompiledStruct? Class;
 
-    public class CompiledField : FieldDefinition
+    public Protection Protection
     {
-        public new CompiledType Type;
-        public CompiledStruct? Class;
-
-        public Protection Protection
+        get
         {
-            get
+            if (ProtectionToken == null) return Protection.Public;
+            return ProtectionToken.Content switch
             {
-                if (ProtectionToken == null) return Protection.Public;
-                return ProtectionToken.Content switch
-                {
-                    "private" => Protection.Private,
-                    "public" => Protection.Public,
-                    _ => Protection.Public,
-                };
-            }
+                "private" => Protection.Private,
+                "public" => Protection.Public,
+                _ => Protection.Public,
+            };
         }
+    }
 
-        public CompiledField(CompiledType type, CompiledStruct? @struct, FieldDefinition definition) : base(definition)
-        {
-            Type = type;
-            Class = @struct;
-        }
+    public CompiledField(CompiledType type, CompiledStruct? @struct, FieldDefinition definition) : base(definition)
+    {
+        Type = type;
+        Class = @struct;
     }
 }

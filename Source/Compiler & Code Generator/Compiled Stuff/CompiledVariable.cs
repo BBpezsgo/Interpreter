@@ -1,22 +1,21 @@
-﻿namespace LanguageCore.Compiler
+﻿namespace LanguageCore.Compiler;
+
+using Parser.Statement;
+
+public class CompiledVariable : VariableDeclaration
 {
-    using Parser.Statement;
+    public new readonly CompiledType Type;
 
-    public class CompiledVariable : VariableDeclaration
+    public readonly int MemoryAddress;
+    public bool IsInitialized;
+
+    public CompiledVariable(int memoryOffset, CompiledType type, VariableDeclaration declaration) : base(declaration)
     {
-        public new readonly CompiledType Type;
+        base.CompiledType = type;
 
-        public readonly int MemoryAddress;
-        public bool IsInitialized;
+        this.Type = type;
 
-        public CompiledVariable(int memoryOffset, CompiledType type, VariableDeclaration declaration) : base(declaration)
-        {
-            base.CompiledType = type;
-
-            this.Type = type;
-
-            this.MemoryAddress = memoryOffset;
-            this.IsInitialized = false;
-        }
+        this.MemoryAddress = memoryOffset;
+        this.IsInitialized = false;
     }
 }

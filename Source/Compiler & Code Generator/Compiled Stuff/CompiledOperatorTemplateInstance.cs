@@ -1,15 +1,14 @@
-﻿namespace LanguageCore.Compiler
+﻿namespace LanguageCore.Compiler;
+
+using Parser;
+
+public class CompiledOperatorTemplateInstance : CompiledOperator
 {
-    using Parser;
+    public readonly CompiledOperator Template;
 
-    public class CompiledOperatorTemplateInstance : CompiledOperator
+    public CompiledOperatorTemplateInstance(CompiledType type, CompiledType[] parameterTypes, CompiledOperator template, FunctionDefinition functionDefinition)
+        : base(type, parameterTypes, functionDefinition)
     {
-        public readonly CompiledOperator Template;
-
-        public CompiledOperatorTemplateInstance(CompiledType type, CompiledType[] parameterTypes, CompiledOperator template, FunctionDefinition functionDefinition)
-            : base(type, parameterTypes, functionDefinition)
-        {
-            Template = template;
-        }
+        Template = template;
     }
 }

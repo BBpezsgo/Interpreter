@@ -2,87 +2,86 @@
 using System.Linq;
 using System.Text;
 
-namespace LanguageCore.Tokenizing
+namespace LanguageCore.Tokenizing;
+
+public class TextSource
 {
-    public class TextSource
+    readonly string text;
+    int position;
+
+    public char this[int i] => text[i];
+
+    public int Position => position;
+    public bool Has => position < text.Length;
+    public int Remaining => text.Length - position;
+
+    public TextSource(string text)
     {
-        readonly string text;
-        int position;
+        this.text = text;
+        this.position = 0;
+    }
 
-        public char this[int i] => text[i];
+    public char Next() => this[position++];
+    public char Peek() => this[position + 1];
+    public string Peek(int length) => text.Substring(position, length);
 
-        public int Position => position;
-        public bool Has => position < text.Length;
-        public int Remaining => text.Length - position;
+    public bool NextIs(string match)
+    {
+        if (Remaining < match.Length) return false;
+        return Peek(match.Length) == match;
+    }
 
-        public TextSource(string text)
+    public string ConsumeAll(params char[] characters)
+    {
+        StringBuilder raw = new();
+
+        while (Has)
         {
-            this.text = text;
-            this.position = 0;
+            if (characters.Contains(Peek()))
+            { raw.Append(Next()); }
         }
 
-        public char Next() => this[position++];
-        public char Peek() => this[position + 1];
-        public string Peek(int length) => text.Substring(position, length);
+        return raw.ToString();
+    }
 
-        public bool NextIs(string match)
+    public string ConsumeAll(int maxLength, params char[] characters)
+    {
+        StringBuilder raw = new();
+
+        while (Has && maxLength-- > 0)
         {
-            if (Remaining < match.Length) return false;
-            return Peek(match.Length) == match;
+            if (characters.Contains(Peek()))
+            { raw.Append(Next()); }
         }
 
-        public string ConsumeAll(params char[] characters)
+        return raw.ToString();
+    }
+
+    public string Consume(int length)
+    {
+        StringBuilder raw = new(length);
+
+        while (Has && length-- > 0)
         {
-            StringBuilder raw = new();
-
-            while (Has)
-            {
-                if (characters.Contains(Peek()))
-                { raw.Append(Next()); }
-            }
-
-            return raw.ToString();
+            raw.Append(Next());
         }
 
-        public string ConsumeAll(int maxLength, params char[] characters)
-        {
-            StringBuilder raw = new();
+        return raw.ToString();
+    }
 
-            while (Has && maxLength-- > 0)
-            {
-                if (characters.Contains(Peek()))
-                { raw.Append(Next()); }
-            }
+    public string? ConsumeUntil(string end)
+    {
+        int i = text.IndexOf(end, position, StringComparison.Ordinal);
+        if (i == 0)
+        { return null; }
+        return Consume(i - position);
+    }
 
-            return raw.ToString();
-        }
-
-        public string Consume(int length)
-        {
-            StringBuilder raw = new(length);
-
-            while (Has && length-- > 0)
-            {
-                raw.Append(Next());
-            }
-
-            return raw.ToString();
-        }
-
-        public string? ConsumeUntil(string end)
-        {
-            int i = text.IndexOf(end, position, StringComparison.Ordinal);
-            if (i == 0)
-            { return null; }
-            return Consume(i - position);
-        }
-
-        public string? ConsumeUntil(params char[] end)
-        {
-            int i = text.IndexOfAny(end, position);
-            if (i == 0)
-            { return null; }
-            return Consume(i - position);
-        }
+    public string? ConsumeUntil(params char[] end)
+    {
+        int i = text.IndexOfAny(end, position);
+        if (i == 0)
+        { return null; }
+        return Consume(i - position);
     }
 }

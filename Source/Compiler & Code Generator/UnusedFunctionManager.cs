@@ -1,157 +1,156 @@
 ﻿using System.Collections.Generic;
 
-namespace LanguageCore.BBCode.Generator
+namespace LanguageCore.BBCode.Generator;
+
+using Compiler;
+
+public class UnusedFunctionManager
 {
-    using Compiler;
+    readonly CompileLevel CompileLevel;
+    readonly PrintCallback? Print;
+    readonly AnalysisCollection? AnalysisCollection;
 
-    public class UnusedFunctionManager
+    const int MaxIterations = 40;
+
+    public UnusedFunctionManager(CompileLevel compileLevel, PrintCallback? printCallback, AnalysisCollection? analysisCollection)
     {
-        readonly CompileLevel CompileLevel;
-        readonly PrintCallback? Print;
-        readonly AnalysisCollection? AnalysisCollection;
+        CompileLevel = compileLevel;
+        Print = printCallback;
+        AnalysisCollection = analysisCollection;
+    }
 
-        const int MaxIterations = 40;
+    int DoTheThing(ref CompilerResult compilerResult)
+    {
+        Print?.Invoke($"  Remove unused functions ...", LogType.Debug);
 
-        public UnusedFunctionManager(CompileLevel compileLevel, PrintCallback? printCallback, AnalysisCollection? analysisCollection)
+        int functionsRemoved = 0;
+
+        List<CompiledFunction> newFunctions = new(compilerResult.Functions);
+        List<CompiledOperator> newOperators = new(compilerResult.Operators);
+        List<CompiledGeneralFunction> newGeneralFunctions = new(compilerResult.GeneralFunctions);
+        List<CompiledConstructor> newConstructors = new(compilerResult.Constructors);
+
         {
-            CompileLevel = compileLevel;
-            Print = printCallback;
-            AnalysisCollection = analysisCollection;
+            for (int i = newFunctions.Count - 1; i >= 0; i--)
+            {
+                CompiledFunction function = newFunctions[i];
+
+                if (function.TimesUsed > 0) continue;
+
+                if (function.CompiledAttributes.ContainsKey("Catch")) continue;
+
+                if (CompileLevel == CompileLevel.All) continue;
+                if (CompileLevel == CompileLevel.Exported && function.IsExport) continue;
+
+                string readableID = function.ToReadable();
+
+                Print?.Invoke($"      Remove function {readableID}", LogType.Debug);
+                AnalysisCollection?.Informations.Add(new Information($"Unused function {readableID} is not compiled", function.Identifier, function.FilePath));
+
+                newFunctions.RemoveAt(i);
+                functionsRemoved++;
+            }
         }
 
-        int DoTheThing(ref CompilerResult compilerResult)
         {
-            Print?.Invoke($"  Remove unused functions ...", LogType.Debug);
-
-            int functionsRemoved = 0;
-
-            List<CompiledFunction> newFunctions = new(compilerResult.Functions);
-            List<CompiledOperator> newOperators = new(compilerResult.Operators);
-            List<CompiledGeneralFunction> newGeneralFunctions = new(compilerResult.GeneralFunctions);
-            List<CompiledConstructor> newConstructors = new(compilerResult.Constructors);
-
+            for (int i = newOperators.Count - 1; i >= 0; i--)
             {
-                for (int i = newFunctions.Count - 1; i >= 0; i--)
-                {
-                    CompiledFunction function = newFunctions[i];
+                CompiledOperator @operator = newOperators[i];
 
-                    if (function.TimesUsed > 0) continue;
+                if (@operator.TimesUsed > 0) continue;
 
-                    if (function.CompiledAttributes.ContainsKey("Catch")) continue;
+                if (CompileLevel == CompileLevel.All) continue;
+                if (CompileLevel == CompileLevel.Exported && @operator.IsExport) continue;
 
-                    if (CompileLevel == CompileLevel.All) continue;
-                    if (CompileLevel == CompileLevel.Exported && function.IsExport) continue;
+                string readableID = @operator.ToReadable();
 
-                    string readableID = function.ToReadable();
+                Print?.Invoke($"      Remove operator {readableID}", LogType.Debug);
+                AnalysisCollection?.Informations.Add(new Information($"Unused operator {readableID} is not compiled", @operator.Identifier, @operator.FilePath));
 
-                    Print?.Invoke($"      Remove function {readableID}", LogType.Debug);
-                    AnalysisCollection?.Informations.Add(new Information($"Unused function {readableID} is not compiled", function.Identifier, function.FilePath));
-
-                    newFunctions.RemoveAt(i);
-                    functionsRemoved++;
-                }
+                newOperators.RemoveAt(i);
+                functionsRemoved++;
             }
-
-            {
-                for (int i = newOperators.Count - 1; i >= 0; i--)
-                {
-                    CompiledOperator @operator = newOperators[i];
-
-                    if (@operator.TimesUsed > 0) continue;
-
-                    if (CompileLevel == CompileLevel.All) continue;
-                    if (CompileLevel == CompileLevel.Exported && @operator.IsExport) continue;
-
-                    string readableID = @operator.ToReadable();
-
-                    Print?.Invoke($"      Remove operator {readableID}", LogType.Debug);
-                    AnalysisCollection?.Informations.Add(new Information($"Unused operator {readableID} is not compiled", @operator.Identifier, @operator.FilePath));
-
-                    newOperators.RemoveAt(i);
-                    functionsRemoved++;
-                }
-            }
-
-            {
-                for (int i = newGeneralFunctions.Count - 1; i >= 0; i--)
-                {
-                    CompiledGeneralFunction generalFunction = newGeneralFunctions[i];
-
-                    if (generalFunction.TimesUsed > 0) continue;
-
-                    if (CompileLevel == CompileLevel.All) continue;
-                    if (CompileLevel == CompileLevel.Exported && generalFunction.IsExport) continue;
-
-                    string readableID = generalFunction.ToReadable();
-
-                    Print?.Invoke($"      Remove general function {readableID}", LogType.Debug);
-                    AnalysisCollection?.Informations.Add(new Information($"Unused general function  {readableID} is not compiled", generalFunction.Identifier, generalFunction.FilePath));
-
-                    newGeneralFunctions.RemoveAt(i);
-                    functionsRemoved++;
-                }
-            }
-
-            {
-                for (int i = newConstructors.Count - 1; i >= 0; i--)
-                {
-                    CompiledConstructor constructor = newConstructors[i];
-
-                    if (constructor.TimesUsed > 0) continue;
-
-                    if (CompileLevel == CompileLevel.All) continue;
-                    if (CompileLevel == CompileLevel.Exported && constructor.IsExport) continue;
-
-                    string readableID = constructor.ToReadable();
-
-                    Print?.Invoke($"      Remove constructor {readableID}", LogType.Debug);
-                    AnalysisCollection?.Informations.Add(new Information($"Unused constructor {readableID} is not compiled", constructor.Identifier, constructor.FilePath));
-
-                    newConstructors.RemoveAt(i);
-                    functionsRemoved++;
-                }
-            }
-
-            compilerResult = new CompilerResult(
-                newFunctions.ToArray(),
-                compilerResult.Macros,
-                newGeneralFunctions.ToArray(),
-                newOperators.ToArray(),
-                newConstructors.ToArray(),
-                compilerResult.ExternalFunctions,
-                compilerResult.Structs,
-                compilerResult.Hashes,
-                compilerResult.Enums,
-                compilerResult.TopLevelStatements,
-                compilerResult.File);
-
-            return functionsRemoved;
         }
 
-        public static void RemoveUnusedFunctions(
-            ref CompilerResult compilerResult,
-            PrintCallback? printCallback = null,
-            CompileLevel level = CompileLevel.Minimal,
-            AnalysisCollection? analysisCollection = null)
         {
-            UnusedFunctionManager unusedFunctionManager = new(level, printCallback, analysisCollection);
-
-            for (int iteration = 0; iteration < MaxIterations; iteration++)
+            for (int i = newGeneralFunctions.Count - 1; i >= 0; i--)
             {
-                ReferenceCollector.CollectReferences(in compilerResult, printCallback);
+                CompiledGeneralFunction generalFunction = newGeneralFunctions[i];
 
-                int functionsRemoved = unusedFunctionManager.DoTheThing(ref compilerResult);
+                if (generalFunction.TimesUsed > 0) continue;
 
-                if (functionsRemoved == 0)
-                {
-                    printCallback?.Invoke($"  Deletion of unused functions is complete", LogType.Debug);
-                    break;
-                }
+                if (CompileLevel == CompileLevel.All) continue;
+                if (CompileLevel == CompileLevel.Exported && generalFunction.IsExport) continue;
 
-                printCallback?.Invoke($"  Removed {functionsRemoved} unused functions at iteration {iteration}", LogType.Debug);
+                string readableID = generalFunction.ToReadable();
+
+                Print?.Invoke($"      Remove general function {readableID}", LogType.Debug);
+                AnalysisCollection?.Informations.Add(new Information($"Unused general function  {readableID} is not compiled", generalFunction.Identifier, generalFunction.FilePath));
+
+                newGeneralFunctions.RemoveAt(i);
+                functionsRemoved++;
+            }
+        }
+
+        {
+            for (int i = newConstructors.Count - 1; i >= 0; i--)
+            {
+                CompiledConstructor constructor = newConstructors[i];
+
+                if (constructor.TimesUsed > 0) continue;
+
+                if (CompileLevel == CompileLevel.All) continue;
+                if (CompileLevel == CompileLevel.Exported && constructor.IsExport) continue;
+
+                string readableID = constructor.ToReadable();
+
+                Print?.Invoke($"      Remove constructor {readableID}", LogType.Debug);
+                AnalysisCollection?.Informations.Add(new Information($"Unused constructor {readableID} is not compiled", constructor.Identifier, constructor.FilePath));
+
+                newConstructors.RemoveAt(i);
+                functionsRemoved++;
+            }
+        }
+
+        compilerResult = new CompilerResult(
+            newFunctions.ToArray(),
+            compilerResult.Macros,
+            newGeneralFunctions.ToArray(),
+            newOperators.ToArray(),
+            newConstructors.ToArray(),
+            compilerResult.ExternalFunctions,
+            compilerResult.Structs,
+            compilerResult.Hashes,
+            compilerResult.Enums,
+            compilerResult.TopLevelStatements,
+            compilerResult.File);
+
+        return functionsRemoved;
+    }
+
+    public static void RemoveUnusedFunctions(
+        ref CompilerResult compilerResult,
+        PrintCallback? printCallback = null,
+        CompileLevel level = CompileLevel.Minimal,
+        AnalysisCollection? analysisCollection = null)
+    {
+        UnusedFunctionManager unusedFunctionManager = new(level, printCallback, analysisCollection);
+
+        for (int iteration = 0; iteration < MaxIterations; iteration++)
+        {
+            ReferenceCollector.CollectReferences(in compilerResult, printCallback);
+
+            int functionsRemoved = unusedFunctionManager.DoTheThing(ref compilerResult);
+
+            if (functionsRemoved == 0)
+            {
+                printCallback?.Invoke($"  Deletion of unused functions is complete", LogType.Debug);
+                break;
             }
 
-            ReferenceCollector.ClearReferences(in compilerResult);
+            printCallback?.Invoke($"  Removed {functionsRemoved} unused functions at iteration {iteration}", LogType.Debug);
         }
+
+        ReferenceCollector.ClearReferences(in compilerResult);
     }
 }

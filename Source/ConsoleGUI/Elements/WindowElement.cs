@@ -2,62 +2,61 @@
 using Win32;
 using Point = System.Drawing.Point;
 
-namespace ConsoleGUI
+namespace ConsoleGUI;
+
+[SupportedOSPlatform("windows")]
+public class WindowElement : Element
 {
-    [SupportedOSPlatform("windows")]
-    public class WindowElement : Element
+    public bool IsFocused { get; private set; }
+    bool IsDragging;
+
+    Point MouseDragStart = Point.Empty;
+    Point MouseDragStartPos = Point.Empty;
+
+    public bool CanDrag = true;
+    public Element[] Elements = System.Array.Empty<Element>();
+
+    public override void BeforeDraw()
     {
-        public bool IsFocused { get; private set; }
-        bool IsDragging;
+        base.BeforeDraw();
+        Elements.BeforeDraw();
+    }
 
-        Point MouseDragStart = Point.Empty;
-        Point MouseDragStartPos = Point.Empty;
+    public override ConsoleChar DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleChar.Empty);
 
-        public bool CanDrag = true;
-        public Element[] Elements = System.Array.Empty<Element>();
+    public void OnMouseEventBase(MouseEvent mouse)
+    {
+        if (!CanDrag) return;
 
-        public override void BeforeDraw()
+        if ((mouse.ButtonState & (uint)MouseButton.Left) != 0)
         {
-            base.BeforeDraw();
-            Elements.BeforeDraw();
+            MouseDragStart = Point.Empty;
+            MouseDragStartPos = Point.Empty;
+            IsFocused = false;
+            IsDragging = false;
         }
 
-        public override ConsoleChar DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleChar.Empty);
+        IsFocused = true;
 
-        public void OnMouseEventBase(MouseEvent mouse)
+        if (IsDragging)
         {
-            if (!CanDrag) return;
-
-            if ((mouse.ButtonState & (uint)MouseButton.Left) != 0)
-            {
-                MouseDragStart = Point.Empty;
-                MouseDragStartPos = Point.Empty;
-                IsFocused = false;
-                IsDragging = false;
-            }
-
-            IsFocused = true;
-
-            if (IsDragging)
-            {
-                Point offset = new(mouse.MousePosition.X - MouseDragStart.X, mouse.MousePosition.Y - MouseDragStart.Y);
-                System.Drawing.Rectangle newRect = Rect;
-                newRect.X = MouseDragStartPos.X + offset.X;
-                newRect.Y = MouseDragStartPos.Y + offset.Y;
-                Rect = newRect;
-                return;
-            }
-
-            if (mouse.MousePosition.Y != Rect.Top) return;
-
-            MouseDragStartPos = Rect.Location;
-            MouseDragStart = new Point(mouse.MousePosition.X, mouse.MousePosition.Y);
-            IsDragging = true;
+            Point offset = new(mouse.MousePosition.X - MouseDragStart.X, mouse.MousePosition.Y - MouseDragStart.Y);
+            System.Drawing.Rectangle newRect = Rect;
+            newRect.X = MouseDragStartPos.X + offset.X;
+            newRect.Y = MouseDragStartPos.Y + offset.Y;
+            Rect = newRect;
+            return;
         }
-        public override void RefreshSize()
-        {
-            base.RefreshSize();
-            Elements.RefreshSize();
-        }
+
+        if (mouse.MousePosition.Y != Rect.Top) return;
+
+        MouseDragStartPos = Rect.Location;
+        MouseDragStart = new Point(mouse.MousePosition.X, mouse.MousePosition.Y);
+        IsDragging = true;
+    }
+    public override void RefreshSize()
+    {
+        base.RefreshSize();
+        Elements.RefreshSize();
     }
 }

@@ -1,15 +1,14 @@
-﻿namespace LanguageCore.Compiler
+﻿namespace LanguageCore.Compiler;
+
+using Parser;
+
+public class CompiledConstructorTemplateInstance : CompiledConstructor
 {
-    using Parser;
+    public readonly CompiledConstructor Template;
 
-    public class CompiledConstructorTemplateInstance : CompiledConstructor
+    public CompiledConstructorTemplateInstance(CompiledType type, CompiledType[] parameterTypes, CompiledConstructor template, ConstructorDefinition functionDefinition)
+        : base(type, parameterTypes, functionDefinition)
     {
-        public readonly CompiledConstructor Template;
-
-        public CompiledConstructorTemplateInstance(CompiledType type, CompiledType[] parameterTypes, CompiledConstructor template, ConstructorDefinition functionDefinition)
-            : base(type, parameterTypes, functionDefinition)
-        {
-            Template = template;
-        }
+        Template = template;
     }
 }

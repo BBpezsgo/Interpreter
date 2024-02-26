@@ -1,18 +1,18 @@
-﻿namespace LanguageCore.Compiler
+﻿using System;
+
+namespace LanguageCore.Compiler;
+
+using Runtime;
+
+public abstract class CompiledConstant : IPositioned
 {
-    using System;
-    using Runtime;
+    public readonly DataItem Value;
+    public abstract string Identifier { get; }
+    public abstract Uri? FilePath { get; }
+    public abstract Position Position { get; }
 
-    public abstract class CompiledConstant : IPositioned
+    protected CompiledConstant(DataItem value)
     {
-        public readonly DataItem Value;
-        public abstract string Identifier { get; }
-        public abstract Uri? FilePath { get; }
-        public abstract Position Position { get; }
-
-        protected CompiledConstant(DataItem value)
-        {
-            Value = value;
-        }
+        Value = value;
     }
 }

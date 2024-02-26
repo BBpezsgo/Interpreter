@@ -1,55 +1,54 @@
-﻿namespace LanguageCore.Tokenizing
+﻿namespace LanguageCore.Tokenizing;
+
+public class StringTokenizer : Tokenizer
 {
-    public class StringTokenizer : Tokenizer
+    readonly string Text;
+
+    StringTokenizer(TokenizerSettings settings, string? text) : base(settings)
     {
-        readonly string Text;
+        Text = text ?? string.Empty;
+    }
 
-        StringTokenizer(TokenizerSettings settings, string? text) : base(settings)
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(string? text)
+        => Tokenize(text, TokenizerSettings.Default);
+
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(string? text, TokenizerSettings settings)
+        => new StringTokenizer(settings, text).TokenizeInternal();
+
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(string? text, ConsoleProgressBar progress)
+        => Tokenize(text, TokenizerSettings.Default, progress);
+
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(string? text, TokenizerSettings settings, ConsoleProgressBar progress)
+        => new StringTokenizer(settings, text).TokenizeInternal(progress);
+
+    TokenizerResult TokenizeInternal()
+    {
+        for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
         {
-            Text = text ?? string.Empty;
+            ProcessCharacter(Text[offsetTotal], offsetTotal);
         }
 
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(string? text)
-            => Tokenize(text, TokenizerSettings.Default);
+        EndToken(Text.Length);
 
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(string? text, TokenizerSettings settings)
-            => new StringTokenizer(settings, text).TokenizeInternal();
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+    }
 
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(string? text, ConsoleProgressBar progress)
-            => Tokenize(text, TokenizerSettings.Default, progress);
-
-        /// <inheritdoc cref="TokenizeInternal"/>
-        public static TokenizerResult Tokenize(string? text, TokenizerSettings settings, ConsoleProgressBar progress)
-            => new StringTokenizer(settings, text).TokenizeInternal(progress);
-
-        TokenizerResult TokenizeInternal()
+    TokenizerResult TokenizeInternal(ConsoleProgressBar progress)
+    {
+        for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
         {
-            for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
-            {
-                ProcessCharacter(Text[offsetTotal], offsetTotal);
-            }
-
-            EndToken(Text.Length);
-
-            return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+            progress.Print(offsetTotal, Text.Length);
+            ProcessCharacter(Text[offsetTotal], offsetTotal);
         }
 
-        TokenizerResult TokenizeInternal(ConsoleProgressBar progress)
-        {
-            for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
-            {
-                progress.Print(offsetTotal, Text.Length);
-                ProcessCharacter(Text[offsetTotal], offsetTotal);
-            }
+        EndToken(Text.Length);
 
-            EndToken(Text.Length);
+        progress.Print(1f);
 
-            progress.Print(1f);
-
-            return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
-        }
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
     }
 }

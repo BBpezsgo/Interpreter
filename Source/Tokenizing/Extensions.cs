@@ -1,29 +1,28 @@
 ﻿using System.Collections.Generic;
 
-namespace LanguageCore.Tokenizing
+namespace LanguageCore.Tokenizing;
+
+public static class Extensions
 {
-    public static class Extensions
+    public static Token? GetTokenAt(this IEnumerable<Token> tokens, SinglePosition position)
     {
-        public static Token? GetTokenAt(this IEnumerable<Token> tokens, SinglePosition position)
+        foreach (Token token in tokens)
         {
-            foreach (Token token in tokens)
-            {
-                if (token.Position.Range.Contains(position))
-                { return token; }
-            }
-
-            return null;
+            if (token.Position.Range.Contains(position))
+            { return token; }
         }
 
-        public static Token? GetTokenAt(this IEnumerable<Token> tokens, int absolutePosition)
-        {
-            foreach (Token token in tokens)
-            {
-                if (token.Position.AbsoluteRange.Contains(absolutePosition))
-                { return token; }
-            }
+        return null;
+    }
 
-            return null;
+    public static Token? GetTokenAt(this IEnumerable<Token> tokens, int absolutePosition)
+    {
+        foreach (Token token in tokens)
+        {
+            if (token.Position.AbsoluteRange.Contains(absolutePosition))
+            { return token; }
         }
+
+        return null;
     }
 }

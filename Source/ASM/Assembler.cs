@@ -1,47 +1,46 @@
 ﻿using System.IO;
 
-namespace LanguageCore.ASM
+namespace LanguageCore.ASM;
+
+public static class Assembler
 {
-    public static class Assembler
+    public static void Assemble(string asmSourceCode, string outputFile)
     {
-        public static void Assemble(string asmSourceCode, string outputFile)
+        string outputFilename = Path.GetFileName(outputFile);
+
+        string fileAsmTemp = outputFilename + ".asm";
+        string fileObjTemp = outputFilename + ".obj";
+        string fileExeTemp = outputFilename + ".exe";
+        string fileExeFinal = outputFile + ".exe";
+
+        if (File.Exists(fileAsmTemp))
+        { Output.LogWarning($"File \"{fileAsmTemp}\" will be overridden"); }
+
+        if (File.Exists(fileObjTemp))
+        { Output.LogWarning($"File \"{fileObjTemp}\" will be overridden"); }
+
+        if (File.Exists(fileExeTemp))
+        { Output.LogWarning($"File \"{fileExeTemp}\" will be overridden"); }
+
+        try
         {
-            string outputFilename = Path.GetFileName(outputFile);
+            File.WriteAllText(fileAsmTemp, asmSourceCode);
 
-            string fileAsmTemp = outputFilename + ".asm";
-            string fileObjTemp = outputFilename + ".obj";
-            string fileExeTemp = outputFilename + ".exe";
-            string fileExeFinal = outputFile + ".exe";
+            Nasm.Assemble(fileAsmTemp, fileObjTemp);
 
-            if (File.Exists(fileAsmTemp))
-            { Output.LogWarning($"File \"{fileAsmTemp}\" will be overridden"); }
-
-            if (File.Exists(fileObjTemp))
-            { Output.LogWarning($"File \"{fileObjTemp}\" will be overridden"); }
+            GolinkLinker.Link(fileObjTemp, fileExeTemp);
 
             if (File.Exists(fileExeTemp))
-            { Output.LogWarning($"File \"{fileExeTemp}\" will be overridden"); }
-
-            try
-            {
-                File.WriteAllText(fileAsmTemp, asmSourceCode);
-
-                Nasm.Assemble(fileAsmTemp, fileObjTemp);
-
-                GolinkLinker.Link(fileObjTemp, fileExeTemp);
-
-                if (File.Exists(fileExeTemp))
-                { File.Copy(fileExeTemp, fileExeFinal, true); }
-            }
-            finally
-            {
-                // if (File.Exists(fileAsmTemp))
-                // { File.Delete(fileAsmTemp); }
-                if (File.Exists(fileObjTemp))
-                { File.Delete(fileObjTemp); }
-                if (File.Exists(fileExeTemp))
-                { File.Delete(fileExeTemp); }
-            }
+            { File.Copy(fileExeTemp, fileExeFinal, true); }
+        }
+        finally
+        {
+            // if (File.Exists(fileAsmTemp))
+            // { File.Delete(fileAsmTemp); }
+            if (File.Exists(fileObjTemp))
+            { File.Delete(fileObjTemp); }
+            if (File.Exists(fileExeTemp))
+            { File.Delete(fileExeTemp); }
         }
     }
 }

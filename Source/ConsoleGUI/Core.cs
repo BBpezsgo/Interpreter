@@ -1,10 +1,9 @@
 ﻿using Win32;
 
-namespace ConsoleGUI
+namespace ConsoleGUI;
+
+public readonly struct CharacterBrush
 {
-    public readonly struct CharacterBrush
-    {
-        public static ConsoleChar Solid(byte color) => new(' ', color, color);
-        public static ConsoleChar ErrorChar => new(' ', CharColor.BrightMagenta, CharColor.BrightMagenta);
-    }
+    public static ConsoleChar Solid(byte color) => new(' ', color, color);
+    public static ConsoleChar ErrorChar => new(' ', CharColor.BrightMagenta, CharColor.BrightMagenta);
 }

@@ -1,20 +1,20 @@
-﻿namespace LanguageCore.Compiler
+﻿using System;
+
+namespace LanguageCore.Compiler;
+
+using Parser.Statement;
+using Runtime;
+
+public class CompiledVariableConstant : CompiledConstant
 {
-    using System;
-    using Parser.Statement;
-    using Runtime;
+    public readonly VariableDeclaration Declaration;
 
-    public class CompiledVariableConstant : CompiledConstant
+    public override string Identifier => Declaration.VariableName.Content;
+    public override Uri? FilePath => Declaration.FilePath;
+    public override Position Position => Declaration.Position;
+
+    public CompiledVariableConstant(VariableDeclaration declaration, DataItem value) : base(value)
     {
-        public readonly VariableDeclaration Declaration;
-
-        public override string Identifier => Declaration.VariableName.Content;
-        public override Uri? FilePath => Declaration.FilePath;
-        public override Position Position => Declaration.Position;
-
-        public CompiledVariableConstant(VariableDeclaration declaration, DataItem value) : base(value)
-        {
-            Declaration = declaration;
-        }
+        Declaration = declaration;
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace LanguageCore;
@@ -10,6 +11,16 @@ using Tokenizing;
 public static class Extensions
 {
     public static bool Contains(this Token[] tokens, string value)
+    {
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            if (string.Equals(tokens[i].Content, value))
+            { return true; }
+        }
+        return false;
+    }
+
+    public static bool Contains(this ImmutableArray<Token> tokens, string value)
     {
         for (int i = 0; i < tokens.Length; i++)
         {

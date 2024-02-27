@@ -431,13 +431,19 @@ FinishCharacter:
     /// <exception cref="TokenizerException"/>
     protected void EndToken(int offsetTotal, bool inFuture = false)
     {
-        CurrentToken.Position.Range.End = new SinglePosition(CurrentLine, CurrentColumn);
-        CurrentToken.Position.AbsoluteRange.End = offsetTotal;
-
         if (inFuture)
         {
-            CurrentToken.Position.Range.End.Character++;
-            CurrentToken.Position.AbsoluteRange.End++;
+            CurrentToken.Position = new Position(
+                new Range<SinglePosition>(CurrentToken.Position.Range.Start, new SinglePosition(CurrentLine, CurrentColumn + 1)),
+                new Range<int>(CurrentToken.Position.AbsoluteRange.Start, offsetTotal + 1)
+                );
+        }
+        else
+        {
+            CurrentToken.Position = new Position(
+                new Range<SinglePosition>(CurrentToken.Position.Range.Start, new SinglePosition(CurrentLine, CurrentColumn)),
+                new Range<int>(CurrentToken.Position.AbsoluteRange.Start, offsetTotal)
+                );
         }
 
         // Skip comments if they should be ignored
@@ -496,7 +502,10 @@ FinishCharacter:
 Finish:
         CurrentToken.TokenType = PreparationTokenType.Whitespace;
         CurrentToken.Content.Clear();
-        CurrentToken.Position.Range.Start = new SinglePosition(CurrentLine, CurrentColumn);
-        CurrentToken.Position.AbsoluteRange.Start = offsetTotal;
+
+        CurrentToken.Position = new Position(
+            new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), CurrentToken.Position.Range.End),
+            new Range<int>(offsetTotal, CurrentToken.Position.AbsoluteRange.End)
+            );
     }
 }

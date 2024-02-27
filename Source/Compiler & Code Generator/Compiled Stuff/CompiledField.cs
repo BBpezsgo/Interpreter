@@ -4,26 +4,20 @@ using Parser;
 
 public class CompiledField : FieldDefinition
 {
-    public new CompiledType Type;
-    public CompiledStruct? Class;
+    public new readonly CompiledType Type;
+    public readonly CompiledStruct? Context;
 
-    public Protection Protection
+    public Protection Protection => ProtectionToken?.Content switch
     {
-        get
-        {
-            if (ProtectionToken == null) return Protection.Public;
-            return ProtectionToken.Content switch
-            {
-                "private" => Protection.Private,
-                "public" => Protection.Public,
-                _ => Protection.Public,
-            };
-        }
-    }
+        "private" => Protection.Private,
+        "public" => Protection.Public,
+        null => Protection.Public,
+        _ => Protection.Public,
+    };
 
-    public CompiledField(CompiledType type, CompiledStruct? @struct, FieldDefinition definition) : base(definition)
+    public CompiledField(CompiledType type, CompiledStruct? context, FieldDefinition definition) : base(definition)
     {
         Type = type;
-        Class = @struct;
+        Context = context;
     }
 }

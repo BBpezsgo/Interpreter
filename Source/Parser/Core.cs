@@ -4,6 +4,16 @@ using System.Linq;
 
 namespace LanguageCore.Parser;
 
+public interface IInFile
+{
+    public Uri? FilePath { get; set; }
+}
+
+public interface IExportable
+{
+    public bool IsExport { get; }
+}
+
 public enum LiteralType
 {
     Integer,

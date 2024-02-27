@@ -231,7 +231,7 @@ public class Interpreter
     {
         #region Console
 
-        externalFunctions.AddManagedExternalFunction("stdin", Array.Empty<Compiler.Type>(), (DataItem[] parameters, ExternalFunctionManaged function) =>
+        externalFunctions.AddManagedExternalFunction("stdin", Array.Empty<RuntimeType>(), (DataItem[] parameters, ExternalFunctionManaged function) =>
         {
             this.IsPaused = true;
             this.ReturnValueConsumer = function;

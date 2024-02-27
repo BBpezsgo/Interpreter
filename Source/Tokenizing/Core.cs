@@ -1,13 +1,14 @@
 ﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace LanguageCore.Tokenizing;
 
 public abstract partial class Tokenizer
 {
-    static readonly char[] Bracelets = ['{', '}', '(', ')', '[', ']'];
-    static readonly char[] Operators = ['+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~'];
-    static readonly string[] DoubleOperators = ["++", "--", "<<", ">>", "&&", "||"];
-    static readonly char[] SimpleOperators = [';', ',', '#'];
+    static readonly ImmutableArray<char> Bracelets = ['{', '}', '(', ')', '[', ']'];
+    static readonly ImmutableArray<char> Operators = ['+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~'];
+    static readonly ImmutableArray<string> DoubleOperators = ["++", "--", "<<", ">>", "&&", "||"];
+    static readonly ImmutableArray<char> SimpleOperators = [';', ',', '#'];
 
     protected readonly List<Token> Tokens;
     protected readonly List<SimpleToken> UnicodeCharacters;
@@ -41,9 +42,12 @@ public abstract partial class Tokenizer
 
     void RefreshTokenPosition(int offsetTotal)
     {
-        CurrentToken.Position.Range.End.Character = CurrentColumn;
-        CurrentToken.Position.Range.End.Line = CurrentLine;
-        CurrentToken.Position.AbsoluteRange.End = offsetTotal;
+        SinglePosition currentPosition = new(CurrentLine, CurrentColumn);
+        Position position = new(
+                new Range<SinglePosition>(CurrentToken.Position.Range.Start, currentPosition),
+                new Range<int>(CurrentToken.Position.AbsoluteRange.Start, offsetTotal)
+            );
+        CurrentToken.Position = position;
     }
 
     protected static Token[] NormalizeTokens(List<Token> tokens, TokenizerSettings settings)

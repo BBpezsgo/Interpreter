@@ -81,6 +81,7 @@ namespace LanguageCore.BBCode.Generator
 
 namespace LanguageCore.Compiler
 {
+    using System.Collections.Immutable;
     using Parser;
     using Parser.Statement;
     using Runtime;
@@ -156,21 +157,20 @@ namespace LanguageCore.Compiler
     public class FunctionType : IEquatable<FunctionType>, IEquatable<CompiledFunction>
     {
         public readonly CompiledType ReturnType;
-        public readonly CompiledType[] Parameters;
+        public readonly ImmutableArray<CompiledType> Parameters;
 
         public bool ReturnSomething => ReturnType != Type.Void;
 
         public FunctionType(CompiledFunction function)
         {
             ReturnType = function.Type;
-            Parameters = new CompiledType[function.ParameterTypes.Length];
-            Array.Copy(function.ParameterTypes, Parameters, function.Parameters.Count);
+            Parameters = function.ParameterTypes;
         }
 
-        public FunctionType(CompiledType returnType, CompiledType[] parameters)
+        public FunctionType(CompiledType returnType, IEnumerable<CompiledType> parameters)
         {
             ReturnType = returnType;
-            Parameters = parameters;
+            Parameters = parameters.ToImmutableArray();
         }
 
         public override string ToString()
@@ -202,7 +202,7 @@ namespace LanguageCore.Compiler
 
             if (!other.ReturnType.Equals(ReturnType)) return false;
 
-            if (!CompiledType.Equals(Parameters, other.Parameters)) return false;
+            if (!CompiledType.AreEquals(Parameters, other.Parameters)) return false;
 
             return true;
         }
@@ -213,7 +213,7 @@ namespace LanguageCore.Compiler
 
             if (!other.Type.Equals(ReturnType)) return false;
 
-            if (!CompiledType.Equals(Parameters, other.ParameterTypes)) return false;
+            if (!CompiledType.AreEquals(Parameters, other.ParameterTypes)) return false;
 
             return true;
         }
@@ -243,15 +243,14 @@ namespace LanguageCore.Compiler
         System.Numerics.IEqualityOperators<CompiledType?, Type, bool>,
         System.Numerics.IEqualityOperators<CompiledType?, RuntimeType, bool>
     {
-        Type builtinType;
+        readonly Type builtinType;
+        readonly CompiledStruct? @struct;
+        readonly CompiledEnum? @enum;
+        readonly FunctionType? function;
+        readonly CompiledType? pointerTo;
+        readonly ImmutableArray<CompiledType> typeParameters;
 
-        CompiledStruct? @struct;
-        CompiledEnum? @enum;
-        FunctionType? function;
-        CompiledType? pointerTo;
-        CompiledType[] typeParameters;
-
-        TypeInstance? typeInstance;
+        readonly TypeInstance? typeInstance;
 
         public Type BuiltinType => builtinType;
         /// <exception cref="InternalException"/>
@@ -272,12 +271,12 @@ namespace LanguageCore.Compiler
         public CompiledEnum? Enum => @enum;
         public FunctionType? Function => function;
         public CompiledType? PointerTo => pointerTo;
-        public CompiledType[] TypeParameters => typeParameters;
+        public ImmutableArray<CompiledType> TypeParameters => typeParameters;
 
-        string? genericName;
-        CompiledType? stackArrayOf;
-        StatementWithValue? stackArraySizeStatement;
-        DataItem stackArraySize;
+        readonly string? genericName;
+        readonly CompiledType? stackArrayOf;
+        readonly StatementWithValue? stackArraySizeStatement;
+        readonly DataItem stackArraySize;
 
         /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
@@ -408,66 +407,76 @@ namespace LanguageCore.Compiler
             }
         }
 
-        CompiledType()
+        CompiledType(
+            Type builtinType = Type.NotBuiltin,
+            CompiledStruct? @struct = null,
+            CompiledEnum? @enum = null,
+            FunctionType? function = null,
+            CompiledType? pointerTo = null,
+            CompiledType[]? typeParameters = null,
+            TypeInstance? typeInstance = null,
+            string? genericName = null,
+            CompiledType? stackArrayOf = null,
+            StatementWithValue? stackArraySizeStatement = null,
+            DataItem stackArraySize = default)
         {
-            this.builtinType = Type.NotBuiltin;
-            this.@struct = null;
-            this.@enum = null;
-            this.function = null;
-            this.genericName = null;
-            this.typeParameters = Array.Empty<CompiledType>();
-            this.stackArrayOf = null;
-            this.pointerTo = null;
+            this.builtinType = builtinType;
+            this.@struct = @struct;
+            this.@enum = @enum;
+            this.function = function;
+            this.pointerTo = pointerTo;
+            this.typeParameters = typeParameters?.ToImmutableArray() ?? ImmutableArray.Create<CompiledType>();
+            this.typeInstance = typeInstance;
+            this.genericName = genericName;
+            this.stackArrayOf = stackArrayOf;
+            this.stackArraySizeStatement = stackArraySizeStatement;
+            this.stackArraySize = stackArraySize;
         }
 
-        /// <exception cref="ArgumentNullException"/>
-        public CompiledType(CompiledType? other, TypeArguments? typeArguments) : this()
+        public static CompiledType From(CompiledType other, TypeArguments? typeArguments)
         {
-            ArgumentNullException.ThrowIfNull(other, nameof(other));
+            if (other.IsBuiltin) return other;
+            if (other.IsEnum) return other;
 
-            this.Set(other);
-
-            if (IsBuiltin) return;
-            if (IsEnum) return;
-
-            if (IsFunction)
+            if (other.IsFunction)
             {
-                function = new FunctionType(
-                    new CompiledType(other.Function!.ReturnType, typeArguments),
-                    CompiledType.FromArray(other.Function.Parameters, typeArguments)
-                    );
-                return;
+                return new CompiledType(new FunctionType(
+                        CompiledType.From(other.Function!.ReturnType, typeArguments),
+                        CompiledType.FromArray(other.Function.Parameters, typeArguments)
+                    ));
             }
 
-            if (IsStruct)
+            if (other.IsStruct)
             {
-                if (typeArguments != null && @struct.TemplateInfo is not null)
+                if (typeArguments != null && other.@struct.TemplateInfo is not null)
                 {
-                    string[] keys = @struct.TemplateInfo.TypeParameterNames;
+                    string[] keys = other.@struct.TemplateInfo.TypeParameterNames;
                     CompiledType[] typeArgumentValues = new CompiledType[keys.Length];
                     for (int i = 0; i < keys.Length; i++)
                     {
                         string key = keys[i];
                         if (!typeArguments.TryGetValue(key, out CompiledType? typeArgumentValue))
-                        { return; }
+                        { return other; }
                         typeArgumentValues[i] = typeArgumentValue;
                     }
-                    typeParameters = typeArgumentValues;
+                    return new CompiledType(other.@struct, typeArgumentValues);
                 }
-                return;
+                return other;
             }
 
-            if (IsStackArray)
+            if (other.IsStackArray)
             {
-                stackArrayOf = new CompiledType(other.StackArrayOf, typeArguments);
-                return;
+                return CompiledType.CreateArrayOf(
+                    CompiledType.From(other.stackArrayOf, typeArguments),
+                    other.stackArraySize,
+                    other.stackArraySizeStatement);
             }
 
-            if (IsGeneric)
+            if (other.IsGeneric)
             {
-                if (typeArguments != null && typeArguments.TryGetValue(genericName, out other))
-                { this.Set(other); }
-                return;
+                if (typeArguments != null && typeArguments.TryGetValue(other.genericName, out CompiledType? _other))
+                { return _other; }
+                return other;
             }
 
             throw new NotImplementedException();
@@ -477,15 +486,18 @@ namespace LanguageCore.Compiler
         {
             this.@struct = @struct;
             if (@struct.TemplateInfo is not null)
-            { typeParameters = @struct.TemplateInfo.TypeParameterNames.Select(CreateGeneric).ToArray(); }
+            { typeParameters = @struct.TemplateInfo.TypeParameterNames.Select(CompiledType.CreateGeneric).ToImmutableArray(); }
         }
 
-        public CompiledType(CompiledStruct @struct, params CompiledType[][] typeParameters) : this(@struct)
+        public CompiledType(CompiledStruct @struct, IEnumerable<CompiledType> typeParameters) : this()
         {
-            List<CompiledType> typeParameters1 = new();
-            for (int i = 0; i < typeParameters.Length; i++)
-            { typeParameters1.AddRange(typeParameters[i]); }
-            this.typeParameters = typeParameters1.ToArray();
+            this.@struct = @struct;
+            this.typeParameters = typeParameters.ToImmutableArray();
+        }
+
+        public CompiledType(CompiledType other, IEnumerable<CompiledType> typeParameters) : this(other)
+        {
+            this.typeParameters = typeParameters.ToImmutableArray();
         }
 
         public CompiledType(FunctionType function) : this()
@@ -523,56 +535,37 @@ namespace LanguageCore.Compiler
         }
 
         /// <exception cref="InternalException"/>
-        public CompiledType(Token type, FindType? typeFinder) : this()
+        public static CompiledType From(Token type, FindType? typeFinder)
         {
-            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Content, out this.builtinType))
-            { return; }
+            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Content, out Type builtinType))
+            { return new CompiledType(builtinType); }
 
             if (typeFinder == null ||
                 !typeFinder.Invoke(type, out CompiledType? result))
             { throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}"); }
 
-            Set(result);
+            return result;
         }
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstance type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
+        public static CompiledType From(TypeInstance type, FindType? typeFinder, ComputeValue? constComputer = null)
         {
-            if (type is TypeInstanceSimple simpleType)
+            return type switch
             {
-                Set(new CompiledType(simpleType, typeFinder));
-                return;
-            }
-
-            if (type is TypeInstanceFunction functionType)
-            {
-                Set(new CompiledType(functionType, typeFinder, constComputer));
-                return;
-            }
-
-            if (type is TypeInstanceStackArray stackArrayType)
-            {
-                Set(new CompiledType(stackArrayType, typeFinder, constComputer));
-                return;
-            }
-
-            if (type is TypeInstancePointer pointerType)
-            {
-                Set(new CompiledType(pointerType, typeFinder, constComputer));
-                return;
-            }
-
-            throw new UnreachableException();
+                TypeInstanceSimple simpleType => From(simpleType, typeFinder),
+                TypeInstanceFunction functionType => From(functionType, typeFinder, constComputer),
+                TypeInstanceStackArray stackArrayType => From(stackArrayType, typeFinder, constComputer),
+                TypeInstancePointer pointerType => From(pointerType, typeFinder, constComputer),
+                _ => throw new UnreachableException()
+            };
         }
 
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceSimple type, FindType? typeFinder) : this()
+        public static CompiledType From(TypeInstanceSimple type, FindType? typeFinder, ComputeValue? constComputer = null)
         {
-            typeInstance = type;
-
-            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
-            { return; }
+            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out Type builtinType))
+            { return new CompiledType(builtinType); }
 
             if (type.Identifier.Content == "func")
             {
@@ -581,41 +574,46 @@ namespace LanguageCore.Compiler
                 CompiledType funcRet;
                 CompiledType[] funcParams;
 
-                if (type.GenericTypes == null || type.GenericTypes.Length == 0)
+                if (!type.GenericTypes.HasValue || type.GenericTypes.Value.Length == 0)
                 {
                     funcRet = new(Type.Void);
                     funcParams = Array.Empty<CompiledType>();
                 }
                 else
                 {
-                    funcRet = new(type.GenericTypes[0], typeFinder);
-                    funcParams = new CompiledType[type.GenericTypes.Length - 1];
-                    for (int i = 1; i < type.GenericTypes.Length; i++)
+                    funcRet = CompiledType.From(type.GenericTypes.Value[0], typeFinder, constComputer);
+                    funcParams = new CompiledType[type.GenericTypes.Value.Length - 1];
+                    for (int i = 1; i < type.GenericTypes.Value.Length; i++)
                     {
-                        TypeInstance genericType = type.GenericTypes[i];
-                        funcParams[i - 1] = new CompiledType(genericType, typeFinder);
+                        TypeInstance genericType = type.GenericTypes.Value[i];
+                        funcParams[i - 1] = CompiledType.From(genericType, typeFinder, constComputer);
                     }
                 }
-                function = new FunctionType(funcRet, funcParams);
-                return;
+
+                return new CompiledType(new FunctionType(funcRet, funcParams));
             }
 
             if (typeFinder == null ||
                 !typeFinder.Invoke(type.Identifier, out CompiledType? result))
             { throw new InternalException($"Can't parse \"{type}\" to {nameof(CompiledType)}"); }
 
-            Set(result);
-
-            typeInstance = type;
-            typeParameters = CompiledType.FromArray(type.GenericTypes, typeFinder);
+            IEnumerable<CompiledType> typeParameters = CompiledType.FromArray(type.GenericTypes, typeFinder);
+            return new CompiledType(result, typeParameters);
         }
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceFunction type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
+        public static CompiledType From(TypeInstanceFunction type, FindType? typeFinder, ComputeValue? constComputer = null)
         {
-            CompiledType returnType = new(type.FunctionReturnType, typeFinder, constComputer);
-            CompiledType[] parameterTypes = CompiledType.FromArray(type.FunctionParameterTypes, typeFinder);
+            return new CompiledType(type, typeFinder, constComputer);
+        }
+
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="InternalException"/>
+        CompiledType(TypeInstanceFunction type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
+        {
+            CompiledType returnType = CompiledType.From(type.FunctionReturnType, typeFinder, constComputer);
+            IEnumerable<CompiledType> parameterTypes = CompiledType.FromArray(type.FunctionParameterTypes, typeFinder);
 
             typeInstance = type;
             function = new FunctionType(returnType, parameterTypes);
@@ -623,12 +621,18 @@ namespace LanguageCore.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstanceStackArray type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
+        public static CompiledType From(TypeInstanceStackArray type, FindType? typeFinder, ComputeValue? constComputer = null)
         {
             ArgumentNullException.ThrowIfNull(constComputer, nameof(constComputer));
 
+            return new CompiledType(type, typeFinder, constComputer);
+        }
+
+        /// <exception cref="InternalException"/>
+        CompiledType(TypeInstanceStackArray type, FindType? typeFinder, ComputeValue constComputer) : this()
+        {
             typeInstance = type;
-            stackArrayOf = new CompiledType(type.StackArrayOf, typeFinder, constComputer);
+            stackArrayOf = CompiledType.From(type.StackArrayOf, typeFinder, constComputer);
             stackArraySizeStatement = type.StackArraySize!;
 
             if (!constComputer.Invoke(type.StackArraySize!, out stackArraySize))
@@ -637,19 +641,20 @@ namespace LanguageCore.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstancePointer type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
+        public static CompiledType From(TypeInstancePointer type, FindType? typeFinder, ComputeValue? constComputer = null)
+        {
+            return new CompiledType(type, typeFinder, constComputer);
+        }
+
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="InternalException"/>
+        CompiledType(TypeInstancePointer type, FindType? typeFinder, ComputeValue? constComputer = null) : this()
         {
             typeInstance = type;
-            pointerTo = new CompiledType(type.To, typeFinder, constComputer);
+            pointerTo = CompiledType.From(type.To, typeFinder, constComputer);
         }
 
         public CompiledType(CompiledType other)
-        {
-            typeParameters = null!;
-            Set(other);
-        }
-
-        void Set(CompiledType other)
         {
             this.typeInstance = other.typeInstance;
             this.builtinType = other.builtinType;
@@ -657,7 +662,7 @@ namespace LanguageCore.Compiler
             this.function = other.function;
             this.genericName = other.genericName;
             this.@struct = other.@struct;
-            this.typeParameters = new List<CompiledType>(other.typeParameters).ToArray();
+            this.typeParameters = other.typeParameters;
             this.stackArrayOf = (other.stackArrayOf is null) ? null : new CompiledType(other.stackArrayOf);
             this.stackArraySize = other.stackArraySize;
             this.stackArraySizeStatement = other.stackArraySizeStatement;
@@ -746,7 +751,7 @@ namespace LanguageCore.Compiler
             if (this.IsGeneric != other.IsGeneric) return false;
             if (this.IsPointer != other.IsPointer) return false;
 
-            if (!CompiledType.Equals(this.typeParameters, other.typeParameters)) return false;
+            if (!CompiledType.AreEquals(this.typeParameters, other.typeParameters)) return false;
 
             if (this.IsStruct && other.IsStruct) return this.@struct.Identifier.Content == other.@struct.Identifier.Content;
             if (this.IsEnum && other.IsEnum) return this.@enum.Identifier.Content == other.@enum.Identifier.Content;
@@ -768,7 +773,7 @@ namespace LanguageCore.Compiler
             {
                 if (other is not TypeInstanceFunction otherFunction) return false;
                 if (!Function.ReturnType.Equals(otherFunction.FunctionReturnType)) return false;
-                if (!CompiledType.Equals(Function.Parameters, otherFunction.FunctionParameterTypes)) return false;
+                if (!CompiledType.AreEquals(Function.Parameters, otherFunction.FunctionParameterTypes)) return false;
                 return true;
             }
 
@@ -791,7 +796,7 @@ namespace LanguageCore.Compiler
 
             if (IsGeneric)
             {
-                if (!CompiledType.Equals((CompiledType?[]?)this.typeParameters, (TypeInstance?[]?)otherSimple.GenericTypes)) return false;
+                if (!CompiledType.AreEquals(this.typeParameters, otherSimple.GenericTypes)) return false;
             }
 
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(otherSimple.Identifier.Content, out Type type))
@@ -806,28 +811,32 @@ namespace LanguageCore.Compiler
             return false;
         }
 
-        public static bool Equals(CompiledType?[]? itemsA, TypeInstance?[]? itemsB)
+        public static bool AreEquals(IEnumerable<CompiledType?>? itemsA, IEnumerable<TypeInstance?>? itemsB)
         {
             if (itemsA is null && itemsB is null) return true;
             if (itemsA is null || itemsB is null) return false;
 
-            if (itemsA.Length != itemsB.Length) return false;
+            IEnumerator<CompiledType?> enumA = itemsA.GetEnumerator();
+            IEnumerator<TypeInstance?> enumB = itemsB.GetEnumerator();
 
-            for (int i = 0; i < itemsA.Length; i++)
+            while (true)
             {
-                CompiledType? a = itemsA[i];
-                TypeInstance? b = itemsB[i];
+                CompiledType? a = enumA.Current;
+                TypeInstance? b = enumB.Current;
+
+                if (enumA.MoveNext() != enumB.MoveNext()) return false;
 
                 if (a is null && b is null) continue;
                 if (a is null || b is null) return false;
 
                 if (!a.Equals(b)) return false;
             }
-
-            return true;
         }
 
-        public static bool Equals(CompiledType?[]? itemsA, CompiledType?[]? itemsB)
+        public static bool AreEquals(IEnumerable<CompiledType?>? itemsA, IEnumerable<CompiledType?>? itemsB)
+            => AreEquals(itemsA?.ToArray(), itemsB?.ToArray());
+
+        public static bool AreEquals(CompiledType?[]? itemsA, CompiledType?[]? itemsB)
         {
             if (itemsA is null && itemsB is null) return true;
             if (itemsA is null || itemsB is null) return false;
@@ -864,6 +873,10 @@ namespace LanguageCore.Compiler
             if (!this.IsBuiltin) return false;
             return this.RuntimeType == other;
         }
+
+        /// <exception cref="NotImplementedException"/>
+        public static bool TryGetTypeParameters(IEnumerable<CompiledType>? definedParameters, IEnumerable<CompiledType>? passedParameters, TypeArguments typeParameters)
+            => CompiledType.TryGetTypeParameters(definedParameters?.ToArray(), passedParameters?.ToArray(), typeParameters);
 
         /// <exception cref="NotImplementedException"/>
         public static bool TryGetTypeParameters(CompiledType[]? definedParameters, CompiledType[]? passedParameters, TypeArguments typeParameters)
@@ -947,32 +960,23 @@ namespace LanguageCore.Compiler
             throw new NotImplementedException();
         }
 
-        public static CompiledType CreateGeneric(string content) => new()
+        public static CompiledType CreateGeneric(string content) => new(genericName: content);
+
+        public static IEnumerable<CompiledType> FromArray(IEnumerable<TypeInstance>? types, FindType? typeFinder)
         {
-            genericName = content,
-        };
+            if (types is null) yield break;
 
-        public static CompiledType[] FromArray(IEnumerable<TypeInstance> types, FindType typeFinder)
-            => CompiledType.FromArray(types.ToArray(), typeFinder);
-        public static CompiledType[] FromArray(TypeInstance[]? types, FindType? typeFinder)
-        {
-            if (types is null || types.Length == 0) return Array.Empty<CompiledType>();
+            foreach (TypeInstance type in types)
+            { yield return CompiledType.From(type, typeFinder); }
 
-            CompiledType[] result = new CompiledType[types.Length];
-            for (int i = 0; i < types.Length; i++)
-            { result[i] = new CompiledType(types[i], typeFinder); }
-
-            return result;
         }
-        public static CompiledType[] FromArray(CompiledType[]? types, TypeArguments? typeArguments)
+
+        public static IEnumerable<CompiledType> FromArray(IEnumerable<CompiledType>? types, TypeArguments? typeArguments)
         {
-            if (types is null || types.Length == 0) return Array.Empty<CompiledType>();
+            if (types is null) yield break;
 
-            CompiledType[] result = new CompiledType[types.Length];
-            for (int i = 0; i < types.Length; i++)
-            { result[i] = new CompiledType(types[i], typeArguments); }
-
-            return result;
+            foreach (CompiledType type in types)
+            { yield return CompiledType.From(type, typeArguments); }
         }
 
         public bool TryGetFieldOffsets([NotNullWhen(true)] out IReadOnlyDictionary<string, int>? fieldOffsets)
@@ -1026,17 +1030,10 @@ namespace LanguageCore.Compiler
             throw new NotImplementedException();
         }
 
-        public static CompiledType Pointer(CompiledType to) => new()
-        {
-            pointerTo = to,
-        };
+        public static CompiledType CreatePointer(CompiledType to) => new(pointerTo: to);
 
-        public static CompiledType ArrayOf(CompiledType of, DataItem size, StatementWithValue? sizeStatement) => new()
-        {
-            stackArrayOf = of,
-            stackArraySize = size,
-            stackArraySizeStatement = sizeStatement,
-        };
+        public static CompiledType CreateArrayOf(CompiledType of, DataItem size, StatementWithValue? sizeStatement)
+            => new(stackArrayOf: of, stackArraySize: size, stackArraySizeStatement: sizeStatement);
 
         public static CompiledType? InsertTypeParameters(CompiledType type, TypeArguments? typeArguments)
         {
@@ -1055,7 +1052,7 @@ namespace LanguageCore.Compiler
                 CompiledType? pointerTo = CompiledType.InsertTypeParameters(type.pointerTo, typeArguments);
                 if (pointerTo is null)
                 { return null; }
-                return CompiledType.Pointer(pointerTo);
+                return CompiledType.CreatePointer(pointerTo);
             }
 
             if (type.IsStackArray)
@@ -1063,7 +1060,7 @@ namespace LanguageCore.Compiler
                 CompiledType? stackArrayOf = CompiledType.InsertTypeParameters(type.stackArrayOf, typeArguments);
                 if (stackArrayOf is null)
                 { return null; }
-                return CompiledType.ArrayOf(stackArrayOf, type.stackArraySize, type.stackArraySizeStatement);
+                return CompiledType.CreateArrayOf(stackArrayOf, type.stackArraySize, type.stackArraySizeStatement);
             }
 
             if (type.IsStruct && type.Struct.TemplateInfo != null)

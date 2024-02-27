@@ -834,7 +834,7 @@ public sealed class InterpreterElement : WindowElement
 
             if (stackDebugInfo.TryGet(Interpreter.BytecodeInterpreter.BasePointer, i, out StackElementInformations itemDebugInfo))
             {
-                Range<int> range = itemDebugInfo.GetRange(Interpreter.BytecodeInterpreter.BasePointer);
+                MutableRange<int> range = itemDebugInfo.GetRange(Interpreter.BytecodeInterpreter.BasePointer);
 
                 if (itemDebugInfo.Kind == StackElementKind.Variable ||
                     itemDebugInfo.Kind == StackElementKind.Parameter)

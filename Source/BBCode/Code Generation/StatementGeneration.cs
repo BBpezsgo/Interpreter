@@ -170,9 +170,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return;
             }
 
-            if (!GetGeneralFunction(deletableType, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
+            if (!GetGeneralFunction(deletableType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
             {
-                if (!GetGeneralFunctionTemplate(deletableType, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
+                if (!GetGeneralFunctionTemplate(deletableType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                 {
                     GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
                     AddInstruction(Opcode.HEAP_FREE);
@@ -575,7 +575,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Absolute, cacheAddress);
 
                 AddComment(" .:");
-                AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
+                AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.Parameters.Length);
 
                 if (compiledFunction.ReturnSomething)
                 {
@@ -613,7 +613,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, functionNameOffset);
 
                 AddComment(" .:");
-                AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
+                AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.Parameters.Length);
 
                 if (compiledFunction.ReturnSomething)
                 {
@@ -883,7 +883,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, offset);
 
                 AddComment(" .:");
-                AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
+                AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.Parameters.Length);
 
                 GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -1349,7 +1349,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(ConstructorCall constructorCall)
     {
-        CompiledType instanceType = new(constructorCall.TypeName, FindType, TryCompute);
+        CompiledType instanceType = CompiledType.From(constructorCall.TypeName, FindType, TryCompute);
         CompiledType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
         if (!GetConstructor(instanceType, parameters, out CompiledConstructor? compiledFunction))
@@ -1652,7 +1652,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForStatement(TypeCast typeCast)
     {
         CompiledType statementType = FindStatementType(typeCast.PrevStatement);
-        CompiledType targetType = new(typeCast.Type, FindType, TryCompute);
+        CompiledType targetType = CompiledType.From(typeCast.Type, FindType, TryCompute);
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
 
@@ -2548,7 +2548,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int paramsSize = 0;
         for (int i = 0; i < parameters.Length; i++)
         {
-            CompiledType parameterType = new(parameters[i].Type, FindType);
+            CompiledType parameterType = CompiledType.From(parameters[i].Type, FindType);
             parameters[i].Type.SetAnalyzedType(parameterType);
 
             this.CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));

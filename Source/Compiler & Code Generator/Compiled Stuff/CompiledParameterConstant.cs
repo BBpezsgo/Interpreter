@@ -8,6 +8,7 @@ using Runtime;
 public class CompiledParameterConstant : CompiledConstant
 {
     public readonly ParameterDefinition Declaration;
+
     public override string Identifier => Declaration.Identifier.Content;
     public override Uri? FilePath => null;
     public override Position Position => Declaration.Position;

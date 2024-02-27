@@ -5,6 +5,7 @@ using System.Text;
 
 namespace LanguageCore.Parser;
 
+using System.Collections.Immutable;
 using Compiler;
 using Statement;
 using Tokenizing;
@@ -120,12 +121,16 @@ public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStack
 public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunction?>
 {
     public readonly TypeInstance FunctionReturnType;
-    public readonly TypeInstance[] FunctionParameterTypes;
+    public readonly ImmutableArray<TypeInstance> FunctionParameterTypes;
+
+    public override Position Position =>
+        new Position(FunctionReturnType)
+        .Union(FunctionParameterTypes);
 
     public TypeInstanceFunction(TypeInstance returnType, IEnumerable<TypeInstance> parameters) : base()
     {
         FunctionReturnType = returnType;
-        FunctionParameterTypes = parameters.ToArray();
+        FunctionParameterTypes = parameters.ToImmutableArray();
     }
 
     public override bool Equals(object? obj) => obj is TypeInstanceFunction other && Equals(other);
@@ -144,16 +149,6 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
     }
 
     public override int GetHashCode() => HashCode.Combine((byte)2, FunctionReturnType, FunctionParameterTypes);
-
-    public override Position Position
-    {
-        get
-        {
-            Position result = new(FunctionReturnType);
-            result.Union(FunctionParameterTypes);
-            return result;
-        }
-    }
 
     public override void SetAnalyzedType(CompiledType type)
     {
@@ -189,12 +184,16 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
 public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
 {
     public readonly Token Identifier;
-    public readonly TypeInstance[]? GenericTypes;
+    public readonly ImmutableArray<TypeInstance>? GenericTypes;
+
+    public override Position Position =>
+        new Position(Identifier)
+        .Union(GenericTypes);
 
     public TypeInstanceSimple(Token identifier, IEnumerable<TypeInstance>? genericTypes = null) : base()
     {
         this.Identifier = identifier;
-        this.GenericTypes = genericTypes?.ToArray();
+        this.GenericTypes = genericTypes?.ToImmutableArray();
     }
 
     public override bool Equals(object? obj) => obj is TypeInstanceSimple other && Equals(other);
@@ -202,15 +201,15 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
     public bool Equals(TypeInstanceSimple? other)
     {
         if (other is null) return false;
-        if (this.Identifier.Content != other.Identifier.Content) return false;
+        if (Identifier.Content != other.Identifier.Content) return false;
 
-        if (this.GenericTypes is null) return other.GenericTypes is null;
-        if (other.GenericTypes is null) return false;
+        if (!GenericTypes.HasValue) return other.GenericTypes is null;
+        if (!other.GenericTypes.HasValue) return false;
 
-        if (this.GenericTypes.Length != other.GenericTypes.Length) return false;
-        for (int i = 0; i < this.GenericTypes.Length; i++)
+        if (GenericTypes.Value.Length != other.GenericTypes.Value.Length) return false;
+        for (int i = 0; i < GenericTypes.Value.Length; i++)
         {
-            if (!this.GenericTypes[i].Equals(other.GenericTypes[i]))
+            if (!GenericTypes.Value[i].Equals(other.GenericTypes.Value[i]))
             { return false; }
         }
         return true;
@@ -218,12 +217,10 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
 
     public override int GetHashCode() => HashCode.Combine((byte)3, Identifier, GenericTypes);
 
-    public override Position Position => new Position(Identifier).Union(GenericTypes);
-
     public override void SetAnalyzedType(CompiledType type)
     {
         if (TryGetAnalyzedType(type, out TokenAnalyzedType analyzedType))
-        { this.Identifier.AnalyzedType = analyzedType; }
+        { Identifier.AnalyzedType = analyzedType; }
     }
 
     public static TypeInstanceSimple CreateAnonymous(string name)
@@ -261,15 +258,15 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
         if (typeArguments.TryGetValue(Identifier.Content, out CompiledType? replaced))
         { identifier = replaced.ToString(); }
 
-        if (GenericTypes is null)
+        if (!GenericTypes.HasValue)
         { return identifier; }
 
         StringBuilder result = new(identifier);
         result.Append('<');
-        for (int i = 0; i < GenericTypes.Length; i++)
+        for (int i = 0; i < GenericTypes.Value.Length; i++)
         {
             if (i > 0) result.Append(", ");
-            result.Append(GenericTypes[i].ToString(typeArguments));
+            result.Append(GenericTypes.Value[i].ToString(typeArguments));
         }
         result.Append('>');
         return result.ToString();
@@ -280,6 +277,8 @@ public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?
 {
     public readonly TypeInstance To;
     public readonly Token Operator;
+
+    public override Position Position => new(To, Operator);
 
     public TypeInstancePointer(TypeInstance to, Token @operator) : base()
     {
@@ -296,8 +295,6 @@ public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?
     }
 
     public override int GetHashCode() => HashCode.Combine((byte)4, To);
-
-    public override Position Position => new(To, Operator);
 
     public override void SetAnalyzedType(CompiledType type)
     {

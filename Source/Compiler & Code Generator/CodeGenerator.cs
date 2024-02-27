@@ -52,57 +52,76 @@ public struct GeneratorSettings
 
 public abstract class CodeGenerator
 {
-    protected readonly struct CompliableTemplate<T> where T : IDuplicatable<T>
+    protected readonly struct CompliableTemplate<T> where T : FunctionThingDefinition
     {
         public readonly T OriginalFunction;
         public readonly T Function;
         public readonly TypeArguments TypeArguments;
 
+        /// <exception cref="InternalException"/>
+        /// <exception cref="NotImplementedException"/>
         public CompliableTemplate(T function, TypeArguments typeArguments)
         {
             OriginalFunction = function;
-            Function = function.Duplicate();
             TypeArguments = typeArguments;
 
-            FinishInitialization();
-        }
-
-        void FinishInitialization()
-        {
             foreach (KeyValuePair<string, CompiledType> pair in TypeArguments)
             {
                 if (pair.Value.IsGeneric)
                 { throw new InternalException($"{nameof(pair.Value.IsGeneric)} is {true}"); }
             }
 
-            switch (Function)
+            switch (OriginalFunction)
             {
                 case CompiledFunction compiledFunction:
                 {
-                    CompiledType.InsertTypeParameters(compiledFunction.ParameterTypes, TypeArguments);
-                    compiledFunction.Type =
-                        CompiledType.InsertTypeParameters(compiledFunction.Type, TypeArguments) ??
-                        compiledFunction.Type;
+                    CompiledType[] parameters = compiledFunction.ParameterTypes.ToArray();
+                    CompiledType type = compiledFunction.Type;
+
+                    CompiledType.InsertTypeParameters(parameters, TypeArguments);
+                    type = CompiledType.InsertTypeParameters(type, TypeArguments) ?? type;
+
+                    Function = (T)(FunctionThingDefinition)new CompiledFunction(type, parameters, compiledFunction);
                     break;
                 }
 
                 case CompiledGeneralFunction compiledGeneralFunction:
                 {
-                    CompiledType.InsertTypeParameters(compiledGeneralFunction.ParameterTypes, TypeArguments);
-                    compiledGeneralFunction.Type =
-                        CompiledType.InsertTypeParameters(compiledGeneralFunction.Type, TypeArguments) ??
-                        compiledGeneralFunction.Type;
+                    CompiledType[] parameters = compiledGeneralFunction.ParameterTypes.ToArray();
+                    CompiledType type = compiledGeneralFunction.Type;
+
+                    CompiledType.InsertTypeParameters(parameters, TypeArguments);
+                    type = CompiledType.InsertTypeParameters(type, TypeArguments) ?? type;
+
+                    Function = (T)(FunctionThingDefinition)new CompiledGeneralFunction(type, parameters, compiledGeneralFunction);
                     break;
                 }
 
                 case CompiledConstructor compiledConstructor:
                 {
-                    CompiledType.InsertTypeParameters(compiledConstructor.ParameterTypes, TypeArguments);
-                    compiledConstructor.Type =
-                        CompiledType.InsertTypeParameters(compiledConstructor.Type, TypeArguments) ??
-                        compiledConstructor.Type;
+                    CompiledType[] parameters = compiledConstructor.ParameterTypes.ToArray();
+                    CompiledType type = compiledConstructor.Type;
+
+                    CompiledType.InsertTypeParameters(parameters, TypeArguments);
+                    type = CompiledType.InsertTypeParameters(type, TypeArguments) ?? type;
+
+                    Function = (T)(FunctionThingDefinition)new CompiledConstructor(type, parameters, compiledConstructor);
                     break;
                 }
+
+                case CompiledOperator compiledOperator:
+                {
+                    CompiledType[] parameters = compiledOperator.ParameterTypes.ToArray();
+                    CompiledType type = compiledOperator.Type;
+
+                    CompiledType.InsertTypeParameters(parameters, TypeArguments);
+                    type = CompiledType.InsertTypeParameters(type, TypeArguments) ?? type;
+
+                    Function = (T)(FunctionThingDefinition)new CompiledOperator(type, parameters, compiledOperator);
+                    break;
+                }
+
+                default: throw new NotImplementedException();
             }
         }
 
@@ -210,7 +229,7 @@ public abstract class CodeGenerator
 
             if (variableDeclaration.Type != "var")
             {
-                CompiledType constantType = new(variableDeclaration.Type, FindType, TryCompute);
+                CompiledType constantType = CompiledType.From(variableDeclaration.Type, FindType, TryCompute);
                 variableDeclaration.Type.SetAnalyzedType(constantType);
 
                 if (!constantType.IsBuiltin)
@@ -424,7 +443,7 @@ public abstract class CodeGenerator
             if (function is null) continue;
             if (function.IsTemplate) continue;
             if (function.Type != type) continue;
-            if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
+            if (!CompiledType.AreEquals(function.ParameterTypes, parameters)) continue;
 
             if (compiledFunction != null)
             { throw new CompilerException($"Duplicated constructor definitions: {compiledFunction} and {function} are the same", function.Identifier, function.FilePath); }
@@ -436,7 +455,7 @@ public abstract class CodeGenerator
         {
             if (function.Function is null) continue;
             if (function.Function.Type != type) continue;
-            if (!CompiledType.Equals(function.Function.ParameterTypes, parameters)) continue;
+            if (!CompiledType.AreEquals(function.Function.ParameterTypes, parameters)) continue;
 
             if (compiledFunction != null)
             { throw new CompilerException($"Duplicated constructor definitions: {compiledFunction} and {function} are the same", function.Function.Identifier, function.Function.FilePath); }
@@ -714,7 +733,7 @@ public abstract class CodeGenerator
 
             if (function.Identifier.Content != name) continue;
 
-            if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
+            if (!CompiledType.AreEquals(function.ParameterTypes, parameters)) continue;
 
             if (found)
             { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
@@ -729,7 +748,7 @@ public abstract class CodeGenerator
 
             if (function.Function.Identifier.Content != name) continue;
 
-            if (!CompiledType.Equals(function.Function.ParameterTypes, parameters)) continue;
+            if (!CompiledType.AreEquals(function.Function.ParameterTypes, parameters)) continue;
 
             if (found)
             { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Function.Identifier, function.Function.FilePath); }
@@ -754,7 +773,7 @@ public abstract class CodeGenerator
 
                 if (function.Identifier.Content != name) continue;
 
-                if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
+                if (!CompiledType.AreEquals(function.ParameterTypes, parameters)) continue;
 
                 if (found)
                 { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
@@ -819,7 +838,7 @@ public abstract class CodeGenerator
         {
             CompiledFunction function = this.CompiledFunctions[i];
 
-            if (!CompiledType.Equals(function.ParameterTypes, type.Parameters)) continue;
+            if (!CompiledType.AreEquals(function.ParameterTypes, type.Parameters)) continue;
             if (!function.Type.Equals(type.ReturnType)) continue;
 
             if (compiledFunction is not null)
@@ -890,7 +909,7 @@ public abstract class CodeGenerator
             if (!function.Identifier.Equals(name.Content)) continue;
 
             if (type.ReturnType.Equals(function.Type) &&
-                CompiledType.Equals(function.ParameterTypes, type.Parameters))
+                CompiledType.AreEquals(function.ParameterTypes, type.Parameters))
             {
                 compiledFunction = function;
                 return true;
@@ -921,7 +940,7 @@ public abstract class CodeGenerator
         {
             if (function.IsTemplate) continue;
             if (function.Identifier.Content != @operator.Operator.Content) continue;
-            if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
+            if (!CompiledType.AreEquals(function.ParameterTypes, parameters)) continue;
 
             if (found)
             { throw new CompilerException($"Duplicated operator definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
@@ -972,7 +991,7 @@ public abstract class CodeGenerator
             if (function.IsTemplate) continue;
             if (function.Identifier.Content != name) continue;
             if (!ContextIs(function, context)) continue;
-            if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
+            if (!CompiledType.AreEquals(function.ParameterTypes, parameters)) continue;
 
             if (compiledFunction != null)
             { throw new CompilerException($"Duplicated general function definitions: {compiledFunction} and {function} are the same", function.Identifier, function.FilePath); }
@@ -984,7 +1003,7 @@ public abstract class CodeGenerator
         {
             if (function.Function.Identifier.Content != name) continue;
             if (!ContextIs(function.Function, context)) continue;
-            if (!CompiledType.Equals(function.Function.ParameterTypes, parameters)) continue;
+            if (!CompiledType.AreEquals(function.Function.ParameterTypes, parameters)) continue;
 
             if (compiledFunction != null)
             { throw new CompilerException($"Duplicated general function definitions: {compiledFunction} and {function} are the same", function.Function.Identifier, function.Function.FilePath); }
@@ -1078,10 +1097,10 @@ public abstract class CodeGenerator
 
     protected bool GetStruct(TypeInstanceSimple type, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
     {
-        if (type.GenericTypes is null)
+        if (!type.GenericTypes.HasValue)
         { return GetStruct(type.Identifier.Content, out compiledStruct); }
         else
-        { return GetStruct(type.Identifier.Content, type.GenericTypes.Length, out compiledStruct); }
+        { return GetStruct(type.Identifier.Content, type.GenericTypes.Value.Length, out compiledStruct); }
     }
 
     protected bool GetStruct(TypeInstance type, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
@@ -1199,7 +1218,7 @@ public abstract class CodeGenerator
     /// <exception cref="InternalException"/>
     /// <exception cref="CompilerException"/>
     protected CompiledType FindType(TypeInstance name)
-        => new(name, FindType, TryCompute);
+        => CompiledType.From(name, FindType, TryCompute);
 
     #endregion
 
@@ -1499,7 +1518,7 @@ public abstract class CodeGenerator
         }
         else
         {
-            type = new CompiledType(newVariable.Type, FindType, TryCompute);
+            type = CompiledType.From(newVariable.Type, FindType, TryCompute);
 
             newVariable.Type.SetAnalyzedType(type);
             newVariable.CompiledType = type;
@@ -1777,7 +1796,7 @@ public abstract class CodeGenerator
             case LiteralType.Float:
                 return OnGotStatementType(literal, new CompiledType(Type.Float));
             case LiteralType.String:
-                return OnGotStatementType(literal, CompiledType.Pointer(new CompiledType(Type.Char)));
+                return OnGotStatementType(literal, CompiledType.CreatePointer(new CompiledType(Type.Char)));
             case LiteralType.Char:
                 return OnGotStatementType(literal, new CompiledType(Type.Char));
             default:
@@ -1843,7 +1862,7 @@ public abstract class CodeGenerator
     protected CompiledType FindStatementType(AddressGetter addressGetter)
     {
         CompiledType to = FindStatementType(addressGetter.PrevStatement);
-        return OnGotStatementType(addressGetter, CompiledType.Pointer(to));
+        return OnGotStatementType(addressGetter, CompiledType.CreatePointer(to));
     }
     protected CompiledType FindStatementType(Pointer pointer)
     {
@@ -1854,13 +1873,13 @@ public abstract class CodeGenerator
     }
     protected CompiledType FindStatementType(NewInstance newInstance)
     {
-        CompiledType type = new(newInstance.TypeName, FindType);
+        CompiledType type = CompiledType.From(newInstance.TypeName, FindType);
         newInstance.TypeName.SetAnalyzedType(type);
         return OnGotStatementType(newInstance, type);
     }
     protected CompiledType FindStatementType(ConstructorCall constructorCall)
     {
-        CompiledType type = new(constructorCall.TypeName, FindType);
+        CompiledType type = CompiledType.From(constructorCall.TypeName, FindType);
         CompiledType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
         if (GetConstructor(type, parameters, out CompiledConstructor? constructor))
@@ -1917,25 +1936,31 @@ public abstract class CodeGenerator
 
                 result = CompiledType.InsertTypeParameters(result, TypeArguments) ?? result;
 
-                for (int j = 0; j < result.TypeParameters.Length; j++)
+                CompiledType[] newTypeParameters = result.TypeParameters.ToArray();
+
+                for (int j = 0; j < newTypeParameters.Length; j++)
                 {
-                    if (result.TypeParameters[j].IsGeneric)
+                    CompiledType item = newTypeParameters[j];
+
+                    if (item.IsGeneric)
                     {
-                        if (TypeArguments.TryGetValue(result.TypeParameters[j].Name, out CompiledType? genericType))
+                        if (TypeArguments.TryGetValue(item.Name, out CompiledType? genericType))
                         {
-                            result.TypeParameters[j] = genericType;
+                            newTypeParameters[j] = genericType;
                         }
-                        else if (prevStatementType.Struct.TryGetTypeArgumentIndex(result.TypeParameters[j].Name, out int k))
+                        else if (prevStatementType.Struct.TryGetTypeArgumentIndex(item.Name, out int k))
                         {
                             if (result.TypeParameters.Length <= k)
                             { throw new NotImplementedException(); }
 
-                            result.TypeParameters[j] = prevStatementType.TypeParameters[k];
+                            newTypeParameters[j] = prevStatementType.TypeParameters[k];
                         }
                         else
-                        { throw new CompilerException($"Type argument \"{result.TypeParameters[j].Name}\" not found", definedField, CurrentFile); }
+                        { throw new CompilerException($"Type argument \"{item.Name}\" not found", definedField, CurrentFile); }
                     }
                 }
+
+                result = new(result, newTypeParameters);
 
                 return OnGotStatementType(field, result);
             }
@@ -1959,7 +1984,7 @@ public abstract class CodeGenerator
     }
     protected CompiledType FindStatementType(TypeCast @as)
     {
-        CompiledType type = new(@as.Type, FindType);
+        CompiledType type = CompiledType.From(@as.Type, FindType);
         @as.Type.SetAnalyzedType(type);
         return OnGotStatementType(@as, type);
     }
@@ -2006,6 +2031,11 @@ public abstract class CodeGenerator
         };
     }
 
+    protected IEnumerable<CompiledType> FindStatementTypes(IEnumerable<StatementWithValue> statements)
+    {
+        return statements.Select<StatementWithValue, CompiledType>(FindStatementType);
+    }
+
     protected CompiledType[] FindStatementTypes(StatementWithValue[] statements)
     {
         CompiledType[] result = new CompiledType[statements.Length];
@@ -2014,6 +2044,8 @@ public abstract class CodeGenerator
         return result;
     }
 
+    protected CompiledType[] FindStatementTypes(IEnumerable<StatementWithValue> statements, IEnumerable<CompiledType> expectedTypes)
+        => FindStatementTypes(statements.ToArray(), expectedTypes.ToArray());
     protected CompiledType[] FindStatementTypes(StatementWithValue[] statements, CompiledType[] expectedTypes)
     {
         CompiledType[] result = new CompiledType[statements.Length];
@@ -2026,6 +2058,8 @@ public abstract class CodeGenerator
         return result;
     }
 
+    protected CompiledType FindMacroType(MacroDefinition macro, IEnumerable<StatementWithValue> parameters)
+        => FindMacroType(macro, parameters.ToArray());
     protected CompiledType FindMacroType(MacroDefinition macro, params StatementWithValue[] parameters)
     {
         if (!InlineMacro(macro, out Statement? inlinedMacro, parameters))
@@ -2087,10 +2121,13 @@ public abstract class CodeGenerator
         return false;
     }
 
+    protected bool InlineMacro(MacroDefinition macro, [NotNullWhen(true)] out Statement? inlined, IEnumerable<StatementWithValue> parameters)
+        => InlineMacro(macro, out inlined, parameters.ToArray());
+
     protected bool InlineMacro(MacroDefinition macro, [NotNullWhen(true)] out Statement? inlined, params StatementWithValue[] parameters)
     {
         Dictionary<string, StatementWithValue> _parameters = Utils.Map(
-            macro.Parameters,
+            macro.Parameters.ToArray(),
             parameters,
             (key, value) => (key.Content, value));
 
@@ -3026,7 +3063,7 @@ public abstract class CodeGenerator
     {
         if (TryCompute(typeCast.PrevStatement, context, out value))
         {
-            CompiledType type = new(typeCast.Type, FindType, TryCompute);
+            CompiledType type = CompiledType.From(typeCast.Type, FindType, TryCompute);
             if (!type.IsBuiltin) return false;
             DataItem.Cast(ref value, type.RuntimeType);
             return true;
@@ -3757,7 +3794,7 @@ public abstract class CodeGenerator
     {
         StatementWithValue prevStatement = Collapse(statement.PrevStatement, parameters);
         CompiledType prevType = FindStatementType(prevStatement);
-        CompiledType targetType = new(statement.Type, FindType, TryCompute);
+        CompiledType targetType = CompiledType.From(statement.Type, FindType, TryCompute);
         if (targetType.Equals(prevType))
         { return prevStatement; }
 
@@ -3841,7 +3878,7 @@ public abstract class CodeGenerator
         }
         else
         {
-            CompiledType iteratorType = new(iteratorVariable.Type, FindType, TryCompute);
+            CompiledType iteratorType = CompiledType.From(iteratorVariable.Type, FindType, TryCompute);
             iteratorVariable.Type.SetAnalyzedType(iteratorType);
             iterator = GetInitialValue(iteratorType);
         }

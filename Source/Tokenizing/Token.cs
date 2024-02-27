@@ -22,7 +22,7 @@ public class Token :
 
     public readonly string Content;
 
-    public static Token Empty => new(TokenType.Whitespace, string.Empty, true, new Position(new Range<SinglePosition>(new SinglePosition(0, 0), new SinglePosition(0, 0)), new Range<int>(0, 0)));
+    public static Token Empty => new(TokenType.Whitespace, string.Empty, true, Position.Zero);
 
     public Position Position => position;
 
@@ -91,28 +91,19 @@ public class Token :
     /// <exception cref="ArgumentOutOfRangeException"/>
     public (Token?, Token?) Slice(int at)
     {
-        if (string.IsNullOrEmpty(Content))
+        ArgumentOutOfRangeException.ThrowIfNegative(at);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(at, Content.Length);
+
+        if (Content.Length <= 0)
         { return (null, null); }
 
-        if (at < 0)
-        { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
-
-        if (at > Content.Length)
-        { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
-
-        Token left;
-        Token right;
-
         if (Content.Length == 1)
-        {
-            left = Duplicate();
-            return (left, null);
-        }
+        { return (Duplicate(), null); }
 
         (Position leftPosition, Position rightPosition) = position.Slice(at);
 
-        left = new Token(TokenType, Content[..at], IsAnonymous, leftPosition);
-        right = new Token(TokenType, Content[at..], IsAnonymous, rightPosition);
+        Token left = new(TokenType, Content[..at], IsAnonymous, leftPosition);
+        Token right = new(TokenType, Content[at..], IsAnonymous, rightPosition);
 
         return (left, right);
     }

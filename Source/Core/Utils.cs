@@ -87,16 +87,22 @@ public static partial class Utils
         return false;
     }
 
+    /// <exception cref="NotImplementedException"/>
     public static void SetTypeParameters(CompiledType[] typeParameters, TypeArguments typeValues)
     {
         for (int i = 0; i < typeParameters.Length; i++)
-        {
-            if (typeParameters[i].IsGeneric)
-            {
-                if (!typeValues.TryGetValue(typeParameters[i].Name, out CompiledType? eTypeParameter))
-                { throw new NotImplementedException(); }
-                typeParameters[i] = eTypeParameter;
-            }
-        }
+        { Utils.SetTypeParameters(ref typeParameters[i], typeValues); }
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static void SetTypeParameters(ref CompiledType typeParameter, TypeArguments typeValues)
+    {
+        if (!typeParameter.IsGeneric)
+        { return; }
+
+        if (!typeValues.TryGetValue(typeParameter.Name, out CompiledType? eTypeParameter))
+        { throw new NotImplementedException(); }
+
+        typeParameter = eTypeParameter;
     }
 }

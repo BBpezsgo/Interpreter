@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 
@@ -12,12 +13,14 @@ public class CompiledStruct : StructDefinition,
     IReferenceable<TypeInstance>,
     IDuplicatable<CompiledStruct>
 {
-    public CompiledAttributeCollection CompiledAttributes;
-    public new readonly CompiledField[] Fields;
-    readonly List<Reference<TypeInstance>> references;
-    readonly TypeArguments currentTypeArguments;
+    public new readonly ImmutableArray<CompiledField> Fields;
 
+    public readonly ImmutableDictionary<string, CompiledAttribute> CompiledAttributes;
+
+    readonly List<Reference<TypeInstance>> references;
     public IReadOnlyList<Reference<TypeInstance>> References => references;
+
+    readonly TypeArguments currentTypeArguments;
     public IReadOnlyDictionary<string, CompiledType> CurrentTypeArguments => currentTypeArguments;
 
     public IReadOnlyDictionary<string, int> FieldOffsets
@@ -46,13 +49,22 @@ public class CompiledStruct : StructDefinition,
         }
     }
 
-    public CompiledStruct(CompiledAttributeCollection compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition)
+    public CompiledStruct(IEnumerable<CompiledField> fields, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, StructDefinition definition) : base(definition)
     {
-        this.CompiledAttributes = compiledAttributes;
-        this.Fields = fields;
-        this.TemplateInfo = definition.TemplateInfo;
+        this.Fields = fields.ToImmutableArray();
+        this.CompiledAttributes = compiledAttributes.ToImmutableDictionary();
+
         this.currentTypeArguments = new TypeArguments();
         this.references = new List<Reference<TypeInstance>>();
+    }
+
+    public CompiledStruct(IEnumerable<CompiledField> fields, CompiledStruct other) : base(other)
+    {
+        this.Fields = fields.ToImmutableArray();
+        this.CompiledAttributes = other.CompiledAttributes;
+
+        this.currentTypeArguments = new TypeArguments(other.currentTypeArguments);
+        this.references = new List<Reference<TypeInstance>>(other.references);
     }
 
     public int SizeWithTypeArguments(IReadOnlyDictionary<string, CompiledType> typeParameters)
@@ -132,7 +144,7 @@ public class CompiledStruct : StructDefinition,
         return result;
     }
 
-    public CompiledStruct Duplicate() => new(CompiledAttributes, Fields, this);
+    public CompiledStruct Duplicate() => new(Fields, this);
 
     public bool TryGetTypeArgumentIndex(string typeArgumentName, out int index)
     {

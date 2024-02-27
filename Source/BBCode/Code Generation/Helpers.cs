@@ -3,6 +3,7 @@ using System.Diagnostics;
 
 namespace LanguageCore.BBCode.Generator;
 
+using System.Linq;
 using Compiler;
 using Parser.Statement;
 using Runtime;
@@ -121,7 +122,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (type.IsStruct)
         {
-            TypeArguments? typeParameters = type.Struct.TemplateInfo?.ToDictionary(type.TypeParameters); ;
+            TypeArguments? typeParameters = type.Struct.TemplateInfo?.ToDictionary(type.TypeParameters);
             int size = 0;
             foreach (CompiledField field in type.Struct.Fields)
             {

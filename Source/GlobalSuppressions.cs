@@ -31,3 +31,4 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Style", "IDE0290:Use primary constructor")]
 [assembly: SuppressMessage("Style", "IDE0305:Simplify collection initialization")]
 [assembly: SuppressMessage("Style", "IDE0300:Simplify collection initialization")]
+[assembly: SuppressMessage("Style", "IDE0303:Simplify collection initialization")]

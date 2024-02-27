@@ -8,19 +8,18 @@ using Parser;
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class CompiledParameter : ParameterDefinition
 {
-    public new CompiledType Type;
+    public new readonly CompiledType Type;
 
     public readonly int Index;
     public readonly int MemoryAddress;
 
     public bool IsAnonymous => Index == -1;
     public bool IsRef => Modifiers.Contains("ref");
-    public TypeInstance TypeToken => base.Type;
 
     public CompiledParameter(int index, int memoryAddress, CompiledType type, ParameterDefinition definition) : base(definition)
     {
-        this.Index = index;
         this.Type = type;
+        this.Index = index;
         this.MemoryAddress = memoryAddress;
     }
 

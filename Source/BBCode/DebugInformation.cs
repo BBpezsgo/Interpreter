@@ -8,7 +8,7 @@ namespace LanguageCore.Runtime;
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public struct SourceCodeLocation
 {
-    public Range<int> Instructions;
+    public MutableRange<int> Instructions;
     public Position SourcePosition;
 
     public readonly bool Contains(int instruction) =>
@@ -43,12 +43,12 @@ public struct StackElementInformations
     public bool BasepointerRelative;
     public int Size;
 
-    public readonly Range<int> GetRange(int basepointer)
+    public readonly MutableRange<int> GetRange(int basepointer)
     {
         int itemStart = this.Address;
         if (this.BasepointerRelative) itemStart += basepointer;
         int itemEnd = itemStart + this.Size - 1;
-        return (itemStart, itemEnd);
+        return new MutableRange<int>(itemStart, itemEnd);
     }
 }
 
@@ -72,7 +72,7 @@ public readonly struct CollectedScopeInfo
         for (int i = 0; i < Stack.Length; i++)
         {
             StackElementInformations item = Stack[i];
-            Range<int> range = item.GetRange(basePointer);
+            MutableRange<int> range = item.GetRange(basePointer);
 
             if (range.Contains(stackAddress))
             {
@@ -94,7 +94,7 @@ public struct FunctionInformations
     public Uri? File;
     public string ReadableIdentifier;
     public bool IsMacro;
-    public Range<int> Instructions;
+    public MutableRange<int> Instructions;
 
     public override readonly string ToString()
     {

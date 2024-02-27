@@ -7,23 +7,22 @@ sealed class PreparationToken :
     IPositioned,
     IDuplicatable<PreparationToken>
 {
-    Position position;
     public PreparationTokenType TokenType;
     public readonly StringBuilder Content;
 
-    public ref Position Position => ref position;
-    Position IPositioned.Position => position;
+    public Position Position;
+    Position IPositioned.Position => Position;
 
     public PreparationToken(Position position)
     {
-        this.position = position;
+        this.Position = position;
         this.TokenType = PreparationTokenType.Whitespace;
         this.Content = new StringBuilder();
     }
 
     PreparationToken(Position position, PreparationTokenType tokenType, string content)
     {
-        this.position = position;
+        this.Position = position;
         this.TokenType = tokenType;
         this.Content = new StringBuilder(content);
     }
@@ -52,14 +51,11 @@ sealed class PreparationToken :
     /// <exception cref="ArgumentOutOfRangeException"/>
     public (PreparationToken?, PreparationToken?) Slice(int at)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(at);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(at, Content.Length);
+
         if (Content.Length == 0)
         { return (null, null); }
-
-        if (at < 0)
-        { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
-
-        if (at > Content.Length)
-        { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
 
         PreparationToken left;
         PreparationToken right;
@@ -70,7 +66,7 @@ sealed class PreparationToken :
             return (left, null);
         }
 
-        (Position leftPosition, Position rightPosition) = position.Slice(at);
+        (Position leftPosition, Position rightPosition) = Position.Slice(at);
 
         string content = Content.ToString();
 
@@ -80,5 +76,5 @@ sealed class PreparationToken :
         return (left, right);
     }
 
-    public PreparationToken Duplicate() => new(position, TokenType, Content.ToString());
+    public PreparationToken Duplicate() => new(Position, TokenType, Content.ToString());
 }

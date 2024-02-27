@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace LanguageCore.Compiler;
@@ -34,7 +35,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         }
         else
         {
-            type = new(newVariable.Type, FindType, TryCompute);
+            type = CompiledType.From(newVariable.Type, FindType, TryCompute);
         }
 
         return new CompiledVariable(-1, type, newVariable);
@@ -82,6 +83,8 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         return variablesAdded;
     }
 
+    void AnalyzeStatements(IEnumerable<Statement>? statements)
+        => AnalyzeStatements(statements?.ToArray());
     void AnalyzeStatements(Statement[]? statements)
     {
         if (statements == null) return;
@@ -104,6 +107,8 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         { this.CompiledVariables.RemoveAt(this.CompiledVariables.Count - 1); }
     }
 
+    void AnalyzeStatements(IEnumerable<Statement> statements, IEnumerable<CompiledType> expectedTypes)
+        => AnalyzeStatements(statements.ToArray(), expectedTypes.ToArray());
     void AnalyzeStatements(Statement[] statements, CompiledType[] expectedTypes)
     {
         int variablesAdded = AnalyzeNewVariables(statements);
@@ -381,8 +386,8 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             if (keywordCall.FunctionName == "delete")
             {
                 CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
-                
-                if (GetGeneralFunction(paramType, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
+
+                if (GetGeneralFunction(paramType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                 {
                     destructor.AddReference(keywordCall, CurrentFile);
 
@@ -392,7 +397,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
                     return;
                 }
-                else if (GetGeneralFunctionTemplate(paramType, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
+                else if (GetGeneralFunctionTemplate(paramType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                 {
                     compilableGeneralFunction.OriginalFunction.AddReference(keywordCall, CurrentFile);
 
@@ -423,7 +428,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         { }
         else if (statement is ConstructorCall constructorCall)
         {
-            CompiledType type = new(constructorCall.TypeName, FindType, TryCompute);
+            CompiledType type = CompiledType.From(constructorCall.TypeName, FindType, TryCompute);
             AnalyzeStatements(constructorCall.Parameters);
 
             CompiledType[] parameters = FindStatementTypes(constructorCall.Parameters);
@@ -518,7 +523,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.FilePath;
             CurrentFunction = function;
 
@@ -538,7 +543,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.FilePath;
             CurrentFunction = function;
 
@@ -558,7 +563,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.FilePath;
             CurrentFunction = function;
 
@@ -578,7 +583,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.FilePath;
             CurrentFunction = function;
 
@@ -619,7 +624,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.Function.FilePath;
             CurrentFunction = function.Function;
 
@@ -639,7 +644,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.Function.FilePath;
             CurrentFunction = function.Function;
 

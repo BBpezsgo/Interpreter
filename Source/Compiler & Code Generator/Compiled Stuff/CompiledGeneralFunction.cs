@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Text;
 
 namespace LanguageCore.Compiler;
@@ -16,18 +17,19 @@ public class CompiledGeneralFunction :
     IReferenceable<ConstructorCall>,
     IDuplicatable<CompiledGeneralFunction>
 {
-    public CompiledType[] ParameterTypes;
-    readonly List<Reference<Statement>> references;
-    public CompiledStruct? Context;
-    public CompiledType Type;
+    public readonly CompiledType Type;
+    public readonly ImmutableArray<CompiledType> ParameterTypes;
+
+    public readonly CompiledStruct? Context;
 
     public int TimesUsed;
     public int TimesUsedTotal;
 
     public int InstructionOffset = -1;
 
-    public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
+    public bool ReturnSomething => Type.BuiltinType != LanguageCore.Compiler.Type.Void;
 
+    readonly List<Reference<Statement>> references;
     public IReadOnlyList<Reference<Statement>> References => references;
 
     public override bool IsTemplate
@@ -40,12 +42,24 @@ public class CompiledGeneralFunction :
         }
     }
 
-    public CompiledGeneralFunction(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledGeneralFunction(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledStruct? context, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
     {
         this.Type = type;
-        this.ParameterTypes = parameterTypes;
+        this.ParameterTypes = parameterTypes.ToImmutableArray();
+
+        this.Context = context;
         this.references = new List<Reference<Statement>>();
-        this.Context = null;
+    }
+
+    public CompiledGeneralFunction(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledGeneralFunction other) : base(other)
+    {
+        this.Type = type;
+        this.ParameterTypes = parameterTypes.ToImmutableArray();
+
+        this.Context = other.Context;
+        this.references = new List<Reference<Statement>>(other.references);
+        this.TimesUsed = other.TimesUsed;
+        this.TimesUsedTotal = other.TimesUsedTotal;
     }
 
     public void AddReference(KeywordCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
@@ -64,11 +78,10 @@ public class CompiledGeneralFunction :
     }
     public bool IsSame(ISameCheck? other) => other is CompiledGeneralFunction other2 && IsSame(other2);
 
-    public new CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, this)
+    public new CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, Context, this)
     {
         TimesUsed = TimesUsed,
         TimesUsedTotal = TimesUsedTotal,
-        Context = Context,
     };
 
     public override string ToString()
@@ -99,26 +112,5 @@ public class CompiledGeneralFunction :
         result.Append(Block?.ToString() ?? ";");
 
         return result.ToString();
-    }
-
-    public CompiledGeneralFunctionTemplateInstance InstantiateTemplate(TypeArguments typeParameters)
-    {
-        CompiledGeneralFunctionTemplateInstance result = new(Type, ParameterTypes, this, this)
-        {
-            TimesUsed = TimesUsed,
-            TimesUsedTotal = TimesUsedTotal,
-            Context = Context,
-        };
-
-        Utils.SetTypeParameters(result.ParameterTypes, typeParameters);
-
-        if (result.Type.IsGeneric)
-        {
-            if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType? typeParameter))
-            { throw new NotImplementedException(); }
-            result.Type = typeParameter;
-        }
-
-        return result;
     }
 }

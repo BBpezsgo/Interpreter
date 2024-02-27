@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace LanguageCore;
@@ -17,6 +18,35 @@ public interface IDuplicatable<T> : ICloneable
 
 public static partial class Utils
 {
+    public static bool SequenceEquals<T1, T2>(IEnumerable<T1> collectionA, IEnumerable<T2> collectionB)
+        where T1 : IEquatable<T2>
+    {
+        using IEnumerator<T1> e1 = collectionA.GetEnumerator();
+        using IEnumerator<T2> e2 = collectionB.GetEnumerator();
+
+        while (e1.MoveNext())
+        {
+            if (!(e2.MoveNext() && e1.Current.Equals(e2.Current)))
+            { return false; }
+        }
+
+        return !e2.MoveNext();
+    }
+
+    public static bool SequenceEquals<T1, T2>(IEnumerable<T1> collectionA, IEnumerable<T2> collectionB, Func<T1, T2, bool> checker)
+    {
+        using IEnumerator<T1> e1 = collectionA.GetEnumerator();
+        using IEnumerator<T2> e2 = collectionB.GetEnumerator();
+
+        while (e1.MoveNext())
+        {
+            if (!(e2.MoveNext() && checker.Invoke(e1.Current, e2.Current)))
+            { return false; }
+        }
+
+        return !e2.MoveNext();
+    }
+
     public static bool TryReplace(ref string @string, string oldValue, string? newValue)
     {
         string result = @string.Replace(oldValue, newValue, StringComparison.Ordinal);

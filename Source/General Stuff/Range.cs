@@ -5,8 +5,9 @@ using System.Numerics;
 namespace LanguageCore;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
-public partial struct Range<T> :
+public readonly partial struct Range<T> :
     IEquatable<Range<T>>,
+    IEquatable<MutableRange<T>>,
     IEquatable<ValueTuple<T, T>>,
     IEquatable<T>,
     IEqualityOperators<Range<T>, Range<T>, bool>,
@@ -14,8 +15,8 @@ public partial struct Range<T> :
     IEqualityOperators<Range<T>, T, bool>
     where T : IEquatable<T>
 {
-    public T Start;
-    public T End;
+    public readonly T Start;
+    public readonly T End;
 
     public Range(T both)
     {
@@ -30,6 +31,7 @@ public partial struct Range<T> :
 
     public override bool Equals(object? obj) => obj is Range<T> other && Equals(other);
     public bool Equals(Range<T> other) => Start.Equals(other.Start) && End.Equals(other.End);
+    public bool Equals(MutableRange<T> other) => Start.Equals(other.Start) && End.Equals(other.End);
     public bool Equals(T start, T end) => Start.Equals(start) && End.Equals(end);
     public bool Equals(T? other) => Start.Equals(other) && End.Equals(other);
     public bool Equals(ValueTuple<T, T> other) => Start.Equals(other.Item1) && End.Equals(other.Item2);

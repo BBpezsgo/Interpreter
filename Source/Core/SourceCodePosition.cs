@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Transactions;
 
 namespace LanguageCore;
 
@@ -12,17 +13,23 @@ public interface IPositioned
 }
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-public struct Position :
+public readonly struct Position :
     IEquatable<Position>,
     IEqualityOperators<Position, Position, bool>
 {
     public static Position UnknownPosition => new(new Range<SinglePosition>(SinglePosition.Undefined), new Range<int>(-1));
     public static Position Zero => new(new Range<SinglePosition>(SinglePosition.Zero), new Range<int>(0));
 
-    public Range<int> AbsoluteRange;
-    public Range<SinglePosition> Range;
+    public readonly Range<int> AbsoluteRange;
+    public readonly Range<SinglePosition> Range;
 
     public Position(Range<SinglePosition> range, Range<int> absoluteRange)
+    {
+        Range = range;
+        AbsoluteRange = absoluteRange;
+    }
+
+    public Position(ValueTuple<SinglePosition, SinglePosition> range, ValueTuple<int, int> absoluteRange)
     {
         Range = range;
         AbsoluteRange = absoluteRange;
@@ -46,67 +53,25 @@ public struct Position :
             break;
         }
 
+        Position result = this;
+
         for (int i = 1; i < elements.Length; i++)
-        { Union(elements[i]); }
+        { result = result.Union(elements[i]); }
+
+        Range = result.Range;
+        AbsoluteRange = result.AbsoluteRange;
     }
     public Position(IEnumerable<IPositioned?> elements) : this(elements.ToArray())
     { }
 
-    public Position(params Position[] elements)
-    {
-        if (elements.Length == 0) throw new ArgumentException($"Number of elements must be more than zero", nameof(elements));
-
-        Range = Position.UnknownPosition.Range;
-        AbsoluteRange = Position.UnknownPosition.AbsoluteRange;
-
-        if (elements.Length > 0)
-        {
-            Position position = elements[0];
-            Range = position.Range;
-            AbsoluteRange = position.AbsoluteRange;
-        }
-
-        for (int i = 1; i < elements.Length; i++)
-        { Union(elements[i]); }
-    }
-    public Position(IEnumerable<Position> elements) : this(elements.ToArray())
-    { }
-
-    public Position Union(Position other)
-    {
-        if (other.AbsoluteRange == Position.UnknownPosition.AbsoluteRange ||
-            AbsoluteRange == Position.UnknownPosition.AbsoluteRange) return this;
-
-        Range = LanguageCore.Range.Union(Range, other.Range);
-        AbsoluteRange = LanguageCore.Range.Union(AbsoluteRange, other.AbsoluteRange);
-
-        return this;
-    }
-    public Position Union(IPositioned? other)
-    {
-        if (other == null) return this;
-        if (other is Tokenizing.Token token && token.IsAnonymous) return this;
-        return Union(other.Position);
-    }
-    public Position Union(params IPositioned?[]? elements)
-    {
-        if (elements == null) return this;
-        if (elements.Length == 0) return this;
-
-        for (int i = 0; i < elements.Length; i++)
-        { Union(elements[i]); }
-
-        return this;
-    }
-
-    public readonly string ToStringRange()
+    public string ToStringRange()
     {
         if (Range.Start == Range.End) return Range.Start.ToStringMin();
         if (Range.Start.Line == Range.End.Line) return $"{Range.Start.Line}:({Range.Start.Character}-{Range.End.Character})";
         return $"{Range.Start.ToStringMin()}-{Range.End.ToStringMin()}";
     }
 
-    public readonly string? ToStringCool(string? prefix = null, string? postfix = null)
+    public string? ToStringCool(string? prefix = null, string? postfix = null)
     {
         if (Range.Start.Line < 0)
         { return null; }
@@ -120,72 +85,67 @@ public struct Position :
         return $"{prefix}line {Range.Start.Line} and column {Range.Start.Character}{postfix}";
     }
 
-    readonly string GetDebuggerDisplay()
+    string GetDebuggerDisplay()
     {
         if (this == Position.UnknownPosition)
         { return "?"; }
         return this.ToStringRange();
     }
 
-    public readonly Position Before() => new(new Range<SinglePosition>(new SinglePosition(this.Range.Start.Line, this.Range.Start.Character - 1), new SinglePosition(this.Range.Start.Line, this.Range.Start.Character)), new Range<int>(this.AbsoluteRange.Start - 1, this.AbsoluteRange.Start));
+    public Position Before() => new(new Range<SinglePosition>(new SinglePosition(this.Range.Start.Line, this.Range.Start.Character - 1), new SinglePosition(this.Range.Start.Line, this.Range.Start.Character)), new Range<int>(this.AbsoluteRange.Start - 1, this.AbsoluteRange.Start));
 
-    public readonly Position After() => new(new Range<SinglePosition>(new SinglePosition(this.Range.End.Line, this.Range.End.Character), new SinglePosition(this.Range.End.Line, this.Range.End.Character + 1)), new Range<int>(this.AbsoluteRange.End, this.AbsoluteRange.End + 1));
+    public Position After() => new(new Range<SinglePosition>(new SinglePosition(this.Range.End.Line, this.Range.End.Character), new SinglePosition(this.Range.End.Line, this.Range.End.Character + 1)), new Range<int>(this.AbsoluteRange.End, this.AbsoluteRange.End + 1));
 
     public override bool Equals(object? obj) => obj is Position position && Equals(position);
     public bool Equals(Position other) => AbsoluteRange.Equals(other.AbsoluteRange) && Range.Equals(other.Range);
 
-    public override readonly int GetHashCode() => HashCode.Combine(AbsoluteRange, Range);
+    public override int GetHashCode() => HashCode.Combine(AbsoluteRange, Range);
 
     /// <exception cref="NotImplementedException"/>
     /// <exception cref="ArgumentOutOfRangeException"/>
-    public readonly (Position Left, Position Right) Slice(int at)
+    public (Position Left, Position Right) Slice(int at)
     {
         if (Range.Start.Line != Range.End.Line)
         { throw new NotImplementedException($"Position slicing on different lines not implemented"); }
 
-        if (at < 0)
-        { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
+        ArgumentOutOfRangeException.ThrowIfNegative(at);
+        int rangeSize = Range.End.Character - Range.Start.Character;
 
-        Position left = default;
-        Position right = default;
+        if (rangeSize < 0)
+        { throw new NotImplementedException($"Somehow end is larger than start"); }
 
-        {
-            ref Range<SinglePosition> leftRange = ref left.Range;
-            ref Range<SinglePosition> rightRange = ref right.Range;
+        if (rangeSize < at)
+        { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is larger than the range size ({rangeSize})"); }
 
-            int rangeSize = Range.End.Character - Range.Start.Character;
+        int rangeSizeAbs = AbsoluteRange.End - AbsoluteRange.Start;
 
-            if (rangeSize < 0)
-            { throw new NotImplementedException($"Somehow end is larger than start"); }
+        if (rangeSizeAbs < 0)
+        { throw new NotImplementedException($"Somehow end is larger than start"); }
 
-            if (rangeSize < at)
-            { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is larger than the range size ({rangeSize})"); }
+        if (rangeSizeAbs < at)
+        { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is larger than the range size ({rangeSizeAbs})"); }
 
-            leftRange.Start = Range.Start;
-            leftRange.End = new SinglePosition(Range.Start.Line, Range.Start.Character + at);
+        Position left = new(
+             new Range<SinglePosition>(
+                Range.Start,
+                new SinglePosition(Range.Start.Line, Range.Start.Character + at)
+                ),
+             new Range<int>(
+                AbsoluteRange.Start,
+                AbsoluteRange.Start + at
+                )
+            );
 
-            rightRange.Start = leftRange.End;
-            rightRange.End = Range.End;
-        }
-
-        {
-            ref Range<int> leftRange = ref left.AbsoluteRange;
-            ref Range<int> rightRange = ref right.AbsoluteRange;
-
-            int rangeSize = AbsoluteRange.End - AbsoluteRange.Start;
-
-            if (rangeSize < 0)
-            { throw new NotImplementedException($"Somehow end is larger than start"); }
-
-            if (rangeSize < at)
-            { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is larger than the range size ({rangeSize})"); }
-
-            leftRange.Start = AbsoluteRange.Start;
-            leftRange.End = AbsoluteRange.Start + at;
-
-            rightRange.Start = leftRange.End;
-            rightRange.End = AbsoluteRange.End;
-        }
+        Position right = new(
+             new Range<SinglePosition>(
+                left.Range.End,
+                Range.End
+                ),
+             new Range<int>(
+                left.AbsoluteRange.End,
+                AbsoluteRange.End
+                )
+            );
 
         return (left, right);
     }
@@ -271,4 +231,50 @@ public struct SinglePosition :
     public override readonly bool Equals(object? obj) => obj is SinglePosition position && Equals(position);
     public readonly bool Equals(SinglePosition other) => Line == other.Line && Character == other.Character;
     public override readonly int GetHashCode() => HashCode.Combine(Line, Character);
+}
+
+public static class PositionExtensions
+{
+    public static Position Union(this Position a, Position b)
+    {
+        if (b.AbsoluteRange == Position.UnknownPosition.AbsoluteRange ||
+            a.AbsoluteRange == Position.UnknownPosition.AbsoluteRange) return a;
+
+        return new Position(
+            Range.Union(a.Range, b.Range),
+            Range.Union(a.AbsoluteRange, b.AbsoluteRange)
+            );
+    }
+
+    public static Position Union(this Position a, IPositioned? b)
+    {
+        if (b is null) return a;
+
+        if (b is Tokenizing.Token token && token.IsAnonymous) return a;
+        return PositionExtensions.Union(a, b.Position);
+    }
+
+    public static Position Union(this Position a, params IPositioned?[]? b)
+    {
+        if (b is null) return a;
+
+        Position result = a;
+
+        for (int i = 0; i < b.Length; i++)
+        { result = PositionExtensions.Union(result, b[i]); }
+
+        return result;
+    }
+
+    public static Position Union(this Position a, IEnumerable<IPositioned?>? b)
+    {
+        if (b is null) return a;
+
+        Position result = a;
+
+        foreach (IPositioned? element in b)
+        { result = PositionExtensions.Union(result, element); }
+
+        return result;
+    }
 }

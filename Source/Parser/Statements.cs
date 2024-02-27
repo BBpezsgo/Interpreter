@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -341,8 +342,9 @@ public class CompileTag : Statement, IInFile
 
     public Uri? FilePath { get; set; }
 
-    public override Position Position
-        => new Position(HashToken, HashName).Union(Parameters);
+    public override Position Position =>
+        new Position(HashToken, HashName)
+        .Union(Parameters);
 
     public CompileTag(Token hashToken, Token hashName, Literal[] parameters)
     {
@@ -424,13 +426,14 @@ public class VariableDeclaration : Statement, IInFile
     public readonly TypeInstance Type;
     public readonly Token VariableName;
     public readonly StatementWithValue? InitialValue;
-    public readonly Token[] Modifiers;
+    public readonly ImmutableArray<Token> Modifiers;
     public CompiledType? CompiledType;
 
     public Uri? FilePath { get; set; }
 
-    public override Position Position
-        => new Position(Type, VariableName, InitialValue).Union(Modifiers);
+    public override Position Position =>
+        new Position(Type, VariableName, InitialValue)
+        .Union(Modifiers);
 
     public VariableDeclaration(VariableDeclaration other) : base(other)
     {
@@ -442,16 +445,16 @@ public class VariableDeclaration : Statement, IInFile
         CompiledType = other.CompiledType;
     }
 
-    public VariableDeclaration(Token[] modifiers, TypeInstance type, Token variableName, StatementWithValue? initialValue)
+    public VariableDeclaration(IEnumerable<Token> modifiers, TypeInstance type, Token variableName, StatementWithValue? initialValue)
     {
         Type = type;
         VariableName = variableName;
         InitialValue = initialValue;
-        Modifiers = modifiers;
+        Modifiers = modifiers.ToImmutableArray();
     }
 
     public override string ToString()
-        => $"{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
+        => $"{string.Join(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -469,7 +472,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
 {
     public readonly StatementWithValue PrevStatement;
     public readonly Token BracketLeft;
-    public readonly StatementWithValue[] Parameters;
+    public readonly ImmutableArray<StatementWithValue> Parameters;
     public readonly Token BracketRight;
 
     public override Position Position => new(PrevStatement, BracketLeft, BracketRight);
@@ -480,7 +483,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
     {
         PrevStatement = prevStatement;
         BracketLeft = bracketLeft;
-        Parameters = parameters.ToArray();
+        Parameters = parameters.ToImmutableArray();
         BracketRight = bracketRight;
     }
 
@@ -565,7 +568,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
 public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
 {
     public readonly Token Identifier;
-    public readonly StatementWithValue[] Parameters;
+    public readonly ImmutableArray<StatementWithValue> Parameters;
     public readonly StatementWithValue? PrevStatement;
 
     public readonly Token BracketLeft;
@@ -585,7 +588,9 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
         }
     }
 
-    public override Position Position => new Position(BracketLeft, BracketRight, Identifier).Union(MethodParameters);
+    public override Position Position =>
+        new Position(BracketLeft, BracketRight, Identifier)
+        .Union(MethodParameters);
 
     public object? Reference { get; set; }
 
@@ -594,7 +599,7 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
         PrevStatement = prevStatement;
         Identifier = identifier;
         BracketLeft = bracketLeft;
-        Parameters = parameters.ToArray();
+        Parameters = parameters.ToImmutableArray();
         BracketRight = bracketRight;
     }
 
@@ -664,17 +669,18 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
 public class KeywordCall : StatementWithValue, IReadable
 {
     public readonly Token Identifier;
-    public readonly StatementWithValue[] Parameters;
+    public readonly ImmutableArray<StatementWithValue> Parameters;
 
     public string FunctionName => Identifier.Content;
 
-    public override Position Position
-        => new Position(Identifier).Union(Parameters);
+    public override Position Position =>
+        new Position(Identifier)
+        .Union(Parameters);
 
     public KeywordCall(Token identifier, IEnumerable<StatementWithValue> parameters)
     {
         Identifier = identifier;
-        Parameters = parameters.ToArray();
+        Parameters = parameters.ToImmutableArray();
     }
 
     public override string ToString()
@@ -1480,8 +1486,9 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
     public readonly Token BracketLeft;
     public readonly Token BracketRight;
 
-    public override Position Position
-        => new Position(Keyword, TypeName, BracketLeft, BracketRight).Union(Parameters);
+    public override Position Position =>
+        new Position(Keyword, TypeName, BracketLeft, BracketRight)
+        .Union(Parameters);
 
     public CompiledGeneralFunction? Reference { get; set; }
 

@@ -48,7 +48,7 @@ public static class Entry
                 else
                 {
                     Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
-                    LanguageCore.Runtime.Interpreter interpreter = new();
+                    Runtime.Interpreter interpreter = new();
 
                     interpreter.OnStdOut += (sender, data) => Output.Write(char.ToString(data));
                     interpreter.OnStdError += (sender, data) => Output.WriteError(char.ToString(data));
@@ -139,6 +139,28 @@ public static class Entry
                         generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
+                    }
+
+                    if (arguments.GeneratorSettings.PrintInstructions)
+                    {
+                        for (int i = 0; i < generatedCode.Code.Length; i++)
+                        {
+                            Instruction instruction = generatedCode.Code[i];
+
+                            Console.ForegroundColor = ConsoleColor.DarkYellow;
+                            Console.Write(instruction.opcode);
+                            Console.ResetColor();
+                            Console.Write(' ');
+
+                            Console.ForegroundColor = ConsoleColor.DarkYellow;
+                            Console.Write(instruction.AddressingMode);
+                            Console.ResetColor();
+                            Console.Write(' ');
+
+                            instruction.Parameter.DebugPrint();
+
+                            Console.WriteLine();
+                        }
                     }
 
                     interpreter.CompilerResult = generatedCode;

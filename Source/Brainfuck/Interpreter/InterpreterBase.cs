@@ -21,7 +21,7 @@ public abstract class InterpreterBase : IDisposable
     protected int _codePointer;
     protected int _memoryPointer;
 
-    protected Range<int> _memoryPointerRange;
+    protected MutableRange<int> _memoryPointerRange;
 
     protected bool _isPaused;
     bool _isDisposed;

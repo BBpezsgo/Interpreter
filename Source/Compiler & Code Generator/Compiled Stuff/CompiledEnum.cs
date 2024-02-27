@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.Compiler;
@@ -17,8 +18,8 @@ public class CompiledEnumMember : EnumMemberDefinition
 
 public class CompiledEnum : EnumDefinition
 {
-    public new CompiledEnumMember[] Members;
-    public CompiledAttributeCollection CompiledAttributes;
+    public new readonly ImmutableArray<CompiledEnumMember> Members;
+    public readonly ImmutableDictionary<string, CompiledAttribute> CompiledAttributes;
 
     public CompiledType? Type
     {
@@ -37,10 +38,10 @@ public class CompiledEnum : EnumDefinition
         }
     }
 
-    public CompiledEnum(EnumDefinition definition) : base(definition)
+    public CompiledEnum(IEnumerable<CompiledEnumMember> members, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, EnumDefinition definition) : base(definition)
     {
-        Members = Array.Empty<CompiledEnumMember>();
-        CompiledAttributes = new CompiledAttributeCollection();
+        Members = members.ToImmutableArray();
+        CompiledAttributes = compiledAttributes.ToImmutableDictionary();
     }
 
     public bool GetValue(string identifier, out DataItem memberValue)

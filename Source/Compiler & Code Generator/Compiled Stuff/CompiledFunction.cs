@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
@@ -18,20 +19,20 @@ public class CompiledFunction :
     IReferenceable<KeywordCall>,
     IDuplicatable<CompiledFunction>
 {
-    public new CompiledType Type;
-    public readonly CompiledType[] ParameterTypes;
-    public CompiledAttributeCollection CompiledAttributes;
-    readonly List<Reference<Statement>> references;
+    public new readonly CompiledType Type;
+    public readonly ImmutableArray<CompiledType> ParameterTypes;
 
-    public CompiledStruct? Context;
+    public readonly CompiledStruct? Context;
+    public readonly ImmutableDictionary<string, CompiledAttribute> CompiledAttributes;
 
     public int TimesUsed;
     public int TimesUsedTotal;
 
     public int InstructionOffset = -1;
 
-    public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
+    public bool ReturnSomething => Type.BuiltinType != LanguageCore.Compiler.Type.Void;
 
+    readonly List<Reference<Statement>> references;
     public IReadOnlyList<Reference<Statement>> References => references;
 
     public TypeInstance TypeToken => base.Type;
@@ -52,7 +53,7 @@ public class CompiledFunction :
     {
         get
         {
-            if (CompiledAttributes.TryGetValue("External", out AttributeValues attributeValues))
+            if (CompiledAttributes.TryGetValue("External", out CompiledAttribute? attributeValues))
             {
                 if (attributeValues.TryGetValue(0, out string name))
                 { return name; }
@@ -67,7 +68,7 @@ public class CompiledFunction :
     {
         get
         {
-            if (CompiledAttributes.TryGetValue("Builtin", out AttributeValues attributeValues))
+            if (CompiledAttributes.TryGetValue("Builtin", out CompiledAttribute? attributeValues))
             {
                 if (attributeValues.TryGetValue(0, out string name))
                 { return name; }
@@ -76,12 +77,26 @@ public class CompiledFunction :
         }
     }
 
-    public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledFunction(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledStruct? context, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
         this.Type = type;
-        this.ParameterTypes = parameterTypes;
-        this.CompiledAttributes = new CompiledAttributeCollection();
+        this.ParameterTypes = parameterTypes.ToImmutableArray();
+
+        this.CompiledAttributes = compiledAttributes.ToImmutableDictionary();
+        this.Context = context;
         this.references = new List<Reference<Statement>>();
+    }
+
+    public CompiledFunction(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledFunction other) : base(other)
+    {
+        this.Type = type;
+        this.ParameterTypes = parameterTypes.ToImmutableArray();
+
+        this.CompiledAttributes = other.CompiledAttributes;
+        this.Context = other.Context;
+        this.references = new List<Reference<Statement>>(other.references);
+        this.TimesUsed = other.TimesUsed;
+        this.TimesUsedTotal = other.TimesUsedTotal;
     }
 
     public void AddReference(FunctionCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
@@ -102,11 +117,8 @@ public class CompiledFunction :
     }
     public bool IsSame(ISameCheck? other) => other is CompiledFunction other2 && IsSame(other2);
 
-    public new CompiledFunction Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
+    public new CompiledFunction Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), Context, CompiledAttributes, this)
     {
-        CompiledAttributes = this.CompiledAttributes,
-        Context = this.Context,
-        Modifiers = this.Modifiers,
         TimesUsed = TimesUsed,
         TimesUsedTotal = TimesUsedTotal,
     };
@@ -142,28 +154,5 @@ public class CompiledFunction :
         { result.Append(';'); }
 
         return result.ToString();
-    }
-
-    public CompiledFunctionTemplateInstance InstantiateTemplate(TypeArguments typeParameters)
-    {
-        CompiledFunctionTemplateInstance result = new(Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this, this)
-        {
-            CompiledAttributes = this.CompiledAttributes,
-            Context = this.Context,
-            Modifiers = this.Modifiers,
-            TimesUsed = TimesUsed,
-            TimesUsedTotal = TimesUsedTotal,
-        };
-
-        Utils.SetTypeParameters(result.ParameterTypes, typeParameters);
-
-        if (result.Type.IsGeneric)
-        {
-            if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType? typeParameter))
-            { throw new NotImplementedException(); }
-            result.Type = typeParameter;
-        }
-
-        return result;
     }
 }

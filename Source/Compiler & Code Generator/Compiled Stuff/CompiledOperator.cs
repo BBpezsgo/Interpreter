@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace LanguageCore.Compiler;
 
@@ -13,19 +14,20 @@ public class CompiledOperator :
     IReferenceable<OperatorCall>,
     IDuplicatable<CompiledOperator>
 {
-    public CompiledType[] ParameterTypes;
-    public new CompiledType Type;
-    public CompiledAttributeCollection CompiledAttributes;
-    readonly List<Reference<OperatorCall>> references;
-    public CompiledStruct? Context;
+    public new readonly CompiledType Type;
+    public readonly ImmutableArray<CompiledType> ParameterTypes;
+
+    public readonly CompiledStruct? Context;
+    public readonly ImmutableDictionary<string, CompiledAttribute> CompiledAttributes;
 
     public int TimesUsed;
     public int TimesUsedTotal;
 
     public int InstructionOffset = -1;
 
-    public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
+    public bool ReturnSomething => Type.BuiltinType != LanguageCore.Compiler.Type.Void;
 
+    readonly List<Reference<OperatorCall>> references;
     public IReadOnlyList<Reference<OperatorCall>> ReferencesOperator => references;
 
     public TypeInstance TypeToken => base.Type;
@@ -43,13 +45,26 @@ public class CompiledOperator :
     public bool IsExternal => CompiledAttributes.ContainsKey("External");
     public string ExternalFunctionName => CompiledAttributes.TryGetAttribute("External", out string? name) ? name : string.Empty;
 
-    public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledOperator(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledStruct? context, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
         this.Type = type;
-        this.ParameterTypes = parameterTypes;
-        this.CompiledAttributes = new();
+        this.ParameterTypes = parameterTypes.ToImmutableArray();
+
+        this.CompiledAttributes = compiledAttributes.ToImmutableDictionary();
+        this.Context = context;
         this.references = new List<Reference<OperatorCall>>();
-        this.Context = null;
+    }
+
+    public CompiledOperator(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledOperator other) : base(other)
+    {
+        this.Type = type;
+        this.ParameterTypes = parameterTypes.ToImmutableArray();
+
+        this.CompiledAttributes = other.CompiledAttributes;
+        this.Context = other.Context;
+        this.references = new List<Reference<OperatorCall>>(other.references);
+        this.TimesUsed = other.TimesUsed;
+        this.TimesUsedTotal = other.TimesUsedTotal;
     }
 
     public void AddReference(OperatorCall referencedBy, Uri? file) => references.Add(new Reference<OperatorCall>(referencedBy, file));
@@ -67,34 +82,10 @@ public class CompiledOperator :
     }
     public bool IsSame(ISameCheck? other) => other is CompiledOperator other2 && IsSame(other2);
 
-    public new CompiledOperator Duplicate() => new (Type, new List<CompiledType>(ParameterTypes).ToArray(), this)
+    public new CompiledOperator Duplicate() => new(Type, new List<CompiledType>(ParameterTypes).ToArray(), Context, CompiledAttributes, this)
     {
-        CompiledAttributes = CompiledAttributes,
         Modifiers = Modifiers,
         TimesUsed = TimesUsed,
         TimesUsedTotal = TimesUsedTotal,
-        Context = Context,
     };
-    public CompiledOperatorTemplateInstance InstantiateTemplate(TypeArguments typeParameters)
-    {
-        CompiledOperatorTemplateInstance result = new(Type, ParameterTypes, this, this)
-        {
-            CompiledAttributes = CompiledAttributes,
-            Modifiers = Modifiers,
-            TimesUsed = TimesUsed,
-            TimesUsedTotal = TimesUsedTotal,
-            Context = Context,
-        };
-
-        Utils.SetTypeParameters(result.ParameterTypes, typeParameters);
-
-        if (result.Type.IsGeneric)
-        {
-            if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType? typeParameter))
-            { throw new NotImplementedException(); }
-            result.Type = typeParameter;
-        }
-
-        return result;
-    }
 }

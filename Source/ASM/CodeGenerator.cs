@@ -1577,7 +1577,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         int paramsSize = 0;
         for (int i = 0; i < parameters.Length; i++)
         {
-            CompiledType parameterType = new(parameters[i].Type, FindType);
+            CompiledType parameterType = CompiledType.From(parameters[i].Type, FindType);
             parameters[i].Type.SetAnalyzedType(parameterType);
 
             this.CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));

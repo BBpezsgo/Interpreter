@@ -51,7 +51,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
         else
         {
-            type = new CompiledType(variableDeclaration.Type, FindType, TryCompute);
+            type = CompiledType.From(variableDeclaration.Type, FindType, TryCompute);
             variableDeclaration.Type.SetAnalyzedType(type);
         }
 
@@ -687,7 +687,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         {
             if (@if.Condition is TypeCast _typeCast &&
-                new CompiledType(_typeCast.Type, FindType, TryCompute).IsBuiltin &&
+                CompiledType.From(_typeCast.Type, FindType, TryCompute).IsBuiltin &&
                 _typeCast.PrevStatement is Literal _literal &&
                 _literal.Type == LiteralType.String)
             {
@@ -2201,7 +2201,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     void GenerateCodeForStatement(TypeCast typeCast)
     {
         CompiledType statementType = FindStatementType(typeCast.PrevStatement);
-        CompiledType targetType = new(typeCast.Type, FindType, TryCompute);
+        CompiledType targetType = CompiledType.From(typeCast.Type, FindType, TryCompute);
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
 
@@ -3273,7 +3273,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         if (function.ReturnSomething)
         {
-            CompiledType returnType = new(function.Type, typeArguments);
+            CompiledType returnType = CompiledType.From(function.Type, typeArguments);
             returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), false, false, returnType);
         }
 

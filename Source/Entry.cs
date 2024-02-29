@@ -230,17 +230,6 @@ public static class Entry
                     Output.WriteLine();
                 }
 
-                if ((compileOptions & BrainfuckCompilerFlags.PrintCompiledMinimized) != 0)
-                {
-                    Output.LogDebug($"Minify code ...");
-                    generated.Code = Minifier.Minify(generated.Code);
-
-                    Output.WriteLine();
-                    Output.WriteLine($" === MINIFIED ===");
-                    BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
-                    Output.WriteLine();
-                }
-
                 generated.Code = BrainfuckCode.RemoveNoncodes(generated.Code, true);
 
                 Output.LogDebug($"Minify code ...");
@@ -252,7 +241,14 @@ public static class Entry
                 {
                     Output.WriteLine();
                     Output.WriteLine($" === FINAL ===");
+                    Output.WriteLine();
                     BrainfuckCode.PrintCode(generated.Code);
+                    Output.WriteLine();
+
+                    Output.WriteLine();
+                    Output.WriteLine($" === SIMPLIFIED ===");
+                    Output.WriteLine();
+                    BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
                     Output.WriteLine();
                 }
 
@@ -283,12 +279,9 @@ public static class Entry
                 }
                 else
                 {
-                    if ((printFlags & BrainfuckPrintFlags.PrintResultLabel) != 0)
-                    {
-                        Output.WriteLine();
-                        Output.WriteLine($" === RESULT ===");
-                        Output.WriteLine();
-                    }
+                    Output.WriteLine();
+                    Output.WriteLine($" === OUTPUT ===");
+                    Output.WriteLine();
 
                     if ((printFlags & BrainfuckPrintFlags.PrintExecutionTime) != 0)
                     {
@@ -394,6 +387,25 @@ public static class Entry
                         //     Console.WriteLine($"{i}: {heap[i]}");
                         // }
 
+                        Console.WriteLine();
+
+                        static void PrintLegend(ConsoleColor background, ConsoleColor foreground, string colorLabel, string label)
+                        {
+                            Console.Write(' ');
+                            Console.ForegroundColor = foreground;
+                            Console.BackgroundColor = background;
+                            Console.Write(colorLabel);
+                            Console.ResetColor();
+                            Console.Write(':');
+                            Console.Write(' ');
+                            Console.Write(label);
+                            Console.WriteLine();
+                        }
+
+                        PrintLegend(ConsoleColor.Red, ConsoleColor.White, "Red", "Memory Pointer");
+                        PrintLegend(ConsoleColor.DarkBlue, ConsoleColor.White, "Blue", "HEAP Start");
+                        PrintLegend(ConsoleColor.DarkGray, ConsoleColor.White, "Gray", "HEAP Internal");
+                        PrintLegend(ConsoleColor.DarkGreen, ConsoleColor.White, "Green", "HEAP Data");
                         Console.WriteLine();
                     }
                 }

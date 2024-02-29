@@ -35,21 +35,17 @@ public struct BrainfuckGeneratorResult
 public enum BrainfuckCompilerFlags
 {
     None = 0b_0000,
-
     PrintCompiled = 0b_0001,
-    PrintCompiledMinimized = 0b_0010,
-    WriteToFile = 0b_0100,
-
-    PrintFinal = 0b_1000,
+    WriteToFile = 0b_0010,
+    PrintFinal = 0b_0100,
 }
 
 [Flags]
 public enum BrainfuckPrintFlags
 {
     None = 0b_0000,
-    PrintResultLabel = 0b_0001,
-    PrintExecutionTime = 0b_0010,
-    PrintMemory = 0b_0100,
+    PrintExecutionTime = 0b_0001,
+    PrintMemory = 0b_0010,
 }
 
 public struct BrainfuckGeneratorSettings

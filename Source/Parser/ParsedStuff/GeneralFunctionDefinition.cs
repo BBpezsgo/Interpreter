@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Text;
-
-namespace LanguageCore.Parser;
+﻿namespace LanguageCore.Parser;
 
 using Tokenizing;
 

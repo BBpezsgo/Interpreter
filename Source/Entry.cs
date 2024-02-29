@@ -1,6 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.IO;
+﻿using System.IO;
 using System.Runtime.InteropServices;
 
 namespace LanguageCore;
@@ -87,7 +85,7 @@ public static class Entry
                     };
 #endif
 
-                    ExternalFunctionCollection externalFunctions = new();
+                    Dictionary<string, ExternalFunctionBase> externalFunctions = new();
                     interpreter.GenerateExternalFunctions(externalFunctions);
 
 #if AOT
@@ -425,9 +423,7 @@ public static class Entry
 
                 if (File.Exists(outputFile))
                 {
-                    Process? process = Process.Start(new ProcessStartInfo(outputFile));
-                    if (process == null)
-                    { throw new InternalException($"Failed to start process \"{outputFile}\""); }
+                    Process? process = Process.Start(new ProcessStartInfo(outputFile)) ?? throw new InternalException($"Failed to start process \"{outputFile}\"");
                     process.WaitForExit();
                     Console.WriteLine();
                     Console.WriteLine($"Exit code: {process.ExitCode}");

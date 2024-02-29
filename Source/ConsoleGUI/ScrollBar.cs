@@ -1,5 +1,4 @@
-﻿using System;
-using System.Runtime.Versioning;
+﻿using System.Runtime.Versioning;
 using Win32;
 
 namespace ConsoleGUI;

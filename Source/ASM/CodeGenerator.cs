@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Text;
-
-#pragma warning disable IDE0051 // Remove unused private members
+﻿#pragma warning disable IDE0051 // Remove unused private members
 #pragma warning disable IDE0052 // Remove unread private members
 #pragma warning disable IDE0060 // Remove unused parameter
 
@@ -18,7 +11,7 @@ using Parser.Statement;
 using Runtime;
 using Tokenizing;
 using LiteralStatement = Parser.Statement.Literal;
-using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.CompiledType Type);
+using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.GeneralType Type);
 
 public class ImportedAsmFunction
 {
@@ -237,18 +230,18 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         if (type is TypeInstanceSimple simpleType)
         {
-            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out Type builtinType))
+            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out BasicType builtinType))
             {
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(builtinType));
                 return 1;
             }
 
-            CompiledType instanceType = FindType(simpleType);
+            GeneralType instanceType = FindType(simpleType);
 
-            if (instanceType.IsStruct)
+            if (instanceType is StructType structType)
             {
                 int size = 0;
-                foreach (FieldDefinition field in instanceType.Struct.Fields)
+                foreach (FieldDefinition field in structType.Struct.Fields)
                 {
                     size++;
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(field.Type));
@@ -256,16 +249,16 @@ public class CodeGeneratorForAsm : CodeGenerator
                 throw new NotImplementedException();
             }
 
-            if (instanceType.IsEnum)
+            if (instanceType is EnumType enumType)
             {
-                if (instanceType.Enum.Members.Length == 0)
-                { throw new CompilerException($"Could not get enum \"{instanceType.Enum.Identifier.Content}\" initial value: enum has no members", instanceType.Enum.Identifier, instanceType.Enum.FilePath); }
+                if (enumType.Enum.Members.Length == 0)
+                { throw new CompilerException($"Could not get enum \"{enumType.Enum.Identifier.Content}\" initial value: enum has no members", enumType.Enum.Identifier, enumType.Enum.FilePath); }
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)instanceType.Enum.Members[0].ComputedValue);
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)enumType.Enum.Members[0].ComputedValue);
                 return 1;
             }
 
-            if (instanceType.IsFunction)
+            if (instanceType is FunctionType)
             {
                 throw new NotImplementedException();
             }
@@ -278,26 +271,24 @@ public class CodeGeneratorForAsm : CodeGenerator
     /// <exception cref="NotImplementedException"/>
     /// <exception cref="CompilerException"/>
     /// <exception cref="InternalException"/>
-    int GenerateInitialValue(CompiledType type)
+    int GenerateInitialValue(GeneralType type)
     {
-        if (type.IsStruct)
+        if (type is StructType structType)
         {
             int size = 0;
-            foreach (CompiledField field in type.Struct.Fields)
+            foreach (CompiledField field in structType.Struct.Fields)
             {
                 size += GenerateInitialValue(field.Type);
             }
             return size;
         }
 
-        if (type.IsStackArray)
+        if (type is ArrayType arrayType)
         {
-            int stackSize = type.StackArraySize;
-
             int size = 0;
-            for (int i = 0; i < stackSize; i++)
+            for (int i = 0; i < arrayType.Length; i++)
             {
-                size += GenerateInitialValue(type.StackArrayOf);
+                size += GenerateInitialValue(arrayType.Of);
             }
             return size;
         }
@@ -308,12 +299,12 @@ public class CodeGeneratorForAsm : CodeGenerator
     /// <exception cref="NotImplementedException"></exception>
     /// <exception cref="CompilerException"></exception>
     /// <exception cref="InternalException"></exception>
-    int GenerateInitialValue(CompiledType type, Action<int> afterValue)
+    int GenerateInitialValue(GeneralType type, Action<int> afterValue)
     {
-        if (type.IsStruct)
+        if (type is StructType structType)
         {
             int size = 0;
-            foreach (CompiledField field in type.Struct.Fields)
+            foreach (CompiledField field in structType.Struct.Fields)
             {
                 size++;
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(field.Type));
@@ -395,23 +386,21 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         return new CleanupItem(size, newVariable.Modifiers.Contains("temp"), compiledVariable.Type);
     }
-    CleanupItem GenerateCodeForVariable(Statement st)
+    CleanupItem GenerateCodeForVariable(Statement statement)
     {
-        if (st is VariableDeclaration newVariable)
+        if (statement is VariableDeclaration newVariable)
         { return GenerateCodeForVariable(newVariable); }
         return CleanupItem.Null;
     }
-    CleanupItem[] GenerateCodeForVariable(Statement[] sts)
+    IEnumerable<CleanupItem> GenerateCodeForVariable(IEnumerable<Statement> statements)
     {
-        List<CleanupItem> result = new();
-        for (int i = 0; i < sts.Length; i++)
+        foreach (Statement statement in statements)
         {
-            CleanupItem item = GenerateCodeForVariable(sts[i]);
+            CleanupItem item = GenerateCodeForVariable(statement);
             if (item.SizeOnStack == 0) continue;
 
-            result.Add(item);
+            yield return (item);
         }
-        return result.ToArray();
     }
 
     #endregion
@@ -439,10 +428,10 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         if (GetParameter(statement.Content, out CompiledParameter? parameter))
         {
-            CompiledType valueType = FindStatementType(value, parameter.Type);
+            GeneralType valueType = FindStatementType(value, parameter.Type);
 
             if (parameter.Type != valueType)
-            { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{parameter.Type.Name}\" type parameter.", value, CurrentFile); }
+            { throw new CompilerException($"Can not set a \"{valueType}\" type value to the \"{parameter.Type}\" type parameter.", value, CurrentFile); }
 
             GenerateCodeForStatement(value);
 
@@ -499,7 +488,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         if (functionCall.PrevStatement != null)
         {
             StatementWithValue passedParameter = functionCall.PrevStatement;
-            CompiledType passedParameterType = FindStatementType(passedParameter);
+            GeneralType passedParameterType = FindStatementType(passedParameter);
             GenerateCodeForStatement(functionCall.PrevStatement);
             parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
         }
@@ -507,13 +496,13 @@ public class CodeGeneratorForAsm : CodeGenerator
         for (int i = 0; i < functionCall.Parameters.Length; i++)
         {
             StatementWithValue passedParameter = functionCall.Parameters[i];
-            CompiledType passedParameterType = FindStatementType(passedParameter);
+            GeneralType passedParameterType = FindStatementType(passedParameter);
             ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
-            // CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+            // GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
 
             bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
-            canDeallocate = canDeallocate && passedParameterType.IsPointer;
+            canDeallocate = canDeallocate && passedParameterType is PointerType;
 
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
@@ -542,7 +531,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         if (functionCall.PrevStatement != null)
         {
             StatementWithValue passedParameter = functionCall.PrevStatement;
-            CompiledType passedParameterType = FindStatementType(passedParameter);
+            GeneralType passedParameterType = FindStatementType(passedParameter);
             GenerateCodeForStatement(functionCall.PrevStatement);
             parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
         }
@@ -550,7 +539,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         for (int i = 0; i < functionCall.Parameters.Length; i++)
         {
             StatementWithValue passedParameter = functionCall.Parameters[i];
-            CompiledType passedParameterType = FindStatementType(passedParameter);
+            GeneralType passedParameterType = FindStatementType(passedParameter);
 
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
@@ -578,13 +567,13 @@ public class CodeGeneratorForAsm : CodeGenerator
         for (int i = 0; i < functionCall.Parameters.Length; i++)
         {
             StatementWithValue passedParameter = functionCall.Parameters[i];
-            CompiledType passedParameterType = FindStatementType(passedParameter);
+            GeneralType passedParameterType = FindStatementType(passedParameter);
             ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
-            // CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+            // GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
 
             bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
-            canDeallocate = canDeallocate && passedParameterType.IsPointer;
+            canDeallocate = canDeallocate && passedParameterType is PointerType;
 
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
@@ -639,9 +628,9 @@ public class CodeGeneratorForAsm : CodeGenerator
         if (compiledFunction.CompiledAttributes.HasAttribute("StandardOutput"))
         {
             StatementWithValue valueToPrint = functionCall.Parameters[0];
-            CompiledType valueToPrintType = FindStatementType(valueToPrint);
+            GeneralType valueToPrintType = FindStatementType(valueToPrint);
 
-            if (valueToPrintType == Type.Char &&
+            if (valueToPrintType == BasicType.Char &&
                 valueToPrint is LiteralStatement charLiteral)
             {
                 string dataLabel = Builder.DataBuilder.NewString(charLiteral.Value);
@@ -659,7 +648,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 return;
             }
 
-            if (valueToPrintType == Type.Char)
+            if (valueToPrintType == BasicType.Char)
             {
                 GenerateCodeForStatement(valueToPrint);
 
@@ -857,7 +846,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             indexCall.BracketLeft,
             new StatementWithValue[]
             {
-                indexCall.Expression,
+                indexCall.Index,
             },
             indexCall.BracketRight));
     }
@@ -944,7 +933,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 if (statement.Parameters.Length == 1)
                 {
                     StatementWithValue returnValue = statement.Parameters[0];
-                    CompiledType returnValueType = FindStatementType(returnValue);
+                    GeneralType returnValueType = FindStatementType(returnValue);
 
                     GenerateCodeForStatement(returnValue);
 
@@ -1050,10 +1039,8 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-            if (!compiledVariable.Type.IsFunction)
+            if (compiledVariable.Type is not FunctionType function)
             { throw new CompilerException($"Variable \"{compiledVariable.VariableName.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
-
-            FunctionType function = compiledVariable.Type.Function;
 
             Stack<ParameterCleanupItem> parameterCleanup;
 
@@ -1134,11 +1121,13 @@ public class CodeGeneratorForAsm : CodeGenerator
                 throw new UnreachableException();
         }
     }
-    void GenerateCodeForStatement(Identifier statement, CompiledType? expectedType = null)
+    void GenerateCodeForStatement(Identifier statement, GeneralType? expectedType = null)
     {
-        if (GetConstant(statement.Content, out DataItem constant))
+        if (GetConstant(statement.Content, out IConstant? constant))
         {
-            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)constant);
+            statement.Token.AnalyzedType = TokenAnalyzedType.ConstantName;
+            statement.Reference = constant;
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)constant.Value);
             return;
         }
 
@@ -1449,7 +1438,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     }
     void GenerateCodeForStatement(Block block)
     {
-        CleanupItem[] cleanup = GenerateCodeForVariable(block.Statements);
+        CleanupItem[] cleanup = GenerateCodeForVariable(block.Statements).ToArray();
         foreach (Statement statement in block.Statements)
         {
             Builder.CodeBuilder.AppendCommentLine(statement.ToString());
@@ -1529,7 +1518,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EBP, Registers.ESP);
 
         Builder.CodeBuilder.AppendCommentLine("Variables:");
-        CleanupItem[] cleanup = GenerateCodeForVariable(statements);
+        CleanupItem[] cleanup = GenerateCodeForVariable(statements).ToArray();
         bool hasExited = false;
 
         Builder.CodeBuilder.AppendCommentLine("Code:");
@@ -1577,7 +1566,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         int paramsSize = 0;
         for (int i = 0; i < parameters.Length; i++)
         {
-            CompiledType parameterType = CompiledType.From(parameters[i].Type, FindType);
+            GeneralType parameterType = GeneralType.From(parameters[i].Type, FindType);
             parameters[i].Type.SetAnalyzedType(parameterType);
 
             this.CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));

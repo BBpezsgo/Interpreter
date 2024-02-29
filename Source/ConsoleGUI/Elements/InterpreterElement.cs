@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Globalization;
+﻿using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Runtime.Versioning;
 using LanguageCore;
 using LanguageCore.Runtime;
@@ -190,7 +186,7 @@ public sealed class InterpreterElement : WindowElement
             LanguageCore.Compiler.CompilerResult compiled;
             LanguageCore.BBCode.Generator.BBCodeGeneratorResult generatedCode;
 
-            ExternalFunctionCollection externalFunctions = new();
+            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
             Interpreter.GenerateExternalFunctions(externalFunctions);
 
             if (handleErrors)
@@ -1048,7 +1044,9 @@ public sealed class InterpreterElement : WindowElement
                 b.AddText(' ');
             }
 
-            if (!instruction.Parameter.IsNull) switch (instruction.Parameter.Type)
+            if (!instruction.Parameter.IsNull)
+            {
+                switch (instruction.Parameter.Type)
                 {
                     case RuntimeType.UInt8:
                         b.ForegroundColor = CharColor.BrightCyan;
@@ -1079,7 +1077,7 @@ public sealed class InterpreterElement : WindowElement
                         b.AddText(' ');
                         break;
                 }
-
+            }
             b.BackgroundColor = CharColor.Black;
 
             b.FinishLine(sender.Rect.Width);

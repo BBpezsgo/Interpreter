@@ -1,31 +1,31 @@
-﻿using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using Parser;
 using Runtime;
 
-public class CompiledEnumMember : EnumMemberDefinition
+public class CompiledEnumMember : EnumMemberDefinition,
+    IHaveCompiledType,
+    IInContext<CompiledEnum>
 {
-    public DataItem ComputedValue;
-    public CompiledType Type => new(ComputedValue.Type);
+    public DataItem ComputedValue { get; set; }
+    public GeneralType Type => new BuiltinType(ComputedValue.Type);
+    [NotNull] public new CompiledEnum? Context { get; set; }
 
     public CompiledEnumMember(EnumMemberDefinition definition) : base(definition)
-    { }
+    {
+
+    }
 }
 
-public class CompiledEnum : EnumDefinition
+public class CompiledEnum : EnumDefinition, IProbablyHaveCompiledType
 {
-    public new readonly ImmutableArray<CompiledEnumMember> Members;
-    public readonly ImmutableDictionary<string, CompiledAttribute> CompiledAttributes;
-
-    public CompiledType? Type
+    public new ImmutableArray<CompiledEnumMember> Members { get; }
+    public ImmutableDictionary<string, CompiledAttribute> CompiledAttributes { get; }
+    public GeneralType? Type
     {
         get
         {
-            CompiledType? result = null;
+            GeneralType? result = null;
             for (int i = 0; i < Members.Length; i++)
             {
                 CompiledEnumMember member = Members[i];
@@ -40,6 +40,7 @@ public class CompiledEnum : EnumDefinition
 
     public CompiledEnum(IEnumerable<CompiledEnumMember> members, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, EnumDefinition definition) : base(definition)
     {
+        foreach (CompiledEnumMember member in members) member.Context = this;
         Members = members.ToImmutableArray();
         CompiledAttributes = compiledAttributes.ToImmutableDictionary();
     }

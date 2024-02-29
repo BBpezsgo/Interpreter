@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using BBCode.Generator;
 

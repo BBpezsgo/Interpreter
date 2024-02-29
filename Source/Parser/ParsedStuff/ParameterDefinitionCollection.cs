@@ -1,7 +1,4 @@
 ﻿using System.Collections;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
 
 namespace LanguageCore.Parser;
 
@@ -9,51 +6,55 @@ using Tokenizing;
 
 public class ParameterDefinitionCollection :
     IPositioned,
-    IReadOnlyCollection<ParameterDefinition>,
-    IDuplicatable<ParameterDefinitionCollection>
+    IReadOnlyList<ParameterDefinition>,
+    IDuplicatable<ParameterDefinitionCollection>,
+    Compiler.IInContext<FunctionThingDefinition>
 {
-    public readonly Token LeftParenthesis;
-    public readonly Token RightParenthesis;
-    readonly ImmutableArray<ParameterDefinition> Parameters;
-
+    public Token LeftParenthesis { get; }
+    public Token RightParenthesis { get; }
+    public int Count => _parameters.Length;
+    [NotNull] public FunctionThingDefinition? Context { get; set; }
     public Position Position =>
         new Position(LeftParenthesis, RightParenthesis)
-        .Union(Parameters);
+        .Union(_parameters);
 
-    public int Count => Parameters.Length;
+    public ParameterDefinition this[int index] => _parameters[index];
+    public ParameterDefinition this[Index index] => _parameters[index];
+    public ImmutableArray<ParameterDefinition> this[System.Range index] => _parameters[index];
 
-    public ParameterDefinition this[int index] => Parameters[index];
+    readonly ImmutableArray<ParameterDefinition> _parameters;
 
     public ParameterDefinitionCollection(ParameterDefinitionCollection other)
     {
-        this.Parameters = other.Parameters;
+        this._parameters = other._parameters;
         this.LeftParenthesis = other.LeftParenthesis;
         this.RightParenthesis = other.RightParenthesis;
+        this.Context = other.Context;
     }
 
     public ParameterDefinitionCollection(IEnumerable<ParameterDefinition> parameterDefinitions, Token leftParenthesis, Token rightParenthesis)
     {
-        this.Parameters = parameterDefinitions.ToImmutableArray();
+        this._parameters = parameterDefinitions.ToImmutableArray();
         this.LeftParenthesis = leftParenthesis;
         this.RightParenthesis = rightParenthesis;
     }
 
-    public IEnumerator<ParameterDefinition> GetEnumerator() => (Parameters as IEnumerable<ParameterDefinition>).GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => (Parameters as IEnumerable).GetEnumerator();
+    public IEnumerator<ParameterDefinition> GetEnumerator() => (_parameters as IEnumerable<ParameterDefinition>).GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => (_parameters as IEnumerable).GetEnumerator();
 
     public bool TypeEquals(ParameterDefinitionCollection? other)
     {
         if (other is null) return false;
-        if (Parameters.Length != other.Parameters.Length) return false;
-        for (int i = 0; i < Parameters.Length; i++)
-        { if (!Parameters[i].Type.Equals(other.Parameters[i].Type)) return false; }
+        if (_parameters.Length != other._parameters.Length) return false;
+        for (int i = 0; i < _parameters.Length; i++)
+        { if (!_parameters[i].Type.Equals(other._parameters[i].Type)) return false; }
         return true;
     }
 
-    public ParameterDefinition[] ToArray() => Parameters.ToArray();
+    public ParameterDefinition[] ToArray() => _parameters.ToArray();
 
     public static ParameterDefinitionCollection CreateAnonymous(IEnumerable<ParameterDefinition> parameterDefinitions)
         => new(parameterDefinitions, Token.CreateAnonymous("(", TokenType.Operator), Token.CreateAnonymous(")", TokenType.Operator));
 
-    public ParameterDefinitionCollection Duplicate() => new(Parameters, LeftParenthesis, RightParenthesis);
+    public ParameterDefinitionCollection Duplicate() => new(this);
 }

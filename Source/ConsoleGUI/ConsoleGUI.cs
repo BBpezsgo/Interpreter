@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.Versioning;
+﻿using System.Runtime.Versioning;
 using Microsoft.Win32.SafeHandles;
 using Win32;
 using Win32.LowLevel;

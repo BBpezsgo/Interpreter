@@ -1,26 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Text;
-
-namespace LanguageCore.Parser;
+﻿namespace LanguageCore.Parser;
 
 using Statement;
 using Tokenizing;
 
 public class MacroDefinition : IExportable, IInFile
 {
-    public readonly Token Keyword;
-    public readonly ImmutableArray<Token> Modifiers;
-    public readonly Token Identifier;
-    public readonly ImmutableArray<Token> Parameters;
-    public readonly Block Block;
-
-    public int ParameterCount => Parameters.Length;
-
-    public bool IsExport => Modifiers.Contains("export");
-
+    public Token Keyword { get; }
+    public ImmutableArray<Token> Modifiers { get; }
+    public Token Identifier { get; }
+    public ImmutableArray<Token> Parameters { get; }
+    public Block Block { get; }
     public Uri? FilePath { get; set; }
+    public bool IsExport => Modifiers.Contains("export");
 
     public MacroDefinition(MacroDefinition other)
     {
@@ -36,13 +27,10 @@ public class MacroDefinition : IExportable, IInFile
     {
         Keyword = keyword;
         Identifier = identifier;
-
         Parameters = parameters.ToImmutableArray();
         Block = block;
         Modifiers = modifiers.ToImmutableArray();
     }
-
-    public bool CanUse(Uri sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
     public string ToReadable()
     {

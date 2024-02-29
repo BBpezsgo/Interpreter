@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-
-namespace LanguageCore.Tokenizing;
+﻿namespace LanguageCore.Tokenizing;
 
 public readonly struct TokenizerResult
 {

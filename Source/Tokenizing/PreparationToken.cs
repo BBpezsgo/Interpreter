@@ -1,17 +1,12 @@
-﻿using System;
-using System.Text;
-
-namespace LanguageCore.Tokenizing;
+﻿namespace LanguageCore.Tokenizing;
 
 sealed class PreparationToken :
     IPositioned,
     IDuplicatable<PreparationToken>
 {
-    public PreparationTokenType TokenType;
-    public readonly StringBuilder Content;
-
-    public Position Position;
-    Position IPositioned.Position => Position;
+    public PreparationTokenType TokenType { get; set; }
+    public StringBuilder Content { get; }
+    public Position Position { get; set; }
 
     public PreparationToken(Position position)
     {

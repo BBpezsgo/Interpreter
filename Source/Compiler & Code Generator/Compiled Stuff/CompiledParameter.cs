@@ -1,29 +1,25 @@
-﻿using System.Diagnostics;
-
-namespace LanguageCore.BBCode.Generator;
+﻿namespace LanguageCore.BBCode.Generator;
 
 using Compiler;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
-public class CompiledParameter : ParameterDefinition
+public class CompiledParameter : ParameterDefinition,
+    IHaveCompiledType
 {
-    public new readonly CompiledType Type;
-
-    public readonly int Index;
-    public readonly int MemoryAddress;
-
+    public new GeneralType Type { get; }
+    public int Index { get; }
+    public int MemoryAddress { get; }
     public bool IsAnonymous => Index == -1;
-    public bool IsRef => Modifiers.Contains("ref");
 
-    public CompiledParameter(int index, int memoryAddress, CompiledType type, ParameterDefinition definition) : base(definition)
+    public CompiledParameter(int index, int memoryAddress, GeneralType type, ParameterDefinition definition) : base(definition)
     {
         this.Type = type;
         this.Index = index;
         this.MemoryAddress = memoryAddress;
     }
 
-    public CompiledParameter(CompiledType type, ParameterDefinition definition)
+    public CompiledParameter(GeneralType type, ParameterDefinition definition)
         : this(-1, -1, type, definition)
     { }
 

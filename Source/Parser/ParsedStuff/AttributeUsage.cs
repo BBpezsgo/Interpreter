@@ -1,16 +1,12 @@
-﻿using System.Collections.Generic;
-using System.Collections.Immutable;
-
-namespace LanguageCore.Parser;
+﻿namespace LanguageCore.Parser;
 
 using Statement;
 using Tokenizing;
 
 public class AttributeUsage : IPositioned
 {
-    public readonly Token Identifier;
-    public readonly ImmutableArray<Literal> Parameters;
-
+    public Token Identifier { get; }
+    public ImmutableArray<Literal> Parameters { get; }
     public Position Position =>
         new Position(Parameters)
         .Union(Identifier);

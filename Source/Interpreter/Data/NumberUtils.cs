@@ -1,12 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Net;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-
-namespace LanguageCore.Runtime;
+﻿namespace LanguageCore.Runtime;
 
 public partial struct DataItem :
     INumberBase<DataItem>,

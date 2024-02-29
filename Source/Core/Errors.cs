@@ -1,9 +1,4 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Text;
-
-namespace LanguageCore;
+﻿namespace LanguageCore;
 
 using Runtime;
 

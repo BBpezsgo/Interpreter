@@ -1,9 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-
-namespace LanguageCore.Brainfuck;
+﻿namespace LanguageCore.Brainfuck;
 
 public readonly struct AutoPrintCodeString
 {
@@ -416,7 +411,8 @@ public class CompiledCode : IDuplicatable<CompiledCode>
             if (result.Contains(" \r\n", StringComparison.Ordinal))
             { result = result.Replace(" \r\n", "\r\n", StringComparison.Ordinal); }
 
-            else break;
+            else
+            { break; }
         }
 
         return result;

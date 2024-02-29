@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace LanguageCore;
+﻿namespace LanguageCore;
 
 public delegate void PrintCallback(string message, LogType logType);
 

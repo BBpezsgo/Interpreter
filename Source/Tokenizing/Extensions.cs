@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace LanguageCore.Tokenizing;
+﻿namespace LanguageCore.Tokenizing;
 
 public static class Extensions
 {

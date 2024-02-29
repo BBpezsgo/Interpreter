@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-
-namespace LanguageCore.BBCode.Generator;
+﻿namespace LanguageCore.BBCode.Generator;
 
 using Compiler;
-using LanguageCore.Parser;
 using Runtime;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -13,9 +8,9 @@ public readonly struct CleanupItem
 {
     public readonly int SizeOnStack;
     public readonly bool ShouldDeallocate;
-    public readonly CompiledType? Type;
+    public readonly GeneralType? Type;
 
-    public CleanupItem(int size, bool shouldDeallocate, CompiledType? type)
+    public CleanupItem(int size, bool shouldDeallocate, GeneralType? type)
     {
         SizeOnStack = size;
         ShouldDeallocate = shouldDeallocate;
@@ -70,11 +65,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Fields
 
-    readonly ExternalFunctionReadonlyCollection ExternalFunctions;
+    readonly ImmutableDictionary<string, ExternalFunctionBase> ExternalFunctions;
     readonly Dictionary<string, int> ExternalFunctionsCache;
 
     readonly Stack<CleanupItem[]> CleanupStack;
-    FunctionThingDefinition? CurrentContext;
+    ISameCheck? CurrentContext;
 
     readonly Stack<List<int>> ReturnInstructions;
     readonly Stack<List<int>> BreakInstructions;
@@ -98,7 +93,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     public CodeGeneratorForMain(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection) : base(compilerResult, settings, analysisCollection)
     {
-        this.ExternalFunctions = compilerResult.ExternalFunctions;
+        this.ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
         this.GeneratedCode = new List<Instruction>();
         this.ExternalFunctionsCache = new Dictionary<string, int>();
         this.GeneratedDebugInfo = new DebugInformation();

@@ -1,9 +1,5 @@
-﻿using System;
-using System.Diagnostics;
+﻿namespace LanguageCore.BBCode.Generator;
 
-namespace LanguageCore.BBCode.Generator;
-
-using System.Linq;
 using Compiler;
 using Parser.Statement;
 using Runtime;
@@ -14,8 +10,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     int CallRuntime(CompiledVariable address)
     {
-        if (!address.Type.IsFunction)
-        { throw new CompilerException($"This should be an \"{new CompiledType(Type.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
+        if (address.Type != BasicType.Integer && address.Type is not FunctionType)
+        { throw new CompilerException($"This should be an \"{new BuiltinType(BasicType.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
 
         int returnToValueInstruction = GeneratedCode.Count;
         AddInstruction(Opcode.PUSH_VALUE, 0);
@@ -40,8 +36,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     int CallRuntime(CompiledParameter address)
     {
-        if (address.Type != Type.Integer && !address.Type.IsFunction)
-        { throw new CompilerException($"This should be an \"{new CompiledType(Type.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
+        if (address.Type != BasicType.Integer && address.Type is not FunctionType)
+        { throw new CompilerException($"This should be an \"{new BuiltinType(BasicType.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
 
         int returnToValueInstruction = GeneratedCode.Count;
         AddInstruction(Opcode.PUSH_VALUE, 0);
@@ -67,10 +63,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     int CallRuntime(StatementWithValue address)
     {
-        CompiledType addressType = FindStatementType(address);
+        GeneralType addressType = FindStatementType(address);
 
-        if (addressType != Type.Integer && !addressType.IsFunction)
-        { throw new CompilerException($"This should be an \"{new CompiledType(Type.Integer)}\" or function pointer and not \"{addressType}\"", address, CurrentFile); }
+        if (addressType != BasicType.Integer && addressType is not FunctionType)
+        { throw new CompilerException($"This should be an \"{new BuiltinType(BasicType.Integer)}\" or function pointer and not \"{addressType}\"", address, CurrentFile); }
 
         int returnToValueInstruction = GeneratedCode.Count;
         AddInstruction(Opcode.PUSH_VALUE, 0); // Saved code pointer
@@ -118,17 +114,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
     /// <exception cref="NotImplementedException"/>
     /// <exception cref="CompilerException"/>
     /// <exception cref="InternalException"/>
-    int GenerateInitialValue(CompiledType type, Action<int>? afterValue = null)
+    int GenerateInitialValue(GeneralType type, Action<int>? afterValue = null)
     {
-        if (type.IsStruct)
+        if (type is StructType structType)
         {
-            TypeArguments? typeParameters = type.Struct.TemplateInfo?.ToDictionary(type.TypeParameters);
+            IReadOnlyDictionary<string, GeneralType>? typeParameters = structType.TypeParametersMap;
             int size = 0;
-            foreach (CompiledField field in type.Struct.Fields)
+            foreach (CompiledField field in structType.Struct.Fields)
             {
-                if (field.Type.IsGeneric &&
+                if (field.Type is GenericType genericType &&
                     typeParameters is not null &&
-                    typeParameters.TryGetValue(field.Type.Name, out CompiledType? yeah))
+                    typeParameters.TryGetValue(genericType.Identifier, out GeneralType? yeah))
                 {
                     size += GenerateInitialValue(yeah, afterValue);
                 }
@@ -141,14 +137,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return size;
         }
 
-        if (type.IsStackArray)
+        if (type is ArrayType arrayType)
         {
-            int stackSize = type.StackArraySize;
-
             int size = 0;
-            for (int i = 0; i < stackSize; i++)
+            for (int i = 0; i < arrayType.Length; i++)
             {
-                size += GenerateInitialValue(type.StackArrayOf, afterValue);
+                size += GenerateInitialValue(arrayType.Of, afterValue);
                 afterValue?.Invoke(size);
             }
             return size;

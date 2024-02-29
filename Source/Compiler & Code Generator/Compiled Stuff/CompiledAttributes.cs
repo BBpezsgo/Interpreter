@@ -1,14 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 public class CompiledAttribute : Parser.AttributeUsage
 {
-    public new readonly ImmutableArray<CompiledLiteral> Parameters;
+    public new ImmutableArray<CompiledLiteral> Parameters { get; }
 
     public CompiledAttribute(IEnumerable<CompiledLiteral> parameters, Parser.AttributeUsage definition) : base(definition.Identifier, definition.Parameters)
     {

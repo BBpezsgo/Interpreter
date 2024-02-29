@@ -1,36 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Text;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using Parser;
 using Parser.Statement;
 using Tokenizing;
 
-public class CompiledGeneralFunction :
-    GeneralFunctionDefinition,
+public class CompiledGeneralFunction : GeneralFunctionDefinition,
     ISameCheck,
     ISameCheck<CompiledGeneralFunction>,
-    IReferenceable<KeywordCall>,
-    IReferenceable<ConstructorCall>,
-    IDuplicatable<CompiledGeneralFunction>
+    IReferenceable<Statement>,
+    IDuplicatable<CompiledGeneralFunction>,
+    IHaveCompiledType,
+    IInContext<CompiledStruct>,
+    ITemplateable<CompiledGeneralFunction>
 {
-    public readonly CompiledType Type;
-    public readonly ImmutableArray<CompiledType> ParameterTypes;
-
-    public readonly CompiledStruct? Context;
-
-    public int TimesUsed;
-    public int TimesUsedTotal;
-
-    public int InstructionOffset = -1;
-
-    public bool ReturnSomething => Type.BuiltinType != LanguageCore.Compiler.Type.Void;
-
-    readonly List<Reference<Statement>> references;
-    public IReadOnlyList<Reference<Statement>> References => references;
+    public GeneralType Type { get; }
+    public ImmutableArray<GeneralType> ParameterTypes { get; }
+    public CompiledStruct Context { get; }
+    public int InstructionOffset { get; set; } = -1;
+    public bool ReturnSomething => Type != BasicType.Void;
+    public List<Reference<Statement>> References { get; }
 
     public override bool IsTemplate
     {
@@ -42,29 +30,21 @@ public class CompiledGeneralFunction :
         }
     }
 
-    public CompiledGeneralFunction(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledStruct? context, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledGeneralFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
     {
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
-
         this.Context = context;
-        this.references = new List<Reference<Statement>>();
+        this.References = new List<Reference<Statement>>();
     }
 
-    public CompiledGeneralFunction(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledGeneralFunction other) : base(other)
+    public CompiledGeneralFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledGeneralFunction other) : base(other)
     {
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
-
         this.Context = other.Context;
-        this.references = new List<Reference<Statement>>(other.references);
-        this.TimesUsed = other.TimesUsed;
-        this.TimesUsedTotal = other.TimesUsedTotal;
+        this.References = new List<Reference<Statement>>(other.References);
     }
-
-    public void AddReference(KeywordCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
-    public void AddReference(ConstructorCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
-    public void ClearReferences() => references.Clear();
 
     public bool IsSame(CompiledGeneralFunction other)
     {
@@ -78,11 +58,7 @@ public class CompiledGeneralFunction :
     }
     public bool IsSame(ISameCheck? other) => other is CompiledGeneralFunction other2 && IsSame(other2);
 
-    public new CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, Context, this)
-    {
-        TimesUsed = TimesUsed,
-        TimesUsedTotal = TimesUsedTotal,
-    };
+    public new CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, Context, this);
 
     public override string ToString()
     {
@@ -112,5 +88,12 @@ public class CompiledGeneralFunction :
         result.Append(Block?.ToString() ?? ";");
 
         return result.ToString();
+    }
+
+    public CompiledGeneralFunction InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
+    {
+        IEnumerable<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
+        GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
+        return new CompiledGeneralFunction(newType, newParameters, this);
     }
 }

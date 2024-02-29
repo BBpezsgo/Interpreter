@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace LanguageCore;
+﻿namespace LanguageCore;
 
 using Compiler;
 using Runtime;
@@ -44,13 +42,13 @@ public static partial class LanguageConstants
         { "char", RuntimeType.UInt16 },
     };
 
-    public static readonly Dictionary<string, Type> BuiltinTypeMap3 = new()
+    public static readonly Dictionary<string, BasicType> BuiltinTypeMap3 = new()
     {
-        { "byte", Type.Byte },
-        { "int", Type.Integer },
-        { "float", Type.Float },
-        { "char", Type.Char },
-        { "void", Type.Void },
+        { "byte", BasicType.Byte },
+        { "int", BasicType.Integer },
+        { "float", BasicType.Float },
+        { "char", BasicType.Char },
+        { "void", BasicType.Void },
     };
 }
 

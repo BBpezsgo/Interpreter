@@ -1,13 +1,11 @@
-﻿using System.Collections.Generic;
-using System.Text;
+﻿namespace LanguageCore.Parser;
 
-namespace LanguageCore.Parser;
-
+using Compiler;
 using Tokenizing;
 
 public class ConstructorDefinition : FunctionThingDefinition, ISimpleReadable
 {
-    public new TypeInstance Identifier;
+    public new TypeInstance Identifier { get; }
 
     public ConstructorDefinition(ConstructorDefinition other) : base(other)
     {
@@ -73,7 +71,7 @@ public class ConstructorDefinition : FunctionThingDefinition, ISimpleReadable
         return result.ToString();
     }
 
-    public new string ToReadable(TypeArguments? typeArguments, ToReadableFlags flags = ToReadableFlags.None)
+    public new string ToReadable(IReadOnlyDictionary<string, GeneralType>? typeArguments, ToReadableFlags flags = ToReadableFlags.None)
     {
         if (typeArguments == null) return ToReadable(flags);
         StringBuilder result = new();

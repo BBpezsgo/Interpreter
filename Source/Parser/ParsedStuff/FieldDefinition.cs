@@ -4,11 +4,10 @@ using Tokenizing;
 
 public class FieldDefinition : IPositioned
 {
-    public readonly Token Identifier;
-    public readonly TypeInstance Type;
-    public readonly Token? ProtectionToken;
-    public Token? Semicolon;
-
+    public Token Identifier { get; }
+    public TypeInstance Type { get; }
+    public Token? ProtectionToken { get; }
+    public Token? Semicolon { get; set; }
     public Position Position => new(Identifier, Type, ProtectionToken);
 
     public FieldDefinition(FieldDefinition other)

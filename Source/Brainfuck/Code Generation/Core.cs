@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+﻿namespace LanguageCore.Brainfuck.Generator;
 
-namespace LanguageCore.Brainfuck.Generator;
-
-using System.Linq;
-using BBCode.Generator;
 using Compiler;
 using Parser;
 using Parser.Statement;
@@ -189,7 +182,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         public int Optimizations;
 
-        public readonly Stack<FunctionThingDefinition> CurrentMacro;
+        public readonly Stack<ISameCheck> CurrentMacro;
 
         public string? VariableCanBeDiscarded;
 
@@ -208,7 +201,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             Optimizations = v.Optimizations;
 
-            CurrentMacro = new Stack<FunctionThingDefinition>(v.CurrentMacro);
+            CurrentMacro = new Stack<ISameCheck>(v.CurrentMacro);
 
             VariableCanBeDiscarded = new string(v.VariableCanBeDiscarded);
 
@@ -233,16 +226,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     struct GeneratorStackFrame
     {
-        public TypeArguments? savedTypeArguments;
+        public Dictionary<string, GeneralType>? savedTypeArguments;
         public int[] savedBreakTagStack;
         public int[] savedBreakCount;
         public Variable[] savedVariables;
         public Uri? savedFilePath;
-        public CompiledConstant[] savedConstants;
+        public IConstant[] savedConstants;
     }
 
     [SuppressMessage("Style", "IDE0017")]
-    GeneratorStackFrame PushStackFrame(TypeArguments? typeArguments)
+    GeneratorStackFrame PushStackFrame(Dictionary<string, GeneralType>? typeArguments)
     {
         GeneratorStackFrame newFrame = new();
 
@@ -313,7 +306,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     [DebuggerBrowsable(DebuggerBrowsableState.Never)]
     int Optimizations;
 
-    readonly Stack<FunctionThingDefinition> CurrentMacro;
+    readonly Stack<ISameCheck> CurrentMacro;
 
     readonly BrainfuckGeneratorSettings GeneratorSettings;
 
@@ -337,7 +330,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         this.Code = new CompiledCode();
         this.Stack = new StackCodeHelper(this.Code, settings.StackStart, settings.StackSize);
         this.Heap = new BasicHeapCodeHelper(this.Code, settings.HeapStart, settings.HeapSize);
-        this.CurrentMacro = new Stack<FunctionThingDefinition>();
+        this.CurrentMacro = new Stack<ISameCheck>();
         this.VariableCleanupStack = new Stack<int>();
         this.GeneratorSettings = settings;
         this.ReturnCount = new Stack<int>();
@@ -361,15 +354,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         public readonly bool HaveToClean;
         public readonly bool DeallocateOnClean;
 
-        public readonly CompiledType Type;
+        public readonly GeneralType Type;
         public readonly int Size;
 
         public bool IsDiscarded;
         public bool IsInitialized;
 
-        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, CompiledType type)
+        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, GeneralType type)
             : this(name, address, haveToClean, deallocateOnClean, type, type.Size) { }
-        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, CompiledType type, int size)
+        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, GeneralType type, int size)
         {
             Name = name;
             Address = address;
@@ -454,7 +447,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);
 
-    protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
+    protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
         if (CodeGeneratorForBrainfuck.GetVariable(Variables, symbolName, out Variable variable))
         {
@@ -462,9 +455,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return true;
         }
 
-        if (GetConstant(symbolName, out DataItem constant))
+        if (GetConstant(symbolName, out IConstant? constant))
         {
-            type = new CompiledType(constant.Type);
+            type = GeneralType.From(constant.Type);
             return true;
         }
 
@@ -533,7 +526,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 }
 
                 if (variable.DeallocateOnClean &&
-                    variable.Type.IsPointer)
+                    variable.Type is PointerType)
                 {
                     GenerateDeallocator(
                         new TypeCast(
@@ -576,9 +569,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     #region GetValueSize
     int GetValueSize(StatementWithValue statement)
     {
-        CompiledType statementType = FindStatementType(statement);
+        GeneralType statementType = FindStatementType(statement);
 
-        if (statementType == Type.Void)
+        if (statementType == BasicType.Void)
         { throw new CompilerException($"Statement \"{statement}\" (with type \"{statementType}\") does not have a size", statement, CurrentFile); }
 
         return statementType.Size;
@@ -619,17 +612,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (!CodeGeneratorForBrainfuck.GetVariable(Variables, arrayIdentifier.Content, out Variable variable))
         { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, CurrentFile); }
 
-        if (variable.Type.IsStackArray)
+        if (variable.Type is ArrayType arrayType)
         {
-            size = variable.Type.StackArrayOf.Size;
+            size = arrayType.Of.Size;
             address = variable.Address;
 
             if (size != 1)
             { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", index, CurrentFile); }
 
-            if (TryCompute(index.Expression, out DataItem indexValue))
+            if (TryCompute(index.Index, out DataItem indexValue))
             {
-                address = variable.Address + ((int)indexValue * 2 * variable.Type.StackArrayOf.Size);
+                address = variable.Address + ((int)indexValue * 2 * arrayType.Of.Size);
                 return true;
             }
 
@@ -641,9 +634,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     bool TryGetAddress(Field field, out int address, out int size)
     {
-        CompiledType type = FindStatementType(field.PrevStatement);
+        GeneralType type = FindStatementType(field.PrevStatement);
 
-        if (type.IsStruct)
+        if (type is StructType structType)
         {
             if (!TryGetAddress(field.PrevStatement, out int prevAddress, out _))
             {
@@ -652,11 +645,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 return false;
             }
 
-            CompiledType fieldType = FindStatementType(field);
+            GeneralType fieldType = FindStatementType(field);
 
-            CompiledStruct @struct = type.Struct;
-
-            address = @struct.FieldOffsets[field.FieldName.Content] + prevAddress;
+            address = structType.Struct.FieldOffsets[field.FieldName.Content] + prevAddress;
             size = fieldType.Size;
             return true;
         }
@@ -700,7 +691,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         int constantCount = CompileConstants(compilerResult.TopLevelStatements);
 
-        Variable returnVariable = new(ReturnVariableName, Stack.PushVirtual(1), false, false, new CompiledType(Type.Integer));
+        Variable returnVariable = new(ReturnVariableName, Stack.PushVirtual(1), false, false, new BuiltinType(BasicType.Integer));
         Variables.Add(returnVariable);
 
         if (GeneratorSettings.ClearGlobalVariablesBeforeExit)

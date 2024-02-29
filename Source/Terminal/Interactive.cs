@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Runtime.InteropServices;
-using System.Text;
+﻿using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Win32;
 using Win32.LowLevel;
@@ -116,7 +112,7 @@ class InteractiveCompiler
         {
             _parsed = Parser.ParseInteractive(_tokens);
 
-            ExternalFunctionCollection externalFunctions = new();
+            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
             new Interpreter().GenerateExternalFunctions(externalFunctions);
 
             Statement parsed2 = _parsed;
@@ -162,7 +158,7 @@ class InteractiveCompiler
         {
             _parsed = Parser.ParseInteractive(_tokens);
 
-            ExternalFunctionCollection externalFunctions = new();
+            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
             new Interpreter().GenerateExternalFunctions(externalFunctions);
 
             Statement parsed2 = _parsed;
@@ -724,7 +720,7 @@ public class Interactive
             interpreter.OnOutput += OnInterpreterOutput;
             interpreter.OnNeedInput += OnInterpreterNeedInput;
 
-            ExternalFunctionCollection externalFunctions = new();
+            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
             interpreter.GenerateExternalFunctions(externalFunctions);
 
             BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, GeneratorSettings.Default);

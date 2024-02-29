@@ -2,10 +2,12 @@
 
 using Parser;
 
-public class CompiledField : FieldDefinition
+public class CompiledField : FieldDefinition,
+    IHaveCompiledType,
+    IInContext<CompiledStruct>
 {
-    public new readonly CompiledType Type;
-    public readonly CompiledStruct? Context;
+    public new GeneralType Type { get; }
+    public CompiledStruct Context { get; set; }
 
     public Protection Protection => ProtectionToken?.Content switch
     {
@@ -15,7 +17,7 @@ public class CompiledField : FieldDefinition
         _ => Protection.Public,
     };
 
-    public CompiledField(CompiledType type, CompiledStruct? context, FieldDefinition definition) : base(definition)
+    public CompiledField(GeneralType type, CompiledStruct context, FieldDefinition definition) : base(definition)
     {
         Type = type;
         Context = context;

@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿namespace LanguageCore.Parser;
 
-namespace LanguageCore.Parser;
-
-using System.Collections.Immutable;
 using Compiler;
 using Statement;
 using Tokenizing;
@@ -39,51 +33,40 @@ public abstract class TypeInstance : IEquatable<TypeInstance>, IPositioned
 
     public abstract override int GetHashCode();
     public abstract override string ToString();
-    public virtual string ToString(TypeArguments typeArguments) => ToString();
+    public virtual string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments) => ToString();
 
-    protected static bool TryGetAnalyzedType(CompiledType type, out TokenAnalyzedType analyzedType)
+    protected static bool TryGetAnalyzedType(GeneralType type, out TokenAnalyzedType analyzedType)
     {
         analyzedType = default;
 
-        if (type.IsStruct)
+        switch (type)
         {
-            analyzedType = TokenAnalyzedType.Struct;
-            return true;
+            case StructType:
+                analyzedType = TokenAnalyzedType.Struct;
+                return true;
+            case GenericType:
+                analyzedType = TokenAnalyzedType.TypeParameter;
+                return true;
+            case BuiltinType:
+                analyzedType = TokenAnalyzedType.BuiltinType;
+                return true;
+            case FunctionType functionType:
+                return TryGetAnalyzedType(functionType.ReturnType, out analyzedType);
+            case EnumType:
+                analyzedType = TokenAnalyzedType.Enum;
+                return true;
+            default:
+                return false;
         }
-
-        if (type.IsGeneric)
-        {
-            analyzedType = TokenAnalyzedType.TypeParameter;
-            return true;
-        }
-
-        if (type.IsBuiltin)
-        {
-            analyzedType = TokenAnalyzedType.BuiltinType;
-            return true;
-        }
-
-        if (type.IsFunction)
-        {
-            return TryGetAnalyzedType(type.Function.ReturnType, out analyzedType);
-        }
-
-        if (type.IsEnum)
-        {
-            analyzedType = TokenAnalyzedType.Enum;
-            return true;
-        }
-
-        return false;
     }
 
-    public abstract void SetAnalyzedType(CompiledType type);
+    public abstract void SetAnalyzedType(GeneralType type);
 }
 
 public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStackArray?>
 {
-    public readonly StatementWithValue? StackArraySize;
-    public readonly TypeInstance StackArrayOf;
+    public StatementWithValue? StackArraySize { get; }
+    public TypeInstance StackArrayOf { get; }
 
     public TypeInstanceStackArray(TypeInstance stackArrayOf, StatementWithValue? sizeValue) : base()
     {
@@ -107,22 +90,21 @@ public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStack
 
     public override Position Position => new(StackArrayOf, StackArraySize);
 
-    public override void SetAnalyzedType(CompiledType type)
+    public override void SetAnalyzedType(GeneralType type)
     {
-        if (!type.IsStackArray) return;
+        if (type is not ArrayType arrayType) return;
 
-        StackArrayOf.SetAnalyzedType(type.StackArrayOf);
+        StackArrayOf.SetAnalyzedType(arrayType.Of);
     }
 
     public override string ToString() => $"{StackArrayOf}[{StackArraySize}]";
-    public override string ToString(TypeArguments typeArguments) => $"{StackArrayOf.ToString(typeArguments)}[{StackArraySize}]";
+    public override string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments) => $"{StackArrayOf.ToString(typeArguments)}[{StackArraySize}]";
 }
 
 public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunction?>
 {
-    public readonly TypeInstance FunctionReturnType;
-    public readonly ImmutableArray<TypeInstance> FunctionParameterTypes;
-
+    public TypeInstance FunctionReturnType { get; }
+    public ImmutableArray<TypeInstance> FunctionParameterTypes { get; }
     public override Position Position =>
         new Position(FunctionReturnType)
         .Union(FunctionParameterTypes);
@@ -150,23 +132,23 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
 
     public override int GetHashCode() => HashCode.Combine((byte)2, FunctionReturnType, FunctionParameterTypes);
 
-    public override void SetAnalyzedType(CompiledType type)
+    public override void SetAnalyzedType(GeneralType type)
     {
-        if (!type.IsFunction) return;
+        if (type is not FunctionType functionType) return;
 
-        FunctionReturnType.SetAnalyzedType(type.Function.ReturnType);
+        FunctionReturnType.SetAnalyzedType(functionType.ReturnType);
 
-        if (this.FunctionParameterTypes.Length == type.Function.Parameters.Length)
+        if (this.FunctionParameterTypes.Length == functionType.Parameters.Length)
         {
-            for (int i = 0; i < type.Function.Parameters.Length; i++)
+            for (int i = 0; i < functionType.Parameters.Length; i++)
             {
-                this.FunctionParameterTypes[i].SetAnalyzedType(type.Function.Parameters[i]);
+                this.FunctionParameterTypes[i].SetAnalyzedType(functionType.Parameters[i]);
             }
         }
     }
 
     public override string ToString() => $"{FunctionReturnType}({string.Join<TypeInstance>(", ", FunctionParameterTypes)})";
-    public override string ToString(TypeArguments typeArguments)
+    public override string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments)
     {
         StringBuilder result = new();
         result.Append(FunctionReturnType.ToString(typeArguments));
@@ -183,9 +165,8 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
 
 public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
 {
-    public readonly Token Identifier;
-    public readonly ImmutableArray<TypeInstance>? GenericTypes;
-
+    public Token Identifier { get; }
+    public ImmutableArray<TypeInstance>? GenericTypes { get; }
     public override Position Position =>
         new Position(Identifier)
         .Union(GenericTypes);
@@ -217,7 +198,7 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
 
     public override int GetHashCode() => HashCode.Combine((byte)3, Identifier, GenericTypes);
 
-    public override void SetAnalyzedType(CompiledType type)
+    public override void SetAnalyzedType(GeneralType type)
     {
         if (TryGetAnalyzedType(type, out TokenAnalyzedType analyzedType))
         { Identifier.AnalyzedType = analyzedType; }
@@ -252,10 +233,10 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
         if (GenericTypes is null) return Identifier.Content;
         return $"{Identifier.Content}<{string.Join<TypeInstance>(", ", GenericTypes)}>";
     }
-    public override string ToString(TypeArguments typeArguments)
+    public override string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments)
     {
         string identifier = Identifier.Content;
-        if (typeArguments.TryGetValue(Identifier.Content, out CompiledType? replaced))
+        if (typeArguments.TryGetValue(Identifier.Content, out GeneralType? replaced))
         { identifier = replaced.ToString(); }
 
         if (!GenericTypes.HasValue)
@@ -275,9 +256,8 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
 
 public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?>
 {
-    public readonly TypeInstance To;
-    public readonly Token Operator;
-
+    public TypeInstance To { get; }
+    public Token Operator { get; }
     public override Position Position => new(To, Operator);
 
     public TypeInstancePointer(TypeInstance to, Token @operator) : base()
@@ -296,14 +276,14 @@ public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?
 
     public override int GetHashCode() => HashCode.Combine((byte)4, To);
 
-    public override void SetAnalyzedType(CompiledType type)
+    public override void SetAnalyzedType(GeneralType type)
     {
-        if (!type.IsPointer) return;
-        To.SetAnalyzedType(type.PointerTo);
+        if (type is not PointerType pointerType) return;
+        To.SetAnalyzedType(pointerType.To);
     }
 
     public override string ToString() => $"{To}{Operator}";
-    public override string ToString(TypeArguments typeArguments) => $"{To.ToString(typeArguments)}{Operator}";
+    public override string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments) => $"{To.ToString(typeArguments)}{Operator}";
 
     public static TypeInstancePointer CreateAnonymous(TypeInstance to) => new(to, Token.CreateAnonymous("*", TokenType.Operator));
 }

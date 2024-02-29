@@ -1,7 +1,4 @@
-﻿using System;
-using System.Linq;
-
-namespace LanguageCore.Tokenizing;
+﻿namespace LanguageCore.Tokenizing;
 
 public abstract partial class Tokenizer
 {

@@ -1,19 +1,13 @@
-﻿using System;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using Runtime;
 
-public abstract class CompiledConstant : IPositioned
+public interface IConstant : IPositioned, IHaveCompiledType
 {
-    public readonly DataItem Value;
-
-    public abstract string Identifier { get; }
-    public abstract Uri? FilePath { get; }
-    public abstract Position Position { get; }
-
-    protected CompiledConstant(DataItem value)
-    {
-        Value = value;
-    }
+    public DataItem Value { get; }
+    public string Identifier { get; }
+    public Uri? FilePath { get; }
+    public new GeneralType Type => new BuiltinType(Value.Type);
+    GeneralType IHaveCompiledType.Type => Type;
+    GeneralType? IProbablyHaveCompiledType.Type => Type;
 }

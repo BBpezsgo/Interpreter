@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace LanguageCore.Brainfuck;
+﻿namespace LanguageCore.Brainfuck;
 
 public readonly struct RuntimeContext
 {

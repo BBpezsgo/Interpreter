@@ -1,17 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿namespace LanguageCore.Parser;
 
-namespace LanguageCore.Parser;
+public static class ExportableExtensions
+{
+    public static bool CanUse(this IExportable self, Uri? sourceFile)
+    {
+        if (self.IsExport) return true;
+        if (sourceFile == null) return true;
+        if (sourceFile == self.FilePath) return true;
+        return false;
+    }
+}
 
 public interface IInFile
 {
     public Uri? FilePath { get; set; }
 }
 
-public interface IExportable
+public interface IExportable : IInFile
 {
     public bool IsExport { get; }
+}
+
+public interface IHaveType
+{
+    public TypeInstance Type { get; }
 }
 
 public enum LiteralType
@@ -178,19 +190,5 @@ public readonly struct ParserResult
                 { yield return statement; }
             }
         }
-    }
-}
-
-public readonly struct ParserResultHeader
-{
-    public readonly List<UsingDefinition> Usings;
-    public readonly Statement.CompileTag[] Hashes;
-    public readonly List<UsingAnalysis> UsingsAnalytics;
-
-    public ParserResultHeader(List<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes)
-    {
-        Usings = usings;
-        UsingsAnalytics = new();
-        Hashes = hashes.ToArray();
     }
 }

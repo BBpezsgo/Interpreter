@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace LanguageCore;
+﻿namespace LanguageCore;
 
 public static partial class GeneralExtensions
 {

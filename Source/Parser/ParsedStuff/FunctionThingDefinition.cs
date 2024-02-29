@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Text;
+﻿namespace LanguageCore.Parser;
 
-namespace LanguageCore.Parser;
-
+using Compiler;
 using Tokenizing;
 
 public abstract class FunctionThingDefinition :
@@ -14,29 +9,22 @@ public abstract class FunctionThingDefinition :
     ISimpleReadable,
     IInFile
 {
-    public ImmutableArray<Token> Modifiers;
-    public readonly Token Identifier;
-    public ParameterDefinitionCollection Parameters;
-    public Statement.Block? Block;
-
-    public readonly TemplateInfo? TemplateInfo;
+    public ImmutableArray<Token> Modifiers { get; }
+    public Token Identifier { get; }
+    public ParameterDefinitionCollection Parameters { get; set; }
+    public Statement.Block? Block { get; init; }
+    public TemplateInfo? TemplateInfo { get; }
+    public Uri? FilePath { get; set; }
 
     /// <summary>
     /// The first parameter is labeled as 'this'
     /// </summary>
     public bool IsMethod => (Parameters.Count > 0) && Parameters[0].Modifiers.Contains("this");
-
     public int ParameterCount => Parameters.Count;
-
     public bool IsExport => Modifiers.Contains("export");
-
     public bool IsMacro => Modifiers.Contains("macro");
-
     public bool IsInlineable => Modifiers.Contains("inline");
-
     public virtual bool IsTemplate => TemplateInfo is not null;
-
-    public Uri? FilePath { get; set; }
 
     public virtual Position Position =>
         new Position(Identifier)
@@ -60,13 +48,14 @@ public abstract class FunctionThingDefinition :
         ParameterDefinitionCollection parameters,
         TemplateInfo? templateInfo)
     {
+        parameters.Context = this;
+        foreach (ParameterDefinition parameter in parameters) parameter.Context = this;
+
         Modifiers = modifiers.ToImmutableArray();
         Identifier = identifier;
         Parameters = parameters;
         TemplateInfo = templateInfo;
     }
-
-    public bool CanUse(Uri? sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
     string ISimpleReadable.ToReadable() => ToReadable();
     public string ToReadable(ToReadableFlags flags = ToReadableFlags.None)
@@ -95,7 +84,7 @@ public abstract class FunctionThingDefinition :
         return result.ToString();
     }
 
-    public string ToReadable(TypeArguments? typeArguments, ToReadableFlags flags = ToReadableFlags.None)
+    public string ToReadable(IReadOnlyDictionary<string, GeneralType>? typeArguments, ToReadableFlags flags = ToReadableFlags.None)
     {
         if (typeArguments == null) return ToReadable(flags);
         StringBuilder result = new();

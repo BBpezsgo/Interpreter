@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
+﻿using System.IO;
 
 namespace LanguageCore.ASM;
 
@@ -33,11 +30,7 @@ public static class GnuLinker
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-        });
-
-        if (process == null)
-        { throw new ProcessNotStartedException(ld); }
-
+        }) ?? throw new ProcessNotStartedException(ld);
         process.WaitForExit();
 
         string stdOutput = process.StandardOutput.ReadToEnd();

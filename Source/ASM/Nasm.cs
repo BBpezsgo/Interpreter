@@ -1,8 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.Globalization;
-using System.IO;
-using System.Text;
+﻿using System.IO;
 
 namespace LanguageCore.ASM;
 
@@ -99,11 +95,7 @@ public static class Nasm
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-        });
-
-        if (process == null)
-        { throw new ProcessNotStartedException(nasm); }
-
+        }) ?? throw new ProcessNotStartedException(nasm);
         process.WaitForExit();
 
         if (process.ExitCode == 0)

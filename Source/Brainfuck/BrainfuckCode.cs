@@ -1,8 +1,4 @@
-﻿using System;
-using System.Linq;
-using System.Text;
-
-namespace LanguageCore.Brainfuck;
+﻿namespace LanguageCore.Brainfuck;
 
 public static class CharCode
 {

@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Frozen;
 using System.IO;
 
 namespace LanguageCore.Runtime;
@@ -167,7 +164,7 @@ public class Interpreter
     }
 
     [MemberNotNullWhen(true, nameof(BytecodeInterpreter))]
-    public bool Initialize(Instruction[] program, BytecodeInterpreterSettings settings, ExternalFunctionCollection externalFunctions)
+    public bool Initialize(Instruction[] program, BytecodeInterpreterSettings settings, Dictionary<string, ExternalFunctionBase> externalFunctions)
     {
         if (IsExecutingCode)
         {
@@ -227,7 +224,7 @@ public class Interpreter
         IsPaused = false;
     }
 
-    public void GenerateExternalFunctions(ExternalFunctionCollection externalFunctions)
+    public void GenerateExternalFunctions(Dictionary<string, ExternalFunctionBase> externalFunctions)
     {
         #region Console
 

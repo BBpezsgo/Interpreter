@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace LanguageCore;
+﻿namespace LanguageCore;
 
 public readonly struct ConsoleProgressBar : IDisposable
 {

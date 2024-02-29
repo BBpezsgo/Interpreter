@@ -1,6 +1,4 @@
-﻿using System.Text;
-
-namespace LanguageCore.Brainfuck;
+﻿namespace LanguageCore.Brainfuck;
 
 public static class Simplifier
 {

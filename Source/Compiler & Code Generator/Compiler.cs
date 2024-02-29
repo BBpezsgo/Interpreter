@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 
 namespace LanguageCore.Compiler;
 
-using System.Collections.Immutable;
 using Parser;
 using Parser.Statement;
 using Runtime;
@@ -27,7 +22,7 @@ public readonly struct CompilerResult
     public readonly CompiledOperator[] Operators;
     public readonly CompiledConstructor[] Constructors;
 
-    public readonly ExternalFunctionCollection ExternalFunctions;
+    public readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
 
     public readonly CompiledStruct[] Structs;
     public readonly CompileTag[] Hashes;
@@ -151,7 +146,7 @@ public readonly struct CompilerResult
         Array.Empty<CompiledGeneralFunction>(),
         Array.Empty<CompiledOperator>(),
         Array.Empty<CompiledConstructor>(),
-        new ExternalFunctionCollection(),
+        new Dictionary<string, ExternalFunctionBase>(),
         Array.Empty<CompiledStruct>(),
         Array.Empty<CompileTag>(),
         Array.Empty<CompiledEnum>(),
@@ -164,7 +159,7 @@ public readonly struct CompilerResult
         IEnumerable<CompiledGeneralFunction> generalFunctions,
         IEnumerable<CompiledOperator> operators,
         IEnumerable<CompiledConstructor> constructors,
-        ExternalFunctionCollection externalFunctions,
+        Dictionary<string, ExternalFunctionBase> externalFunctions,
         IEnumerable<CompiledStruct> structs,
         IEnumerable<CompileTag> hashes,
         IEnumerable<CompiledEnum> enums,
@@ -302,18 +297,18 @@ public class Compiler
     readonly List<CompileTag> Tags;
 
     readonly CompilerSettings Settings;
-    readonly ExternalFunctionCollection ExternalFunctions;
+    readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
     readonly PrintCallback? PrintCallback;
 
     readonly AnalysisCollection? AnalysisCollection;
 
-    readonly Dictionary<string, (CompiledType ReturnValue, CompiledType[] Parameters)> BuiltinFunctions = new()
+    readonly Dictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)> BuiltinFunctions = new()
     {
-        { "alloc", (CompiledType.CreatePointer(new CompiledType(Type.Integer)), [ new CompiledType(Type.Integer) ]) },
-        { "free", (new CompiledType(Type.Void), [ CompiledType.CreatePointer(new CompiledType(Type.Integer)) ]) },
+        { "alloc", (new PointerType(new BuiltinType(BasicType.Integer)), [ new BuiltinType(BasicType.Integer) ]) },
+        { "free", (new BuiltinType(BasicType.Void), [ new PointerType(new BuiltinType(BasicType.Integer)) ]) },
     };
 
-    Compiler(ExternalFunctionCollection? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection)
+    Compiler(Dictionary<string, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection)
     {
         Functions = new List<FunctionDefinition>();
         Macros = new List<MacroDefinition>();
@@ -330,23 +325,23 @@ public class Compiler
         CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
         CompiledEnums = Array.Empty<CompiledEnum>();
 
-        ExternalFunctions = externalFunctions ?? new ExternalFunctionCollection();
+        ExternalFunctions = externalFunctions ?? new Dictionary<string, ExternalFunctionBase>();
         Settings = settings;
         PrintCallback = printCallback;
         AnalysisCollection = analysisCollection;
     }
 
-    bool FindType(Token name, [NotNullWhen(true)] out CompiledType? result)
+    bool FindType(Token name, [NotNullWhen(true)] out GeneralType? result)
     {
         if (CodeGenerator.GetStruct(CompiledStructs, name.Content, out CompiledStruct? @struct))
         {
-            result = new CompiledType(@struct);
+            result = new StructType(@struct);
             return true;
         }
 
         if (CodeGenerator.GetEnum(CompiledEnums, name.Content, out CompiledEnum? @enum))
         {
-            result = new CompiledType(@enum);
+            result = new EnumType(@enum);
             return true;
         }
 
@@ -357,7 +352,7 @@ public class Compiler
                 if (GenericParameters[i][j].Content == name.Content)
                 {
                     GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
-                    result = CompiledType.CreateGeneric(GenericParameters[i][j].Content);
+                    result = new GenericType(GenericParameters[i][j].Content);
                     return true;
                 }
             }
@@ -365,7 +360,7 @@ public class Compiler
 
         if (CodeGenerator.GetFunction(CompiledFunctions, name, out CompiledFunction? function))
         {
-            result = new CompiledType(new FunctionType(function));
+            result = new FunctionType(function);
             return true;
         }
 
@@ -394,17 +389,6 @@ public class Compiler
         }
     }
 
-    static CompiledType[] CompileTypes(ParameterDefinition[] parameters, FindType unknownTypeCallback)
-    {
-        CompiledType[] result = new CompiledType[parameters.Length];
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            result[i] = CompiledType.From(parameters[i].Type, unknownTypeCallback);
-            parameters[i].Type.SetAnalyzedType(result[i]);
-        }
-        return result;
-    }
-
     CompiledStruct CompileStruct(StructDefinition @struct)
     {
         if (LanguageConstants.Keywords.Contains(@struct.Identifier.Content))
@@ -427,8 +411,7 @@ public class Compiler
         for (int j = 0; j < @struct.Fields.Length; j++)
         {
             FieldDefinition field = @struct.Fields[j];
-            CompiledField newField = new(CompiledType.From(field.Type, FindType), null, field);
-            field.Type.SetAnalyzedType(newField.Type);
+            CompiledField newField = new(GeneralType.From(field.Type, FindType), null!, field);
             compiledFields[j] = newField;
         }
 
@@ -449,7 +432,7 @@ public class Compiler
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
-        CompiledType type = CompiledType.From(function.Type, FindType);
+        GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
         if (attributes.TryGetAttribute<string>("External", out string? externalName, out CompiledAttribute? attribute))
@@ -460,13 +443,13 @@ public class Compiler
             {
                 if (externalFunction.Parameters.Length != function.Parameters.Count)
                 { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.FilePath); }
-                if (externalFunction.ReturnSomething != (type != Type.Void))
+                if (externalFunction.ReturnSomething != (type != BasicType.Void))
                 { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.FilePath); }
 
                 for (int i = 0; i < externalFunction.Parameters.Length; i++)
                 {
                     RuntimeType definedParameterType = externalFunction.Parameters[i];
-                    CompiledType passedParameterType = CompiledType.From(function.Parameters[i].Type, FindType);
+                    GeneralType passedParameterType = GeneralType.From(function.Parameters[i].Type, FindType);
                     function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                     if (passedParameterType == definedParameterType)
@@ -480,7 +463,7 @@ public class Compiler
 
                 return new CompiledFunction(
                     type,
-                    externalFunction.Parameters.Select(v => new CompiledType(v)).ToArray(),
+                    externalFunction.Parameters.Select(v => new BuiltinType(v)).ToArray(),
                     context,
                     attributes,
                     function);
@@ -489,7 +472,7 @@ public class Compiler
 
         if (attributes.TryGetAttribute<string>("Builtin", out string? builtinName, out attribute))
         {
-            if (!BuiltinFunctions.TryGetValue(builtinName, out (CompiledType ReturnValue, CompiledType[] Parameters) builtinFunction))
+            if (!BuiltinFunctions.TryGetValue(builtinName, out (GeneralType ReturnValue, GeneralType[] Parameters) builtinFunction))
             { AnalysisCollection?.Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", attribute, function.FilePath)); }
             else
             {
@@ -501,14 +484,14 @@ public class Compiler
 
                 for (int i = 0; i < builtinFunction.Parameters.Length; i++)
                 {
-                    CompiledType definedParameterType = builtinFunction.Parameters[i];
-                    CompiledType passedParameterType = CompiledType.From(function.Parameters[i].Type, FindType);
+                    GeneralType definedParameterType = builtinFunction.Parameters[i];
+                    GeneralType passedParameterType = GeneralType.From(function.Parameters[i].Type, FindType);
                     function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                     if (passedParameterType == definedParameterType)
                     { continue; }
 
-                    if (passedParameterType.IsPointer && definedParameterType.IsPointer)
+                    if (passedParameterType is PointerType && definedParameterType is PointerType)
                     { continue; }
 
                     throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
@@ -518,7 +501,7 @@ public class Compiler
 
         CompiledFunction result = new(
             type,
-            CompileTypes(function.Parameters.ToArray(), FindType),
+            GeneralType.FromArray(function.Parameters, FindType),
             context,
             attributes,
             function);
@@ -533,7 +516,7 @@ public class Compiler
     {
         Dictionary<string, CompiledAttribute> attributes = CompileAttributes(function.Attributes).ToDictionary();
 
-        CompiledType type = CompiledType.From(function.Type, FindType);
+        GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
         if (attributes.TryGetAttribute<string>("External", out string? name, out CompiledAttribute? attribute))
@@ -542,12 +525,12 @@ public class Compiler
             {
                 if (externalFunction.Parameters.Length != function.Parameters.Count)
                 { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.FilePath); }
-                if (externalFunction.ReturnSomething != (type != Type.Void))
+                if (externalFunction.ReturnSomething != (type != BasicType.Void))
                 { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.FilePath); }
 
                 for (int i = 0; i < externalFunction.Parameters.Length; i++)
                 {
-                    if (LanguageConstants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.ToString(), out Type builtinType))
+                    if (LanguageConstants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.ToString(), out BasicType builtinType))
                     {
                         if (externalFunction.Parameters[i].Convert() != builtinType)
                         { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.Parameters[i]} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
@@ -558,7 +541,7 @@ public class Compiler
 
                 return new CompiledOperator(
                     type,
-                    externalFunction.Parameters.Select(v => new CompiledType(v)).ToArray(),
+                    externalFunction.Parameters.Select(v => new BuiltinType(v)).ToArray(),
                     context,
                     attributes,
                     function);
@@ -569,23 +552,23 @@ public class Compiler
 
         return new CompiledOperator(
             type,
-            CompileTypes(function.Parameters.ToArray(), FindType),
+            GeneralType.FromArray(function.Parameters, FindType),
             context,
             attributes,
             function);
     }
 
-    CompiledGeneralFunction CompileGeneralFunction(GeneralFunctionDefinition function, CompiledType returnType, CompiledStruct? context)
+    CompiledGeneralFunction CompileGeneralFunction(GeneralFunctionDefinition function, GeneralType returnType, CompiledStruct context)
     {
         return new CompiledGeneralFunction(
             returnType,
-            CompileTypes(function.Parameters.ToArray(), FindType),
+            GeneralType.FromArray(function.Parameters, FindType),
             context,
             function
             );
     }
 
-    CompiledConstructor CompileConstructor(ConstructorDefinition function, CompiledStruct? context)
+    CompiledConstructor CompileConstructor(ConstructorDefinition function, CompiledStruct context)
     {
         if (function.TemplateInfo != null)
         {
@@ -594,12 +577,12 @@ public class Compiler
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
-        CompiledType type = CompiledType.From(function.Identifier, FindType);
+        GeneralType type = GeneralType.From(function.Identifier, FindType);
         function.Identifier.SetAnalyzedType(type);
 
         CompiledConstructor result = new(
             type,
-            CompileTypes(function.Parameters.ToArray(), FindType),
+            GeneralType.FromArray(function.Parameters, FindType),
             context,
             function);
 
@@ -609,23 +592,23 @@ public class Compiler
         return result;
     }
 
-    static CompiledEnum CompileEnum(EnumDefinition @enum)
+    static CompiledEnumMember CompileEnumMember(EnumMemberDefinition member)
     {
-        CompiledEnumMember[] compiledMembers = new CompiledEnumMember[@enum.Members.Length];
+        CompiledEnumMember compiledMember = new(member);
 
-        for (int i = 0; i < @enum.Members.Length; i++)
-        {
-            EnumMemberDefinition member = @enum.Members[i];
-            CompiledEnumMember compiledMember = new(member);
+        if (!CodeGenerator.TryComputeSimple(member.Value, out DataItem computedValue))
+        { throw new CompilerException($"I can't compute this. The developer should make a better preprocessor for this case I think...", member.Value, member.Context.FilePath); }
 
-            if (!CodeGenerator.TryComputeSimple(member.Value, out compiledMember.ComputedValue))
-            { throw new CompilerException($"I can't compute this. The developer should make a better preprocessor for this case I think...", member.Value, @enum.FilePath); }
+        compiledMember.ComputedValue = computedValue;
 
-            compiledMembers[i] = compiledMember;
-        }
-
-        return new CompiledEnum(compiledMembers, CompileAttributes(@enum.Attributes), @enum);
+        return compiledMember;
     }
+
+    static IEnumerable<CompiledEnumMember> CompileEnumMembers(IEnumerable<EnumMemberDefinition> members)
+        => members.Select(CompileEnumMember);
+
+    static CompiledEnum CompileEnum(EnumDefinition @enum)
+        => new(CompileEnumMembers(@enum.Members), CompileAttributes(@enum.Attributes), @enum);
 
     bool IsSymbolExists(string symbol, [NotNullWhen(true)] out Token? where)
     {
@@ -797,14 +780,14 @@ public class Compiler
                     for (int i = 1; i < tag.Parameters.Length; i++)
                     { bfParams[i - 1] = tag.Parameters[i].Value; }
 
-                    Type[] parameterTypes = new Type[bfParams.Length];
+                    BasicType[] parameterTypes = new BasicType[bfParams.Length];
                     for (int i = 0; i < bfParams.Length; i++)
                     {
-                        if (LanguageConstants.BuiltinTypeMap3.TryGetValue(bfParams[i], out Type paramType))
+                        if (LanguageConstants.BuiltinTypeMap3.TryGetValue(bfParams[i], out BasicType paramType))
                         {
                             parameterTypes[i] = paramType;
 
-                            if (paramType == Type.Void && i > 0)
+                            if (paramType == BasicType.Void && i > 0)
                             { AnalysisCollection?.Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", tag.Parameters[i + 1].ValueToken, tag.FilePath)); goto ExitBreak; }
                         }
                         else
@@ -814,12 +797,12 @@ public class Compiler
                         }
                     }
 
-                    Type returnType = parameterTypes[0];
-                    List<Type> x = parameterTypes.ToList();
+                    BasicType returnType = parameterTypes[0];
+                    List<BasicType> x = parameterTypes.ToList();
                     x.RemoveAt(0);
                     RuntimeType[] pTypes = x.ToArray().Select(v => v.Convert()).ToArray();
 
-                    if (returnType == Type.Void)
+                    if (returnType == BasicType.Void)
                     {
                         ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                         {
@@ -912,7 +895,7 @@ ExitBreak:
                         { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledStruct.FilePath); }
                     }
 
-                    CompiledType returnType = new(compiledStruct);
+                    GeneralType returnType = new StructType(compiledStruct);
 
                     if (method.Identifier.Content == BuiltinFunctionNames.Destructor)
                     {
@@ -923,10 +906,11 @@ ExitBreak:
                             new ParameterDefinition(
                                 new Token[] { Token.CreateAnonymous("ref"), Token.CreateAnonymous("this") },
                                 TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters),
-                                Token.CreateAnonymous("this"))
+                                Token.CreateAnonymous("this"),
+                                copy)
                             );
                         copy.Parameters = new ParameterDefinitionCollection(parameters, copy.Parameters.LeftParenthesis, copy.Parameters.RightParenthesis);
-                        returnType = new CompiledType(Type.Void);
+                        returnType = new BuiltinType(BasicType.Void);
 
                         CompiledGeneralFunction methodWithRef = CompileGeneralFunction(copy, returnType, compiledStruct);
 
@@ -937,7 +921,8 @@ ExitBreak:
                             new ParameterDefinition(
                                 new Token[] { Token.CreateAnonymous("this") },
                                 TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters)),
-                                Token.CreateAnonymous("this"))
+                                Token.CreateAnonymous("this"),
+                                copy)
                             );
                         copy.Parameters = new ParameterDefinitionCollection(parameters, copy.Parameters.LeftParenthesis, copy.Parameters.RightParenthesis);
 
@@ -980,7 +965,8 @@ ExitBreak:
                         new ParameterDefinition(
                             new Token[] { Token.CreateAnonymous("ref"), Token.CreateAnonymous("this") },
                             TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters),
-                            Token.CreateAnonymous("this"))
+                            Token.CreateAnonymous("this"),
+                            copy)
                         );
                     copy.Parameters = new ParameterDefinitionCollection(parameters, copy.Parameters.LeftParenthesis, copy.Parameters.RightParenthesis);
 
@@ -993,7 +979,8 @@ ExitBreak:
                         new ParameterDefinition(
                             new Token[] { Token.CreateAnonymous("this") },
                             TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters)),
-                            Token.CreateAnonymous("this"))
+                            Token.CreateAnonymous("this"),
+                            copy)
                         );
                     copy.Parameters = new ParameterDefinitionCollection(parameters, copy.Parameters.LeftParenthesis, copy.Parameters.RightParenthesis);
 
@@ -1022,7 +1009,8 @@ ExitBreak:
                         new ParameterDefinition(
                             new Token[] { Token.CreateAnonymous("this") },
                             constructor.Identifier,
-                            Token.CreateAnonymous("this"))
+                            Token.CreateAnonymous("this"),
+                            constructor)
                         );
                     constructor.Parameters = new ParameterDefinitionCollection(parameters, constructor.Parameters.LeftParenthesis, constructor.Parameters.RightParenthesis);
 
@@ -1053,7 +1041,7 @@ ExitBreak:
     /// <exception cref="Exception"/>
     public static CompilerResult Compile(
         ParserResult parserResult,
-        ExternalFunctionCollection? externalFunctions,
+        Dictionary<string, ExternalFunctionBase>? externalFunctions,
         Uri? file,
         CompilerSettings settings,
         PrintCallback? printCallback = null,
@@ -1071,7 +1059,7 @@ ExitBreak:
     /// <exception cref="Exception"/>
     public static CompilerResult CompileFile(
         FileInfo file,
-        ExternalFunctionCollection? externalFunctions,
+        Dictionary<string, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null)
@@ -1083,7 +1071,7 @@ ExitBreak:
 
     public static CompilerResult CompileInteractive(
         Statement statement,
-        ExternalFunctionCollection? externalFunctions,
+        Dictionary<string, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
         UsingDefinition[] usings,
         PrintCallback? printCallback = null,

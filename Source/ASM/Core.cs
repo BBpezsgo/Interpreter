@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace LanguageCore.ASM;
+﻿namespace LanguageCore.ASM;
 
 public class ProcessException : Exception
 {

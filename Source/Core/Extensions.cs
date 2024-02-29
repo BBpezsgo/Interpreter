@@ -1,15 +1,25 @@
-﻿using System;
-using System.Collections.Immutable;
-using System.Diagnostics;
-
-namespace LanguageCore;
+﻿namespace LanguageCore;
 
 using Compiler;
+using Parser;
 using Runtime;
 using Tokenizing;
 
 public static class Extensions
 {
+    public static bool Get(this IEnumerable<AttributeUsage> attributes, string? identifier, [NotNullWhen(true)] out AttributeUsage? attribute)
+        => (attribute = Get(attributes, identifier)) is not null;
+    public static AttributeUsage? Get(this IEnumerable<AttributeUsage> attributes, string? identifier)
+    {
+        if (identifier is null) return null;
+        foreach (AttributeUsage attribute in attributes)
+        {
+            if (attribute.Identifier.Content == identifier)
+            { return attribute; }
+        }
+        return null;
+    }
+
     public static bool Contains(this Token[] tokens, string value)
     {
         for (int i = 0; i < tokens.Length; i++)
@@ -30,25 +40,27 @@ public static class Extensions
         return false;
     }
 
-    public static Type Convert(this RuntimeType v) => v switch
+    /// <exception cref="NotImplementedException"/>
+    /// <exception cref="UnreachableException"/>
+    public static BasicType Convert(this RuntimeType v) => v switch
     {
-        RuntimeType.UInt8 => Type.Byte,
-        RuntimeType.SInt32 => Type.Integer,
-        RuntimeType.Single => Type.Float,
-        RuntimeType.UInt16 => Type.Char,
+        RuntimeType.UInt8 => BasicType.Byte,
+        RuntimeType.SInt32 => BasicType.Integer,
+        RuntimeType.Single => BasicType.Float,
+        RuntimeType.UInt16 => BasicType.Char,
         RuntimeType.Null => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
 
-    public static RuntimeType Convert(this Type v) => v switch
+    /// <exception cref="NotImplementedException"/>
+    /// <exception cref="UnreachableException"/>
+    public static RuntimeType Convert(this BasicType v) => v switch
     {
-        Type.Byte => RuntimeType.UInt8,
-        Type.Integer => RuntimeType.SInt32,
-        Type.Float => RuntimeType.Single,
-        Type.Char => RuntimeType.UInt16,
-        Type.NotBuiltin => throw new NotImplementedException(),
-        Type.Void => throw new NotImplementedException(),
-        Type.Unknown => throw new NotImplementedException(),
+        BasicType.Byte => RuntimeType.UInt8,
+        BasicType.Integer => RuntimeType.SInt32,
+        BasicType.Float => RuntimeType.Single,
+        BasicType.Char => RuntimeType.UInt16,
+        BasicType.Void => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
 }

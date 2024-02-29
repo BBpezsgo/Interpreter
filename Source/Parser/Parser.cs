@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Linq;
-
-namespace LanguageCore.Parser;
+﻿namespace LanguageCore.Parser;
 
 using Statement;
 using Tokenizing;
@@ -125,9 +118,6 @@ public class Parser
     public static ParserResult Parse(Token[] tokens)
         => new Parser(tokens).ParseInternal();
 
-    public static ParserResultHeader ParseHeader(Token[] tokens)
-        => new Parser(tokens).ParseHeaderInternal();
-
     public static Statement.Statement ParseInteractive(Token[] tokens)
         => new Parser(tokens).ParseInteractiveInternal();
 
@@ -156,15 +146,6 @@ public class Parser
             Hashes,
             TopLevelStatements,
             Enums);
-    }
-
-    ParserResultHeader ParseHeaderInternal()
-    {
-        CurrentTokenIndex = 0;
-
-        ParseCodeHeader();
-
-        return new ParserResultHeader(this.Usings, this.Hashes);
     }
 
     Statement.Statement ParseInteractiveInternal()
@@ -358,7 +339,7 @@ public class Parser
             throw new SyntaxException($"Expected \",\" or \"}}\" (not \"{CurrentToken}\")", PreviousToken?.Position.After());
         }
 
-        enumDefinition = new(identifier, attributes, members.ToArray());
+        enumDefinition = new(identifier, attributes, members);
 
         return true;
     }
@@ -395,12 +376,12 @@ public class Parser
             if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected a type (the parameter's type)", PreviousToken?.Position.After()); }
 
-            if (!ExpectIdentifier(out Token? ParameterIdentifier))
+            if (!ExpectIdentifier(out Token? parameterIdentifier))
             { throw new SyntaxException("Expected an identifier (the parameter's name)", parameterType.Position.After()); }
 
-            ParameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
+            parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-            ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, ParameterIdentifier);
+            ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
             parameters.Add(parameterDefinition);
 
             if (ExpectOperator(")", out rightParenthesis))
@@ -414,20 +395,21 @@ public class Parser
 
         CheckModifiers(modifiers, "export");
 
+        Block? block = null;
+
+        if (!ExpectOperator(";") && !ExpectBlock(out block))
+        { throw new SyntaxException($"Expected \";\" or block", PreviousToken?.Position.After()); }
+
         function = new FunctionDefinition(
             attributes,
             modifiers,
             possibleType,
             possibleName,
             new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis),
-            null);
-
-        Block? block = null;
-
-        if (!ExpectOperator(";") && !ExpectBlock(out block))
-        { throw new SyntaxException($"Expected \";\" or block", PreviousToken?.Position.After()); }
-
-        function.Block = block;
+            null)
+        {
+            Block = block
+        };
 
         return true;
     }
@@ -575,20 +557,21 @@ public class Parser
 
         CheckModifiers(modifiers, FunctionModifiers);
 
+        Block? block = null;
+
+        if (!ExpectOperator(";") && !ExpectBlock(out block))
+        { throw new SyntaxException($"Expected \";\" or block", rightParenthesis.Position.After()); }
+
         function = new FunctionDefinition(
             attributes,
             modifiers,
             possibleType,
             possibleNameT,
             new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis),
-            templateInfo);
-
-        Block? block = null;
-
-        if (!ExpectOperator(";") && !ExpectBlock(out block))
-        { throw new SyntaxException($"Expected \";\" or block", rightParenthesis.Position.After()); }
-
-        function.Block = block;
+            templateInfo)
+        {
+            Block = block
+        };
 
         return true;
     }
@@ -639,15 +622,16 @@ public class Parser
 
         CheckModifiers(modifiers, "export");
 
-        function = new GeneralFunctionDefinition(
-            possibleNameT,
-            modifiers,
-            new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis));
-
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out Block? block))
         { throw new SyntaxException($"Body is required for general function definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After()); }
 
-        function.Block = block;
+        function = new GeneralFunctionDefinition(
+            possibleNameT,
+            modifiers,
+            new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis))
+        {
+            Block = block
+        };
 
         return true;
     }
@@ -696,15 +680,16 @@ public class Parser
 
         CheckModifiers(modifiers, "export");
 
-        function = new ConstructorDefinition(
-            type,
-            modifiers,
-            new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis));
-
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out Block? block))
         { throw new SyntaxException($"Body is required for constructor definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After()); }
 
-        function.Block = block;
+        function = new ConstructorDefinition(
+            type,
+            modifiers,
+            new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis))
+        {
+            Block = block
+        };
 
         return true;
     }

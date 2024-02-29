@@ -1,22 +1,50 @@
-﻿using System.Collections.Generic;
-
-namespace LanguageCore.BBCode.Generator;
+﻿namespace LanguageCore.BBCode.Generator;
 
 using Compiler;
+using Parser;
 
 public class UnusedFunctionManager
 {
     readonly CompileLevel CompileLevel;
     readonly PrintCallback? Print;
-    readonly AnalysisCollection? AnalysisCollection;
 
     const int MaxIterations = 40;
 
-    public UnusedFunctionManager(CompileLevel compileLevel, PrintCallback? printCallback, AnalysisCollection? analysisCollection)
+    public UnusedFunctionManager(CompileLevel compileLevel, PrintCallback? printCallback)
     {
         CompileLevel = compileLevel;
         Print = printCallback;
-        AnalysisCollection = analysisCollection;
+    }
+
+    void RemoveUnused<TFunction>(List<TFunction> functions, ref int functionsRemoved, Action<TFunction>? onRemove)
+        where TFunction : ISameCheck, IReferenceable, IExportable, ISimpleReadable
+    {
+        static bool IsUsed(ISameCheck function, IEnumerable<Reference> references)
+        {
+            foreach (Reference reference in references)
+            {
+                if (reference.SourceContext == null ||
+                    !function.IsSame(reference.SourceContext))
+                { return true; }
+            }
+            return false;
+        }
+
+        for (int i = functions.Count - 1; i >= 0; i--)
+        {
+            TFunction function = functions[i];
+
+            if (IsUsed(function, function.References))
+            { continue; }
+
+            if (CompileLevel == CompileLevel.All) continue;
+            if (CompileLevel == CompileLevel.Exported && function.IsExport) continue;
+
+            onRemove?.Invoke(function);
+
+            functions.RemoveAt(i);
+            functionsRemoved++;
+        }
     }
 
     int DoTheThing(ref CompilerResult compilerResult)
@@ -30,87 +58,10 @@ public class UnusedFunctionManager
         List<CompiledGeneralFunction> newGeneralFunctions = new(compilerResult.GeneralFunctions);
         List<CompiledConstructor> newConstructors = new(compilerResult.Constructors);
 
-        {
-            for (int i = newFunctions.Count - 1; i >= 0; i--)
-            {
-                CompiledFunction function = newFunctions[i];
-
-                if (function.TimesUsed > 0) continue;
-
-                if (function.CompiledAttributes.ContainsKey("Catch")) continue;
-
-                if (CompileLevel == CompileLevel.All) continue;
-                if (CompileLevel == CompileLevel.Exported && function.IsExport) continue;
-
-                string readableID = function.ToReadable();
-
-                Print?.Invoke($"      Remove function {readableID}", LogType.Debug);
-                AnalysisCollection?.Informations.Add(new Information($"Unused function {readableID} is not compiled", function.Identifier, function.FilePath));
-
-                newFunctions.RemoveAt(i);
-                functionsRemoved++;
-            }
-        }
-
-        {
-            for (int i = newOperators.Count - 1; i >= 0; i--)
-            {
-                CompiledOperator @operator = newOperators[i];
-
-                if (@operator.TimesUsed > 0) continue;
-
-                if (CompileLevel == CompileLevel.All) continue;
-                if (CompileLevel == CompileLevel.Exported && @operator.IsExport) continue;
-
-                string readableID = @operator.ToReadable();
-
-                Print?.Invoke($"      Remove operator {readableID}", LogType.Debug);
-                AnalysisCollection?.Informations.Add(new Information($"Unused operator {readableID} is not compiled", @operator.Identifier, @operator.FilePath));
-
-                newOperators.RemoveAt(i);
-                functionsRemoved++;
-            }
-        }
-
-        {
-            for (int i = newGeneralFunctions.Count - 1; i >= 0; i--)
-            {
-                CompiledGeneralFunction generalFunction = newGeneralFunctions[i];
-
-                if (generalFunction.TimesUsed > 0) continue;
-
-                if (CompileLevel == CompileLevel.All) continue;
-                if (CompileLevel == CompileLevel.Exported && generalFunction.IsExport) continue;
-
-                string readableID = generalFunction.ToReadable();
-
-                Print?.Invoke($"      Remove general function {readableID}", LogType.Debug);
-                AnalysisCollection?.Informations.Add(new Information($"Unused general function  {readableID} is not compiled", generalFunction.Identifier, generalFunction.FilePath));
-
-                newGeneralFunctions.RemoveAt(i);
-                functionsRemoved++;
-            }
-        }
-
-        {
-            for (int i = newConstructors.Count - 1; i >= 0; i--)
-            {
-                CompiledConstructor constructor = newConstructors[i];
-
-                if (constructor.TimesUsed > 0) continue;
-
-                if (CompileLevel == CompileLevel.All) continue;
-                if (CompileLevel == CompileLevel.Exported && constructor.IsExport) continue;
-
-                string readableID = constructor.ToReadable();
-
-                Print?.Invoke($"      Remove constructor {readableID}", LogType.Debug);
-                AnalysisCollection?.Informations.Add(new Information($"Unused constructor {readableID} is not compiled", constructor.Identifier, constructor.FilePath));
-
-                newConstructors.RemoveAt(i);
-                functionsRemoved++;
-            }
-        }
+        RemoveUnused(newFunctions, ref functionsRemoved, function => Print?.Invoke($"      Remove function {function.ToReadable()}", LogType.Debug));
+        RemoveUnused(newOperators, ref functionsRemoved, function => Print?.Invoke($"      Remove operator {function.ToReadable()}", LogType.Debug));
+        RemoveUnused(newGeneralFunctions, ref functionsRemoved, function => Print?.Invoke($"      Remove general function {function.ToReadable()}", LogType.Debug));
+        RemoveUnused(newConstructors, ref functionsRemoved, function => Print?.Invoke($"      Remove constructor {function.ToReadable()}", LogType.Debug));
 
         compilerResult = new CompilerResult(
             newFunctions.ToArray(),
@@ -131,10 +82,9 @@ public class UnusedFunctionManager
     public static void RemoveUnusedFunctions(
         ref CompilerResult compilerResult,
         PrintCallback? printCallback = null,
-        CompileLevel level = CompileLevel.Minimal,
-        AnalysisCollection? analysisCollection = null)
+        CompileLevel level = CompileLevel.Minimal)
     {
-        UnusedFunctionManager unusedFunctionManager = new(level, printCallback, analysisCollection);
+        UnusedFunctionManager unusedFunctionManager = new(level, printCallback);
 
         for (int iteration = 0; iteration < MaxIterations; iteration++)
         {

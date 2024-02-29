@@ -1,6 +1,4 @@
-﻿using System.Text;
-
-namespace LanguageCore.Brainfuck;
+﻿namespace LanguageCore.Brainfuck;
 
 /// <summary>
 /// Source: <see href="https://esolangs.org/wiki/Brainfuck_bitwidth_conversions"/>

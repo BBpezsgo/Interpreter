@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Numerics;
-using System.Transactions;
-
-namespace LanguageCore;
+﻿namespace LanguageCore;
 
 public interface IPositioned
 {
@@ -237,8 +230,8 @@ public static class PositionExtensions
 {
     public static Position Union(this Position a, Position b)
     {
-        if (b.AbsoluteRange == Position.UnknownPosition.AbsoluteRange ||
-            a.AbsoluteRange == Position.UnknownPosition.AbsoluteRange) return a;
+        if (b == Position.UnknownPosition) return a;
+        if (a == Position.UnknownPosition) return b;
 
         return new Position(
             Range.Union(a.Range, b.Range),

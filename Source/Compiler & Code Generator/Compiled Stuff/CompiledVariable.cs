@@ -2,19 +2,16 @@
 
 using Parser.Statement;
 
-public class CompiledVariable : VariableDeclaration
+public class CompiledVariable : VariableDeclaration, IHaveCompiledType
 {
-    public new readonly CompiledType Type;
+    public new GeneralType Type { get; }
+    public int MemoryAddress { get; }
+    public bool IsInitialized { get; set; }
 
-    public readonly int MemoryAddress;
-    public bool IsInitialized;
-
-    public CompiledVariable(int memoryOffset, CompiledType type, VariableDeclaration declaration) : base(declaration)
+    public CompiledVariable(int memoryOffset, GeneralType type, VariableDeclaration declaration) : base(declaration)
     {
         base.CompiledType = type;
-
         this.Type = type;
-
         this.MemoryAddress = memoryOffset;
         this.IsInitialized = false;
     }

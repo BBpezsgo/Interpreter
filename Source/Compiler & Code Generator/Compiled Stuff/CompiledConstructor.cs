@@ -1,34 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Text;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using Parser;
 using Parser.Statement;
 
-public class CompiledConstructor :
-    ConstructorDefinition,
-    ISameCheck,
+public class CompiledConstructor : ConstructorDefinition,
     ISameCheck<CompiledConstructor>,
-    IReferenceable<KeywordCall>,
     IReferenceable<ConstructorCall>,
-    IDuplicatable<CompiledConstructor>
+    IDuplicatable<CompiledConstructor>,
+    IHaveCompiledType,
+    IInContext<CompiledStruct>,
+    ITemplateable<CompiledConstructor>
 {
-    public readonly CompiledType Type;
-    public readonly ImmutableArray<CompiledType> ParameterTypes;
-
-    public readonly CompiledStruct? Context;
-
-    public int TimesUsed;
-    public int TimesUsedTotal;
-
-    public int InstructionOffset = -1;
-
-    readonly List<Reference<Statement>> references;
-    public IReadOnlyList<Reference<Statement>> References => references;
-
+    public GeneralType Type { get; }
+    public ImmutableArray<GeneralType> ParameterTypes { get; }
+    public CompiledStruct Context { get; }
+    public int InstructionOffset { get; set; } = -1;
+    public List<Reference<ConstructorCall>> References { get; }
     public override bool IsTemplate
     {
         get
@@ -39,46 +26,30 @@ public class CompiledConstructor :
         }
     }
 
-    public CompiledConstructor(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledStruct? context, ConstructorDefinition functionDefinition) : base(functionDefinition)
+    public CompiledConstructor(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
     {
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
-
         this.Context = context;
-        this.references = new List<Reference<Statement>>();
+        this.References = new List<Reference<ConstructorCall>>();
     }
 
-    public CompiledConstructor(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledConstructor other) : base(other)
+    public CompiledConstructor(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledConstructor other) : base(other)
     {
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
-
         this.Context = other.Context;
-        this.references = new List<Reference<Statement>>(other.references);
-        this.TimesUsed = other.TimesUsed;
-        this.TimesUsedTotal = other.TimesUsedTotal;
+        this.References = new List<Reference<ConstructorCall>>(other.References);
     }
-
-    public void AddReference(KeywordCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
-    public void AddReference(ConstructorCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
-    public void ClearReferences() => references.Clear();
 
     public bool IsSame(CompiledConstructor other)
     {
-        if (this.Type != other.Type) return false;
-        if (this.ParameterTypes.Length != other.ParameterTypes.Length) return false;
-        for (int i = 0; i < this.ParameterTypes.Length; i++)
-        { if (this.ParameterTypes[i] != other.ParameterTypes[i]) return false; }
-
+        if (!Type.Equals(other.Type)) return false;
+        if (!GeneralType.AreEquals(ParameterTypes, other.ParameterTypes)) return false;
         return true;
     }
-    public bool IsSame(ISameCheck? other) => other is CompiledConstructor other2 && IsSame(other2);
 
-    public CompiledConstructor Duplicate() => new(Type, ParameterTypes, Context, this)
-    {
-        TimesUsed = TimesUsed,
-        TimesUsedTotal = TimesUsedTotal,
-    };
+    public CompiledConstructor Duplicate() => new(Type, ParameterTypes, Context, this);
 
     public override string ToString()
     {
@@ -103,5 +74,12 @@ public class CompiledConstructor :
         result.Append(Block?.ToString() ?? ";");
 
         return result.ToString();
+    }
+
+    public CompiledConstructor InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
+    {
+        IEnumerable<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
+        GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
+        return new CompiledConstructor(newType, newParameters, this);
     }
 }

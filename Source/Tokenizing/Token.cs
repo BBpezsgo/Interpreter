@@ -1,9 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.Globalization;
-using System.Numerics;
-
-namespace LanguageCore.Tokenizing;
+﻿namespace LanguageCore.Tokenizing;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class Token :
@@ -13,26 +8,21 @@ public class Token :
     IDuplicatable<Token>,
     IAdditionOperators<Token, Token, Token>
 {
-    readonly Position position;
-
-    public TokenAnalyzedType AnalyzedType;
-
-    public readonly TokenType TokenType;
-    public readonly bool IsAnonymous;
-
-    public readonly string Content;
+    public TokenType TokenType { get; }
+    public bool IsAnonymous { get; }
+    public string Content { get; }
+    public Position Position { get; }
+    public TokenAnalyzedType AnalyzedType { get; set; }
 
     public static Token Empty => new(TokenType.Whitespace, string.Empty, true, Position.Zero);
-
-    public Position Position => position;
 
     public Token(TokenType type, string content, bool isAnonymous, Position position) : base()
     {
         TokenType = type;
-        AnalyzedType = TokenAnalyzedType.None;
         Content = content;
         IsAnonymous = isAnonymous;
-        this.position = position;
+        Position = position;
+        AnalyzedType = TokenAnalyzedType.None;
     }
 
     public override string ToString() => Content;
@@ -77,7 +67,7 @@ public class Token :
 
     public override int GetHashCode() => HashCode.Combine(Position, TokenType, Content);
 
-    public Token Duplicate() => new(TokenType, new string(Content), IsAnonymous, Position)
+    public Token Duplicate() => new(TokenType, Content, IsAnonymous, Position)
     { AnalyzedType = AnalyzedType };
 
     string GetDebuggerDisplay() => TokenType switch
@@ -100,7 +90,7 @@ public class Token :
         if (Content.Length == 1)
         { return (Duplicate(), null); }
 
-        (Position leftPosition, Position rightPosition) = position.Slice(at);
+        (Position leftPosition, Position rightPosition) = Position.Slice(at);
 
         Token left = new(TokenType, Content[..at], IsAnonymous, leftPosition);
         Token right = new(TokenType, Content[at..], IsAnonymous, rightPosition);
@@ -121,6 +111,6 @@ public class Token :
             a.TokenType,
             a.Content + b.Content,
             a.IsAnonymous,
-            a.position.Union(b.position));
+            a.Position.Union(b.Position));
     }
 }

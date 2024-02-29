@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using BBCode.Generator;
 using Parser;
@@ -22,20 +18,20 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         if (LanguageConstants.Keywords.Contains(newVariable.VariableName.Content))
         { throw new CompilerException($"Identifier \"{newVariable.VariableName.Content}\" reserved as a keyword, do not use it as a variable name", newVariable.VariableName, CurrentFile); }
 
-        CompiledType type;
+        GeneralType type;
 
         if (newVariable.Type == "var")
         {
             if (newVariable.InitialValue == null)
             { throw new CompilerException($"Initial value is required for variable declaration \"var\"", newVariable, newVariable.FilePath); }
 
-            CompiledType initialValueType = FindStatementType(newVariable.InitialValue);
+            GeneralType initialValueType = FindStatementType(newVariable.InitialValue);
 
             type = initialValueType;
         }
         else
         {
-            type = CompiledType.From(newVariable.Type, FindType, TryCompute);
+            type = GeneralType.From(newVariable.Type, FindType, TryCompute);
         }
 
         return new CompiledVariable(-1, type, newVariable);
@@ -107,15 +103,15 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         { this.CompiledVariables.RemoveAt(this.CompiledVariables.Count - 1); }
     }
 
-    void AnalyzeStatements(IEnumerable<Statement> statements, IEnumerable<CompiledType> expectedTypes)
+    void AnalyzeStatements(IEnumerable<Statement> statements, IEnumerable<GeneralType> expectedTypes)
         => AnalyzeStatements(statements.ToArray(), expectedTypes.ToArray());
-    void AnalyzeStatements(Statement[] statements, CompiledType[] expectedTypes)
+    void AnalyzeStatements(Statement[] statements, GeneralType[] expectedTypes)
     {
         int variablesAdded = AnalyzeNewVariables(statements);
 
         for (int i = 0; i < statements.Length; i++)
         {
-            CompiledType? expectedType = null;
+            GeneralType? expectedType = null;
             if (i < expectedTypes.Length) expectedType = expectedTypes[i];
 
             AnalyzeStatement(statements[i], expectedType);
@@ -132,7 +128,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         { this.CompiledVariables.RemoveAt(this.CompiledVariables.Count - 1); }
     }
 
-    void AnalyzeStatement(Statement? statement, CompiledType? expectedType = null)
+    void AnalyzeStatement(Statement? statement, GeneralType? expectedType = null)
     {
         if (statement == null) return;
 
@@ -165,32 +161,19 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         else if (statement is IndexCall index)
         {
             AnalyzeStatement(index.PrevStatement);
-            AnalyzeStatement(index.Expression);
+            AnalyzeStatement(index.Index);
 
-            CompiledType prevType = FindStatementType(index.PrevStatement);
+            GeneralType prevType = FindStatementType(index.PrevStatement);
 
             if (GetIndexGetter(prevType, out CompiledFunction? indexer))
             {
-                indexer.AddReference(index, CurrentFile);
-
-                if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
-                { indexer.TimesUsed++; }
-                indexer.TimesUsedTotal++;
+                indexer.References.Add((index, CurrentFile, CurrentFunction));
             }
             else if (GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
             {
                 indexerTemplate = AddCompilable(indexerTemplate);
 
-                indexerTemplate.OriginalFunction.AddReference(index, CurrentFile);
-                indexerTemplate.Function.AddReference(index, CurrentFile);
-
-                if (CurrentFunction == null || !indexerTemplate.Function.IsSame(CurrentFunction))
-                {
-                    indexerTemplate.OriginalFunction.TimesUsed++;
-                    indexerTemplate.Function.TimesUsed++;
-                }
-                indexerTemplate.OriginalFunction.TimesUsedTotal++;
-                indexerTemplate.Function.TimesUsedTotal++;
+                indexerTemplate.OriginalFunction.References.Add((index, CurrentFile, CurrentFunction));
             }
         }
         else if (statement is VariableDeclaration newVariable)
@@ -204,19 +187,11 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
             if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
             {
-                operatorDefinition.AddReference(@operator, CurrentFile);
-
-                if (CurrentFunction == null || !operatorDefinition.IsSame(CurrentFunction))
-                { operatorDefinition.TimesUsed++; }
-                operatorDefinition.TimesUsedTotal++;
+                operatorDefinition.References.Add((@operator, CurrentFile, CurrentFunction));
             }
             else if (GetOperatorTemplate(@operator, out CompliableTemplate<CompiledOperator> compilableOperator))
             {
-                compilableOperator.Function.AddReference(@operator, CurrentFile);
-
-                if (CurrentFunction == null || !compilableOperator.Function.IsSame(CurrentFunction))
-                { compilableOperator.Function.TimesUsed++; }
-                compilableOperator.Function.TimesUsedTotal++;
+                compilableOperator.Function.References.Add((@operator, CurrentFile, CurrentFunction));
 
                 AddCompilable(compilableOperator);
             }
@@ -226,33 +201,20 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             if (compoundAssignment.Left is IndexCall indexSetter)
             {
                 AnalyzeStatement(indexSetter.PrevStatement);
-                AnalyzeStatement(indexSetter.Expression);
+                AnalyzeStatement(indexSetter.Index);
 
-                CompiledType prevType = FindStatementType(indexSetter.PrevStatement);
-                CompiledType valueType = FindStatementType(compoundAssignment.Right);
+                GeneralType prevType = FindStatementType(indexSetter.PrevStatement);
+                GeneralType valueType = FindStatementType(compoundAssignment.Right);
 
                 if (GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
                 {
-                    indexer.AddReference(indexSetter, CurrentFile);
-
-                    if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
-                    { indexer.TimesUsed++; }
-                    indexer.TimesUsedTotal++;
+                    indexer.References.Add((indexSetter, CurrentFile, CurrentFunction));
                 }
                 else if (GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 {
                     indexerTemplate = AddCompilable(indexerTemplate);
 
-                    indexerTemplate.OriginalFunction.AddReference(indexSetter, CurrentFile);
-                    indexerTemplate.Function.AddReference(indexSetter, CurrentFile);
-
-                    if (CurrentFunction == null || !indexerTemplate.OriginalFunction.IsSame(CurrentFunction))
-                    {
-                        indexerTemplate.OriginalFunction.TimesUsed++;
-                        indexerTemplate.Function.TimesUsed++;
-                    }
-                    indexerTemplate.OriginalFunction.TimesUsedTotal++;
-                    indexerTemplate.Function.TimesUsedTotal++;
+                    indexerTemplate.OriginalFunction.References.Add((indexSetter, CurrentFile, CurrentFunction));
                 }
             }
             else
@@ -264,33 +226,20 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             if (setter.Left is IndexCall indexSetter)
             {
                 AnalyzeStatement(indexSetter.PrevStatement);
-                AnalyzeStatement(indexSetter.Expression);
+                AnalyzeStatement(indexSetter.Index);
 
-                CompiledType prevType = FindStatementType(indexSetter.PrevStatement);
-                CompiledType valueType = FindStatementType(setter.Right);
+                GeneralType prevType = FindStatementType(indexSetter.PrevStatement);
+                GeneralType valueType = FindStatementType(setter.Right);
 
                 if (GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
                 {
-                    indexer.AddReference(indexSetter, CurrentFile);
-
-                    if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
-                    { indexer.TimesUsed++; }
-                    indexer.TimesUsedTotal++;
+                    indexer.References.Add((indexSetter, CurrentFile, CurrentFunction));
                 }
                 else if (GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 {
                     indexerTemplate = AddCompilable(indexerTemplate);
 
-                    indexerTemplate.OriginalFunction.AddReference(indexSetter, CurrentFile);
-                    indexerTemplate.Function.AddReference(indexSetter, CurrentFile);
-
-                    if (CurrentFunction == null || !indexerTemplate.OriginalFunction.IsSame(CurrentFunction))
-                    {
-                        indexerTemplate.OriginalFunction.TimesUsed++;
-                        indexerTemplate.Function.TimesUsed++;
-                    }
-                    indexerTemplate.OriginalFunction.TimesUsedTotal++;
-                    indexerTemplate.Function.TimesUsedTotal++;
+                    indexerTemplate.OriginalFunction.References.Add((indexSetter, CurrentFile, CurrentFunction));
                 }
             }
             else
@@ -346,23 +295,11 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
             if (GetFunction(functionCall, out CompiledFunction? function))
             {
-                function.AddReference(functionCall, CurrentFile);
-
-                if (CurrentFunction == null || !function.IsSame(CurrentFunction))
-                { function.TimesUsed++; }
-                function.TimesUsedTotal++;
+                function.References.Add((functionCall, CurrentFile, CurrentFunction));
             }
             else if (GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
             {
-                compilableFunction.OriginalFunction.AddReference(functionCall, CurrentFile);
-
-                if (CurrentFunction == null || !compilableFunction.OriginalFunction.IsSame(CurrentFunction))
-                {
-                    compilableFunction.OriginalFunction.TimesUsed++;
-                    compilableFunction.Function.TimesUsed++;
-                }
-                compilableFunction.OriginalFunction.TimesUsedTotal++;
-                compilableFunction.Function.TimesUsedTotal++;
+                compilableFunction.OriginalFunction.References.Add((functionCall, CurrentFile, CurrentFunction));
 
                 AddCompilable(compilableFunction);
             }
@@ -385,29 +322,17 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
             if (keywordCall.FunctionName == "delete")
             {
-                CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
+                GeneralType paramType = FindStatementType(keywordCall.Parameters[0]);
 
                 if (GetGeneralFunction(paramType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                 {
-                    destructor.AddReference(keywordCall, CurrentFile);
-
-                    if (CurrentFunction == null || !destructor.IsSame(CurrentFunction))
-                    { destructor.TimesUsed++; }
-                    destructor.TimesUsedTotal++;
+                    destructor.References.Add((keywordCall, CurrentFile, CurrentFunction));
 
                     return;
                 }
                 else if (GetGeneralFunctionTemplate(paramType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                 {
-                    compilableGeneralFunction.OriginalFunction.AddReference(keywordCall, CurrentFile);
-
-                    if (CurrentFunction == null || !compilableGeneralFunction.OriginalFunction.IsSame(CurrentFunction))
-                    {
-                        compilableGeneralFunction.OriginalFunction.TimesUsed++;
-                        compilableGeneralFunction.Function.TimesUsed++;
-                    }
-                    compilableGeneralFunction.OriginalFunction.TimesUsedTotal++;
-                    compilableGeneralFunction.Function.TimesUsedTotal++;
+                    compilableGeneralFunction.OriginalFunction.References.Add((keywordCall, CurrentFile, CurrentFunction));
 
                     AddCompilable(compilableGeneralFunction);
                 }
@@ -419,39 +344,25 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         {
             if (GetFunction(variable.Token, expectedType, out CompiledFunction? function))
             {
-                if (CurrentFunction == null || !function.IsSame(CurrentFunction))
-                { function.TimesUsed++; }
-                function.TimesUsedTotal++;
+                function.References.Add((variable, CurrentFile, CurrentFunction));
             }
         }
         else if (statement is NewInstance)
         { }
         else if (statement is ConstructorCall constructorCall)
         {
-            CompiledType type = CompiledType.From(constructorCall.TypeName, FindType, TryCompute);
+            GeneralType type = GeneralType.From(constructorCall.TypeName, FindType, TryCompute);
             AnalyzeStatements(constructorCall.Parameters);
 
-            CompiledType[] parameters = FindStatementTypes(constructorCall.Parameters);
+            GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
             if (GetConstructor(type, parameters, out CompiledConstructor? constructor))
             {
-                constructor.AddReference(constructorCall, CurrentFile);
-
-                if (CurrentFunction == null || !constructor.IsSame(CurrentFunction))
-                { constructor.TimesUsed++; }
-                constructor.TimesUsedTotal++;
+                constructor.References.Add((constructorCall, CurrentFile, CurrentFunction));
             }
             else if (GetConstructorTemplate(type, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction))
             {
-                compilableGeneralFunction.OriginalFunction.AddReference(constructorCall, CurrentFile);
-
-                if (CurrentFunction == null || !compilableGeneralFunction.OriginalFunction.IsSame(CurrentFunction))
-                {
-                    compilableGeneralFunction.OriginalFunction.TimesUsed++;
-                    compilableGeneralFunction.Function.TimesUsed++;
-                }
-                compilableGeneralFunction.OriginalFunction.TimesUsedTotal++;
-                compilableGeneralFunction.Function.TimesUsedTotal++;
+                compilableGeneralFunction.OriginalFunction.References.Add((constructorCall, CurrentFile, CurrentFunction));
 
                 AddCompilable(compilableGeneralFunction);
             }
@@ -514,16 +425,14 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             { this.CompiledVariables.RemoveAt(this.CompiledVariables.Count - 1); }
         }
 
-        for (int i = 0; i < this.CompiledFunctions.Length; i++)
+        foreach (CompiledFunction function in CompiledFunctions)
         {
-            CompiledFunction function = this.CompiledFunctions[i];
-
             if (function.IsTemplate)
             { continue; }
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(GeneralType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.FilePath;
             CurrentFunction = function;
 
@@ -534,16 +443,14 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             CompiledParameters.Clear();
         }
 
-        for (int i = 0; i < this.CompiledOperators.Length; i++)
+        foreach (CompiledOperator function in CompiledOperators)
         {
-            CompiledOperator function = this.CompiledOperators[i];
-
             if (function.IsTemplate)
             { continue; }
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(GeneralType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.FilePath;
             CurrentFunction = function;
 
@@ -554,16 +461,14 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             CompiledParameters.Clear();
         }
 
-        for (int i = 0; i < this.CompiledGeneralFunctions.Length; i++)
+        foreach (CompiledGeneralFunction function in CompiledGeneralFunctions)
         {
-            CompiledGeneralFunction function = this.CompiledGeneralFunctions[i];
-
             if (function.IsTemplate)
             { continue; }
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(GeneralType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.FilePath;
             CurrentFunction = function;
 
@@ -574,16 +479,14 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             CompiledParameters.Clear();
         }
 
-        for (int i = 0; i < this.CompiledConstructors.Length; i++)
+        foreach (CompiledConstructor function in CompiledConstructors)
         {
-            CompiledConstructor function = this.CompiledConstructors[i];
-
             if (function.IsTemplate)
             { continue; }
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(GeneralType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.FilePath;
             CurrentFunction = function;
 
@@ -594,10 +497,9 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             CompiledParameters.Clear();
         }
 
-        for (int i = 0; i < this.CompilableFunctions.Count; i++)
+        for (int i = 0; i < CompilableFunctions.Count; i++)
         {
-            CompliableTemplate<CompiledFunction> function = this.CompilableFunctions[i];
-
+            CompliableTemplate<CompiledFunction> function = CompilableFunctions[i];
             SetTypeArguments(function.TypeArguments);
 
             CompiledParameters.Clear();
@@ -616,15 +518,14 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             TypeArguments.Clear();
         }
 
-        for (int i = 0; i < this.CompilableOperators.Count; i++)
+        for (int i = 0; i < CompilableOperators.Count; i++)
         {
-            CompliableTemplate<CompiledOperator> function = this.CompilableOperators[i];
-
+            CompliableTemplate<CompiledOperator> function = CompilableOperators[i];
             SetTypeArguments(function.TypeArguments);
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(GeneralType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.Function.FilePath;
             CurrentFunction = function.Function;
 
@@ -636,15 +537,14 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             TypeArguments.Clear();
         }
 
-        for (int i = 0; i < this.CompilableGeneralFunctions.Count; i++)
+        for (int i = 0; i < CompilableGeneralFunctions.Count; i++)
         {
-            CompliableTemplate<CompiledGeneralFunction> function = this.CompilableGeneralFunctions[i];
-
+            CompliableTemplate<CompiledGeneralFunction> function = CompilableGeneralFunctions[i];
             SetTypeArguments(function.TypeArguments);
 
             CompiledParameters.Clear();
             foreach (ParameterDefinition parameter in function.Function.Parameters)
-            { CompiledParameters.Add(new CompiledParameter(CompiledType.From(parameter.Type, FindType), parameter)); }
+            { CompiledParameters.Add(new CompiledParameter(GeneralType.From(parameter.Type, FindType), parameter)); }
             CurrentFile = function.Function.FilePath;
             CurrentFunction = function.Function;
 
@@ -656,10 +556,9 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             TypeArguments.Clear();
         }
 
-        for (int i = 0; i < this.CompilableConstructors.Count; i++)
+        for (int i = 0; i < CompilableConstructors.Count; i++)
         {
-            CompliableTemplate<CompiledConstructor> function = this.CompilableConstructors[i];
-
+            CompliableTemplate<CompiledConstructor> function = CompilableConstructors[i];
             SetTypeArguments(function.TypeArguments);
 
             CompiledParameters.Clear();
@@ -681,33 +580,17 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
     void ClearReferences()
     {
-        for (int i = 0; i < this.CompiledFunctions.Length; i++)
-        {
-            this.CompiledFunctions[i].ClearReferences();
-            this.CompiledFunctions[i].TimesUsed = 0;
-            this.CompiledFunctions[i].TimesUsedTotal = 0;
-        }
+        foreach (CompiledFunction function in CompiledFunctions)
+        { function.References.Clear(); }
 
-        for (int i = 0; i < this.CompiledGeneralFunctions.Length; i++)
-        {
-            this.CompiledGeneralFunctions[i].ClearReferences();
-            this.CompiledGeneralFunctions[i].TimesUsed = 0;
-            this.CompiledGeneralFunctions[i].TimesUsedTotal = 0;
-        }
+        foreach (CompiledGeneralFunction function in CompiledGeneralFunctions)
+        { function.References.Clear(); }
 
-        for (int i = 0; i < this.CompiledOperators.Length; i++)
-        {
-            this.CompiledOperators[i].ClearReferences();
-            this.CompiledOperators[i].TimesUsed = 0;
-            this.CompiledOperators[i].TimesUsedTotal = 0;
-        }
+        foreach (CompiledOperator function in CompiledOperators)
+        { function.References.Clear(); }
 
-        for (int i = 0; i < this.CompiledConstructors.Length; i++)
-        {
-            this.CompiledConstructors[i].ClearReferences();
-            this.CompiledConstructors[i].TimesUsed = 0;
-            this.CompiledConstructors[i].TimesUsedTotal = 0;
-        }
+        foreach (CompiledConstructor function in CompiledConstructors)
+        { function.References.Clear(); }
     }
 
     void AnalyzeFunctions(Statement[] topLevelStatements, PrintCallback? printCallback = null)

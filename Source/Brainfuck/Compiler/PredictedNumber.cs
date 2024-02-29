@@ -1,8 +1,4 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Numerics;
-
-namespace LanguageCore.Brainfuck;
+﻿namespace LanguageCore.Brainfuck;
 
 public readonly struct PredictedNumber<T> :
     IAdditionOperators<PredictedNumber<T>, PredictedNumber<T>, PredictedNumber<T>>,

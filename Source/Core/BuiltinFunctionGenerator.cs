@@ -1,13 +1,4 @@
-﻿global using ExternalFunctionCollection = System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>;
-global using ExternalFunctionReadonlyCollection = System.Collections.Generic.IReadOnlyDictionary<string, LanguageCore.Runtime.ExternalFunctionBase>;
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
-using System.Text;
-
-namespace LanguageCore.Runtime;
+﻿namespace LanguageCore.Runtime;
 
 [Flags]
 public enum ExternalFunctionFlags : byte
@@ -125,11 +116,11 @@ public class ExternalFunctionManaged : ExternalFunctionBase
 public static unsafe class ExternalFunctionGenerator
 {
     [RequiresUnreferencedCode("Loading Assembly")]
-    public static void LoadAssembly(this ExternalFunctionCollection externalFunctions, string path)
+    public static void LoadAssembly(this Dictionary<string, ExternalFunctionBase> externalFunctions, string path)
         => ExternalFunctionGenerator.LoadAssembly(externalFunctions, System.Reflection.Assembly.LoadFile(path));
 
     [RequiresUnreferencedCode("Loading Assembly")]
-    public static void LoadAssembly(this ExternalFunctionCollection externalFunctions, System.Reflection.Assembly assembly)
+    public static void LoadAssembly(this Dictionary<string, ExternalFunctionBase> externalFunctions, System.Reflection.Assembly assembly)
     {
         Type[] exportedTypes = assembly.GetExportedTypes();
 
@@ -145,7 +136,7 @@ public static unsafe class ExternalFunctionGenerator
 
     /// <exception cref="InternalException"/>
     /// <exception cref="RuntimeException"/>
-    static ExternalFunctionSimple AddExternalFunction(this ExternalFunctionCollection functions, System.Reflection.MethodInfo method)
+    static ExternalFunctionSimple AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, System.Reflection.MethodInfo method)
     {
         if (!method.IsStatic)
         { throw new InternalException($"Only static functions can be added as an external function"); }
@@ -179,15 +170,15 @@ public static unsafe class ExternalFunctionGenerator
         return function;
     }
 
-    public static void AddManagedExternalFunction(this ExternalFunctionCollection functions, string name, RuntimeType[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+    public static void AddManagedExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, RuntimeType[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
         => functions.AddExternalFunction(name, new ExternalFunctionManaged(callback, name, parameterTypes, flags));
 
-    public static void AddSimpleExternalFunction(this ExternalFunctionCollection functions, string name, RuntimeType[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+    public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, RuntimeType[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
         => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
-    public static void AddSimpleExternalFunction(this ExternalFunctionCollection functions, string name, RuntimeType[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+    public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, RuntimeType[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
         => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
 
-    static void AddExternalFunction(this ExternalFunctionCollection functions, string name, ExternalFunctionBase function)
+    static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, ExternalFunctionBase function)
     {
         if (!functions.TryAdd(name, function))
         {
@@ -196,7 +187,7 @@ public static unsafe class ExternalFunctionGenerator
         }
     }
 
-    public static void AddExternalFunction(this ExternalFunctionCollection functions, string name, Action callback)
+    public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Action callback)
     {
         RuntimeType[] types = Array.Empty<RuntimeType>();
 
@@ -207,7 +198,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0>(this ExternalFunctionCollection functions, string name, Action<T0?> callback)
+    public static void AddExternalFunction<T0>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?> callback)
     {
         RuntimeType[] types = GetTypes<T0>();
 
@@ -219,7 +210,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1>(this ExternalFunctionCollection functions, string name, Action<T0?, T1?> callback)
+    public static void AddExternalFunction<T0, T1>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1>();
 
@@ -232,7 +223,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2>(this ExternalFunctionCollection functions, string name, Action<T0?, T1?, T2?> callback)
+    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2>();
 
@@ -246,7 +237,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3>(this ExternalFunctionCollection functions, string name, Action<T0?, T1?, T2?, T3?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3>();
 
@@ -261,7 +252,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this ExternalFunctionCollection functions, string name, Action<T0?, T1?, T2?, T3?, T4?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?, T4?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3, T4>();
 
@@ -277,7 +268,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this ExternalFunctionCollection functions, string name, Action<T0?, T1?, T2?, T3?, T4?, T5?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?, T4?, T5?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
@@ -295,7 +286,7 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<TResult>(this ExternalFunctionCollection functions, string name, Func<TResult> callback)
+    public static void AddExternalFunction<TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<TResult> callback)
     {
         RuntimeType[] types = Array.Empty<RuntimeType>();
 
@@ -308,7 +299,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, TResult>(this ExternalFunctionCollection functions, string name, Func<T0?, TResult> callback)
+    public static void AddExternalFunction<T0, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0>();
 
@@ -322,7 +313,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, TResult>(this ExternalFunctionCollection functions, string name, Func<T0?, T1?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1>();
 
@@ -337,7 +328,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, TResult>(this ExternalFunctionCollection functions, string name, Func<T0?, T1?, T2?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, T2?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2>();
 
@@ -353,7 +344,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this ExternalFunctionCollection functions, string name, Func<T0?, T1?, T2?, T3?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, T2?, T3?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3>();
 
@@ -370,7 +361,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this ExternalFunctionCollection functions, string name, Func<T0?, T1?, T2?, T3?, T4?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, T2?, T3?, T4?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3, T4>();
 
@@ -388,7 +379,7 @@ public static unsafe class ExternalFunctionGenerator
         });
     }
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this ExternalFunctionCollection functions, string name, Func<T0?, T1?, T2?, T3?, T4?, T5?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, T2?, T3?, T4?, T5?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
@@ -419,7 +410,7 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="RuntimeException"/>
-    public static void CheckTypes(IEnumerable<DataItem> values, IEnumerable<Compiler.Type> types)
+    public static void CheckTypes(IEnumerable<DataItem> values, IEnumerable<Compiler.BasicType> types)
     {
         Utils.SequenceEquals(values, types, (value, type) =>
         {
@@ -441,7 +432,7 @@ public static unsafe class ExternalFunctionGenerator
         return data.ToType<T>(null);
     }
 
-    public static void SetInterpreter(this ExternalFunctionCollection functions, BytecodeInterpreter interpreter)
+    public static void SetInterpreter(this Dictionary<string, ExternalFunctionBase> functions, BytecodeInterpreter interpreter)
     {
         foreach (KeyValuePair<string, ExternalFunctionBase> item in functions)
         { item.Value.BytecodeInterpreter = interpreter; }
@@ -548,22 +539,22 @@ public static unsafe class ExternalFunctionGenerator
     }
     */
 
-    static Compiler.Type GetType(Type type)
+    static Compiler.BasicType GetType(Type type)
     {
         if (type == typeof(byte))
-        { return Compiler.Type.Byte; }
+        { return Compiler.BasicType.Byte; }
 
         if (type == typeof(int))
-        { return Compiler.Type.Integer; }
+        { return Compiler.BasicType.Integer; }
 
         if (type == typeof(float))
-        { return Compiler.Type.Float; }
+        { return Compiler.BasicType.Float; }
 
         if (type == typeof(float))
-        { return Compiler.Type.Float; }
+        { return Compiler.BasicType.Float; }
 
         if (type == typeof(void))
-        { return Compiler.Type.Void; }
+        { return Compiler.BasicType.Void; }
 
         throw new InternalException($"Unknown type {type.FullName}");
     }

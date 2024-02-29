@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Text;
-
-namespace LanguageCore.ASM;
+﻿namespace LanguageCore.ASM;
 
 using Runtime;
+using Compiler;
 
 public enum Instruction
 {
@@ -217,7 +213,7 @@ public readonly struct InstructionOperand
 
     public static implicit operator InstructionOperand(string v) => new(v);
     public static implicit operator InstructionOperand(int v) => new(v.ToString(System.Globalization.CultureInfo.InvariantCulture));
-    public static explicit operator InstructionOperand(BBCode.Generator.ValueAddress v)
+    public static explicit operator InstructionOperand(ValueAddress v)
     {
         StringBuilder result = new();
 

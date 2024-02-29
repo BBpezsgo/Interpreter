@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 
 namespace LanguageCore;
 
@@ -8,13 +7,13 @@ using Parser.Statement;
 
 public interface IReadable
 {
-    public string ToReadable(Func<StatementWithValue, CompiledType> typeSearch);
+    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch);
 }
 
 public interface ISimpleReadable : IReadable
 {
     public string ToReadable();
-    string IReadable.ToReadable(Func<StatementWithValue, CompiledType> typeSearch) => ToReadable();
+    string IReadable.ToReadable(Func<StatementWithValue, GeneralType> typeSearch) => ToReadable();
 }
 
 [Flags]
@@ -88,19 +87,19 @@ public static partial class Utils
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void SetTypeParameters(CompiledType[] typeParameters, TypeArguments typeValues)
+    public static void SetTypeParameters(GeneralType[] typeParameters, Dictionary<string, GeneralType> typeValues)
     {
         for (int i = 0; i < typeParameters.Length; i++)
         { Utils.SetTypeParameters(ref typeParameters[i], typeValues); }
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void SetTypeParameters(ref CompiledType typeParameter, TypeArguments typeValues)
+    public static void SetTypeParameters(ref GeneralType typeParameter, Dictionary<string, GeneralType> typeValues)
     {
-        if (!typeParameter.IsGeneric)
+        if (typeParameter is not GenericType genericType)
         { return; }
 
-        if (!typeValues.TryGetValue(typeParameter.Name, out CompiledType? eTypeParameter))
+        if (!typeValues.TryGetValue(genericType.Identifier, out GeneralType? eTypeParameter))
         { throw new NotImplementedException(); }
 
         typeParameter = eTypeParameter;

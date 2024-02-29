@@ -1,21 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-
-namespace LanguageCore.Parser;
+﻿namespace LanguageCore.Parser;
 
 using Tokenizing;
 
 public class TemplateInfo : IPositioned
 {
-    public Token Keyword;
-    public Token LeftP;
-    public ImmutableArray<Token> TypeParameters;
-    public Token RightP;
-
-    public string[] TypeParameterNames => TypeParameters.Select(v => v.Content).ToArray();
-
+    public Token Keyword { get; }
+    public Token LeftP { get; }
+    public ImmutableArray<Token> TypeParameters { get; }
+    public Token RightP { get; }
+    public IEnumerable<string> TypeParameterNames => TypeParameters.Select(v => v.Content);
     public Position Position =>
         new Position(TypeParameters)
         .Union(Keyword, LeftP, RightP);

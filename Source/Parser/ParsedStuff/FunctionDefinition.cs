@@ -1,16 +1,11 @@
-﻿using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Text;
-
-namespace LanguageCore.Parser;
+﻿namespace LanguageCore.Parser;
 
 using Tokenizing;
 
-public class FunctionDefinition : FunctionThingDefinition
+public class FunctionDefinition : FunctionThingDefinition, IHaveType
 {
-    public readonly ImmutableArray<AttributeUsage> Attributes;
-    public readonly TypeInstance Type;
-
+    public ImmutableArray<AttributeUsage> Attributes { get; }
+    public TypeInstance Type { get; }
     public override Position Position => base.Position.Union(Type);
 
     public FunctionDefinition(FunctionDefinition other) : base(other)
@@ -64,16 +59,6 @@ public class FunctionDefinition : FunctionThingDefinition
         if (this.Identifier.Content != other.Identifier.Content) return false;
         if (!this.Parameters.TypeEquals(other.Parameters)) return false;
         return true;
-    }
-
-    public AttributeUsage? GetAttribute(string identifier)
-    {
-        for (int i = 0; i < Attributes.Length; i++)
-        {
-            if (Attributes[i].Identifier.Content == identifier)
-            { return Attributes[i]; }
-        }
-        return null;
     }
 
     public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), TemplateInfo)

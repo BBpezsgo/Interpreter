@@ -1,40 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
-using System.Text;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using Parser;
 using Parser.Statement;
 
-public class CompiledFunction :
-    FunctionDefinition,
+public class CompiledFunction : FunctionDefinition,
     ISameCheck,
     ISameCheck<CompiledFunction>,
-    IReferenceable<FunctionCall>,
-    IReferenceable<IndexCall>,
-    IReferenceable<Identifier>,
-    IReferenceable<KeywordCall>,
-    IDuplicatable<CompiledFunction>
+    IReferenceable<StatementWithValue>,
+    IDuplicatable<CompiledFunction>,
+    IHaveCompiledType,
+    IInContext<CompiledStruct?>,
+    ITemplateable<CompiledFunction>
 {
-    public new readonly CompiledType Type;
-    public readonly ImmutableArray<CompiledType> ParameterTypes;
-
-    public readonly CompiledStruct? Context;
-    public readonly ImmutableDictionary<string, CompiledAttribute> CompiledAttributes;
-
-    public int TimesUsed;
-    public int TimesUsedTotal;
-
-    public int InstructionOffset = -1;
-
-    public bool ReturnSomething => Type.BuiltinType != LanguageCore.Compiler.Type.Void;
-
-    readonly List<Reference<Statement>> references;
-    public IReadOnlyList<Reference<Statement>> References => references;
-
+    public new GeneralType Type { get; }
+    public ImmutableArray<GeneralType> ParameterTypes { get; }
+    public CompiledStruct? Context { get; }
+    public ImmutableDictionary<string, CompiledAttribute> CompiledAttributes { get; }
+    public int InstructionOffset { get; set; } = -1;
+    public bool ReturnSomething => Type != LanguageCore.Compiler.BasicType.Void;
+    public List<Reference<StatementWithValue>> References { get; }
     public TypeInstance TypeToken => base.Type;
 
     public override bool IsTemplate
@@ -77,33 +61,25 @@ public class CompiledFunction :
         }
     }
 
-    public CompiledFunction(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledStruct? context, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, FunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
 
         this.CompiledAttributes = compiledAttributes.ToImmutableDictionary();
         this.Context = context;
-        this.references = new List<Reference<Statement>>();
+        this.References = new List<Reference<StatementWithValue>>();
     }
 
-    public CompiledFunction(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledFunction other) : base(other)
+    public CompiledFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledFunction other) : base(other)
     {
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
 
         this.CompiledAttributes = other.CompiledAttributes;
         this.Context = other.Context;
-        this.references = new List<Reference<Statement>>(other.references);
-        this.TimesUsed = other.TimesUsed;
-        this.TimesUsedTotal = other.TimesUsedTotal;
+        this.References = new List<Reference<StatementWithValue>>(other.References);
     }
-
-    public void AddReference(FunctionCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
-    public void AddReference(Identifier referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
-    public void AddReference(KeywordCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
-    public void AddReference(IndexCall referencedBy, Uri? file) => references.Add(new Reference<Statement>(referencedBy, file));
-    public void ClearReferences() => references.Clear();
 
     public bool IsSame(CompiledFunction other)
     {
@@ -117,11 +93,7 @@ public class CompiledFunction :
     }
     public bool IsSame(ISameCheck? other) => other is CompiledFunction other2 && IsSame(other2);
 
-    public new CompiledFunction Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), Context, CompiledAttributes, this)
-    {
-        TimesUsed = TimesUsed,
-        TimesUsedTotal = TimesUsedTotal,
-    };
+    public new CompiledFunction Duplicate() => new(this.Type, new List<GeneralType>(this.ParameterTypes).ToArray(), Context, CompiledAttributes, this);
 
     public override string ToString()
     {
@@ -154,5 +126,12 @@ public class CompiledFunction :
         { result.Append(';'); }
 
         return result.ToString();
+    }
+
+    public CompiledFunction InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
+    {
+        IEnumerable<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
+        GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
+        return new CompiledFunction(newType, newParameters, this);
     }
 }

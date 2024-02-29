@@ -1,36 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using Parser;
 using Parser.Statement;
 
-public class CompiledOperator :
-    FunctionDefinition,
+public class CompiledOperator : FunctionDefinition,
     ISameCheck,
     ISameCheck<CompiledOperator>,
     IReferenceable<OperatorCall>,
-    IDuplicatable<CompiledOperator>
+    IDuplicatable<CompiledOperator>,
+    IHaveCompiledType,
+    IInContext<CompiledStruct?>,
+    ITemplateable<CompiledOperator>
 {
-    public new readonly CompiledType Type;
-    public readonly ImmutableArray<CompiledType> ParameterTypes;
-
-    public readonly CompiledStruct? Context;
-    public readonly ImmutableDictionary<string, CompiledAttribute> CompiledAttributes;
-
-    public int TimesUsed;
-    public int TimesUsedTotal;
-
-    public int InstructionOffset = -1;
-
-    public bool ReturnSomething => Type.BuiltinType != LanguageCore.Compiler.Type.Void;
-
-    readonly List<Reference<OperatorCall>> references;
-    public IReadOnlyList<Reference<OperatorCall>> ReferencesOperator => references;
-
-    public TypeInstance TypeToken => base.Type;
+    public new GeneralType Type { get; }
+    public ImmutableArray<GeneralType> ParameterTypes { get; }
+    public CompiledStruct? Context { get; }
+    public ImmutableDictionary<string, CompiledAttribute> CompiledAttributes { get; }
+    public int InstructionOffset { get; set; } = -1;
+    public bool ReturnSomething => Type != BasicType.Void;
+    public List<Reference<OperatorCall>> References { get; }
 
     public override bool IsTemplate
     {
@@ -45,30 +33,25 @@ public class CompiledOperator :
     public bool IsExternal => CompiledAttributes.ContainsKey("External");
     public string ExternalFunctionName => CompiledAttributes.TryGetAttribute("External", out string? name) ? name : string.Empty;
 
-    public CompiledOperator(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledStruct? context, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, FunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledOperator(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
 
         this.CompiledAttributes = compiledAttributes.ToImmutableDictionary();
         this.Context = context;
-        this.references = new List<Reference<OperatorCall>>();
+        this.References = new List<Reference<OperatorCall>>();
     }
 
-    public CompiledOperator(CompiledType type, IEnumerable<CompiledType> parameterTypes, CompiledOperator other) : base(other)
+    public CompiledOperator(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledOperator other) : base(other)
     {
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
 
         this.CompiledAttributes = other.CompiledAttributes;
         this.Context = other.Context;
-        this.references = new List<Reference<OperatorCall>>(other.references);
-        this.TimesUsed = other.TimesUsed;
-        this.TimesUsedTotal = other.TimesUsedTotal;
+        this.References = new List<Reference<OperatorCall>>(other.References);
     }
-
-    public void AddReference(OperatorCall referencedBy, Uri? file) => references.Add(new Reference<OperatorCall>(referencedBy, file));
-    public void ClearReferences() => references.Clear();
 
     public bool IsSame(CompiledOperator other)
     {
@@ -82,10 +65,12 @@ public class CompiledOperator :
     }
     public bool IsSame(ISameCheck? other) => other is CompiledOperator other2 && IsSame(other2);
 
-    public new CompiledOperator Duplicate() => new(Type, new List<CompiledType>(ParameterTypes).ToArray(), Context, CompiledAttributes, this)
+    public new CompiledOperator Duplicate() => new(Type, new List<GeneralType>(ParameterTypes).ToArray(), Context, CompiledAttributes, this);
+
+    public CompiledOperator InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
     {
-        Modifiers = Modifiers,
-        TimesUsed = TimesUsed,
-        TimesUsedTotal = TimesUsedTotal,
-    };
+        IEnumerable<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
+        GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
+        return new CompiledOperator(newType, newParameters, this);
+    }
 }

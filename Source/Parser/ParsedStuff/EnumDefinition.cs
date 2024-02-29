@@ -1,19 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-
-namespace LanguageCore.Parser;
+﻿namespace LanguageCore.Parser;
 
 using Tokenizing;
 
 public class EnumDefinition : IInFile, IPositioned
 {
-    public readonly Token Identifier;
-    public readonly ImmutableArray<EnumMemberDefinition> Members;
-    public readonly ImmutableArray<AttributeUsage> Attributes;
-
+    public Token Identifier { get; }
+    public ImmutableArray<EnumMemberDefinition> Members { get; }
+    public ImmutableArray<AttributeUsage> Attributes { get; }
     public Uri? FilePath { get; set; }
-
     public Position Position =>
         new Position(Identifier)
         .Union(Members);
@@ -30,6 +24,7 @@ public class EnumDefinition : IInFile, IPositioned
     {
         Identifier = identifier;
         Attributes = attributes.ToImmutableArray();
+        foreach (EnumMemberDefinition member in members) member.Context = this;
         Members = members.ToImmutableArray();
     }
 

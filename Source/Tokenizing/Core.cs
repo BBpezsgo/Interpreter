@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Collections.Immutable;
-
-namespace LanguageCore.Tokenizing;
+﻿namespace LanguageCore.Tokenizing;
 
 public abstract partial class Tokenizer
 {

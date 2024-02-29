@@ -1,7 +1,4 @@
-﻿using System;
-using System.Numerics;
-
-namespace LanguageCore;
+﻿namespace LanguageCore;
 
 public partial struct Range
 {

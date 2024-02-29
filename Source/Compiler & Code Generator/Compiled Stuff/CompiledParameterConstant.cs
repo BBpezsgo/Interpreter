@@ -1,20 +1,17 @@
-﻿using System;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using Parser;
 using Runtime;
 
-public class CompiledParameterConstant : CompiledConstant
+public class CompiledParameterConstant : ParameterDefinition,
+    IConstant
 {
-    public readonly ParameterDefinition Declaration;
+    public DataItem Value { get; }
+    string IConstant.Identifier => base.Identifier.Content;
+    public Uri? FilePath { get; set; }
 
-    public override string Identifier => Declaration.Identifier.Content;
-    public override Uri? FilePath => null;
-    public override Position Position => Declaration.Position;
-
-    public CompiledParameterConstant(ParameterDefinition declaration, DataItem value) : base(value)
+    public CompiledParameterConstant(DataItem value, ParameterDefinition declaration) : base(declaration)
     {
-        Declaration = declaration;
+        Value = value;
     }
 }

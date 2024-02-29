@@ -1,7 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-using System.Globalization;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace LanguageCore.Runtime;
 
@@ -270,15 +267,13 @@ public partial struct DataItem
     };
 
     /// <exception cref="InternalException"/>
-    public static DataItem GetDefaultValue(Compiler.Type type) => type switch
+    public static DataItem GetDefaultValue(Compiler.BasicType type) => type switch
     {
-        Compiler.Type.Byte => new DataItem((byte)0),
-        Compiler.Type.Integer => new DataItem((int)0),
-        Compiler.Type.Float => new DataItem((float)0f),
-        Compiler.Type.Char => new DataItem((char)'\0'),
-        Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type}\" does not have a default value"),
-        Compiler.Type.Void => throw new InternalException($"Type \"{type}\" does not have a default value"),
-        Compiler.Type.Unknown => throw new InternalException($"Type \"{type}\" does not have a default value"),
+        Compiler.BasicType.Byte => new DataItem((byte)0),
+        Compiler.BasicType.Integer => new DataItem((int)0),
+        Compiler.BasicType.Float => new DataItem((float)0f),
+        Compiler.BasicType.Char => new DataItem((char)'\0'),
+        Compiler.BasicType.Void => throw new InternalException($"Type \"{type}\" does not have a default value"),
         _ => DataItem.Null,
     };
 

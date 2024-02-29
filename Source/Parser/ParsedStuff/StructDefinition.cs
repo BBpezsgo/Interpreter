@@ -1,36 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-
-namespace LanguageCore.Parser;
+﻿namespace LanguageCore.Parser;
 
 using Tokenizing;
 
 public class StructDefinition : IExportable, IInFile, IPositioned
 {
-    public readonly ImmutableArray<AttributeUsage> Attributes;
-    public readonly Token Identifier;
-    public readonly Token BracketStart;
-    public readonly Token BracketEnd;
+    public ImmutableArray<AttributeUsage> Attributes { get; }
+    public Token Identifier { get; }
+    public Token BracketStart { get; }
+    public Token BracketEnd { get; }
     public Uri? FilePath { get; set; }
-    public readonly ImmutableArray<FieldDefinition> Fields;
-    public ImmutableArray<Token> Modifiers;
-    public TemplateInfo? TemplateInfo;
-
-    public IReadOnlyList<FunctionDefinition> Methods => methods;
-    public IReadOnlyList<GeneralFunctionDefinition> GeneralMethods => generalMethods;
-    public IReadOnlyList<FunctionDefinition> Operators => operators;
-    public IReadOnlyList<ConstructorDefinition> Constructors => constructors;
-
+    public ImmutableArray<FieldDefinition> Fields { get; }
+    public ImmutableArray<Token> Modifiers { get; }
+    public TemplateInfo? TemplateInfo { get; init; }
     public bool IsExport => Modifiers.Contains("export");
-
-    readonly FunctionDefinition[] methods;
-    readonly GeneralFunctionDefinition[] generalMethods;
-    readonly FunctionDefinition[] operators;
-    readonly ConstructorDefinition[] constructors;
-
     public virtual Position Position => new(Identifier, BracketStart, BracketEnd);
+    public ImmutableArray<FunctionDefinition> Methods { get; }
+    public ImmutableArray<GeneralFunctionDefinition> GeneralMethods { get; }
+    public ImmutableArray<FunctionDefinition> Operators { get; }
+    public ImmutableArray<ConstructorDefinition> Constructors { get; }
 
     public StructDefinition(StructDefinition other)
     {
@@ -42,10 +29,10 @@ public class StructDefinition : IExportable, IInFile, IPositioned
         Fields = other.Fields;
         Modifiers = other.Modifiers;
         TemplateInfo = other.TemplateInfo;
-        methods = other.methods;
-        generalMethods = other.generalMethods;
-        operators = other.operators;
-        constructors = other.constructors;
+        Methods = other.Methods;
+        GeneralMethods = other.GeneralMethods;
+        Operators = other.Operators;
+        Constructors = other.Constructors;
     }
 
     public StructDefinition(
@@ -60,19 +47,17 @@ public class StructDefinition : IExportable, IInFile, IPositioned
         IEnumerable<FunctionDefinition> operators,
         IEnumerable<ConstructorDefinition> constructors)
     {
-        this.Identifier = name;
-        this.BracketStart = bracketStart;
-        this.BracketEnd = bracketEnd;
-        this.Fields = fields.ToImmutableArray();
-        this.methods = methods.ToArray();
-        this.generalMethods = generalMethods.ToArray();
-        this.Attributes = attributes.ToImmutableArray();
-        this.operators = operators.ToArray();
-        this.constructors = constructors.ToArray();
-        this.Modifiers = modifiers.ToImmutableArray();
+        Identifier = name;
+        BracketStart = bracketStart;
+        BracketEnd = bracketEnd;
+        Fields = fields.ToImmutableArray();
+        Methods = methods.ToImmutableArray();
+        GeneralMethods = generalMethods.ToImmutableArray();
+        Attributes = attributes.ToImmutableArray();
+        Operators = operators.ToImmutableArray();
+        Constructors = constructors.ToImmutableArray();
+        Modifiers = modifiers.ToImmutableArray();
     }
 
     public override string ToString() => $"struct {Identifier.Content}";
-
-    public bool CanUse(Uri sourceFile) => IsExport || sourceFile == FilePath;
 }

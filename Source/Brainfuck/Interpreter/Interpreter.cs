@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Runtime.Versioning;
 using Win32;
 using Thread = System.Threading.Thread;
@@ -83,7 +79,8 @@ public class Interpreter : InterpreterBase<byte>
                             if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
                             depth--;
                         }
-                        else if (Code[_codePointer] == OpCodes.BRANCH_START) depth++;
+                        else if (Code[_codePointer] == OpCodes.BRANCH_START)
+                        { depth++; }
                     }
                     throw new BrainfuckRuntimeException($"Unclosed bracket", CurrentContext);
                 }
@@ -102,7 +99,8 @@ public class Interpreter : InterpreterBase<byte>
                             if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
                             depth--;
                         }
-                        else if (Code[_codePointer] == OpCodes.BRANCH_END) depth++;
+                        else if (Code[_codePointer] == OpCodes.BRANCH_END)
+                        { depth++; }
                     }
                     throw new BrainfuckRuntimeException($"Unexpected closing bracket", CurrentContext);
                 }

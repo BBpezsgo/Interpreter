@@ -1,25 +1,23 @@
-﻿using System;
+﻿namespace LanguageCore.Tokenizing;
 
-namespace LanguageCore.Tokenizing;
-
-public readonly struct SimpleToken : IPositioned, IEquatable<SimpleToken>
+public readonly struct SimpleToken :
+    IPositioned,
+    IEquatable<SimpleToken>,
+    IEqualityOperators<SimpleToken, SimpleToken, bool>
 {
-    readonly string _content;
-    readonly Position _position;
-
-    public Position Position => _position;
-    public string Content => _content;
+    public Position Position { get; }
+    public string Content { get; }
 
     public SimpleToken(string content, Position position)
     {
-        _content = content;
-        _position = position;
+        Content = content;
+        Position = position;
     }
 
     public override string ToString() => Content;
     public override bool Equals(object? obj) => obj is SimpleToken token && Equals(token);
-    public bool Equals(SimpleToken other) => _content.Equals(other._content) && _position.Equals(other._position);
-    public override int GetHashCode() => HashCode.Combine(_content, _position);
+    public bool Equals(SimpleToken other) => Content.Equals(other.Content) && Position.Equals(other.Position);
+    public override int GetHashCode() => HashCode.Combine(Content, Position);
 
     public static bool operator ==(SimpleToken left, SimpleToken right) => left.Equals(right);
     public static bool operator !=(SimpleToken left, SimpleToken right) => !left.Equals(right);

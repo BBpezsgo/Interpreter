@@ -20,7 +20,6 @@ public class CompiledEnumMember : EnumMemberDefinition,
 public class CompiledEnum : EnumDefinition, IProbablyHaveCompiledType
 {
     public new ImmutableArray<CompiledEnumMember> Members { get; }
-    public ImmutableDictionary<string, CompiledAttribute> CompiledAttributes { get; }
     public GeneralType? Type
     {
         get
@@ -38,11 +37,10 @@ public class CompiledEnum : EnumDefinition, IProbablyHaveCompiledType
         }
     }
 
-    public CompiledEnum(IEnumerable<CompiledEnumMember> members, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, EnumDefinition definition) : base(definition)
+    public CompiledEnum(IEnumerable<CompiledEnumMember> members, EnumDefinition definition) : base(definition)
     {
         foreach (CompiledEnumMember member in members) member.Context = this;
         Members = members.ToImmutableArray();
-        CompiledAttributes = compiledAttributes.ToImmutableDictionary();
     }
 
     public bool GetValue(string identifier, out DataItem memberValue)

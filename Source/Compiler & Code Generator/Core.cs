@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
+using LanguageCore.Parser;
 using Parser.Statement;
 using Runtime;
 
@@ -131,6 +132,14 @@ public readonly struct Reference<TSource>
     public static implicit operator Reference(Reference<TSource> v) => new(v.SourceFile, v.SourceContext);
 
     public Reference<TTarget> Cast<TTarget>(Func<TSource, TTarget> caster) => new(caster.Invoke(Source), SourceFile, SourceContext);
+}
+
+public interface ICompiledFunctionThingy
+{
+    public GeneralType Type { get; }
+    public bool ReturnSomething => Type != BasicType.Void;
+    public Block? Block { get; }
+    public IReadOnlyList<ParameterDefinition> Parameters { get; }
 }
 
 public interface ITemplateable<TSelf> where TSelf : notnull

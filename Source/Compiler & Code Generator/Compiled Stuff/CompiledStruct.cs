@@ -8,7 +8,6 @@ public class CompiledStruct : StructDefinition,
     IDuplicatable<CompiledStruct>
 {
     public new ImmutableArray<CompiledField> Fields { get; }
-    public ImmutableDictionary<string, CompiledAttribute> CompiledAttributes { get; }
     public List<Reference<TypeInstance>> References { get; }
     public IReadOnlyDictionary<string, GeneralType> CurrentTypeArguments => _currentTypeArguments;
     public IReadOnlyDictionary<string, int> FieldOffsets
@@ -38,10 +37,9 @@ public class CompiledStruct : StructDefinition,
 
     readonly Dictionary<string, GeneralType> _currentTypeArguments;
 
-    public CompiledStruct(IEnumerable<CompiledField> fields, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, StructDefinition definition) : base(definition)
+    public CompiledStruct(IEnumerable<CompiledField> fields, StructDefinition definition) : base(definition)
     {
         this.Fields = fields.ToImmutableArray();
-        this.CompiledAttributes = compiledAttributes.ToImmutableDictionary();
         foreach (CompiledField field in fields) field.Context = this;
 
         this._currentTypeArguments = new Dictionary<string, GeneralType>();
@@ -51,7 +49,6 @@ public class CompiledStruct : StructDefinition,
     public CompiledStruct(IEnumerable<CompiledField> fields, CompiledStruct other) : base(other)
     {
         this.Fields = fields.ToImmutableArray();
-        this.CompiledAttributes = other.CompiledAttributes;
         foreach (CompiledField field in fields) field.Context = this;
 
         this._currentTypeArguments = new Dictionary<string, GeneralType>(other._currentTypeArguments);

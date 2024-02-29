@@ -15,7 +15,7 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
 {
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
-    public CompiledStruct Context { get; }
+    public new CompiledStruct Context { get; }
     public int InstructionOffset { get; set; } = -1;
     public bool ReturnSomething => Type != BasicType.Void;
     public List<Reference<Statement>> References { get; }

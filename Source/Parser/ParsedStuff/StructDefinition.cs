@@ -47,6 +47,11 @@ public class StructDefinition : IExportable, IInFile, IPositioned
         IEnumerable<FunctionDefinition> operators,
         IEnumerable<ConstructorDefinition> constructors)
     {
+        foreach (FunctionDefinition method in methods) method.Context = this;
+        foreach (GeneralFunctionDefinition generalMethod in generalMethods) generalMethod.Context = this;
+        foreach (FunctionDefinition @operator in operators) @operator.Context = this;
+        foreach (ConstructorDefinition constructor in constructors) constructor.Context = this;
+
         Identifier = name;
         BracketStart = bracketStart;
         BracketEnd = bracketEnd;

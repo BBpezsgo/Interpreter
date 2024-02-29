@@ -933,7 +933,7 @@ public abstract class CodeGenerator
     {
         foreach (CompiledFunction _function in CompiledFunctions)
         {
-            if (!_function.CompiledAttributes.HasAttribute("StandardOutput"))
+            if (!_function.Attributes.HasAttribute("External", "stdout"))
             { continue; }
 
             if (!_function.CanUse(CurrentFile))
@@ -2968,7 +2968,7 @@ public abstract class CodeGenerator
 
         return false;
     }
-    bool TryEvaluate(CompiledFunction function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunctionThingy function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
     {
         value = null;
         runtimeStatements = null;
@@ -2992,7 +2992,7 @@ public abstract class CodeGenerator
 
         CurrentEvaluationContext.Push(context);
         Uri? prevFile = CurrentFile;
-        CurrentFile = function.FilePath;
+        CurrentFile = (function as IInFile)?.FilePath;
 
         bool success = TryEvaluate(function.Block, context);
 
@@ -3001,45 +3001,6 @@ public abstract class CodeGenerator
 
         if (!success)
         { return false; }
-
-        if (function.ReturnSomething)
-        { value = context.LastScope!["@return"]; }
-
-        runtimeStatements = context.RuntimeStatements.ToArray();
-
-        return true;
-    }
-    bool TryEvaluate(CompiledOperator function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
-    {
-        value = null;
-        runtimeStatements = null;
-
-        if (function.ReturnSomething &&
-            function.Type is not BuiltinType)
-        { return false; }
-
-        if (function.Block is null)
-        { return false; }
-
-        Dictionary<string, DataItem> variables = new();
-
-        if (function.ReturnSomething)
-        { variables.Add("@return", GetInitialValue((function.Type as BuiltinType)!.Type)); }
-
-        for (int i = 0; i < parameterValues.Length; i++)
-        { variables.Add(function.Parameters[i].Identifier.Content, parameterValues[i]); }
-
-        EvaluationContext context = new(null, variables);
-
-        CurrentEvaluationContext.Push(context);
-
-        if (!TryEvaluate(function.Block, context))
-        {
-            CurrentEvaluationContext.Pop();
-            return false;
-        }
-
-        CurrentEvaluationContext.Pop();
 
         if (function.ReturnSomething)
         { value = context.LastScope!["@return"]; }

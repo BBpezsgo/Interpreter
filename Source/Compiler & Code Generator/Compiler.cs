@@ -368,27 +368,6 @@ public class Compiler
         return false;
     }
 
-    static CompiledAttribute CompileAttribute(AttributeUsage attribute)
-    {
-        attribute.Identifier.AnalyzedType = TokenAnalyzedType.Attribute;
-
-        List<CompiledLiteral> parameters = new();
-
-        for (int j = 0; j < attribute.Parameters.Length; j++)
-        { parameters.Add(new CompiledLiteral(attribute.Parameters[j])); }
-
-        return new CompiledAttribute(parameters, attribute);
-    }
-
-    static IEnumerable<KeyValuePair<string, CompiledAttribute>> CompileAttributes(ImmutableArray<AttributeUsage> attributes)
-    {
-        foreach (AttributeUsage attribute in attributes)
-        {
-            CompiledAttribute compiledAttribute = CompileAttribute(attribute);
-            yield return new KeyValuePair<string, CompiledAttribute>(attribute.Identifier.Content, compiledAttribute);
-        }
-    }
-
     CompiledStruct CompileStruct(StructDefinition @struct)
     {
         if (LanguageConstants.Keywords.Contains(@struct.Identifier.Content))
@@ -418,13 +397,11 @@ public class Compiler
         if (@struct.TemplateInfo != null)
         { GenericParameters.Pop(); }
 
-        return new CompiledStruct(compiledFields, CompileAttributes(@struct.Attributes), @struct);
+        return new CompiledStruct(compiledFields, @struct);
     }
 
     CompiledFunction CompileFunction(FunctionDefinition function, CompiledStruct? context)
     {
-        Dictionary<string, CompiledAttribute> attributes = CompileAttributes(function.Attributes).ToDictionary();
-
         if (function.TemplateInfo != null)
         {
             GenericParameters.Push(function.TemplateInfo.TypeParameters);
@@ -435,7 +412,7 @@ public class Compiler
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
-        if (attributes.TryGetAttribute<string>("External", out string? externalName, out CompiledAttribute? attribute))
+        if (function.Attributes.TryGetAttribute<string>("External", out string? externalName, out AttributeUsage? attribute))
         {
             if (!ExternalFunctions.TryGetValue(externalName, out ExternalFunctionBase? externalFunction))
             { AnalysisCollection?.Errors.Add(new Error($"External function \"{externalName}\" not found", attribute, function.FilePath)); }
@@ -465,12 +442,11 @@ public class Compiler
                     type,
                     externalFunction.Parameters.Select(v => new BuiltinType(v)).ToArray(),
                     context,
-                    attributes,
                     function);
             }
         }
 
-        if (attributes.TryGetAttribute<string>("Builtin", out string? builtinName, out attribute))
+        if (function.Attributes.TryGetAttribute<string>("Builtin", out string? builtinName, out attribute))
         {
             if (!BuiltinFunctions.TryGetValue(builtinName, out (GeneralType ReturnValue, GeneralType[] Parameters) builtinFunction))
             { AnalysisCollection?.Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", attribute, function.FilePath)); }
@@ -503,7 +479,6 @@ public class Compiler
             type,
             GeneralType.FromArray(function.Parameters, FindType),
             context,
-            attributes,
             function);
 
         if (function.TemplateInfo != null)
@@ -514,12 +489,10 @@ public class Compiler
 
     CompiledOperator CompileOperator(FunctionDefinition function, CompiledStruct? context)
     {
-        Dictionary<string, CompiledAttribute> attributes = CompileAttributes(function.Attributes).ToDictionary();
-
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
-        if (attributes.TryGetAttribute<string>("External", out string? name, out CompiledAttribute? attribute))
+        if (function.Attributes.TryGetAttribute<string>("External", out string? name, out AttributeUsage? attribute))
         {
             if (ExternalFunctions.TryGetValue(name, out ExternalFunctionBase? externalFunction))
             {
@@ -543,7 +516,6 @@ public class Compiler
                     type,
                     externalFunction.Parameters.Select(v => new BuiltinType(v)).ToArray(),
                     context,
-                    attributes,
                     function);
             }
 
@@ -554,7 +526,6 @@ public class Compiler
             type,
             GeneralType.FromArray(function.Parameters, FindType),
             context,
-            attributes,
             function);
     }
 
@@ -608,7 +579,7 @@ public class Compiler
         => members.Select(CompileEnumMember);
 
     static CompiledEnum CompileEnum(EnumDefinition @enum)
-        => new(CompileEnumMembers(@enum.Members), CompileAttributes(@enum.Attributes), @enum);
+        => new(CompileEnumMembers(@enum.Members), @enum);
 
     bool IsSymbolExists(string symbol, [NotNullWhen(true)] out Token? where)
     {

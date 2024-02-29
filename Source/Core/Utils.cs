@@ -3,6 +3,7 @@
 namespace LanguageCore;
 
 using Compiler;
+using LanguageCore.Parser;
 using Parser.Statement;
 
 public interface IReadable
@@ -38,47 +39,23 @@ public static partial class Utils
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static CompiledLiteralType ConvertType(System.Type type)
-    {
-        if (type == typeof(int))
-        { return CompiledLiteralType.Integer; }
-
-        if (type == typeof(float))
-        { return CompiledLiteralType.Float; }
-
-        if (type == typeof(bool))
-        { return CompiledLiteralType.Boolean; }
-
-        if (type == typeof(string))
-        { return CompiledLiteralType.String; }
-
-        throw new NotImplementedException($"Unknown attribute type requested: \"{type.FullName}\"");
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static bool TryConvertType(System.Type type, out CompiledLiteralType result)
+    public static bool TryConvertType(Type type, out LiteralType result)
     {
         if (type == typeof(int))
         {
-            result = CompiledLiteralType.Integer;
+            result = LiteralType.Integer;
             return true;
         }
 
         if (type == typeof(float))
         {
-            result = CompiledLiteralType.Float;
-            return true;
-        }
-
-        if (type == typeof(bool))
-        {
-            result = CompiledLiteralType.Boolean;
+            result = LiteralType.Float;
             return true;
         }
 
         if (type == typeof(string))
         {
-            result = CompiledLiteralType.String;
+            result = LiteralType.String;
             return true;
         }
 

@@ -1,12 +1,16 @@
 ﻿namespace LanguageCore.Parser;
 
+using LanguageCore.Compiler;
 using Tokenizing;
 
-public class GeneralFunctionDefinition : FunctionThingDefinition
+public class GeneralFunctionDefinition : FunctionThingDefinition,
+    IInContext<StructDefinition>
 {
+    [NotNull] public StructDefinition? Context { get; set; }
+
     public GeneralFunctionDefinition(GeneralFunctionDefinition other) : base(other)
     {
-
+        Context = other.Context;
     }
 
     public GeneralFunctionDefinition(
@@ -20,6 +24,7 @@ public class GeneralFunctionDefinition : FunctionThingDefinition
     {
         Block = Block,
         FilePath = FilePath,
+        Context = Context,
     };
 
     public override string ToString()

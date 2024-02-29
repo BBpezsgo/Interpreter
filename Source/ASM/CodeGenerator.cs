@@ -625,7 +625,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         if (functionCall.IsMethodCall != compiledFunction.IsMethod)
         { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
 
-        if (compiledFunction.CompiledAttributes.HasAttribute("StandardOutput"))
+        if (compiledFunction.Attributes.HasAttribute("External", "stdout"))
         {
             StatementWithValue valueToPrint = functionCall.Parameters[0];
             GeneralType valueToPrintType = FindStatementType(valueToPrint);

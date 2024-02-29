@@ -2658,7 +2658,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (GenerateDebugInformation)
         { instructionStart = Code.GetFinalCode().Length; }
 
-        if (function.CompiledAttributes.HasAttribute("StandardOutput"))
+        if (function.Attributes.HasAttribute("External", "stdout"))
         {
             bool canPrint = true;
 
@@ -2694,7 +2694,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
 
-        if (function.CompiledAttributes.HasAttribute("StandardInput"))
+        if (function.Attributes.HasAttribute("External", "stdin"))
         {
             int address = Stack.PushVirtual(1);
             Code.SetPointer(address);
@@ -2707,7 +2707,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 if (function.Type.Size != 1)
                 {
-                    throw new CompilerException($"Function with \"{"StandardInput"}\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
+                    throw new CompilerException($"Function with attribute \"[External(\"stdin\")]\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
                 }
                 Code += ',';
             }
@@ -2949,7 +2949,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (GenerateDebugInformation)
         { instructionStart = Code.GetFinalCode().Length; }
 
-        if (function.CompiledAttributes.HasAttribute("StandardOutput"))
+        if (function.Attributes.HasAttribute("StandardOutput"))
         {
             bool canPrint = true;
 
@@ -2985,7 +2985,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
 
-        if (function.CompiledAttributes.HasAttribute("StandardInput"))
+        if (function.Attributes.HasAttribute("StandardInput"))
         {
             int address = Stack.PushVirtual(1);
             Code.SetPointer(address);

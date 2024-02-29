@@ -24,14 +24,7 @@ export void PrintError(char data);
 //
 
 [External("stdout")]
-[StandardOutput]
 export void Print(char data);
-
-[StandardOutput]
-export void Print(byte message)
-{
-    Print(temp message.ToString());
-}
 
 // https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
 inline int _FindMaxPowOf10(int num)

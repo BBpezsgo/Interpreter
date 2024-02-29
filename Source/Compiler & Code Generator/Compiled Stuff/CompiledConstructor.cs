@@ -13,7 +13,7 @@ public class CompiledConstructor : ConstructorDefinition,
 {
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
-    public CompiledStruct Context { get; }
+    public new CompiledStruct Context { get; }
     public int InstructionOffset { get; set; } = -1;
     public List<Reference<ConstructorCall>> References { get; }
     public override bool IsTemplate

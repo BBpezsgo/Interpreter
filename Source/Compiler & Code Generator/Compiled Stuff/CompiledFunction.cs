@@ -10,14 +10,14 @@ public class CompiledFunction : FunctionDefinition,
     IDuplicatable<CompiledFunction>,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
-    ITemplateable<CompiledFunction>
+    ITemplateable<CompiledFunction>,
+    ICompiledFunctionThingy
 {
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
-    public CompiledStruct? Context { get; }
-    public ImmutableDictionary<string, CompiledAttribute> CompiledAttributes { get; }
+    public new CompiledStruct? Context { get; }
     public int InstructionOffset { get; set; } = -1;
-    public bool ReturnSomething => Type != LanguageCore.Compiler.BasicType.Void;
+    public bool ReturnSomething => Type != BasicType.Void;
     public List<Reference<StatementWithValue>> References { get; }
     public TypeInstance TypeToken => base.Type;
 
@@ -32,41 +32,35 @@ public class CompiledFunction : FunctionDefinition,
     }
 
     [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
-    public bool IsExternal => CompiledAttributes.ContainsKey("External");
+    public bool IsExternal => Attributes.TryGetAttribute<string>("External", out _);
     public string? ExternalFunctionName
     {
         get
         {
-            if (CompiledAttributes.TryGetValue("External", out CompiledAttribute? attributeValues))
-            {
-                if (attributeValues.TryGetValue(0, out string name))
-                { return name; }
-            }
+            if (Attributes.TryGetAttribute<string>("External", out string? name))
+            { return name; }
             return null;
         }
     }
 
     [MemberNotNullWhen(true, nameof(BuiltinFunctionName))]
-    public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
+    public bool IsBuiltin => Attributes.TryGetAttribute<string>("Builtin", out _);
     public string? BuiltinFunctionName
     {
         get
         {
-            if (CompiledAttributes.TryGetValue("Builtin", out CompiledAttribute? attributeValues))
-            {
-                if (attributeValues.TryGetValue(0, out string name))
-                { return name; }
-            }
+            if (Attributes.TryGetAttribute("Builtin", out string? name))
+            { return name; }
             return null;
         }
     }
+    IReadOnlyList<ParameterDefinition> ICompiledFunctionThingy.Parameters => Parameters;
 
-    public CompiledFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, IEnumerable<KeyValuePair<string, CompiledAttribute>> compiledAttributes, FunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
 
-        this.CompiledAttributes = compiledAttributes.ToImmutableDictionary();
         this.Context = context;
         this.References = new List<Reference<StatementWithValue>>();
     }
@@ -76,7 +70,6 @@ public class CompiledFunction : FunctionDefinition,
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
 
-        this.CompiledAttributes = other.CompiledAttributes;
         this.Context = other.Context;
         this.References = new List<Reference<StatementWithValue>>(other.References);
     }
@@ -93,7 +86,7 @@ public class CompiledFunction : FunctionDefinition,
     }
     public bool IsSame(ISameCheck? other) => other is CompiledFunction other2 && IsSame(other2);
 
-    public new CompiledFunction Duplicate() => new(this.Type, new List<GeneralType>(this.ParameterTypes).ToArray(), Context, CompiledAttributes, this);
+    public new CompiledFunction Duplicate() => new(Type, ParameterTypes, Context, this);
 
     public override string ToString()
     {

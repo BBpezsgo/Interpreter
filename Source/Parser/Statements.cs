@@ -1103,6 +1103,31 @@ public class Literal : StatementWithValue
     public float GetFloat() => Literal.GetFloat(Value);
     public bool GetBoolean() => Literal.GetBoolean(Value);
 
+    public bool TryConvert<T>([NotNullWhen(true)] out T? value)
+    {
+        if (!Utils.TryConvertType(typeof(T), out LiteralType type))
+        {
+            value = default;
+            return false;
+        }
+
+        if (type != Type)
+        {
+            value = default;
+            return false;
+        }
+
+        value = type switch
+        {
+            LiteralType.Integer => (T)(object)GetInt(),
+            LiteralType.Float => (T)(object)GetFloat(),
+            LiteralType.String => (T)(object)Value,
+            LiteralType.Char => (T)(object)Value[0],
+            _ => throw new UnreachableException(),
+        };
+        return true;
+    }
+
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
         if (includeThis) yield return this;

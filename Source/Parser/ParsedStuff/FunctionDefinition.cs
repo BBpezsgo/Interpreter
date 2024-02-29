@@ -1,17 +1,22 @@
 ﻿namespace LanguageCore.Parser;
 
+using Compiler;
 using Tokenizing;
 
-public class FunctionDefinition : FunctionThingDefinition, IHaveType
+public class FunctionDefinition : FunctionThingDefinition,
+    IHaveType,
+    IInContext<StructDefinition?>
 {
     public ImmutableArray<AttributeUsage> Attributes { get; }
     public TypeInstance Type { get; }
     public override Position Position => base.Position.Union(Type);
+    public StructDefinition? Context { get; set; }
 
     public FunctionDefinition(FunctionDefinition other) : base(other)
     {
         Attributes = other.Attributes;
         Type = other.Type;
+        Context = other.Context;
     }
 
     public FunctionDefinition(
@@ -65,5 +70,6 @@ public class FunctionDefinition : FunctionThingDefinition, IHaveType
     {
         Block = Block,
         FilePath = FilePath,
+        Context = Context,
     };
 }

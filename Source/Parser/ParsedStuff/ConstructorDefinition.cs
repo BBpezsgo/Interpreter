@@ -3,9 +3,12 @@
 using Compiler;
 using Tokenizing;
 
-public class ConstructorDefinition : FunctionThingDefinition, ISimpleReadable
+public class ConstructorDefinition : FunctionThingDefinition,
+    ISimpleReadable,
+    IInContext<StructDefinition?>
 {
     public new TypeInstance Identifier { get; }
+    public StructDefinition? Context { get; set; }
 
     public ConstructorDefinition(ConstructorDefinition other) : base(other)
     {

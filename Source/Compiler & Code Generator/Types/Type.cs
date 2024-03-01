@@ -386,10 +386,10 @@ public class BuiltinType : GeneralType,
     /// <exception cref="NotImplementedException"/>
     public RuntimeType RuntimeType => Type switch
     {
-        BasicType.Byte => RuntimeType.UInt8,
-        BasicType.Integer => RuntimeType.SInt32,
+        BasicType.Byte => RuntimeType.Byte,
+        BasicType.Integer => RuntimeType.Integer,
         BasicType.Float => RuntimeType.Single,
-        BasicType.Char => RuntimeType.UInt16,
+        BasicType.Char => RuntimeType.Char,
 
         _ => throw new NotImplementedException($"Type conversion for {Type} is not implemented"),
     };
@@ -411,10 +411,10 @@ public class BuiltinType : GeneralType,
     {
         Type = type switch
         {
-            RuntimeType.UInt8 => BasicType.Byte,
-            RuntimeType.SInt32 => BasicType.Integer,
+            RuntimeType.Byte => BasicType.Byte,
+            RuntimeType.Integer => BasicType.Integer,
             RuntimeType.Single => BasicType.Float,
-            RuntimeType.UInt16 => BasicType.Char,
+            RuntimeType.Char => BasicType.Char,
             RuntimeType.Null => throw new NotImplementedException(),
             _ => throw new UnreachableException(),
         };

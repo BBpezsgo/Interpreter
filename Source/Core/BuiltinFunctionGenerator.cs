@@ -500,28 +500,28 @@ public static unsafe class ExternalFunctionGenerator
         Type type_ = typeof(T);
 
         if (type_ == typeof(byte))
-        { return RuntimeType.UInt8; }
+        { return RuntimeType.Byte; }
 
         if (type_ == typeof(int))
-        { return RuntimeType.SInt32; }
+        { return RuntimeType.Integer; }
 
         if (type_ == typeof(float))
         { return RuntimeType.Single; }
 
         if (type_ == typeof(char))
-        { return RuntimeType.UInt16; }
+        { return RuntimeType.Char; }
 
         if (type_.IsClass)
-        { return RuntimeType.SInt32; }
+        { return RuntimeType.Integer; }
 
         if (type_ == typeof(uint))
-        { return RuntimeType.SInt32; }
+        { return RuntimeType.Integer; }
 
         if (type_ == typeof(IntPtr))
-        { return RuntimeType.SInt32; }
+        { return RuntimeType.Integer; }
 
         if (type_ == typeof(UIntPtr))
-        { return RuntimeType.SInt32; }
+        { return RuntimeType.Integer; }
 
         throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
     }

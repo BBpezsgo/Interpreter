@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace LanguageCore.Compiler;
 
@@ -79,8 +80,28 @@ public class SourceCodeManager
         Print?.Invoke($" Download file \"{uri}\" ...", LogType.Debug);
 
         using HttpClient client = new();
-        using HttpResponseMessage res = client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead).Result;
-        res.EnsureSuccessStatusCode();
+        using Task<HttpResponseMessage> getTask = client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+        try
+        {
+            getTask.Wait();
+        }
+        catch (AggregateException ex)
+        {
+            foreach (Exception error in ex.InnerExceptions)
+            { Output.LogError(error.Message); }
+
+            ast = default;
+            return false;
+        }
+        using HttpResponseMessage res = getTask.Result;
+
+        if (!res.IsSuccessStatusCode)
+        {
+            Output.LogError($"HTTP {res.StatusCode}");
+
+            ast = default;
+            return false;
+        }
 
         TokenizerResult tokens;
         if (res.Content.Headers.ContentLength.HasValue)
@@ -95,7 +116,8 @@ public class SourceCodeManager
 
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
 
-        ast = Parser.Parse(tokens);
+        ast = Parser.Parse(tokens, uri);
+
         AnalysisCollection?.Errors.AddRange(ast.Errors);
 
         return true;
@@ -113,7 +135,7 @@ public class SourceCodeManager
         TokenizerResult tokens = StreamTokenizer.Tokenize(path);
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
 
-        ast = Parser.Parse(tokens);
+        ast = Parser.Parse(tokens, new Uri(path, UriKind.Absolute));
         AnalysisCollection?.Errors.AddRange(ast.Errors);
 
         return true;

@@ -44,10 +44,10 @@ public static class Extensions
     /// <exception cref="UnreachableException"/>
     public static BasicType Convert(this RuntimeType v) => v switch
     {
-        RuntimeType.UInt8 => BasicType.Byte,
-        RuntimeType.SInt32 => BasicType.Integer,
+        RuntimeType.Byte => BasicType.Byte,
+        RuntimeType.Integer => BasicType.Integer,
         RuntimeType.Single => BasicType.Float,
-        RuntimeType.UInt16 => BasicType.Char,
+        RuntimeType.Char => BasicType.Char,
         RuntimeType.Null => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
@@ -56,10 +56,10 @@ public static class Extensions
     /// <exception cref="UnreachableException"/>
     public static RuntimeType Convert(this BasicType v) => v switch
     {
-        BasicType.Byte => RuntimeType.UInt8,
-        BasicType.Integer => RuntimeType.SInt32,
+        BasicType.Byte => RuntimeType.Byte,
+        BasicType.Integer => RuntimeType.Integer,
         BasicType.Float => RuntimeType.Single,
-        BasicType.Char => RuntimeType.UInt16,
+        BasicType.Char => RuntimeType.Char,
         BasicType.Void => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };

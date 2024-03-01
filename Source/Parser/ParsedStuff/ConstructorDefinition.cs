@@ -29,21 +29,9 @@ public class ConstructorDefinition : FunctionThingDefinition,
         StringBuilder result = new();
         if (IsExport)
         { result.Append("export "); }
-        result.Append(Identifier);
-
-        result.Append('(');
-        if (Parameters.Count > 0)
-        {
-            for (int i = 0; i < Parameters.Count; i++)
-            {
-                if (i > 0) result.Append(", ");
-                result.Append(Parameters[i].Type);
-            }
-        }
-        result.Append(')');
-
+        result.Append(Identifier.ToString());
+        result.Append(Parameters.ToString());
         result.Append(Block?.ToString() ?? ";");
-
         return result.ToString();
     }
 

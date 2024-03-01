@@ -35,19 +35,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (newVariable.Modifiers.Contains("const")) return;
 
-        newVariable.VariableName.AnalyzedType = TokenAnalyzedType.VariableName;
+        newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-        if (GetConstant(newVariable.VariableName.Content, out _))
-        { throw new CompilerException($"Symbol name \"{newVariable.VariableName}\" conflicts with an another symbol name", newVariable.VariableName, newVariable.FilePath); }
+        if (GetConstant(newVariable.Identifier.Content, out _))
+        { throw new CompilerException($"Symbol name \"{newVariable.Identifier}\" conflicts with an another symbol name", newVariable.Identifier, newVariable.FilePath); }
 
-        if (!GetVariable(newVariable.VariableName.Content, out CompiledVariable? compiledVariable))
-        { throw new InternalException($"Variable \"{newVariable.VariableName.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", CurrentFile); }
+        if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable))
+        { throw new InternalException($"Variable \"{newVariable.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", CurrentFile); }
 
         newVariable.Type.SetAnalyzedType(compiledVariable.Type);
 
         if (newVariable.InitialValue == null) return;
 
-        AddComment($"New Variable \"{newVariable.VariableName.Content}\" {{");
+        AddComment($"New Variable \"{newVariable.Identifier.Content}\" {{");
 
         GenerateCodeForValueSetter(newVariable, newVariable.InitialValue);
 
@@ -55,9 +55,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(KeywordCall keywordCall)
     {
-        AddComment($"Call Keyword {keywordCall.FunctionName} {{");
+        AddComment($"Call Keyword {keywordCall.Identifier} {{");
 
-        if (keywordCall.FunctionName == "return")
+        if (keywordCall.Identifier.Content == "return")
         {
             if (keywordCall.Parameters.Length > 1)
             { throw new CompilerException($"Wrong number of parameters passed to \"return\": required {0} or {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
@@ -105,7 +105,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (keywordCall.FunctionName == "throw")
+        if (keywordCall.Identifier.Content == "throw")
         {
             if (keywordCall.Parameters.Length != 1)
             { throw new CompilerException($"Wrong number of parameters passed to \"throw\": required {1} passed {keywordCall.Parameters}", keywordCall, CurrentFile); }
@@ -120,7 +120,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (keywordCall.FunctionName == "break")
+        if (keywordCall.Identifier.Content == "break")
         {
             if (BreakInstructions.Count == 0)
             { throw new CompilerException($"The keyword \"break\" does not available in the current context", keywordCall.Identifier, CurrentFile); }
@@ -136,7 +136,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (keywordCall.FunctionName == "sizeof")
+        if (keywordCall.Identifier.Content == "sizeof")
         {
             if (keywordCall.Parameters.Length != 1)
             { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
@@ -152,7 +152,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (keywordCall.FunctionName == "delete")
+        if (keywordCall.Identifier.Content == "delete")
         {
             if (keywordCall.Parameters.Length != 1)
             { throw new CompilerException($"Wrong number of parameters passed to \"delete\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
@@ -207,24 +207,28 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        throw new CompilerException($"Unknown keyword \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile);
+        throw new CompilerException($"Unknown keyword \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile);
     }
     void GenerateCodeForStatement(FunctionCall functionCall)
     {
-        if (functionCall.FunctionName == "sizeof")
+        if (functionCall.Identifier.Content == "sizeof")
         {
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (functionCall.Parameters.Length != 1)
             { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
 
-            StatementWithValue param0 = functionCall.Parameters[0];
-            GeneralType param0Type = FindStatementType(param0);
+            StatementWithValue param = functionCall.Parameters[0];
+            GeneralType paramType;
+            if (param is TypeStatement typeStatement)
+            { paramType = GeneralType.From(typeStatement.Type, FindType, TryCompute); }
+            else
+            { paramType = FindStatementType(param); }
 
             OnGotStatementType(functionCall, new BuiltinType(BasicType.Integer));
-            functionCall.PredictedValue = param0Type.Size;
+            functionCall.PredictedValue = paramType.Size;
 
-            AddInstruction(Opcode.PUSH_VALUE, param0Type.Size);
+            AddInstruction(Opcode.PUSH_VALUE, paramType.Size);
 
             return;
         }
@@ -235,7 +239,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             functionCall.Reference = compiledVariable;
 
             if (compiledVariable.Type is not FunctionType)
-            { throw new CompilerException($"Variable \"{compiledVariable.VariableName.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
+            { throw new CompilerException($"Variable \"{compiledVariable.Identifier.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
 
             GenerateCodeForFunctionCall_Variable(functionCall, compiledVariable);
             return;
@@ -513,7 +517,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
 
         if (functionCall.IsMethodCall != compiledFunction.IsMethod)
-        { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
+        { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.Identifier}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
 
         if (compiledFunction.IsMacro)
         { AnalysisCollection?.Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
@@ -761,10 +765,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (inlined is Identifier identifier)
             {
-                functionCall = new FunctionCall(null, identifier.Token, anyCall.BracketLeft, anyCall.Parameters, anyCall.BracketRight)
+                functionCall = new FunctionCall(null, identifier.Token, anyCall.Parameters, anyCall.Brackets)
                 {
                     SaveValue = anyCall.SaveValue,
                     Semicolon = anyCall.Semicolon,
+                    SurroundingBracelet = anyCall.SurroundingBracelet,
                 };
                 GenerateCodeForStatement(functionCall);
                 return;
@@ -1309,11 +1314,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(NewInstance newObject)
     {
-        AddComment($"new {newObject.TypeName} {{");
+        AddComment($"new {newObject.Type} {{");
 
-        GeneralType instanceType = FindType(newObject.TypeName);
+        GeneralType instanceType = FindType(newObject.Type);
 
-        newObject.TypeName.SetAnalyzedType(instanceType);
+        newObject.Type.SetAnalyzedType(instanceType);
         OnGotStatementType(newObject, instanceType);
 
         switch (instanceType)
@@ -1337,27 +1342,27 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             case StructType structType:
             {
-                structType.Struct.References.Add((newObject.TypeName, CurrentFile, CurrentContext));
+                structType.Struct.References.Add((newObject.Type, CurrentFile, CurrentContext));
 
                 GenerateInitialValue(structType);
                 break;
             }
 
             default:
-                throw new CompilerException($"Unknown type definition {instanceType}", newObject.TypeName, CurrentFile);
+                throw new CompilerException($"Unknown type definition {instanceType}", newObject.Type, CurrentFile);
         }
 
         AddComment("}");
     }
     void GenerateCodeForStatement(ConstructorCall constructorCall)
     {
-        GeneralType instanceType = GeneralType.From(constructorCall.TypeName, FindType, TryCompute);
+        GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute);
         GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
         if (!GetConstructor(instanceType, parameters, out CompiledConstructor? compiledFunction))
         {
             if (!GetConstructorTemplate(instanceType, parameters, out CompliableTemplate<CompiledConstructor> compilableFunction))
-            { throw new CompilerException($"Constructor {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.TypeName, CurrentFile); }
+            { throw new CompilerException($"Constructor {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Type, CurrentFile); }
 
             compilableFunction = AddCompilable(compilableFunction);
             compiledFunction = compilableFunction.Function;
@@ -1368,7 +1373,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!compiledFunction.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Constructor {compiledFunction.ToReadable()} could not be called due to its protection level", constructorCall.TypeName, CurrentFile));
+            AnalysisCollection?.Errors.Add(new Error($"Constructor {compiledFunction.ToReadable()} could not be called due to its protection level", constructorCall.Type, CurrentFile));
             return;
         }
 
@@ -1381,11 +1386,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         NewInstance newInstance = constructorCall.ToInstantiation();
         GeneralType newInstanceType = FindStatementType(newInstance);
-        if (newInstanceType.Size != 1)
-        { throw new NotImplementedException(); }
         GenerateCodeForStatement(newInstance);
 
-        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -1);
+        for (int i = 0; i < newInstanceType.Size; i++)
+        { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -newInstanceType.Size); }
 
         parameterCleanup = GenerateCodeForParameterPassing(constructorCall, compiledFunction);
         parameterCleanup.Insert(0, (newInstanceType.Size, false, newInstanceType));
@@ -1403,14 +1407,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(Field field)
     {
-        field.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
+        field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
 
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
         if (prevType is EnumType enumType)
         {
-            if (!enumType.Enum.GetValue(field.FieldName.Content, out DataItem enumValue))
-            { throw new CompilerException($"I didn't find anything like \"{field.FieldName.Content}\" in the enum {enumType.Enum.Identifier}", field.FieldName, CurrentFile); }
+            if (!enumType.Enum.GetValue(field.Identifier.Content, out DataItem enumValue))
+            { throw new CompilerException($"I didn't find anything like \"{field.Identifier.Content}\" in the enum {enumType.Enum.Identifier}", field.Identifier, CurrentFile); }
 
             OnGotStatementType(field, new BuiltinType(enumValue.Type));
 
@@ -1418,7 +1422,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (prevType is ArrayType arrayType && field.FieldName.Equals("Length"))
+        if (prevType is ArrayType arrayType && field.Identifier.Equals("Length"))
         {
             OnGotStatementType(field, new BuiltinType(BasicType.Integer));
             field.PredictedValue = arrayType.Length;
@@ -1432,8 +1436,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (pointerType.To is not StructType structPointerType)
             { throw new CompilerException($"Could not get the field offsets of type {pointerType}", field.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.Struct.FieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
-            { throw new CompilerException($"Could not get the field offset of field \"{field.FieldName}\"", field.FieldName, CurrentFile); }
+            if (!structPointerType.Struct.FieldOffsets.TryGetValue(field.Identifier.Content, out int fieldOffset))
+            { throw new CompilerException($"Could not get the field offset of field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
 
             GenerateCodeForStatement(field.PrevStatement);
 
@@ -1450,8 +1454,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GeneralType type = FindStatementType(field);
 
-        if (!structType.Struct.GetField(field.FieldName.Content, out CompiledField? compiledField))
-        { throw new CompilerException($"Field definition \"{field.FieldName}\" not found in type \"{structType}\"", field, CurrentFile); }
+        if (!structType.Struct.GetField(field.Identifier.Content, out CompiledField? compiledField))
+        { throw new CompilerException($"Field definition \"{field.Identifier}\" not found in type \"{structType}\"", field, CurrentFile); }
 
         field.Reference = compiledField;
 
@@ -1520,7 +1524,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (val.Type != arrayType)
                     { throw new NotImplementedException(); }
 
-                    int offset = computedIndexData.ValueSInt32 * arrayType.Of.Size;
+                    int offset = (int)computedIndexData * arrayType.Of.Size;
                     ValueAddress address = new(val);
 
                     StackLoad(address + offset, arrayType.Of.Size);
@@ -1594,12 +1598,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForFunctionCall_Function(new FunctionCall(
                 index.PrevStatement,
                 Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
-                index.BracketLeft,
                 new StatementWithValue[]
                 {
                     index.Index,
                 },
-                index.BracketRight
+                index.Brackets
             ), indexer);
     }
     void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
@@ -1853,7 +1856,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
     {
-        statementToSet.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
+        statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
 
         GeneralType valueType = FindStatementType(value);
 
@@ -1864,8 +1867,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (pointerType.To is not StructType structType)
             { throw new CompilerException($"Failed to get the field offsets of type {pointerType.To}", statementToSet.PrevStatement, CurrentFile); }
 
-            if (!structType.Struct.FieldOffsets.TryGetValue(statementToSet.FieldName.Content, out int fieldOffset))
-            { throw new CompilerException($"Failed to get the field offset for \"{statementToSet.FieldName}\" in type {pointerType.To}", statementToSet.FieldName, CurrentFile); }
+            if (!structType.Struct.FieldOffsets.TryGetValue(statementToSet.Identifier.Content, out int fieldOffset))
+            { throw new CompilerException($"Failed to get the field offset for \"{statementToSet.Identifier}\" in type {pointerType.To}", statementToSet.Identifier, CurrentFile); }
 
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
@@ -1889,27 +1892,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GenerateCodeForStatement(value);
 
-        bool _inHeap = IsItInHeap(statementToSet);
-
-        structType1.Struct.ClearTypeArguments();
-
-        if (_inHeap)
+        if (IsItInHeap(statementToSet))
         {
             int offset = GetDataOffset(statementToSet);
             ValueAddress pointerOffset = GetBaseAddress(statementToSet);
             HeapStore(pointerOffset, offset);
-
-            return;
         }
         else
         {
             ValueAddress offset = GetDataAddress(statementToSet);
             StackStore(offset, valueType.Size);
-
-            return;
         }
 
-        throw new NotImplementedException();
+        structType1.Struct.ClearTypeArguments();
     }
     void GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value)
     {
@@ -1985,13 +1980,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForFunctionCall_Function(new FunctionCall(
                     statementToSet.PrevStatement,
                     Token.CreateAnonymous(BuiltinFunctionNames.IndexerSet),
-                    statementToSet.BracketLeft,
                     new StatementWithValue[]
                     {
                     statementToSet.Index,
                     value,
                     },
-                    statementToSet.BracketRight
+                    statementToSet.Brackets
                 ), indexer);
             return;
         }
@@ -2011,14 +2005,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(VariableDeclaration statementToSet, StatementWithValue value)
     {
-        if (GetConstant(statementToSet.VariableName.Content, out _))
+        if (GetConstant(statementToSet.Identifier.Content, out _))
         { throw new CompilerException($"Can not set constant value: it is readonly", statementToSet, statementToSet.FilePath); }
 
         if (value is LiteralList)
         { throw new NotImplementedException(); }
 
-        if (!GetVariable(statementToSet.VariableName.Content, out CompiledVariable? variable))
-        { throw new CompilerException($"Variable \"{statementToSet.VariableName.Content}\" not found", statementToSet.VariableName, CurrentFile); }
+        if (!GetVariable(statementToSet.Identifier.Content, out CompiledVariable? variable))
+        { throw new CompilerException($"Variable \"{statementToSet.Identifier.Content}\" not found", statementToSet.Identifier, CurrentFile); }
 
         GeneralType valueType = FindStatementType(value);
 
@@ -2181,13 +2175,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (newVariable.Modifiers.Contains("const")) return CleanupItem.Null;
 
-        newVariable.VariableName.AnalyzedType = TokenAnalyzedType.VariableName;
+        newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
         for (int i = 0; i < CompiledVariables.Count; i++)
         {
-            if (CompiledVariables[i].VariableName.Content == newVariable.VariableName.Content)
+            if (CompiledVariables[i].Identifier.Content == newVariable.Identifier.Content)
             {
-                AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].VariableName}\" already defined", CompiledVariables[i].VariableName, CurrentFile));
+                AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].Identifier}\" already defined", CompiledVariables[i].Identifier, CurrentFile));
                 return CleanupItem.Null;
             }
         }
@@ -2199,7 +2193,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         StackElementInformations debugInfo = new()
         {
             Kind = StackElementKind.Variable,
-            Tag = compiledVariable.VariableName.Content,
+            Tag = compiledVariable.Identifier.Content,
             Address = offset,
             BasepointerRelative = true,
             Size = compiledVariable.Type.Size,

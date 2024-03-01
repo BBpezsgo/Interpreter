@@ -2,7 +2,8 @@
 
 namespace LanguageCore.Tokenizing;
 
-public class StreamTokenizer : Tokenizer, IDisposable
+public class StreamTokenizer : Tokenizer,
+    IDisposable
 {
     readonly Stream Stream;
     bool IsDisposed;

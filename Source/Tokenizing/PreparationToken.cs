@@ -10,16 +10,16 @@ sealed class PreparationToken :
 
     public PreparationToken(Position position)
     {
-        this.Position = position;
-        this.TokenType = PreparationTokenType.Whitespace;
-        this.Content = new StringBuilder();
+        Position = position;
+        TokenType = PreparationTokenType.Whitespace;
+        Content = new StringBuilder();
     }
 
     PreparationToken(Position position, PreparationTokenType tokenType, string content)
     {
-        this.Position = position;
-        this.TokenType = tokenType;
-        this.Content = new StringBuilder(content);
+        Position = position;
+        TokenType = tokenType;
+        Content = new StringBuilder(content);
     }
 
     public override string ToString() => Content.ToString();

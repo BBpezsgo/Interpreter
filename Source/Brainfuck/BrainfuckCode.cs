@@ -1,8 +1,12 @@
-﻿namespace LanguageCore.Brainfuck;
+﻿using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
+namespace LanguageCore.Brainfuck;
 
 public static class CharCode
 {
     public static byte GetByte(char c) => Encoding.ASCII.GetBytes(new char[1] { c }, 0, 1)[0];
+
     public static char GetChar(byte v) => Encoding.ASCII.GetChars(new byte[1] { v }, 0, 1)[0];
 }
 

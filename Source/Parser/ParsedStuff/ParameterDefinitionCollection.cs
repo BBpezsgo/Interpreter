@@ -2,13 +2,14 @@
 
 namespace LanguageCore.Parser;
 
+using Compiler;
 using Tokenizing;
 
 public class ParameterDefinitionCollection :
     IPositioned,
     IReadOnlyList<ParameterDefinition>,
     IDuplicatable<ParameterDefinitionCollection>,
-    Compiler.IInContext<FunctionThingDefinition>
+    IInContext<FunctionThingDefinition>
 {
     public Token LeftParenthesis { get; }
     public Token RightParenthesis { get; }
@@ -57,4 +58,50 @@ public class ParameterDefinitionCollection :
         => new(parameterDefinitions, Token.CreateAnonymous("(", TokenType.Operator), Token.CreateAnonymous(")", TokenType.Operator));
 
     public ParameterDefinitionCollection Duplicate() => new(this);
+
+    public override string ToString()
+    {
+        StringBuilder result = new();
+
+        result.Append(LeftParenthesis.ToString());
+
+        for (int i = 0; i < _parameters.Length; i++)
+        {
+            if (i > 0) result.Append(", ");
+            if (_parameters[i].Modifiers.Length > 0)
+            {
+                result.Append(string.Join(", ", _parameters[i].Modifiers));
+                result.Append(' ');
+            }
+            result.Append(_parameters[i].Type);
+        }
+
+        result.Append(RightParenthesis.ToString());
+
+        return result.ToString();
+    }
+
+    public string ToString(IEnumerable<GeneralType> types)
+        => ToString(types.ToImmutableArray());
+    public string ToString(ImmutableArray<GeneralType> types)
+    {
+        StringBuilder result = new();
+
+        result.Append(LeftParenthesis.ToString());
+
+        for (int i = 0; i < _parameters.Length; i++)
+        {
+            if (i > 0) result.Append(", ");
+            if (_parameters[i].Modifiers.Length > 0)
+            {
+                result.Append(string.Join(", ", _parameters[i].Modifiers));
+                result.Append(' ');
+            }
+            result.Append(types[i].ToString());
+        }
+
+        result.Append(RightParenthesis.ToString());
+
+        return result.ToString();
+    }
 }

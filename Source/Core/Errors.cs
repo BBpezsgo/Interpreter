@@ -6,36 +6,22 @@ using Runtime;
 
 public class LanguageException : Exception
 {
-    public readonly Position Position;
-    public readonly Uri? Uri;
-
-    public override string? StackTrace
-    {
-        get
-        {
-            if (_capturedStackTrace != null) return _capturedStackTrace.ToString();
-            return base.StackTrace;
-        }
-    }
-
-    readonly System.Diagnostics.StackTrace? _capturedStackTrace;
+    public Position Position { get; }
+    public Uri? Uri { get; }
 
     protected LanguageException(string message, Position position) : base(message)
     {
-        this.Position = position;
-        this.Uri = null;
+        Position = position;
+        Uri = null;
     }
 
     protected LanguageException(string message, Position position, Uri? uri) : base(message)
     {
-        this.Position = position;
-        this.Uri = uri;
+        Position = position;
+        Uri = uri;
     }
 
-    public LanguageException(Error error) : this(error.Message, error.Position, error.File)
-    {
-        _capturedStackTrace = error.StackTrace;
-    }
+    public LanguageException(Error error) : this(error.Message, error.Position, error.Uri) { }
 
     public LanguageException(string message, Exception inner) : base(message, inner) { }
 
@@ -46,10 +32,10 @@ public class LanguageException : Exception
         result.Append(Position.ToStringCool(" (at ", ")"));
 
         if (Uri != null)
-        { result.Append(CultureInfo.InvariantCulture, $" (in {Uri})"); }
+        { result.Append($" (in {Uri})"); }
 
         if (InnerException != null)
-        { result.Append(CultureInfo.InvariantCulture, $" {InnerException}"); }
+        { result.Append($" {InnerException}"); }
 
         return result.ToString();
     }
@@ -98,7 +84,6 @@ public class CompilerException : LanguageException
 public class NotSupportedException : CompilerException
 {
     public NotSupportedException(string message) : base(message) { }
-    public NotSupportedException(string message, Uri? uri) : base(message, uri) { }
     public NotSupportedException(string message, Position position, Uri? file) : base(message, position, file) { }
     public NotSupportedException(string message, IPositioned? position, Uri? uri) : base(message, position, uri) { }
 }
@@ -110,20 +95,18 @@ public class TokenizerException : LanguageException
 
 public class SyntaxException : LanguageException
 {
-    public SyntaxException(string message, Position position) : base(message, position) { }
-    public SyntaxException(string message, Position? position) : base(message, position ?? Position.UnknownPosition) { }
-    public SyntaxException(string message, IPositioned? position) : base(message, position?.Position ?? Position.UnknownPosition) { }
+    public SyntaxException(string message, Position position, Uri? uri) : base(message, position, uri) { }
+    public SyntaxException(string message, Position? position, Uri? uri) : base(message, position ?? Position.UnknownPosition, uri) { }
     public SyntaxException(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
 }
 
 public class ProcessRuntimeException : Exception
 {
-    readonly uint exitCode;
-    public uint ExitCode => exitCode;
+    public uint ExitCode { get; }
 
     ProcessRuntimeException(uint exitCode, string message) : base(message)
     {
-        this.exitCode = exitCode;
+        ExitCode = exitCode;
     }
 
     public static bool TryGetFromExitCode(int exitCode, [NotNullWhen(true)] out ProcessRuntimeException? processRuntimeException)
@@ -169,11 +152,11 @@ public class RuntimeException : LanguageException
     public RuntimeException(string message, Exception inner) : base(message, inner) { }
     public RuntimeException(string message, RuntimeContext context) : base(message, Position.UnknownPosition)
     {
-        this.Context = context;
+        Context = context;
     }
     public RuntimeException(string message, Exception inner, RuntimeContext context) : this(message, inner)
     {
-        this.Context = context;
+        Context = context;
     }
 
     public override string ToString()
@@ -183,10 +166,10 @@ public class RuntimeException : LanguageException
 
         StringBuilder result = new(Message);
 
-        result.Append(SourcePosition.ToStringCool(" (at ", ")") ?? string.Empty);
+        result.Append(SourcePosition.ToStringCool(" (at ", ")"));
 
         if (SourceFile != null)
-        { result.Append(CultureInfo.InvariantCulture, $" (in {SourceFile})"); }
+        { result.Append($" (in {SourceFile})"); }
 
         result.Append(Environment.NewLine);
         result.Append($"Code Pointer: ");
@@ -216,29 +199,6 @@ public class RuntimeException : LanguageException
             result.Append(" (current)");
         }
 
-        /*
-        result.Append(Environment.NewLine);
-        result.Append("System Stack Trace:");
-        if (StackTrace == null) { result.Append(" (StackTrace is null)"); }
-        else if (StackTrace.Length == 0) { result.Append(" (StackTrace is empty)"); }
-        else { result.Append("\n  " + string.Join("\n  ", StackTrace)); }
-
-        result.Append(Environment.NewLine);
-        result.Append("Stack:");
-        for (int i = 0; i < context.Stack.Count; i++)
-        {
-            if (context.Stack[i].IsNull)
-            { result.Append($"{Environment.NewLine}{i}\t null"); }
-            else
-            { result.Append($"{Environment.NewLine}{i}\t {context.Stack[i].Type} {context.Stack[i].GetValue()}"); }
-        }
-
-        result.Append(Environment.NewLine);
-        result.Append("Code:");
-        for (int offset = 0; offset < context.Code.Length; offset++)
-        { result.Append($"{Environment.NewLine}{offset + context.CodeSampleStart}\t {context.Code[offset]}"); }
-        */
-
         return result.ToString();
     }
 }
@@ -255,12 +215,10 @@ public class UserException : RuntimeException
 
         StringBuilder result = new(Message);
 
-        result.Append(SourcePosition.ToStringCool(" (at ", ")") ?? string.Empty);
+        result.Append(SourcePosition.ToStringCool(" (at ", ")"));
 
         if (SourceFile != null)
-        {
-            result.Append(CultureInfo.InvariantCulture, $" (in {SourceFile})");
-        }
+        { result.Append($" (in {SourceFile})"); }
 
         if (context.CallTrace.Length != 0)
         {
@@ -311,77 +269,70 @@ public class EndlessLoopException : InternalException
 
 public class NotExceptionBut
 {
-    public readonly string Message;
-    public readonly Position Position;
-    public readonly Uri? File;
+    public string Message { get; }
+    public Position Position { get; }
+    public Uri? Uri { get; }
 
-    public readonly System.Diagnostics.StackTrace StackTrace;
-
-    protected NotExceptionBut(string message, Position position)
+    protected NotExceptionBut(string message, Position position, Uri? file)
     {
-        this.Message = message;
-        this.Position = position;
-        this.File = null;
-        this.StackTrace = new System.Diagnostics.StackTrace(0, true);
-    }
-    protected NotExceptionBut(string message, Position position, Uri? file) : this(message, position)
-    {
-        this.File = file;
+        Message = message;
+        Position = position;
+        Uri = file;
     }
 
     public string? GetArrows()
     {
-        if (File == null) return null;
-        if (!File.IsFile) return null;
-        return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(File.LocalPath));
+        if (Uri == null) return null;
+        if (!Uri.IsFile) return null;
+        return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(Uri.LocalPath));
     }
 
     public override string ToString()
     {
         StringBuilder result = new(Message);
 
-        if (Position.Range.Start.Line == -1)
-        { }
-        else if (Position.Range.Start.Character == -1)
-        { result.Append(CultureInfo.InvariantCulture, $" (at line {Position.Range.Start.Character})"); }
-        else
-        { result.Append(CultureInfo.InvariantCulture, $" (at line {Position.Range.Start.Line} and column {Position.Range.Start.Character})"); }
-
-        if (File != null)
-        { result.Append(CultureInfo.InvariantCulture, $" (in {File})"); }
+        result.Append(Position.ToStringCool(" (at ", ")"));
+        if (Uri != null)
+        { result.Append($" (in {Uri})"); }
 
         return result.ToString();
     }
 }
 
-public class Warning : NotExceptionBut
-{
-    public Warning(string message, Position position, Uri? uri) : base(message, position, uri) { }
-    public Warning(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
-}
-
-/// <summary> It's an exception, but not. </summary>
 public class Error : NotExceptionBut
 {
-    public Error(string message, Uri uri) : base(message, Position.UnknownPosition, uri) { }
+    public Error(string message, Position position, Uri? uri) : base(message, position, uri)
+    {
+#if DEBUG
+        Debugger.Break();
+#endif
+    }
 
-    public Error(string message, Position position) : base(message, position) { }
-    public Error(string message, Position position, Uri? uri) : base(message, position, uri) { }
-
-    public Error(string message, IPositioned? position) : base(message, position?.Position ?? Position.UnknownPosition) { }
-    public Error(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
+    public Error(string message, Position? position, Uri? uri) : this(message, position ?? Position.UnknownPosition, uri) { }
+    public Error(string message, IPositioned? position, Uri? uri) : this(message, position?.Position ?? Position.UnknownPosition, uri) { }
 
     public LanguageException ToException() => new(this);
 }
 
-public class Hint : NotExceptionBut
+public class Warning : NotExceptionBut
 {
-    public Hint(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
+    public Warning(string message, Position position, Uri? uri) : base(message, position, uri) { }
+    public Warning(string message, Position? position, Uri? uri) : this(message, position ?? Position.UnknownPosition, uri) { }
+    public Warning(string message, IPositioned? position, Uri? uri) : this(message, position?.Position ?? Position.UnknownPosition, uri) { }
 }
 
 public class Information : NotExceptionBut
 {
-    public Information(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
+    public Information(string message, Position position, Uri? uri) : base(message, position, uri) { }
+    public Information(string message, Position? position, Uri? uri) : this(message, position ?? Position.UnknownPosition, uri) { }
+    public Information(string message, IPositioned? position, Uri? uri) : this(message, position?.Position ?? Position.UnknownPosition, uri) { }
+}
+
+public class Hint : NotExceptionBut
+{
+    public Hint(string message, Position position, Uri? uri) : base(message, position, uri) { }
+    public Hint(string message, Position? position, Uri? uri) : this(message, position ?? Position.UnknownPosition, uri) { }
+    public Hint(string message, IPositioned? position, Uri? uri) : this(message, position?.Position ?? Position.UnknownPosition, uri) { }
 }
 
 #endregion

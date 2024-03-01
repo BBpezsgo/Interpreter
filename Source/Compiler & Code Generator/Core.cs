@@ -190,5 +190,5 @@ public interface ISameCheck<T> : ISameCheck
 {
     public bool IsSame(T other);
 
-    bool ISameCheck.IsSame(ISameCheck? other) => IsSame(other);
+    bool ISameCheck.IsSame(ISameCheck? other) => other is T _other && IsSame(_other);
 }

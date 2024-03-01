@@ -15,8 +15,8 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 
     CompiledVariable GetVariableInfo(VariableDeclaration newVariable)
     {
-        if (LanguageConstants.Keywords.Contains(newVariable.VariableName.Content))
-        { throw new CompilerException($"Identifier \"{newVariable.VariableName.Content}\" reserved as a keyword, do not use it as a variable name", newVariable.VariableName, CurrentFile); }
+        if (LanguageConstants.Keywords.Contains(newVariable.Identifier.Content))
+        { throw new CompilerException($"Identifier \"{newVariable.Identifier.Content}\" reserved as a keyword, do not use it as a variable name", newVariable.Identifier, CurrentFile); }
 
         GeneralType type;
 
@@ -264,7 +264,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
             if (functionCall.PrevStatement != null)
             { AnalyzeStatement(functionCall.PrevStatement); }
 
-            if (functionCall.FunctionName == "sizeof")
+            if (functionCall.Identifier.Content == "sizeof")
             { return; }
 
             if (GetParameter(functionCall.Identifier.Content, out _))
@@ -308,19 +308,19 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         {
             AnalyzeStatements(keywordCall.Parameters);
 
-            if (keywordCall.FunctionName == "return")
+            if (keywordCall.Identifier.Content == "return")
             { return; }
 
-            if (keywordCall.FunctionName == "throw")
+            if (keywordCall.Identifier.Content == "throw")
             { return; }
 
-            if (keywordCall.FunctionName == "break")
+            if (keywordCall.Identifier.Content == "break")
             { return; }
 
-            if (keywordCall.FunctionName == "sizeof")
+            if (keywordCall.Identifier.Content == "sizeof")
             { return; }
 
-            if (keywordCall.FunctionName == "delete")
+            if (keywordCall.Identifier.Content == "delete")
             {
                 GeneralType paramType = FindStatementType(keywordCall.Parameters[0]);
 
@@ -351,7 +351,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         { }
         else if (statement is ConstructorCall constructorCall)
         {
-            GeneralType type = GeneralType.From(constructorCall.TypeName, FindType, TryCompute);
+            GeneralType type = GeneralType.From(constructorCall.Type, FindType, TryCompute);
             AnalyzeStatements(constructorCall.Parameters);
 
             GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
@@ -397,6 +397,8 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
                 { AnalyzeStatement(anyCall.Parameters[j]); }
             }
         }
+        else if (statement is TypeStatement)
+        { }
         else
         { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
     }

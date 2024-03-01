@@ -536,7 +536,7 @@ public class BytecodeProcessor
     void CALL_EXTERNAL()
     {
         DataItem functionNameDataItem = Memory.Stack.Pop();
-        if (functionNameDataItem.Type != RuntimeType.SInt32)
+        if (functionNameDataItem.Type != RuntimeType.Integer)
         { throw new InternalException($"Instruction CALL_EXTERNAL need a String pointer (int) DataItem parameter from the stack, received {functionNameDataItem.Type} {functionNameDataItem}"); }
 
         string functionName = Memory.Heap.GetString((int)functionNameDataItem);

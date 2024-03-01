@@ -57,20 +57,8 @@ public class CompiledConstructor : ConstructorDefinition,
 
         if (IsExport)
         { result.Append("export "); }
-
         result.Append(Type);
-
-        result.Append('(');
-        if (this.ParameterTypes.Length > 0)
-        {
-            for (int i = 0; i < ParameterTypes.Length; i++)
-            {
-                if (i > 0) result.Append(", ");
-                result.Append(ParameterTypes[i].ToString());
-            }
-        }
-        result.Append(')');
-
+        result.Append(Parameters.ToString(ParameterTypes));
         result.Append(Block?.ToString() ?? ";");
 
         return result.ToString();

@@ -181,8 +181,8 @@ public abstract class CodeGenerator
                 DataItem.TryCast(ref constantValue, builtinType.RuntimeType);
             }
 
-            if (GetConstant(variableDeclaration.VariableName.Content, out _))
-            { throw new CompilerException($"Constant \"{variableDeclaration.VariableName}\" already defined", variableDeclaration.VariableName, variableDeclaration.FilePath); }
+            if (GetConstant(variableDeclaration.Identifier.Content, out _))
+            { throw new CompilerException($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.FilePath); }
 
             CompiledConstants.Push(new CompiledVariableConstant(constantValue, variableDeclaration));
             count++;
@@ -592,7 +592,7 @@ public abstract class CodeGenerator
     }
 
     protected bool GetFunctionTemplate(FunctionCall functionCallStatement, out CompliableTemplate<CompiledFunction> compiledFunction)
-        => GetFunctionTemplate(functionCallStatement.FunctionName, FindStatementTypes(functionCallStatement.MethodParameters), out compiledFunction);
+        => GetFunctionTemplate(functionCallStatement.Identifier.Content, FindStatementTypes(functionCallStatement.MethodParameters), out compiledFunction);
 
     protected bool GetFunctionTemplate(string identifier, GeneralType[] parameters, out CompliableTemplate<CompiledFunction> compiledFunction)
     {
@@ -768,7 +768,7 @@ public abstract class CodeGenerator
         return compiledFunction is not null;
     }
 
-    public static bool GetFunction(CompiledFunction[] compiledFunctions, Token name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+    public static bool GetFunction(IEnumerable<CompiledFunction> compiledFunctions, Token name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
     {
         compiledFunction = null;
 
@@ -1105,7 +1105,7 @@ public abstract class CodeGenerator
     {
         foreach (CompiledVariable compiledVariable_ in CompiledVariables)
         {
-            if (compiledVariable_.VariableName.Content == variableName)
+            if (compiledVariable_.Identifier.Content == variableName)
             {
                 compiledVariable = compiledVariable_;
                 return true;
@@ -1119,7 +1119,7 @@ public abstract class CodeGenerator
     {
         foreach (CompiledVariable compiledVariable_ in CompiledGlobalVariables)
         {
-            if (compiledVariable_.VariableName.Content == variableName)
+            if (compiledVariable_.Identifier.Content == variableName)
             {
                 compiledVariable = compiledVariable_;
                 return true;
@@ -1164,7 +1164,7 @@ public abstract class CodeGenerator
         if (destination is BuiltinType destBuiltinType &&
             destBuiltinType.Type == BasicType.Byte &&
             TryCompute(value, out DataItem yeah) &&
-            yeah.Type == RuntimeType.SInt32)
+            yeah.Type == RuntimeType.Integer)
         { return; }
 
         if (value is LiteralStatement literal &&
@@ -1204,7 +1204,7 @@ public abstract class CodeGenerator
         { return; }
 
         if (destination == BasicType.Byte &&
-            value.Type == RuntimeType.SInt32)
+            value.Type == RuntimeType.Integer)
         { return; }
 
         throw new CompilerException($"Can not set a {valueType} type value to the {destination} type", valuePosition, CurrentFile);
@@ -1279,8 +1279,8 @@ public abstract class CodeGenerator
         else
         { throw new NotImplementedException(); }
 
-        if (!fieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
-        { throw new InternalException($"Field \"{field.FieldName}\" does not have an offset value", CurrentFile); }
+        if (!fieldOffsets.TryGetValue(field.Identifier.Content, out int fieldOffset))
+        { throw new InternalException($"Field \"{field.Identifier}\" does not have an offset value", CurrentFile); }
 
         int prevOffset = GetDataOffset(field.PrevStatement);
         return prevOffset + fieldOffset;
@@ -1364,8 +1364,8 @@ public abstract class CodeGenerator
 
     protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset)
     {
-        if (LanguageConstants.Keywords.Contains(newVariable.VariableName.Content))
-        { throw new CompilerException($"Illegal variable name \"{newVariable.VariableName.Content}\"", newVariable.VariableName, CurrentFile); }
+        if (LanguageConstants.Keywords.Contains(newVariable.Identifier.Content))
+        { throw new CompilerException($"Illegal variable name \"{newVariable.Identifier.Content}\"", newVariable.Identifier, CurrentFile); }
 
         GeneralType type;
         if (newVariable.Type == "var")
@@ -1384,7 +1384,7 @@ public abstract class CodeGenerator
         }
 
         if (!type.AllGenericsDefined())
-        { throw new InternalException($"Failed to qualify all generics in variable \"{newVariable.VariableName}\" type \"{type}\"", newVariable.FilePath); }
+        { throw new InternalException($"Failed to qualify all generics in variable \"{newVariable.Identifier}\" type \"{type}\"", newVariable.FilePath); }
 
         return new CompiledVariable(memoryOffset, type, newVariable);
     }
@@ -1505,14 +1505,14 @@ public abstract class CodeGenerator
     }
     protected GeneralType FindStatementType(KeywordCall keywordCall)
     {
-        return keywordCall.FunctionName switch
+        return keywordCall.Identifier.Content switch
         {
             "return" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
             "throw" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
             "break" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
             "sizeof" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Integer)),
             "delete" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-            _ => throw new CompilerException($"Unknown keyword-function \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile)
+            _ => throw new CompilerException($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile)
         };
     }
     protected GeneralType FindStatementType(IndexCall index)
@@ -1542,7 +1542,7 @@ public abstract class CodeGenerator
     }
     protected GeneralType FindStatementType(FunctionCall functionCall)
     {
-        if (functionCall.FunctionName == "sizeof") return new BuiltinType(BasicType.Integer);
+        if (functionCall.Identifier.Content == "sizeof") return new BuiltinType(BasicType.Integer);
 
         if (TryGetMacro(functionCall, out MacroDefinition? macro))
         {
@@ -1728,24 +1728,24 @@ public abstract class CodeGenerator
     }
     protected GeneralType FindStatementType(NewInstance newInstance)
     {
-        GeneralType type = GeneralType.From(newInstance.TypeName, FindType);
-        newInstance.TypeName.SetAnalyzedType(type);
+        GeneralType type = GeneralType.From(newInstance.Type, FindType);
+        newInstance.Type.SetAnalyzedType(type);
         return OnGotStatementType(newInstance, type);
     }
     protected GeneralType FindStatementType(ConstructorCall constructorCall)
     {
-        GeneralType type = GeneralType.From(constructorCall.TypeName, FindType);
+        GeneralType type = GeneralType.From(constructorCall.Type, FindType);
         GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
         if (GetConstructor(type, parameters, out CompiledConstructor? constructor))
         {
-            constructorCall.TypeName.SetAnalyzedType(constructor.Type);
+            constructorCall.Type.SetAnalyzedType(constructor.Type);
             return OnGotStatementType(constructorCall, constructor.Type);
         }
 
         if (GetConstructorTemplate(type, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction))
         {
-            constructorCall.TypeName.SetAnalyzedType(compilableGeneralFunction.Function.Type);
+            constructorCall.Type.SetAnalyzedType(compilableGeneralFunction.Function.Type);
             return OnGotStatementType(constructorCall, compilableGeneralFunction.Function.Type);
         }
 
@@ -1755,9 +1755,9 @@ public abstract class CodeGenerator
     {
         GeneralType prevStatementType = FindStatementType(field.PrevStatement);
 
-        if (prevStatementType is ArrayType && field.FieldName.Equals("Length"))
+        if (prevStatementType is ArrayType && field.Identifier.Equals("Length"))
         {
-            field.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
+            field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
             return OnGotStatementType(field, new BuiltinType(BasicType.Integer));
         }
 
@@ -1768,8 +1768,8 @@ public abstract class CodeGenerator
         {
             foreach (CompiledField definedField in structType.Struct.Fields)
             {
-                if (definedField.Identifier.Content != field.FieldName.Content) continue;
-                field.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
+                if (definedField.Identifier.Content != field.Identifier.Content) continue;
+                field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
 
                 if (structType.Struct.TemplateInfo is null)
                 { return definedField.Type; }
@@ -1778,22 +1778,22 @@ public abstract class CodeGenerator
                 return GeneralType.InsertTypeParameters(definedField.Type, typeArguments) ?? definedField.Type;
             }
 
-            throw new CompilerException($"Field definition \"{field.FieldName}\" not found in type \"{prevStatementType}\"", field.FieldName, CurrentFile);
+            throw new CompilerException($"Field definition \"{field.Identifier}\" not found in type \"{prevStatementType}\"", field.Identifier, CurrentFile);
         }
 
         if (prevStatementType is EnumType enumType)
         {
             foreach (CompiledEnumMember enumMember in enumType.Enum.Members)
             {
-                if (enumMember.Identifier.Content != field.FieldName.Content) continue;
-                field.FieldName.AnalyzedType = TokenAnalyzedType.EnumMember;
+                if (enumMember.Identifier.Content != field.Identifier.Content) continue;
+                field.Identifier.AnalyzedType = TokenAnalyzedType.EnumMember;
                 return OnGotStatementType(field, new BuiltinType(enumMember.ComputedValue.Type));
             }
 
-            throw new CompilerException($"Enum member \"{enumType}\" not found in enum \"{enumType.Enum.Identifier.Content}\"", field.FieldName, CurrentFile);
+            throw new CompilerException($"Enum member \"{enumType}\" not found in enum \"{enumType.Enum.Identifier.Content}\"", field.Identifier, CurrentFile);
         }
 
-        throw new CompilerException($"Type \"{prevStatementType}\" does not have a field \"{field.FieldName}\"", field, CurrentFile);
+        throw new CompilerException($"Type \"{prevStatementType}\" does not have a field \"{field.Identifier}\"", field, CurrentFile);
     }
     protected GeneralType FindStatementType(TypeCast @as)
     {
@@ -2045,7 +2045,7 @@ public abstract class CodeGenerator
                 keywordCall.Identifier.Equals("return"))
             { break; }
         }
-        inlined = new Block(block.BracketStart, statements.ToArray(), block.BracketEnd)
+        inlined = new Block(statements.ToArray(), block.Brackets)
         {
             Semicolon = block.Semicolon,
         };
@@ -2058,7 +2058,7 @@ public abstract class CodeGenerator
             left: InlineMacro(operatorCall.Left, parameters),
             right: InlineMacro(operatorCall.Right, parameters))
         {
-            InsideBracelet = operatorCall.InsideBracelet,
+            SurroundingBracelet = operatorCall.SurroundingBracelet,
             SaveValue = operatorCall.SaveValue,
             Semicolon = operatorCall.Semicolon,
         };
@@ -2078,18 +2078,29 @@ public abstract class CodeGenerator
         StatementWithValue? prevStatement = functionCall.PrevStatement;
         if (prevStatement != null)
         { prevStatement = InlineMacro(prevStatement, parameters); }
-        return new FunctionCall(prevStatement, functionCall.Identifier, functionCall.BracketLeft, _parameters, functionCall.BracketRight);
+        return new FunctionCall(prevStatement, functionCall.Identifier, _parameters, functionCall.Brackets);
     }
 
     static AnyCall InlineMacro(AnyCall anyCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(anyCall.PrevStatement, parameters),
-            bracketLeft: anyCall.BracketLeft,
             parameters: InlineMacro(anyCall.Parameters, parameters),
-            bracketRight: anyCall.BracketRight)
+            brackets: anyCall.Brackets)
         {
             SaveValue = anyCall.SaveValue,
             Semicolon = anyCall.Semicolon,
+        };
+
+    static ConstructorCall InlineMacro(ConstructorCall constructorCall, Dictionary<string, StatementWithValue> parameters)
+        => new(
+            keyword: constructorCall.Keyword,
+            typeName: constructorCall.Type,
+            bracketLeft: constructorCall.BracketLeft,
+            parameters: InlineMacro(constructorCall.Parameters, parameters),
+            bracketRight: constructorCall.BracketRight)
+        {
+            SaveValue = constructorCall.SaveValue,
+            Semicolon = constructorCall.Semicolon,
         };
 
     static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
@@ -2394,13 +2405,13 @@ public abstract class CodeGenerator
     {
         inlined = null;
 
-        if (parameters.ContainsKey(statement.VariableName.Content))
+        if (parameters.ContainsKey(statement.Identifier.Content))
         { return false; }
 
         inlined = new VariableDeclaration(
             modifiers: statement.Modifiers,
             type: statement.Type,
-            variableName: statement.VariableName,
+            variableName: statement.Identifier,
             initialValue: InlineMacro(statement.InitialValue, parameters))
         {
             FilePath = statement.FilePath,
@@ -2411,7 +2422,7 @@ public abstract class CodeGenerator
 
     static Pointer InlineMacro(Pointer statement, Dictionary<string, StatementWithValue> parameters)
         => new(
-            operatorToken: statement.OperatorToken,
+            operatorToken: statement.Operator,
             prevStatement: InlineMacro(statement.PrevStatement, parameters))
         {
             SaveValue = statement.SaveValue,
@@ -2420,7 +2431,7 @@ public abstract class CodeGenerator
 
     static AddressGetter InlineMacro(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
         => new(
-            operatorToken: statement.OperatorToken,
+            operatorToken: statement.Operator,
             prevStatement: InlineMacro(statement.PrevStatement, parameters))
         {
             SaveValue = statement.SaveValue,
@@ -2448,7 +2459,7 @@ public abstract class CodeGenerator
     static Field InlineMacro(Field statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
-            fieldName: statement.FieldName)
+            fieldName: statement.Identifier)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
@@ -2457,9 +2468,8 @@ public abstract class CodeGenerator
     static IndexCall InlineMacro(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
-            bracketLeft: statement.BracketLeft,
             indexStatement: InlineMacro(statement.Index, parameters),
-            bracketRight: statement.BracketRight)
+            brackets: statement.Brackets)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
@@ -2504,6 +2514,8 @@ public abstract class CodeGenerator
         IndexCall v => InlineMacro(v, parameters),
         TypeCast v => InlineMacro(v, parameters),
         ModifiedStatement v => InlineMacro(v, parameters),
+        TypeStatement v => v,
+        ConstructorCall v => InlineMacro(v, parameters),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 
@@ -2756,7 +2768,7 @@ public abstract class CodeGenerator
     }
     bool TryCompute(KeywordCall keywordCall, out DataItem value)
     {
-        if (keywordCall.FunctionName == "sizeof")
+        if (keywordCall.Identifier.Content == "sizeof")
         {
             if (keywordCall.Parameters.Length != 1)
             {
@@ -2787,7 +2799,7 @@ public abstract class CodeGenerator
     }
     bool TryCompute(FunctionCall functionCall, EvaluationContext context, out DataItem value)
     {
-        if (functionCall.FunctionName == "sizeof")
+        if (functionCall.Identifier.Content == "sizeof")
         {
             if (functionCall.Parameters.Length != 1)
             {
@@ -2826,9 +2838,8 @@ public abstract class CodeGenerator
                 FunctionCall newFunctionCall = new(
                     null,
                     functionCall.Identifier,
-                    functionCall.BracketLeft,
                     Literal.CreateAnonymous(parameters, functionCall.MethodParameters),
-                    functionCall.BracketRight)
+                    functionCall.Brackets)
                 {
                     SaveValue = functionCall.SaveValue,
                     Semicolon = functionCall.Semicolon,
@@ -2872,7 +2883,7 @@ public abstract class CodeGenerator
     {
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
-        if (prevType is ArrayType arrayType && field.FieldName.Equals("Length"))
+        if (prevType is ArrayType arrayType && field.Identifier.Equals("Length"))
         {
             value = new DataItem(arrayType.Length);
             return true;
@@ -3152,7 +3163,7 @@ public abstract class CodeGenerator
             { return false; }
         }
 
-        if (!context.LastScope.TryAdd(variableDeclaration.VariableName.Content, value))
+        if (!context.LastScope.TryAdd(variableDeclaration.Identifier.Content, value))
         { return false; }
 
         return true;
@@ -3350,7 +3361,7 @@ public abstract class CodeGenerator
 
     protected bool IsUnrollable(ForLoop loop)
     {
-        string iteratorVariable = loop.VariableDeclaration.VariableName.Content;
+        string iteratorVariable = loop.VariableDeclaration.Identifier.Content;
         Dictionary<string, StatementWithValue> _params = new()
         {
             { iteratorVariable, Literal.CreateAnonymous(new DataItem(0), loop.VariableDeclaration) }
@@ -3397,7 +3408,7 @@ public abstract class CodeGenerator
         }
 
         KeyValuePair<string, StatementWithValue> GetIteratorStatement()
-            => new(iteratorVariable.VariableName.Content, Literal.CreateAnonymous(iterator, Position.UnknownPosition));
+            => new(iteratorVariable.Identifier.Content, Literal.CreateAnonymous(iterator, Position.UnknownPosition));
 
         DataItem ComputeIterator()
         {

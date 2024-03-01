@@ -24,10 +24,10 @@ public partial struct DataItem :
     public static DataItem Abs(DataItem value) => value.type switch
     {
         RuntimeType.Null => value,
-        RuntimeType.UInt8 => value,
-        RuntimeType.SInt32 => new DataItem(Math.Abs(value.valueSInt32)),
-        RuntimeType.Single => new DataItem(Math.Abs(value.valueSingle)),
-        RuntimeType.UInt16 => value,
+        RuntimeType.Byte => value,
+        RuntimeType.Integer => new DataItem(Math.Abs(value._integer)),
+        RuntimeType.Single => new DataItem(Math.Abs(value._single)),
+        RuntimeType.Char => value,
         _ => throw new UnreachableException(),
     };
 
@@ -39,123 +39,123 @@ public partial struct DataItem :
     public static bool IsNormal(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.Single => float.IsNormal(value.valueSingle),
+        RuntimeType.Single => float.IsNormal(value._single),
         _ => true,
     };
     public static bool IsRealNumber(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.Single => float.IsRealNumber(value.valueSingle),
+        RuntimeType.Single => float.IsRealNumber(value._single),
         _ => true,
     };
     /// <exception cref="NotImplementedException"/>
     public static bool IsSubnormal(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.Single => float.IsSubnormal(value.valueSingle),
+        RuntimeType.Single => float.IsSubnormal(value._single),
         _ => throw new NotImplementedException(),
     };
 
     public static bool IsEvenInteger(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.UInt8 => byte.IsEvenInteger(value.valueUInt8),
-        RuntimeType.SInt32 => int.IsEvenInteger(value.valueSInt32),
-        RuntimeType.Single => float.IsEvenInteger(value.valueSingle),
-        RuntimeType.UInt16 => ushort.IsEvenInteger(value.valueUInt16),
+        RuntimeType.Byte => byte.IsEvenInteger(value._byte),
+        RuntimeType.Integer => int.IsEvenInteger(value._integer),
+        RuntimeType.Single => float.IsEvenInteger(value._single),
+        RuntimeType.Char => ushort.IsEvenInteger(value._char),
         _ => throw new UnreachableException(),
     };
     public static bool IsOddInteger(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.UInt8 => byte.IsOddInteger(value.valueUInt8),
-        RuntimeType.SInt32 => int.IsOddInteger(value.valueSInt32),
-        RuntimeType.Single => float.IsOddInteger(value.valueSingle),
-        RuntimeType.UInt16 => ushort.IsOddInteger(value.valueUInt16),
+        RuntimeType.Byte => byte.IsOddInteger(value._byte),
+        RuntimeType.Integer => int.IsOddInteger(value._integer),
+        RuntimeType.Single => float.IsOddInteger(value._single),
+        RuntimeType.Char => ushort.IsOddInteger(value._char),
         _ => throw new UnreachableException(),
     };
 
     public static bool IsFinite(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.Single => float.IsFinite(value.valueSingle),
+        RuntimeType.Single => float.IsFinite(value._single),
         _ => true,
     };
     public static bool IsInfinity(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.Single => float.IsInfinity(value.valueSingle),
+        RuntimeType.Single => float.IsInfinity(value._single),
         _ => false,
     };
 
     public static bool IsInteger(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.Single => float.IsInfinity(value.valueSingle),
+        RuntimeType.Single => float.IsInfinity(value._single),
         _ => true,
     };
 
     public static bool IsNaN(DataItem value) => value.type switch
     {
         RuntimeType.Null => true,
-        RuntimeType.Single => float.IsNaN(value.valueSingle),
+        RuntimeType.Single => float.IsNaN(value._single),
         _ => false,
     };
     public static bool IsZero(DataItem value) => value.type switch
     {
         RuntimeType.Null => true,
-        RuntimeType.UInt8 => value.valueUInt8 == 0,
-        RuntimeType.SInt32 => value.valueSInt32 == 0,
-        RuntimeType.Single => value.valueSingle == 0,
-        RuntimeType.UInt16 => value.valueUInt16 == 0,
+        RuntimeType.Byte => value._byte == 0,
+        RuntimeType.Integer => value._integer == 0,
+        RuntimeType.Single => value._single == 0,
+        RuntimeType.Char => value._char == 0,
         _ => throw new UnreachableException(),
     };
 
     public static bool IsNegative(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.SInt32 => int.IsNegative(value.valueSInt32),
-        RuntimeType.Single => float.IsNegative(value.valueSingle),
+        RuntimeType.Integer => int.IsNegative(value._integer),
+        RuntimeType.Single => float.IsNegative(value._single),
         _ => false,
     };
     public static bool IsPositive(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.SInt32 => int.IsPositive(value.valueSInt32),
-        RuntimeType.Single => float.IsPositive(value.valueSingle),
+        RuntimeType.Integer => int.IsPositive(value._integer),
+        RuntimeType.Single => float.IsPositive(value._single),
         _ => true,
     };
 
     public static bool IsNegativeInfinity(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.Single => float.IsNegativeInfinity(value.valueSingle),
+        RuntimeType.Single => float.IsNegativeInfinity(value._single),
         _ => false,
     };
     public static bool IsPositiveInfinity(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.Single => float.IsPositiveInfinity(value.valueSingle),
+        RuntimeType.Single => float.IsPositiveInfinity(value._single),
         _ => false,
     };
 
     public static bool IsPow2(DataItem value) => value.type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.UInt8 => byte.IsPow2(value.valueUInt8),
-        RuntimeType.SInt32 => int.IsPow2(value.valueSInt32),
-        RuntimeType.Single => float.IsPow2(value.valueSingle),
-        RuntimeType.UInt16 => ushort.IsPow2(value.valueUInt16),
+        RuntimeType.Byte => byte.IsPow2(value._byte),
+        RuntimeType.Integer => int.IsPow2(value._integer),
+        RuntimeType.Single => float.IsPow2(value._single),
+        RuntimeType.Char => ushort.IsPow2(value._char),
         _ => throw new UnreachableException(),
     };
 
     public static DataItem Log2(DataItem value) => value.type switch
     {
         RuntimeType.Null => value,
-        RuntimeType.UInt8 => new DataItem((byte)byte.Log2(value.valueUInt8)),
-        RuntimeType.SInt32 => new DataItem((int)int.Log2(value.valueSInt32)),
-        RuntimeType.Single => new DataItem((float)float.Log2(value.valueSingle)),
-        RuntimeType.UInt16 => new DataItem((ushort)ushort.Log2(value.valueUInt16)),
+        RuntimeType.Byte => new DataItem((byte)byte.Log2(value._byte)),
+        RuntimeType.Integer => new DataItem((int)int.Log2(value._integer)),
+        RuntimeType.Single => new DataItem((float)float.Log2(value._single)),
+        RuntimeType.Char => new DataItem((ushort)ushort.Log2(value._char)),
         _ => throw new UnreachableException(),
     };
 
@@ -171,10 +171,10 @@ public partial struct DataItem :
         return self.type switch
         {
             RuntimeType.Null => 0,
-            RuntimeType.UInt8 => self.valueUInt8.CompareTo(other.valueUInt8),
-            RuntimeType.SInt32 => self.valueSInt32.CompareTo(other.valueSInt32),
-            RuntimeType.Single => self.valueSingle.CompareTo(other.valueSingle),
-            RuntimeType.UInt16 => self.valueUInt16.CompareTo(other.valueUInt16),
+            RuntimeType.Byte => self._byte.CompareTo(other._byte),
+            RuntimeType.Integer => self._integer.CompareTo(other._integer),
+            RuntimeType.Single => self._single.CompareTo(other._single),
+            RuntimeType.Char => self._char.CompareTo(other._char),
             _ => 0,
         };
     }
@@ -187,10 +187,10 @@ public partial struct DataItem :
         return x.type switch
         {
             RuntimeType.Null => DataItem.Null,
-            RuntimeType.UInt8 => new DataItem(byte.Max(x.valueUInt8, y.valueUInt8)),
-            RuntimeType.SInt32 => new DataItem(int.MaxMagnitude(x.valueSInt32, y.valueSInt32)),
-            RuntimeType.Single => new DataItem(float.MaxMagnitude(x.valueSingle, y.valueSingle)),
-            RuntimeType.UInt16 => new DataItem(ushort.Max(x.valueUInt16, y.valueUInt16)),
+            RuntimeType.Byte => new DataItem(byte.Max(x._byte, y._byte)),
+            RuntimeType.Integer => new DataItem(int.MaxMagnitude(x._integer, y._integer)),
+            RuntimeType.Single => new DataItem(float.MaxMagnitude(x._single, y._single)),
+            RuntimeType.Char => new DataItem(ushort.Max(x._char, y._char)),
             _ => throw new UnreachableException(),
         };
     }
@@ -202,10 +202,10 @@ public partial struct DataItem :
         return x.type switch
         {
             RuntimeType.Null => DataItem.Null,
-            RuntimeType.UInt8 => new DataItem(byte.Max(x.valueUInt8, y.valueUInt8)),
-            RuntimeType.SInt32 => new DataItem(int.MaxMagnitude(x.valueSInt32, y.valueSInt32)),
-            RuntimeType.Single => new DataItem(float.MaxMagnitudeNumber(x.valueSingle, y.valueSingle)),
-            RuntimeType.UInt16 => new DataItem(ushort.Max(x.valueUInt16, y.valueUInt16)),
+            RuntimeType.Byte => new DataItem(byte.Max(x._byte, y._byte)),
+            RuntimeType.Integer => new DataItem(int.MaxMagnitude(x._integer, y._integer)),
+            RuntimeType.Single => new DataItem(float.MaxMagnitudeNumber(x._single, y._single)),
+            RuntimeType.Char => new DataItem(ushort.Max(x._char, y._char)),
             _ => throw new UnreachableException(),
         };
     }
@@ -218,10 +218,10 @@ public partial struct DataItem :
         return x.type switch
         {
             RuntimeType.Null => DataItem.Null,
-            RuntimeType.UInt8 => new DataItem(byte.Min(x.valueUInt8, y.valueUInt8)),
-            RuntimeType.SInt32 => new DataItem(int.MinMagnitude(x.valueSInt32, y.valueSInt32)),
-            RuntimeType.Single => new DataItem(float.MinMagnitude(x.valueSingle, y.valueSingle)),
-            RuntimeType.UInt16 => new DataItem(ushort.Min(x.valueUInt16, y.valueUInt16)),
+            RuntimeType.Byte => new DataItem(byte.Min(x._byte, y._byte)),
+            RuntimeType.Integer => new DataItem(int.MinMagnitude(x._integer, y._integer)),
+            RuntimeType.Single => new DataItem(float.MinMagnitude(x._single, y._single)),
+            RuntimeType.Char => new DataItem(ushort.Min(x._char, y._char)),
             _ => throw new UnreachableException(),
         };
     }
@@ -233,10 +233,10 @@ public partial struct DataItem :
         return x.type switch
         {
             RuntimeType.Null => DataItem.Null,
-            RuntimeType.UInt8 => new DataItem(byte.Min(x.valueUInt8, y.valueUInt8)),
-            RuntimeType.SInt32 => new DataItem(int.MinMagnitude(x.valueSInt32, y.valueSInt32)),
-            RuntimeType.Single => new DataItem(float.MinMagnitudeNumber(x.valueSingle, y.valueSingle)),
-            RuntimeType.UInt16 => new DataItem(ushort.Min(x.valueUInt16, y.valueUInt16)),
+            RuntimeType.Byte => new DataItem(byte.Min(x._byte, y._byte)),
+            RuntimeType.Integer => new DataItem(int.MinMagnitude(x._integer, y._integer)),
+            RuntimeType.Single => new DataItem(float.MinMagnitudeNumber(x._single, y._single)),
+            RuntimeType.Char => new DataItem(ushort.Min(x._char, y._char)),
             _ => throw new UnreachableException(),
         };
     }
@@ -395,10 +395,10 @@ public partial struct DataItem :
         return type switch
         {
             RuntimeType.Null => false,
-            RuntimeType.UInt8 => valueUInt8.TryFormat(destination, out charsWritten, format, provider),
-            RuntimeType.SInt32 => valueSInt32.TryFormat(destination, out charsWritten, format, provider),
-            RuntimeType.Single => valueSingle.TryFormat(destination, out charsWritten, format, provider),
-            RuntimeType.UInt16 => false,
+            RuntimeType.Byte => _byte.TryFormat(destination, out charsWritten, format, provider),
+            RuntimeType.Integer => _integer.TryFormat(destination, out charsWritten, format, provider),
+            RuntimeType.Single => _single.TryFormat(destination, out charsWritten, format, provider),
+            RuntimeType.Char => false,
             _ => false,
         };
     }
@@ -413,10 +413,10 @@ public partial struct DataItem :
     public readonly TypeCode GetTypeCode() => type switch
     {
         RuntimeType.Null => TypeCode.Empty,
-        RuntimeType.UInt8 => TypeCode.Byte,
-        RuntimeType.SInt32 => TypeCode.Int32,
+        RuntimeType.Byte => TypeCode.Byte,
+        RuntimeType.Integer => TypeCode.Int32,
         RuntimeType.Single => TypeCode.Single,
-        RuntimeType.UInt16 => TypeCode.UInt16,
+        RuntimeType.Char => TypeCode.UInt16,
         _ => throw new UnreachableException(),
     };
 
@@ -425,10 +425,10 @@ public partial struct DataItem :
     public readonly bool ToBoolean(IFormatProvider? provider) => Type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.UInt8 => valueUInt8 != 0,
-        RuntimeType.SInt32 => valueSInt32 != 0,
-        RuntimeType.Single => valueSingle != 0f,
-        RuntimeType.UInt16 => valueUInt16 != 0,
+        RuntimeType.Byte => _byte != 0,
+        RuntimeType.Integer => _integer != 0,
+        RuntimeType.Single => _single != 0f,
+        RuntimeType.Char => _char != 0,
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Boolean)}"),
     };
 
@@ -437,10 +437,10 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly byte ToByte(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToByte(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToByte(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToByte(valueUInt16),
-        RuntimeType.Single => Convert.ToByte(valueSingle),
+        RuntimeType.Byte => Convert.ToByte(_byte),
+        RuntimeType.Integer => Convert.ToByte(_integer),
+        RuntimeType.Char => Convert.ToByte(_char),
+        RuntimeType.Single => Convert.ToByte(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Byte)}"),
     };
 
@@ -449,11 +449,11 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly char ToChar(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToChar(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToChar(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToChar(valueUInt16),
-        RuntimeType.Single => Convert.ToChar(valueSingle),
-        _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Char)}"),
+        RuntimeType.Byte => Convert.ToChar(_byte),
+        RuntimeType.Integer => Convert.ToChar(_integer),
+        RuntimeType.Char => Convert.ToChar(_char),
+        RuntimeType.Single => Convert.ToChar(_single),
+        _ => throw new InvalidCastException($"Can't cast {type} to {nameof(VChar)}"),
     };
 
     /// <inheritdoc/>
@@ -466,10 +466,10 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly decimal ToDecimal(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToDecimal(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToDecimal(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToDecimal(valueUInt16),
-        RuntimeType.Single => Convert.ToDecimal(valueSingle),
+        RuntimeType.Byte => Convert.ToDecimal(_byte),
+        RuntimeType.Integer => Convert.ToDecimal(_integer),
+        RuntimeType.Char => Convert.ToDecimal(_char),
+        RuntimeType.Single => Convert.ToDecimal(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Decimal)}"),
     };
 
@@ -477,10 +477,10 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly double ToDouble(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToDouble(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToDouble(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToDouble(valueUInt16),
-        RuntimeType.Single => Convert.ToDouble(valueSingle),
+        RuntimeType.Byte => Convert.ToDouble(_byte),
+        RuntimeType.Integer => Convert.ToDouble(_integer),
+        RuntimeType.Char => Convert.ToDouble(_char),
+        RuntimeType.Single => Convert.ToDouble(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Double)}"),
     };
 
@@ -489,22 +489,22 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly short ToInt16(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToInt16(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToInt16(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToInt16(valueUInt16),
-        RuntimeType.Single => Convert.ToInt16(valueSingle),
+        RuntimeType.Byte => Convert.ToInt16(_byte),
+        RuntimeType.Integer => Convert.ToInt16(_integer),
+        RuntimeType.Char => Convert.ToInt16(_char),
+        RuntimeType.Single => Convert.ToInt16(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Int16)}"),
     };
 
     /// <inheritdoc/>
     /// <exception cref="OverflowException"/>
     /// <exception cref="InvalidCastException"/>
-    public readonly int ToInt32(IFormatProvider? provider) => type switch
+    public readonly int ToInt32(IFormatProvider? provider = null) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToInt32(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToInt32(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToInt32(valueUInt16),
-        RuntimeType.Single => Convert.ToInt32(valueSingle),
+        RuntimeType.Byte => Convert.ToInt32(_byte),
+        RuntimeType.Integer => Convert.ToInt32(_integer),
+        RuntimeType.Char => Convert.ToInt32(_char),
+        RuntimeType.Single => Convert.ToInt32(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Int32)}"),
     };
 
@@ -512,10 +512,10 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly int RoundToInt32(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => (int)valueUInt8,
-        RuntimeType.SInt32 => (int)valueSInt32,
-        RuntimeType.UInt16 => (int)valueUInt16,
-        RuntimeType.Single => checked((int)MathF.Round(valueSingle)),
+        RuntimeType.Byte => (int)_byte,
+        RuntimeType.Integer => (int)_integer,
+        RuntimeType.Char => (int)_char,
+        RuntimeType.Single => checked((int)MathF.Round(_single)),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Int32)}"),
     };
 
@@ -524,10 +524,10 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly long ToInt64(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToInt64(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToInt64(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToInt64(valueUInt16),
-        RuntimeType.Single => Convert.ToInt64(valueSingle),
+        RuntimeType.Byte => Convert.ToInt64(_byte),
+        RuntimeType.Integer => Convert.ToInt64(_integer),
+        RuntimeType.Char => Convert.ToInt64(_char),
+        RuntimeType.Single => Convert.ToInt64(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Int64)}"),
     };
 
@@ -536,10 +536,10 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly sbyte ToSByte(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToSByte(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToSByte(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToSByte(valueUInt16),
-        RuntimeType.Single => Convert.ToSByte(valueSingle),
+        RuntimeType.Byte => Convert.ToSByte(_byte),
+        RuntimeType.Integer => Convert.ToSByte(_integer),
+        RuntimeType.Char => Convert.ToSByte(_char),
+        RuntimeType.Single => Convert.ToSByte(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(SByte)}"),
     };
 
@@ -547,32 +547,40 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly float ToSingle(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToSingle(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToSingle(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToSingle(valueUInt16),
-        RuntimeType.Single => Convert.ToSingle(valueSingle),
-        _ => throw new InvalidCastException($"Can't cast {type} to {nameof(Single)}"),
+        RuntimeType.Byte => Convert.ToSingle(_byte),
+        RuntimeType.Integer => Convert.ToSingle(_integer),
+        RuntimeType.Char => Convert.ToSingle(_char),
+        RuntimeType.Single => Convert.ToSingle(_single),
+        _ => throw new InvalidCastException($"Can't cast {type} to {nameof(VSingle)}"),
     };
 
-    public override readonly string ToString() => this.ToString(CultureInfo.InvariantCulture);
+    public override readonly string ToString() => type switch
+    {
+        RuntimeType.Null => "null",
+        RuntimeType.Byte => _byte.ToString(),
+        RuntimeType.Integer => _integer.ToString(),
+        RuntimeType.Char => _char.ToString(),
+        RuntimeType.Single => _single.ToString(),
+        _ => throw new UnreachableException(),
+    };
 
     public readonly string ToString(IFormatProvider? provider) => type switch
     {
         RuntimeType.Null => "null",
-        RuntimeType.UInt8 => Convert.ToString(valueUInt8, provider),
-        RuntimeType.SInt32 => Convert.ToString(valueSInt32, provider),
-        RuntimeType.UInt16 => Convert.ToString(valueUInt16, provider),
-        RuntimeType.Single => Convert.ToString(valueSingle, provider),
+        RuntimeType.Byte => Convert.ToString(_byte, provider),
+        RuntimeType.Integer => Convert.ToString(_integer, provider),
+        RuntimeType.Char => Convert.ToString(_char, provider),
+        RuntimeType.Single => Convert.ToString(_single, provider),
         _ => throw new UnreachableException(),
     };
 
     public readonly string ToString(string? format, IFormatProvider? formatProvider) => type switch
     {
         RuntimeType.Null => "null",
-        RuntimeType.UInt8 => valueUInt8.ToString(format, formatProvider),
-        RuntimeType.SInt32 => valueSInt32.ToString(format, formatProvider),
-        RuntimeType.Single => valueSingle.ToString(format, formatProvider),
-        RuntimeType.UInt16 => valueUInt16.ToString(formatProvider),
+        RuntimeType.Byte => _byte.ToString(format, formatProvider),
+        RuntimeType.Integer => _integer.ToString(format, formatProvider),
+        RuntimeType.Single => _single.ToString(format, formatProvider),
+        RuntimeType.Char => _char.ToString(formatProvider),
         _ => throw new UnreachableException(),
     };
 
@@ -649,10 +657,10 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly ushort ToUInt16(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToUInt16(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToUInt16(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToUInt16(valueUInt16),
-        RuntimeType.Single => Convert.ToUInt16(valueSingle),
+        RuntimeType.Byte => Convert.ToUInt16(_byte),
+        RuntimeType.Integer => Convert.ToUInt16(_integer),
+        RuntimeType.Char => Convert.ToUInt16(_char),
+        RuntimeType.Single => Convert.ToUInt16(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(UInt16)}"),
     };
 
@@ -661,10 +669,10 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly uint ToUInt32(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToUInt32(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToUInt32(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToUInt32(valueUInt16),
-        RuntimeType.Single => Convert.ToUInt32(valueSingle),
+        RuntimeType.Byte => Convert.ToUInt32(_byte),
+        RuntimeType.Integer => Convert.ToUInt32(_integer),
+        RuntimeType.Char => Convert.ToUInt32(_char),
+        RuntimeType.Single => Convert.ToUInt32(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.UInt32)}"),
     };
 
@@ -673,10 +681,10 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public readonly ulong ToUInt64(IFormatProvider? provider) => type switch
     {
-        RuntimeType.UInt8 => Convert.ToUInt64(valueUInt8),
-        RuntimeType.SInt32 => Convert.ToUInt64(valueSInt32),
-        RuntimeType.UInt16 => Convert.ToUInt16(valueUInt16),
-        RuntimeType.Single => Convert.ToUInt64(valueSingle),
+        RuntimeType.Byte => Convert.ToUInt64(_byte),
+        RuntimeType.Integer => Convert.ToUInt64(_integer),
+        RuntimeType.Char => Convert.ToUInt16(_char),
+        RuntimeType.Single => Convert.ToUInt64(_single),
         _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.UInt64)}"),
     };
 
@@ -684,36 +692,36 @@ public partial struct DataItem :
     {
         value = targetType switch
         {
-            RuntimeType.UInt8 => value.Type switch
+            RuntimeType.Byte => value.Type switch
             {
-                RuntimeType.UInt8 => new DataItem((byte)value.ValueUInt8),
-                RuntimeType.SInt32 => new DataItem((byte)(value.ValueSInt32 % byte.MaxValue)),
-                RuntimeType.Single => new DataItem((byte)value.ValueSingle),
-                RuntimeType.UInt16 => new DataItem((byte)value.ValueUInt16),
+                RuntimeType.Byte => new DataItem((byte)value.VByte),
+                RuntimeType.Integer => new DataItem((byte)(value.VInt % byte.MaxValue)),
+                RuntimeType.Single => new DataItem((byte)value.VSingle),
+                RuntimeType.Char => new DataItem((byte)value.VChar),
                 _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
             },
-            RuntimeType.SInt32 => value.Type switch
+            RuntimeType.Integer => value.Type switch
             {
-                RuntimeType.UInt8 => new DataItem((int)value.ValueUInt8),
-                RuntimeType.SInt32 => new DataItem((int)value.ValueSInt32),
-                RuntimeType.Single => new DataItem((int)value.ValueSingle),
-                RuntimeType.UInt16 => new DataItem((int)value.ValueUInt16),
+                RuntimeType.Byte => new DataItem((int)value.VByte),
+                RuntimeType.Integer => new DataItem((int)value.VInt),
+                RuntimeType.Single => new DataItem((int)value.VSingle),
+                RuntimeType.Char => new DataItem((int)value.VChar),
                 _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
             },
             RuntimeType.Single => value.Type switch
             {
-                RuntimeType.UInt8 => new DataItem((float)value.ValueUInt8),
-                RuntimeType.SInt32 => new DataItem((float)value.ValueSInt32),
-                RuntimeType.Single => new DataItem((float)value.ValueSingle),
-                RuntimeType.UInt16 => new DataItem((float)value.ValueUInt16),
+                RuntimeType.Byte => new DataItem((float)value.VByte),
+                RuntimeType.Integer => new DataItem((float)value.VInt),
+                RuntimeType.Single => new DataItem((float)value.VSingle),
+                RuntimeType.Char => new DataItem((float)value.VChar),
                 _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
             },
-            RuntimeType.UInt16 => value.Type switch
+            RuntimeType.Char => value.Type switch
             {
-                RuntimeType.UInt8 => new DataItem((char)value.ValueUInt8),
-                RuntimeType.SInt32 => new DataItem((char)value.ValueSInt32),
-                RuntimeType.Single => new DataItem((char)value.ValueSingle),
-                RuntimeType.UInt16 => new DataItem((char)value.ValueUInt16),
+                RuntimeType.Byte => new DataItem((char)value.VByte),
+                RuntimeType.Integer => new DataItem((char)value.VInt),
+                RuntimeType.Single => new DataItem((char)value.VSingle),
+                RuntimeType.Char => new DataItem((char)value.VChar),
                 _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
             },
             _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
@@ -726,42 +734,42 @@ public partial struct DataItem :
     {
         switch (targetType)
         {
-            case RuntimeType.UInt8:
+            case RuntimeType.Byte:
                 switch (value.Type)
                 {
-                    case RuntimeType.UInt8:
+                    case RuntimeType.Byte:
                         return true;
-                    case RuntimeType.SInt32:
-                        if (value.ValueSInt32 >= byte.MinValue && value.ValueSInt32 <= byte.MaxValue)
+                    case RuntimeType.Integer:
+                        if (value.VInt >= byte.MinValue && value.VInt <= byte.MaxValue)
                         {
-                            value = new DataItem((byte)value.ValueSInt32);
+                            value = new DataItem((byte)value.VInt);
                             return true;
                         }
                         return false;
                     case RuntimeType.Single:
                         return false;
-                    case RuntimeType.UInt16:
-                        if (value.ValueUInt16 >= byte.MinValue && value.ValueUInt16 <= byte.MaxValue)
+                    case RuntimeType.Char:
+                        if (value.VChar >= byte.MinValue && value.VChar <= byte.MaxValue)
                         {
-                            value = new DataItem((byte)value.ValueUInt16);
+                            value = new DataItem((byte)value.VChar);
                             return true;
                         }
                         return false;
                     default:
                         return false;
                 }
-            case RuntimeType.SInt32:
+            case RuntimeType.Integer:
                 switch (value.Type)
                 {
-                    case RuntimeType.UInt8:
-                        value = new DataItem((int)value.ValueUInt8);
+                    case RuntimeType.Byte:
+                        value = new DataItem((int)value.VByte);
                         return true;
-                    case RuntimeType.SInt32:
+                    case RuntimeType.Integer:
                         return true;
                     case RuntimeType.Single:
                         return false;
-                    case RuntimeType.UInt16:
-                        value = new DataItem((int)value.ValueUInt16);
+                    case RuntimeType.Char:
+                        value = new DataItem((int)value.VChar);
                         return true;
                     default:
                         return false;
@@ -769,36 +777,36 @@ public partial struct DataItem :
             case RuntimeType.Single:
                 switch (value.Type)
                 {
-                    case RuntimeType.UInt8:
-                        value = new DataItem((float)value.ValueUInt8);
+                    case RuntimeType.Byte:
+                        value = new DataItem((float)value.VByte);
                         return true;
-                    case RuntimeType.SInt32:
-                        value = new DataItem((float)value.ValueSInt32);
+                    case RuntimeType.Integer:
+                        value = new DataItem((float)value.VInt);
                         return true;
                     case RuntimeType.Single:
                         return true;
-                    case RuntimeType.UInt16:
-                        value = new DataItem((float)value.ValueUInt16);
+                    case RuntimeType.Char:
+                        value = new DataItem((float)value.VChar);
                         return true;
                     default:
                         return false;
                 }
-            case RuntimeType.UInt16:
+            case RuntimeType.Char:
                 switch (value.Type)
                 {
-                    case RuntimeType.UInt8:
-                        value = new DataItem((char)value.ValueUInt8);
+                    case RuntimeType.Byte:
+                        value = new DataItem((char)value.VByte);
                         return true;
-                    case RuntimeType.SInt32:
-                        if (value.ValueSInt32 >= char.MinValue && value.ValueSInt32 <= char.MaxValue)
+                    case RuntimeType.Integer:
+                        if (value.VInt >= char.MinValue && value.VInt <= char.MaxValue)
                         {
-                            value = new DataItem((char)value.ValueSInt32);
+                            value = new DataItem((char)value.VInt);
                             return true;
                         }
                         return false;
                     case RuntimeType.Single:
                         return false;
-                    case RuntimeType.UInt16:
+                    case RuntimeType.Char:
                         return true;
                     default:
                         return false;
@@ -811,10 +819,10 @@ public partial struct DataItem :
     public readonly int GetByteCount() => type switch
     {
         RuntimeType.Null => 0,
-        RuntimeType.UInt8 => sizeof(byte),
-        RuntimeType.SInt32 => sizeof(int),
+        RuntimeType.Byte => sizeof(byte),
+        RuntimeType.Integer => sizeof(int),
         RuntimeType.Single => sizeof(float),
-        RuntimeType.UInt16 => sizeof(char),
+        RuntimeType.Char => sizeof(char),
         _ => throw new UnreachableException(),
     };
     /// <inheritdoc/>
@@ -823,16 +831,16 @@ public partial struct DataItem :
     public readonly int GetShortestBitLength() => throw new NotImplementedException();
     public static DataItem PopCount(DataItem value) => value.type switch
     {
-        RuntimeType.UInt8 => (DataItem)BitOperations.PopCount(value.ValueUInt8),
-        RuntimeType.SInt32 => (DataItem)BitOperations.PopCount(unchecked((uint)value.ValueSInt32)),
-        RuntimeType.UInt16 => (DataItem)BitOperations.PopCount(value.valueUInt16),
+        RuntimeType.Byte => (DataItem)BitOperations.PopCount(value.VByte),
+        RuntimeType.Integer => (DataItem)BitOperations.PopCount(unchecked((uint)value.VInt)),
+        RuntimeType.Char => (DataItem)BitOperations.PopCount(value._char),
         _ => throw new NotImplementedException($"Can't do {nameof(PopCount)} on type {value.type}"),
     };
     public static DataItem TrailingZeroCount(DataItem value) => value.type switch
     {
-        RuntimeType.UInt8 => (DataItem)BitOperations.TrailingZeroCount(value.ValueUInt8),
-        RuntimeType.SInt32 => (DataItem)BitOperations.TrailingZeroCount(unchecked((uint)value.ValueSInt32)),
-        RuntimeType.UInt16 => (DataItem)BitOperations.TrailingZeroCount(value.valueUInt16),
+        RuntimeType.Byte => (DataItem)BitOperations.TrailingZeroCount(value.VByte),
+        RuntimeType.Integer => (DataItem)BitOperations.TrailingZeroCount(unchecked((uint)value.VInt)),
+        RuntimeType.Char => (DataItem)BitOperations.TrailingZeroCount(value._char),
         _ => throw new NotImplementedException($"Can't do {nameof(TrailingZeroCount)} on type {value.type}"),
     };
     /// <inheritdoc/>

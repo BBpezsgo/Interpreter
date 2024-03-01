@@ -672,8 +672,8 @@ public class Interactive
                         TokenAnalyzedType.VariableName or
                         TokenAnalyzedType.ParameterName => InteractiveColors.LocalSymbol,
                         TokenAnalyzedType.Namespace => Color.White,
-                        TokenAnalyzedType.Hash => Color.White,
-                        TokenAnalyzedType.HashParameter => Color.White,
+                        TokenAnalyzedType.CompileTag => Color.White,
+                        TokenAnalyzedType.CompileTagParameter => Color.White,
                         TokenAnalyzedType.Library => Color.White,
                         TokenAnalyzedType.Statement => InteractiveColors.Statement,
                         TokenAnalyzedType.Enum => InteractiveColors.Enum,
@@ -787,21 +787,21 @@ public class Interactive
 
             switch (exitCode.Type)
             {
-                case RuntimeType.UInt8:
+                case RuntimeType.Byte:
                     output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append(exitCode.ValueUInt8);
+                    output.Append(exitCode.VByte);
                     break;
-                case RuntimeType.SInt32:
+                case RuntimeType.Integer:
                     output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append(exitCode.ValueSInt32);
+                    output.Append(exitCode.VInt);
                     break;
                 case RuntimeType.Single:
                     output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append($"{exitCode.ValueSingle}f");
+                    output.Append($"{exitCode.VSingle}f");
                     break;
-                case RuntimeType.UInt16:
+                case RuntimeType.Char:
                     output.ForegroundColor = InteractiveColors.LiteralString;
-                    output.Append($"'{exitCode.ValueUInt16}'");
+                    output.Append($"'{exitCode.VChar}'");
                     break;
                 case RuntimeType.Null:
                 default:

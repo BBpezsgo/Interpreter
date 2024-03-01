@@ -273,7 +273,7 @@ public class BytecodeInterpreter : BytecodeProcessor
         AddressingMode.Absolute => offset,
         AddressingMode.BasePointerRelative => BasePointer + offset,
         AddressingMode.StackRelative => Memory.Stack.Count + offset,
-        AddressingMode.Runtime => Memory.Stack.Last.ValueSInt32,
+        AddressingMode.Runtime => Memory.Stack.Last.VInt,
         _ => offset,
     };
 }

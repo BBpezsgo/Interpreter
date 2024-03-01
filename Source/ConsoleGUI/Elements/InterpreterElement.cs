@@ -531,7 +531,7 @@ public sealed class InterpreterElement : WindowElement
             if (instruction.opcode == Opcode.HEAP_SET)
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
-                { storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueSInt32); }
+                { storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].VInt); }
                 else
                 { storeIndicators.Add((int)instruction.Parameter); }
             }
@@ -540,8 +540,8 @@ public sealed class InterpreterElement : WindowElement
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
                 {
-                    if (this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].Type == RuntimeType.SInt32)
-                    { loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueSInt32); }
+                    if (this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].Type == RuntimeType.Integer)
+                    { loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].VInt); }
                 }
                 else
                 { loadIndicators.Add((int)instruction.Parameter); }
@@ -624,23 +624,23 @@ public sealed class InterpreterElement : WindowElement
                 {
                     switch (item.Type)
                     {
-                        case RuntimeType.UInt8:
+                        case RuntimeType.Byte:
                             b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(item.ValueUInt8.ToString(CultureInfo.InvariantCulture));
+                            b.AddText(item.VByte.ToString(CultureInfo.InvariantCulture));
                             break;
-                        case RuntimeType.SInt32:
+                        case RuntimeType.Integer:
                             b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(item.ValueSInt32.ToString(CultureInfo.InvariantCulture));
+                            b.AddText(item.VInt.ToString(CultureInfo.InvariantCulture));
                             break;
                         case RuntimeType.Single:
                             b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(item.ValueSingle.ToString(CultureInfo.InvariantCulture));
+                            b.AddText(item.VSingle.ToString(CultureInfo.InvariantCulture));
                             b.AddText('f');
                             break;
-                        case RuntimeType.UInt16:
+                        case RuntimeType.Char:
                             b.ForegroundColor = CharColor.BrightYellow;
                             b.AddText('\'');
-                            b.AddText(item.ValueUInt16.Escape());
+                            b.AddText(item.VChar.Escape());
                             b.AddText('\'');
                             break;
                         default:
@@ -797,23 +797,23 @@ public sealed class InterpreterElement : WindowElement
 
             switch (item.Type)
             {
-                case RuntimeType.UInt8:
+                case RuntimeType.Byte:
                     b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.ValueUInt8.ToString(CultureInfo.InvariantCulture));
+                    b.AddText(item.VByte.ToString(CultureInfo.InvariantCulture));
                     break;
-                case RuntimeType.SInt32:
+                case RuntimeType.Integer:
                     b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.ValueSInt32.ToString(CultureInfo.InvariantCulture));
+                    b.AddText(item.VInt.ToString(CultureInfo.InvariantCulture));
                     break;
                 case RuntimeType.Single:
                     b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.ValueSingle.ToString(CultureInfo.InvariantCulture));
+                    b.AddText(item.VSingle.ToString(CultureInfo.InvariantCulture));
                     b.AddText('f');
                     break;
-                case RuntimeType.UInt16:
+                case RuntimeType.Char:
                     b.ForegroundColor = CharColor.BrightYellow;
                     b.AddText('\'');
-                    b.AddText(item.ValueUInt16.Escape());
+                    b.AddText(item.VChar.Escape());
                     b.AddText('\'');
                     break;
                 default:
@@ -1048,26 +1048,26 @@ public sealed class InterpreterElement : WindowElement
             {
                 switch (instruction.Parameter.Type)
                 {
-                    case RuntimeType.UInt8:
+                    case RuntimeType.Byte:
                         b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Parameter.ValueUInt8.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Parameter.VByte.ToString(CultureInfo.InvariantCulture));
                         b.AddText(' ');
                         break;
-                    case RuntimeType.SInt32:
+                    case RuntimeType.Integer:
                         b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Parameter.ValueSInt32.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Parameter.VInt.ToString(CultureInfo.InvariantCulture));
                         b.AddText(' ');
                         break;
                     case RuntimeType.Single:
                         b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Parameter.ValueSingle.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Parameter.VSingle.ToString(CultureInfo.InvariantCulture));
                         b.AddText('f');
                         b.AddText(' ');
                         break;
-                    case RuntimeType.UInt16:
+                    case RuntimeType.Char:
                         b.ForegroundColor = CharColor.BrightYellow;
                         b.AddText('\'');
-                        b.AddText(instruction.Parameter.ValueUInt16.Escape());
+                        b.AddText(instruction.Parameter.VChar.Escape());
                         b.AddText('\'');
                         b.AddText(' ');
                         break;

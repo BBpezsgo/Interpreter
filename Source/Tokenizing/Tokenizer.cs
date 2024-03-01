@@ -28,7 +28,7 @@ public abstract partial class Tokenizer
                 UnicodeCharacters.Add(new SimpleToken(
                         unicodeChar,
                         new Position(
-                            new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
+                            new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), CurrentSinglePosition),
                             new Range<int>(offsetTotal - 6, offsetTotal)
                         )
                     ));
@@ -55,7 +55,7 @@ public abstract partial class Tokenizer
                 UnicodeCharacters.Add(new SimpleToken(
                     unicodeChar,
                     new Position(
-                        new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
+                        new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), CurrentSinglePosition),
                         new Range<int>(offsetTotal - 6, offsetTotal)
                     )
                 ));
@@ -438,7 +438,7 @@ FinishCharacter:
         else
         {
             CurrentToken.Position = new Position(
-                new Range<SinglePosition>(CurrentToken.Position.Range.Start, new SinglePosition(CurrentLine, CurrentColumn)),
+                new Range<SinglePosition>(CurrentToken.Position.Range.Start, CurrentSinglePosition),
                 new Range<int>(CurrentToken.Position.AbsoluteRange.Start, offsetTotal)
                 );
         }
@@ -501,7 +501,7 @@ Finish:
         CurrentToken.Content.Clear();
 
         CurrentToken.Position = new Position(
-            new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), CurrentToken.Position.Range.End),
+            new Range<SinglePosition>(CurrentSinglePosition, CurrentToken.Position.Range.End),
             new Range<int>(offsetTotal, CurrentToken.Position.AbsoluteRange.End)
             );
     }

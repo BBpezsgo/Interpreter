@@ -92,7 +92,7 @@ public class HEAP : IReadOnlyHeap
     public static DataItem GetHeader(ushort size, bool used)
         => new((size & BLOCK_SIZE_MASK) | (used ? BLOCK_STAT_MASK : 0));
     public static (ushort, bool) GetHeader(DataItem header)
-        => ((ushort)(header.ValueSInt32 & BLOCK_SIZE_MASK), (header.ValueSInt32 & BLOCK_STAT_MASK) != 0);
+        => ((ushort)(header.VInt & BLOCK_SIZE_MASK), (header.VInt & BLOCK_STAT_MASK) != 0);
 
     static void FixSize(ref ushort size)
     {

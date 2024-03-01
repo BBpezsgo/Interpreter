@@ -15,6 +15,26 @@ public interface IReferenceableTo<T> where T : notnull
     public T? Reference { get; set; }
 }
 
+public readonly struct TokenPair :
+    IPositioned
+{
+    public Token Start { get; }
+    public Token End { get; }
+
+    public Position Position => new(Start, End);
+
+    public TokenPair(Token start, Token end)
+    {
+        Start = start;
+        End = end;
+    }
+
+    public static TokenPair CreateAnonymous(Position surround, string start, string end) => new(
+        Token.CreateAnonymous(start, TokenType.Operator, surround.Before()),
+        Token.CreateAnonymous(end, TokenType.Operator, surround.Before())
+    );
+}
+
 public static class StatementExtensions
 {
     public static T? GetStatementAt<T>(this ParserResult parserResult, int absolutePosition)
@@ -171,16 +191,11 @@ public abstract class StatementWithValue : Statement
     public bool SaveValue { get; set; } = true;
     public GeneralType? CompiledType { get; internal set; }
     public DataItem? PredictedValue { get; internal set; }
+    public TokenPair? SurroundingBracelet { get; set; }
 
     public StatementWithValue() : base()
     {
         SaveValue = true;
-        CompiledType = null;
-    }
-
-    public StatementWithValue(StatementWithValue other) : base(other)
-    {
-        SaveValue = other.SaveValue;
         CompiledType = null;
     }
 }
@@ -202,34 +217,35 @@ public abstract class StatementWithAnyBlock : Statement
 public class Block : Statement
 {
     public ImmutableArray<Statement> Statements { get; }
-    public Token BracketStart { get; }
-    public Token BracketEnd { get; }
-    public override Position Position => new(BracketStart, BracketEnd);
+    public TokenPair Brackets { get; }
+    public override Position Position => new(Brackets);
 
-    public Block(Token bracketStart, IEnumerable<Statement> statements, Token bracketEnd)
+    public Block(IEnumerable<Statement> statements, TokenPair brackets)
     {
-        this.BracketStart = bracketStart;
-        this.Statements = statements.ToImmutableArray();
-        this.BracketEnd = bracketEnd;
+        Statements = statements.ToImmutableArray();
+        Brackets = brackets;
     }
 
     public override string ToString()
     {
         StringBuilder result = new();
-        result.Append('{');
+
+        result.Append(Brackets.Start);
 
         if (Statements.Length == 0)
         { result.Append(' '); }
         else if (Statements.Length == 1)
         {
             result.Append(' ');
-            result.Append(Statements[0].ToString());
+            result.Append(Statements[0]);
             result.Append(' ');
         }
         else
         { result.Append("..."); }
 
-        result.Append('}');
+        result.Append(Brackets.End);
+        result.Append(Semicolon);
+
         return result.ToString();
     }
 
@@ -248,10 +264,8 @@ public class Block : Statement
     {
         if (statement is Block block) return block;
         return new Block(
-            Token.CreateAnonymous("{", TokenType.Operator, statement.Position.Before()),
             [statement],
-            Token.CreateAnonymous("}", TokenType.Operator, statement.Position.After())
-            );
+            TokenPair.CreateAnonymous(statement.Position, "{", "}"));
     }
 }
 
@@ -317,23 +331,23 @@ public class LinkedElse : LinkedIfThing
 
 public class CompileTag : Statement, IInFile
 {
-    public Token HashToken { get; }
-    public Token HashName { get; }
+    public Token Operator { get; }
+    public Token Identifier { get; }
     public ImmutableArray<Literal> Parameters { get; }
     public Uri? FilePath { get; set; }
     public override Position Position =>
-        new Position(HashToken, HashName)
+        new Position(Operator, Identifier)
         .Union(Parameters);
 
     public CompileTag(Token hashToken, Token hashName, IEnumerable<Literal> parameters)
     {
-        HashToken = hashToken;
-        HashName = hashName;
+        Operator = hashToken;
+        Identifier = hashName;
         Parameters = parameters.ToImmutableArray();
     }
 
     public override string ToString()
-        => $"{HashToken}{HashName}{(Parameters.Length > 0 ? string.Join<Literal>(' ', Parameters) : string.Empty)}{Semicolon}";
+        => $"{Operator}{Identifier}{(Parameters.Length > 0 ? string.Join<Literal>(' ', Parameters) : string.Empty)}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -349,15 +363,13 @@ public class CompileTag : Statement, IInFile
 
 public class LiteralList : StatementWithValue
 {
-    public Token BracketLeft { get; }
-    public Token BracketRight { get; }
+    public TokenPair Brackets { get; }
     public ImmutableArray<StatementWithValue> Values { get; }
-    public override Position Position => new(BracketLeft, BracketRight);
+    public override Position Position => new(Brackets);
 
-    public LiteralList(Token bracketLeft, IEnumerable<StatementWithValue> values, Token bracketRight)
+    public LiteralList(IEnumerable<StatementWithValue> values, TokenPair brackets)
     {
-        BracketLeft = bracketLeft;
-        BracketRight = bracketRight;
+        Brackets = brackets;
         Values = values.ToImmutableArray();
     }
 
@@ -374,8 +386,11 @@ public class LiteralList : StatementWithValue
 
     public override string ToString()
     {
-        StringBuilder result = new(3);
-        result.Append('[');
+        StringBuilder result = new();
+
+        result.Append(SurroundingBracelet?.Start);
+        result.Append(Brackets.Start);
+
         if (Values.Length == 0)
         {
             result.Append(' ');
@@ -389,11 +404,14 @@ public class LiteralList : StatementWithValue
                 if (result.Length >= Stringify.CozyLength)
                 { result.Append("..."); break; }
 
-                result.Append(Values[i].ToString());
+                result.Append(Values[i]);
             }
         }
-        result.Append(']');
-        if (Semicolon != null) result.Append(Semicolon.ToString());
+        result.Append(Brackets.End);
+        result.Append(SurroundingBracelet?.End);
+
+        if (Semicolon != null) result.Append(Semicolon);
+
         return result.ToString();
     }
 }
@@ -401,19 +419,19 @@ public class LiteralList : StatementWithValue
 public class VariableDeclaration : Statement, IInFile, IHaveType
 {
     public TypeInstance Type { get; }
-    public Token VariableName { get; }
+    public Token Identifier { get; }
     public StatementWithValue? InitialValue { get; }
     public ImmutableArray<Token> Modifiers { get; }
     public GeneralType? CompiledType { get; set; }
     public Uri? FilePath { get; set; }
     public override Position Position =>
-        new Position(Type, VariableName, InitialValue)
+        new Position(Type, Identifier, InitialValue)
         .Union(Modifiers);
 
     public VariableDeclaration(VariableDeclaration other) : base(other)
     {
         Type = other.Type;
-        VariableName = other.VariableName;
+        Identifier = other.Identifier;
         InitialValue = other.InitialValue;
         Modifiers = other.Modifiers;
         FilePath = other.FilePath;
@@ -423,13 +441,13 @@ public class VariableDeclaration : Statement, IInFile, IHaveType
     public VariableDeclaration(IEnumerable<Token> modifiers, TypeInstance type, Token variableName, StatementWithValue? initialValue)
     {
         Type = type;
-        VariableName = variableName;
+        Identifier = variableName;
         InitialValue = initialValue;
         Modifiers = modifiers.ToImmutableArray();
     }
 
     public override string ToString()
-        => $"{string.Join(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
+        => $"{string.Join(' ', Modifiers)} {Type} {Identifier}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -443,28 +461,61 @@ public class VariableDeclaration : Statement, IInFile, IHaveType
     }
 }
 
-public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
+public class TypeStatement : StatementWithValue
 {
-    public StatementWithValue PrevStatement { get; }
-    public Token BracketLeft { get; }
-    public ImmutableArray<StatementWithValue> Parameters { get; }
-    public Token BracketRight { get; }
-    public object? Reference { get; set; }
-    public override Position Position => new(PrevStatement, BracketLeft, BracketRight);
+    public Token Keyword { get; }
+    public TypeInstance Type { get; }
+    public override Position Position => new(Keyword, Type);
 
-    public AnyCall(StatementWithValue prevStatement, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
+    public TypeStatement(Token keyword, TypeInstance type)
     {
-        PrevStatement = prevStatement;
-        BracketLeft = bracketLeft;
-        Parameters = parameters.ToImmutableArray();
-        BracketRight = bracketRight;
+        Keyword = keyword;
+        Type = type;
     }
 
     public override string ToString()
     {
         StringBuilder result = new();
-        if (PrevStatement != null) result.Append(PrevStatement.ToString());
-        result.Append('(');
+
+        result.Append(SurroundingBracelet?.Start);
+
+        result.Append(Type);
+
+        result.Append(SurroundingBracelet?.End);
+        result.Append(Semicolon);
+
+        return result.ToString();
+    }
+    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    {
+        if (includeThis) yield return this;
+    }
+}
+
+public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
+{
+    public StatementWithValue PrevStatement { get; }
+    public TokenPair Brackets { get; }
+    public ImmutableArray<StatementWithValue> Parameters { get; }
+    public object? Reference { get; set; }
+    public override Position Position => new(PrevStatement, Brackets);
+
+    public AnyCall(StatementWithValue prevStatement, IEnumerable<StatementWithValue> parameters, TokenPair brackets)
+    {
+        PrevStatement = prevStatement;
+        Parameters = parameters.ToImmutableArray();
+        Brackets = brackets;
+    }
+
+    public override string ToString()
+    {
+        StringBuilder result = new();
+
+        result.Append(SurroundingBracelet?.Start);
+
+        result.Append(PrevStatement);
+        result.Append(Brackets.Start);
+
         for (int i = 0; i < Parameters.Length; i++)
         {
             if (i > 0)
@@ -473,10 +524,13 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
             if (result.Length >= Stringify.CozyLength)
             { result.Append("..."); break; }
 
-            result.Append(Parameters[i].ToString());
+            result.Append(Parameters[i]);
         }
-        result.Append(')');
-        if (Semicolon != null) result.Append(Semicolon.ToString());
+        result.Append(Brackets.End);
+
+        result.Append(SurroundingBracelet?.End);
+        result.Append(Semicolon);
+
         return result.ToString();
     }
 
@@ -484,10 +538,10 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
     {
         StringBuilder result = new();
         result.Append('(');
-        for (int i = 0; i < this.Parameters.Length; i++)
+        for (int i = 0; i < Parameters.Length; i++)
         {
             if (i > 0) { result.Append(", "); }
-            result.Append(TypeSearch.Invoke(this.Parameters[i]).ToString());
+            result.Append(TypeSearch.Invoke(Parameters[i]).ToString());
         }
         result.Append(')');
         return result.ToString();
@@ -502,20 +556,28 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
 
         if (PrevStatement is Identifier functionIdentifier)
         {
-            functionCall = new FunctionCall(null, functionIdentifier.Token, BracketLeft, Parameters, BracketRight)
+            functionCall = new FunctionCall(null, functionIdentifier.Token, Parameters, Brackets)
             {
                 Semicolon = Semicolon,
                 SaveValue = SaveValue,
+                SurroundingBracelet = SurroundingBracelet,
+                CompiledType = CompiledType,
+                PredictedValue = PredictedValue,
+                Reference = Reference,
             };
             return true;
         }
 
         if (PrevStatement is Field field)
         {
-            functionCall = new FunctionCall(field.PrevStatement, field.FieldName, BracketLeft, Parameters, BracketRight)
+            functionCall = new FunctionCall(field.PrevStatement, field.Identifier, Parameters, Brackets)
             {
                 Semicolon = Semicolon,
                 SaveValue = SaveValue,
+                SurroundingBracelet = SurroundingBracelet,
+                CompiledType = CompiledType,
+                PredictedValue = PredictedValue,
+                Reference = Reference,
             };
             return true;
         }
@@ -543,10 +605,8 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
     public Token Identifier { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
     public StatementWithValue? PrevStatement { get; }
-    public Token BracketLeft { get; }
-    public Token BracketRight { get; }
+    public TokenPair Brackets { get; }
     public object? Reference { get; set; }
-    public string FunctionName => Identifier.Content;
     public bool IsMethodCall => PrevStatement != null;
     public StatementWithValue[] MethodParameters
     {
@@ -560,33 +620,35 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
         }
     }
     public override Position Position =>
-        new Position(BracketLeft, BracketRight, Identifier)
+        new Position(Brackets, Identifier)
         .Union(MethodParameters);
 
-    public FunctionCall(StatementWithValue? prevStatement, Token identifier, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
+    public FunctionCall(StatementWithValue? prevStatement, Token identifier, IEnumerable<StatementWithValue> parameters, TokenPair brackets)
     {
         PrevStatement = prevStatement;
         Identifier = identifier;
-        BracketLeft = bracketLeft;
         Parameters = parameters.ToImmutableArray();
-        BracketRight = bracketRight;
+        Brackets = brackets;
     }
 
     public override string ToString()
     {
         StringBuilder result = new();
+
+        result.Append(SurroundingBracelet?.Start);
+
         if (PrevStatement != null)
         {
             result.Append(PrevStatement);
             result.Append('.');
         }
-        result.Append(FunctionName);
-        result.Append('(');
+        result.Append(Identifier);
+        result.Append(Brackets.Start);
         for (int i = 0; i < Parameters.Length; i++)
         {
             if (i > 0) result.Append(", ");
 
-            result.Append(Parameters[i].ToString());
+            result.Append(Parameters[i]);
 
             if (result.Length >= 10 && i + 1 != Parameters.Length)
             {
@@ -594,7 +656,11 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
                 break;
             }
         }
-        result.Append(')');
+        result.Append(Brackets.End);
+
+        result.Append(SurroundingBracelet?.End);
+        result.Append(Semicolon);
+
         return result.ToString();
     }
 
@@ -606,7 +672,7 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
             result.Append(TypeSearch.Invoke(PrevStatement).ToString());
             result.Append('.');
         }
-        result.Append(FunctionName);
+        result.Append(Identifier.ToString());
         result.Append('(');
         for (int i = 0; i < Parameters.Length; i++)
         {
@@ -639,10 +705,9 @@ public class KeywordCall : StatementWithValue, IReadable
 {
     public Token Identifier { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
-    public string FunctionName => Identifier.Content;
     public override Position Position =>
-    new Position(Identifier)
-    .Union(Parameters);
+        new Position(Identifier)
+        .Union(Parameters);
 
     public KeywordCall(Token identifier, IEnumerable<StatementWithValue> parameters)
     {
@@ -652,8 +717,10 @@ public class KeywordCall : StatementWithValue, IReadable
 
     public override string ToString()
     {
-        StringBuilder result = new(1);
-        result.Append(FunctionName);
+        StringBuilder result = new();
+        result.Append(SurroundingBracelet?.Start);
+
+        result.Append(Identifier);
 
         if (Parameters.Length > 0)
         {
@@ -665,12 +732,12 @@ public class KeywordCall : StatementWithValue, IReadable
                 if (result.Length >= Stringify.CozyLength)
                 { result.Append("..."); break; }
 
-                result.Append(Parameters[i].ToString());
+                result.Append(Parameters[i]);
             }
         }
 
-        if (Semicolon != null) result.Append(Semicolon.ToString());
-
+        result.Append(SurroundingBracelet?.End);
+        result.Append(Semicolon);
         return result.ToString();
     }
 
@@ -707,77 +774,68 @@ public class OperatorCall : StatementWithValue, IReadable, IReferenceableTo<Comp
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue? Right { get; set; }
-    public bool InsideBracelet { get; set; }
     public CompiledOperator? Reference { get; set; }
-    public StatementWithValue[] Parameters
-    {
-        get
-        {
-            if (Right is null) return new StatementWithValue[] { Left };
-            else return new StatementWithValue[] { Left, Right };
-        }
-    }
-    public int ParameterCount
-    {
-        get
-        {
-            if (Right is not null) return 2;
-            else return 1;
-        }
-    }
     public override Position Position => new(Operator, Left, Right);
+
+    public StatementWithValue[] Parameters =>
+        Right is not null ?
+        (new StatementWithValue[] { Left, Right }) :
+        (new StatementWithValue[] { Left });
+
+    public int ParameterCount =>
+        Right is not null ?
+        2 :
+        1;
 
     public OperatorCall(Token op, StatementWithValue left, StatementWithValue? right = null)
     {
-        this.Operator = op;
-        this.Left = left;
-        this.Right = right;
+        Operator = op;
+        Left = left;
+        Right = right;
     }
 
     public override string ToString()
     {
-        StringBuilder result = new(3);
-
-        if (InsideBracelet) result.Append('(');
+        StringBuilder result = new();
+        result.Append(SurroundingBracelet?.Start);
 
         if (Left != null)
         {
             if (Left.ToString().Length < Stringify.CozyLength)
-            { result.Append(Left.ToString()); }
+            { result.Append(Left); }
             else
             { result.Append("..."); }
 
             result.Append(' ');
-            result.Append(Operator.ToString());
+            result.Append(Operator);
             result.Append(' ');
 
             if (Right != null)
             {
                 if (Right.ToString().Length < Stringify.CozyLength)
-                { result.Append(Right.ToString()); }
+                { result.Append(Right); }
                 else
                 { result.Append("..."); }
             }
         }
         else
-        { result.Append(Operator.ToString()); }
+        { result.Append(Operator); }
 
-        if (InsideBracelet) result.Append(')');
-
-        if (Semicolon != null) result.Append(Semicolon.ToString());
-
+        result.Append(SurroundingBracelet?.End);
+        result.Append(Semicolon);
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> TypeSearch)
+    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
     {
-        StringBuilder result = new(this.Operator.Content);
+        StringBuilder result = new();
+
+        result.Append(Operator.Content);
         result.Append('(');
-        for (int i = 0; i < this.Parameters.Length; i++)
+        for (int i = 0; i < Parameters.Length; i++)
         {
             if (i > 0) { result.Append(", "); }
-
-            result.Append(TypeSearch.Invoke(this.Parameters[i]).ToString());
+            result.Append(typeSearch.Invoke(Parameters[i]).ToString());
         }
         result.Append(')');
 
@@ -809,27 +867,28 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
 
     public ShortOperatorCall(Token op, StatementWithValue left)
     {
-        this.Operator = op;
-        this.Left = left;
+        Operator = op;
+        Left = left;
     }
 
     public override string ToString()
     {
         StringBuilder result = new();
+
         if (Left != null)
         {
             if (Left.ToString().Length <= Stringify.CozyLength)
-            { result.Append(Left.ToString()); }
+            { result.Append(Left); }
             else
             { result.Append("..."); }
 
             result.Append(' ');
-            result.Append(Operator.ToString());
+            result.Append(Operator);
         }
         else
-        { result.Append(Operator.ToString()); }
+        { result.Append(Operator); }
 
-        if (Semicolon != null) result.Append(Semicolon.ToString());
+        result.Append(Semicolon);
         return result.ToString();
     }
 
@@ -838,7 +897,6 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
         StringBuilder result = new();
 
         result.Append(Operator.Content);
-
         result.Append('(');
         for (int i = 0; i < Parameters.Length; i++)
         {
@@ -901,14 +959,34 @@ public class Assignment : AnyAssignment, IReferenceableTo<CompiledOperator>
 
     public Assignment(Token @operator, StatementWithValue left, StatementWithValue right)
     {
-        this.Operator = @operator;
-        this.Left = left;
-        this.Right = right;
+        Operator = @operator;
+        Left = left;
+        Right = right;
     }
 
     public override string ToString()
-        => $"... {Operator} ...{Semicolon}";
+    {
+        StringBuilder result = new();
 
+        if (result.Length + Left.ToString().Length > Stringify.CozyLength)
+        {
+            result.Append($"... {Operator} ...");
+        }
+        else
+        {
+            result.Append(Left);
+            result.Append(' ');
+            result.Append(Operator);
+            result.Append(' ');
+            if (result.Length + Right.ToString().Length > Stringify.CozyLength)
+            { result.Append("..."); }
+            else
+            { result.Append(Right); }
+        }
+
+        result.Append(Semicolon);
+        return result.ToString();
+    }
     public override Assignment ToAssignment() => this;
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
@@ -936,12 +1014,34 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo<CompiledOperat
 
     public CompoundAssignment(Token @operator, StatementWithValue left, StatementWithValue right)
     {
-        this.Operator = @operator;
-        this.Left = left;
-        this.Right = right;
+        Operator = @operator;
+        Left = left;
+        Right = right;
     }
 
-    public override string ToString() => $"... {Operator} ...{Semicolon}";
+    public override string ToString()
+    {
+        StringBuilder result = new();
+
+        if (result.Length + Left.ToString().Length > Stringify.CozyLength)
+        {
+            result.Append($"... {Operator} ...");
+        }
+        else
+        {
+            result.Append(Left);
+            result.Append(' ');
+            result.Append(Operator);
+            result.Append(' ');
+            if (result.Length + Right.ToString().Length > Stringify.CozyLength)
+            { result.Append("..."); }
+            else
+            { result.Append(Right); }
+        }
+
+        result.Append(Semicolon);
+        return result.ToString();
+    }
 
     public override Assignment ToAssignment()
     {
@@ -994,10 +1094,10 @@ public class Literal : StatementWithValue
     {
         Type = value.Type switch
         {
-            RuntimeType.UInt8 => LiteralType.Integer,
-            RuntimeType.SInt32 => LiteralType.Integer,
+            RuntimeType.Byte => LiteralType.Integer,
+            RuntimeType.Integer => LiteralType.Integer,
             RuntimeType.Single => LiteralType.Float,
-            RuntimeType.UInt16 => LiteralType.Char,
+            RuntimeType.Char => LiteralType.Char,
             _ => throw new NotImplementedException(),
         };
         Value = value.ToString();
@@ -1032,10 +1132,10 @@ public class Literal : StatementWithValue
     {
         TokenType tokenType = value.Type switch
         {
-            RuntimeType.UInt8 => TokenType.LiteralNumber,
-            RuntimeType.SInt32 => TokenType.LiteralNumber,
+            RuntimeType.Byte => TokenType.LiteralNumber,
+            RuntimeType.Integer => TokenType.LiteralNumber,
             RuntimeType.Single => TokenType.LiteralFloat,
-            RuntimeType.UInt16 => TokenType.LiteralCharacter,
+            RuntimeType.Char => TokenType.LiteralCharacter,
             _ => TokenType.Identifier,
         };
         return new Literal(value, Token.CreateAnonymous(value.ToString(), tokenType))
@@ -1062,12 +1162,22 @@ public class Literal : StatementWithValue
         return result;
     }
 
-    public override string ToString() => Type switch
+    public override string ToString()
     {
-        LiteralType.String => $"\"{Value.Escape()}\"",
-        LiteralType.Char => $"'{Value.Escape()}'",
-        _ => Value,
-    };
+        StringBuilder result = new();
+        result.Append(SurroundingBracelet?.Start);
+
+        result.Append(Type switch
+        {
+            LiteralType.String => $"\"{Value.Escape()}\"",
+            LiteralType.Char => $"'{Value.Escape()}'",
+            _ => Value,
+        });
+
+        result.Append(SurroundingBracelet?.End);
+        result.Append(Semicolon);
+        return result.ToString();
+    }
 
     public static int GetInt(string value)
     {
@@ -1153,18 +1263,18 @@ public class Identifier : StatementWithValue, IReferenceableTo
 
 public class AddressGetter : StatementWithValue
 {
-    public Token OperatorToken { get; }
+    public Token Operator { get; }
     public StatementWithValue PrevStatement { get; }
-    public override Position Position => new(OperatorToken, PrevStatement);
+    public override Position Position => new(Operator, PrevStatement);
 
     public AddressGetter(Token operatorToken, StatementWithValue prevStatement)
     {
-        OperatorToken = operatorToken;
+        Operator = operatorToken;
         PrevStatement = prevStatement;
     }
 
     public override string ToString()
-        => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
+        => $"{SurroundingBracelet?.Start}{Operator}{PrevStatement}{SurroundingBracelet?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -1177,18 +1287,18 @@ public class AddressGetter : StatementWithValue
 
 public class Pointer : StatementWithValue
 {
-    public Token OperatorToken { get; }
+    public Token Operator { get; }
     public StatementWithValue PrevStatement { get; }
-    public override Position Position => new(OperatorToken, PrevStatement);
+    public override Position Position => new(Operator, PrevStatement);
 
     public Pointer(Token operatorToken, StatementWithValue prevStatement)
     {
-        OperatorToken = operatorToken;
+        Operator = operatorToken;
         PrevStatement = prevStatement;
     }
 
     public override string ToString()
-        => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
+        => $"{SurroundingBracelet?.Start}{Operator}{PrevStatement}{SurroundingBracelet?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -1358,7 +1468,7 @@ public class IfBranch : BaseBranch
     public IfBranch(Token keyword, StatementWithValue condition, Statement block)
         : base(keyword, IfPart.If, block)
     {
-        this.Condition = condition;
+        Condition = condition;
     }
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
@@ -1380,7 +1490,7 @@ public class ElseIfBranch : BaseBranch
     public ElseIfBranch(Token keyword, StatementWithValue condition, Statement block)
         : base(keyword, IfPart.ElseIf, block)
     {
-        this.Condition = condition;
+        Condition = condition;
     }
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
@@ -1413,18 +1523,17 @@ public class ElseBranch : BaseBranch
 public class NewInstance : StatementWithValue, IHaveType
 {
     public Token Keyword { get; }
-    public TypeInstance TypeName { get; }
-    public override Position Position => new(Keyword, TypeName);
-    TypeInstance IHaveType.Type => TypeName;
+    public TypeInstance Type { get; }
+    public override Position Position => new(Keyword, Type);
 
     public NewInstance(Token keyword, TypeInstance typeName)
     {
         Keyword = keyword;
-        TypeName = typeName;
+        Type = typeName;
     }
 
     public override string ToString()
-        => $"{Keyword} {TypeName}{Semicolon}";
+        => $"{SurroundingBracelet?.Start}{Keyword} {Type}{SurroundingBracelet?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -1435,20 +1544,19 @@ public class NewInstance : StatementWithValue, IHaveType
 public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<ConstructorDefinition>, IHaveType
 {
     public Token Keyword { get; }
-    public TypeInstance TypeName { get; }
-    TypeInstance IHaveType.Type => TypeName;
+    public TypeInstance Type { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
     public Token BracketLeft { get; }
     public Token BracketRight { get; }
     public ConstructorDefinition? Reference { get; set; }
     public override Position Position =>
-        new Position(Keyword, TypeName, BracketLeft, BracketRight)
+        new Position(Keyword, Type, BracketLeft, BracketRight)
         .Union(Parameters);
 
     public ConstructorCall(Token keyword, TypeInstance typeName, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
     {
         Keyword = keyword;
-        TypeName = typeName;
+        Type = typeName;
         BracketLeft = bracketLeft;
         Parameters = parameters.ToImmutableArray();
         BracketRight = bracketRight;
@@ -1457,13 +1565,12 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
     public override string ToString()
     {
         StringBuilder result = new();
+        result.Append(SurroundingBracelet?.Start);
 
-        result.Append(Keyword.ToString());
-
+        result.Append(Keyword);
         result.Append(' ');
-
-        result.Append(TypeName.ToString());
-        result.Append(BracketLeft.ToString());
+        result.Append(Type);
+        result.Append(BracketLeft);
 
         for (int i = 0; i < Parameters.Length; i++)
         {
@@ -1472,20 +1579,20 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
             if (result.Length >= Stringify.CozyLength)
             { result.Append("..."); break; }
 
-            result.Append(Parameters[i].ToString());
+            result.Append(Parameters[i]);
         }
 
-        result.Append(BracketRight.ToString());
+        result.Append(BracketRight);
 
-        if (Semicolon != null) result.Append(Semicolon.ToString());
-
+        result.Append(SurroundingBracelet?.End);
+        result.Append(Semicolon);
         return result.ToString();
     }
 
     public string ToReadable(Func<StatementWithValue, GeneralType> TypeSearch)
     {
         StringBuilder result = new();
-        result.Append(TypeName.ToString());
+        result.Append(Type.ToString());
         result.Append('.');
         result.Append(Keyword.Content);
         result.Append(BracketLeft.ToString());
@@ -1513,7 +1620,7 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
 
     public NewInstance ToInstantiation() => new(
         Keyword,
-        TypeName)
+        Type)
     {
         CompiledType = CompiledType,
         SaveValue = true,
@@ -1525,34 +1632,32 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<General
 {
     public StatementWithValue PrevStatement { get; }
     public StatementWithValue Index { get; }
-    public Token BracketLeft { get; }
-    public Token BracketRight { get; }
+    public TokenPair Brackets { get; }
     public override Position Position => new(PrevStatement, Index);
     public GeneralFunctionDefinition? Reference { get; set; }
 
-    public IndexCall(StatementWithValue prevStatement, Token bracketLeft, StatementWithValue indexStatement, Token bracketRight)
+    public IndexCall(StatementWithValue prevStatement, StatementWithValue indexStatement, TokenPair brackets)
     {
-        this.PrevStatement = prevStatement;
-        this.Index = indexStatement;
-        this.BracketLeft = bracketLeft;
-        this.BracketRight = bracketRight;
+        PrevStatement = prevStatement;
+        Index = indexStatement;
+        Brackets = brackets;
     }
 
     public override string ToString()
-        => $"{PrevStatement}{BracketLeft}{Index}{BracketRight}{Semicolon}";
+        => $"{SurroundingBracelet?.Start}{PrevStatement}{Brackets.Start}{Index}{Brackets.End}{SurroundingBracelet?.End}{Semicolon}";
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> TypeSearch)
+    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
     {
-        StringBuilder result = new(2);
+        StringBuilder result = new();
 
         if (PrevStatement != null)
-        { result.Append(TypeSearch.Invoke(this.PrevStatement).ToString()); }
+        { result.Append(typeSearch.Invoke(PrevStatement)); }
         else
         { result.Append('?'); }
 
-        result.Append(BracketLeft.ToString());
-        result.Append(TypeSearch.Invoke(this.Index).ToString());
-        result.Append(BracketRight.ToString());
+        result.Append(Brackets.Start);
+        result.Append(typeSearch.Invoke(Index));
+        result.Append(Brackets.End);
 
         return result.ToString();
     }
@@ -1571,19 +1676,19 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<General
 
 public class Field : StatementWithValue, IReferenceableTo<FieldDefinition>
 {
-    public Token FieldName { get; }
+    public Token Identifier { get; }
     public StatementWithValue PrevStatement { get; }
     public FieldDefinition? Reference { get; set; }
-    public override Position Position => new(PrevStatement, FieldName);
+    public override Position Position => new(PrevStatement, Identifier);
 
     public Field(StatementWithValue prevStatement, Token fieldName)
     {
         PrevStatement = prevStatement;
-        FieldName = fieldName;
+        Identifier = fieldName;
     }
 
     public override string ToString()
-        => $"{PrevStatement}.{FieldName}{Semicolon}";
+        => $"{SurroundingBracelet?.Start}{PrevStatement}.{Identifier}{SurroundingBracelet?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -1603,13 +1708,13 @@ public class TypeCast : StatementWithValue, IHaveType
 
     public TypeCast(StatementWithValue prevStatement, Token keyword, TypeInstance type)
     {
-        this.PrevStatement = prevStatement;
-        this.Keyword = keyword;
-        this.Type = type;
+        PrevStatement = prevStatement;
+        Keyword = keyword;
+        Type = type;
     }
 
     public override string ToString()
-        => $"{PrevStatement} {Keyword} {Type}{Semicolon}";
+        => $"{SurroundingBracelet?.Start}{PrevStatement} {Keyword} {Type}{SurroundingBracelet?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -1629,12 +1734,12 @@ public class ModifiedStatement : StatementWithValue
 
     public ModifiedStatement(Token modifier, StatementWithValue statement)
     {
-        this.Statement = statement;
-        this.Modifier = modifier;
+        Statement = statement;
+        Modifier = modifier;
     }
 
     public override string ToString()
-        => $"{Modifier} {Statement}{Semicolon}";
+        => $"{SurroundingBracelet?.Start}{Modifier} {Statement}{SurroundingBracelet?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {

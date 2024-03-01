@@ -31,8 +31,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     int PrecompileVariable(VariableDeclaration variableDeclaration)
     {
-        if (CodeGeneratorForBrainfuck.GetVariable(Variables, variableDeclaration.VariableName.Content, out _))
-        { throw new CompilerException($"Variable \"{variableDeclaration.VariableName.Content}\" already defined", variableDeclaration.VariableName, CurrentFile); }
+        if (CodeGeneratorForBrainfuck.GetVariable(Variables, variableDeclaration.Identifier.Content, out _))
+        { throw new CompilerException($"Variable \"{variableDeclaration.Identifier.Content}\" already defined", variableDeclaration.Identifier, CurrentFile); }
 
         GeneralType type;
 
@@ -51,7 +51,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             variableDeclaration.Type.SetAnalyzedType(type);
         }
 
-        return PrecompileVariable(Variables, variableDeclaration.VariableName.Content, type, initialValue, variableDeclaration.Modifiers.Contains("temp"));
+        return PrecompileVariable(Variables, variableDeclaration.Identifier.Content, type, initialValue, variableDeclaration.Modifiers.Contains("temp"));
     }
     int PrecompileVariable(Stack<Variable> variables, string name, GeneralType type, StatementWithValue? initialValue, bool deallocateOnClean)
     {
@@ -160,8 +160,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (pointerType.To is not StructType structPointerType)
             { throw new CompilerException($"Could not get the field offsets of type {pointerType}", field.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.Struct.FieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
-            { throw new CompilerException($"Could not get the field offset of field \"{field.FieldName}\"", field.FieldName, CurrentFile); }
+            if (!structPointerType.Struct.FieldOffsets.TryGetValue(field.Identifier.Content, out int fieldOffset))
+            { throw new CompilerException($"Could not get the field offset of field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
 
             if (type.Size != GetValueSize(value))
             { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
@@ -649,12 +649,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GenerateCodeForStatement(new FunctionCall(
             indexCall.PrevStatement,
             Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
-            indexCall.BracketLeft,
             new StatementWithValue[]
             {
                 indexCall.Index,
             },
-            indexCall.BracketRight));
+            indexCall.Brackets));
     }
     void GenerateCodeForStatement(LinkedIf @if, bool linked = false)
     {
@@ -1176,22 +1175,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     if (variable.Type != constantValue.Type)
                     { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
 
-                    switch (constantValue.Type)
-                    {
-                        case RuntimeType.UInt8:
-                            Code.AddValue(variable.Address, constantValue.ValueUInt8);
-                            break;
-                        case RuntimeType.SInt32:
-                            Code.AddValue(variable.Address, constantValue.ValueSInt32);
-                            break;
-                        case RuntimeType.Single:
-                            throw new NotSupportedException($"Floats not supported by brainfuck :(", statement.Right, CurrentFile);
-                        case RuntimeType.UInt16:
-                            Code.AddValue(variable.Address, constantValue.ValueUInt16);
-                            break;
-                        default:
-                            throw new UnreachableException();
-                    }
+                    Code.AddValue(variable.Address, constantValue);
 
                     Optimizations++;
                     return;
@@ -1237,22 +1221,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     if (variable.Type != constantValue.Type)
                     { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
 
-                    switch (constantValue.Type)
-                    {
-                        case RuntimeType.UInt8:
-                            Code.AddValue(variable.Address, -constantValue.ValueUInt8);
-                            break;
-                        case RuntimeType.SInt32:
-                            Code.AddValue(variable.Address, -constantValue.ValueSInt32);
-                            break;
-                        case RuntimeType.Single:
-                            throw new NotSupportedException($"Floats not supported by brainfuck :(", statement.Right, CurrentFile);
-                        case RuntimeType.UInt16:
-                            Code.AddValue(variable.Address, -constantValue.ValueUInt16);
-                            break;
-                        default:
-                            throw new UnreachableException();
-                    }
+                    Code.AddValue(variable.Address, -constantValue);
 
                     Optimizations++;
                     return;
@@ -1350,8 +1319,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         if (statement.InitialValue == null) return;
 
-        if (!CodeGeneratorForBrainfuck.GetVariable(Variables, statement.VariableName.Content, out Variable variable))
-        { throw new CompilerException($"Variable \"{statement.VariableName.Content}\" not found", statement.VariableName, CurrentFile); }
+        if (!CodeGeneratorForBrainfuck.GetVariable(Variables, statement.Identifier.Content, out Variable variable))
+        { throw new CompilerException($"Variable \"{statement.Identifier.Content}\" not found", statement.Identifier, CurrentFile); }
 
         if (variable.IsInitialized)
         { return; }
@@ -1360,7 +1329,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(FunctionCall functionCall)
     {
-        if (functionCall.FunctionName == "sizeof")
+        if (functionCall.Identifier.Content == "sizeof")
         {
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
@@ -1443,11 +1412,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(ConstructorCall constructorCall)
     {
-        GeneralType instanceType = FindType(constructorCall.TypeName);
+        GeneralType instanceType = FindType(constructorCall.Type);
         GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
         if (instanceType is StructType structType)
-        { structType.Struct?.References.Add((constructorCall.TypeName, CurrentFile, CurrentMacro.Last)); }
+        { structType.Struct?.References.Add((constructorCall.Type, CurrentFile, CurrentMacro.Last)); }
 
         Dictionary<string, GeneralType> typeArguments = new();
 
@@ -1465,7 +1434,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         if (!constructor.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Constructor {constructor.ToReadable()} could not be called due to its protection level", constructorCall.TypeName, CurrentFile));
+            AnalysisCollection?.Errors.Add(new Error($"Constructor {constructor.ToReadable()} could not be called due to its protection level", constructorCall.Type, CurrentFile));
             return;
         }
 
@@ -1582,7 +1551,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 typeArguments = Utils.ConcatDictionary(typeArguments, compiledOperator.Context?.CurrentTypeArguments);
 
-                GenerateCodeForFunction(compiledOperator, statement.Parameters, typeArguments, statement);
+                GenerateCodeForFunction(compiledOperator, statement.Parameters.ToArray(), typeArguments, statement);
 
                 if (!statement.SaveValue)
                 { Stack.Pop(); }
@@ -1644,13 +1613,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                             CodeGeneratorForBrainfuck.GetVariable(Variables, _left.Content, out Variable left) &&
                             !left.IsDiscarded &&
                             TryCompute(statement.Right, out DataItem right) &&
-                            right.Type == RuntimeType.UInt8)
+                            right.Type == RuntimeType.Byte)
                         {
                             int resultAddress = Stack.PushVirtual(1);
 
                             Code.CopyValueWithTemp(left.Address, Stack.NextAddress, resultAddress);
 
-                            Code.AddValue(resultAddress, -right.ValueUInt8);
+                            Code.AddValue(resultAddress, -right.VByte);
 
                             Optimizations++;
 
@@ -1988,7 +1957,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         using ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress);
 
-        using (this.DebugBlock(block.BracketStart))
+        using (this.DebugBlock(block.Brackets.Start))
         {
             VariableCleanupStack.Push(PrecompileVariables(block));
 
@@ -2008,7 +1977,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             VariableCanBeDiscarded = null;
         }
 
-        using (this.DebugBlock(block.BracketEnd))
+        using (this.DebugBlock(block.Brackets.End))
         {
             if (ReturnTagStack.Count > 0)
             { FinishReturnStatements(); }
@@ -2073,7 +2042,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(NewInstance newInstance)
     {
-        GeneralType instanceType = FindType(newInstance.TypeName);
+        GeneralType instanceType = FindType(newInstance.Type);
 
         if (instanceType is PointerType pointerType)
         {
@@ -2085,7 +2054,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
         else if (instanceType is StructType structType)
         {
-            structType.Struct.References.Add((newInstance.TypeName, CurrentFile, CurrentMacro.Last));
+            structType.Struct.References.Add((newInstance.Type, CurrentFile, CurrentMacro.Last));
 
             int address = Stack.PushVirtual(structType.Struct.Size);
 
@@ -2119,13 +2088,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
         else
-        { throw new CompilerException($"Unknown type definition {instanceType}", newInstance.TypeName, CurrentFile); }
+        { throw new CompilerException($"Unknown type definition {instanceType}", newInstance.Type, CurrentFile); }
     }
     void GenerateCodeForStatement(Field field)
     {
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
-        if (prevType is ArrayType arrayType && field.FieldName.Equals("Length"))
+        if (prevType is ArrayType arrayType && field.Identifier.Equals("Length"))
         {
             Stack.Push(arrayType.Length);
             return;
@@ -2142,8 +2111,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (pointerType.To is not StructType structPointerType)
             { throw new CompilerException($"Could not get the field offsets of type {prevType}", field.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.Struct.FieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
-            { throw new CompilerException($"Could not get the field offset of field \"{field.FieldName}\"", field.FieldName, CurrentFile); }
+            if (!structPointerType.Struct.FieldOffsets.TryGetValue(field.Identifier.Content, out int fieldOffset))
+            { throw new CompilerException($"Could not get the field offset of field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
 
             int resultAddress = Stack.Push(0);
 
@@ -2216,53 +2185,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForPrinter(DataItem value)
     {
-        if (value.Type == RuntimeType.UInt16)
+        int tempAddress = Stack.NextAddress;
+        using (CommentBlock($"Print value {value.ToString(null)} (on address {tempAddress})"))
         {
-            int tempAddress = Stack.NextAddress;
-            using (CommentBlock($"Print character '{value.ValueUInt16}' (on address {tempAddress})"))
-            {
-                Code.SetValue(tempAddress, value.ValueUInt16);
-                Code.SetPointer(tempAddress);
-                Code += '.';
-                Code.ClearValue(tempAddress);
-                Code.SetPointer(0);
-            }
-            return;
+            Code.SetValue(tempAddress, value);
+            Code.SetPointer(tempAddress);
+            Code += '.';
+            Code.ClearValue(tempAddress);
+            Code.SetPointer(0);
         }
-
-        if (value.Type == RuntimeType.UInt8)
-        {
-            int tempAddress = Stack.NextAddress;
-            using (CommentBlock($"Print number {value.ValueUInt8} as text (on address {tempAddress})"))
-            {
-                Code.SetValue(tempAddress, value.ValueUInt8);
-                Code.SetPointer(tempAddress);
-
-                using (CommentBlock($"SNIPPET OUT_AS_STRING"))
-                { Code += Snippets.OUT_AS_STRING; }
-                Code.ClearValue(tempAddress);
-                Code.SetPointer(0);
-            }
-            return;
-        }
-
-        if (value.Type == RuntimeType.SInt32)
-        {
-            int tempAddress = Stack.NextAddress;
-            using (CommentBlock($"Print number {value.ValueSInt32} as text (on address {tempAddress})"))
-            {
-                Code.SetValue(tempAddress, value.ValueSInt32);
-                Code.SetPointer(tempAddress);
-
-                using (CommentBlock($"SNIPPET OUT_AS_STRING"))
-                { Code += Snippets.OUT_AS_STRING; }
-                Code.ClearValue(tempAddress);
-                Code.SetPointer(0);
-            }
-            return;
-        }
-
-        throw new NotImplementedException($"Unimplemented constant value type \"{value.Type}\"");
     }
     void GenerateCodeForPrinter(string value)
     {
@@ -2521,7 +2452,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         if (!destructor.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Destructor for type {deallocateableType} cannot be called due to its protection level", null, CurrentFile));
+            AnalysisCollection?.Errors.Add(new Error($"Destructor for type {deallocateableType} cannot be called due to its protection level", value, CurrentFile));
             return;
         }
 
@@ -2871,7 +2802,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledConstants.PushRange(constantParameters);
         CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
-        using (DebugBlock(function.Block.BracketStart))
+        using (DebugBlock(function.Block.Brackets.Start))
         using (CommentBlock($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
         {
             int tagAddress = Stack.Push(1);
@@ -2881,7 +2812,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         GenerateCodeForStatement(function.Block);
 
-        using (DebugBlock(function.Block.BracketEnd))
+        using (DebugBlock(function.Block.Brackets.End))
         using (CommentBlock($"Finish \"return\" block"))
         {
             if (ReturnTagStack.Pop() != Stack.LastAddress)
@@ -2889,7 +2820,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             Stack.Pop();
         }
 
-        using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
+        using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.Brackets.End))
         {
             using (CommentBlock($"Deallocate macro variables ({Variables.Count})"))
             {
@@ -3162,7 +3093,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledConstants.PushRange(constantParameters);
         CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
-        using (DebugBlock(function.Block.BracketStart))
+        using (DebugBlock(function.Block.Brackets.Start))
         {
             using (CommentBlock($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
             {
@@ -3174,14 +3105,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         GenerateCodeForStatement(function.Block);
 
-        using (DebugBlock(function.Block.BracketEnd))
+        using (DebugBlock(function.Block.Brackets.End))
         {
             if (ReturnTagStack.Pop() != Stack.LastAddress)
             { throw new InternalException(string.Empty, function.Block, function.FilePath); }
             Stack.Pop();
         }
 
-        using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
+        using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.Brackets.End))
         {
             using (CommentBlock($"Deallocate macro variables ({Variables.Count})"))
             {
@@ -3594,7 +3525,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledConstants.PushRange(constantParameters);
         CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
-        using (DebugBlock(function.Block.BracketStart))
+        using (DebugBlock(function.Block.Brackets.Start))
         using (CommentBlock($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
         {
             int tagAddress = Stack.Push(1);
@@ -3604,7 +3535,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         GenerateCodeForStatement(function.Block);
 
-        using (DebugBlock(function.Block.BracketEnd))
+        using (DebugBlock(function.Block.Brackets.End))
         using (CommentBlock($"Finish \"return\" block"))
         {
             if (ReturnTagStack.Pop() != Stack.LastAddress)
@@ -3612,7 +3543,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             Stack.Pop();
         }
 
-        using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
+        using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.Brackets.End))
         {
             using (CommentBlock($"Deallocate macro variables ({Variables.Count})"))
             {

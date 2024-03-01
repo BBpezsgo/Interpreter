@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.Brainfuck;
+﻿using System.Runtime.CompilerServices;
+
+namespace LanguageCore.Brainfuck;
 
 public readonly struct AutoPrintCodeString
 {
@@ -75,6 +77,22 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         this.indent = 0;
         this.pointer = 0;
         this.branchDepth = 0;
+    }
+
+    /// <exception cref="NotSupportedException"/>
+    /// <exception cref="InternalException"/>
+    public static int GetInteger(Runtime.DataItem v)
+    {
+        return v.Type switch
+        {
+            Runtime.RuntimeType.Byte => v.VByte,
+            Runtime.RuntimeType.Integer => v.VInt,
+            Runtime.RuntimeType.Char => CharCode.GetByte(v.VChar),
+
+            Runtime.RuntimeType.Single => throw new NotSupportedException($"Floats not supported by brainfuck :("),
+            Runtime.RuntimeType.Null => throw new InternalException(),
+            _ => throw new UnreachableException(),
+        };
     }
 
     #region Comments
@@ -210,9 +228,25 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     }
 
     /// <summary>
+    /// <b>Pointer:</b> Not modified
+    /// </summary>
+    /// <exception cref="NotSupportedException"/>
+    /// <exception cref="InternalException"/>
+    public void AddValue(Runtime.DataItem value) => AddValue(GetInteger(value));
+
+    /// <summary>
     /// <b>Pointer:</b> <paramref name="address"/>
     /// </summary>
     public void AddValue(int address, int value)
+    {
+        SetPointer(address);
+        AddValue(value);
+    }
+
+    /// <summary>
+    /// <b>Pointer:</b> <paramref name="address"/>
+    /// </summary>
+    public void AddValue(int address, Runtime.DataItem value)
     {
         SetPointer(address);
         AddValue(value);
@@ -243,29 +277,9 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     /// <summary>
     /// <b>Pointer:</b> <paramref name="address"/>
     /// </summary>
-    /// <exception cref="CompilerException"/>
+    /// <exception cref="NotSupportedException"/>
     /// <exception cref="InternalException"/>
-    public void SetValue(int address, Runtime.DataItem value)
-    {
-        switch (value.Type)
-        {
-            case Runtime.RuntimeType.UInt8:
-                SetValue(address, value.ValueUInt8);
-                return;
-            case Runtime.RuntimeType.SInt32:
-                SetValue(address, value.ValueSInt32);
-                return;
-            case Runtime.RuntimeType.Single:
-                throw new NotSupportedException($"Floats not supported by brainfuck :(");
-            case Runtime.RuntimeType.UInt16:
-                SetValue(address, value.ValueUInt16);
-                return;
-            case Runtime.RuntimeType.Null:
-                throw new InternalException();
-            default:
-                throw new UnreachableException();
-        }
-    }
+    public void SetValue(int address, Runtime.DataItem value) => SetValue(address, GetInteger(value));
 
     /// <summary>
     /// <b>Pointer:</b> <paramref name="address"/>
@@ -498,12 +512,6 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public void SetValueUnsafe(int address, char value)
-        => SetValueUnsafe(address, CharCode.GetByte(value));
-
-    /// <summary>
-    /// <b>Pointer:</b> Restored to the last state
-    /// </summary>
     public void SetValueUnsafe(int offset, int value)
     {
         MovePointer(offset);
@@ -679,14 +687,9 @@ public class StackCodeHelper
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public int Push(Runtime.DataItem v) => v.Type switch
-    {
-        Runtime.RuntimeType.UInt8 => Push(v.ValueUInt8),
-        Runtime.RuntimeType.SInt32 => Push(v.ValueSInt32),
-        Runtime.RuntimeType.Single => throw new NotSupportedException("Floats are not supported by the brainfuck compiler"),
-        Runtime.RuntimeType.UInt16 => Push(v.ValueUInt16),
-        _ => throw new UnreachableException(),
-    };
+    /// <exception cref="NotSupportedException"/>
+    /// <exception cref="InternalException"/>
+    public int Push(Runtime.DataItem v) => Push(CompiledCode.GetInteger(v));
 
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
@@ -719,31 +722,6 @@ public class StackCodeHelper
         }
 
         Code.SetValue(address, v);
-        return address;
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> 0
-    /// </summary>
-    public int Push(string v)
-    {
-        ArgumentNullException.ThrowIfNull(v, nameof(v));
-
-        int size = v.Length;
-        int address = PushVirtual(size);
-
-        if (Size > MaxSize)
-        {
-            Code.OUT_STRING(address, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Stack overflow")}\n");
-            Code.Append("[-]+[]");
-        }
-
-        for (int i = 0; i < size; i++)
-        {
-            Code.SetValue(address + i, v[i]);
-        }
-
-        Code.SetPointer(0);
         return address;
     }
 

@@ -643,7 +643,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             GeneralType fieldType = FindStatementType(field);
 
-            address = structType.Struct.FieldOffsets[field.FieldName.Content] + prevAddress;
+            address = structType.Struct.FieldOffsets[field.Identifier.Content] + prevAddress;
             size = fieldType.Size;
             return true;
         }
@@ -661,7 +661,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (!DataItem.TryShrinkToByte(ref addressToSet))
         { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, CurrentFile); }
 
-        address = addressToSet.ValueUInt8;
+        address = addressToSet.VByte;
         size = 1;
 
         return true;

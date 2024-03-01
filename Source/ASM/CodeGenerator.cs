@@ -336,13 +336,13 @@ public class CodeGeneratorForAsm : CodeGenerator
     {
         if (newVariable.Modifiers.Contains("const")) return CleanupItem.Null;
 
-        newVariable.VariableName.AnalyzedType = TokenAnalyzedType.VariableName;
+        newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
         for (int i = 0; i < CompiledVariables.Count; i++)
         {
-            if (CompiledVariables[i].VariableName.Content == newVariable.VariableName.Content)
+            if (CompiledVariables[i].Identifier.Content == newVariable.Identifier.Content)
             {
-                AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].VariableName}\" already defined", CompiledVariables[i].VariableName, CurrentFile));
+                AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].Identifier}\" already defined", CompiledVariables[i].Identifier, CurrentFile));
                 return CleanupItem.Null;
             }
         }
@@ -355,7 +355,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         newVariable.Type.SetAnalyzedType(compiledVariable.Type);
 
-        Builder.CodeBuilder.AppendCommentLine($"{compiledVariable.Type} {compiledVariable.VariableName.Content}");
+        Builder.CodeBuilder.AppendCommentLine($"{compiledVariable.Type} {compiledVariable.Identifier.Content}");
 
         int size;
 
@@ -623,7 +623,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
 
         if (functionCall.IsMethodCall != compiledFunction.IsMethod)
-        { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
+        { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.Identifier}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
 
         if (compiledFunction.Attributes.HasAttribute("External", "stdout"))
         {
@@ -843,12 +843,11 @@ public class CodeGeneratorForAsm : CodeGenerator
         GenerateCodeForStatement(new FunctionCall(
             indexCall.PrevStatement,
             Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
-            indexCall.BracketLeft,
             new StatementWithValue[]
             {
                 indexCall.Index,
             },
-            indexCall.BracketRight));
+            indexCall.Brackets));
     }
     void GenerateCodeForStatement(IfContainer @if)
     {
@@ -1019,18 +1018,18 @@ public class CodeGeneratorForAsm : CodeGenerator
         if (statement.Modifiers.Contains("const"))
         { return; }
 
-        if (!GetVariable(statement.VariableName.Content, out CompiledVariable? variable))
-        { throw new InternalException($"Variable \"{statement.VariableName.Content}\" not found", CurrentFile); }
+        if (!GetVariable(statement.Identifier.Content, out CompiledVariable? variable))
+        { throw new InternalException($"Variable \"{statement.Identifier.Content}\" not found", CurrentFile); }
 
         if (variable.IsInitialized) return;
 
-        GenerateCodeForSetter(new Identifier(statement.VariableName), statement.InitialValue);
+        GenerateCodeForSetter(new Identifier(statement.Identifier), statement.InitialValue);
 
         variable.IsInitialized = true;
     }
     void GenerateCodeForStatement(FunctionCall functionCall)
     {
-        if (functionCall.FunctionName == "sizeof")
+        if (functionCall.Identifier.Content == "sizeof")
         {
             throw new NotImplementedException();
         }
@@ -1040,7 +1039,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
             if (compiledVariable.Type is not FunctionType function)
-            { throw new CompilerException($"Variable \"{compiledVariable.VariableName.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
+            { throw new CompilerException($"Variable \"{compiledVariable.Identifier.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
 
             Stack<ParameterCleanupItem> parameterCleanup;
 

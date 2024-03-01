@@ -8,15 +8,15 @@ public class Token :
     IDuplicatable<Token>,
     IAdditionOperators<Token, Token, Token>
 {
+    public static Token Empty => new(TokenType.Whitespace, string.Empty, true, Position.Zero);
+
     public TokenType TokenType { get; }
     public bool IsAnonymous { get; }
     public string Content { get; }
     public Position Position { get; }
     public TokenAnalyzedType AnalyzedType { get; set; }
 
-    public static Token Empty => new(TokenType.Whitespace, string.Empty, true, Position.Zero);
-
-    public Token(TokenType type, string content, bool isAnonymous, Position position) : base()
+    public Token(TokenType type, string content, bool isAnonymous, Position position)
     {
         TokenType = type;
         Content = content;

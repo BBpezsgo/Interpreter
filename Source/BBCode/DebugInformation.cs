@@ -153,8 +153,8 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         if (!CanTraceBPsWith(basePointer)) return;
         if (basePointer - 1 >= stack.Length) return;
         DataItem item = stack[basePointer - 1];
-        if (item.Type != RuntimeType.SInt32) return;
-        int num = item.ValueSInt32;
+        if (item.Type != RuntimeType.Integer) return;
+        int num = item.VInt;
         result.Add(num);
         if (num == basePointer) return;
         TraceBasePointers(result, stack, num);

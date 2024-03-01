@@ -36,10 +36,10 @@ public static partial class LanguageConstants
 
     public static readonly Dictionary<string, RuntimeType> BuiltinTypeMap1 = new()
     {
-        { "byte", RuntimeType.UInt8 },
-        { "int", RuntimeType.SInt32 },
+        { "byte", RuntimeType.Byte },
+        { "int", RuntimeType.Integer },
         { "float", RuntimeType.Single },
-        { "char", RuntimeType.UInt16 },
+        { "char", RuntimeType.Char },
     };
 
     public static readonly Dictionary<string, BasicType> BuiltinTypeMap3 = new()

@@ -35,16 +35,15 @@ public abstract partial class Tokenizer
         SavedUnicode = null;
     }
 
-    Position GetCurrentPosition(int offsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(offsetTotal, offsetTotal + 1));
+    protected SinglePosition CurrentSinglePosition => new(CurrentLine, CurrentColumn);
+    protected Position GetCurrentPosition(int offsetTotal) => new(new Range<SinglePosition>(CurrentSinglePosition, new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(offsetTotal, offsetTotal + 1));
 
     void RefreshTokenPosition(int offsetTotal)
     {
-        SinglePosition currentPosition = new(CurrentLine, CurrentColumn);
-        Position position = new(
-                new Range<SinglePosition>(CurrentToken.Position.Range.Start, currentPosition),
-                new Range<int>(CurrentToken.Position.AbsoluteRange.Start, offsetTotal)
-            );
-        CurrentToken.Position = position;
+        CurrentToken.Position = new Position(
+            new Range<SinglePosition>(CurrentToken.Position.Range.Start, CurrentSinglePosition),
+            new Range<int>(CurrentToken.Position.AbsoluteRange.Start, offsetTotal)
+        );
     }
 
     protected static Token[] NormalizeTokens(List<Token> tokens, TokenizerSettings settings)

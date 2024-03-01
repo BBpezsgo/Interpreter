@@ -257,10 +257,10 @@ public readonly struct InstructionOperand
     public static explicit operator InstructionOperand(DataItem v) => new(v.Type switch
     {
         RuntimeType.Null => throw new InternalException($"Operand value is null"),
-        RuntimeType.UInt8 => v.ValueUInt8.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        RuntimeType.SInt32 => v.ValueSInt32.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        RuntimeType.Byte => v.VByte.ToString(CultureInfo.InvariantCulture),
+        RuntimeType.Integer => v.VInt.ToString(CultureInfo.InvariantCulture),
         RuntimeType.Single => throw new NotImplementedException(),
-        RuntimeType.UInt16 => v.ValueUInt16.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        RuntimeType.Char => v.VChar.ToString(CultureInfo.InvariantCulture),
         _ => throw new UnreachableException(),
     });
 }

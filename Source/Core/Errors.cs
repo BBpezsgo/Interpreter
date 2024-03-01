@@ -9,12 +9,6 @@ public class LanguageException : Exception
     public Position Position { get; }
     public Uri? Uri { get; }
 
-    protected LanguageException(string message, Position position) : base(message)
-    {
-        Position = position;
-        Uri = null;
-    }
-
     protected LanguageException(string message, Position position, Uri? uri) : base(message)
     {
         Position = position;
@@ -63,9 +57,18 @@ public class LanguageException : Exception
 
         StringBuilder result = new();
 
-        result.Append(line.Replace('\t', ' '));
+        line = line.Replace('\t', ' ');
+
+        int removedLeadingWhitespaces;
+        {
+            string trimmedLine = line.TrimStart();
+            removedLeadingWhitespaces = line.Length - trimmedLine.Length;
+            line = trimmedLine.Trim();
+        }
+
+        result.Append(line);
         result.AppendLine();
-        result.Append(' ', Math.Max(0, position.Range.Start.Character));
+        result.Append(' ', Math.Max(0, position.Range.Start.Character - removedLeadingWhitespaces));
         result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
         return result.ToString();
     }
@@ -73,24 +76,19 @@ public class LanguageException : Exception
 
 public class CompilerException : LanguageException
 {
-    public CompilerException(string message) : base(message, Position.UnknownPosition) { }
-    public CompilerException(string message, Uri? uri) : base(message, Position.UnknownPosition, uri) { }
-    public CompilerException(string message, Position position) : base(message, position) { }
     public CompilerException(string message, Position position, Uri? uri) : base(message, position, uri) { }
-    public CompilerException(string message, IPositioned? position) : base(message, position?.Position ?? Position.UnknownPosition) { }
     public CompilerException(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
 }
 
 public class NotSupportedException : CompilerException
 {
-    public NotSupportedException(string message) : base(message) { }
     public NotSupportedException(string message, Position position, Uri? file) : base(message, position, file) { }
     public NotSupportedException(string message, IPositioned? position, Uri? uri) : base(message, position, uri) { }
 }
 
 public class TokenizerException : LanguageException
 {
-    public TokenizerException(string message, Position position) : base(message, position) { }
+    public TokenizerException(string message, Position position) : base(message, position, null) { }
 }
 
 public class SyntaxException : LanguageException
@@ -148,9 +146,9 @@ public class RuntimeException : LanguageException
         SourceFile = CallStack.Length > 0 ? CallStack[^1].File : null;
     }
 
-    public RuntimeException(string message) : base(message, Position.UnknownPosition) { }
+    public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
     public RuntimeException(string message, Exception inner) : base(message, inner) { }
-    public RuntimeException(string message, RuntimeContext context) : base(message, Position.UnknownPosition)
+    public RuntimeException(string message, RuntimeContext context) : base(message, Position.UnknownPosition, null)
     {
         Context = context;
     }
@@ -185,9 +183,9 @@ public class RuntimeException : LanguageException
             result.Append('\t');
             result.Append(' ');
             if (CallStack == null)
-            { result.Append(string.Join("\n   ", context.CallTrace)); }
+            { result.AppendJoin("\n   ", context.CallTrace); }
             else
-            { result.Append(string.Join("\n   ", CallStack)); }
+            { result.AppendJoin("\n   ", CallStack); }
         }
 
         if (CurrentFrame.HasValue)
@@ -226,9 +224,9 @@ public class UserException : RuntimeException
             result.Append('\t');
             result.Append(' ');
             if (CallStack == null)
-            { result.Append(string.Join("\n   ", context.CallTrace)); }
+            { result.AppendJoin("\n   ", context.CallTrace); }
             else
-            { result.Append(string.Join("\n   ", CallStack)); }
+            { result.AppendJoin("\n   ", CallStack); }
         }
 
         if (CurrentFrame.HasValue)
@@ -251,16 +249,17 @@ public class UserException : RuntimeException
 /// <summary> If this exception raised, it's a <b>big</b> problem. </summary>
 public class InternalException : LanguageException
 {
-    public InternalException() : base(string.Empty, Position.UnknownPosition) { }
-    public InternalException(string message) : base(message, Position.UnknownPosition) { }
+    public InternalException() : base(string.Empty, Position.UnknownPosition, null) { }
+    public InternalException(string message) : base(message, Position.UnknownPosition, null) { }
     public InternalException(string message, Uri? uri) : base(message, Position.UnknownPosition, uri) { }
+    public InternalException(string message, Position position, Uri? uri) : base(message, position, uri) { }
     public InternalException(string message, IPositioned position, Uri? uri) : base(message, position.Position, uri) { }
 }
 
 /// <inheritdoc/>
 public class EndlessLoopException : InternalException
 {
-    public EndlessLoopException() : base("Endless loop") { }
+    public EndlessLoopException() : base("Endless loop", Position.UnknownPosition, null) { }
 }
 
 #endregion

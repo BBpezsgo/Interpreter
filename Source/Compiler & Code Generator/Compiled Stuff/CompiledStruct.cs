@@ -89,7 +89,7 @@ public class CompiledStruct : StructDefinition,
         string[] typeParameterNames = TemplateInfo.ToDictionary().Keys.ToArray();
 
         if (typeParameters.Length != typeParameterNames.Length)
-        { throw new CompilerException("Ah"); }
+        { throw new CompilerException("Ah", null, null); }
 
         for (int i = 0; i < typeParameters.Length; i++)
         {
@@ -195,7 +195,7 @@ public class CompiledStruct : StructDefinition,
             }
             else
             {
-                result.Append(string.Join<Token>(", ", this.TemplateInfo.TypeParameters));
+                result.AppendJoin(", ", this.TemplateInfo.TypeParameters);
             }
             result.Append('>');
         }

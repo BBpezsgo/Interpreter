@@ -100,7 +100,7 @@ public abstract class GeneralType :
         else
         {
             if (type.GenericTypes.HasValue)
-            { throw new CompilerException($"Asd", new Position(type.GenericTypes.Value)); }
+            { throw new InternalException($"Asd"); }
             return result;
         }
     }
@@ -693,7 +693,7 @@ public class ArrayType : GeneralType,
                 constComputer.Invoke(type.StackArraySize!, out DataItem stackArraySize)
            ) &&
            !CodeGenerator.TryComputeSimple(type.StackArraySize, out stackArraySize))
-        { throw new CompilerException($"Failed to compute array size value", type.StackArraySize); }
+        { throw new CompilerException($"Failed to compute array size value", type.StackArraySize, null); }
 
         Of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer);
         Length = (int)stackArraySize;

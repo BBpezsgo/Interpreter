@@ -101,38 +101,38 @@ public static class BrainfuckCode
             {
                 case '>':
                 case '<':
-                    if (Console.ForegroundColor != ConsoleColor.Red) Console.ForegroundColor = ConsoleColor.Red;
+                    Console.ForegroundColor = ConsoleColor.Red;
                     expectNumber = true;
                     break;
                 case '+':
                 case '-':
-                    if (Console.ForegroundColor != ConsoleColor.Blue) Console.ForegroundColor = ConsoleColor.Blue;
+                    Console.ForegroundColor = ConsoleColor.Blue;
                     expectNumber = true;
                     break;
                 case '[':
                 case ']':
-                    if (Console.ForegroundColor != ConsoleColor.Green) Console.ForegroundColor = ConsoleColor.Green;
+                    Console.ForegroundColor = ConsoleColor.Green;
                     expectNumber = false;
                     break;
                 case '.':
                 case ',':
-                    if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.ForegroundColor = ConsoleColor.Magenta;
                     expectNumber = false;
                     break;
                 default:
                     if (expectNumber && char.IsAsciiDigit(code[i]))
                     {
-                        if (Console.ForegroundColor != ConsoleColor.Yellow) Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.ForegroundColor = ConsoleColor.Yellow;
                     }
                     else if (CodeCharacters.Contains(code[i]))
                     {
                         expectNumber = false;
-                        if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
+                        Console.ForegroundColor = ConsoleColor.Magenta;
                     }
                     else
                     {
                         expectNumber = false;
-                        if (Console.ForegroundColor != ConsoleColor.DarkGray) Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
                     }
                     break;
             }
@@ -141,31 +141,34 @@ public static class BrainfuckCode
         Console.ResetColor();
     }
 
+    /// <summary>
+    /// <b>Warning:</b> This will not call <see cref="Console.ResetColor"/>
+    /// </summary>
     public static void PrintCodeChar(char code)
     {
         switch (code)
         {
             case '>':
             case '<':
-                if (Console.ForegroundColor != ConsoleColor.Red) Console.ForegroundColor = ConsoleColor.Red;
+                Console.ForegroundColor = ConsoleColor.Red;
                 break;
             case '+':
             case '-':
-                if (Console.ForegroundColor != ConsoleColor.Blue) Console.ForegroundColor = ConsoleColor.Blue;
+                Console.ForegroundColor = ConsoleColor.Blue;
                 break;
             case '[':
             case ']':
-                if (Console.ForegroundColor != ConsoleColor.Green) Console.ForegroundColor = ConsoleColor.Green;
+                Console.ForegroundColor = ConsoleColor.Green;
                 break;
             case '.':
             case ',':
-                if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.ForegroundColor = ConsoleColor.Magenta;
                 break;
             default:
                 if (CodeCharacters.Contains(code))
-                { if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta; }
+                { Console.ForegroundColor = ConsoleColor.Magenta; }
                 else
-                { if (Console.ForegroundColor != ConsoleColor.DarkGray) Console.ForegroundColor = ConsoleColor.DarkGray; }
+                { Console.ForegroundColor = ConsoleColor.DarkGray; }
                 break;
         }
         Console.Write(code);

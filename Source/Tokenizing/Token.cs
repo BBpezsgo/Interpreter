@@ -84,7 +84,7 @@ public class Token :
         ArgumentOutOfRangeException.ThrowIfNegative(at);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(at, Content.Length);
 
-        if (Content.Length <= 0)
+        if (Content.Length == 0)
         { return (null, null); }
 
         if (Content.Length == 1)

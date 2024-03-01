@@ -74,20 +74,28 @@ public readonly struct ValueAddress
 
 readonly struct UndefinedOffset<TFunction>
 {
-    public readonly int InstructionIndex;
-    public readonly bool IsAbsoluteAddress;
+    public int InstructionIndex { get; }
+    public bool IsAbsoluteAddress { get; }
 
-    public readonly Statement? Caller;
-    public readonly TFunction Called;
+    public Position CallerPosition { get; }
+    public TFunction Called { get; }
 
-    public readonly Uri? CurrentFile;
+    public Uri? CurrentFile { get; }
 
-    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Statement? caller, TFunction called, Uri? file)
+    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, IPositioned? caller, TFunction called, Uri? file)
+        : this(callInstructionIndex, isAbsoluteAddress, caller?.Position, called, file)
+    { }
+
+    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Position? callerPosition, TFunction called, Uri? file)
+        : this(callInstructionIndex, isAbsoluteAddress, callerPosition ?? Position.UnknownPosition, called, file)
+    { }
+
+    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Position callerPosition, TFunction called, Uri? file)
     {
         InstructionIndex = callInstructionIndex;
         IsAbsoluteAddress = isAbsoluteAddress;
 
-        Caller = caller;
+        CallerPosition = callerPosition;
         Called = called;
 
         CurrentFile = file;
@@ -96,8 +104,8 @@ readonly struct UndefinedOffset<TFunction>
 
 public readonly struct Reference
 {
-    public readonly Uri? SourceFile;
-    public readonly ISameCheck? SourceContext;
+    public Uri? SourceFile { get; }
+    public ISameCheck? SourceContext { get; }
 
     public Reference(Uri? sourceFile = null, ISameCheck? sourceContext = null)
     {
@@ -110,9 +118,9 @@ public readonly struct Reference
 
 public readonly struct Reference<TSource>
 {
-    public readonly TSource Source;
-    public readonly Uri? SourceFile;
-    public readonly ISameCheck? SourceContext;
+    public TSource Source { get; }
+    public Uri? SourceFile { get; }
+    public ISameCheck? SourceContext { get; }
 
     public Reference(TSource source, Reference reference)
     {
@@ -132,6 +140,11 @@ public readonly struct Reference<TSource>
     public static implicit operator Reference(Reference<TSource> v) => new(v.SourceFile, v.SourceContext);
 
     public Reference<TTarget> Cast<TTarget>(Func<TSource, TTarget> caster) => new(caster.Invoke(Source), SourceFile, SourceContext);
+}
+
+public interface IWithInstructionOffset
+{
+    public int InstructionOffset { get; set; }
 }
 
 public interface ICompiledFunctionThingy

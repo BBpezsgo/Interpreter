@@ -91,7 +91,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    public CodeGeneratorForMain(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection) : base(compilerResult, settings, analysisCollection)
+    public CodeGeneratorForMain(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, settings, analysisCollection, print)
     {
         this.ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
         this.GeneratedCode = new List<Instruction>();
@@ -109,11 +109,95 @@ public partial class CodeGeneratorForMain : CodeGenerator
         this.TagCount = new Stack<int>();
     }
 
-    BBCodeGeneratorResult GenerateCode(
-        CompilerResult compilerResult,
-        GeneratorSettings settings,
-        PrintCallback? printCallback = null)
+    void GenerateExternalFunctionsCache(IEnumerable<string> usedExternalFunctions)
     {
+        int offset = 0;
+        AddComment($"Create external functions cache {{");
+        foreach (string function in usedExternalFunctions)
+        {
+            AddComment($"Create string \"{function}\" {{");
+
+            AddInstruction(Opcode.PUSH_VALUE, function.Length + 1);
+            AddInstruction(Opcode.HEAP_ALLOC);
+
+            ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count + 1);
+            offset += function.Length;
+
+            for (int i = 0; i < function.Length; i++)
+            {
+                // Prepare value
+                AddInstruction(Opcode.PUSH_VALUE, new DataItem(function[i]));
+
+                // Calculate pointer
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
+                AddInstruction(Opcode.PUSH_VALUE, i);
+                AddInstruction(Opcode.MATH_ADD);
+
+                // Set value
+                AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+            }
+
+            {
+                // Prepare value
+                AddInstruction(Opcode.PUSH_VALUE, new DataItem('\0'));
+
+                // Calculate pointer
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
+                AddInstruction(Opcode.PUSH_VALUE, function.Length);
+                AddInstruction(Opcode.MATH_ADD);
+
+                // Set value
+                AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+            }
+
+            AddComment("}");
+        }
+        AddComment("}");
+    }
+
+    void SetUndefinedFunctionOffsets<TFunction>(IEnumerable<UndefinedOffset<TFunction>> undefinedOffsets)
+        where TFunction : IWithInstructionOffset
+    {
+        foreach (UndefinedOffset<TFunction> item in undefinedOffsets)
+        {
+            if (item.Called.InstructionOffset == -1)
+            {
+                if (item.Called is Parser.GeneralFunctionDefinition generalFunction)
+                {
+                    throw generalFunction.Identifier.Content switch
+                    {
+                        BuiltinFunctionNames.Destructor => new InternalException($"Destructor for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        BuiltinFunctionNames.IndexerGet => new InternalException($"Index getter for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        BuiltinFunctionNames.IndexerSet => new InternalException($"Index setter for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        _ => new NotImplementedException(),
+                    };
+                }
+
+                string thingName = item.Called switch
+                {
+                    CompiledOperator => "Operator",
+                    CompiledConstructor => "Constructor",
+                    _ => "Function",
+                };
+
+                if (item.Called is ISimpleReadable simpleReadable)
+                { throw new InternalException($"{thingName} {simpleReadable.ToReadable()} does not have instruction offset", item.CallerPosition, item.CurrentFile); }
+
+                throw new InternalException($"{thingName} {item.Called} does not have instruction offset", item.CallerPosition, item.CurrentFile);
+            }
+
+            int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
+            GeneratedCode[item.InstructionIndex].Parameter = offset;
+        }
+    }
+
+    BBCodeGeneratorResult GenerateCode(CompilerResult compilerResult, GeneratorSettings settings)
+    {
+        if (settings.ExternalFunctionsCache)
+        { throw new NotImplementedException(); }
+
+        Print?.Invoke("Generating code ...", LogType.Debug);
+
         List<string> usedExternalFunctions = new();
 
         foreach (CompiledFunction function in this.CompiledFunctions)
@@ -131,50 +215,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.PUSH_VALUE, new DataItem(0));
 
         if (settings.ExternalFunctionsCache)
-        {
-            int offset = 0;
-            AddComment($"Create external functions cache {{");
-            foreach (string function in usedExternalFunctions)
-            {
-                AddComment($"Create string \"{function}\" {{");
-
-                AddInstruction(Opcode.PUSH_VALUE, function.Length + 1);
-                AddInstruction(Opcode.HEAP_ALLOC);
-
-                ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count + 1);
-                offset += function.Length;
-
-                for (int i = 0; i < function.Length; i++)
-                {
-                    // Prepare value
-                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(function[i]));
-
-                    // Calculate pointer
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-                    AddInstruction(Opcode.PUSH_VALUE, i);
-                    AddInstruction(Opcode.MATH_ADD);
-
-                    // Set value
-                    AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
-                }
-
-                {
-                    // Prepare value
-                    AddInstruction(Opcode.PUSH_VALUE, new DataItem('\0'));
-
-                    // Calculate pointer
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-                    AddInstruction(Opcode.PUSH_VALUE, function.Length);
-                    AddInstruction(Opcode.MATH_ADD);
-
-                    // Set value
-                    AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
-                }
-
-                AddComment("}");
-            }
-            AddComment("}");
-        }
+        { GenerateExternalFunctionsCache(usedExternalFunctions); }
 
         CurrentFile = compilerResult.File;
 #if DEBUG
@@ -193,119 +234,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddInstruction(Opcode.EXIT);
 
-        foreach (CompiledFunction function in this.CompiledFunctions)
+        while (true)
         {
-            if (function.IsTemplate)
-            { continue; }
+            bool generatedAnything = false;
 
-            function.InstructionOffset = GeneratedCode.Count;
-            GenerateCodeForFunction(function);
+            generatedAnything = GenerateCodeForFunctions(CompiledFunctions) || generatedAnything;
+            generatedAnything = GenerateCodeForFunctions(CompiledOperators) || generatedAnything;
+            generatedAnything = GenerateCodeForFunctions(CompiledGeneralFunctions) || generatedAnything;
+            generatedAnything = GenerateCodeForFunctions(CompiledConstructors) || generatedAnything;
+
+            generatedAnything = GenerateCodeForCompilableFunctions(CompilableFunctions) || generatedAnything;
+            generatedAnything = GenerateCodeForCompilableFunctions(CompilableConstructors) || generatedAnything;
+            generatedAnything = GenerateCodeForCompilableFunctions(CompilableOperators) || generatedAnything;
+            generatedAnything = GenerateCodeForCompilableFunctions(CompilableGeneralFunctions) || generatedAnything;
+
+            if (!generatedAnything) break;
         }
 
-        foreach (CompiledOperator function in this.CompiledOperators)
-        {
-            if (function.IsTemplate)
-            { continue; }
+        SetUndefinedFunctionOffsets(UndefinedFunctionOffsets);
+        SetUndefinedFunctionOffsets(UndefinedConstructorOffsets);
+        SetUndefinedFunctionOffsets(UndefinedOperatorFunctionOffsets);
+        SetUndefinedFunctionOffsets(UndefinedGeneralFunctionOffsets);
 
-            function.InstructionOffset = GeneratedCode.Count;
-            GenerateCodeForFunction(function);
-        }
-
-        foreach (CompiledGeneralFunction function in this.CompiledGeneralFunctions)
-        {
-            if (function.IsTemplate)
-            { continue; }
-
-            function.InstructionOffset = GeneratedCode.Count;
-            GenerateCodeForFunction(function);
-        }
-
-        {
-            int i = 0;
-            while (i < CompilableFunctions.Count)
-            {
-                CompliableTemplate<CompiledFunction> function = CompilableFunctions[i];
-                i++;
-
-                function.Function.InstructionOffset = GeneratedCode.Count;
-                GenerateCodeForCompilableFunction(function);
-            }
-        }
-
-        {
-            int i = 0;
-            while (i < CompilableConstructors.Count)
-            {
-                CompliableTemplate<CompiledConstructor> function = CompilableConstructors[i];
-                i++;
-
-                function.Function.InstructionOffset = GeneratedCode.Count;
-                GenerateCodeForCompilableFunction(function);
-            }
-        }
-
-        foreach (CompliableTemplate<CompiledOperator> function in this.CompilableOperators)
-        {
-            function.Function.InstructionOffset = GeneratedCode.Count;
-            GenerateCodeForCompilableFunction(function);
-        }
-
-        {
-            int i = 0;
-            while (i < CompilableGeneralFunctions.Count)
-            {
-                CompliableTemplate<CompiledGeneralFunction> function = CompilableGeneralFunctions[i];
-                i++;
-
-                function.Function.InstructionOffset = GeneratedCode.Count;
-                GenerateCodeForCompilableFunction(function);
-            }
-        }
-
-        foreach (UndefinedOffset<CompiledFunction> item in UndefinedFunctionOffsets)
-        {
-            if (item.Called.InstructionOffset == -1)
-            { throw new InternalException($"Function {item.Called.ToReadable()} does not have instruction offset", item.CurrentFile); }
-
-            int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
-            GeneratedCode[item.InstructionIndex].Parameter = offset;
-        }
-
-        foreach (UndefinedOffset<CompiledConstructor> item in UndefinedConstructorOffsets)
-        {
-            if (item.Called.InstructionOffset == -1)
-            { throw new InternalException($"Constructor {item.Called.ToReadable()} does not have instruction offset", item.CurrentFile); }
-
-            int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
-            GeneratedCode[item.InstructionIndex].Parameter = offset;
-        }
-
-        foreach (UndefinedOffset<CompiledOperator> item in UndefinedOperatorFunctionOffsets)
-        {
-            if (item.Called.InstructionOffset == -1)
-            { throw new InternalException($"Operator {item.Called.ToReadable()} does not have instruction offset", item.CurrentFile); }
-
-            int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
-            GeneratedCode[item.InstructionIndex].Parameter = offset;
-        }
-
-        foreach (UndefinedOffset<CompiledGeneralFunction> item in UndefinedGeneralFunctionOffsets)
-        {
-            if (item.Called.InstructionOffset == -1)
-            {
-                throw item.Called.Identifier.Content switch
-                {
-                    // TODO: Show item.Called.Context instead of item.Called
-                    BuiltinFunctionNames.Destructor => new InternalException($"Destructor for \"{item.Called}\" does not have instruction offset", item.CurrentFile),
-                    BuiltinFunctionNames.IndexerGet => new InternalException($"Index getter for \"{item.Called}\" does not have instruction offset", item.CurrentFile),
-                    BuiltinFunctionNames.IndexerSet => new InternalException($"Index setter for \"{item.Called}\" does not have instruction offset", item.CurrentFile),
-                    _ => new NotImplementedException(),
-                };
-            }
-
-            int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
-            GeneratedCode[item.InstructionIndex].Parameter = offset;
-        }
+        Print?.Invoke("Code generated", LogType.Debug);
 
         return new BBCodeGeneratorResult()
         {
@@ -320,11 +271,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null)
     {
-        UnusedFunctionManager.RemoveUnusedFunctions(
-            ref compilerResult,
-            printCallback,
-            settings.CompileLevel);
+        // UnusedFunctionManager.RemoveUnusedFunctions(
+        //     ref compilerResult,
+        //     printCallback,
+        //     settings.CompileLevel);
 
-        return new CodeGeneratorForMain(compilerResult, settings, analysisCollection).GenerateCode(compilerResult, settings, printCallback);
+        return new CodeGeneratorForMain(compilerResult, settings, analysisCollection, printCallback).GenerateCode(compilerResult, settings);
     }
 }

@@ -89,6 +89,8 @@ public readonly struct Position :
 
     public Position After() => new(new Range<SinglePosition>(new SinglePosition(this.Range.End.Line, this.Range.End.Character), new SinglePosition(this.Range.End.Line, this.Range.End.Character + 1)), new Range<int>(this.AbsoluteRange.End, this.AbsoluteRange.End + 1));
 
+    public Position NextLine() => new(new Range<SinglePosition>(new SinglePosition(Range.End.Line + 1, 0), new SinglePosition(Range.End.Line + 1, 1)), new Range<int>(AbsoluteRange.End, AbsoluteRange.End + 1));
+
     public override bool Equals(object? obj) => obj is Position position && Equals(position);
     public bool Equals(Position other) => AbsoluteRange.Equals(other.AbsoluteRange) && Range.Equals(other.Range);
 

@@ -1,41 +1,70 @@
 ﻿namespace LanguageCore;
 
-public readonly struct ConsoleProgressBar : IDisposable
+public static class ConsoleProgress
 {
-    static bool IsEnabled;
-    public static void SetProgramArguments(ProgramArguments arguments) => IsEnabled = arguments.ShowProgress;
+    public static bool IsEnabled { get; private set; }
+    public static ImmutableArray<char> SpinnerCharacters { get; } = ImmutableArray.Create('-', '\\', '|', '/');
 
-    readonly int Line;
-    readonly ConsoleColor Color;
-    readonly bool Show;
+    public static void SetProgramArguments(ProgramArguments arguments) => IsEnabled = arguments.ShowProgress;
+}
+
+public readonly struct ConsoleSpinner
+{
+    const double Speed = 5d;
+
+    readonly ImmutableArray<char> _characters;
+    readonly double _time;
+
+    public char Current => _characters[(int)((DateTime.UtcNow.TimeOfDay.TotalSeconds - _time) * Speed) % _characters.Length];
+
+    public ConsoleSpinner(ImmutableArray<char> characters)
+    {
+        _characters = characters;
+        _time = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+    }
+}
+
+public struct ConsoleProgressBar : IDisposable
+{
+    readonly int _line;
+    readonly ConsoleColor _color;
+    readonly bool _show;
+
+    float _progress;
 
     public ConsoleProgressBar(ConsoleColor color, bool show)
     {
-        Line = 0;
-        Color = color;
-        Show = show && IsEnabled;
+        _line = 0;
+        _color = color;
+        _show = show && ConsoleProgress.IsEnabled;
+        _progress = 0f;
 
-        if (!Show) return;
+        if (!_show) return;
 
-        Line = Console.GetCursorPosition().Top;
+        _line = Console.GetCursorPosition().Top;
         Console.WriteLine();
     }
 
     public void Print(int iterator, int count) => Print((float)(iterator) / (float)count);
     public void Print(float progress)
     {
-        if (!Show) return;
+        _progress = progress;
+        Print();
+    }
+    public readonly void Print()
+    {
+        if (!_show) return;
 
         (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
 
-        Console.SetCursorPosition(0, Line);
+        Console.SetCursorPosition(0, _line);
 
         int width = Console.WindowWidth;
-        Console.ForegroundColor = Color;
+        Console.ForegroundColor = _color;
         for (int i = 0; i < width; i++)
         {
             float v = (float)(i + 1) / (float)(width);
-            if (v <= progress)
+            if (v <= _progress)
             { Console.Write('═'); }
             else
             { Console.Write(' '); }
@@ -45,13 +74,13 @@ public readonly struct ConsoleProgressBar : IDisposable
         Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top);
     }
 
-    public void Dispose()
+    public readonly void Dispose()
     {
-        if (!Show) return;
+        if (!_show) return;
 
         (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
 
-        Console.SetCursorPosition(0, Line);
+        Console.SetCursorPosition(0, _line);
 
         int width = Console.WindowWidth;
         for (int i = 0; i < width; i++)
@@ -63,38 +92,51 @@ public readonly struct ConsoleProgressBar : IDisposable
 
 public struct ConsoleProgressLabel : IDisposable
 {
-    static bool IsEnabled;
-    public static void SetProgramArguments(ProgramArguments arguments) => IsEnabled = arguments.ShowProgress;
+    public string Label { get; set; }
 
-    public string Label;
+    readonly int _line;
+    readonly ConsoleColor _color;
+    readonly bool _show;
+    readonly ConsoleSpinner _spinner;
+    readonly bool _showSpinner;
 
-    readonly int Line;
-    readonly ConsoleColor Color;
-    readonly bool Show;
-
-    public ConsoleProgressLabel(string label, ConsoleColor color, bool show)
+    public ConsoleProgressLabel(string label, ConsoleColor color, bool show, bool showSpinner = false)
     {
-        Line = 0;
         Label = label;
-        Color = color;
-        Show = show && IsEnabled;
 
-        if (!Show) return;
+        _line = 0;
+        _color = color;
+        _show = show && ConsoleProgress.IsEnabled;
+        if (showSpinner)
+        {
+            _showSpinner = showSpinner;
+            _spinner = new ConsoleSpinner(ConsoleProgress.SpinnerCharacters);
+        }
 
-        Line = Console.GetCursorPosition().Top;
+        if (!_show) return;
+
+        _line = Console.GetCursorPosition().Top;
         Console.WriteLine();
     }
 
     public readonly void Print()
     {
-        if (!Show) return;
+        if (!_show) return;
 
         (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
 
-        Console.SetCursorPosition(0, Line);
+        Console.SetCursorPosition(0, _line);
 
         int width = Console.WindowWidth;
-        Console.ForegroundColor = Color;
+        Console.ForegroundColor = _color;
+
+        if (_showSpinner && width > 2)
+        {
+            Console.Write(_spinner.Current);
+            Console.Write(' ');
+            width -= 2;
+        }
+
         for (int i = 0; i < width; i++)
         {
             if (i < Label.Length)
@@ -109,11 +151,11 @@ public struct ConsoleProgressLabel : IDisposable
 
     public readonly void Dispose()
     {
-        if (!Show) return;
+        if (!_show) return;
 
         (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
 
-        Console.SetCursorPosition(0, Line);
+        Console.SetCursorPosition(0, _line);
 
         int width = Console.WindowWidth;
         for (int i = 0; i < width; i++)

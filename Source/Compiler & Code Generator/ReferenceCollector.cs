@@ -8,7 +8,7 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
 {
     ISameCheck? CurrentFunction;
 
-    public ReferenceCollector(CompilerResult compilerResult, AnalysisCollection? analysisCollection) : base(compilerResult, GeneratorSettings.Default, analysisCollection)
+    public ReferenceCollector(CompilerResult compilerResult, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, GeneratorSettings.Default, analysisCollection, print)
     {
         CurrentFunction = null;
     }
@@ -595,9 +595,9 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
         { function.References.Clear(); }
     }
 
-    void AnalyzeFunctions(Statement[] topLevelStatements, PrintCallback? printCallback = null)
+    void AnalyzeFunctions(Statement[] topLevelStatements)
     {
-        printCallback?.Invoke($"  Collect references ...", LogType.Debug);
+        Print?.Invoke($"  Collect references ...", LogType.Debug);
 
         ClearReferences();
 
@@ -605,8 +605,8 @@ public class ReferenceCollector : CodeGeneratorNonGeneratorBase
     }
 
     public static void CollectReferences(in CompilerResult compilerResult, PrintCallback? printCallback = null, AnalysisCollection? analysisCollection = null)
-        => new ReferenceCollector(compilerResult, analysisCollection).AnalyzeFunctions(compilerResult.TopLevelStatements, printCallback);
+        => new ReferenceCollector(compilerResult, analysisCollection, printCallback).AnalyzeFunctions(compilerResult.TopLevelStatements);
 
     public static void ClearReferences(in CompilerResult compilerResult, AnalysisCollection? analysisCollection = null)
-        => new ReferenceCollector(compilerResult, analysisCollection).ClearReferences();
+        => new ReferenceCollector(compilerResult, analysisCollection, null).ClearReferences();
 }

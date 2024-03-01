@@ -11,7 +11,8 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
     IDuplicatable<CompiledGeneralFunction>,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
-    ITemplateable<CompiledGeneralFunction>
+    ITemplateable<CompiledGeneralFunction>,
+    IWithInstructionOffset
 {
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
@@ -77,7 +78,7 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
                 if (i > 0) result.Append(", ");
                 if (Parameters[i].Modifiers.Length > 0)
                 {
-                    result.Append(string.Join<Token>(' ', Parameters[i].Modifiers));
+                    result.AppendJoin(' ', Parameters[i].Modifiers);
                     result.Append(' ');
                 }
                 result.Append(ParameterTypes[i].ToString());

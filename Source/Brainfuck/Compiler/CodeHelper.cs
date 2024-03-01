@@ -79,7 +79,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         this.branchDepth = 0;
     }
 
-    /// <exception cref="NotSupportedException"/>
+    /// <exception cref="NotImplementedException"/>
     /// <exception cref="InternalException"/>
     public static int GetInteger(Runtime.DataItem v)
     {
@@ -89,7 +89,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
             Runtime.RuntimeType.Integer => v.VInt,
             Runtime.RuntimeType.Char => CharCode.GetByte(v.VChar),
 
-            Runtime.RuntimeType.Single => throw new NotSupportedException($"Floats not supported by brainfuck :("),
+            Runtime.RuntimeType.Single => throw new NotImplementedException("Floats not supported by brainfuck :("),
             Runtime.RuntimeType.Null => throw new InternalException(),
             _ => throw new UnreachableException(),
         };

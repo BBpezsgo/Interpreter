@@ -41,7 +41,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (variableDeclaration.Type == "var")
         {
             if (initialValue == null)
-            { throw new CompilerException($"Variable with implicit type must have an initial value"); }
+            { throw new CompilerException($"Variable with implicit type must have an initial value", variableDeclaration, CurrentFile); }
 
             type = FindStatementType(initialValue);
         }
@@ -1036,7 +1036,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 // AnalysisCollection?.Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
 
-                if (ReturnTagStack.Count <= 0)
+                if (ReturnTagStack.Count == 0)
                 { throw new CompilerException($"Can't return for some reason :(", statement.Identifier, CurrentFile); }
 
                 Code.SetValue(ReturnTagStack[^1], 0);
@@ -1057,7 +1057,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (statement.Parameters.Length != 0)
                 { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                if (BreakTagStack.Count <= 0)
+                if (BreakTagStack.Count == 0)
                 { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, CurrentFile); }
 
                 // AnalysisCollection?.Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
@@ -2259,23 +2259,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             switch (builtinType.Type)
             {
                 case BasicType.Byte:
-                    using (CommentBlock($"SNIPPET OUT_AS_STRING"))
-                    { Code += Snippets.OUT_AS_STRING; }
-                    break;
                 case BasicType.Integer:
-                    using (CommentBlock($"SNIPPET OUT_AS_STRING"))
-                    { Code += Snippets.OUT_AS_STRING; }
-                    break;
                 case BasicType.Float:
-                    using (CommentBlock($"SNIPPET OUT_AS_STRING"))
+                    using (CommentBlock("SNIPPET OUT_AS_STRING"))
                     { Code += Snippets.OUT_AS_STRING; }
                     break;
                 case BasicType.Char:
                     Code += '.';
                     break;
-                case BasicType.Void:
                 default:
-                    throw new CompilerException($"Invalid type {valueType}");
+                    throw new CompilerException($"Invalid type {valueType}", value, CurrentFile);
             }
 
             using (CommentBlock($"Clear address {address}"))
@@ -2758,10 +2751,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (passed is StatementWithValue value)
             {
                 if (defined.Modifiers.Contains("ref"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"ref\" modifier", passed, CurrentFile); }
 
                 if (defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
 
                 PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
 
@@ -2929,7 +2922,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 if (function.Type.Size != 1)
                 {
-                    throw new CompilerException($"Function with \"{"StandardInput"}\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
+                    throw new CompilerException($"Function with \"StandardInput\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
                 }
                 Code += ',';
             }
@@ -3049,10 +3042,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (passed is StatementWithValue value)
             {
                 if (defined.Modifiers.Contains("ref"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"ref\" modifier", passed, CurrentFile); }
 
                 if (defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
 
                 PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
 
@@ -3265,10 +3258,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (passed is StatementWithValue value)
             {
                 if (defined.Modifiers.Contains("ref"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"ref\" modifier", passed, CurrentFile); }
 
                 if (defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
 
                 PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
 
@@ -3316,7 +3309,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             ReturnTagStack.Push(tagAddress);
         }
 
-        GenerateCodeForStatement(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body"));
+        GenerateCodeForStatement(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath));
 
         {
             if (ReturnTagStack.Pop() != Stack.LastAddress)
@@ -3482,10 +3475,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (passed is StatementWithValue value)
             {
                 if (defined.Modifiers.Contains("ref"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"ref\" modifier", passed, CurrentFile); }
 
                 if (defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
 
                 PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
 
@@ -3647,7 +3640,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void ContinueReturnStatements()
     {
-        if (ReturnTagStack.Count <= 0)
+        if (ReturnTagStack.Count == 0)
         { return; }
 
         using (CommentBlock("Continue \"return\" statements"))
@@ -3675,7 +3668,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void ContinueBreakStatements()
     {
-        if (BreakTagStack.Count <= 0)
+        if (BreakTagStack.Count == 0)
         { return; }
 
         using (CommentBlock("Continue \"break\" statements"))

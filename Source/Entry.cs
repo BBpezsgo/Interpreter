@@ -18,12 +18,11 @@ public static class Entry
     public static void Run(ProgramArguments arguments)
     {
         Output.SetProgramArguments(arguments);
-        ConsoleProgressBar.SetProgramArguments(arguments);
-        ConsoleProgressLabel.SetProgramArguments(arguments);
+        ConsoleProgress.SetProgramArguments(arguments);
 
         if (arguments.IsEmpty)
         {
-            new LanguageCore.Interactive.Interactive().Run();
+            new Interactive.Interactive().Run();
             return;
         }
 
@@ -429,7 +428,7 @@ public static class Entry
 
                 string outputFile = Path.Combine(fileDirectoryPath, fileNameNoExt);
 
-                LanguageCore.ASM.Assembler.Assemble(code.AssemblyCode, outputFile);
+                ASM.Assembler.Assemble(code.AssemblyCode, outputFile);
 
                 outputFile += ".exe";
 

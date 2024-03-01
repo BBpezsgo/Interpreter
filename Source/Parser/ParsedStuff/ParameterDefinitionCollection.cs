@@ -70,7 +70,7 @@ public class ParameterDefinitionCollection :
             if (i > 0) result.Append(", ");
             if (_parameters[i].Modifiers.Length > 0)
             {
-                result.Append(string.Join(", ", _parameters[i].Modifiers));
+                result.AppendJoin(", ", _parameters[i].Modifiers);
                 result.Append(' ');
             }
             result.Append(_parameters[i].Type);
@@ -94,7 +94,7 @@ public class ParameterDefinitionCollection :
             if (i > 0) result.Append(", ");
             if (_parameters[i].Modifiers.Length > 0)
             {
-                result.Append(string.Join(", ", _parameters[i].Modifiers));
+                result.AppendJoin(", ", _parameters[i].Modifiers);
                 result.Append(' ');
             }
             result.Append(types[i].ToString());

@@ -11,7 +11,8 @@ public class CompiledFunction : FunctionDefinition,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
     ITemplateable<CompiledFunction>,
-    ICompiledFunctionThingy
+    ICompiledFunctionThingy,
+    IWithInstructionOffset
 {
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }

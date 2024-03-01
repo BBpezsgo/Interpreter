@@ -320,7 +320,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     #endregion
 
-    public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback, AnalysisCollection? analysisCollection) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection)
+    public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection, print)
     {
         this.Variables = new Stack<Variable>();
         this.Code = new CompiledCode();
@@ -765,6 +765,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         compilerResult,
         generatorSettings,
         printCallback,
-        analysisCollection
-    ).GenerateCode(compilerResult);
+        analysisCollection,
+        printCallback).GenerateCode(compilerResult);
 }

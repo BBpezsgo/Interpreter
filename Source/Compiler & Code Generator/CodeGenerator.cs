@@ -38,7 +38,7 @@ public struct GeneratorSettings
         PrintInstructions = false,
         DontOptimize = false,
         GenerateDebugInstructions = true,
-        ExternalFunctionsCache = true,
+        ExternalFunctionsCache = false,
         CheckNullPointers = true,
         CompileLevel = CompileLevel.Minimal,
     };
@@ -107,6 +107,8 @@ public abstract class CodeGenerator
 
     protected readonly GeneratorSettings Settings;
 
+    protected readonly PrintCallback? Print;
+
     protected CodeGenerator()
     {
         CompiledStructs = ImmutableArray.Create<CompiledStruct>();
@@ -136,9 +138,11 @@ public abstract class CodeGenerator
         InFunction = false;
 
         Settings = GeneratorSettings.Default;
+
+        Print = null;
     }
 
-    protected CodeGenerator(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection) : this()
+    protected CodeGenerator(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : this()
     {
         CompiledStructs = compilerResult.Structs.ToImmutableArray();
         CompiledFunctions = compilerResult.Functions.ToImmutableArray();
@@ -151,6 +155,8 @@ public abstract class CodeGenerator
         AnalysisCollection = analysisCollection;
 
         Settings = settings;
+
+        Print = print;
     }
 
     #region Helper Functions
@@ -176,7 +182,7 @@ public abstract class CodeGenerator
                 variableDeclaration.Type.SetAnalyzedType(constantType);
 
                 if (constantType is not BuiltinType builtinType)
-                { throw new NotSupportedException($"Only builtin types supported as a constant value"); }
+                { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, CurrentFile); }
 
                 DataItem.TryCast(ref constantValue, builtinType.RuntimeType);
             }
@@ -743,7 +749,7 @@ public abstract class CodeGenerator
             if (!function.Type.Equals(type.ReturnType)) continue;
 
             if (compiledFunction is not null)
-            { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", CurrentFile); }
+            { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", null, CurrentFile); }
 
             compiledFunction = function;
         }
@@ -777,7 +783,7 @@ public abstract class CodeGenerator
             if (!function.Identifier.Equals(name.Content)) continue;
 
             if (compiledFunction is not null)
-            { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name); }
+            { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, null); }
 
             compiledFunction = function;
         }
@@ -1449,8 +1455,8 @@ public abstract class CodeGenerator
             "float" => new DataItem((float)0f),
             "char" => new DataItem((char)'\0'),
 
-            "var" => throw new CompilerException("Undefined type", type),
-            "void" => throw new CompilerException("Invalid type", type),
+            "var" => throw new InternalException("Undefined type"),
+            "void" => throw new InternalException("Invalid type"),
             _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
         };
 
@@ -1723,7 +1729,7 @@ public abstract class CodeGenerator
     {
         GeneralType to = FindStatementType(pointer.PrevStatement);
         if (to is not PointerType pointerType)
-        { throw new UnreachableException(); }
+        { return OnGotStatementType(pointer, new BuiltinType(BasicType.Integer)); }
         return OnGotStatementType(pointer, pointerType.To);
     }
     protected GeneralType FindStatementType(NewInstance newInstance)
@@ -3454,7 +3460,7 @@ public abstract class CodeGenerator
             };
 
             if (!InlineMacro(loop.Block, parameters, out Block? subBlock))
-            { throw new CompilerException($"Failed to inline"); }
+            { throw new CompilerException($"Failed to inline", loop.Block, CurrentFile); }
 
             statements.Add(subBlock);
 

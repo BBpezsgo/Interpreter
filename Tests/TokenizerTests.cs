@@ -335,7 +335,7 @@ public class TokenizerTests
     [TestMethod]
     public void Test20()
     {
-        string text = @"'a'";
+        string text = "'a'";
 
         Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
         Position[] positions = new Position[]
@@ -353,7 +353,7 @@ public class TokenizerTests
     [TestMethod]
     public void Test21()
     {
-        string text = @"563";
+        string text = "563";
 
         Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
         Position[] positions = new Position[]
@@ -371,7 +371,7 @@ public class TokenizerTests
     [TestMethod]
     public void Test22()
     {
-        string text = @".563";
+        string text = ".563";
 
         Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
         Position[] positions = new Position[]
@@ -389,7 +389,7 @@ public class TokenizerTests
     [TestMethod]
     public void Test23()
     {
-        string text = @".563f";
+        string text = ".563f";
 
         Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
         Position[] positions = new Position[]
@@ -503,7 +503,7 @@ public class TokenizerTests
     [ExpectedException(typeof(TokenizerException))]
     public void Test29()
     {
-        string text = @"''";
+        string text = "''";
 
         Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
         Position[] positions = new Position[]
@@ -521,7 +521,7 @@ public class TokenizerTests
     [TestMethod]
     public void Test30()
     {
-        string text = @"// hello";
+        string text = "// hello";
 
         Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
         Position[] positions = new Position[]

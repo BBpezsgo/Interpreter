@@ -88,12 +88,6 @@ export void PrintLine(int message)
     PrintLine();
 }
 
-export void PrintLine(byte message)
-{
-    Print(message);
-    PrintLine();
-}
-
 //
 //  == INPUT ==
 //
@@ -112,7 +106,7 @@ export char ReadKey()
 export char* ReadLine()
 {
     char* result = "";
-    while (true)
+    while (1)
     {
         char inpChar = ReadKey();
         if (inpChar == '\n') { break; };

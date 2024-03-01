@@ -11,10 +11,7 @@ public class CompiledEnumMember : EnumMemberDefinition,
     public GeneralType Type => new BuiltinType(ComputedValue.Type);
     [NotNull] public new CompiledEnum? Context { get; set; }
 
-    public CompiledEnumMember(EnumMemberDefinition definition) : base(definition)
-    {
-
-    }
+    public CompiledEnumMember(EnumMemberDefinition definition) : base(definition) { }
 }
 
 public class CompiledEnum : EnumDefinition, IProbablyHaveCompiledType

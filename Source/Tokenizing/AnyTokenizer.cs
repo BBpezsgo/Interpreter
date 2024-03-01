@@ -10,14 +10,14 @@ public static class AnyTokenizer
     public static TokenizerResult Tokenize(Uri uri, TokenizerSettings settings)
     {
         if (uri.IsFile)
-        { return StreamTokenizer.Tokenize(uri.LocalPath); }
+        { return StreamTokenizer.Tokenize(uri.LocalPath, settings); }
         else
         {
             using HttpClient client = new();
             using HttpResponseMessage res = client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead).Result;
             res.EnsureSuccessStatusCode();
 
-            return StreamTokenizer.Tokenize(res.Content.ReadAsStream());
+            return StreamTokenizer.Tokenize(res.Content.ReadAsStream(), settings);
         }
     }
 }

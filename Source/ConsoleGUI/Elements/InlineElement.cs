@@ -20,7 +20,7 @@ public class InlineElement : Element, IInlineLayoutElement
     {
         base.BeforeDraw();
         try { OnBeforeDraw?.Invoke(this); }
-        catch (System.Exception) { }
+        catch (Exception) { }
     }
     public override void RefreshSize()
     {

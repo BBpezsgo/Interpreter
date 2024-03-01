@@ -12,21 +12,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
 {
     #region AddInstruction()
 
-    void AddInstruction(Instruction instruction) => GeneratedCode.Add(instruction);
+    int InstructionInsertIndex = -1;
+
+    void AddInstruction(Instruction instruction)
+    {
+        if (InstructionInsertIndex < 0)
+        { GeneratedCode.Add(instruction); }
+        else
+        { GeneratedCode.Insert(InstructionInsertIndex, instruction); }
+    }
     void AddInstruction(Opcode opcode) => AddInstruction(new Instruction(opcode));
     void AddInstruction(Opcode opcode, DataItem param0) => AddInstruction(new Instruction(opcode, param0));
     void AddInstruction(Opcode opcode, int param0) => AddInstruction(new Instruction(opcode, new DataItem(param0)));
-
     void AddInstruction(Opcode opcode, AddressingMode addressingMode) => AddInstruction(new Instruction(opcode, addressingMode));
     void AddInstruction(Opcode opcode, AddressingMode addressingMode, int param0) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)));
 
     void AddComment(string comment)
     {
-        if (GeneratedDebugInfo.CodeComments.TryGetValue(GeneratedCode.Count, out List<string>? comments))
+        int index = InstructionInsertIndex >= 0 ? InstructionInsertIndex : GeneratedCode.Count;
+        if (GeneratedDebugInfo.CodeComments.TryGetValue(index, out List<string>? comments))
         { comments.Add(comment); }
         else
-        { GeneratedDebugInfo.CodeComments.Add(GeneratedCode.Count, new List<string>() { comment }); }
+        { GeneratedDebugInfo.CodeComments.Add(index, new List<string>() { comment }); }
     }
+
     #endregion
 
     #region GenerateCodeForStatement
@@ -159,21 +168,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GeneralType deletableType = FindStatementType(keywordCall.Parameters[0]);
 
-            if (deletableType is not PointerType)
+            if (deletableType is not PointerType deletablePointerType)
             {
                 AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on pointers or pointer so I skip this", keywordCall.Parameters[0], CurrentFile));
                 return;
             }
 
-            if (!GetGeneralFunction(deletableType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
+            if (!GetGeneralFunction(deletablePointerType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
             {
-                if (!GetGeneralFunctionTemplate(deletableType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
+                if (!GetGeneralFunctionTemplate(deletablePointerType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                 {
                     GenerateCodeForStatement(keywordCall.Parameters[0], new BuiltinType(BasicType.Integer));
                     AddInstruction(Opcode.HEAP_FREE);
                     AddComment("}");
 
-                    AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deletableType}\" not found", keywordCall.Identifier, CurrentFile));
+                    if (deletablePointerType.To is not BuiltinType)
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deletablePointerType}\" not found", keywordCall.Identifier, CurrentFile)); }
 
                     return;
                 }
@@ -183,13 +193,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (!destructor.CanUse(CurrentFile))
             {
-                AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{deletableType}\" function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
+                AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{deletablePointerType}\" function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
                 AddComment("}");
                 return;
             }
 
             AddComment(" Param0:");
-            GenerateCodeForStatement(keywordCall.Parameters[0], deletableType);
+            GenerateCodeForStatement(keywordCall.Parameters[0], deletablePointerType);
 
             AddComment(" .:");
 
@@ -348,7 +358,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -393,7 +403,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -430,7 +440,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -467,7 +477,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -484,7 +494,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return parameterCleanup;
     }
 
-    void GenerateCodeForParameterCleanup(Stack<ParameterCleanupItem> parameterCleanup)
+    void GenerateCodeForParameterCleanup(Stack<ParameterCleanupItem> parameterCleanup, Position position)
     {
         AddComment(" Clear Params:");
         while (parameterCleanup.Count > 0)
@@ -493,7 +503,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (passedParameter.CanDeallocate && passedParameter.Size == 1)
             {
-                GenerateDeallocator(passedParameter.Type);
+                GenerateDeallocator(passedParameter.Type, position);
                 continue;
             }
 
@@ -591,7 +601,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     }
                 }
 
-                GenerateCodeForParameterCleanup(parameterCleanup);
+                GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
             }
             else
             {
@@ -629,7 +639,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     }
                 }
 
-                GenerateCodeForParameterCleanup(parameterCleanup);
+                GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
 
                 AddComment(" Deallocate Function Name String:");
 
@@ -649,7 +659,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.InstructionOffset == -1)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, functionCall, compiledFunction, CurrentFile)); }
 
-        GenerateCodeForParameterCleanup(parameterCleanup);
+        GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
 
         if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
         {
@@ -688,7 +698,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CallRuntime(compiledVariable);
 
-        GenerateCodeForParameterCleanup(parameterCleanup);
+        GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
 
         if (functionType.ReturnSomething && !functionCall.SaveValue)
         {
@@ -727,7 +737,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CallRuntime(compiledParameter);
 
-        GenerateCodeForParameterCleanup(parameterCleanup);
+        GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
 
         if (functionType.ReturnSomething && !functionCall.SaveValue)
         {
@@ -882,7 +892,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddComment(" .:");
                 AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.Parameters.Length);
 
-                GenerateCodeForParameterCleanup(parameterCleanup);
+                GenerateCodeForParameterCleanup(parameterCleanup, @operator.Operator.Position);
 
                 bool thereIsReturnValue = false;
                 if (!@operator.SaveValue)
@@ -926,7 +936,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (operatorDefinition.InstructionOffset == -1)
             { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, CurrentFile)); }
 
-            GenerateCodeForParameterCleanup(parameterCleanup);
+            GenerateCodeForParameterCleanup(parameterCleanup, @operator.Operator.Position);
 
             if (!@operator.SaveValue)
             {
@@ -1200,7 +1210,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GeneratedCode[conditionJumpOffset].Parameter = GeneratedCode.Count - conditionJumpOffset;
 
-        OnScopeExit();
+        OnScopeExit(whileLoop.Block.Brackets.End.Position);
 
         AddComment("}");
 
@@ -1247,7 +1257,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         FinishJumpInstructions(BreakInstructions.Pop());
 
-        OnScopeExit();
+        OnScopeExit(forLoop.Position.After());
 
         AddComment("}");
     }
@@ -1401,7 +1411,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.InstructionOffset == -1)
         { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructor>(jumpInstruction, false, constructorCall, compiledFunction, CurrentFile)); }
 
-        GenerateCodeForParameterCleanup(parameterCleanup);
+        GenerateCodeForParameterCleanup(parameterCleanup, constructorCall.BracketRight.Position);
 
         AddComment("}");
     }
@@ -1704,7 +1714,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { GenerateCodeForStatement(block.Statements[i]); }
         AddComment("}");
 
-        OnScopeExit();
+        OnScopeExit(block.Brackets.End.Position);
     }
 
     void GenerateCodeForStatement(Statement statement, GeneralType? expectedType = null)
@@ -1763,7 +1773,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return result.ToArray();
     }
 
-    void CleanupVariables(CleanupItem[] cleanupItems)
+    void CleanupVariables(CleanupItem[] cleanupItems, Position position)
     {
         if (cleanupItems.Length == 0) return;
         AddComment("Clear Variables");
@@ -1774,7 +1784,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (item.ShouldDeallocate)
             {
                 if (item.SizeOnStack != 1) throw new InternalException();
-                GenerateDeallocator(item.Type!);
+                GenerateDeallocator(item.Type!, position);
             }
             else
             {
@@ -2053,60 +2063,52 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, destination + size - offset); }
     }
 
-    void GenerateDeallocator(GeneralType deallocateableType)
+    void GenerateDeallocator(GeneralType deallocateableType, Position position)
     {
-        AddComment($"Deallocate \"{deallocateableType}\" {{");
-
-        if (deallocateableType is PointerType)
+        if (deallocateableType is not PointerType deallocateablePointerType)
         {
-            AddInstruction(Opcode.HEAP_FREE);
-            AddComment("}");
+            AnalysisCollection?.Warnings.Add(new Warning($"Deallocation only working on pointers or pointer so I skip this", position, CurrentFile));
             return;
         }
 
-        /*
-        if (deallocateableType.IsClass)
+        if (!GetGeneralFunction(deallocateablePointerType, new GeneralType[] { deallocateablePointerType }, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
         {
-            if (!GetGeneralFunction(deallocateableType, new GeneralType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
+            if (!GetGeneralFunctionTemplate(deallocateablePointerType, new GeneralType[] { deallocateablePointerType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
             {
-                if (!GetGeneralFunctionTemplate(deallocateableType, new GeneralType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
-                {
-                    AddInstruction(Opcode.HEAP_FREE);
-                    AddComment("}");
-                    return;
-                }
-                destructorTemplate = AddCompilable(destructorTemplate);
-                destructor = destructorTemplate.Function;
-            }
-
-            if (!destructor.CanUse(CurrentFile))
-            {
-                AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Identifier.Content}' function cannot be called due to its protection level", null, CurrentFile));
+                AddComment($"Pointer value should be already there");
+                AddInstruction(Opcode.HEAP_FREE);
                 AddComment("}");
+
+                if (deallocateablePointerType.To is not BuiltinType)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deallocateablePointerType}\" not found", position, CurrentFile)); }
+
                 return;
             }
+            destructorTemplate = AddCompilable(destructorTemplate);
+            destructor = destructorTemplate.Function;
+        }
 
-            AddComment(" Param0 (should be already be there):");
-
-            AddComment(" .:");
-
-            int jumpInstruction = Call(destructor.InstructionOffset);
-
-            if (destructor.InstructionOffset == -1)
-            { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, null, destructor, CurrentFile)); }
-
-            AddComment(" Clear Param:");
-
-            AddInstruction(Opcode.POP_VALUE);
-
+        if (!destructor.CanUse(CurrentFile))
+        {
+            AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{deallocateablePointerType}\" function cannot be called due to its protection level", position, CurrentFile));
             AddComment("}");
             return;
         }
 
+        AddComment(" Param0 should be already there");
+
+        AddComment(" .:");
+
+        int jumpInstruction = Call(destructor.InstructionOffset);
+
+        if (destructor.InstructionOffset == -1)
+        { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, position, destructor, CurrentFile)); }
+
+        AddComment(" Clear Param0:");
+
         AddInstruction(Opcode.HEAP_FREE);
+
         AddComment("}");
-        */
-        throw new NotImplementedException();
     }
 
     void GenerateCodeForInlinedMacro(Statement inlinedMacro)
@@ -2145,14 +2147,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions.Push(new List<int>());
     }
 
-    void OnScopeExit()
+    void OnScopeExit(Position position)
     {
         AddComment("Scope exit");
 
         FinishJumpInstructions(ReturnInstructions.Last);
         ReturnInstructions.Pop();
 
-        CleanupVariables(CleanupStack.Pop());
+        CleanupVariables(CleanupStack.Pop(), position);
 
         if (CanReturn)
         {
@@ -2299,7 +2301,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void GenerateCodeForFunction(FunctionThingDefinition function)
+    bool GenerateCodeForFunction(FunctionThingDefinition function)
     {
         if (LanguageConstants.Keywords.Contains(function.Identifier?.ToString()))
         { throw new CompilerException($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
@@ -2312,9 +2314,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             for (int i = 0; i < functionDefinition.Attributes.Length; i++)
             {
                 if (functionDefinition.Attributes[i].Identifier.Equals("External"))
-                { return; }
+                { return false; }
             }
         }
+
+        Print?.Invoke($"Generate {function.ToReadable()} ...", LogType.Debug);
 
         if (function.Identifier is not null)
         { AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }")); }
@@ -2341,7 +2345,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.PUSH_VALUE, new DataItem(false));
         TagCount.Last++;
 
-        OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body"));
+        OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath));
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
         {
@@ -2401,7 +2405,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CanReturn = false;
 
-        OnScopeExit();
+        OnScopeExit(function.Block.Brackets.End.Position);
 
         AddInstruction(Opcode.POP_VALUE);
         TagCount.Last--;
@@ -2434,16 +2438,52 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentContext = null;
         InFunction = false;
+        return true;
     }
 
-    void GenerateCodeForCompilableFunction<T>(CompliableTemplate<T> function)
+    bool GenerateCodeForFunctions<TFunction>(IEnumerable<TFunction> functions)
+        where TFunction : FunctionThingDefinition, IWithInstructionOffset, IReferenceable
+    {
+        bool generatedAnything = false;
+        foreach (TFunction function in functions)
+        {
+            if (function.IsTemplate) continue;
+            if (function.InstructionOffset >= 0) continue;
+            if (!function.References.Any()) continue;
+
+            function.InstructionOffset = GeneratedCode.Count;
+            if (GenerateCodeForFunction(function))
+            { generatedAnything = true; }
+        }
+        return generatedAnything;
+    }
+
+    bool GenerateCodeForCompilableFunction<T>(CompliableTemplate<T> function)
         where T : FunctionThingDefinition, ITemplateable<T>
     {
         SetTypeArguments(function.TypeArguments);
-
-        GenerateCodeForFunction(function.Function);
-
+        bool generatedAnything = GenerateCodeForFunction(function.Function);
         TypeArguments.Clear();
+        return generatedAnything;
+    }
+
+    bool GenerateCodeForCompilableFunctions<T>(IReadOnlyList<CompliableTemplate<T>> functions)
+        where T : FunctionThingDefinition, ITemplateable<T>, IWithInstructionOffset
+    {
+        bool generatedAnything = false;
+        int i = 0;
+        while (i < functions.Count)
+        {
+            CompliableTemplate<T> function = functions[i];
+            i++;
+
+            if (function.Function.InstructionOffset >= 0) continue;
+
+            function.Function.InstructionOffset = GeneratedCode.Count;
+            if (GenerateCodeForCompilableFunction(function))
+            { generatedAnything = true; }
+        }
+        return generatedAnything;
     }
 
     void GenerateCodeForTopLevelStatements(Statement[] statements)
@@ -2517,7 +2557,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions.Pop();
 
         CompiledGlobalVariables.AddRange(CompiledVariables);
-        CleanupVariables(CleanupStack.Pop());
+        CleanupVariables(CleanupStack.Pop(), statements[^1].Position.NextLine());
 
         CleanupConstants();
 

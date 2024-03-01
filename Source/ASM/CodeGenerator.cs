@@ -27,10 +27,7 @@ public class ImportedAsmFunction
     public override string ToString() => $"_{Name}@{ParameterSizeBytes}";
 }
 
-public struct AsmGeneratorSettings
-{
-
-}
+public struct AsmGeneratorSettings;
 
 public struct AsmGeneratorResult
 {
@@ -51,7 +48,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     #endregion
 
-    public CodeGeneratorForAsm(CompilerResult compilerResult, AsmGeneratorSettings settings, AnalysisCollection? analysisCollection) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection)
+    public CodeGeneratorForAsm(CompilerResult compilerResult, AsmGeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection, print)
     {
         this.GeneratorSettings = settings;
         this.Builder = new AssemblyCode();
@@ -371,7 +368,6 @@ public class CodeGeneratorForAsm : CodeGenerator
         }
         else
         {
-
             size = GenerateInitialValue(compiledVariable.Type);
 
             if (size <= 0)
@@ -399,7 +395,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             CleanupItem item = GenerateCodeForVariable(statement);
             if (item.SizeOnStack == 0) continue;
 
-            yield return (item);
+            yield return item;
         }
     }
 
@@ -507,7 +503,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -544,7 +540,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -578,7 +574,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -1650,7 +1646,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         Builder.CodeBuilder.Indent = 0;
     }
 
-    AsmGeneratorResult GenerateCode(CompilerResult compilerResult, PrintCallback? printCallback = null)
+    AsmGeneratorResult GenerateCode(CompilerResult compilerResult)
     {
         GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
@@ -1679,5 +1675,5 @@ public class CodeGeneratorForAsm : CodeGenerator
     }
 
     public static AsmGeneratorResult Generate(CompilerResult compilerResult, AsmGeneratorSettings generatorSettings, PrintCallback? printCallback = null, AnalysisCollection? analysisCollection = null)
-        => new CodeGeneratorForAsm(compilerResult, generatorSettings, analysisCollection).GenerateCode(compilerResult, printCallback);
+        => new CodeGeneratorForAsm(compilerResult, generatorSettings, analysisCollection, printCallback).GenerateCode(compilerResult);
 }

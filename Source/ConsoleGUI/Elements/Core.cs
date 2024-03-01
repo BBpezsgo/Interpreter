@@ -11,8 +11,6 @@ public class DrawBuffer
     int currentIndex;
     public readonly int Width;
     public readonly int Height;
-    byte currentBgColor;
-    byte currentFgColor;
 
     public DrawBuffer()
     {
@@ -126,7 +124,6 @@ public class DrawBuffer
             {
                 for (int y = prevPoint.y; y <= point.y; y++)
                 {
-                    ;
                     /*
                     char c = '█'
                     if (i + 1 < points.Length)
@@ -192,16 +189,8 @@ public class DrawBuffer
 
     public int CurrentIndex => currentIndex;
 
-    public byte ForegroundColor
-    {
-        get => currentFgColor;
-        set => currentFgColor = value;
-    }
-    public byte BackgroundColor
-    {
-        get => currentBgColor;
-        set => currentBgColor = value;
-    }
+    public byte ForegroundColor { get; set; }
+    public byte BackgroundColor { get; set; }
 
     public void ResetColor()
     {
@@ -214,7 +203,7 @@ public class DrawBuffer
         if (currentIndex >= this.v.Length) return false;
         if (currentIndex < 0) return false;
 
-        this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new ConsoleChar(v, currentFgColor, currentBgColor);
+        this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new ConsoleChar(v, ForegroundColor, BackgroundColor);
 
         currentIndex++;
         if (currentIndex >= this.v.Length) return false;
@@ -227,8 +216,8 @@ public class DrawBuffer
         if (i >= this.v.Length) return false;
         if (i < 0) return false;
 
-        this.v[i].Foreground = currentFgColor;
-        this.v[i].Background = currentBgColor;
+        this.v[i].Foreground = ForegroundColor;
+        this.v[i].Background = BackgroundColor;
         this.v[i].Char = v;
 
         return true;
@@ -367,9 +356,9 @@ public static class Extensions
         }
         return side switch
         {
-            Side.TopLeft => ('┌').Details(),
-            Side.Top => ('─').Details(),
-            Side.TopRight => ('┒').Details(),
+            Side.TopLeft => '┌'.Details(),
+            Side.Top => '─'.Details(),
+            Side.TopRight => '┒'.Details(),
             Side.Right => '┃'.Details(),
             Side.BottomRight => '┛'.Details(),
             Side.Bottom => '━'.Details(),

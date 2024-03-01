@@ -64,13 +64,13 @@ public class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                 _memoryPointer += instruction.Count;
                 _memoryPointerRange = Range.Union(_memoryPointerRange, _memoryPointer);
                 if (_memoryPointer >= Memory.Length)
-                { throw new BrainfuckRuntimeException($"Memory overflow", CurrentContext); }
+                { throw new BrainfuckRuntimeException("Memory overflow", CurrentContext); }
                 break;
             case OpCodes.POINTER_L:
                 _memoryPointer -= instruction.Count;
                 _memoryPointerRange = Range.Union(_memoryPointerRange, _memoryPointer);
                 if (_memoryPointer < 0)
-                { throw new BrainfuckRuntimeException($"Memory underflow", CurrentContext); }
+                { throw new BrainfuckRuntimeException("Memory underflow", CurrentContext); }
                 break;
             case OpCodes.BRANCH_START:
                 if (instruction.Count != 1)
@@ -85,13 +85,13 @@ public class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                         if (Code[_codePointer].OpCode == OpCodes.BRANCH_END)
                         {
                             if (depth == 0) return;
-                            if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
+                            if (depth < 0) throw new BrainfuckRuntimeException("Wat", CurrentContext);
                             depth--;
                         }
                         else if (Code[_codePointer].OpCode == OpCodes.BRANCH_START)
                         { depth++; }
                     }
-                    throw new BrainfuckRuntimeException($"Unclosed bracket", CurrentContext);
+                    throw new BrainfuckRuntimeException("Unclosed bracket", CurrentContext);
                 }
                 break;
             case OpCodes.BRANCH_END:
@@ -107,13 +107,13 @@ public class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                         if (Code[_codePointer].OpCode == OpCodes.BRANCH_START)
                         {
                             if (depth == 0) return;
-                            if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
+                            if (depth < 0) throw new BrainfuckRuntimeException("Wat", CurrentContext);
                             depth--;
                         }
                         else if (Code[_codePointer].OpCode == OpCodes.BRANCH_END)
                         { depth++; }
                     }
-                    throw new BrainfuckRuntimeException($"Unexpected closing bracket", CurrentContext);
+                    throw new BrainfuckRuntimeException("Unexpected closing bracket", CurrentContext);
                 }
                 break;
             case OpCodes.OUT:

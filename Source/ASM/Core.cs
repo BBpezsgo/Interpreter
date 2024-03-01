@@ -4,19 +4,17 @@ public class ProcessException : Exception
 {
     readonly string processName;
     readonly int exitCode;
-    readonly string stdOutput;
-    readonly string stdError;
 
     public override string Message => $"Process \"{processName}\" exited with code {exitCode}";
-    public string StandardOutput => stdOutput;
-    public string StandardError => stdError;
+    public string StandardOutput { get; }
+    public string StandardError { get; }
 
     public ProcessException(string processName, int exitCode, string stdOutput, string stdError) : base()
     {
         this.processName = processName;
         this.exitCode = exitCode;
-        this.stdOutput = stdOutput;
-        this.stdError = stdError;
+        this.StandardOutput = stdOutput;
+        this.StandardError = stdError;
     }
 }
 

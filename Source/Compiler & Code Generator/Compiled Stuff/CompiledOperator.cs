@@ -11,7 +11,8 @@ public class CompiledOperator : FunctionDefinition,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
     ITemplateable<CompiledOperator>,
-    ICompiledFunctionThingy
+    ICompiledFunctionThingy,
+    IWithInstructionOffset
 {
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }

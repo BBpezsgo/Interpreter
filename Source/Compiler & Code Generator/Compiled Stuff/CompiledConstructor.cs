@@ -9,7 +9,8 @@ public class CompiledConstructor : ConstructorDefinition,
     IDuplicatable<CompiledConstructor>,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
-    ITemplateable<CompiledConstructor>
+    ITemplateable<CompiledConstructor>,
+    IWithInstructionOffset
 {
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }

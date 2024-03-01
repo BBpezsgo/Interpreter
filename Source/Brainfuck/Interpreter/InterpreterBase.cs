@@ -34,7 +34,7 @@ public abstract class InterpreterBase : IDisposable
     public static void OnDefaultOutput(byte data) => Console.Write(CharCode.GetChar(data));
     public static byte OnDefaultInput() => CharCode.GetByte(Console.ReadKey(true).KeyChar);
 
-    public InterpreterBase(OutputCallback? onOutput = null, InputCallback? onInput = null)
+    protected InterpreterBase(OutputCallback? onOutput = null, InputCallback? onInput = null)
     {
         Memory = new byte[MEMORY_SIZE];
 
@@ -54,9 +54,8 @@ public abstract class InterpreterBase : IDisposable
     public void Run(int stepsBeforeSleep)
     {
         int step = 0;
-        while (true)
+        while (Step())
         {
-            if (!Step()) break;
             step++;
             if (step >= stepsBeforeSleep)
             {
@@ -118,19 +117,19 @@ public abstract class InterpreterBase<TCode> : InterpreterBase
 
     public bool IsDone => _codePointer >= Code.Length || _codePointer < 0;
 
-    public InterpreterBase(Uri uri, OutputCallback? onOutput = null, InputCallback? onInput = null)
+    protected InterpreterBase(Uri uri, OutputCallback? onOutput = null, InputCallback? onInput = null)
         : this(onOutput, onInput)
         => LoadCode(uri);
 
-    public InterpreterBase(FileInfo file, OutputCallback? onOutput = null, InputCallback? onInput = null)
+    protected InterpreterBase(FileInfo file, OutputCallback? onOutput = null, InputCallback? onInput = null)
         : this(onOutput, onInput)
         => LoadCode(file);
 
-    public InterpreterBase(string code, OutputCallback? onOutput = null, InputCallback? onInput = null)
+    protected InterpreterBase(string code, OutputCallback? onOutput = null, InputCallback? onInput = null)
         : this(onOutput, onInput)
         => LoadCode(code);
 
-    public InterpreterBase(OutputCallback? onOutput = null, InputCallback? onInput = null) : base(onOutput, onInput)
+    protected InterpreterBase(OutputCallback? onOutput = null, InputCallback? onInput = null) : base(onOutput, onInput)
     {
         Code = Array.Empty<TCode>();
     }

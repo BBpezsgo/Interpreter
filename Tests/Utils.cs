@@ -444,7 +444,7 @@ public readonly struct MainResult : IResult
         StdOutput = stdOut;
         StdError = stdErr;
 
-        ExitCode = interpreter.Memory.Stack.Last.RoundToInt32(null);
+        ExitCode = (int)interpreter.Memory.Stack.Last;
 
         Heap = interpreter.Memory.Heap;
         Stack = interpreter.Memory.Stack;

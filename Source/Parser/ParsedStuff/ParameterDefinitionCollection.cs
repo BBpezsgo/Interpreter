@@ -3,7 +3,7 @@
 namespace LanguageCore.Parser;
 
 using Compiler;
-using Tokenizing;
+using LanguageCore.Parser.Statement;
 
 public class ParameterDefinitionCollection :
     IPositioned,
@@ -11,12 +11,11 @@ public class ParameterDefinitionCollection :
     IDuplicatable<ParameterDefinitionCollection>,
     IInContext<FunctionThingDefinition>
 {
-    public Token LeftParenthesis { get; }
-    public Token RightParenthesis { get; }
+    public TokenPair Brackets { get; }
     public int Count => _parameters.Length;
     [NotNull] public FunctionThingDefinition? Context { get; set; }
     public Position Position =>
-        new Position(LeftParenthesis, RightParenthesis)
+        new Position(Brackets)
         .Union(_parameters);
 
     public ParameterDefinition this[int index] => _parameters[index];
@@ -28,16 +27,14 @@ public class ParameterDefinitionCollection :
     public ParameterDefinitionCollection(ParameterDefinitionCollection other)
     {
         this._parameters = other._parameters;
-        this.LeftParenthesis = other.LeftParenthesis;
-        this.RightParenthesis = other.RightParenthesis;
+        this.Brackets = other.Brackets;
         this.Context = other.Context;
     }
 
-    public ParameterDefinitionCollection(IEnumerable<ParameterDefinition> parameterDefinitions, Token leftParenthesis, Token rightParenthesis)
+    public ParameterDefinitionCollection(IEnumerable<ParameterDefinition> parameterDefinitions, TokenPair brackets)
     {
         this._parameters = parameterDefinitions.ToImmutableArray();
-        this.LeftParenthesis = leftParenthesis;
-        this.RightParenthesis = rightParenthesis;
+        this.Brackets = brackets;
     }
 
     public IEnumerator<ParameterDefinition> GetEnumerator() => (_parameters as IEnumerable<ParameterDefinition>).GetEnumerator();
@@ -55,7 +52,7 @@ public class ParameterDefinitionCollection :
     public ParameterDefinition[] ToArray() => _parameters.ToArray();
 
     public static ParameterDefinitionCollection CreateAnonymous(IEnumerable<ParameterDefinition> parameterDefinitions)
-        => new(parameterDefinitions, Token.CreateAnonymous("(", TokenType.Operator), Token.CreateAnonymous(")", TokenType.Operator));
+        => new(parameterDefinitions, TokenPair.CreateAnonymous(new Position(parameterDefinitions), "(", ")"));
 
     public ParameterDefinitionCollection Duplicate() => new(this);
 
@@ -63,7 +60,7 @@ public class ParameterDefinitionCollection :
     {
         StringBuilder result = new();
 
-        result.Append(LeftParenthesis.ToString());
+        result.Append(Brackets.Start);
 
         for (int i = 0; i < _parameters.Length; i++)
         {
@@ -76,7 +73,7 @@ public class ParameterDefinitionCollection :
             result.Append(_parameters[i].Type);
         }
 
-        result.Append(RightParenthesis.ToString());
+        result.Append(Brackets.End);
 
         return result.ToString();
     }
@@ -87,7 +84,7 @@ public class ParameterDefinitionCollection :
     {
         StringBuilder result = new();
 
-        result.Append(LeftParenthesis.ToString());
+        result.Append(Brackets.Start);
 
         for (int i = 0; i < _parameters.Length; i++)
         {
@@ -100,7 +97,7 @@ public class ParameterDefinitionCollection :
             result.Append(types[i].ToString());
         }
 
-        result.Append(RightParenthesis.ToString());
+        result.Append(Brackets.End);
 
         return result.ToString();
     }

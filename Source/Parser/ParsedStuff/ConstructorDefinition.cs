@@ -46,7 +46,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
             if (j > 0) result.Append(", ");
             if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
             {
-                result.Append(string.Join<Token>(' ', Parameters[j].Modifiers));
+                result.AppendJoin(' ', Parameters[j].Modifiers);
                 result.Append(' ');
             }
 
@@ -74,7 +74,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
             if (j > 0) { result.Append(", "); }
             if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
             {
-                result.Append(string.Join<Token>(' ', Parameters[j].Modifiers));
+                result.AppendJoin(' ', Parameters[j].Modifiers);
                 result.Append(' ');
             }
 

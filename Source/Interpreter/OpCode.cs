@@ -702,13 +702,13 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from value
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>

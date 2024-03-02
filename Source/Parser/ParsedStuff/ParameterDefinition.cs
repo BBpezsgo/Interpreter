@@ -10,7 +10,7 @@ public class ParameterDefinition :
     public Token Identifier { get; }
     public TypeInstance Type { get; }
     public ImmutableArray<Token> Modifiers { get; }
-    public bool IsRef => Modifiers.Contains("ref");
+    public bool IsRef => Modifiers.Contains(ModifierKeywords.Ref);
     public Position Position =>
         new Position(Identifier, Type)
         .Union(Modifiers);

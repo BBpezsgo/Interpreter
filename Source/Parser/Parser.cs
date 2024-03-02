@@ -3,7 +3,7 @@
 using Statement;
 using Tokenizing;
 
-public class Parser
+public sealed class Parser
 {
     int CurrentTokenIndex;
     readonly Token[] Tokens;
@@ -14,43 +14,39 @@ public class Parser
 
     static readonly string[] Modifiers = new string[]
     {
-        "export",
-        "adaptive",
-        "inline",
+        ProtectionKeywords.Export,
+        ModifierKeywords.Inline,
     };
 
     static readonly string[] FunctionModifiers = new string[]
     {
-        "export",
+        ProtectionKeywords.Export,
+        ModifierKeywords.Inline,
         "macro",
-        "adaptive",
-        "inline",
     };
 
     static readonly string[] GeneralStatementModifiers = new string[]
     {
-        "temp",
+        ModifierKeywords.Temp,
     };
 
     static readonly string[] VariableDefinitionModifiers = new string[]
     {
-        "const",
-        "temp",
+        ModifierKeywords.Temp,
+        ModifierKeywords.Const,
     };
 
     static readonly string[] ParameterDefinitionModifiers = new string[]
     {
-        "this",
-        "ref",
-        "const",
-        "temp",
+        ModifierKeywords.This,
+        ModifierKeywords.Ref,
+        ModifierKeywords.Temp,
     };
 
     static readonly string[] PassedParameterModifiers = new string[]
     {
-        "ref",
-        "const",
-        "temp",
+        ModifierKeywords.Ref,
+        ModifierKeywords.Temp,
     };
 
     static readonly string[] OverloadableOperators = new string[]
@@ -217,10 +213,10 @@ public class Parser
     bool ExpectUsing([NotNullWhen(true)] out UsingDefinition? usingDefinition)
     {
         usingDefinition = null;
-        if (!ExpectIdentifier("using", out Token? keyword))
+        if (!ExpectIdentifier(DeclarationKeywords.Using, out Token? keyword))
         { return false; }
 
-        if (CurrentToken == null) throw new SyntaxException($"Expected url after keyword \"using\"", keyword.Position.After(), File);
+        if (CurrentToken == null) throw new SyntaxException($"Expected url after keyword \"{DeclarationKeywords.Using}\"", keyword.Position.After(), File);
 
         keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
@@ -249,17 +245,17 @@ public class Parser
         {
             if (!ExpectOperator(";"))
             {
-                throw new SyntaxException("Expected library name after \"using\"", keyword, File);
+                throw new SyntaxException($"Expected library name after \"{DeclarationKeywords.Using}\"", keyword, File);
             }
             else
             {
-                Errors.Add(new Error("Expected library name after \"using\"", keyword, File));
+                Errors.Add(new Error($"Expected library name after \"{DeclarationKeywords.Using}\"", keyword, File));
             }
             return false;
         }
 
         if (!ExpectOperator(";"))
-        { throw new SyntaxException("Please put a \";\" here (after \"using\")", keyword.Position.After(), File); }
+        { throw new SyntaxException($"Please put a \";\" here (after \"{DeclarationKeywords.Using}\")", keyword.Position.After(), File); }
 
         usingDefinition = new UsingDefinition(keyword, tokens.ToArray());
 
@@ -304,7 +300,7 @@ public class Parser
 
         AttributeUsage[] attributes = ExpectAttributes();
 
-        if (!ExpectIdentifier("enum", out Token? keyword))
+        if (!ExpectIdentifier(DeclarationKeywords.Enum, out Token? keyword))
         { CurrentTokenIndex = parseStart; return false; }
 
         keyword.AnalyzedType = TokenAnalyzedType.Keyword;
@@ -365,7 +361,7 @@ public class Parser
         if (!ExpectOperator(OverloadableOperators, out Token? possibleName))
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpectOperator("(", out Token? leftParenthesis))
+        if (!ExpectOperator("(", out Token? bracketStart))
         { CurrentTokenIndex = parseStart; return false; }
 
         possibleName.AnalyzedType = TokenAnalyzedType.FunctionName;
@@ -373,11 +369,11 @@ public class Parser
         List<ParameterDefinition> parameters = new();
 
         bool expectParameter = false;
-        Token? rightParenthesis;
-        while (!ExpectOperator(")", out rightParenthesis) || expectParameter)
+        Token? bracketEnd;
+        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
             Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-            CheckModifiers(parameterModifiers, "this", "temp");
+            CheckModifiers(parameterModifiers, ModifierKeywords.This, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected a type (the parameter's type)", PreviousToken?.Position.After(), File); }
@@ -390,7 +386,7 @@ public class Parser
             ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
             parameters.Add(parameterDefinition);
 
-            if (ExpectOperator(")", out rightParenthesis))
+            if (ExpectOperator(")", out bracketEnd))
             { break; }
 
             if (!ExpectOperator(","))
@@ -399,7 +395,7 @@ public class Parser
             { expectParameter = true; }
         }
 
-        CheckModifiers(modifiers, "export");
+        CheckModifiers(modifiers, ProtectionKeywords.Export);
 
         Block? block = null;
 
@@ -411,7 +407,7 @@ public class Parser
             modifiers,
             possibleType,
             possibleName,
-            new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis),
+            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
             null)
         {
             Block = block
@@ -422,7 +418,7 @@ public class Parser
 
     bool ExpectTemplateInfo([NotNullWhen(true)] out TemplateInfo? templateInfo)
     {
-        if (!ExpectIdentifier("template", out Token? keyword))
+        if (!ExpectIdentifier(DeclarationKeywords.Template, out Token? keyword))
         {
             templateInfo = null;
             return false;
@@ -466,7 +462,7 @@ public class Parser
 
         Token[] modifiers = ParseModifiers();
 
-        if (!ExpectIdentifier("macro", out Token? macroKeyword))
+        if (!ExpectIdentifier(DeclarationKeywords.Macro, out Token? macroKeyword))
         { CurrentTokenIndex = parseStart; return false; }
 
         if (!ExpectIdentifier(out Token? possibleNameT))
@@ -479,10 +475,10 @@ public class Parser
 
         List<Token> parameters = new();
 
-        Token? bracketRight;
+        Token? bracketEnd;
 
         bool expectParameter = false;
-        while (!ExpectOperator(")", out bracketRight) || expectParameter)
+        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
             if (!ExpectIdentifier(out Token? parameterIdentifier))
             { throw new SyntaxException("Expected a parameter name", PreviousToken?.Position.After(), File); }
@@ -490,7 +486,7 @@ public class Parser
             parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
             parameters.Add(parameterIdentifier);
 
-            if (ExpectOperator(")", out bracketRight))
+            if (ExpectOperator(")", out bracketEnd))
             { break; }
 
             if (!ExpectOperator(","))
@@ -499,10 +495,10 @@ public class Parser
             { expectParameter = true; }
         }
 
-        CheckModifiers(modifiers, "export");
+        CheckModifiers(modifiers, ProtectionKeywords.Export);
 
         if (!ExpectBlock(out Block? block))
-        { throw new SyntaxException($"Expected block", bracketRight?.Position.After(), File); }
+        { throw new SyntaxException($"Expected block", bracketEnd?.Position.After(), File); }
 
         macro = new MacroDefinition(modifiers, macroKeyword, possibleNameT, parameters, block);
 
@@ -526,20 +522,20 @@ public class Parser
         if (!ExpectIdentifier(out Token? possibleNameT))
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpectOperator("(", out Token? leftParenthesis))
+        if (!ExpectOperator("(", out Token? bracketStart))
         { CurrentTokenIndex = parseStart; return false; }
 
         possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
 
         List<ParameterDefinition> parameters = new();
 
-        Token? rightParenthesis;
+        Token? bracketEnd;
 
         bool expectParameter = false;
-        while (!ExpectOperator(")", out rightParenthesis) || expectParameter)
+        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
             Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-            CheckModifiers(parameterModifiers, "this", "ref", "temp");
+            CheckModifiers(parameterModifiers, ModifierKeywords.This, ModifierKeywords.Ref, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
@@ -552,7 +548,7 @@ public class Parser
             ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
             parameters.Add(parameterDefinition);
 
-            if (ExpectOperator(")", out rightParenthesis))
+            if (ExpectOperator(")", out bracketEnd))
             { break; }
 
             if (!ExpectOperator(","))
@@ -566,14 +562,14 @@ public class Parser
         Block? block = null;
 
         if (!ExpectOperator(";") && !ExpectBlock(out block))
-        { throw new SyntaxException($"Expected \";\" or block", rightParenthesis.Position.After(), File); }
+        { throw new SyntaxException($"Expected \";\" or block", bracketEnd.Position.After(), File); }
 
         function = new FunctionDefinition(
             attributes,
             modifiers,
             possibleType,
             possibleNameT,
-            new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis),
+            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
             templateInfo)
         {
             Block = block
@@ -592,7 +588,7 @@ public class Parser
         if (!ExpectIdentifier(out Token? possibleNameT))
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpectOperator("(", out Token? leftParenthesis))
+        if (!ExpectOperator("(", out Token? bracketStart))
         { CurrentTokenIndex = parseStart; return false; }
 
         possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
@@ -600,11 +596,11 @@ public class Parser
         List<ParameterDefinition> parameters = new();
 
         bool expectParameter = false;
-        Token? rightParenthesis;
-        while (!ExpectOperator(")", out rightParenthesis) || expectParameter)
+        Token? bracketEnd;
+        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
             Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-            CheckModifiers(parameterModifiers, "temp");
+            CheckModifiers(parameterModifiers, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
@@ -617,7 +613,7 @@ public class Parser
             ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
             parameters.Add(parameterDefinition);
 
-            if (ExpectOperator(")", out rightParenthesis))
+            if (ExpectOperator(")", out bracketEnd))
             { break; }
 
             if (!ExpectOperator(","))
@@ -626,7 +622,7 @@ public class Parser
             { expectParameter = true; }
         }
 
-        CheckModifiers(modifiers, "export");
+        CheckModifiers(modifiers, ProtectionKeywords.Export);
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
@@ -635,7 +631,7 @@ public class Parser
         function = new GeneralFunctionDefinition(
             possibleNameT,
             modifiers,
-            new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis))
+            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)))
         {
             Block = block
         };
@@ -653,17 +649,17 @@ public class Parser
         if (!ExpectType(AllowedType.None, out TypeInstance? type))
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpectOperator("(", out Token? leftParenthesis))
+        if (!ExpectOperator("(", out Token? bracketStart))
         { CurrentTokenIndex = parseStart; return false; }
 
         List<ParameterDefinition> parameters = new();
 
         bool expectParameter = false;
-        Token? rightParenthesis;
-        while (!ExpectOperator(")", out rightParenthesis) || expectParameter)
+        Token? bracketEnd;
+        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
             Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-            CheckModifiers(parameterModifiers, "temp");
+            CheckModifiers(parameterModifiers, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
@@ -676,7 +672,7 @@ public class Parser
             ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
             parameters.Add(parameterDefinition);
 
-            if (ExpectOperator(")", out rightParenthesis))
+            if (ExpectOperator(")", out bracketEnd))
             { break; }
 
             if (!ExpectOperator(","))
@@ -685,7 +681,7 @@ public class Parser
             { expectParameter = true; }
         }
 
-        CheckModifiers(modifiers, "export");
+        CheckModifiers(modifiers, ProtectionKeywords.Export);
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
@@ -694,7 +690,7 @@ public class Parser
         function = new ConstructorDefinition(
             type,
             modifiers,
-            new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis))
+            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)))
         {
             Block = block
         };
@@ -733,17 +729,11 @@ public class Parser
         while (!ExpectOperator("}", out _))
         {
             if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
-            {
-                operators.Add(operatorDefinition);
-            }
+            { operators.Add(operatorDefinition); }
             else if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition))
-            {
-                methods.Add(methodDefinition);
-            }
+            { methods.Add(methodDefinition); }
             else if (ExpectGeneralFunctionDefinition(out GeneralFunctionDefinition? generalMethodDefinition))
-            {
-                generalMethods.Add(generalMethodDefinition);
-            }
+            { generalMethods.Add(generalMethodDefinition); }
             else if (ExpectField(out FieldDefinition? field))
             {
                 fields.Add(field);
@@ -751,13 +741,9 @@ public class Parser
                 { field.Semicolon = semicolon; }
             }
             else if (ExpectConstructorDefinition(out _))
-            {
-
-            }
+            { }
             else
-            {
-                throw new SyntaxException($"Expected field definition or \"}}\"", CurrentToken?.Position ?? PreviousToken?.Position.After(), File);
-            }
+            { throw new SyntaxException($"Expected field definition or \"}}\"", CurrentToken?.Position ?? PreviousToken?.Position.After(), File); }
 
             endlessSafe++;
             if (endlessSafe > 50)
@@ -766,7 +752,7 @@ public class Parser
             }
         }
 
-        CheckModifiers(modifiers, "export");
+        CheckModifiers(modifiers, ProtectionKeywords.Export);
 
         return true;
     }
@@ -781,13 +767,13 @@ public class Parser
 
         Token[] modifiers = ParseModifiers();
 
-        if (!ExpectIdentifier("struct", out Token? keyword))
+        if (!ExpectIdentifier(DeclarationKeywords.Struct, out Token? keyword))
         { CurrentTokenIndex = startTokenIndex; return false; }
 
         if (!ExpectIdentifier(out Token? possibleStructName))
         { throw new SyntaxException($"Expected struct identifier after keyword \"{keyword}\"", keyword.Position.After(), File); }
 
-        if (!ExpectOperator("{", out Token? braceletStart))
+        if (!ExpectOperator("{", out Token? bracketStart))
         { throw new SyntaxException("Expected \"{\" after struct identifier", possibleStructName.Position.After(), File); }
 
         possibleStructName.AnalyzedType = TokenAnalyzedType.Struct;
@@ -800,8 +786,8 @@ public class Parser
         List<ConstructorDefinition> constructors = new();
 
         int endlessSafe = 0;
-        Token? braceletEnd;
-        while (!ExpectOperator("}", out braceletEnd))
+        Token? bracketEnd;
+        while (!ExpectOperator("}", out bracketEnd))
         {
             if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
             {
@@ -837,12 +823,12 @@ public class Parser
             }
         }
 
-        CheckModifiers(modifiers, "export");
+        CheckModifiers(modifiers, ProtectionKeywords.Export);
 
         StructDefinition structDefinition = new(
             possibleStructName,
-            braceletStart,
-            braceletEnd,
+            bracketStart,
+            bracketEnd,
             attributes,
             modifiers,
             fields,
@@ -865,7 +851,7 @@ public class Parser
 
     bool ExpectListValue([NotNullWhen(true)] out LiteralList? listValue)
     {
-        if (!ExpectOperator("[", out Token? bracketLeft))
+        if (!ExpectOperator("[", out Token? bracketStart))
         {
             listValue = null;
             return false;
@@ -873,7 +859,7 @@ public class Parser
 
         List<StatementWithValue> values = new();
 
-        Token? bracketRight;
+        Token? bracketEnd;
 
         int endlessSafe = 0;
         while (true)
@@ -884,15 +870,15 @@ public class Parser
 
                 if (!ExpectOperator(","))
                 {
-                    if (!ExpectOperator("]", out bracketRight))
-                    { throw new SyntaxException("Unbalanced \"[\"", bracketLeft, File); }
+                    if (!ExpectOperator("]", out bracketEnd))
+                    { throw new SyntaxException("Unbalanced \"[\"", bracketStart, File); }
                     break;
                 }
             }
             else
             {
-                if (!ExpectOperator("]", out bracketRight))
-                { throw new SyntaxException("Unbalanced \"[\"", bracketLeft, File); }
+                if (!ExpectOperator("]", out bracketEnd))
+                { throw new SyntaxException("Unbalanced \"[\"", bracketStart, File); }
                 break;
             }
 
@@ -900,7 +886,7 @@ public class Parser
             if (endlessSafe >= 50) { throw new EndlessLoopException(); }
         }
 
-        listValue = new LiteralList(values.ToArray(), new TokenPair(bracketLeft, bracketRight));
+        listValue = new LiteralList(values, new TokenPair(bracketStart, bracketEnd));
         return true;
     }
 
@@ -983,7 +969,7 @@ public class Parser
 
     bool ExpectIndex(StatementWithValue prevStatement, [NotNullWhen(true)] out IndexCall? statement)
     {
-        if (!ExpectOperator("[", out Token? bracketLeft))
+        if (!ExpectOperator("[", out Token? bracketStart))
         {
             statement = null;
             return false;
@@ -995,10 +981,10 @@ public class Parser
             return false;
         }
 
-        if (!ExpectOperator("]", out Token? bracketRight))
-        { throw new SyntaxException("Unbalanced [", bracketLeft, File); }
+        if (!ExpectOperator("]", out Token? bracketEnd))
+        { throw new SyntaxException("Unbalanced [", bracketStart, File); }
 
-        statement = new IndexCall(prevStatement, expression, new TokenPair(bracketLeft, bracketRight));
+        statement = new IndexCall(prevStatement, expression, new TokenPair(bracketStart, bracketEnd));
         return true;
     }
 
@@ -1014,40 +1000,40 @@ public class Parser
         {
             statementWithValue = literal;
         }
-        else if (ExpectOperator("(", out Token? braceletT))
+        else if (ExpectOperator("(", out Token? bracketStart1))
         {
             if (!ExpectExpression(out StatementWithValue? expression))
-            { throw new SyntaxException("Expected expression after \"(\"", braceletT.Position.After(), File); }
+            { throw new SyntaxException("Expected expression after \"(\"", bracketStart1.Position.After(), File); }
 
-            if (!ExpectOperator(")", out Token? bracketRight))
-            { throw new SyntaxException("Unbalanced \"(\"", braceletT, File); }
+            if (!ExpectOperator(")", out Token? bracketEnd1))
+            { throw new SyntaxException("Unbalanced \"(\"", bracketStart1, File); }
 
-            expression.SurroundingBracelet = new TokenPair(braceletT, bracketRight);
+            expression.SurroundingBracelet = new TokenPair(bracketStart1, bracketEnd1);
 
             statementWithValue = expression;
         }
-        else if (ExpectIdentifier("new", out Token? keywordNew))
+        else if (ExpectIdentifier(StatementKeywords.New, out Token? keywordNew))
         {
             keywordNew.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (!ExpectType(AllowedType.None, out TypeInstance? instanceTypeName))
             { throw new SyntaxException("Expected instance constructor after keyword \"new\"", keywordNew, File); }
 
-            if (ExpectOperator("(", out Token? bracketLeft))
+            if (ExpectOperator("(", out Token? bracketStart2))
             {
                 bool expectParameter = false;
                 List<StatementWithValue> parameters = new();
 
                 int endlessSafe = 0;
-                Token? bracketRight;
-                while (!ExpectOperator(")", out bracketRight) || expectParameter)
+                Token? bracketEnd2;
+                while (!ExpectOperator(")", out bracketEnd2) || expectParameter)
                 {
                     if (!ExpectExpression(out StatementWithValue? parameter))
-                    { throw new SyntaxException("Expected expression as parameter", CurrentToken?.Position ?? bracketLeft.Position.After(), File); }
+                    { throw new SyntaxException("Expected expression as parameter", CurrentToken?.Position ?? bracketStart2.Position.After(), File); }
 
                     parameters.Add(parameter);
 
-                    if (ExpectOperator(")", out bracketRight))
+                    if (ExpectOperator(")", out bracketEnd2))
                     { break; }
 
                     if (!ExpectOperator(","))
@@ -1060,7 +1046,7 @@ public class Parser
                     { throw new EndlessLoopException(); }
                 }
 
-                ConstructorCall newStructStatement = new(keywordNew, instanceTypeName, bracketLeft, parameters, bracketRight);
+                ConstructorCall newStructStatement = new(keywordNew, instanceTypeName, parameters, new TokenPair(bracketStart2, bracketEnd2));
 
                 statementWithValue = newStructStatement;
             }
@@ -1079,7 +1065,7 @@ public class Parser
         }
         else if (ExpectIdentifier(out Token? simpleIdentifier))
         {
-            if (simpleIdentifier.Content == "type" &&
+            if (simpleIdentifier.Content == StatementKeywords.Type &&
                 ExpectType(AllowedType.None, out TypeInstance? typeInstance))
             {
                 simpleIdentifier.AnalyzedType = TokenAnalyzedType.Keyword;
@@ -1089,7 +1075,7 @@ public class Parser
             {
                 Identifier identifierStatement = new(simpleIdentifier);
 
-                if (simpleIdentifier.Content == "this")
+                if (simpleIdentifier.Content == StatementKeywords.This)
                 { simpleIdentifier.AnalyzedType = TokenAnalyzedType.Keyword; }
 
                 statementWithValue = identifierStatement;
@@ -1128,10 +1114,10 @@ public class Parser
 
         if (allowAsStatement)
         {
-            if (ExpectIdentifier("as", out Token? keyword))
+            if (ExpectIdentifier(StatementKeywords.As, out Token? keyword))
             {
                 if (!ExpectType(AllowedType.None, out TypeInstance? type))
-                { throw new SyntaxException($"Expected type after \"as\" keyword", keyword.Position.After(), File); }
+                { throw new SyntaxException($"Expected type after keyword \"{keyword}\"", keyword.Position.After(), File); }
 
                 statementWithValue = new TypeCast(statementWithValue, keyword, type);
             }
@@ -1201,7 +1187,7 @@ public class Parser
 
     bool ExpectBlock([NotNullWhen(true)] out Block? block)
     {
-        if (!ExpectOperator("{", out Token? braceletStart))
+        if (!ExpectOperator("{", out Token? bracketStart))
         {
             block = null;
             return false;
@@ -1210,13 +1196,13 @@ public class Parser
         List<Statement.Statement> statements = new();
 
         int endlessSafe = 0;
-        Token? braceletEnd;
-        while (!ExpectOperator("}", out braceletEnd))
+        Token? bracketEnd;
+        while (!ExpectOperator("}", out bracketEnd))
         {
             if (!ExpectStatement(out Statement.Statement? statement))
             {
                 if (CurrentToken is null)
-                { throw new SyntaxException($"Expected a statement, got nothing", braceletStart.Position.After(), File); }
+                { throw new SyntaxException($"Expected a statement, got nothing", bracketStart.Position.After(), File); }
                 else
                 { throw new SyntaxException($"Expected a statement, got a token \"{CurrentToken}\"", CurrentToken, File); }
             }
@@ -1227,7 +1213,7 @@ public class Parser
             if (endlessSafe > 500) throw new EndlessLoopException();
         }
 
-        block = new Block(statements, new TokenPair(braceletStart, braceletEnd));
+        block = new Block(statements, new TokenPair(bracketStart, bracketEnd));
 
         if (ExpectOperator(";", out Token? semicolon))
         { block.Semicolon = semicolon; }
@@ -1261,7 +1247,7 @@ public class Parser
         }
         else
         {
-            if (possibleType == "var")
+            if (possibleType == StatementKeywords.Var)
             { throw new SyntaxException("Initial value for variable declaration with implicit type is required", possibleType, File); }
         }
 
@@ -1271,19 +1257,19 @@ public class Parser
 
     bool ExpectForStatement([NotNullWhen(true)] out ForLoop? forLoop)
     {
-        if (!ExpectIdentifier("for", out Token? keyword))
+        if (!ExpectIdentifier(StatementKeywords.For, out Token? keyword))
         { forLoop = null; return false; }
 
         keyword.AnalyzedType = TokenAnalyzedType.Statement;
 
-        if (!ExpectOperator("(", out Token? parenthesesStart))
+        if (!ExpectOperator("(", out Token? bracketStart))
         { throw new SyntaxException($"Expected \"(\" after \"{keyword}\" keyword", keyword.Position.After(), File); }
 
         if (!ExpectVariableDeclaration(out VariableDeclaration? variableDeclaration))
-        { throw new SyntaxException("Expected variable declaration", parenthesesStart.Position.After(), File); }
+        { throw new SyntaxException("Expected variable declaration", bracketStart.Position.After(), File); }
 
         if (!ExpectOperator(";", out Token? semicolon1))
-        { throw new SyntaxException($"Expected \";\" after \"for\" variable declaration", variableDeclaration.Position.After(), File); }
+        { throw new SyntaxException($"Expected \";\" after for-loop variable declaration", variableDeclaration.Position.After(), File); }
         variableDeclaration.Semicolon = semicolon1;
 
         if (!ExpectExpression(out StatementWithValue? condition))
@@ -1296,11 +1282,11 @@ public class Parser
         if (!ExpectAnySetter(out AnyAssignment? anyAssignment))
         { throw new SyntaxException($"Expected an assignment after \"{keyword}\" condition", semicolon2.Position.After(), File); }
 
-        if (!ExpectOperator(")", out Token? parenthesesEnd))
+        if (!ExpectOperator(")", out Token? bracketEnd))
         { throw new SyntaxException($"Expected \")\" after \"{keyword}\" assignment", anyAssignment.Position.After(), File); }
 
         if (!ExpectBlock(out Block? block))
-        { throw new SyntaxException($"Expected block", parenthesesEnd.Position.After(), File); }
+        { throw new SyntaxException($"Expected block", bracketEnd.Position.After(), File); }
 
         forLoop = new ForLoop(keyword, variableDeclaration, condition, anyAssignment, block);
         return true;
@@ -1308,22 +1294,22 @@ public class Parser
 
     bool ExpectWhileStatement([NotNullWhen(true)] out WhileLoop? whileLoop)
     {
-        if (!ExpectIdentifier("while", out Token? keyword))
+        if (!ExpectIdentifier(StatementKeywords.While, out Token? keyword))
         { whileLoop = null; return false; }
 
         keyword.AnalyzedType = TokenAnalyzedType.Statement;
 
-        if (!ExpectOperator("(", out Token? parenthesesStart))
+        if (!ExpectOperator("(", out Token? bracketStart))
         { throw new SyntaxException($"Expected \"(\" after \"{keyword}\" keyword", keyword.Position.After(), File); }
 
         if (!ExpectExpression(out StatementWithValue? condition))
-        { throw new SyntaxException($"Expected condition after \"{parenthesesStart}\"", parenthesesStart.Position.After(), File); }
+        { throw new SyntaxException($"Expected condition after \"{bracketStart}\"", bracketStart.Position.After(), File); }
 
-        if (!ExpectOperator(")", out Token? parenthesesEnd))
-        { throw new SyntaxException($"Expected \")\" after \"{keyword}\" condition", condition.Position.After(), File); }
+        if (!ExpectOperator(")", out Token? bracketEnd))
+        { throw new SyntaxException($"Expected \")\" after while-loop condition", condition.Position.After(), File); }
 
         if (!ExpectBlock(out Block? block))
-        { throw new SyntaxException("Expected block", parenthesesEnd.Position.After(), File); }
+        { throw new SyntaxException("Expected block", bracketEnd.Position.After(), File); }
 
         whileLoop = new WhileLoop(keyword, condition, block);
         return true;
@@ -1333,7 +1319,7 @@ public class Parser
     {
         ifContainer = null;
 
-        if (!ExpectIfSegmentStatement("if", BaseBranch.IfPart.If, true, out BaseBranch? ifStatement)) return false;
+        if (!ExpectIfSegmentStatement(StatementKeywords.If, BaseBranch.IfPart.If, true, out BaseBranch? ifStatement)) return false;
 
         List<BaseBranch> branches = new()
         { ifStatement };
@@ -1341,7 +1327,7 @@ public class Parser
         int endlessSafe = 0;
         while (true)
         {
-            if (!ExpectIfSegmentStatement("elseif", BaseBranch.IfPart.ElseIf, true, out BaseBranch? elseifStatement)) break;
+            if (!ExpectIfSegmentStatement(StatementKeywords.ElseIf, BaseBranch.IfPart.ElseIf, true, out BaseBranch? elseifStatement)) break;
             branches.Add(elseifStatement);
 
             endlessSafe++;
@@ -1349,7 +1335,7 @@ public class Parser
             { throw new EndlessLoopException(); }
         }
 
-        if (ExpectIfSegmentStatement("else", BaseBranch.IfPart.Else, false, out BaseBranch? elseStatement))
+        if (ExpectIfSegmentStatement(StatementKeywords.Else, BaseBranch.IfPart.Else, false, out BaseBranch? elseStatement))
         {
             branches.Add(elseStatement);
         }
@@ -1358,12 +1344,12 @@ public class Parser
         return true;
     }
 
-    bool ExpectIfSegmentStatement(string ifSegmentName, BaseBranch.IfPart ifSegmentType, bool needParameters, [NotNullWhen(true)] out BaseBranch? baseBranch)
+    bool ExpectIfSegmentStatement(string keywordName, BaseBranch.IfPart ifSegmentType, bool needParameters, [NotNullWhen(true)] out BaseBranch? baseBranch)
     {
-        if (!ExpectIdentifier(ifSegmentName, out Token? tokenIf))
+        if (!ExpectIdentifier(keywordName, out Token? keyword))
         { baseBranch = null; return false; }
 
-        tokenIf.AnalyzedType = TokenAnalyzedType.Statement;
+        keyword.AnalyzedType = TokenAnalyzedType.Statement;
 
         StatementWithValue? condition = null;
 
@@ -1371,29 +1357,29 @@ public class Parser
 
         if (needParameters)
         {
-            if (!ExpectOperator("(", out Token? parenthesesStart))
-            { throw new SyntaxException($"Expected \"(\" after keyword \"{tokenIf}\"", tokenIf.Position.After(), File); }
+            if (!ExpectOperator("(", out Token? bracketStart))
+            { throw new SyntaxException($"Expected \"(\" after keyword \"{keyword}\"", keyword.Position.After(), File); }
 
             if (!ExpectExpression(out condition))
-            { throw new SyntaxException($"Expected condition after \"{tokenIf} (\"", parenthesesStart.Position.After(), File); }
+            { throw new SyntaxException($"Expected condition after \"{keyword} (\"", bracketStart.Position.After(), File); }
 
-            if (!ExpectOperator(")", out Token? parenthesesEnd))
-            { throw new SyntaxException($"Expected \")\" after \"{tokenIf}\" condition condition", condition.Position.After(), File); }
+            if (!ExpectOperator(")", out Token? bracketEnd))
+            { throw new SyntaxException($"Expected \")\" after \"{keyword}\" condition condition", condition.Position.After(), File); }
 
             if (!ExpectStatement(out block))
-            { throw new SyntaxException($"Expected a statement after \"{tokenIf}\" condition", parenthesesEnd.Position.After(), File); }
+            { throw new SyntaxException($"Expected a statement after \"{keyword}\" condition", bracketEnd.Position.After(), File); }
         }
         else
         {
             if (!ExpectStatement(out block))
-            { throw new SyntaxException($"Expected a statement after \"{tokenIf}\" condition", tokenIf.Position.After(), File); }
+            { throw new SyntaxException($"Expected a statement after \"{keyword}\" condition", keyword.Position.After(), File); }
         }
 
         baseBranch = ifSegmentType switch
         {
-            BaseBranch.IfPart.If => new IfBranch(tokenIf, condition!, block),
-            BaseBranch.IfPart.ElseIf => new ElseIfBranch(tokenIf, condition!, block),
-            BaseBranch.IfPart.Else => new ElseBranch(tokenIf, block),
+            BaseBranch.IfPart.If => new IfBranch(keyword, condition!, block),
+            BaseBranch.IfPart.ElseIf => new ElseIfBranch(keyword, condition!, block),
+            BaseBranch.IfPart.Else => new ElseBranch(keyword, block),
             _ => throw new UnreachableException(),
         };
         return true;
@@ -1436,25 +1422,25 @@ public class Parser
             return true;
         }
 
-        if (ExpectKeywordCall("return", 0, 1, out KeywordCall? keywordCallReturn))
+        if (ExpectKeywordCall(StatementKeywords.Return, 0, 1, out KeywordCall? keywordCallReturn))
         {
             statement = keywordCallReturn;
             return true;
         }
 
-        if (ExpectKeywordCall("throw", 1, out KeywordCall? keywordCallThrow))
+        if (ExpectKeywordCall(StatementKeywords.Throw, 1, out KeywordCall? keywordCallThrow))
         {
             statement = keywordCallThrow;
             return true;
         }
 
-        if (ExpectKeywordCall("break", 0, out KeywordCall? keywordCallBreak))
+        if (ExpectKeywordCall(StatementKeywords.Break, 0, out KeywordCall? keywordCallBreak))
         {
             statement = keywordCallBreak;
             return true;
         }
 
-        if (ExpectKeywordCall("delete", 1, out KeywordCall? keywordCallDelete))
+        if (ExpectKeywordCall(StatementKeywords.Delete, 1, out KeywordCall? keywordCallDelete))
         {
             statement = keywordCallDelete;
             return true;
@@ -1493,65 +1479,6 @@ public class Parser
         statement = null;
         return false;
     }
-
-    /*
-    bool ExpectMethodCall(bool expectDot, StatementWithValue prevStatement, [NotNullWhen(true)] out FunctionCall? methodCall)
-    {
-        int startTokenIndex = CurrentTokenIndex;
-
-        if (expectDot && !ExpectOperator("."))
-        {
-            CurrentTokenIndex = startTokenIndex;
-            methodCall = null;
-            return false;
-        }
-
-        if (!ExpectIdentifier(out var possibleFunctionName))
-        {
-            CurrentTokenIndex = startTokenIndex;
-            methodCall = null;
-            return false;
-        }
-
-        if (!ExpectOperator("(", out Token? bracketLeft))
-        {
-            CurrentTokenIndex = startTokenIndex;
-            methodCall = null;
-            return false;
-        }
-
-        possibleFunctionName.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-        bool expectParameter = false;
-
-        List<StatementWithValue> parameters = new();
-        int endlessSafe = 0;
-        Token? bracketRight;
-        while (!ExpectOperator(")", out bracketRight) || expectParameter)
-        {
-            if (!ExpectExpression(out StatementWithValue? parameter))
-            { throw new SyntaxException("Expected expression as parameter", CurrentToken); }
-
-            parameters.Add(parameter);
-
-            if (ExpectOperator(")", out bracketRight))
-            { break; }
-
-            if (!ExpectOperator(","))
-            { throw new SyntaxException($"Expected \",\" to separate parameters, got {CurrentToken}", parameter); }
-            else
-            { expectParameter = true; }
-
-            endlessSafe++;
-            if (endlessSafe > 100)
-            { throw new EndlessLoopException(); }
-        }
-
-        methodCall = new(prevStatement, possibleFunctionName, bracketLeft, parameters, bracketRight);
-
-        return true;
-    }
-    */
 
     bool ExpectExpression([NotNullWhen(true)] out StatementWithValue? result)
     {
@@ -1748,15 +1675,15 @@ public class Parser
         anyCall = null;
         int startTokenIndex = CurrentTokenIndex;
 
-        if (!ExpectOperator("(", out Token? bracketLeft))
+        if (!ExpectOperator("(", out Token? bracketStart))
         { CurrentTokenIndex = startTokenIndex; return false; }
 
         bool expectParameter = false;
         List<StatementWithValue> parameters = new();
 
         int endlessSafe = 0;
-        Token? bracketRight;
-        while (!ExpectOperator(")", out bracketRight) || expectParameter)
+        Token? bracketEnd;
+        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
             StatementWithValue? parameter;
 
@@ -1773,7 +1700,7 @@ public class Parser
 
             parameters.Add(parameter);
 
-            if (ExpectOperator(")", out bracketRight))
+            if (ExpectOperator(")", out bracketEnd))
             { break; }
 
             if (!ExpectOperator(","))
@@ -1784,9 +1711,9 @@ public class Parser
             endlessSafe++;
             if (endlessSafe > 100)
             { throw new EndlessLoopException(); }
-        };
+        }
 
-        anyCall = new AnyCall(prevStatement, parameters, new TokenPair(bracketLeft, bracketRight));
+        anyCall = new AnyCall(prevStatement, parameters, new TokenPair(bracketStart, bracketEnd));
         return true;
     }
 
@@ -1835,7 +1762,7 @@ public class Parser
         int parseStart = CurrentTokenIndex;
         attribute = null;
 
-        if (!ExpectOperator("[", out Token? t0))
+        if (!ExpectOperator("[", out Token? bracketStart))
         { CurrentTokenIndex = parseStart; return false; }
 
         if (!ExpectIdentifier(out Token? attributeT))
@@ -1844,14 +1771,14 @@ public class Parser
         attributeT.AnalyzedType = TokenAnalyzedType.Attribute;
 
         List<Literal> parameters = new();
-        if (ExpectOperator("(", out Token? t3))
+        if (ExpectOperator("(", out Token? bracketParametersStart))
         {
             int endlessSafe = 50;
             while (!ExpectOperator(")"))
             {
                 ExpectLiteral(out Literal? param);
                 if (param == null)
-                { throw new SyntaxException("Expected parameter", t3, File); }
+                { throw new SyntaxException("Expected parameter", bracketParametersStart, File); }
                 ExpectOperator(",");
 
                 parameters.Add(param);
@@ -1863,9 +1790,9 @@ public class Parser
         }
 
         if (!ExpectOperator("]"))
-        { throw new SyntaxException("Unbalanced ]", t0, File); }
+        { throw new SyntaxException("Unbalanced ]", bracketStart, File); }
 
-        attribute = new AttributeUsage(attributeT, parameters.ToArray());
+        attribute = new AttributeUsage(attributeT, parameters);
         return true;
     }
     AttributeUsage[] ExpectAttributes()
@@ -1898,10 +1825,8 @@ public class Parser
 
         int startTokenIndex = CurrentTokenIndex;
 
-        if (ExpectIdentifier("private", out Token? protectionToken))
-        {
-
-        }
+        if (ExpectIdentifier(ProtectionKeywords.Private, out Token? protectionToken))
+        { }
 
         if (!ExpectType(AllowedType.Implicit | AllowedType.StackArrayWithLength, out TypeInstance? possibleType))
         { CurrentTokenIndex = startTokenIndex; return false; }
@@ -1932,9 +1857,9 @@ public class Parser
                 modifier.AnalyzedType = TokenAnalyzedType.Keyword;
                 modifiers.Add(modifier);
 
-                if (modifier.Equals("this") && parameterIndex != 0)
+                if (modifier.Equals(ModifierKeywords.This) && parameterIndex != 0)
                 {
-                    Errors.Add(new Error($"Modifier \"{modifier}\" only valid on the first parameter", modifier, File));
+                    Errors.Add(new Error($"Modifier \"{ModifierKeywords.This}\" only valid on the first parameter", modifier, File));
                 }
             }
             else
@@ -2005,7 +1930,7 @@ public class Parser
         result = null;
         if (CurrentToken == null) return false;
         if (CurrentToken.TokenType != TokenType.Operator) return false;
-        if (name.Contains(CurrentToken.Content) == false) return false;
+        if (!name.Contains(CurrentToken.Content)) return false;
 
         result = CurrentToken;
         CurrentTokenIndex++;
@@ -2044,10 +1969,10 @@ public class Parser
 
         if (!ExpectIdentifier(out Token? possibleType)) return false;
 
-        if (possibleType.Equals("macro"))
+        if (possibleType.Equals(DeclarationKeywords.Macro))
         { return false; }
 
-        if (possibleType.Equals("return"))
+        if (possibleType.Equals(StatementKeywords.Return))
         { return false; }
 
         type = new TypeInstanceSimple(possibleType);
@@ -2071,7 +1996,7 @@ public class Parser
             return true;
         }
 
-        if (possibleType.Content.Equals("var"))
+        if (possibleType.Content.Equals(StatementKeywords.Var))
         {
             possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
 
@@ -2087,7 +2012,7 @@ public class Parser
             return true;
         }
 
-        if (LanguageConstants.BuiltinTypes.Contains(possibleType.Content))
+        if (TypeKeywords.List.Contains(possibleType.Content))
         { possibleType.AnalyzedType = TokenAnalyzedType.Keyword; }
 
         int afterIdentifier = CurrentTokenIndex;
@@ -2161,7 +2086,7 @@ public class Parser
 
                 type = new TypeInstanceFunction(type, parameterTypes);
             }
-            else if (ExpectOperator("[", out Token? bracket1Left))
+            else if (ExpectOperator("[", out Token? bracketStart1))
             {
                 if (!flags.HasFlag(AllowedType.StackArrayWithLength) &&
                     !flags.HasFlag(AllowedType.StackArrayWithoutLength))
@@ -2170,10 +2095,10 @@ public class Parser
                 ExpectOneValue(out StatementWithValue? sizeValue);
 
                 if (sizeValue == null && !flags.HasFlag(AllowedType.StackArrayWithoutLength))
-                { Errors.Add(new Error($"Expected value as array size", bracket1Left, File)); }
+                { Errors.Add(new Error($"Expected value as array size", bracketStart1, File)); }
 
                 if (sizeValue != null && !flags.HasFlag(AllowedType.StackArrayWithLength))
-                { Errors.Add(new Error($"Expected value as array size", bracket1Left, File)); }
+                { Errors.Add(new Error($"Expected value as array size", bracketStart1, File)); }
 
                 if (!ExpectOperator("]"))
                 { return false; }
@@ -2187,27 +2112,15 @@ public class Parser
         return true;
     }
 
-    static bool NeedSemicolon(Statement.Statement? statement)
+    static bool NeedSemicolon(Statement.Statement statement) => statement switch
     {
-        if (statement == null) return false;
-
-        if (statement is ForLoop)
-        { return false; }
-
-        if (statement is WhileLoop)
-        { return false; }
-
-        if (statement is Block)
-        { return false; }
-
-        if (statement is IfContainer)
-        { return false; }
-
-        if (statement is BaseBranch)
-        { return false; }
-
-        return true;
-    }
+        ForLoop => false,
+        WhileLoop => false,
+        Block => false,
+        IfContainer => false,
+        BaseBranch => false,
+        _ => true
+    };
 
     #endregion
 }

@@ -9,7 +9,7 @@ struct Stringify
     public const int CozyLength = 30;
 }
 
-public interface IReferenceableTo : IReferenceableTo<object> { }
+public interface IReferenceableTo : IReferenceableTo<object>;
 public interface IReferenceableTo<T> where T : notnull
 {
     public T? Reference { get; set; }
@@ -162,15 +162,15 @@ public static class StatementExtensions
 
 public abstract class Statement : IPositioned
 {
-    public Token? Semicolon { get; set; }
+    public Token? Semicolon { get; internal set; }
     public abstract Position Position { get; }
 
-    public Statement()
+    protected Statement()
     {
         Semicolon = null;
     }
 
-    public Statement(Statement other)
+    protected Statement(Statement other)
     {
         Semicolon = other.Semicolon;
     }
@@ -188,12 +188,12 @@ public abstract class AnyAssignment : Statement
 
 public abstract class StatementWithValue : Statement
 {
-    public bool SaveValue { get; set; } = true;
+    public bool SaveValue { get; internal set; } = true;
     public GeneralType? CompiledType { get; internal set; }
     public DataItem? PredictedValue { get; internal set; }
-    public TokenPair? SurroundingBracelet { get; set; }
+    public TokenPair? SurroundingBracelet { get; internal set; }
 
-    public StatementWithValue() : base()
+    protected StatementWithValue()
     {
         SaveValue = true;
         CompiledType = null;
@@ -1546,20 +1546,18 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
     public Token Keyword { get; }
     public TypeInstance Type { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
-    public Token BracketLeft { get; }
-    public Token BracketRight { get; }
+    public TokenPair Brackets { get; }
     public ConstructorDefinition? Reference { get; set; }
     public override Position Position =>
-        new Position(Keyword, Type, BracketLeft, BracketRight)
+        new Position(Keyword, Type, Brackets)
         .Union(Parameters);
 
-    public ConstructorCall(Token keyword, TypeInstance typeName, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
+    public ConstructorCall(Token keyword, TypeInstance typeName, IEnumerable<StatementWithValue> parameters, TokenPair brackets)
     {
         Keyword = keyword;
         Type = typeName;
-        BracketLeft = bracketLeft;
         Parameters = parameters.ToImmutableArray();
-        BracketRight = bracketRight;
+        Brackets = brackets;
     }
 
     public override string ToString()
@@ -1570,7 +1568,7 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
         result.Append(Keyword);
         result.Append(' ');
         result.Append(Type);
-        result.Append(BracketLeft);
+        result.Append(Brackets.Start);
 
         for (int i = 0; i < Parameters.Length; i++)
         {
@@ -1582,7 +1580,7 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
             result.Append(Parameters[i]);
         }
 
-        result.Append(BracketRight);
+        result.Append(Brackets.End);
 
         result.Append(SurroundingBracelet?.End);
         result.Append(Semicolon);
@@ -1595,14 +1593,14 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
         result.Append(Type.ToString());
         result.Append('.');
         result.Append(Keyword.Content);
-        result.Append(BracketLeft.ToString());
+        result.Append(Brackets.Start);
         for (int i = 0; i < Parameters.Length; i++)
         {
             if (i > 0) result.Append(", ");
 
             result.Append(TypeSearch.Invoke(Parameters[i]));
         }
-        result.Append(BracketRight.ToString());
+        result.Append(Brackets.End);
 
         return result.ToString();
     }
@@ -1618,13 +1616,11 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
         }
     }
 
-    public NewInstance ToInstantiation() => new(
-        Keyword,
-        Type)
+    public NewInstance ToInstantiation() => new(Keyword, Type)
     {
         CompiledType = CompiledType,
         SaveValue = true,
-        Semicolon = null,
+        Semicolon = Semicolon,
     };
 }
 

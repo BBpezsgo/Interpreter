@@ -43,7 +43,7 @@ public abstract class GeneralType :
     /// <exception cref="InternalException"/>
     public static GeneralType From(Token type, FindType? typeFinder)
     {
-        if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Content, out BasicType builtinType))
+        if (TypeKeywords.BasicTypes.TryGetValue(type.Content, out BasicType builtinType))
         { return new BuiltinType(builtinType); }
 
         if (typeFinder == null ||
@@ -76,7 +76,7 @@ public abstract class GeneralType :
     /// <exception cref="ArgumentNullException"/>
     public static GeneralType From(TypeInstanceSimple type, FindType? typeFinder)
     {
-        if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out BasicType builtinType))
+        if (TypeKeywords.BasicTypes.TryGetValue(type.Identifier.Content, out BasicType builtinType))
         { return new BuiltinType(builtinType); }
 
         ArgumentNullException.ThrowIfNull(typeFinder);
@@ -435,7 +435,7 @@ public class BuiltinType : GeneralType,
         if (other is not TypeInstanceSimple otherSimple)
         { return false; }
 
-        if (LanguageConstants.BuiltinTypeMap3.TryGetValue(otherSimple.Identifier.Content, out BasicType type))
+        if (TypeKeywords.BasicTypes.TryGetValue(otherSimple.Identifier.Content, out BasicType type))
         { return Type == type; }
 
         return false;
@@ -443,11 +443,11 @@ public class BuiltinType : GeneralType,
     public override int GetHashCode() => HashCode.Combine(Type);
     public override string ToString() => Type switch
     {
-        BasicType.Void => "void",
-        BasicType.Byte => "byte",
-        BasicType.Integer => "int",
-        BasicType.Float => "float",
-        BasicType.Char => "char",
+        BasicType.Void => TypeKeywords.Void,
+        BasicType.Byte => TypeKeywords.Byte,
+        BasicType.Integer => TypeKeywords.Int,
+        BasicType.Float => TypeKeywords.Float,
+        BasicType.Char => TypeKeywords.Char,
         _ => throw new UnreachableException(),
     };
 }
@@ -508,7 +508,7 @@ public class StructType : GeneralType,
         if (other is not TypeInstanceSimple otherSimple)
         { return false; }
 
-        if (LanguageConstants.BuiltinTypeMap3.ContainsKey(otherSimple.Identifier.Content))
+        if (TypeKeywords.BasicTypes.ContainsKey(otherSimple.Identifier.Content))
         { return false; }
 
         if (Struct.Identifier.Content == otherSimple.Identifier.Content)
@@ -568,7 +568,7 @@ public class GenericType : GeneralType,
         if (other is not TypeInstanceSimple otherSimple)
         { return false; }
 
-        if (LanguageConstants.BuiltinTypeMap3.ContainsKey(otherSimple.Identifier.Content))
+        if (TypeKeywords.BasicTypes.ContainsKey(otherSimple.Identifier.Content))
         { return false; }
 
         return false;
@@ -610,7 +610,7 @@ public class EnumType : GeneralType,
         if (other is not TypeInstanceSimple otherSimple)
         { return false; }
 
-        if (LanguageConstants.BuiltinTypeMap3.ContainsKey(otherSimple.Identifier.Content))
+        if (TypeKeywords.BasicTypes.ContainsKey(otherSimple.Identifier.Content))
         { return false; }
 
         if (Enum.Identifier.Content == otherSimple.Identifier.Content)

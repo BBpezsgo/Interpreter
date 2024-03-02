@@ -4,69 +4,51 @@ namespace LanguageCore.Runtime;
 
 [DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
 [StructLayout(LayoutKind.Explicit)]
-public partial struct DataItem
+public readonly partial struct DataItem
 {
     public static DataItem Null => default;
 
-    public readonly RuntimeType Type => type;
-
-    [FieldOffset(0)] readonly RuntimeType type;
+    [field: FieldOffset(0)] public RuntimeType Type { get; }
 
     #region Value Fields
 
-    [FieldOffset(1)] byte _byte;
-    [FieldOffset(1)] int _integer;
-    [FieldOffset(1)] float _single;
-    [FieldOffset(1)] char _char;
+    [FieldOffset(1)] readonly byte _byte;
+    [FieldOffset(1)] readonly int _integer;
+    [FieldOffset(1)] readonly float _single;
+    [FieldOffset(1)] readonly char _char;
 
     #endregion
 
-    public readonly bool IsNull => type == RuntimeType.Null;
+    public bool IsNull => Type == RuntimeType.Null;
 
     #region Value Properties
 
     /// <exception cref="RuntimeException"/>
-    public byte VByte
+    public byte VByte => Type switch
     {
-        readonly get => Type switch
-        {
-            RuntimeType.Byte => _byte,
-            _ => throw new RuntimeException($"Can't cast {Type} to byte")
-        };
-        set => _byte = value;
-    }
+        RuntimeType.Byte => _byte,
+        _ => throw new RuntimeException($"Can't cast {Type} to {typeof(byte)}")
+    };
     /// <exception cref="RuntimeException"/>
-    public int VInt
+    public int VInt => Type switch
     {
-        readonly get => Type switch
-        {
-            RuntimeType.Integer => _integer,
-            _ => throw new RuntimeException($"Can't cast {Type} to integer")
-        };
-        set => _integer = value;
-    }
+        RuntimeType.Integer => _integer,
+        _ => throw new RuntimeException($"Can't cast {Type} to {typeof(int)}")
+    };
     /// <exception cref="RuntimeException"/>
-    public float VSingle
+    public float VSingle => Type switch
     {
-        readonly get => Type switch
-        {
-            RuntimeType.Single => _single,
-            _ => throw new RuntimeException($"Can't cast {Type} to float")
-        };
-        set => _single = value;
-    }
+        RuntimeType.Single => _single,
+        _ => throw new RuntimeException($"Can't cast {Type} to {typeof(float)}")
+    };
     /// <exception cref="RuntimeException"/>
-    public char VChar
+    public char VChar => Type switch
     {
-        readonly get => Type switch
-        {
-            RuntimeType.Char => _char,
-            RuntimeType.Integer => (char)_integer,
-            RuntimeType.Byte => (char)_integer,
-            _ => throw new RuntimeException($"Can't cast {Type} to char")
-        };
-        set => _char = value;
-    }
+        RuntimeType.Char => _char,
+        RuntimeType.Integer => (char)_integer,
+        RuntimeType.Byte => (char)_integer,
+        _ => throw new RuntimeException($"Can't cast {Type} to {typeof(char)}")
+    };
 
     #endregion
 
@@ -74,42 +56,41 @@ public partial struct DataItem
 
     DataItem(RuntimeType type)
     {
-        this.type = type;
-
-        this._integer = default;
-        this._byte = default;
-        this._single = default;
-        this._char = default;
+        Type = type;
+        _integer = default;
+        _byte = default;
+        _single = default;
+        _char = default;
     }
 
     public DataItem(int value) : this(RuntimeType.Integer)
-    { this._integer = value; }
+    { _integer = value; }
     public DataItem(byte value) : this(RuntimeType.Byte)
-    { this._byte = value; }
+    { _byte = value; }
     public DataItem(float value) : this(RuntimeType.Single)
-    { this._single = value; }
+    { _single = value; }
     public DataItem(char value) : this(RuntimeType.Char)
-    { this._char = value; }
+    { _char = value; }
     public DataItem(bool value) : this(value ? 1 : 0)
     { }
 
     #endregion
 
-    public readonly int? Integer => Type switch
+    public int? Integer => Type switch
     {
-        RuntimeType.Byte => this.VByte,
-        RuntimeType.Integer => this.VInt,
-        RuntimeType.Char => this.VChar,
+        RuntimeType.Byte => VByte,
+        RuntimeType.Integer => VInt,
+        RuntimeType.Char => VChar,
         RuntimeType.Single => null,
         RuntimeType.Null => null,
         _ => throw new UnreachableException(),
     };
 
-    public readonly byte? Byte
+    public byte? Byte
     {
         get
         {
-            switch (type)
+            switch (Type)
             {
                 case RuntimeType.Byte:
                     return _byte;
@@ -132,7 +113,7 @@ public partial struct DataItem
         }
     }
 
-    public readonly object? GetValue() => type switch
+    public object? GetValue() => Type switch
     {
         RuntimeType.Null => (object?)null,
         RuntimeType.Byte => (object)_byte,
@@ -142,7 +123,7 @@ public partial struct DataItem
         _ => throw new UnreachableException(),
     };
 
-    public readonly string GetDebuggerDisplay() => Type switch
+    public string GetDebuggerDisplay() => Type switch
     {
         RuntimeType.Null => "null",
         RuntimeType.Integer => VInt.ToString(CultureInfo.InvariantCulture),
@@ -152,7 +133,7 @@ public partial struct DataItem
         _ => throw new UnreachableException(),
     };
 
-    public override readonly int GetHashCode() => Type switch
+    public override int GetHashCode() => Type switch
     {
         RuntimeType.Byte => HashCode.Combine(Type, _byte),
         RuntimeType.Integer => HashCode.Combine(Type, _integer),
@@ -161,7 +142,7 @@ public partial struct DataItem
         _ => throw new UnreachableException(),
     };
 
-    public readonly void DebugPrint()
+    public void DebugPrint()
     {
         ConsoleColor savedFgColor = Console.ForegroundColor;
         ConsoleColor savedBgColor = Console.BackgroundColor;
@@ -202,50 +183,27 @@ public partial struct DataItem
     {
         ArgumentNullException.ThrowIfNull(value, nameof(value));
 
-        if (value is byte @byte)
-        { return new DataItem(@byte); }
-
-        if (value is int @int)
-        { return new DataItem(@int); }
-
-        if (value is float @float)
-        { return new DataItem(@float); }
-
-        if (value is bool @bool)
-        { return new DataItem(@bool); }
-
-        if (value is char @char)
-        { return new DataItem(@char); }
-
-        if (value is Enum @enum)
+        return value switch
         {
-            TypeCode underlyingType = @enum.GetTypeCode();
-            object enumValue = underlyingType switch
+            byte v => new DataItem(v),
+            int v => new DataItem(v),
+            float v => new DataItem(v),
+            bool v => new DataItem(v),
+            char v => new DataItem(v),
+            Enum v => v.GetTypeCode() switch
             {
-                TypeCode.Empty => throw new NotImplementedException(),
-                TypeCode.Object => throw new NotImplementedException(),
-                TypeCode.DBNull => throw new NotImplementedException(),
-                TypeCode.Boolean => (bool)value,
-                TypeCode.Char => (char)value,
-                TypeCode.SByte => (sbyte)value,
-                TypeCode.Byte => (byte)value,
-                TypeCode.Int16 => (short)value,
-                TypeCode.UInt16 => (ushort)value,
-                TypeCode.Int32 => (int)value,
-                TypeCode.UInt32 => (uint)value,
-                TypeCode.Int64 => (long)value,
-                TypeCode.UInt64 => (ulong)value,
-                TypeCode.Single => (float)value,
-                TypeCode.Double => (double)value,
-                TypeCode.Decimal => (decimal)value,
-                TypeCode.DateTime => (DateTime)value,
-                TypeCode.String => (string)value,
-                _ => throw new UnreachableException(),
-            };
-            return DataItem.GetValue(enumValue);
-        }
-
-        throw new NotImplementedException($"Type conversion for type {value.GetType()} not implemented");
+                TypeCode.Boolean => new DataItem((bool)value),
+                TypeCode.Char => new DataItem((char)value),
+                TypeCode.SByte => new DataItem((sbyte)value),
+                TypeCode.Byte => new DataItem((byte)value),
+                TypeCode.Int16 => new DataItem((short)value),
+                TypeCode.UInt16 => new DataItem((ushort)value),
+                TypeCode.Int32 => new DataItem((int)value),
+                TypeCode.Single => new DataItem((float)value),
+                _ => throw new NotImplementedException($"Cannot convert {value} to {typeof(DataItem)}"),
+            },
+            _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(DataItem)}"),
+        };
     }
 
     public static DataItem GetDefaultValue(RuntimeType type) => type switch
@@ -264,34 +222,13 @@ public partial struct DataItem
         Compiler.BasicType.Integer => new DataItem((int)0),
         Compiler.BasicType.Float => new DataItem((float)0f),
         Compiler.BasicType.Char => new DataItem((char)'\0'),
-        Compiler.BasicType.Void => throw new InternalException($"Type \"{type}\" does not have a default value"),
+        Compiler.BasicType.Void => throw new InternalException($"Type {type} does not have a default value"),
         _ => DataItem.Null,
     };
 
-    public static bool TryShrinkToByte(DataItem value, out DataItem result)
-    {
-        switch (value.type)
-        {
-            case RuntimeType.Byte:
-                result = value;
-                return true;
-            case RuntimeType.Integer:
-                if (value._integer < byte.MinValue || value._integer > byte.MaxValue)
-                {
-                    result = default;
-                    return false;
-                }
-                result = new DataItem((byte)value._integer);
-                return true;
-            default:
-                result = default;
-                return false;
-        }
-    }
-
     public static bool TryShrinkToByte(ref DataItem value)
     {
-        switch (value.type)
+        switch (value.Type)
         {
             case RuntimeType.Byte:
                 return true;

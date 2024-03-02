@@ -429,7 +429,7 @@ public static unsafe class ExternalFunctionGenerator
         if (typeof(T) == typeof(string))
         { return (T?)(object?)bytecodeProcessor.Memory.Heap.GetStringByPointer((int)data); }
 
-        return data.ToType<T>(null);
+        return data.ToType<T>();
     }
 
     public static void SetInterpreter(this Dictionary<string, ExternalFunctionBase> functions, BytecodeInterpreter interpreter)

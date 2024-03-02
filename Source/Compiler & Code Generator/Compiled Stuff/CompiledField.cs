@@ -11,7 +11,7 @@ public class CompiledField : FieldDefinition,
 
     public Protection Protection => ProtectionToken?.Content switch
     {
-        "private" => Protection.Private,
+        ProtectionKeywords.Private => Protection.Private,
         "public" => Protection.Public,
         null => Protection.Public,
         _ => Protection.Public,

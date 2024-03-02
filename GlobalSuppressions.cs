@@ -13,3 +13,5 @@
 [assembly: SuppressMessage("Roslynator", "RCS1073:Convert 'if' to 'return' statement")]
 [assembly: SuppressMessage("Roslynator", "RCS1163:Unused parameter")]
 [assembly: SuppressMessage("Roslynator", "RCS1146:Use conditional access")]
+[assembly: SuppressMessage("Roslynator", "RCS1218:Simplify code branching")]
+[assembly: SuppressMessage("Roslynator", "RCS1173:Use coalesce expression instead of 'if'")]

@@ -20,7 +20,7 @@ public partial struct DataItem :
     {
         (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Byte => new DataItem((byte)(a._byte + b._byte)),
             RuntimeType.Integer => new DataItem((int)(a._integer + b._integer)),
@@ -36,7 +36,7 @@ public partial struct DataItem :
     {
         (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Byte => new DataItem((byte)(a._byte - b._byte)),
             RuntimeType.Integer => new DataItem((int)(a._integer - b._integer)),
@@ -61,7 +61,7 @@ public partial struct DataItem :
 
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
-    public static DataItem operator <<(DataItem leftSide, int rightSide) => leftSide.type switch
+    public static DataItem operator <<(DataItem leftSide, int rightSide) => leftSide.Type switch
     {
         RuntimeType.Byte => new DataItem(unchecked((byte)(leftSide._byte << rightSide))),
         RuntimeType.Integer => new DataItem(unchecked((int)(leftSide._integer << rightSide))),
@@ -70,7 +70,7 @@ public partial struct DataItem :
     };
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
-    public static DataItem operator >>(DataItem leftSide, int rightSide) => leftSide.type switch
+    public static DataItem operator >>(DataItem leftSide, int rightSide) => leftSide.Type switch
     {
         RuntimeType.Byte => new DataItem(unchecked((byte)(leftSide._byte >> rightSide))),
         RuntimeType.Integer => new DataItem(unchecked((int)(leftSide._integer >> rightSide))),
@@ -79,7 +79,7 @@ public partial struct DataItem :
     };
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
-    public static DataItem operator >>>(DataItem leftSide, int rightSide) => leftSide.type switch
+    public static DataItem operator >>>(DataItem leftSide, int rightSide) => leftSide.Type switch
     {
         RuntimeType.Byte => new DataItem(unchecked((byte)(leftSide._byte >>> rightSide))),
         RuntimeType.Integer => new DataItem(unchecked((int)(leftSide._integer >>> rightSide))),
@@ -87,12 +87,12 @@ public partial struct DataItem :
         _ => throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type}"),
     };
 
-    public override readonly bool Equals(object? obj) => obj is DataItem value && this.Equals(value);
+    public override bool Equals(object? obj) => obj is DataItem value && this.Equals(value);
 
-    public readonly bool Equals(DataItem other)
+    public bool Equals(DataItem other)
     {
-        if (type != other.type) return false;
-        return type switch
+        if (Type != other.Type) return false;
+        return Type switch
         {
             RuntimeType.Null => false,
             RuntimeType.Byte => _byte == other._byte,
@@ -106,87 +106,26 @@ public partial struct DataItem :
     /// <exception cref="InternalException"/>
     public static void MakeSameType(ref DataItem x, ref DataItem y)
     {
-        if (x.type == y.type) return;
+        if (x.Type == y.Type) return;
 
         DataItem xBefore = x;
         DataItem yBefore = y;
 
-        switch (x.type)
-        {
-            case RuntimeType.Byte:
-                switch (y.type)
-                {
-                    case RuntimeType.Integer:
-                        x = new DataItem((int)x._byte);
-                        break;
-                    case RuntimeType.Single:
-                        x = new DataItem((float)x._byte);
-                        break;
-                    case RuntimeType.Char:
-                        x = new DataItem((char)x._byte);
-                        break;
-                    default: break;
-                }
-                break;
-            case RuntimeType.Integer:
-                switch (y.type)
-                {
-                    case RuntimeType.Byte:
-                        y = new DataItem((int)y._byte);
-                        break;
-                    case RuntimeType.Single:
-                        x = new DataItem((float)x._integer);
-                        break;
-                    case RuntimeType.Char:
-                        y = new DataItem((int)y._char);
-                        break;
-                    default: break;
-                }
-                break;
-            case RuntimeType.Single:
-                switch (y.type)
-                {
-                    case RuntimeType.Byte:
-                        y = new DataItem((float)y._byte);
-                        break;
-                    case RuntimeType.Integer:
-                        y = new DataItem((float)y._integer);
-                        break;
-                    case RuntimeType.Char:
-                        y = new DataItem((float)y._char);
-                        break;
-                    default: break;
-                }
-                break;
-            case RuntimeType.Char:
-                switch (y.type)
-                {
-                    case RuntimeType.Byte:
-                        y = new DataItem((char)y._byte);
-                        break;
-                    case RuntimeType.Integer:
-                        x = new DataItem((int)x._char);
-                        break;
-                    case RuntimeType.Single:
-                        x = new DataItem((float)x._char);
-                        break;
-                    default: break;
-                }
-                break;
-        }
+        DataItem.TryCast(ref x, y.Type);
+        DataItem.TryCast(ref y, x.Type);
 
         if (!xBefore.Equals(x) &&
             !yBefore.Equals(y))
         { throw new InternalException(); }
 
-        if (x.type != y.type)
+        if (x.Type != y.Type)
         { throw new InternalException(); }
     }
 
     /// <exception cref="InternalException"/>
     public static (RuntimeType, RuntimeType) MakeSameTypeAndKeep(ref DataItem x, ref DataItem y)
     {
-        (RuntimeType, RuntimeType) result = (x.type, y.type);
+        (RuntimeType, RuntimeType) result = (x.Type, y.Type);
         DataItem.MakeSameType(ref x, ref y);
         return result;
     }
@@ -198,7 +137,7 @@ public partial struct DataItem :
     {
         (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Byte => new DataItem((byte)(a._byte * b._byte)),
             RuntimeType.Integer => new DataItem((int)(a._integer * b._integer)),
@@ -214,7 +153,7 @@ public partial struct DataItem :
     {
         (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Byte => new DataItem((byte)(a._byte / b._byte)),
             RuntimeType.Integer => new DataItem((int)(a._integer / b._integer)),
@@ -230,7 +169,7 @@ public partial struct DataItem :
     {
         (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Byte => new DataItem((byte)(a._byte % b._byte)),
             RuntimeType.Integer => new DataItem((int)(a._integer % b._integer)),
@@ -240,12 +179,11 @@ public partial struct DataItem :
         };
     }
 
-    /// <inheritdoc/>
     public static bool operator <(DataItem a, DataItem b)
     {
-        if (a.type == RuntimeType.Null || b.type == RuntimeType.Null) return false;
+        if (a.IsNull || b.IsNull) return false;
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Null => false,
             RuntimeType.Byte => a._byte < b._byte,
@@ -255,12 +193,11 @@ public partial struct DataItem :
             _ => false,
         };
     }
-    /// <inheritdoc/>
     public static bool operator >(DataItem a, DataItem b)
     {
-        if (a.type == RuntimeType.Null || b.type == RuntimeType.Null) return false;
+        if (a.IsNull || b.IsNull) return false;
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Null => false,
             RuntimeType.Byte => a._byte > b._byte,
@@ -271,23 +208,44 @@ public partial struct DataItem :
         };
     }
 
-    /// <inheritdoc/>
     public static bool operator <=(DataItem a, DataItem b)
-        => (a < b) || (a == b);
-    /// <inheritdoc/>
-    public static bool operator >=(DataItem a, DataItem b)
-        => (a > b) || (a == b);
+    {
+        if (a.IsNull || b.IsNull) return false;
 
-    /// <inheritdoc/>
+        return a.Type switch
+        {
+            RuntimeType.Null => false,
+            RuntimeType.Byte => a._byte <= b._byte,
+            RuntimeType.Integer => a._integer <= b._integer,
+            RuntimeType.Single => a._single <= b._single,
+            RuntimeType.Char => a._char <= b._char,
+            _ => false,
+        };
+    }
+    public static bool operator >=(DataItem a, DataItem b)
+    {
+        if (a.IsNull || b.IsNull) return false;
+
+        return a.Type switch
+        {
+            RuntimeType.Null => false,
+            RuntimeType.Byte => a._byte >= b._byte,
+            RuntimeType.Integer => a._integer >= b._integer,
+            RuntimeType.Single => a._single >= b._single,
+            RuntimeType.Char => a._char >= b._char,
+            _ => false,
+        };
+    }
+
     public static bool operator ==(DataItem a, DataItem b)
     {
-        if (a.type == RuntimeType.Null && b.type == RuntimeType.Null) return true;
-        if (a.type == RuntimeType.Null && DataItem.IsZero(b)) return true;
-        if (b.type == RuntimeType.Null && DataItem.IsZero(a)) return true;
+        if (a.IsNull && b.IsNull) return true;
+        if (a.IsNull && DataItem.IsZero(b)) return true;
+        if (b.IsNull && DataItem.IsZero(a)) return true;
 
-        return a.type switch
+        return a.Type switch
         {
-            RuntimeType.Null => b.type == RuntimeType.Null,
+            RuntimeType.Null => b.IsNull,
             RuntimeType.Byte => a._byte == b._byte,
             RuntimeType.Integer => a._integer == b._integer,
             RuntimeType.Single => a._single == b._single,
@@ -295,13 +253,12 @@ public partial struct DataItem :
             _ => false,
         };
     }
-    /// <inheritdoc/>
     public static bool operator !=(DataItem a, DataItem b)
         => !(a == b);
 
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
-    public static DataItem operator !(DataItem value) => value.type switch
+    public static DataItem operator !(DataItem value) => value.Type switch
     {
         RuntimeType.Byte => new DataItem((byte)((value._byte == 0) ? (byte)1 : (byte)0)),
         RuntimeType.Integer => new DataItem((int)((value._integer == 0) ? (int)1 : (int)0)),
@@ -312,7 +269,7 @@ public partial struct DataItem :
 
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
-    public static DataItem operator +(DataItem value) => value.type switch
+    public static DataItem operator +(DataItem value) => value.Type switch
     {
         RuntimeType.Byte => new DataItem((byte)(+value._byte)),
         RuntimeType.Integer => new DataItem((int)(+value._integer)),
@@ -323,7 +280,7 @@ public partial struct DataItem :
 
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
-    public static DataItem operator -(DataItem value) => value.type switch
+    public static DataItem operator -(DataItem value) => value.Type switch
     {
         RuntimeType.Byte => new DataItem((byte)(-value._byte)),
         RuntimeType.Integer => new DataItem((int)(-value._integer)),
@@ -339,7 +296,7 @@ public partial struct DataItem :
     {
         (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Byte => new DataItem((byte)(a._byte | b._byte)),
             RuntimeType.Integer => new DataItem((int)(a._integer | b._integer)),
@@ -354,7 +311,7 @@ public partial struct DataItem :
     {
         (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Byte => new DataItem((byte)(a._byte & b._byte)),
             RuntimeType.Integer => new DataItem((int)(a._integer & b._integer)),
@@ -369,7 +326,7 @@ public partial struct DataItem :
     {
         (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
-        return a.type switch
+        return a.Type switch
         {
             RuntimeType.Byte => new DataItem((byte)(a._byte ^ b._byte)),
             RuntimeType.Integer => new DataItem((int)(a._integer ^ b._integer)),

@@ -176,7 +176,7 @@ public abstract class CodeGenerator
             if (!TryCompute(variableDeclaration.InitialValue, out DataItem constantValue))
             { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.FilePath); }
 
-            if (variableDeclaration.Type != "var")
+            if (variableDeclaration.Type != StatementKeywords.Var)
             {
                 GeneralType constantType = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
                 variableDeclaration.Type.SetAnalyzedType(constantType);
@@ -223,7 +223,7 @@ public abstract class CodeGenerator
     protected bool StatementCanBeDeallocated(StatementWithValue statement, out bool explicitly)
     {
         if (statement is ModifiedStatement modifiedStatement &&
-            modifiedStatement.Modifier.Equals("temp"))
+            modifiedStatement.Modifier.Equals(ModifierKeywords.Temp))
         {
             if (modifiedStatement.Statement is LiteralStatement ||
                 modifiedStatement.Statement is OperatorCall)
@@ -1036,7 +1036,7 @@ public abstract class CodeGenerator
 
     protected bool FindType(Token name, [NotNullWhen(true)] out GeneralType? result)
     {
-        if (LanguageConstants.BuiltinTypeMap3.TryGetValue(name.Content, out BasicType builtinType))
+        if (TypeKeywords.BasicTypes.TryGetValue(name.Content, out BasicType builtinType))
         {
             result = new BuiltinType(builtinType);
             return true;
@@ -1370,11 +1370,11 @@ public abstract class CodeGenerator
 
     protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset)
     {
-        if (LanguageConstants.Keywords.Contains(newVariable.Identifier.Content))
+        if (LanguageConstants.KeywordList.Contains(newVariable.Identifier.Content))
         { throw new CompilerException($"Illegal variable name \"{newVariable.Identifier.Content}\"", newVariable.Identifier, CurrentFile); }
 
         GeneralType type;
-        if (newVariable.Type == "var")
+        if (newVariable.Type == StatementKeywords.Var)
         {
             if (newVariable.InitialValue == null)
             { throw new CompilerException($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.FilePath); }
@@ -1450,13 +1450,12 @@ public abstract class CodeGenerator
     protected static DataItem GetInitialValue(TypeInstance type)
         => type.ToString() switch
         {
-            "int" => new DataItem((int)0),
-            "byte" => new DataItem((byte)0),
-            "float" => new DataItem((float)0f),
-            "char" => new DataItem((char)'\0'),
-
-            "var" => throw new InternalException("Undefined type"),
-            "void" => throw new InternalException("Invalid type"),
+            TypeKeywords.Int => new DataItem((int)0),
+            TypeKeywords.Byte => new DataItem((byte)0),
+            TypeKeywords.Float => new DataItem((float)0f),
+            TypeKeywords.Char => new DataItem((char)'\0'),
+            StatementKeywords.Var => throw new InternalException("Undefined type"),
+            TypeKeywords.Void => throw new InternalException("Invalid type"),
             _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
         };
 
@@ -1513,11 +1512,11 @@ public abstract class CodeGenerator
     {
         return keywordCall.Identifier.Content switch
         {
-            "return" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-            "throw" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-            "break" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
+            StatementKeywords.Return => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
+            StatementKeywords.Throw => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
+            StatementKeywords.Break => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
             "sizeof" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Integer)),
-            "delete" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
+            StatementKeywords.Delete => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
             _ => throw new CompilerException($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile)
         };
     }
@@ -1679,7 +1678,7 @@ public abstract class CodeGenerator
         {
             if (GetParameter(identifier.Content, out CompiledParameter? parameter))
             {
-                if (identifier.Content != "this")
+                if (identifier.Content != StatementKeywords.This)
                 { identifier.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
                 identifier.Reference = parameter;
             }
@@ -1809,12 +1808,12 @@ public abstract class CodeGenerator
     }
     protected GeneralType FindStatementType(ModifiedStatement modifiedStatement, GeneralType? expectedType)
     {
-        if (modifiedStatement.Modifier.Equals("ref"))
+        if (modifiedStatement.Modifier.Equals(ModifierKeywords.Ref))
         {
             return OnGotStatementType(modifiedStatement, FindStatementType(modifiedStatement.Statement, expectedType));
         }
 
-        if (modifiedStatement.Modifier.Equals("temp"))
+        if (modifiedStatement.Modifier.Equals(ModifierKeywords.Temp))
         {
             return OnGotStatementType(modifiedStatement, FindStatementType(modifiedStatement.Statement, expectedType));
         }
@@ -1897,7 +1896,7 @@ public abstract class CodeGenerator
 
         List<GeneralType> result = new();
 
-        if (inlinedMacro.TryGetStatement(out KeywordCall? keywordCall, s => s.Identifier.Equals("return")))
+        if (inlinedMacro.TryGetStatement(out KeywordCall? keywordCall, s => s.Identifier.Equals(StatementKeywords.Return)))
         {
             if (keywordCall.Parameters.Length == 0)
             { result.Add(new BuiltinType(BasicType.Void)); }
@@ -1985,7 +1984,7 @@ public abstract class CodeGenerator
         // inlined = Collapse(inlined, parameters);
 
         if (inlined is KeywordCall keywordCall &&
-            keywordCall.Identifier.Equals("return") &&
+            keywordCall.Identifier.Equals(StatementKeywords.Return) &&
             keywordCall.Parameters.Length == 1)
         { inlined = keywordCall.Parameters[0]; }
 
@@ -2027,7 +2026,7 @@ public abstract class CodeGenerator
         // inlined = Collapse(inlined, parameters);
 
         if (inlined is KeywordCall keywordCall &&
-            keywordCall.Identifier.Equals("return") &&
+            keywordCall.Identifier.Equals(StatementKeywords.Return) &&
             keywordCall.Parameters.Length == 1)
         { inlined = keywordCall.Parameters[0]; }
 
@@ -2048,7 +2047,7 @@ public abstract class CodeGenerator
             statements.Add(inlinedStatement);
 
             if (statement is KeywordCall keywordCall &&
-                keywordCall.Identifier.Equals("return"))
+                keywordCall.Identifier.Equals(StatementKeywords.Return))
             { break; }
         }
         inlined = new Block(statements.ToArray(), block.Brackets)
@@ -2101,9 +2100,8 @@ public abstract class CodeGenerator
         => new(
             keyword: constructorCall.Keyword,
             typeName: constructorCall.Type,
-            bracketLeft: constructorCall.BracketLeft,
             parameters: InlineMacro(constructorCall.Parameters, parameters),
-            bracketRight: constructorCall.BracketRight)
+            brackets: constructorCall.Brackets)
         {
             SaveValue = constructorCall.SaveValue,
             Semicolon = constructorCall.Semicolon,
@@ -2907,7 +2905,8 @@ public abstract class CodeGenerator
         {
             GeneralType type = GeneralType.From(typeCast.Type, FindType, TryCompute);
             if (type is not BuiltinType builtinType) return false;
-            DataItem.Cast(ref value, builtinType.RuntimeType);
+            if (!DataItem.TryCast(ref value, builtinType.RuntimeType))
+            { return false; }
             return true;
         }
 
@@ -3159,7 +3158,7 @@ public abstract class CodeGenerator
         { return false; }
 
         if (variableDeclaration.InitialValue is null &&
-            variableDeclaration.Type.ToString() != "var")
+            variableDeclaration.Type.ToString() != StatementKeywords.Var)
         {
             value = GetInitialValue(variableDeclaration.Type);
         }
@@ -3191,7 +3190,7 @@ public abstract class CodeGenerator
     }
     bool TryEvaluate(KeywordCall keywordCall, EvaluationContext context)
     {
-        if (keywordCall.Identifier.Content == "return")
+        if (keywordCall.Identifier.Content == StatementKeywords.Return)
         {
             context.IsReturning = true;
 
@@ -3212,7 +3211,7 @@ public abstract class CodeGenerator
             return false;
         }
 
-        if (keywordCall.Identifier.Content == "break")
+        if (keywordCall.Identifier.Content == StatementKeywords.Break)
         {
             context.IsBreaking = true;
 
@@ -3388,7 +3387,7 @@ public abstract class CodeGenerator
         { return false; }
 
         // TODO: return and break in unrolled loop
-        if (loop.Block.TryGetStatement<KeywordCall>(out _, (statement) => statement.Identifier.Content is "break" or "return"))
+        if (loop.Block.TryGetStatement<KeywordCall>(out _, (statement) => statement.Identifier.Content is StatementKeywords.Break or StatementKeywords.Return))
         { return false; }
 
         return true;

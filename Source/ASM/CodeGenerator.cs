@@ -227,7 +227,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         if (type is TypeInstanceSimple simpleType)
         {
-            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out BasicType builtinType))
+            if (TypeKeywords.BasicTypes.TryGetValue(simpleType.Identifier.Content, out BasicType builtinType))
             {
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(builtinType));
                 return 1;
@@ -380,7 +380,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         if (FunctionFrameSize.Count > 0)
         { FunctionFrameSize.Last += size; }
 
-        return new CleanupItem(size, newVariable.Modifiers.Contains("temp"), compiledVariable.Type);
+        return new CleanupItem(size, newVariable.Modifiers.Contains(ModifierKeywords.Temp), compiledVariable.Type);
     }
     CleanupItem GenerateCodeForVariable(Statement statement)
     {
@@ -496,14 +496,14 @@ public class CodeGeneratorForAsm : CodeGenerator
             ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
             // GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
 
-            bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
 
             canDeallocate = canDeallocate && passedParameterType is PointerType;
 
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -567,14 +567,14 @@ public class CodeGeneratorForAsm : CodeGenerator
             ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
             // GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
 
-            bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
 
             canDeallocate = canDeallocate && passedParameterType is PointerType;
 
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -798,7 +798,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         StatementWithValue statement = modifiedStatement.Statement;
         Token modifier = modifiedStatement.Modifier;
 
-        if (modifier.Equals("ref"))
+        if (modifier.Equals(ModifierKeywords.Ref))
         {
             ValueAddress address = GetDataAddress(statement);
 
@@ -816,7 +816,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             return;
         }
 
-        if (modifier.Equals("temp"))
+        if (modifier.Equals(ModifierKeywords.Temp))
         {
             GenerateCodeForStatement(statement);
             return;
@@ -920,10 +920,10 @@ public class CodeGeneratorForAsm : CodeGenerator
     {
         switch (statement.Identifier.Content)
         {
-            case "return":
+            case StatementKeywords.Return:
             {
                 if (statement.Parameters.Length > 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"return\": required {0} or {1} passed {statement.Parameters.Length}", statement, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {statement.Parameters.Length}", statement, CurrentFile); }
 
                 if (statement.Parameters.Length == 1)
                 {
@@ -944,15 +944,15 @@ public class CodeGeneratorForAsm : CodeGenerator
                 break;
             }
 
-            case "break":
+            case StatementKeywords.Break:
             {
                 if (statement.Parameters.Length != 0)
-                { throw new CompilerException($"Wrong number of parameters passed to \"break\": required {0}, passed {statement.Parameters.Length}", statement, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Break}\": required {0}, passed {statement.Parameters.Length}", statement, CurrentFile); }
 
                 throw new NotImplementedException();
             }
 
-            case "delete":
+            case StatementKeywords.Delete:
             {
                 throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly");
             }
@@ -1128,7 +1128,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         if (GetParameter(statement.Content, out CompiledParameter? compiledParameter))
         {
-            if (statement.Content != "this")
+            if (statement.Content != StatementKeywords.This)
             { statement.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
             ValueAddress address = GetBaseAddress(compiledParameter);
             StackLoad(address, compiledParameter.Type.Size);
@@ -1477,7 +1477,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             GenerateCodeForStatement(block);
         }
         else if (inlinedMacro is KeywordCall keywordCall &&
-            keywordCall.Identifier.Equals("return") &&
+            keywordCall.Identifier.Equals(StatementKeywords.Return) &&
             keywordCall.Parameters.Length == 1)
         {
             Builder.CodeBuilder.AppendCommentLine($"{keywordCall.Parameters[0]}  (returned)");
@@ -1521,7 +1521,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         for (int i = 0; i < statements.Length; i++)
         {
             if (statements[i] is KeywordCall keywordCall &&
-                keywordCall.Identifier.Equals("return"))
+                keywordCall.Identifier.Equals(StatementKeywords.Return))
             {
                 if (keywordCall.Parameters.Length != 0 &&
                     keywordCall.Parameters.Length != 1)
@@ -1572,7 +1572,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     void GenerateCodeForFunction(FunctionThingDefinition function)
     {
-        if (LanguageConstants.Keywords.Contains(function.Identifier.Content))
+        if (LanguageConstants.KeywordList.Contains(function.Identifier.Content))
         { throw new CompilerException($"The identifier \"{function.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
 
         function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;

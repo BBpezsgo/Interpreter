@@ -11,7 +11,7 @@ public class MacroDefinition : IExportable, IInFile
     public ImmutableArray<Token> Parameters { get; }
     public Block Block { get; }
     public Uri? FilePath { get; set; }
-    public bool IsExport => Modifiers.Contains("export");
+    public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
 
     public MacroDefinition(MacroDefinition other)
     {

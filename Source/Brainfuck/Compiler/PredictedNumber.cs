@@ -7,7 +7,6 @@ public readonly struct PredictedNumber<T> :
     IEquatable<T>
     where T : struct, INumberBase<T>
 {
-
     [MemberNotNullWhen(true, nameof(Value))]
     public bool IsUnknown { get; }
     public T Value { get; }

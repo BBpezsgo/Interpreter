@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.Tokenizing;
 
-public class StringTokenizer : Tokenizer
+public sealed class StringTokenizer : Tokenizer
 {
     readonly string Text;
 

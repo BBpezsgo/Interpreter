@@ -20,7 +20,6 @@ public class AttributeUsage : IPositioned
     public bool TryGetValue<T>(int index, [NotNullWhen(true)] out T? value)
     {
         value = default;
-        if (Parameters == null) return false;
         if (Parameters.Length <= index) return false;
 
         LiteralType literalType;
@@ -50,7 +49,6 @@ public class AttributeUsage : IPositioned
     public bool TryGetValue(int index, out string value)
     {
         value = string.Empty;
-        if (Parameters == null) return false;
         if (Parameters.Length <= index) return false;
         if (Parameters[index].Type == LiteralType.String)
         {
@@ -62,7 +60,6 @@ public class AttributeUsage : IPositioned
     public bool TryGetValue(int index, out int value)
     {
         value = 0;
-        if (Parameters == null) return false;
         if (Parameters.Length <= index) return false;
         if (Parameters[index].Type == LiteralType.Integer)
         {
@@ -74,7 +71,6 @@ public class AttributeUsage : IPositioned
     public bool TryGetValue(int index, out float value)
     {
         value = 0;
-        if (Parameters == null) return false;
         if (Parameters.Length <= index) return false;
         if (Parameters[index].Type == LiteralType.Float)
         {
@@ -86,7 +82,6 @@ public class AttributeUsage : IPositioned
     public bool TryGetValue(int index, out char value)
     {
         value = default;
-        if (Parameters == null) return false;
         if (Parameters.Length <= index) return false;
         if (Parameters[index].Type == LiteralType.Char)
         {

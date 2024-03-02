@@ -12,7 +12,7 @@ public class StructDefinition : IExportable, IInFile, IPositioned
     public ImmutableArray<FieldDefinition> Fields { get; }
     public ImmutableArray<Token> Modifiers { get; }
     public TemplateInfo? TemplateInfo { get; init; }
-    public bool IsExport => Modifiers.Contains("export");
+    public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
     public virtual Position Position => new(Identifier, BracketStart, BracketEnd);
     public ImmutableArray<FunctionDefinition> Methods { get; }
     public ImmutableArray<GeneralFunctionDefinition> GeneralMethods { get; }

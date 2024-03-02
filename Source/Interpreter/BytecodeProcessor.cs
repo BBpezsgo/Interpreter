@@ -506,7 +506,8 @@ public class BytecodeProcessor
         RuntimeType targetType = (RuntimeType)(byte)Memory.Stack.Pop();
         DataItem value = Memory.Stack.Pop();
 
-        DataItem.Cast(ref value, targetType);
+        if (!DataItem.TryCast(ref value, targetType))
+        { throw new RuntimeException($"Cannot cast {value.Type} to {targetType}"); }
 
         Memory.Stack.Push(value);
 

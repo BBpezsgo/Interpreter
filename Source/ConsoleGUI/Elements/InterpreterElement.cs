@@ -295,7 +295,7 @@ public sealed class InterpreterElement : WindowElement
                         }
 
                         string param = parameters2[j];
-                        if (LanguageConstants.BuiltinTypes.Contains(param))
+                        if (TypeKeywords.List.Contains(param))
                         {
                             sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
                         }
@@ -380,7 +380,7 @@ public sealed class InterpreterElement : WindowElement
                         }
 
                         string param = parameters2[j];
-                        if (LanguageConstants.BuiltinTypes.Contains(param))
+                        if (TypeKeywords.List.Contains(param))
                         {
                             sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
                         }

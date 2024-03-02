@@ -41,11 +41,11 @@ public class UsingDefinition : IPositioned
         {
             pathTokens[i] = Token.CreateAnonymous(path[i]);
         }
-        return new UsingDefinition(Token.CreateAnonymous("using"), pathTokens);
+        return new UsingDefinition(Token.CreateAnonymous(DeclarationKeywords.Using), pathTokens);
     }
 
     public static UsingDefinition CreateAnonymous(Uri uri) => new(
-        Token.CreateAnonymous("using"), new Token[]
+        Token.CreateAnonymous(DeclarationKeywords.Using), new Token[]
         {
             Token.CreateAnonymous(uri.ToString(), TokenType.LiteralString)
         });

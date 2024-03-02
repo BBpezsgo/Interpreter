@@ -66,10 +66,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         AddComment($"Call Keyword {keywordCall.Identifier} {{");
 
-        if (keywordCall.Identifier.Content == "return")
+        if (keywordCall.Identifier.Content == StatementKeywords.Return)
         {
             if (keywordCall.Parameters.Length > 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"return\": required {0} or {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
             if (InMacro.Last)
             { throw new NotImplementedException(); }
@@ -114,10 +114,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (keywordCall.Identifier.Content == "throw")
+        if (keywordCall.Identifier.Content == StatementKeywords.Throw)
         {
             if (keywordCall.Parameters.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"throw\": required {1} passed {keywordCall.Parameters}", keywordCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Throw}\": required {1} passed {keywordCall.Parameters}", keywordCall, CurrentFile); }
 
             AddComment(" Param 0:");
 
@@ -129,10 +129,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (keywordCall.Identifier.Content == "break")
+        if (keywordCall.Identifier.Content == StatementKeywords.Break)
         {
             if (BreakInstructions.Count == 0)
-            { throw new CompilerException($"The keyword \"break\" does not available in the current context", keywordCall.Identifier, CurrentFile); }
+            { throw new CompilerException($"The keyword \"{StatementKeywords.Break}\" does not available in the current context", keywordCall.Identifier, CurrentFile); }
 
             if (InMacro.Last)
             { throw new NotImplementedException(); }
@@ -161,16 +161,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (keywordCall.Identifier.Content == "delete")
+        if (keywordCall.Identifier.Content == StatementKeywords.Delete)
         {
             if (keywordCall.Parameters.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"delete\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Delete}\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
             GeneralType deletableType = FindStatementType(keywordCall.Parameters[0]);
 
             if (deletableType is not PointerType deletablePointerType)
             {
-                AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on pointers or pointer so I skip this", keywordCall.Parameters[0], CurrentFile));
+                AnalysisCollection?.Warnings.Add(new Warning($"The \"{StatementKeywords.Delete}\" keyword-function is only working on pointers or pointer so I skip this", keywordCall.Parameters[0], CurrentFile));
                 return;
             }
 
@@ -257,7 +257,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (GetParameter(functionCall.Identifier.Content, out CompiledParameter? compiledParameter))
         {
-            if (functionCall.Identifier.Content != "this")
+            if (functionCall.Identifier.Content != StatementKeywords.This)
             { functionCall.Identifier.AnalyzedType = TokenAnalyzedType.ParameterName; }
             functionCall.Reference = compiledParameter;
 
@@ -351,14 +351,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment($" Param {i}:");
 
-            bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
 
             canDeallocate = canDeallocate && passedParameterType is PointerType;
 
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -403,7 +403,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -433,14 +433,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment($" Param {i}:");
 
-            bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
 
             canDeallocate = canDeallocate && passedParameterType is PointerType;
 
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -470,14 +470,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment($" Param {i}:");
 
-            bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
 
             canDeallocate = canDeallocate && passedParameterType is PointerType;
 
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"temp\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
             }
             else
             {
@@ -1095,7 +1095,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (GetParameter(variable.Content, out CompiledParameter? param))
         {
-            if (variable.Content != "this")
+            if (variable.Content != StatementKeywords.This)
             { variable.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
             variable.Reference = param;
             OnGotStatementType(variable, param.Type);
@@ -1411,7 +1411,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.InstructionOffset == -1)
         { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructor>(jumpInstruction, false, constructorCall, compiledFunction, CurrentFile)); }
 
-        GenerateCodeForParameterCleanup(parameterCleanup, constructorCall.BracketRight.Position);
+        GenerateCodeForParameterCleanup(parameterCleanup, constructorCall.Brackets.End.Position);
 
         AddComment("}");
     }
@@ -1620,7 +1620,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         StatementWithValue statement = modifiedStatement.Statement;
         Token modifier = modifiedStatement.Modifier;
 
-        if (modifier.Equals("ref"))
+        if (modifier.Equals(ModifierKeywords.Ref))
         {
             ValueAddress address = GetDataAddress(statement);
 
@@ -1654,7 +1654,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (modifier.Equals("temp"))
+        if (modifier.Equals(ModifierKeywords.Temp))
         {
             GenerateCodeForStatement(statement);
             return;
@@ -1814,7 +1814,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (GetParameter(statementToSet.Content, out CompiledParameter? parameter))
         {
-            if (statementToSet.Content != "this")
+            if (statementToSet.Content != StatementKeywords.This)
             { statementToSet.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
 
             GeneralType valueType = FindStatementType(value, parameter.Type);
@@ -2117,7 +2117,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (inlinedMacro is Block block)
         { GenerateCodeForStatement(block); }
         else if (inlinedMacro is KeywordCall keywordCall &&
-            keywordCall.Identifier.Equals("return") &&
+            keywordCall.Identifier.Equals(StatementKeywords.Return) &&
             keywordCall.Parameters.Length == 1)
         { GenerateCodeForStatement(keywordCall.Parameters[0]); }
         else
@@ -2259,7 +2259,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (size != compiledVariable.Type.Size)
         { throw new InternalException($"Variable size ({compiledVariable.Type.Size}) and initial value size ({size}) mismatch"); }
 
-        return new CleanupItem(size, newVariable.Modifiers.Contains("temp"), compiledVariable.Type);
+        return new CleanupItem(size, newVariable.Modifiers.Contains(ModifierKeywords.Temp), compiledVariable.Type);
     }
     CleanupItem GenerateCodeForVariable(Statement st)
     {
@@ -2303,7 +2303,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     bool GenerateCodeForFunction(FunctionThingDefinition function)
     {
-        if (LanguageConstants.Keywords.Contains(function.Identifier?.ToString()))
+        if (LanguageConstants.KeywordList.Contains(function.Identifier.ToString()))
         { throw new CompilerException($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
 
         if (function.Identifier is not null)

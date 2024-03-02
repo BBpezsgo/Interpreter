@@ -38,7 +38,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         StatementWithValue? initialValue = variableDeclaration.InitialValue;
 
-        if (variableDeclaration.Type == "var")
+        if (variableDeclaration.Type == StatementKeywords.Var)
         {
             if (initialValue == null)
             { throw new CompilerException($"Variable with implicit type must have an initial value", variableDeclaration, CurrentFile); }
@@ -51,7 +51,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             variableDeclaration.Type.SetAnalyzedType(type);
         }
 
-        return PrecompileVariable(Variables, variableDeclaration.Identifier.Content, type, initialValue, variableDeclaration.Modifiers.Contains("temp"));
+        return PrecompileVariable(Variables, variableDeclaration.Identifier.Content, type, initialValue, variableDeclaration.Modifiers.Contains(ModifierKeywords.Temp));
     }
     int PrecompileVariable(Stack<Variable> variables, string name, GeneralType type, StatementWithValue? initialValue, bool deallocateOnClean)
     {
@@ -564,12 +564,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         StatementWithValue statement = modifiedStatement.Statement;
         Token modifier = modifiedStatement.Modifier;
 
-        if (modifier.Equals("ref"))
+        if (modifier.Equals(ModifierKeywords.Ref))
         {
             throw new NotImplementedException();
         }
 
-        if (modifier.Equals("temp"))
+        if (modifier.Equals(ModifierKeywords.Temp))
         {
             GenerateCodeForStatement(statement);
             return;
@@ -1015,7 +1015,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         switch (statement.Identifier.Content)
         {
-            case "return":
+            case StatementKeywords.Return:
             {
                 statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
 
@@ -1050,7 +1050,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 break;
             }
 
-            case "break":
+            case StatementKeywords.Break:
             {
                 statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
 
@@ -1095,7 +1095,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
             */
 
-            case "delete":
+            case StatementKeywords.Delete:
             {
                 statement.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
@@ -1109,7 +1109,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 break;
             }
 
-            case "throw":
+            case StatementKeywords.Throw:
             {
                 if (statement.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
@@ -2703,7 +2703,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
             }
 
-            if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
+            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains("const"))
             { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
             bool deallocateOnClean = false;
@@ -2715,7 +2715,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 switch (modifiedStatement.Modifier.Content)
                 {
-                    case "ref":
+                    case ModifierKeywords.Ref:
                     {
                         Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
@@ -2737,7 +2737,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         constantParameters.Add(new CompiledParameterConstant(constValue, defined));
                         continue;
                     }
-                    case "temp":
+                    case ModifierKeywords.Temp:
                     {
                         deallocateOnClean = true;
                         passed = modifiedStatement.Statement;
@@ -2750,13 +2750,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             if (passed is StatementWithValue value)
             {
-                if (defined.Modifiers.Contains("ref"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"ref\" modifier", passed, CurrentFile); }
+                if (defined.Modifiers.Contains(ModifierKeywords.Ref))
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
 
                 if (defined.Modifiers.Contains("const"))
                 { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
 
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
+                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
 
                 bool parameterFound = false;
                 Variable compiledParameter = default;
@@ -2827,8 +2827,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         GenerateDeallocator(
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name)),
-                                Token.CreateAnonymous("as"),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int"), Token.CreateAnonymous("*", TokenType.Operator))
+                                Token.CreateAnonymous(StatementKeywords.As),
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -2994,7 +2994,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
             }
 
-            if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
+            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains("const"))
             { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
             bool deallocateOnClean = false;
@@ -3006,7 +3006,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 switch (modifiedStatement.Modifier.Content)
                 {
-                    case "ref":
+                    case ModifierKeywords.Ref:
                     {
                         Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
@@ -3028,7 +3028,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         constantParameters.Add(new CompiledParameterConstant(constValue, defined));
                         continue;
                     }
-                    case "temp":
+                    case ModifierKeywords.Temp:
                     {
                         deallocateOnClean = true;
                         passed = modifiedStatement.Statement;
@@ -3041,13 +3041,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             if (passed is StatementWithValue value)
             {
-                if (defined.Modifiers.Contains("ref"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"ref\" modifier", passed, CurrentFile); }
+                if (defined.Modifiers.Contains(ModifierKeywords.Ref))
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
 
                 if (defined.Modifiers.Contains("const"))
                 { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
 
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
+                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
 
                 bool parameterFound = false;
                 Variable compiledParameter = default;
@@ -3119,8 +3119,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         GenerateDeallocator(
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name)),
-                                Token.CreateAnonymous("as"),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int"), Token.CreateAnonymous("*", TokenType.Operator))
+                                Token.CreateAnonymous(StatementKeywords.As),
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -3211,7 +3211,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
             }
 
-            if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
+            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains("const"))
             { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
             bool deallocateOnClean = false;
@@ -3223,7 +3223,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 switch (modifiedStatement.Modifier.Content)
                 {
-                    case "ref":
+                    case ModifierKeywords.Ref:
                     {
                         Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
@@ -3245,7 +3245,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         constantParameters.Add(new CompiledParameterConstant(constValue, defined));
                         continue;
                     }
-                    case "temp":
+                    case ModifierKeywords.Temp:
                     {
                         deallocateOnClean = true;
                         break;
@@ -3257,13 +3257,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             if (passed is StatementWithValue value)
             {
-                if (defined.Modifiers.Contains("ref"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"ref\" modifier", passed, CurrentFile); }
+                if (defined.Modifiers.Contains(ModifierKeywords.Ref))
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
 
                 if (defined.Modifiers.Contains("const"))
                 { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
 
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
+                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
 
                 bool parameterFound = false;
                 Variable compiledParameter = default;
@@ -3331,8 +3331,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         GenerateDeallocator(
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name)),
-                                Token.CreateAnonymous("as"),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int"), Token.CreateAnonymous("*", TokenType.Operator))
+                                Token.CreateAnonymous(StatementKeywords.As),
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -3427,7 +3427,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
             }
 
-            if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
+            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains("const"))
             { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
             bool deallocateOnClean = false;
@@ -3439,7 +3439,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 switch (modifiedStatement.Modifier.Content)
                 {
-                    case "ref":
+                    case ModifierKeywords.Ref:
                     {
                         Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
@@ -3461,7 +3461,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         constantParameters.Add(new CompiledParameterConstant(constValue, defined));
                         continue;
                     }
-                    case "temp":
+                    case ModifierKeywords.Temp:
                     {
                         deallocateOnClean = true;
                         passed = modifiedStatement.Statement;
@@ -3474,13 +3474,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             if (passed is StatementWithValue value)
             {
-                if (defined.Modifiers.Contains("ref"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"ref\" modifier", passed, CurrentFile); }
+                if (defined.Modifiers.Contains(ModifierKeywords.Ref))
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
 
                 if (defined.Modifiers.Contains("const"))
                 { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
 
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
+                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
 
                 bool parameterFound = false;
                 Variable compiledParameter = default;
@@ -3550,8 +3550,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         GenerateDeallocator(
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name)),
-                                Token.CreateAnonymous("as"),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous("int"), Token.CreateAnonymous("*", TokenType.Operator))
+                                Token.CreateAnonymous(StatementKeywords.As),
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }

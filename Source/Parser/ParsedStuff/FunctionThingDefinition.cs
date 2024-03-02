@@ -19,11 +19,11 @@ public abstract class FunctionThingDefinition :
     /// <summary>
     /// The first parameter is labeled as 'this'
     /// </summary>
-    public bool IsMethod => (Parameters.Count > 0) && Parameters[0].Modifiers.Contains("this");
+    public bool IsMethod => (Parameters.Count > 0) && Parameters[0].Modifiers.Contains(ModifierKeywords.This);
     public int ParameterCount => Parameters.Count;
-    public bool IsExport => Modifiers.Contains("export");
+    public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
     public bool IsMacro => Modifiers.Contains("macro");
-    public bool IsInlineable => Modifiers.Contains("inline");
+    public bool IsInlineable => Modifiers.Contains(ModifierKeywords.Inline);
     public virtual bool IsTemplate => TemplateInfo is not null;
 
     public virtual Position Position =>
@@ -68,7 +68,7 @@ public abstract class FunctionThingDefinition :
             if (j > 0) result.Append(", ");
             if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
             {
-                result.Append(string.Join<Token>(' ', Parameters[j].Modifiers));
+                result.AppendJoin(' ', Parameters[j].Modifiers);
                 result.Append(' ');
             }
 
@@ -96,7 +96,7 @@ public abstract class FunctionThingDefinition :
             if (j > 0) { result.Append(", "); }
             if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
             {
-                result.Append(string.Join<Token>(' ', Parameters[j].Modifiers));
+                result.AppendJoin(' ', Parameters[j].Modifiers);
                 result.Append(' ');
             }
 

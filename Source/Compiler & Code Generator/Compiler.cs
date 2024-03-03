@@ -358,7 +358,7 @@ public sealed class Compiler
             }
         }
 
-        if (CodeGenerator.GetFunction(CompiledFunctions, name, out CompiledFunction? function))
+        if (CodeGenerator.GetFunction(CompiledFunctions, name.Content, out CompiledFunction? function, out _))
         {
             result = new FunctionType(function);
             return true;

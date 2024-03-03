@@ -10,7 +10,7 @@ public class CompiledConstructor : ConstructorDefinition,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
     ITemplateable<CompiledConstructor>,
-    IWithInstructionOffset
+    IHaveInstructionOffset
 {
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
@@ -70,5 +70,25 @@ public class CompiledConstructor : ConstructorDefinition,
         IEnumerable<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
         GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
         return new CompiledConstructor(newType, newParameters, this);
+    }
+
+    public static string ToReadable(GeneralType identifier, IEnumerable<GeneralType> parameters)
+    {
+        StringBuilder result = new();
+        result.Append(identifier.ToString());
+        result.Append('(');
+        result.AppendJoin(", ", parameters);
+        result.Append(')');
+        return result.ToString();
+    }
+
+    public static string ToReadable(TypeInstance identifier, IEnumerable<GeneralType> parameters)
+    {
+        StringBuilder result = new();
+        result.Append(identifier.ToString());
+        result.Append('(');
+        result.AppendJoin(", ", parameters);
+        result.Append(')');
+        return result.ToString();
     }
 }

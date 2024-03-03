@@ -787,7 +787,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         if (statement is FunctionCall statementWithValue &&
             !statementWithValue.SaveValue &&
-            GetFunction(statementWithValue, out CompiledFunction? _f) &&
+            GetFunction(statementWithValue, out CompiledFunction? _f, out _) &&
             _f.ReturnSomething)
         {
             throw new NotImplementedException();
@@ -1084,10 +1084,10 @@ public class CodeGeneratorForAsm : CodeGenerator
             return;
         }
 
-        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
+        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out WillBeCompilerException? notFound))
         {
             if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-            { throw new CompilerException($"Function {functionCall.ToReadable(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
+            { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
 
             compiledFunction = compilableFunction.Function;
         }
@@ -1142,7 +1142,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             return;
         }
 
-        if (GetFunction(statement.Token, expectedType, out CompiledFunction? compiledFunction))
+        if (GetFunction(statement.Token.Content, expectedType, out CompiledFunction? compiledFunction, out _))
         {
             if (!TryGetFunctionLabel(compiledFunction, out string? label))
             {
@@ -1161,7 +1161,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             return;
         }
 
-        throw new CompilerException($"Variable \"{statement.Content}\" not found", statement, CurrentFile);
+        throw new CompilerException($"Symbol \"{statement.Content}\" not found", statement, CurrentFile);
     }
     void GenerateCodeForStatement(OperatorCall statement)
     {

@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
-using LanguageCore.Parser;
+using Parser;
 using Parser.Statement;
 using Runtime;
 
@@ -138,16 +138,14 @@ public readonly struct Reference<TSource>
 
     public static implicit operator Reference<TSource>(ValueTuple<TSource, Uri?, ISameCheck?> v) => new(v.Item1, v.Item2, v.Item3);
     public static implicit operator Reference(Reference<TSource> v) => new(v.SourceFile, v.SourceContext);
-
-    public Reference<TTarget> Cast<TTarget>(Func<TSource, TTarget> caster) => new(caster.Invoke(Source), SourceFile, SourceContext);
 }
 
-public interface IWithInstructionOffset
+public interface IHaveInstructionOffset
 {
     public int InstructionOffset { get; set; }
 }
 
-public interface ICompiledFunctionThingy
+public interface ICompiledFunction
 {
     public GeneralType Type { get; }
     public bool ReturnSomething => Type != BasicType.Void;
@@ -183,9 +181,9 @@ public interface IProbablyHaveCompiledType
     public GeneralType? Type { get; }
 }
 
-public interface IInContext<T>
+public interface IInContext<TContext>
 {
-    public T Context { get; }
+    public TContext Context { get; }
 }
 
 public enum Protection
@@ -196,12 +194,12 @@ public enum Protection
 
 public interface ISameCheck
 {
-    public bool IsSame(ISameCheck? other);
+    public bool IsSame(object? other);
 }
 
-public interface ISameCheck<T> : ISameCheck
+public interface ISameCheck<TOther> : ISameCheck
 {
-    public bool IsSame(T other);
+    public bool IsSame(TOther other);
 
-    bool ISameCheck.IsSame(ISameCheck? other) => other is T _other && IsSame(_other);
+    bool ISameCheck.IsSame(object? other) => other is TOther _other && IsSame(_other);
 }

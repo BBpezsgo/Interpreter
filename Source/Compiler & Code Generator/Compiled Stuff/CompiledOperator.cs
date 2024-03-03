@@ -11,8 +11,8 @@ public class CompiledOperator : FunctionDefinition,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
     ITemplateable<CompiledOperator>,
-    ICompiledFunctionThingy,
-    IWithInstructionOffset
+    ICompiledFunction,
+    IHaveInstructionOffset
 {
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
@@ -31,7 +31,7 @@ public class CompiledOperator : FunctionDefinition,
     }
     public bool IsExternal => Attributes.TryGetAttribute<string>("External", out _);
     public string ExternalFunctionName => Attributes.TryGetAttribute("External", out string? name) ? name : string.Empty;
-    IReadOnlyList<ParameterDefinition> ICompiledFunctionThingy.Parameters => Parameters;
+    IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
 
     public CompiledOperator(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
     {

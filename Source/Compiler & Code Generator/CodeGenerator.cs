@@ -1,6 +1,4 @@
-﻿using ConsoleGUI;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using BBCode.Generator;
 using Parser;
@@ -371,9 +369,10 @@ public abstract class CodeGenerator
         return false;
     }
 
-    protected bool GetConstructor(GeneralType type, GeneralType[] parameters, [NotNullWhen(true)] out CompiledConstructor? compiledFunction)
+    protected bool GetConstructor(GeneralType type, GeneralType[] parameters, [NotNullWhen(true)] out CompiledConstructor? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
     {
         compiledFunction = null;
+        error = null;
 
         {
             List<GeneralType> _parameters = new();
@@ -386,10 +385,18 @@ public abstract class CodeGenerator
         {
             if (function.IsTemplate) continue;
             if (function.Type != type) continue;
-            if (!GeneralType.AreEquals(function.ParameterTypes, parameters)) continue;
 
-            if (compiledFunction != null)
-            { throw new CompilerException($"Duplicated constructor definitions: {compiledFunction} and {function} are the same", function.Identifier, function.FilePath); }
+            if (!GeneralType.AreEquals(function.ParameterTypes, parameters))
+            {
+                error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found: parameter types doesn't match with {function}");
+                continue;
+            }
+
+            if (compiledFunction is not null)
+            {
+                error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found: multiple constructors matched");
+                return false;
+            }
 
             compiledFunction = function;
         }
@@ -397,21 +404,34 @@ public abstract class CodeGenerator
         foreach (CompliableTemplate<CompiledConstructor> function in compilableConstructors)
         {
             if (function.Function.Type != type) continue;
-            if (!GeneralType.AreEquals(function.Function.ParameterTypes, parameters)) continue;
 
-            if (compiledFunction != null)
-            { throw new CompilerException($"Duplicated constructor definitions: {compiledFunction} and {function} are the same", function.Function.Identifier, function.Function.FilePath); }
+            if (!GeneralType.AreEquals(function.Function.ParameterTypes, parameters))
+            {
+                error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found: parameter types doesn't match with {function}");
+                continue;
+            }
+
+            if (compiledFunction is not null)
+            {
+                error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found: multiple constructors matched");
+                return false;
+            }
 
             compiledFunction = function.Function;
         }
 
-        return compiledFunction != null;
+        if (compiledFunction is not null)
+        { return true; }
+
+        error ??= new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found");
+        return false;
     }
 
-    protected bool GetConstructorTemplate(GeneralType type, GeneralType[] parameters, out CompliableTemplate<CompiledConstructor> compiledConstructor)
+    protected bool GetConstructorTemplate(GeneralType type, GeneralType[] parameters, out CompliableTemplate<CompiledConstructor> compiledConstructor, [NotNullWhen(false)] out WillBeCompilerException? error)
     {
         bool found = false;
         compiledConstructor = default;
+        error = null;
 
         {
             List<GeneralType> _parameters = new();
@@ -423,7 +443,12 @@ public abstract class CodeGenerator
         foreach (CompiledConstructor constructor in CompiledConstructors)
         {
             if (!constructor.IsTemplate) continue;
-            if (constructor.ParameterCount != parameters.Length) continue;
+
+            if (constructor.ParameterCount != parameters.Length)
+            {
+                error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found: parameter count doesn't match with {constructor.ParameterCount}");
+                continue;
+            }
 
             Dictionary<string, GeneralType> typeArguments = new(TypeArguments);
 
@@ -432,25 +457,34 @@ public abstract class CodeGenerator
             compiledConstructor = new CompliableTemplate<CompiledConstructor>(constructor, typeArguments);
 
             if (found)
-            { throw new CompilerException($"Duplicated constructor definitions: {compiledConstructor} and {constructor} are the same", constructor.Identifier, constructor.FilePath); }
+            {
+                error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found: multiple constructors matched");
+                return false;
+            }
 
             found = true;
         }
 
-        return found;
+        if (found)
+        { return true; }
+
+        error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found");
+        return false;
     }
 
-    protected bool GetIndexGetter(GeneralType prevType, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+    protected bool GetIndexGetter(GeneralType prevType, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
         => GetFunction(
             BuiltinFunctionNames.IndexerGet,
             new GeneralType[] { prevType, new BuiltinType(BasicType.Integer) },
-            out compiledFunction);
+            out compiledFunction,
+            out error);
 
-    protected bool GetIndexSetter(GeneralType prevType, GeneralType elementType, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+    protected bool GetIndexSetter(GeneralType prevType, GeneralType elementType, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
         => GetFunction(
             BuiltinFunctionNames.IndexerSet,
             new GeneralType[] { prevType, new BuiltinType(BasicType.Integer), elementType },
-            out compiledFunction);
+            out compiledFunction,
+            out error);
 
     protected bool GetIndexGetterTemplate(GeneralType prevType, out CompliableTemplate<CompiledFunction> compiledFunction)
         => GetFunctionTemplate(
@@ -566,36 +600,26 @@ public abstract class CodeGenerator
 
     #region GetFunction()
 
-    protected bool GetFunctionByPointer(FunctionType functionType, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+    protected bool GetFunction(string identifier, GeneralType? type, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
     {
-        bool found = false;
-        compiledFunction = null;
-
-        foreach (CompiledFunction function in CompiledFunctions)
-        {
-            if (function.IsTemplate) continue;
-            if (!functionType.Equals(function)) continue;
-
-            if (found)
-            { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
-
-            compiledFunction = function;
-            found = true;
-        }
-
-        foreach (CompliableTemplate<CompiledFunction> function in compilableFunctions)
-        {
-            if (!functionType.Equals(function.Function)) continue;
-
-            if (found)
-            { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Function.Identifier, function.Function.FilePath); }
-
-            compiledFunction = function.Function;
-            found = true;
-        }
-
-        return found;
+        if (type is null || type is not FunctionType functionType)
+        { return GetFunction(identifier, out compiledFunction, out error); }
+        return GetFunction(identifier, functionType, out compiledFunction, out error);
     }
+
+    protected bool GetFunction(FunctionCall functionCallStatement, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
+    {
+        Token functionIdentifier = functionCallStatement.Identifier;
+        StatementWithValue[] passedParameters = functionCallStatement.MethodParameters;
+
+        if (GetFunction(functionIdentifier.Content, passedParameters.Length, out CompiledFunction? possibleFunction, out _))
+        { return GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters, possibleFunction.ParameterTypes), out compiledFunction, out error); }
+        else
+        { return GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters), out compiledFunction, out error); }
+    }
+
+    protected bool GetFunction(string identifier, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
+        => GetFunction(CompiledFunctions, identifier, out compiledFunction, out error);
 
     protected bool GetFunctionTemplate(FunctionCall functionCallStatement, out CompliableTemplate<CompiledFunction> compiledFunction)
         => GetFunctionTemplate(functionCallStatement.Identifier.Content, FindStatementTypes(functionCallStatement.MethodParameters), out compiledFunction);
@@ -614,9 +638,6 @@ public abstract class CodeGenerator
 
             if (!GeneralType.TryGetTypeParameters(element.ParameterTypes, parameters, typeArguments)) continue;
 
-            // if (element.Context != null && element.Context.TemplateInfo != null)
-            // { CollectTypeParameters(FindStatementType(functionCallStatement.PrevStatement), element.Context.TemplateInfo.TypeParameters, typeParameters); }
-
             CompliableTemplate<CompiledFunction> compiledFunction_ = new(element, typeArguments);
 
             if (found)
@@ -629,119 +650,117 @@ public abstract class CodeGenerator
         return found;
     }
 
-    protected bool GetFunction(FunctionCall functionCallStatement, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
-    {
-        Token functionIdentifier = functionCallStatement.Identifier;
-        StatementWithValue[] passedParameters = functionCallStatement.MethodParameters;
-
-        if (TryGetFunction(functionIdentifier, passedParameters.Length, out CompiledFunction? possibleFunction))
-        {
-            return GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters, possibleFunction.ParameterTypes), out compiledFunction);
-        }
-        else
-        {
-            return GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters), out compiledFunction);
-        }
-    }
-
-    protected bool GetFunction(string name, GeneralType[] parameters, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+    protected bool GetFunction(string identifier, GeneralType[] parameters, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
     {
         compiledFunction = null;
+        error = null;
 
         foreach (CompiledFunction function in CompiledFunctions)
         {
             if (function.IsTemplate) continue;
-            if (function.Identifier.Content != name) continue;
+            if (function.Identifier.Content != identifier) continue;
 
-            if (!GeneralType.AreEquals(function.ParameterTypes, parameters)) continue;
+            if (!GeneralType.AreEquals(function.ParameterTypes, parameters))
+            {
+                error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: parameter types doesn not match with ({function.ToReadable()})");
+                continue;
+            }
 
             if (compiledFunction is not null)
-            { throw new CompilerException($"Duplicated function definitions: {compiledFunction} and {function} are the same", function.Identifier, function.FilePath); }
+            {
+                error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: multiple functions matched");
+                return false;
+            }
 
             compiledFunction = function;
         }
 
         foreach (CompliableTemplate<CompiledFunction> function in compilableFunctions)
         {
-            if (function.Function.Identifier.Content != name) continue;
+            if (function.Function.Identifier.Content != identifier) continue;
 
-            if (!GeneralType.AreEquals(function.Function.ParameterTypes, parameters)) continue;
+            if (!GeneralType.AreEquals(function.Function.ParameterTypes, parameters))
+            {
+                error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: parameter types doesn not match with ({function.Function.ToReadable()})");
+                continue;
+            }
 
             if (compiledFunction is not null)
-            { throw new CompilerException($"Duplicated function definitions: {compiledFunction} and {function} are the same", function.Function.Identifier, function.Function.FilePath); }
+            {
+                error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: multiple functions matched");
+                return false;
+            }
 
             compiledFunction = function.Function;
         }
 
         if (compiledFunction is null)
         {
-            try
-            { parameters = GeneralType.InsertTypeParameters(parameters, TypeArguments).ToArray(); }
-            catch (Exception)
-            { return false; }
+            parameters = GeneralType.InsertTypeParameters(parameters, TypeArguments).ToArray();
 
             foreach (CompiledFunction function in CompiledFunctions)
             {
                 if (function.IsTemplate) continue;
-                if (function.Identifier.Content != name) continue;
+                if (function.Identifier.Content != identifier) continue;
 
-                if (!GeneralType.AreEquals(function.ParameterTypes, parameters)) continue;
+                if (!GeneralType.AreEquals(function.ParameterTypes, parameters))
+                {
+                    error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: parameter types doesn not match with ({function.ToReadable()})");
+                    continue;
+                }
 
                 if (compiledFunction is not null)
-                { throw new CompilerException($"Duplicated function definitions: {compiledFunction} and {function} are the same", function.Identifier, function.FilePath); }
+                {
+                    error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: multiple functions matched");
+                    return false;
+                }
 
                 compiledFunction = function;
             }
         }
 
-        return compiledFunction is not null;
+        if (compiledFunction is not null)
+        { return true; }
+
+        error ??= new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found");
+        return false;
     }
 
-    bool TryGetFunction(string name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+    protected bool GetFunction(string identifier, int parameterCount, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
     {
         compiledFunction = null;
-
-        for (int i = 0; i < this.CompiledFunctions.Length; i++)
-        {
-            CompiledFunction function = this.CompiledFunctions[i];
-
-            if (!function.Identifier.Equals(name)) continue;
-
-            if (compiledFunction is not null)
-            { return false; }
-
-            compiledFunction = function;
-        }
-
-        return compiledFunction is not null;
-    }
-    protected bool TryGetFunction(Token name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
-        => TryGetFunction(name.Content, out compiledFunction);
-
-    bool TryGetFunction(string name, int parameterCount, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
-    {
-        compiledFunction = null;
+        error = null;
 
         foreach (CompiledFunction function in CompiledFunctions)
         {
-            if (!function.Identifier.Equals(name)) continue;
+            if (!function.Identifier.Equals(identifier)) continue;
 
-            if (function.ParameterCount != parameterCount) continue;
+            if (function.ParameterCount != parameterCount)
+            {
+                error = new WillBeCompilerException($"Function \"{identifier}\" (with {parameterCount} parameters) not found: parameter count doesn't match ({parameterCount} and {function.ParameterCount})");
+                continue;
+            }
 
             if (compiledFunction is not null)
-            { return false; }
+            {
+                error = new WillBeCompilerException($"Function \"{identifier}\" (with {parameterCount} parameters) not found: multiple functions matched");
+                return false;
+            }
 
             compiledFunction = function;
         }
 
-        return compiledFunction is not null;
-    }
-    protected bool TryGetFunction(Token name, int parameterCount, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
-        => TryGetFunction(name.Content, parameterCount, out compiledFunction);
+        if (compiledFunction is not null)
+        { return true; }
 
-    protected bool GetFunction(FunctionType type, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+        error ??= new WillBeCompilerException($"Function \"{identifier}\" (with {parameterCount} parameters) not found");
+        return false;
+    }
+
+    protected bool GetFunction(FunctionType type, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
     {
         compiledFunction = null;
+        error = null;
 
         foreach (CompiledFunction function in CompiledFunctions)
         {
@@ -749,73 +768,95 @@ public abstract class CodeGenerator
             if (!function.Type.Equals(type.ReturnType)) continue;
 
             if (compiledFunction is not null)
-            { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", null, CurrentFile); }
+            {
+                error = new WillBeCompilerException($"Function {type} not found: multiple functions matched");
+                return false;
+            }
 
             compiledFunction = function;
         }
 
-        return compiledFunction is not null;
-    }
-
-    protected bool GetFunction(Token name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
-    {
-        compiledFunction = null;
-
-        foreach (CompiledFunction function in CompiledFunctions)
+        foreach (CompliableTemplate<CompiledFunction> function in compilableFunctions)
         {
-            if (!function.Identifier.Equals(name.Content)) continue;
+            if (!GeneralType.AreEquals(function.Function.ParameterTypes, type.Parameters)) continue;
+            if (!function.Function.Type.Equals(type.ReturnType)) continue;
 
             if (compiledFunction is not null)
-            { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, CurrentFile); }
+            {
+                error = new WillBeCompilerException($"Function {type} not found: multiple functions matched");
+                return false;
+            }
 
-            compiledFunction = function;
+            compiledFunction = function.Function;
         }
 
-        return compiledFunction is not null;
+        if (compiledFunction is not null)
+        { return true; }
+
+        error ??= new WillBeCompilerException($"Function {type} not found");
+        return false;
     }
 
-    public static bool GetFunction(IEnumerable<CompiledFunction> compiledFunctions, Token name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+    public static bool GetFunction(IEnumerable<CompiledFunction> compiledFunctions, string identifier, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
     {
         compiledFunction = null;
+        error = null;
 
         foreach (CompiledFunction function in compiledFunctions)
         {
-            if (!function.Identifier.Equals(name.Content)) continue;
+            if (!function.Identifier.Equals(identifier)) continue;
 
             if (compiledFunction is not null)
-            { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, null); }
+            {
+                error = new WillBeCompilerException($"Function \"{identifier}\" not found: multiple functions matched");
+                return false;
+            }
 
             compiledFunction = function;
         }
 
-        return compiledFunction is not null;
+        if (compiledFunction is not null)
+        { return true; }
+
+        error ??= new WillBeCompilerException($"Function \"{identifier}\" not found");
+        return false;
     }
 
-    protected bool GetFunction(Token name, GeneralType? type, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
-    {
-        if (type is null || type is not FunctionType functionType)
-        { return GetFunction(name, out compiledFunction); }
-        return GetFunction(name, functionType, out compiledFunction);
-    }
-    protected bool GetFunction(Token name, FunctionType type, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+    protected bool GetFunction(string identifier, FunctionType type, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
     {
         compiledFunction = null;
+        error = null;
 
         foreach (CompiledFunction function in CompiledFunctions)
         {
-            if (!function.Identifier.Equals(name.Content)) continue;
+            if (!function.Identifier.Equals(identifier)) continue;
+
             if (!type.ReturnType.Equals(function.Type))
-            { return false; }
+            {
+                error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, type)} not found: return types doesn't match ({type.ReturnType} and {function.Type})");
+                continue;
+            }
+
             if (!GeneralType.AreEquals(function.ParameterTypes, type.Parameters))
-            { return false; }
+            {
+                error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, type)} not found: parameter types doesn't match");
+                continue;
+            }
 
             if (compiledFunction is not null)
-            { return false; }
+            {
+                error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, type)} not found: multiple functions matched");
+                return false;
+            }
 
             compiledFunction = function;
         }
 
-        return compiledFunction is not null;
+        if (compiledFunction is not null)
+        { return true; }
+
+        error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, type)} not found");
+        return false;
     }
 
     #endregion
@@ -1064,7 +1105,7 @@ public abstract class CodeGenerator
             return true;
         }
 
-        if (GetFunction(name, out CompiledFunction? function))
+        if (GetFunction(name.Content, out CompiledFunction? function, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.FunctionName;
             function.References.Add(new Reference<StatementWithValue>(new Identifier(name), CurrentFile));
@@ -1527,7 +1568,7 @@ public abstract class CodeGenerator
         if (prevType is ArrayType arrayType)
         { return OnGotStatementType(index, arrayType.Of); }
 
-        if (!GetIndexGetter(prevType, out CompiledFunction? indexer))
+        if (!GetIndexGetter(prevType, out CompiledFunction? indexer, out _))
         {
             if (GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
             {
@@ -1555,10 +1596,12 @@ public abstract class CodeGenerator
             return OnGotStatementType(functionCall, FindMacroType(macro, functionCall.Parameters));
         }
 
-        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
+        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out WillBeCompilerException? notFoundError))
         {
             if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compiledFunctionTemplate))
-            { throw new CompilerException($"Function \"{functionCall.ToReadable(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile); }
+            {
+                throw new CompilerException($"Function \"{functionCall.ToReadable(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile);
+            }
 
             compiledFunction = compiledFunctionTemplate.Function;
         }
@@ -1702,7 +1745,7 @@ public abstract class CodeGenerator
             return OnGotStatementType(identifier, new EnumType(@enum));
         }
 
-        if (GetFunction(identifier.Token, expectedType, out CompiledFunction? function))
+        if (GetFunction(identifier.Token.Content, expectedType, out CompiledFunction? function, out _))
         {
             identifier.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
             return OnGotStatementType(identifier, new FunctionType(function));
@@ -1742,19 +1785,19 @@ public abstract class CodeGenerator
         GeneralType type = GeneralType.From(constructorCall.Type, FindType);
         GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
-        if (GetConstructor(type, parameters, out CompiledConstructor? constructor))
+        if (GetConstructor(type, parameters, out CompiledConstructor? constructor, out WillBeCompilerException? notFound))
         {
             constructorCall.Type.SetAnalyzedType(constructor.Type);
             return OnGotStatementType(constructorCall, constructor.Type);
         }
 
-        if (GetConstructorTemplate(type, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction))
+        if (GetConstructorTemplate(type, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction, out notFound))
         {
             constructorCall.Type.SetAnalyzedType(compilableGeneralFunction.Function.Type);
             return OnGotStatementType(constructorCall, compilableGeneralFunction.Function.Type);
         }
 
-        throw new CompilerException($"Constructor {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
+        throw notFound.Instantiate(constructorCall.Keyword, CurrentFile);
     }
     protected GeneralType FindStatementType(Field field)
     {
@@ -2827,7 +2870,7 @@ public abstract class CodeGenerator
             { return TryCompute(statementWithValue, context, out value); }
         }
 
-        if (GetFunction(functionCall, out CompiledFunction? function))
+        if (GetFunction(functionCall, out CompiledFunction? function, out _))
         {
             if (!function.CanUse(CurrentFile))
             {
@@ -2984,7 +3027,7 @@ public abstract class CodeGenerator
 
         return false;
     }
-    bool TryEvaluate(ICompiledFunctionThingy function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunction function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
     {
         value = null;
         runtimeStatements = null;

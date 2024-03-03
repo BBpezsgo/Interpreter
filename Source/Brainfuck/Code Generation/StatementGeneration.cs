@@ -399,7 +399,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GeneralType valueType = FindStatementType(value);
 
         Dictionary<string, GeneralType> typeArguments = new();
-        if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
+        if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer, out _))
         {
             if (GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
             {
@@ -1370,10 +1370,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         Dictionary<string, GeneralType> typeArguments = new();
 
-        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
+        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out WillBeCompilerException? notFound))
         {
             if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-            { throw new CompilerException($"Function {functionCall.ToReadable(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
+            { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
 
             compiledFunction = compilableFunction.Function;
             typeArguments = compilableFunction.TypeArguments;
@@ -1420,10 +1420,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         Dictionary<string, GeneralType> typeArguments = new();
 
-        if (!GetConstructor(instanceType, parameters, out CompiledConstructor? constructor))
+        if (!GetConstructor(instanceType, parameters, out CompiledConstructor? constructor, out WillBeCompilerException? notFound))
         {
-            if (!GetConstructorTemplate(instanceType, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction))
-            { throw new CompilerException($"Constructor {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Keyword, CurrentFile); }
+            if (!GetConstructorTemplate(instanceType, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction, out notFound))
+            { throw notFound.Instantiate(constructorCall.Keyword, CurrentFile); }
 
             constructor = compilableGeneralFunction.Function;
             typeArguments = compilableGeneralFunction.TypeArguments;
@@ -1520,7 +1520,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (GetFunction(statement.Token, out _))
+        if (GetFunction(statement.Token.Content, out _, out _))
         { throw new NotSupportedException($"Function pointers not supported by brainfuck", statement, CurrentFile); }
 
         throw new CompilerException($"Symbol \"{statement}\" not found", statement, CurrentFile);

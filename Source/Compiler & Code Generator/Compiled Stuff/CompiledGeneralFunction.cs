@@ -12,7 +12,7 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
     ITemplateable<CompiledGeneralFunction>,
-    IWithInstructionOffset
+    IHaveInstructionOffset
 {
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }

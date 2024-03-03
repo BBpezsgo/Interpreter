@@ -175,8 +175,6 @@ public static class Entry
             {
                 Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
 
-                BrainfuckPrintFlags printFlags = BrainfuckPrintFlags.PrintMemory;
-
                 BrainfuckCompilerFlags compileOptions =
                     arguments.GeneratorSettings.PrintInstructions
                     ? BrainfuckCompilerFlags.PrintFinal | BrainfuckCompilerFlags.PrintCompiled
@@ -282,30 +280,29 @@ public static class Entry
                     Output.WriteLine($" === OUTPUT ===");
                     Output.WriteLine();
 
-                    if ((printFlags & BrainfuckPrintFlags.PrintExecutionTime) != 0)
+                    if (false)
                     {
-                        Stopwatch sw = Stopwatch.StartNew();
-                        interpreter.Run();
-                        Console.ResetColor();
-                        sw.Stop();
-
-                        Output.WriteLine();
-                        Output.WriteLine();
-                        Output.WriteLine($"Execution time: {sw.ElapsedMilliseconds} ms");
+                        // Stopwatch sw = Stopwatch.StartNew();
+                        // interpreter.Run();
+                        // Console.ResetColor();
+                        // sw.Stop();
+                        // 
+                        // Output.WriteLine();
+                        // Output.WriteLine();
+                        // Output.WriteLine($"Execution time: {sw.ElapsedMilliseconds} ms");
                     }
                     else
                     {
                         interpreter.Run();
                     }
 
-                    if ((printFlags & BrainfuckPrintFlags.PrintMemory) != 0)
                     {
                         Output.WriteLine();
                         Output.WriteLine();
                         Output.WriteLine($" === MEMORY ===");
                         Output.WriteLine();
 
-                        int zerosToShow = 10;
+                        const int zerosToShow = 10;
                         int finalIndex = 0;
 
                         for (int i = 0; i < interpreter.Memory.Length; i++)
@@ -315,7 +312,7 @@ public static class Entry
                         finalIndex = Math.Min(interpreter.Memory.Length, finalIndex + zerosToShow);
 
                         int heapStart = BrainfuckGeneratorSettings.Default.HeapStart;
-                        int heapEnd = heapStart + BrainfuckGeneratorSettings.Default.HeapSize * BasicHeapCodeHelper.BLOCK_SIZE;
+                        int heapEnd = heapStart + (BrainfuckGeneratorSettings.Default.HeapSize * BasicHeapCodeHelper.BLOCK_SIZE);
 
                         for (int i = 0; i < finalIndex; i++)
                         {

@@ -88,6 +88,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     readonly DebugInformation GeneratedDebugInfo;
     readonly Stack<ScopeInformations> CurrentScopeDebug = new();
+    readonly CompileLevel CompileLevel;
 
     #endregion
 
@@ -105,8 +106,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         this.UndefinedGeneralFunctionOffsets = new List<UndefinedOffset<CompiledGeneralFunction>>();
         this.UndefinedConstructorOffsets = new List<UndefinedOffset<CompiledConstructor>>();
         this.InMacro = new Stack<bool>();
-
         this.TagCount = new Stack<int>();
+        this.CompileLevel = settings.CompileLevel;
     }
 
     void GenerateExternalFunctionsCache(IEnumerable<string> usedExternalFunctions)
@@ -156,7 +157,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
 
     void SetUndefinedFunctionOffsets<TFunction>(IEnumerable<UndefinedOffset<TFunction>> undefinedOffsets)
-        where TFunction : IWithInstructionOffset
+        where TFunction : IHaveInstructionOffset
     {
         foreach (UndefinedOffset<TFunction> item in undefinedOffsets)
         {

@@ -305,10 +305,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
+        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out WillBeCompilerException? notFound))
         {
             if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-            { throw new CompilerException($"Function {functionCall.ToReadable(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
+            { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
 
             compilableFunction = AddCompilable(compilableFunction);
             compiledFunction = compilableFunction.Function;
@@ -1130,7 +1130,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetFunction(variable.Token, expectedType, out CompiledFunction? compiledFunction))
+        if (GetFunction(variable.Token.Content, expectedType, out CompiledFunction? compiledFunction, out _))
         {
             compiledFunction.References.Add((variable, CurrentFile, CurrentContext));
             variable.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
@@ -1145,7 +1145,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
+        throw new CompilerException($"Symbol \"{variable.Content}\" not found", variable, CurrentFile);
     }
     void GenerateCodeForStatement(AddressGetter addressGetter)
     {
@@ -1369,10 +1369,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute);
         GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
-        if (!GetConstructor(instanceType, parameters, out CompiledConstructor? compiledFunction))
+        if (!GetConstructor(instanceType, parameters, out CompiledConstructor? compiledFunction, out WillBeCompilerException? notFound))
         {
-            if (!GetConstructorTemplate(instanceType, parameters, out CompliableTemplate<CompiledConstructor> compilableFunction))
-            { throw new CompilerException($"Constructor {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Type, CurrentFile); }
+            if (!GetConstructorTemplate(instanceType, parameters, out CompliableTemplate<CompiledConstructor> compilableFunction, out notFound))
+            { throw notFound.Instantiate(constructorCall.Type, CurrentFile); }
 
             compilableFunction = AddCompilable(compilableFunction);
             compiledFunction = compilableFunction.Function;
@@ -1573,7 +1573,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (!GetIndexGetter(prevType, out CompiledFunction? indexer))
+        if (!GetIndexGetter(prevType, out CompiledFunction? indexer, out _))
         {
             if (GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
             {
@@ -1952,7 +1952,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
+        if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer, out _))
         {
             if (GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
             {
@@ -2442,14 +2442,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
 
     bool GenerateCodeForFunctions<TFunction>(IEnumerable<TFunction> functions)
-        where TFunction : FunctionThingDefinition, IWithInstructionOffset, IReferenceable
+        where TFunction : FunctionThingDefinition, IHaveInstructionOffset, IReferenceable
     {
         bool generatedAnything = false;
         foreach (TFunction function in functions)
         {
             if (function.IsTemplate) continue;
             if (function.InstructionOffset >= 0) continue;
-            if (!function.References.Any()) continue;
+            if (!function.References.Any())
+            {
+                switch (CompileLevel)
+                {
+                    case CompileLevel.Minimal: continue;
+                    case CompileLevel.Exported:
+                        if (!function.IsExport) continue;
+                        break;
+                }
+            }
 
             function.InstructionOffset = GeneratedCode.Count;
             if (GenerateCodeForFunction(function))
@@ -2468,7 +2477,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
 
     bool GenerateCodeForCompilableFunctions<T>(IReadOnlyList<CompliableTemplate<T>> functions)
-        where T : FunctionThingDefinition, ITemplateable<T>, IWithInstructionOffset
+        where T : FunctionThingDefinition, ITemplateable<T>, IHaveInstructionOffset
     {
         bool generatedAnything = false;
         int i = 0;

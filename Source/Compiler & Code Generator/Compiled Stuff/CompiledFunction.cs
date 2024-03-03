@@ -11,8 +11,8 @@ public class CompiledFunction : FunctionDefinition,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
     ITemplateable<CompiledFunction>,
-    ICompiledFunctionThingy,
-    IWithInstructionOffset
+    ICompiledFunction,
+    IHaveInstructionOffset
 {
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
@@ -55,7 +55,7 @@ public class CompiledFunction : FunctionDefinition,
             return null;
         }
     }
-    IReadOnlyList<ParameterDefinition> ICompiledFunctionThingy.Parameters => Parameters;
+    IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
 
     public CompiledFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
@@ -127,5 +127,27 @@ public class CompiledFunction : FunctionDefinition,
         IEnumerable<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
         GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
         return new CompiledFunction(newType, newParameters, this);
+    }
+
+    public static string ToReadable(string identifier, IEnumerable<GeneralType> parameters)
+    {
+        StringBuilder result = new();
+        result.Append(identifier);
+        result.Append('(');
+        result.AppendJoin(", ", parameters);
+        result.Append(')');
+        return result.ToString();
+    }
+
+    public static string ToReadable(string identifier, FunctionType type)
+    {
+        StringBuilder result = new();
+        result.Append(type.ReturnType);
+        result.Append(' ');
+        result.Append(identifier);
+        result.Append('(');
+        result.AppendJoin(", ", type.Parameters);
+        result.Append(')');
+        return result.ToString();
     }
 }

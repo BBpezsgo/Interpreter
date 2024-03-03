@@ -80,6 +80,19 @@ public class CompilerException : LanguageException
     public CompilerException(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
 }
 
+public class WillBeCompilerException
+{
+    public string Message { get; }
+
+    public WillBeCompilerException(string message)
+    {
+        Message = message;
+    }
+
+    public CompilerException Instantiate(Position position, Uri? uri) => new(Message, position, uri);
+    public CompilerException Instantiate(IPositioned? position, Uri? uri) => new(Message, position, uri);
+}
+
 public class NotSupportedException : CompilerException
 {
     public NotSupportedException(string message, Position position, Uri? file) : base(message, position, file) { }

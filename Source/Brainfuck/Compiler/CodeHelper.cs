@@ -644,7 +644,6 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     };
 }
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class StackCodeHelper
 {
     readonly CompiledCode Code;
@@ -807,8 +806,6 @@ public class StackCodeHelper
     }
 
     public int PopVirtual() => TheStack.Pop();
-
-    internal string GetDebuggerDisplay() => TheStack.GetDebuggerDisplay();
 }
 
 public class BasicHeapCodeHelper

@@ -277,3 +277,59 @@ class LinkedList
         }
     }
 }
+
+template<TKey, TValue>
+struct Pair
+{
+    TKey Key;
+    TValue Value;
+
+    export Pair<TKey, TValue>(TKey key, TValue value)
+    {
+        this.Key = key;
+        this.Value = value;
+    }
+}
+
+template<TKey, TValue>
+struct Map
+{
+    Pair<TKey, TValue>* _ptr;
+    int _length;
+    int _capacity;
+
+    export void Add(TKey key, TValue value)
+    {
+        if (this._length + 1 >= this._capacity)
+        {
+            if (this._ptr)
+            { this.EnsureCapacity(this._capacity * 2); }
+            else
+            { this.EnsureCapacity(4); }
+        }
+        
+        this._ptr[this._length] = new Pair<TKey, TValue>(key, value);
+        this._length++;
+    }
+
+    void EnsureCapacity(int capacity)
+    {
+        if (this._capacity < capacity)
+        {
+            var old = this._ptr;
+            this._ptr = Alloc(capacity * sizeof(type Pair<TKey, TValue>));
+            this._capacity = capacity;
+
+            if (old)
+            {
+                int length = this._length;
+                for (int i = 0; i < length; i++)
+                {
+                    this._ptr[i] = old[i];
+                }
+
+                delete old as int*;
+            }
+        }
+    }
+}

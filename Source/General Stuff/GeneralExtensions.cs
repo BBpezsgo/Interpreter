@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore;
 
-public static partial class GeneralExtensions
+public static class GeneralExtensions
 {
     public static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements) where TKey : notnull
     {
@@ -17,5 +17,11 @@ public static partial class GeneralExtensions
                 collection.Add(item);
             }
         }
+    }
+
+    public static void Set<T>(this List<T> collection, IEnumerable<T> newValues)
+    {
+        collection.Clear();
+        collection.AddRange(newValues);
     }
 }

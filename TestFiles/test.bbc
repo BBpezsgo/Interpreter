@@ -1,4 +1,8 @@
 using System;
+using System.Lists;
+
+// using "https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/StandardLibrary/System.bbc";
+// using "https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/StandardLibrary/System.Lists.bbc";
 
 // template<T>
 // struct Vector2
@@ -20,12 +24,12 @@ using System;
 
 // Print(55);
 
-// List<int>* list = new List<int>*;
-// list.Add(77);
-// list.Add(55);
-// Print(temp list.ToString());
+temp List<int>* list = new List<int>*;
+list.Add(77);
+list.Add(55);
+Print(temp list.ToString());
 
-Print(77);
+// Print("hello");
 
 // inline int Yeah(int a, int b)
 // {
@@ -39,3 +43,9 @@ Print(77);
 // }
 // 
 // int br = Yeah(5, 8);
+
+// Map<int, int>* map = new Map<int, int>*;
+// 
+// map.Add(3, 7);
+
+

@@ -1,6 +1,4 @@
-﻿
-
-[assembly: SuppressMessage("Style", "IDE0290:Use primary constructor")]
+﻿[assembly: SuppressMessage("Style", "IDE0290:Use primary constructor")]
 [assembly: SuppressMessage("Style", "IDE0305:Simplify collection initialization")]
 [assembly: SuppressMessage("Style", "IDE0300:Simplify collection initialization")]
 [assembly: SuppressMessage("Style", "IDE0301:Simplify collection initialization")]
@@ -15,3 +13,4 @@
 [assembly: SuppressMessage("Roslynator", "RCS1146:Use conditional access")]
 [assembly: SuppressMessage("Roslynator", "RCS1218:Simplify code branching")]
 [assembly: SuppressMessage("Roslynator", "RCS1173:Use coalesce expression instead of 'if'")]
+[assembly: SuppressMessage("Roslynator", "RCS1256:Invalid argument null check")]

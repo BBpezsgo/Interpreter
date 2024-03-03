@@ -1,22 +1,10 @@
 .vs
-
-/bin
-/obj
-/out
-
-/Tests/bin
-/Tests/obj
-/Tests/Program.cs
-
+bin
+obj
 *.user
 
-/Source/package.json
-/Source/bb.bbcode-interpreter.asmdef
+/Tests/Program.cs
 /Diagsessions
-
 /TestFiles/*.exe
 /TestFiles/Old
-
-/publish-*.txt
-
 /Source/DevelopmentEntry.cs

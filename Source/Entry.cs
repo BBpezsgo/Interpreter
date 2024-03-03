@@ -145,7 +145,7 @@ public static class Entry
                             Instruction instruction = generatedCode.Code[i];
 
                             Console.ForegroundColor = ConsoleColor.DarkYellow;
-                            Console.Write(instruction.opcode);
+                            Console.Write(instruction.Opcode);
                             Console.ResetColor();
                             Console.Write(' ');
 

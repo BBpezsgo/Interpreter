@@ -114,7 +114,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     /// <exception cref="NotImplementedException"/>
     /// <exception cref="CompilerException"/>
     /// <exception cref="InternalException"/>
-    int GenerateInitialValue(GeneralType type, Action<int>? afterValue = null)
+    int GenerateInitialValue(GeneralType type)
     {
         if (type is StructType structType)
         {
@@ -125,14 +125,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (field.Type is GenericType genericType &&
                     typeParameters is not null &&
                     typeParameters.TryGetValue(genericType.Identifier, out GeneralType? yeah))
-                {
-                    size += GenerateInitialValue(yeah, afterValue);
-                }
+                { size += GenerateInitialValue(yeah); }
                 else
-                {
-                    size += GenerateInitialValue(field.Type, afterValue);
-                }
-                afterValue?.Invoke(size);
+                { size += GenerateInitialValue(field.Type); }
             }
             return size;
         }
@@ -141,15 +136,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             int size = 0;
             for (int i = 0; i < arrayType.Length; i++)
-            {
-                size += GenerateInitialValue(arrayType.Of, afterValue);
-                afterValue?.Invoke(size);
-            }
+            { size += GenerateInitialValue(arrayType.Of); }
             return size;
         }
 
         AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(type));
-        afterValue?.Invoke(0);
         return 1;
     }
 
@@ -221,38 +212,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             default: throw new UnreachableException();
         }
     }
-
-    /*
-    void BoxData(int to, int size)
-    {
-        AddComment($"Box: {{");
-        for (int currentOffset = 0; currentOffset < size; currentOffset++)
-        {
-            int currentReversedOffset = size - currentOffset - 1;
-
-            AddComment($"Element {currentOffset}:");
-
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, (-currentReversedOffset) - 1);
-
-            AddInstruction(Opcode.PUSH_VALUE, to + size);
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-        }
-        AddComment("}");
-    }
-    void UnboxData(int from, int size)
-    {
-        AddComment($"Unbox: {{");
-
-        for (int currentOffset = 0; currentOffset < size; currentOffset++)
-        {
-            AddComment($"Element {currentOffset}:");
-
-            AddInstruction(Opcode.PUSH_VALUE, currentOffset + from);
-            AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
-        }
-        AddComment("}");
-    }
-    */
 
     void CheckPointerNull(bool preservePointer = true, string exceptionMessage = "null pointer")
     {

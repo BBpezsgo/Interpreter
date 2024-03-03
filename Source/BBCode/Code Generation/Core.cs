@@ -75,7 +75,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly Stack<List<int>> BreakInstructions;
     readonly Stack<bool> InMacro;
 
-    readonly List<Instruction> GeneratedCode;
+    readonly List<PreparationInstruction> GeneratedCode;
 
     readonly List<UndefinedOffset<CompiledFunction>> UndefinedFunctionOffsets;
     readonly List<UndefinedOffset<CompiledOperator>> UndefinedOperatorFunctionOffsets;
@@ -95,7 +95,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public CodeGeneratorForMain(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, settings, analysisCollection, print)
     {
         this.ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
-        this.GeneratedCode = new List<Instruction>();
+        this.GeneratedCode = new List<PreparationInstruction>();
         this.ExternalFunctionsCache = new Dictionary<string, int>();
         this.GeneratedDebugInfo = new DebugInformation();
         this.CleanupStack = new Stack<CleanupItem[]>();
@@ -261,7 +261,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         return new BBCodeGeneratorResult()
         {
-            Code = GeneratedCode.ToArray(),
+            Code = GeneratedCode.Select(v => new Instruction(v)).ToArray(),
             DebugInfo = GeneratedDebugInfo,
         };
     }

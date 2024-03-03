@@ -427,7 +427,7 @@ public static unsafe class ExternalFunctionGenerator
     static T? GetValue<T>(BytecodeProcessor bytecodeProcessor, DataItem data)
     {
         if (typeof(T) == typeof(string))
-        { return (T?)(object?)bytecodeProcessor.Memory.Heap.GetStringByPointer((int)data); }
+        { return (T?)(object?)bytecodeProcessor.Memory.Heap.GetString((int)data); }
 
         return data.ToType<T>();
     }

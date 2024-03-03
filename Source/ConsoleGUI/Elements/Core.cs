@@ -165,11 +165,6 @@ public class DrawBuffer
                             break;
                         }
                     }
-
-                    if (c == '+')
-                    {
-
-                    }
                 }
 
                 this[x, y] = new ConsoleChar(c, color, CharColor.Black);

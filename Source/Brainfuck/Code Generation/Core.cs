@@ -145,9 +145,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, IPositioned? position)
             : this(code, debugInfo, position?.Position ?? Position.UnknownPosition)
-        {
-
-        }
+        { }
 
         public void Dispose()
         {

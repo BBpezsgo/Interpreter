@@ -1,7 +1,7 @@
 ﻿namespace LanguageCore;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
-public partial struct MutableRange<T> :
+public struct MutableRange<T> :
     IEquatable<MutableRange<T>>,
     IEquatable<Range<T>>,
     IEquatable<T>,

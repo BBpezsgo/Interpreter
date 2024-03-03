@@ -124,8 +124,7 @@ public class BytecodeInterpreter : BytecodeProcessor
 
         TraceCalls(callTrace, BasePointer);
 
-        int[] callTraceResult;
-        callTraceResult = callTrace.ToArray();
+        int[] callTraceResult = callTrace.ToArray();
         Array.Reverse(callTraceResult);
         return callTraceResult;
     }

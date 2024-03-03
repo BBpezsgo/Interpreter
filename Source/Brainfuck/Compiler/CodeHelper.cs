@@ -421,10 +421,8 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         {
             if (result.Contains("\r\n\r\n", StringComparison.Ordinal))
             { result = result.Replace("\r\n\r\n", "\r\n", StringComparison.Ordinal); }
-
             if (result.Contains(" \r\n", StringComparison.Ordinal))
             { result = result.Replace(" \r\n", "\r\n", StringComparison.Ordinal); }
-
             else
             { break; }
         }

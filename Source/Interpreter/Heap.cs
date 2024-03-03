@@ -72,13 +72,13 @@ public class HEAP : IReadOnlyHeap
     {
         get
         {
-            if (i < 0) throw new RuntimeException($"Pointer {i} points ouf of memory bounds");
-            if (i >= heap.Length) throw new RuntimeException($"Pointer {i} points ouf of memory bounds. Possibly out of HEAP memory.");
+            if (i < 0) throw new RuntimeException("Pointer points ouf of memory bounds");
+            if (i >= heap.Length) throw new RuntimeException("Pointer points ouf of memory bounds. Possibly out of HEAP memory.");
             return heap[i];
         }
         set
         {
-            if (i < 0) throw new RuntimeException($"Pointer {i} points ouf of memory bounds");
+            if (i < 0) throw new RuntimeException("Pointer points ouf of memory bounds");
             if (i >= heap.Length) return; // throw new RuntimeException($"Pointer points ouf of memory bounds. Possibly out of HEAP memory.");
             heap[i] = value;
         }
@@ -88,6 +88,7 @@ public class HEAP : IReadOnlyHeap
 
     const int BLOCK_SIZE_MASK = 0b_0000_0000_0000_0000_1111_1111_1111_1111;
     const int BLOCK_STAT_MASK = 0b_0000_0000_0000_1111_0000_0000_0000_0000;
+    const int JoinFreeBlocksIterations = 2;
 
     public static DataItem GetHeader(ushort size, bool used)
         => new((size & BLOCK_SIZE_MASK) | (used ? BLOCK_STAT_MASK : 0));
@@ -96,8 +97,8 @@ public class HEAP : IReadOnlyHeap
 
     static void FixSize(ref ushort size)
     {
-        while (size == 0)
-        { size++; }
+        if (size <= 0)
+        { size = 1; }
     }
 
     public void DebugPrint()
@@ -159,8 +160,6 @@ public class HEAP : IReadOnlyHeap
     int Allocate(ushort sizeNeed)
     {
         FixSize(ref sizeNeed);
-        // if (sizeNeed <= 0)
-        // { throw new RuntimeException($"HEAP error: Invalid size {sizeNeed} while allocating block"); }
 
         int endlessSafe = heap.Length;
         int headerPointer = 0;
@@ -224,8 +223,7 @@ public class HEAP : IReadOnlyHeap
 
         Clear(pointer, blockSize);
 
-        int joinIterations = 2;
-        for (int i = 0; i < joinIterations; i++)
+        for (int i = 0; i < JoinFreeBlocksIterations; i++)
         {
             bool joined = JoinFreeBlocks();
             if (!joined) break;
@@ -323,22 +321,20 @@ public static class HeapExtensions
         return result;
     }
 
-    public static string GetString(this IReadOnlyHeap heap, int start)
+    public static void GetData(this IReadOnlyHeap heap, int start, Span<DataItem> buffer)
     {
-        StringBuilder result = new();
-        int i = start;
-        while (heap[i])
-        {
-            result.Append((char)heap[i]);
-            i++;
-        }
-        return result.ToString();
+        for (int i = 0; i < buffer.Length; i++)
+        { buffer[i] = heap[start + i]; }
     }
-    public static string? GetStringByPointer(this IReadOnlyHeap heap, int pointer)
+
+    public static string? GetString(this IReadOnlyHeap heap, int pointer)
     {
         if (pointer == 0)
         { return null; }
-        return heap.GetString(pointer);
+        StringBuilder result = new();
+        for (int i = pointer; heap[i]; i++)
+        { result.Append((char)heap[i]); }
+        return result.ToString();
     }
 }
 

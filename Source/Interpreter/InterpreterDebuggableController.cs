@@ -16,112 +16,102 @@ public readonly struct Record<T>
 
 public class Records<T> : IReadOnlyList<Record<T>>
 {
-    readonly List<Record<T>> records;
+    readonly List<Record<T>> _records;
+    readonly int _maxSize = 100;
 
-    readonly int MaxSize = 100;
-    public int Count => records.Count;
+    public int Count => _records.Count;
+    public Record<T> this[int i] => _records[i];
 
-    public Record<T> this[int i] => records[i];
-
-    public Records() => records = new List<Record<T>>();
+    public Records() => _records = new List<Record<T>>();
 
     public void Add(T record)
     {
-        records.Add(new Record<T>(record, DateTime.Now.TimeOfDay));
-        if (records.Count > MaxSize)
-        { records.RemoveAt(0); }
+        _records.Add(new Record<T>(record, DateTime.Now.TimeOfDay));
+        if (_records.Count > _maxSize)
+        { _records.RemoveAt(0); }
     }
-    public void Clear() => records.Clear();
+    public void Clear() => _records.Clear();
 
-    public IEnumerator<Record<T>> GetEnumerator() => records.GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => records.GetEnumerator();
+    public IEnumerator<Record<T>> GetEnumerator() => _records.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => _records.GetEnumerator();
 }
 
 public class InterpreterDebuggabble : Interpreter
 {
-    int _absoluteBreakpoint = int.MinValue;
-
-    bool _stackOperation;
-    bool _heapOperation;
-    bool _externalFunctionOperation;
-    bool _aluOperation;
-
-    public int AbsoluteBreakpoint
-    {
-        get => _absoluteBreakpoint;
-        set => _absoluteBreakpoint = value;
-    }
+    public int AbsoluteBreakpoint { get; set; } = int.MinValue;
     public int Breakpoint
     {
         get
         {
-            if (!DebugInfo.TryGetSourceLocation(_absoluteBreakpoint, out SourceCodeLocation sourceLocation))
+            if (!DebugInfo.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
             { return -1; }
 
             return sourceLocation.SourcePosition.Range.Start.Line;
         }
         set
         {
-            if (!DebugInfo.TryGetSourceLocation(_absoluteBreakpoint, out SourceCodeLocation sourceLocation))
+            if (!DebugInfo.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
             { return; }
 
             AbsoluteBreakpoint = sourceLocation.SourcePosition.Range.Start.Line;
         }
     }
-    public bool StackOperation => _stackOperation;
-    public bool HeapOperation => _heapOperation;
-    public bool ExternalFunctionOperation => _externalFunctionOperation;
-    public bool AluOperation => _aluOperation;
+    public bool StackOperation { get; private set; }
+    public bool HeapOperation { get; private set; }
+    public bool ExternalFunctionOperation { get; private set; }
+    public bool AluOperation { get; private set; }
     public readonly Records<float> HeapUsage = new();
 
     DebugInformation DebugInfo => CompilerResult.DebugInfo;
 
     public void DoUpdate()
     {
-        Instruction? nextInstruction = NextInstruction;
-        if (nextInstruction != null)
+        Instruction? nextInstruction_ = NextInstruction;
+        if (nextInstruction_.HasValue)
         {
-            _externalFunctionOperation =
-                nextInstruction.opcode == Opcode.CALL_EXTERNAL;
+            Instruction nextInstruction = nextInstruction_.Value;
 
-            _stackOperation =
-                nextInstruction.opcode == Opcode.STORE_VALUE ||
-                nextInstruction.opcode == Opcode.PUSH_VALUE ||
-                nextInstruction.opcode == Opcode.POP_VALUE ||
-                nextInstruction.opcode == Opcode.LOAD_VALUE;
+            ExternalFunctionOperation =
+                nextInstruction.Opcode == Opcode.CALL_EXTERNAL;
 
-            _heapOperation =
-                nextInstruction.opcode == Opcode.HEAP_ALLOC ||
-                nextInstruction.opcode == Opcode.HEAP_FREE ||
-                nextInstruction.opcode == Opcode.HEAP_GET ||
-                nextInstruction.opcode == Opcode.HEAP_SET;
+            StackOperation =
+                nextInstruction.Opcode == Opcode.STORE_VALUE ||
+                nextInstruction.Opcode == Opcode.PUSH_VALUE ||
+                nextInstruction.Opcode == Opcode.POP_VALUE ||
+                nextInstruction.Opcode == Opcode.LOAD_VALUE;
 
-            _aluOperation =
-                nextInstruction.opcode == Opcode.BITS_SHIFT_LEFT ||
-                nextInstruction.opcode == Opcode.BITS_SHIFT_RIGHT ||
+            HeapOperation =
+                nextInstruction.Opcode == Opcode.HEAP_ALLOC ||
+                nextInstruction.Opcode == Opcode.HEAP_FREE ||
+                nextInstruction.Opcode == Opcode.HEAP_GET ||
+                nextInstruction.Opcode == Opcode.HEAP_SET;
 
-                nextInstruction.opcode == Opcode.BITS_AND ||
-                nextInstruction.opcode == Opcode.LOGIC_EQ ||
-                nextInstruction.opcode == Opcode.LOGIC_LT ||
-                nextInstruction.opcode == Opcode.LOGIC_LTEQ ||
-                nextInstruction.opcode == Opcode.LOGIC_MT ||
-                nextInstruction.opcode == Opcode.LOGIC_MTEQ ||
-                nextInstruction.opcode == Opcode.LOGIC_NEQ ||
-                nextInstruction.opcode == Opcode.LOGIC_NOT ||
-                nextInstruction.opcode == Opcode.BITS_OR ||
-                nextInstruction.opcode == Opcode.BITS_XOR ||
+            AluOperation =
+                nextInstruction.Opcode == Opcode.BITS_SHIFT_LEFT ||
+                nextInstruction.Opcode == Opcode.BITS_SHIFT_RIGHT ||
 
-                nextInstruction.opcode == Opcode.MATH_ADD ||
-                nextInstruction.opcode == Opcode.MATH_DIV ||
-                nextInstruction.opcode == Opcode.MATH_MOD ||
-                nextInstruction.opcode == Opcode.MATH_MULT ||
-                nextInstruction.opcode == Opcode.MATH_SUB;
+                nextInstruction.Opcode == Opcode.BITS_AND ||
+                nextInstruction.Opcode == Opcode.LOGIC_EQ ||
+                nextInstruction.Opcode == Opcode.LOGIC_LT ||
+                nextInstruction.Opcode == Opcode.LOGIC_LTEQ ||
+                nextInstruction.Opcode == Opcode.LOGIC_MT ||
+                nextInstruction.Opcode == Opcode.LOGIC_MTEQ ||
+                nextInstruction.Opcode == Opcode.LOGIC_NEQ ||
+                nextInstruction.Opcode == Opcode.LOGIC_NOT ||
+                nextInstruction.Opcode == Opcode.BITS_OR ||
+                nextInstruction.Opcode == Opcode.BITS_XOR ||
+
+                nextInstruction.Opcode == Opcode.MATH_ADD ||
+                nextInstruction.Opcode == Opcode.MATH_DIV ||
+                nextInstruction.Opcode == Opcode.MATH_MOD ||
+                nextInstruction.Opcode == Opcode.MATH_MULT ||
+                nextInstruction.Opcode == Opcode.MATH_SUB;
         }
         else
         {
-            _externalFunctionOperation = false;
-            _stackOperation = false;
-            _heapOperation = false;
+            ExternalFunctionOperation = false;
+            StackOperation = false;
+            HeapOperation = false;
         }
         Update();
         SampleHeap();

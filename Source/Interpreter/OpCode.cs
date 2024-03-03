@@ -8,7 +8,7 @@ public enum Opcode : byte
     /// <summary>
     /// <para>
     ///     <b>Stack elements added:</b><br/>
-    ///     <c><see cref="Instruction.parameter"/></c><br/>
+    ///     <c><see cref="PreparationInstruction.parameter"/></c><br/>
     /// </para>
     /// <br/><br/>
     /// 

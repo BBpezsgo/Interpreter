@@ -93,25 +93,25 @@ public class WillBeCompilerException
     public CompilerException Instantiate(IPositioned? position, Uri? uri) => new(Message, position, uri);
 }
 
-public class NotSupportedException : CompilerException
+public sealed class NotSupportedException : CompilerException
 {
     public NotSupportedException(string message, Position position, Uri? file) : base(message, position, file) { }
     public NotSupportedException(string message, IPositioned? position, Uri? uri) : base(message, position, uri) { }
 }
 
-public class TokenizerException : LanguageException
+public sealed class TokenizerException : LanguageException
 {
     public TokenizerException(string message, Position position) : base(message, position, null) { }
 }
 
-public class SyntaxException : LanguageException
+public sealed class SyntaxException : LanguageException
 {
     public SyntaxException(string message, Position position, Uri? uri) : base(message, position, uri) { }
     public SyntaxException(string message, Position? position, Uri? uri) : base(message, position ?? Position.UnknownPosition, uri) { }
     public SyntaxException(string message, IPositioned? position, Uri? uri) : base(message, position?.Position ?? Position.UnknownPosition, uri) { }
 }
 
-public class ProcessRuntimeException : Exception
+public sealed class ProcessRuntimeException : Exception
 {
     public uint ExitCode { get; }
 
@@ -214,7 +214,7 @@ public class RuntimeException : LanguageException
     }
 }
 
-public class UserException : RuntimeException
+public sealed class UserException : RuntimeException
 {
     public UserException(string message) : base(message)
     { }
@@ -270,7 +270,7 @@ public class InternalException : LanguageException
 }
 
 /// <inheritdoc/>
-public class EndlessLoopException : InternalException
+public sealed class EndlessLoopException : InternalException
 {
     public EndlessLoopException() : base("Endless loop", Position.UnknownPosition, null) { }
 }
@@ -279,7 +279,7 @@ public class EndlessLoopException : InternalException
 
 #region NotExceptionBut
 
-public class NotExceptionBut
+public abstract class NotExceptionBut
 {
     public string Message { get; }
     public Position Position { get; }
@@ -311,7 +311,7 @@ public class NotExceptionBut
     }
 }
 
-public class Error : NotExceptionBut
+public sealed class Error : NotExceptionBut
 {
     public Error(string message, Position position, Uri? uri) : base(message, position, uri)
     {
@@ -326,21 +326,21 @@ public class Error : NotExceptionBut
     public LanguageException ToException() => new(this);
 }
 
-public class Warning : NotExceptionBut
+public sealed class Warning : NotExceptionBut
 {
     public Warning(string message, Position position, Uri? uri) : base(message, position, uri) { }
     public Warning(string message, Position? position, Uri? uri) : this(message, position ?? Position.UnknownPosition, uri) { }
     public Warning(string message, IPositioned? position, Uri? uri) : this(message, position?.Position ?? Position.UnknownPosition, uri) { }
 }
 
-public class Information : NotExceptionBut
+public sealed class Information : NotExceptionBut
 {
     public Information(string message, Position position, Uri? uri) : base(message, position, uri) { }
     public Information(string message, Position? position, Uri? uri) : this(message, position ?? Position.UnknownPosition, uri) { }
     public Information(string message, IPositioned? position, Uri? uri) : this(message, position?.Position ?? Position.UnknownPosition, uri) { }
 }
 
-public class Hint : NotExceptionBut
+public sealed class Hint : NotExceptionBut
 {
     public Hint(string message, Position position, Uri? uri) : base(message, position, uri) { }
     public Hint(string message, Position? position, Uri? uri) : this(message, position ?? Position.UnknownPosition, uri) { }

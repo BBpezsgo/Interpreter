@@ -5,9 +5,7 @@ namespace LanguageCore.ASM;
 public class GnuLinkerException : Exception
 {
     public GnuLinkerException(string message, Exception? inner) : base(message, inner)
-    {
-
-    }
+    { }
 }
 
 public static class GnuLinker

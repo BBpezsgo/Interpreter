@@ -14,18 +14,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     int InstructionInsertIndex = -1;
 
-    void AddInstruction(Instruction instruction)
+    void AddInstruction(PreparationInstruction instruction)
     {
         if (InstructionInsertIndex < 0)
         { GeneratedCode.Add(instruction); }
         else
         { GeneratedCode.Insert(InstructionInsertIndex, instruction); }
     }
-    void AddInstruction(Opcode opcode) => AddInstruction(new Instruction(opcode));
-    void AddInstruction(Opcode opcode, DataItem param0) => AddInstruction(new Instruction(opcode, param0));
-    void AddInstruction(Opcode opcode, int param0) => AddInstruction(new Instruction(opcode, new DataItem(param0)));
-    void AddInstruction(Opcode opcode, AddressingMode addressingMode) => AddInstruction(new Instruction(opcode, addressingMode));
-    void AddInstruction(Opcode opcode, AddressingMode addressingMode, int param0) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)));
+    void AddInstruction(Opcode opcode) => AddInstruction(new PreparationInstruction(opcode));
+    void AddInstruction(Opcode opcode, DataItem param0) => AddInstruction(new PreparationInstruction(opcode, param0));
+    void AddInstruction(Opcode opcode, int param0) => AddInstruction(new PreparationInstruction(opcode, new DataItem(param0)));
+    void AddInstruction(Opcode opcode, AddressingMode addressingMode) => AddInstruction(new PreparationInstruction(opcode, addressingMode));
+    void AddInstruction(Opcode opcode, AddressingMode addressingMode, int param0) => AddInstruction(new PreparationInstruction(opcode, addressingMode, new DataItem(param0)));
 
     void AddComment(string comment)
     {

@@ -11,7 +11,7 @@ public class BytecodeProcessor
     public int CodePointer;
     public int BasePointer;
 
-    public Instruction CurrentInstruction => Memory.Code[CodePointer];
+    public ref Instruction CurrentInstruction => ref Memory.Code[CodePointer];
     public bool IsDone => CodePointer >= Memory.Code.Length;
 
     public BytecodeProcessor(Instruction[] code, int heapSize, FrozenDictionary<string, ExternalFunctionBase> externalFunctions)
@@ -33,7 +33,7 @@ public class BytecodeProcessor
     /// <exception cref="Exception"/>
     public void Process()
     {
-        switch (CurrentInstruction.opcode)
+        switch (CurrentInstruction.Opcode)
         {
             case Opcode.UNKNOWN: throw new InternalException("Unknown instruction");
 
@@ -176,13 +176,8 @@ public class BytecodeProcessor
     void THROW()
     {
         int pointer = (int)Memory.Stack.Pop();
-        string? value = null;
-        try
-        {
-            value = Memory.Heap.GetString(pointer);
-            Memory.Heap.Deallocate(pointer);
-        }
-        catch (Exception) { }
+        string? value = Memory.Heap.GetString(pointer);
+        Memory.Heap.Deallocate(pointer);
         throw new UserException(value ?? "null");
     }
 
@@ -540,7 +535,8 @@ public class BytecodeProcessor
         if (functionNameDataItem.Type != RuntimeType.Integer)
         { throw new InternalException($"Instruction CALL_EXTERNAL need a String pointer (int) DataItem parameter from the stack, received {functionNameDataItem.Type} {functionNameDataItem}"); }
 
-        string functionName = Memory.Heap.GetString((int)functionNameDataItem);
+        string? functionName = Memory.Heap.GetString((int)functionNameDataItem)
+            ?? throw new RuntimeException($"Function name is null");
 
         if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase? function))
         { throw new RuntimeException($"Undefined function \"{functionName}\""); }

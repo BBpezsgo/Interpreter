@@ -452,21 +452,13 @@ public class Interpreter : InterpreterBase<byte>
                 continue;
             }
             else if (text[i] == '\r')
-            {
-
-            }
+            { }
             else if (text[i] == '\t')
-            {
-                renderer[_x, _y] = new ConsoleChar(' ', CharColor.White, CharColor.Black);
-            }
+            { renderer[_x, _y] = new ConsoleChar(' ', CharColor.White, CharColor.Black); }
             else if (text[i] < 32 || text[i] > 127)
-            {
-                renderer[_x, _y] = new ConsoleChar(' ', CharColor.White, CharColor.Black);
-            }
+            { renderer[_x, _y] = new ConsoleChar(' ', CharColor.White, CharColor.Black); }
             else
-            {
-                renderer[_x, _y] = new ConsoleChar(text[i], CharColor.White, CharColor.Black);
-            }
+            { renderer[_x, _y] = new ConsoleChar(text[i], CharColor.White, CharColor.Black); }
 
             _x++;
             if (_x >= width)

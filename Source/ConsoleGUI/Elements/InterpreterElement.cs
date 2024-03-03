@@ -521,14 +521,16 @@ public sealed class InterpreterElement : WindowElement
 
         b.ResetColor();
 
-        Instruction instruction = this.Interpreter.NextInstruction;
+        Instruction? _instruction = Interpreter.NextInstruction;
 
         List<int> loadIndicators = new();
         List<int> storeIndicators = new();
 
-        if (instruction != null)
+        if (_instruction.HasValue)
         {
-            if (instruction.opcode == Opcode.HEAP_SET)
+            Instruction instruction = _instruction.Value;
+
+            if (instruction.Opcode == Opcode.HEAP_SET)
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
                 { storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].VInt); }
@@ -536,7 +538,7 @@ public sealed class InterpreterElement : WindowElement
                 { storeIndicators.Add((int)instruction.Parameter); }
             }
 
-            if (instruction.opcode == Opcode.HEAP_GET)
+            if (instruction.Opcode == Opcode.HEAP_GET)
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
                 {
@@ -671,7 +673,7 @@ public sealed class InterpreterElement : WindowElement
 
         CollectedScopeInfo stackDebugInfo = Interpreter.CompilerResult.DebugInfo.GetScopeInformations(Interpreter.BytecodeInterpreter.CodePointer);
 
-        Instruction instruction = this.Interpreter.NextInstruction;
+        Instruction? instruction_ = this.Interpreter.NextInstruction;
 
         int stackSize = this.Interpreter.BytecodeInterpreter.Memory.Stack.Count;
 
@@ -682,15 +684,17 @@ public sealed class InterpreterElement : WindowElement
         List<int> loadIndicators = new();
         List<int> storeIndicators = new();
 
-        if (instruction != null)
+        if (instruction_.HasValue)
         {
-            if (instruction.opcode == Opcode.STORE_VALUE)
+            Instruction instruction = instruction_.Value;
+
+            if (instruction.Opcode == Opcode.STORE_VALUE)
             {
                 storeIndicators.Add(this.Interpreter.BytecodeInterpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
             }
 
-            if (instruction.opcode == Opcode.STORE_VALUE ||
-                instruction.opcode == Opcode.HEAP_SET)
+            if (instruction.Opcode == Opcode.STORE_VALUE ||
+                instruction.Opcode == Opcode.HEAP_SET)
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
                 { loadIndicators.Add(stackSize - 2); }
@@ -698,29 +702,29 @@ public sealed class InterpreterElement : WindowElement
                 { loadIndicators.Add(stackSize - 1); }
             }
 
-            if (instruction.opcode == Opcode.LOAD_VALUE)
+            if (instruction.Opcode == Opcode.LOAD_VALUE)
             {
                 loadIndicators.Add(this.Interpreter.BytecodeInterpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
                 storeIndicators.Add(stackSize);
             }
 
-            if (instruction.opcode == Opcode.PUSH_VALUE ||
-                instruction.opcode == Opcode.GET_BASEPOINTER ||
-                instruction.opcode == Opcode.HEAP_GET)
+            if (instruction.Opcode == Opcode.PUSH_VALUE ||
+                instruction.Opcode == Opcode.GET_BASEPOINTER ||
+                instruction.Opcode == Opcode.HEAP_GET)
             { storeIndicators.Add(stackSize); }
 
-            if (instruction.opcode == Opcode.POP_VALUE)
+            if (instruction.Opcode == Opcode.POP_VALUE)
             { loadIndicators.Add(stackSize - 1); }
 
-            if (instruction.opcode == Opcode.MATH_ADD ||
-                instruction.opcode == Opcode.MATH_DIV ||
-                instruction.opcode == Opcode.MATH_MOD ||
-                instruction.opcode == Opcode.MATH_MULT ||
-                instruction.opcode == Opcode.MATH_SUB ||
-                instruction.opcode == Opcode.BITS_AND ||
-                instruction.opcode == Opcode.BITS_OR ||
-                instruction.opcode == Opcode.LOGIC_AND ||
-                instruction.opcode == Opcode.LOGIC_OR)
+            if (instruction.Opcode == Opcode.MATH_ADD ||
+                instruction.Opcode == Opcode.MATH_DIV ||
+                instruction.Opcode == Opcode.MATH_MOD ||
+                instruction.Opcode == Opcode.MATH_MULT ||
+                instruction.Opcode == Opcode.MATH_SUB ||
+                instruction.Opcode == Opcode.BITS_AND ||
+                instruction.Opcode == Opcode.BITS_OR ||
+                instruction.Opcode == Opcode.LOGIC_AND ||
+                instruction.Opcode == Opcode.LOGIC_OR)
             {
                 loadIndicators.Add(stackSize - 1);
                 storeIndicators.Add(stackSize - 2);
@@ -995,7 +999,7 @@ public sealed class InterpreterElement : WindowElement
         {
             if (Interpreter.BytecodeInterpreter.CodePointer == i) IsNextInstruction = true;
 
-            Instruction instruction = this.Interpreter.CompilerResult.Code[i];
+            Instruction instruction = Interpreter.CompilerResult.Code[i];
 
             if (this.Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out List<string> comments))
             {
@@ -1032,13 +1036,13 @@ public sealed class InterpreterElement : WindowElement
                 IsNextInstruction = false;
                 b.BackgroundColor = CharColor.BrightRed;
             }
-            b.AddText(instruction.opcode.ToString());
+            b.AddText(instruction.Opcode.ToString());
             b.AddText(' ');
 
-            if (instruction.opcode == Opcode.LOAD_VALUE ||
-                instruction.opcode == Opcode.STORE_VALUE ||
-                instruction.opcode == Opcode.HEAP_GET ||
-                instruction.opcode == Opcode.HEAP_SET)
+            if (instruction.Opcode == Opcode.LOAD_VALUE ||
+                instruction.Opcode == Opcode.STORE_VALUE ||
+                instruction.Opcode == Opcode.HEAP_GET ||
+                instruction.Opcode == Opcode.HEAP_SET)
             {
                 b.AddText(instruction.AddressingMode.ToString());
                 b.AddText(' ');

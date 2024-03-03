@@ -315,7 +315,7 @@ internal sealed class ConsoleGUI
         {
             for (int y = Element.Rect.Top; y <= Element.Rect.Bottom; y++)
             {
-                int i = y * Width + x;
+                int i = (y * Width) + x;
                 if (ConsoleBuffer.IsOutside(i)) continue;
 
                 ConsoleChar chr = IsFilled ? Element.DrawContent(x, y) : Element.DrawContentWithBorders(x, y);

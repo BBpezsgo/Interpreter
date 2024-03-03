@@ -5,9 +5,7 @@ namespace LanguageCore.ASM;
 public class GolinkLinkerException : Exception
 {
     public GolinkLinkerException(string message, Exception? inner) : base(message, inner)
-    {
-
-    }
+    { }
 }
 
 public static class GolinkLinker

@@ -1,7 +1,7 @@
 ﻿namespace LanguageCore;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
-public readonly partial struct Range<T> :
+public readonly struct Range<T> :
     IEquatable<Range<T>>,
     IEquatable<MutableRange<T>>,
     IEquatable<ValueTuple<T, T>>,

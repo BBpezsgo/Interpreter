@@ -2,7 +2,7 @@
 
 using LanguageCore;
 
-[TestClass]
+[TestClass, TestCategory("Code Position")]
 public class PositionTests
 {
     [TestMethod]

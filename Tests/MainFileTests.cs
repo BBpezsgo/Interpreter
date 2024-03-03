@@ -1,6 +1,6 @@
 namespace Tests;
 
-[TestClass, TestCategory("Main")]
+[TestClass, TestCategory("Main"), TestCategory("FileTest")]
 public class MainFileTests
 {
     [TestMethod] public void Test01() => Utils.GetTest(01).DoMain();

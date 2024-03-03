@@ -1,6 +1,6 @@
 ﻿namespace Tests;
 
-[TestClass, TestCategory("Assembly")]
+[TestClass, TestCategory("Assembly"), TestCategory("FileTest")]
 public class AsmFileTests
 {
     [TestMethod] public void Test01() => Utils.GetTest(01).DoAssembly();

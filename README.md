@@ -100,3 +100,5 @@ Done
 8. Open the `/Interpreter` folder
 
 Done, you can now use the .NET CLI to build the project (`dotnet build`) or run it (`dotnet run`)
+
+## [Tests](https://github.com/BBpezsgo/Interpreter/blob/master/Tests.md)

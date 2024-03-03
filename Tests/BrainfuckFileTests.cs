@@ -1,6 +1,6 @@
 ﻿namespace Tests;
 
-[TestClass, TestCategory("Brainfuck")]
+[TestClass, TestCategory("Brainfuck"), TestCategory("FileTest")]
 public class BrainfuckFileTests
 {
     const int Timeout = 2000 * 1000;

@@ -73,32 +73,30 @@ This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/window
 If you want to download the project and build it, there is how to do that:
 1. Download this repository
 2. Download the [Win32-Stuff](https://github.com/BBpezsgo/Win32-Stuff) repository
-3. Download the [DataUtilities](https://github.com/BBpezsgo/DataUtilities) repository
-4. Extract all three .zip files
-5. Remove all `-main` suffixes
+3. Extract the .zip files
+4. Remove all `-main` suffixes
 
 Now the folder structure should look like this:
 ```
-/Interpreter/BBCodeInterpreter.csproj
-/Win32-Stuff/Win32.csproj
-/DataUtilities/DataUtilities.csproj
+./Interpreter/BBCodeInterpreter.csproj
+./Win32-Stuff/Win32.csproj
 ```
 
-6. Open `/Interpreter/BBCodeInterpreter.csproj` in a **text editor**
-7. In the two `ProjectReference` tags, replace `C:\Users\bazsi\source\repos` with `..` (so it will point to the existing projects you downloaded)
+5. Open `./Interpreter/BBCodeInterpreter.csproj` in a **text editor**
+6. In the `ProjectReference` tags, replace `C:\Users\bazsi\source\repos` with `..` (so it will point to the existing projects you downloaded)
 
 ### Method 1: Building with Visual Studio:
 
-8. Open `/Interpreter/BBCodeInterpreter.csproj` in Visual Studio
-9. Add the two existing projects to the solution 
-   ( `/Win32-Stuff/Win32.csproj` and `/DataUtilities/DataUtilities.csproj` )
+7. Open `./Interpreter/BBCodeInterpreter.csproj` in Visual Studio
+8. Add the `./Win32-Stuff/Win32.csproj` project to the solution
+9. Now you can build it with the "Build" button
 
 Done
 
 ### Method 2: Building with .NET CLI:
 
-8. Open the `/Interpreter` folder
+7. Open the `./Interpreter` folder
 
-Done, you can now use the .NET CLI to build the project (`dotnet build`) or run it (`dotnet run`)
+8. Now you can use the .NET CLI to build (`dotnet build`) or run (`dotnet run`) the project
 
 ## [Tests](https://github.com/BBpezsgo/Interpreter/blob/master/Tests.md)

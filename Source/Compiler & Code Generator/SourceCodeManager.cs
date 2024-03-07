@@ -11,14 +11,16 @@ using Tokenizing;
 public readonly struct CollectedAST
 {
     public readonly ParserResult ParserResult;
-    public readonly string Path;
+    public readonly Uri Uri;
     public readonly UsingDefinition Using;
+    public readonly ImmutableArray<Token> Tokens;
 
-    public CollectedAST(ParserResult parserResult, string path, UsingDefinition @using)
+    public CollectedAST(ParserResult parserResult, Uri uri, UsingDefinition @using, ImmutableArray<Token> tokens)
     {
         ParserResult = parserResult;
-        Path = path;
+        Uri = uri;
         Using = @using;
+        Tokens = tokens;
     }
 }
 
@@ -77,7 +79,7 @@ public class SourceCodeManager
 
     bool FromWeb(Uri uri, out ParserResult ast)
     {
-        Print?.Invoke($" Download file \"{uri}\" ...", LogType.Debug);
+        Print?.Invoke($"  Download file \"{uri}\" ...", LogType.Debug);
 
         using HttpClient client = new();
         using Task<HttpResponseMessage> getTask = client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
@@ -130,7 +132,7 @@ public class SourceCodeManager
         if (!File.Exists(path))
         { return false; }
 
-        Print?.Invoke($" Load local file \"{path}\" ...", LogType.Debug);
+        Print?.Invoke($"  Load local file \"{path}\" ...", LogType.Debug);
 
         TokenizerResult tokens = StreamTokenizer.Tokenize(path);
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
@@ -262,7 +264,7 @@ public class SourceCodeManager
 
         List<CollectedAST> collectedASTs = new();
 
-        collectedASTs.Add(new CollectedAST(ast.Value, path.ToString(), @using));
+        collectedASTs.Add(new CollectedAST(ast.Value, path, @using, ast.Value.Tokens));
 
         foreach (UsingDefinition using_ in ast.Value.Usings)
         { collectedASTs.AddRange(ProcessFile(using_, path, null)); }
@@ -276,7 +278,7 @@ public class SourceCodeManager
         string? basePath)
     {
         if (usings.Length > 0)
-        { Print?.Invoke("Parse usings ...", LogType.Debug); }
+        { Print?.Invoke("Loading used files ...", LogType.Debug); }
 
         List<CollectedAST> collectedASTs = new();
 

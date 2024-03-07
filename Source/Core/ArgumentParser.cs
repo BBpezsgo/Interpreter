@@ -269,6 +269,7 @@ public static class ArgumentParser
                 if (ExpectArg(args, ref i, out _, "--no-debug-info", "-ndi"))
                 {
                     result.GeneratorSettings.GenerateDebugInstructions = false;
+                    result.BrainfuckGeneratorSettings.GenerateDebugInformation = false;
                     continue;
                 }
 

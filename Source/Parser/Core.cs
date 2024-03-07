@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.Parser;
+﻿using LanguageCore.Tokenizing;
+
+namespace LanguageCore.Parser;
 
 public static class ExportableExtensions
 {
@@ -54,19 +56,21 @@ public readonly struct ParserResult
     public readonly List<UsingAnalysis> UsingsAnalytics;
     public readonly Statement.Statement[] TopLevelStatements;
     public readonly EnumDefinition[] Enums;
+    public readonly ImmutableArray<Token> Tokens;
 
     public static ParserResult Empty => new(
-        new List<Error>(),
-        new List<FunctionDefinition>(),
-        new List<FunctionDefinition>(),
-        new List<MacroDefinition>(),
-        new List<StructDefinition>(),
-        new List<UsingDefinition>(),
-        new List<Statement.CompileTag>(),
-        new List<Statement.Statement>(),
-        new List<EnumDefinition>());
+        Enumerable.Empty<Error>(),
+        Enumerable.Empty<FunctionDefinition>(),
+        Enumerable.Empty<FunctionDefinition>(),
+        Enumerable.Empty<MacroDefinition>(),
+        Enumerable.Empty<StructDefinition>(),
+        Enumerable.Empty<UsingDefinition>(),
+        Enumerable.Empty<Statement.CompileTag>(),
+        Enumerable.Empty<Statement.Statement>(),
+        Enumerable.Empty<EnumDefinition>(),
+        Enumerable.Empty<Token>());
 
-    public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<FunctionDefinition> operators, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
+    public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<FunctionDefinition> operators, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, IEnumerable<Token> tokens)
     {
         Errors = errors.ToArray();
 
@@ -79,6 +83,7 @@ public readonly struct ParserResult
         Hashes = hashes.ToArray();
         TopLevelStatements = topLevelStatements.ToArray();
         Enums = enums.ToArray();
+        Tokens = tokens.ToImmutableArray();
     }
 
     public void SetFile(Uri path)

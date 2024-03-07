@@ -68,7 +68,7 @@ export char* ToString(this int number)
 [External("sleep")]
 export void Sleep(int ms);
 
-export int ParseInt(temp char* v)
+export inline int ParseInt(temp char* v)
 {
     if (v.IsNullOrEmpty())
     { return 0; }
@@ -101,7 +101,7 @@ export int ParseInt(temp char* v)
     return result;
 }
 
-export byte ParseByte(temp char* v)
+export inline byte ParseByte(temp char* v)
 {
     if (v.IsNullOrEmpty())
     { return 0; }
@@ -140,7 +140,7 @@ export float ToFloat(this int v);
 [External("float-to-int")]
 export int ToInt(this float v);
 
-export int Random(int state)
+export inline int Random(int state)
 {
 	// Precomputed parameters for Schrage's method
 	int M = 0x7fffffff;

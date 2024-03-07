@@ -157,6 +157,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         if (prevType is PointerType pointerType)
         {
+            using DebugInfoBlock debugBlock = DebugBlock(new Position(field, value));
             if (pointerType.To is not StructType structPointerType)
             { throw new CompilerException($"Could not get the field offsets of type {pointerType}", field.PrevStatement, CurrentFile); }
 
@@ -513,11 +514,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     #region GenerateCodeForStatement()
     void GenerateCodeForStatement(Statement statement)
     {
-        int start = 0;
-
-        if (GenerateDebugInformation)
-        { start = Code.GetFinalCode().Length; }
-
         switch (statement)
         {
             case KeywordCall v: GenerateCodeForStatement(v); break;
@@ -543,20 +539,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             case ModifiedStatement v: GenerateCodeForStatement(v); break;
             case Block v: GenerateCodeForStatement(v); break;
             default: throw new CompilerException($"Unknown statement \"{statement.GetType().Name}\"", statement, CurrentFile);
-        }
-
-        Code.SetPointer(0);
-
-        if (InMacro.Count > 0 && InMacro.Last) return;
-
-        if (GenerateDebugInformation)
-        {
-            int end = Code.GetFinalCode().Length;
-            DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
-            {
-                Instructions = (start, end),
-                SourcePosition = statement.Position,
-            });
         }
     }
     void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
@@ -589,6 +571,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(IndexCall indexCall)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(indexCall);
+
         GeneralType arrayType = FindStatementType(indexCall.PrevStatement);
 
         if (arrayType is ArrayType arrayType1)
@@ -692,14 +676,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             using (CommentBlock("Compute condition"))
             { GenerateCodeForStatement(@if.Condition); }
 
-            using (this.DebugBlock(@if.Condition))
+            using (DebugBlock(@if.Condition))
             { Code.LOGIC_MAKE_BOOL(conditionAddress, conditionAddress + 1); }
 
             Code.CommentLine($"Condition result at {conditionAddress}");
 
             Code.CommentLine($"Pointer: {Code.Pointer}");
 
-            using (this.DebugBlock(@if.Keyword))
+            using (DebugBlock(@if.Keyword))
             {
                 Code.JumpStart(conditionAddress);
             }
@@ -737,7 +721,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     Code.MoveValue(conditionAddress + 1, conditionAddress);
                     // }
 
-                    using (this.DebugBlock(@if.NextLink.Keyword))
+                    using (DebugBlock(@if.NextLink.Keyword))
                     {
                         // using (CommentBlock($"Invert condition (at {conditionAddress}) result (to {conditionAddress + 1})"))
                         // { Code.LOGIC_NOT(conditionAddress, conditionAddress + 1); }
@@ -799,7 +783,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             if (!linked)
             {
-                using (this.DebugBlock(@if.Semicolon ?? @if.Block.Semicolon/* ?? @if.Block.BracketEnd*/))
+                using (DebugBlock(@if.Semicolon ?? @if.Block.Semicolon/* ?? @if.Block.BracketEnd*/))
                 {
                     ContinueReturnStatements();
                     ContinueBreakStatements();
@@ -1013,6 +997,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(KeywordCall statement)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(statement);
         switch (statement.Identifier.Content)
         {
             case StatementKeywords.Return:
@@ -1144,6 +1129,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
 
+        using DebugInfoBlock debugBlock = DebugBlock(statement);
+
         switch (statement.Operator.Content)
         {
             case "+=":
@@ -1259,6 +1246,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
 
+        using DebugInfoBlock debugBlock = DebugBlock(statement);
         switch (statement.Operator.Content)
         {
             case "++":
@@ -1329,6 +1317,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(FunctionCall functionCall)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(functionCall);
+
         if (functionCall.Identifier.Content == "sizeof")
         {
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
@@ -1412,6 +1402,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(ConstructorCall constructorCall)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(constructorCall);
+
         GeneralType instanceType = FindType(constructorCall.Type);
         GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
@@ -1444,6 +1436,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(Literal statement)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(statement);
+
         using (CommentBlock($"Set {statement} to address {Stack.NextAddress}"))
         {
             switch (statement.Type)
@@ -1475,6 +1469,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(Identifier statement)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(statement);
+
         if (GetVariable(Variables, statement.Content, out Variable variable))
         {
             if (variable.IsDiscarded)
@@ -1527,6 +1523,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(OperatorCall statement)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(statement);
+
         {
             Dictionary<string, GeneralType> typeArguments = new();
 
@@ -1957,7 +1955,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         using ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress);
 
-        using (this.DebugBlock(block.Brackets.Start))
+        using (DebugBlock(block.Brackets.Start))
         {
             VariableCleanupStack.Push(PrecompileVariables(block));
 
@@ -1977,7 +1975,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             VariableCanBeDiscarded = null;
         }
 
-        using (this.DebugBlock(block.Brackets.End))
+        using (DebugBlock(block.Brackets.End))
         {
             if (ReturnTagStack.Count > 0)
             { FinishReturnStatements(); }
@@ -1992,6 +1990,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(AddressGetter addressGetter)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(addressGetter);
+
         GeneralType type = FindStatementType(addressGetter.PrevStatement);
 
         throw new CompilerException($"Type {type} isn't stored in the heap", addressGetter, CurrentFile);
@@ -2000,6 +2000,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(Pointer pointer)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(pointer);
+
         if (TryCompute(pointer, out DataItem computed))
         {
             Stack.Push(computed);
@@ -2042,6 +2044,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(NewInstance newInstance)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(newInstance);
+
         GeneralType instanceType = FindType(newInstance.Type);
 
         if (instanceType is PointerType pointerType)
@@ -2092,6 +2096,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(Field field)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(field);
+
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
         if (prevType is ArrayType arrayType && field.Identifier.Equals("Length"))
@@ -2461,6 +2467,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         => GenerateCodeForLiteralString(literal.Value, literal);
     int GenerateCodeForLiteralString(string literal, IPositioned position)
     {
+        using DebugInfoBlock debugBlock = DebugBlock(position);
+
         using (CommentBlock($"Create String \"{literal}\""))
         {
             int pointerAddress = Stack.NextAddress;
@@ -2508,9 +2516,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         if (function.Block is null ||
             !function.IsInlineable)
-        {
-            return false;
-        }
+        { return false; }
 
         for (int i = 0; i < parameters.Length; i++)
         {
@@ -2806,15 +2812,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GenerateCodeForStatement(function.Block);
 
         using (DebugBlock(function.Block.Brackets.End))
-        using (CommentBlock($"Finish \"return\" block"))
         {
-            if (ReturnTagStack.Pop() != Stack.LastAddress)
-            { throw new InternalException(string.Empty, function.Block, function.FilePath); }
-            Stack.Pop();
-        }
+            using (CommentBlock($"Finish \"return\" block"))
+            {
+                if (ReturnTagStack.Pop() != Stack.LastAddress)
+                { throw new InternalException(string.Empty, function.Block, function.FilePath); }
+                Stack.Pop();
+            }
 
-        using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.Brackets.End))
-        {
             using (CommentBlock($"Deallocate macro variables ({Variables.Count})"))
             {
                 for (int i = 0; i < Variables.Count; i++)

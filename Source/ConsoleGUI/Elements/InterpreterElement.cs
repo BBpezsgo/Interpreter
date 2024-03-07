@@ -228,7 +228,7 @@ public sealed class InterpreterElement : WindowElement
 
         int[] calltraceRaw = this.Interpreter.BytecodeInterpreter.TraceCalls();
 
-        FunctionInformations[] callstack = this.Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(calltraceRaw);
+        FunctionInformations[] callstack = this.Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(calltraceRaw).ToArray();
 
         int i;
         for (i = 0; i < callstack.Length; i++)

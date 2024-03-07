@@ -144,7 +144,8 @@ public sealed class Parser
             Usings,
             Hashes,
             TopLevelStatements,
-            Enums);
+            Enums,
+            Tokens);
     }
 
     Statement.Statement ParseInteractiveInternal()

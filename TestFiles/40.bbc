@@ -4,10 +4,9 @@ using System.Lists;
 List<int>* list = new List<int>*;
 list.Add(66);
 list.Add(67);
-list.Add(68);
 PrintLine(temp list.ToString());
 
-list.Remove(1);
+list.Remove(0);
 PrintLine(temp list.ToString());
 
 list.Clear();

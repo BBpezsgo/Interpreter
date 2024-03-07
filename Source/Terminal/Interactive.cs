@@ -83,7 +83,18 @@ class InteractiveCompiler
     public Statement? Statement => _parsed;
     public CompilerResult Compiled => _compiled;
     public BBCodeGeneratorResult Generated => _generated;
-    public ParserResult InteractiveAST => new([], [], [], [], [], [], [], _parsed != null ? [_parsed] : [], []);
+    public ParserResult InteractiveAST => new(
+        Enumerable.Empty<Error>(),
+        Enumerable.Empty<FunctionDefinition>(),
+        Enumerable.Empty<FunctionDefinition>(),
+        Enumerable.Empty<MacroDefinition>(),
+        Enumerable.Empty<StructDefinition>(),
+        Enumerable.Empty<UsingDefinition>(),
+        Enumerable.Empty<CompileTag>(),
+        _parsed != null ? [_parsed] :
+        Enumerable.Empty<Statement>(),
+        Enumerable.Empty<EnumDefinition>(),
+        Enumerable.Empty<Token>());
 
     public InteractiveCompiler(Action<Task> onCompiledAsync)
     {

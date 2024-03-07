@@ -307,8 +307,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         StartBlock($"MoveValue({from}; {string.Join("; ", to)})");
 
         CommentLine($"Clear the destination {string.Join("; ", to)}:");
-        for (int i = 0; i < to.Length; i++)
-        { ClearValue(to[i]); }
+        ClearValue(to);
 
         CommentLine($"Move value from {from} to {string.Join("; ", to)}:");
         MoveAddValue(from, to);
@@ -350,13 +349,6 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         CachedFinalCode.Append("[-]");
     }
 
-    public void ClearRange(int start, int size)
-    {
-        for (int offset = 0; offset < size; offset++)
-        { this.ClearValue(start + offset); }
-        this.SetPointer(start);
-    }
-
     /// <summary>
     /// <b>Pointer:</b> not modified
     /// </summary>
@@ -378,24 +370,22 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     }
 
     /// <summary>
-    /// <b>Pointer:</b> 0
+    /// <b>Pointer:</b> <paramref name="conditionAddress"/>
     /// </summary>
     public void JumpStart(int conditionAddress)
     {
         this.SetPointer(conditionAddress);
         this.JumpStart();
-        // this.SetPointer(0);
     }
 
     /// <summary>
-    /// <b>Pointer:</b> 0
+    /// <b>Pointer:</b> <paramref name="conditionAddress"/>
     /// </summary>
     public void JumpEnd(int conditionAddress, bool clearCondition = false)
     {
         this.SetPointer(conditionAddress);
         if (clearCondition) this.ClearCurrent();
         this.JumpEnd();
-        // this.SetPointer(0);
     }
 
     public static CompiledCode operator +(CompiledCode a, string b)

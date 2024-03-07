@@ -21,6 +21,7 @@ public readonly struct CompilerResult
     public readonly CompiledGeneralFunction[] GeneralFunctions;
     public readonly CompiledOperator[] Operators;
     public readonly CompiledConstructor[] Constructors;
+    public readonly ImmutableDictionary<Uri, ImmutableArray<Token>> Tokens;
 
     public readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
 
@@ -138,40 +139,44 @@ public readonly struct CompilerResult
         Enumerable.Empty<UsingDefinition>(),
         Enumerable.Empty<CompileTag>(),
         TopLevelStatements,
-        Enums);
+        Enums,
+        Enumerable.Empty<Token>());
 
     public static CompilerResult Empty => new(
-        Array.Empty<CompiledFunction>(),
-        Array.Empty<MacroDefinition>(),
-        Array.Empty<CompiledGeneralFunction>(),
-        Array.Empty<CompiledOperator>(),
-        Array.Empty<CompiledConstructor>(),
-        new Dictionary<string, ExternalFunctionBase>(),
-        Array.Empty<CompiledStruct>(),
-        Array.Empty<CompileTag>(),
-        Array.Empty<CompiledEnum>(),
-        Array.Empty<Statement>(),
+        Enumerable.Empty<KeyValuePair<Uri, ImmutableArray<Token>>>(),
+        Enumerable.Empty<CompiledFunction>(),
+        Enumerable.Empty<MacroDefinition>(),
+        Enumerable.Empty<CompiledGeneralFunction>(),
+        Enumerable.Empty<CompiledOperator>(),
+        Enumerable.Empty<CompiledConstructor>(),
+        Enumerable.Empty<KeyValuePair<string, ExternalFunctionBase>>(),
+        Enumerable.Empty<CompiledStruct>(),
+        Enumerable.Empty<CompileTag>(),
+        Enumerable.Empty<CompiledEnum>(),
+        Enumerable.Empty<Statement>(),
         null);
 
     public CompilerResult(
+        IEnumerable<KeyValuePair<Uri, ImmutableArray<Token>>> tokens,
         IEnumerable<CompiledFunction> functions,
         IEnumerable<MacroDefinition> macros,
         IEnumerable<CompiledGeneralFunction> generalFunctions,
         IEnumerable<CompiledOperator> operators,
         IEnumerable<CompiledConstructor> constructors,
-        Dictionary<string, ExternalFunctionBase> externalFunctions,
+        IEnumerable<KeyValuePair<string, ExternalFunctionBase>> externalFunctions,
         IEnumerable<CompiledStruct> structs,
         IEnumerable<CompileTag> hashes,
         IEnumerable<CompiledEnum> enums,
         IEnumerable<Statement> topLevelStatements,
         Uri? file)
     {
+        Tokens = tokens.ToImmutableDictionary();
         Functions = functions.ToArray();
         Macros = macros.ToArray();
         GeneralFunctions = generalFunctions.ToArray();
         Operators = operators.ToArray();
         Constructors = constructors.ToArray();
-        ExternalFunctions = externalFunctions;
+        ExternalFunctions = externalFunctions.ToDictionary();
         Structs = structs.ToArray();
         Hashes = hashes.ToArray();
         Enums = enums.ToArray();
@@ -686,17 +691,25 @@ public sealed class Compiler
         Macros.AddRange(parserResult.Macros);
         Enums.AddRange(parserResult.Enums);
 
+        Dictionary<Uri, ImmutableArray<Token>> tokens = new();
+
         if (file != null)
         {
+            tokens[file] = parserResult.Tokens;
+
             CollectorResult collectorResult = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, Settings.BasePath, AnalysisCollection);
 
             for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
-            { CompileFile(collectorResult.CollectedASTs[i]); }
+            {
+                tokens[collectorResult.CollectedASTs[i].Uri] = collectorResult.CollectedASTs[i].Tokens;
+                CompileFile(collectorResult.CollectedASTs[i]);
+            }
         }
 
         CompileInternal();
 
         return new CompilerResult(
+            tokens,
             CompiledFunctions,
             Macros.ToArray(),
             CompiledGeneralFunctions,
@@ -714,12 +727,18 @@ public sealed class Compiler
     {
         CollectorResult collectorResult = SourceCodeManager.Collect(usings, (Uri?)null, PrintCallback, Settings.BasePath, AnalysisCollection);
 
+        Dictionary<Uri, ImmutableArray<Token>> tokens = new();
+
         for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
-        { CompileFile(collectorResult.CollectedASTs[i]); }
+        {
+            tokens[collectorResult.CollectedASTs[i].Uri] = collectorResult.CollectedASTs[i].Tokens;
+            CompileFile(collectorResult.CollectedASTs[i]);
+        }
 
         CompileInternal();
 
         return new CompilerResult(
+            tokens,
             CompiledFunctions,
             Macros.ToArray(),
             CompiledGeneralFunctions,
@@ -1077,6 +1096,7 @@ ExitBreak:
         Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection);
         return compiler.CompileMainFile(parserResult, file);
     }
+
     /// <exception cref="EndlessLoopException"/>
     /// <exception cref="SyntaxException"/>
     /// <exception cref="CompilerException"/>

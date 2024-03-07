@@ -5,6 +5,7 @@ public struct SourceCodeLocation
 {
     public MutableRange<int> Instructions;
     public Position SourcePosition;
+    public Uri? Uri;
 
     public readonly bool Contains(int instruction) =>
         Instructions.Start <= instruction &&
@@ -40,9 +41,9 @@ public struct StackElementInformations
 
     public readonly MutableRange<int> GetRange(int basepointer)
     {
-        int itemStart = this.Address;
-        if (this.BasepointerRelative) itemStart += basepointer;
-        int itemEnd = itemStart + this.Size - 1;
+        int itemStart = Address;
+        if (BasepointerRelative) itemStart += basepointer;
+        int itemEnd = itemStart + Size - 1;
         return new MutableRange<int>(itemStart, itemEnd);
     }
 }
@@ -55,11 +56,11 @@ public struct ScopeInformations
 
 public readonly struct CollectedScopeInfo
 {
-    public readonly StackElementInformations[] Stack;
+    public readonly ImmutableArray<StackElementInformations> Stack;
 
-    public CollectedScopeInfo(StackElementInformations[] stack)
+    public CollectedScopeInfo(IEnumerable<StackElementInformations> stack)
     {
-        Stack = stack;
+        Stack = stack.ToImmutableArray();
     }
 
     public bool TryGet(int basePointer, int stackAddress, out StackElementInformations result)
@@ -126,19 +127,21 @@ public class DebugInformation : IDuplicatable<DebugInformation>
     public readonly List<FunctionInformations> FunctionInformations;
     public readonly List<ScopeInformations> ScopeInformations;
     public readonly Dictionary<int, List<string>> CodeComments;
+    public readonly Dictionary<Uri, ImmutableArray<Tokenizing.Token>> OriginalFiles;
 
-    public DebugInformation()
+    public DebugInformation(IEnumerable<KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>> originalFiles)
     {
         SourceCodeLocations = new List<SourceCodeLocation>();
         FunctionInformations = new List<FunctionInformations>();
         ScopeInformations = new List<ScopeInformations>();
         CodeComments = new Dictionary<int, List<string>>();
+        OriginalFiles = new Dictionary<Uri, ImmutableArray<Tokenizing.Token>>(originalFiles);
     }
 
     public static int[] TraceBasePointers(DataItem[] stack, int basePointer)
     {
         if (!CanTraceBPsWith(basePointer))
-        { return System.Array.Empty<int>(); }
+        { return Array.Empty<int>(); }
 
         List<int> result = new();
         TraceBasePointers(result, stack, basePointer);
@@ -160,17 +163,15 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         TraceBasePointers(result, stack, num);
     }
 
-    public SourceCodeLocation[] GetSourceLocations(int instruction)
+    public IEnumerable<SourceCodeLocation> GetSourceLocations(int instruction)
     {
-        List<SourceCodeLocation> result = new();
         for (int i = 0; i < SourceCodeLocations.Count; i++)
         {
             SourceCodeLocation sourceLocation = SourceCodeLocations[i];
             if (!sourceLocation.Contains(instruction))
             { continue; }
-            result.Add(sourceLocation);
+            yield return sourceLocation;
         }
-        return result.ToArray();
     }
 
     public bool TryGetSourceLocation(int instruction, out SourceCodeLocation sourceLocation)
@@ -192,78 +193,111 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         return success;
     }
 
-    public FunctionInformations[] GetFunctionInformations(int[] callstack)
+    public IEnumerable<FunctionInformations> GetFunctionInformations(IEnumerable<int> callstack)
     {
-        if (callstack.Length == 0)
-        { return System.Array.Empty<FunctionInformations>(); }
-
-        FunctionInformations[] result = new FunctionInformations[callstack.Length];
-        for (int i = 0; i < callstack.Length; i++)
-        { result[i] = GetFunctionInformations(callstack[i]); }
-        return result;
+        foreach (int item in callstack)
+        { yield return GetFunctionInformations(item); }
     }
 
     public FunctionInformations GetFunctionInformations(int codePointer)
     {
-        for (int j = 0; j < FunctionInformations.Count; j++)
+        for (int i = 0; i < FunctionInformations.Count; i++)
         {
-            FunctionInformations info = FunctionInformations[j];
+            FunctionInformations function = FunctionInformations[i];
 
-            if (info.Instructions.Contains(codePointer))
-            { return info; }
+            if (function.Instructions.Contains(codePointer))
+            { return function; }
         }
         return default;
     }
 
-    public FunctionInformations[] GetFunctionInformationsNested(int codePointer)
+    public ImmutableArray<FunctionInformations> GetFunctionInformationsNested(int codePointer)
     {
         List<FunctionInformations> result = new();
-        for (int j = 0; j < FunctionInformations.Count; j++)
+        for (int i = 0; i < FunctionInformations.Count; i++)
         {
-            FunctionInformations info = FunctionInformations[j];
+            FunctionInformations info = FunctionInformations[i];
 
             if (info.Instructions.Contains(codePointer))
             { result.Add(info); }
         }
         result.Sort((a, b) => a.Instructions.Size() - b.Instructions.Size());
-        return result.ToArray();
+        return result.ToImmutableArray();
     }
 
-    public ScopeInformations[] GetScopes(int codePointer)
+    public IEnumerable<ScopeInformations> GetScopes(int codePointer)
     {
-        List<ScopeInformations> result = new();
-
         for (int i = 0; i < ScopeInformations.Count; i++)
         {
             ScopeInformations scope = ScopeInformations[i];
             if (!scope.Location.Contains(codePointer)) continue;
-            result.Add(scope);
+            yield return scope;
         }
-
-        return result.ToArray();
     }
 
     public CollectedScopeInfo GetScopeInformations(int codePointer)
     {
-        ScopeInformations[] scopes = GetScopes(codePointer);
         List<StackElementInformations> result = new();
+        foreach (ScopeInformations scope in GetScopes(codePointer))
+        { result.AddRange(scope.Stack); }
+        return new CollectedScopeInfo(result);
+    }
 
-        for (int i = 0; i < scopes.Length; i++)
+    public void OffsetCodeFrom(int from, int offset)
+    {
         {
-            if (scopes[i].Stack == null) continue;
-            for (int j = 0; j < scopes[i].Stack.Count; j++)
+            Dictionary<int, List<string>> newCodeComments = new();
+            foreach (KeyValuePair<int, List<string>> item in CodeComments)
             {
-                StackElementInformations item = scopes[i].Stack[j];
-                result.Add(item);
+                if (item.Key > from)
+                { newCodeComments.Add(item.Key + offset, item.Value); }
+                else
+                { newCodeComments.Add(item.Key, item.Value); }
             }
+            CodeComments.Clear();
+            CodeComments.AddRange(newCodeComments);
         }
 
-        return new CollectedScopeInfo(result.ToArray());
+        for (int i = 0; i < SourceCodeLocations.Count; i++)
+        {
+            SourceCodeLocation loc = SourceCodeLocations[i];
+
+            if (loc.Instructions.Start > offset)
+            { loc.Instructions.Start += offset; }
+            if (loc.Instructions.End > offset)
+            { loc.Instructions.End += offset; }
+
+            SourceCodeLocations[i] = loc;
+        }
+
+        for (int i = 0; i < FunctionInformations.Count; i++)
+        {
+            FunctionInformations func = FunctionInformations[i];
+
+            if (func.Instructions.Start > offset)
+            { func.Instructions.Start += offset; }
+            if (func.Instructions.End > offset)
+            { func.Instructions.End += offset; }
+
+            FunctionInformations[i] = func;
+        }
+
+        for (int i = 0; i < ScopeInformations.Count; i++)
+        {
+            ScopeInformations scope = ScopeInformations[i];
+
+            if (scope.Location.Instructions.Start > offset)
+            { scope.Location.Instructions.Start += offset; }
+            if (scope.Location.Instructions.End > offset)
+            { scope.Location.Instructions.End += offset; }
+
+            ScopeInformations[i] = scope;
+        }
     }
 
     public DebugInformation Duplicate()
     {
-        DebugInformation copy = new();
+        DebugInformation copy = new(OriginalFiles);
 
         copy.SourceCodeLocations.AddRange(SourceCodeLocations);
         copy.FunctionInformations.AddRange(FunctionInformations);

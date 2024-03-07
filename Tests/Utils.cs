@@ -26,37 +26,36 @@ public readonly struct TestFile
     }
 
     /// <exception cref="AssertFailedException"/>
-    public MainResult DoMain(bool heapShouldBeEmpty = true)
+    public void DoMain(bool heapShouldBeEmpty = true)
     {
         MainResult result = Utils.RunMain(new FileInfo(SourceFile), GetInput());
         Console.Write($"ExitCode: {result.ExitCode}");
         ExpectedResult expected = GetExpectedResult();
         expected.Assert(result, heapShouldBeEmpty);
-        return result;
     }
 
     /// <exception cref="AssertFailedException"/>
-    public BrainfuckResult DoBrainfuck(bool memoryShouldBeEmpty = true, int? expectedMemoryPointer = 0)
+    public void DoBrainfuck(bool memoryShouldBeEmpty = true, int? expectedMemoryPointer = 0)
     {
-        BrainfuckResult result = Utils.RunBrainfuck(new FileInfo(SourceFile), GetInput());
-        BrainfuckResult resultCompact = Utils.RunBrainfuckCompact(new FileInfo(SourceFile), GetInput());
+        (BrainfuckResult result, BrainfuckResult resultCompact) = Utils.RunBrainfuckBoth(new FileInfo(SourceFile), GetInput());
+
+        if (result.StdOutput != resultCompact.StdOutput) throw new AssertFailedException($"Compacted brainfuck code made different result (stdout)");
+        if (result.MemoryPointer != resultCompact.MemoryPointer) throw new AssertFailedException($"Compacted brainfuck code made different result (memory pointer)");
+        if (!result.Memory.SequenceEqual(resultCompact.Memory)) throw new AssertFailedException($"Compacted brainfuck code made different result (memory)");
 
         ExpectedResult expected = GetExpectedResult();
 
         expected.Assert(result, memoryShouldBeEmpty, expectedMemoryPointer);
         expected.Assert(resultCompact, memoryShouldBeEmpty, expectedMemoryPointer);
-
-        return result;
     }
 
     /// <exception cref="AssertFailedException"/>
-    public AssemblyResult DoAssembly()
+    public void DoAssembly()
     {
         AssemblyResult result = Utils.RunAssembly(new FileInfo(SourceFile), GetInput());
         Console.Write($"ExitCode: {result.ExitCode}");
         ExpectedResult expected = GetExpectedResult();
         expected.Assert(result);
-        return result;
     }
 }
 
@@ -222,7 +221,11 @@ public static class Utils
     const int TestCount = 50;
     static readonly int TestFileNameWidth = (int)Math.Floor(Math.Log10(TestCount)) + 1;
 
-    public static LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckSettings => LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default;
+    public static LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckSettings => new(LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default)
+    {
+        GenerateDebugInformation = false,
+        ShowProgress = false,
+    };
 
     public static byte[] GenerateBrainfuckMemory(int length)
     {
@@ -342,12 +345,13 @@ public static class Utils
         AnalysisCollection analysisCollection = new();
 
         CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath }, null, analysisCollection);
-        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default, null, analysisCollection);
+        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckSettings, null, analysisCollection);
 
         analysisCollection.Throw();
 
-        LanguageCore.Brainfuck.Interpreter interpreter = new(generated.Code, OutputCallback, InputCallback);
-
+        LanguageCore.Brainfuck.Interpreter interpreter = new(OutputCallback, InputCallback)
+        { DebugInfo = generated.DebugInfo };
+        interpreter.LoadCode(generated.Code, false, generated.DebugInfo);
         interpreter.Run();
 
         return new BrainfuckResult(stdOutput.ToString(), interpreter);
@@ -364,15 +368,59 @@ public static class Utils
         AnalysisCollection analysisCollection = new();
 
         CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath }, null, analysisCollection);
-        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default, null, analysisCollection);
+        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckSettings, null, analysisCollection);
 
         analysisCollection.Throw();
 
-        LanguageCore.Brainfuck.InterpreterCompact interpreter = new(generated.Code, OutputCallback, InputCallback);
-
+        LanguageCore.Brainfuck.InterpreterCompact interpreter = new(OutputCallback, InputCallback)
+        { DebugInfo = generated.DebugInfo };
+        interpreter.LoadCode(generated.Code, false, generated.DebugInfo);
         interpreter.Run();
 
         return new BrainfuckResult(stdOutput.ToString(), interpreter);
+    }
+
+    public static (BrainfuckResult Normal, BrainfuckResult Compact) RunBrainfuckBoth(FileInfo file, string input)
+    {
+        BrainfuckResult resultNormal;
+        BrainfuckResult resultCompact;
+
+        InputBuffer inputBuffer;
+        StringBuilder stdOutput = new();
+
+        void OutputCallback(byte data) => stdOutput.Append(LanguageCore.Brainfuck.CharCode.GetChar(data));
+        byte InputCallback() => LanguageCore.Brainfuck.CharCode.GetByte(inputBuffer.Read());
+
+        AnalysisCollection analysisCollection = new();
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath }, null, analysisCollection);
+        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckSettings, null, analysisCollection);
+        analysisCollection.Throw();
+
+        {
+            inputBuffer = new(input);
+            stdOutput.Clear();
+
+            LanguageCore.Brainfuck.Interpreter interpreter = new(OutputCallback, InputCallback)
+            { DebugInfo = generated.DebugInfo };
+            interpreter.LoadCode(generated.Code, false, generated.DebugInfo);
+            interpreter.Run();
+
+            resultNormal = new BrainfuckResult(stdOutput.ToString(), interpreter);
+        }
+
+        {
+            inputBuffer = new(input);
+            stdOutput.Clear();
+
+            LanguageCore.Brainfuck.InterpreterCompact interpreter = new(OutputCallback, InputCallback)
+            { DebugInfo = generated.DebugInfo };
+            interpreter.LoadCode(generated.Code, false, generated.DebugInfo);
+            interpreter.Run();
+
+            resultCompact = new BrainfuckResult(stdOutput.ToString(), interpreter);
+        }
+
+        return (resultNormal, resultCompact);
     }
 
     public static AssemblyResult RunAssembly(FileInfo file, string input)

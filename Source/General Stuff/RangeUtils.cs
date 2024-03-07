@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore;
 
-public partial struct Range
+public struct Range
 {
     public static bool Overlaps<T>(MutableRange<T> a, MutableRange<T> b)
         where T : IEquatable<T>, IComparisonOperators<T, T, bool>
@@ -9,6 +9,10 @@ public partial struct Range
         T minEnd = (a.End < b.End) ? a.End : b.End;
         return maxStart <= minEnd;
     }
+
+    public static bool Inside<T>(MutableRange<T> outer, MutableRange<T> inner)
+        where T : IEquatable<T>, IComparisonOperators<T, T, bool>
+        => inner.Start >= outer.Start && inner.End <= outer.End;
 
     public static MutableRange<T> Union<T>(MutableRange<T> a, MutableRange<T> b)
         where T : IEquatable<T>, IComparisonOperators<T, T, bool>
@@ -37,6 +41,10 @@ public partial struct Range
         T minEnd = (a.End < b.End) ? a.End : b.End;
         return maxStart <= minEnd;
     }
+
+    public static bool Inside<T>(Range<T> outer, Range<T> inner)
+        where T : IEquatable<T>, IComparisonOperators<T, T, bool>
+        => inner.Start >= outer.Start && inner.End <= outer.End;
 
     public static Range<T> Union<T>(Range<T> a, Range<T> b)
         where T : IEquatable<T>, IComparisonOperators<T, T, bool>
@@ -92,4 +100,8 @@ public static class RangeExtensions
     public static bool Overlaps<T>(this Range<T> a, Range<T> b)
         where T : IEquatable<T>, IComparisonOperators<T, T, bool>
         => Range.Overlaps(a, b);
+
+    public static T Middle<T>(this Range<T> a)
+        where T : IEquatable<T>, IAdditionOperators<T, T, T>, IDivisionOperators<T, int, T>
+        => (a.Start + a.End) / 2;
 }

@@ -68,7 +68,7 @@ public struct BrainfuckGeneratorSettings
                 StackStart = 0,
                 HeapStart = 64,
                 HeapSize = 64,
-                GenerateDebugInformation = false,
+                GenerateDebugInformation = true,
                 ShowProgress = true,
             };
             result.StackSize = result.HeapStart - 1;
@@ -130,8 +130,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         readonly CompiledCode Code;
         readonly DebugInformation? DebugInfo;
         readonly Position Position;
+        readonly Uri? CurrentFile;
 
-        public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, Position position)
+        public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, Position position, Uri? currentFile)
         {
             Code = code;
             DebugInfo = debugInfo;
@@ -141,10 +142,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (position == Position.UnknownPosition) return;
 
             InstructionStart = code.GetFinalCode().Length;
+            CurrentFile = currentFile;
         }
 
-        public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, IPositioned? position)
-            : this(code, debugInfo, position?.Position ?? Position.UnknownPosition)
+        public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, IPositioned? position, Uri? currentFile)
+            : this(code, debugInfo, position?.Position ?? Position.UnknownPosition, currentFile)
         { }
 
         public void Dispose()
@@ -158,6 +160,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 Instructions = (InstructionStart, end),
                 SourcePosition = Position,
+                Uri = CurrentFile,
             });
         }
     }
@@ -332,7 +335,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         this.BreakCount = new Stack<int>();
         this.BreakTagStack = new Stack<int>();
         this.InMacro = new Stack<bool>();
-        this.DebugInfo = new DebugInformation();
+        this.DebugInfo = new DebugInformation(compilerResult.Tokens);
         this.PrintCallback = printCallback;
         this.GenerateDebugInformation = settings.GenerateDebugInformation;
         this.ShowProgress = settings.ShowProgress;
@@ -439,7 +442,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         return new GeneratorCodeBlock(this);
     }
 
-    DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);
+    DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position, CurrentFile);
+    DebugInfoBlock DebugBlock(Position position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position, CurrentFile);
 
     protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
@@ -679,6 +683,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
     {
+        PrintCallback?.Invoke("Generating code ...", LogType.Debug);
         PrintCallback?.Invoke("  Precompiling ...", LogType.Debug);
 
         CurrentFile = compilerResult.File;

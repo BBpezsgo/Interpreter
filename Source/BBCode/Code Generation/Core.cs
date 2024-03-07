@@ -97,7 +97,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         this.ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
         this.GeneratedCode = new List<PreparationInstruction>();
         this.ExternalFunctionsCache = new Dictionary<string, int>();
-        this.GeneratedDebugInfo = new DebugInformation();
+        this.GeneratedDebugInfo = new DebugInformation(compilerResult.Tokens);
         this.CleanupStack = new Stack<CleanupItem[]>();
         this.ReturnInstructions = new Stack<List<int>>();
         this.BreakInstructions = new Stack<List<int>>();

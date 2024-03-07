@@ -1751,6 +1751,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Instructions = (startInstruction, GeneratedCode.Count - 1),
             SourcePosition = statement.Position,
+            Uri = CurrentFile,
         });
     }
 
@@ -2135,6 +2136,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 Instructions = (GeneratedCode.Count, GeneratedCode.Count),
                 SourcePosition = block.Position,
+                Uri = CurrentFile,
             },
             Stack = new List<StackElementInformations>(),
         });
@@ -2505,6 +2507,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 Instructions = (GeneratedCode.Count, GeneratedCode.Count),
                 SourcePosition = new Position(statements),
+                Uri = CurrentFile,
             },
             Stack = new List<StackElementInformations>(),
         });

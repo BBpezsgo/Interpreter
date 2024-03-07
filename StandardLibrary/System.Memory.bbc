@@ -23,16 +23,11 @@ void SetHeader(int* ptr, int size, int allocated)
 	*ptr = value;
 }
 
-void FixSize(ref int size)
-{
-    if (size == 0)
-    { size++; }
-}
-
 [Builtin("alloc")]
 export int* Alloc(int sizeNeed)
 {
-    FixSize(ref sizeNeed);
+    if (sizeNeed == 0)
+    { sizeNeed++; }
     
     // Print("Allocating ");
     // Print(sizeNeed);

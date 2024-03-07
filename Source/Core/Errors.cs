@@ -139,7 +139,7 @@ public class RuntimeException : LanguageException
     public RuntimeContext? Context;
     public Position SourcePosition;
     public Uri? SourceFile;
-    public FunctionInformations[]? CallStack;
+    public ImmutableArray<FunctionInformations> CallStack;
     public FunctionInformations? CurrentFrame;
 
     public void FeedDebugInfo(DebugInformation debugInfo)
@@ -154,7 +154,7 @@ public class RuntimeException : LanguageException
 
         CurrentFrame = debugInfo.GetFunctionInformations(context.CodePointer);
 
-        CallStack = debugInfo.GetFunctionInformations(context.CallTrace);
+        CallStack = debugInfo.GetFunctionInformations(context.CallTrace).ToImmutableArray();
 
         SourceFile = CallStack.Length > 0 ? CallStack[^1].File : null;
     }
@@ -195,7 +195,7 @@ public class RuntimeException : LanguageException
             result.AppendLine();
             result.Append('\t');
             result.Append(' ');
-            if (CallStack == null)
+            if (CallStack == default)
             { result.AppendJoin("\n   ", context.CallTrace); }
             else
             { result.AppendJoin("\n   ", CallStack); }
@@ -236,7 +236,7 @@ public sealed class UserException : RuntimeException
             result.AppendLine();
             result.Append('\t');
             result.Append(' ');
-            if (CallStack == null)
+            if (CallStack == default)
             { result.AppendJoin("\n   ", context.CallTrace); }
             else
             { result.AppendJoin("\n   ", CallStack); }

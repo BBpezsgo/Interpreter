@@ -29,7 +29,9 @@ public struct ConsoleProgressBar : IDisposable
     readonly int _line;
     readonly ConsoleColor _color;
     readonly bool _show;
+    readonly double _time;
 
+    bool _isFast;
     float _progress;
 
     public ConsoleProgressBar(ConsoleColor color, bool show)
@@ -38,6 +40,8 @@ public struct ConsoleProgressBar : IDisposable
         _color = color;
         _show = show && ConsoleProgress.IsEnabled;
         _progress = 0f;
+        _time = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+        _isFast = true;
 
         if (!_show) return;
 
@@ -51,9 +55,16 @@ public struct ConsoleProgressBar : IDisposable
         _progress = progress;
         Print();
     }
-    public readonly void Print()
+    public void Print()
     {
         if (!_show) return;
+        if (_isFast)
+        {
+            if (DateTime.UtcNow.TimeOfDay.TotalSeconds - _time > .2f)
+            { _isFast = false; }
+            else
+            { return; }
+        }
 
         (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
 
@@ -99,6 +110,10 @@ public struct ConsoleProgressLabel : IDisposable
     readonly bool _show;
     readonly ConsoleSpinner _spinner;
     readonly bool _showSpinner;
+    readonly double _time;
+
+    bool _isNotFirst;
+    bool _isFast;
 
     public ConsoleProgressLabel(string label, ConsoleColor color, bool show, bool showSpinner = false)
     {
@@ -112,6 +127,9 @@ public struct ConsoleProgressLabel : IDisposable
             _showSpinner = showSpinner;
             _spinner = new ConsoleSpinner(ConsoleProgress.SpinnerCharacters);
         }
+        _time = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+        _isFast = true;
+        _isNotFirst = false;
 
         if (!_show) return;
 
@@ -119,9 +137,17 @@ public struct ConsoleProgressLabel : IDisposable
         Console.WriteLine();
     }
 
-    public readonly void Print()
+    public void Print()
     {
         if (!_show) return;
+        if (_isFast && _isNotFirst)
+        {
+            if (DateTime.UtcNow.TimeOfDay.TotalSeconds - _time > .2f)
+            { _isFast = false; }
+            else
+            { return; }
+        }
+        _isNotFirst = true;
 
         (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
 

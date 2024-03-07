@@ -219,12 +219,16 @@ public static class Entry
                     }
                 }
 
+                bool pauseBeforeRun = false;
+
                 if ((compileOptions & BrainfuckCompilerFlags.PrintCompiled) != 0)
                 {
                     Output.WriteLine();
                     Output.WriteLine($" === COMPILED ===");
                     BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
                     Output.WriteLine();
+
+                    pauseBeforeRun = true;
                 }
 
                 generated.Code = BrainfuckCode.RemoveNoncodes(generated.Code, true);
@@ -247,6 +251,8 @@ public static class Entry
                     Output.WriteLine();
                     BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
                     Output.WriteLine();
+
+                    pauseBeforeRun = true;
                 }
 
                 if ((compileOptions & BrainfuckCompilerFlags.WriteToFile) != 0)
@@ -255,20 +261,23 @@ public static class Entry
                     File.WriteAllText(compiledFilePath, generated.Code);
                 }
 
-                InterpreterCompact interpreter = new(generated.Code)
+                InterpreterCompact interpreter = new()
                 {
                     DebugInfo = generated.DebugInfo,
-                    OriginalCode = tokens,
                 };
+                interpreter.LoadCode(generated.Code, true, interpreter.DebugInfo);
+
+                if (pauseBeforeRun)
+                {
+                    Output.WriteLine();
+                    Output.Write("Press any key to start executing");
+                    Console.ReadKey();
+                }
 
                 if (arguments.ConsoleGUI)
                 {
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     { throw new PlatformNotSupportedException($"Console rendering is only supported on Windows"); }
-
-                    Output.WriteLine();
-                    Output.Write("Press any key to start the interpreter");
-                    Console.ReadKey();
 
                     interpreter.RunWithUI(true, 1);
 

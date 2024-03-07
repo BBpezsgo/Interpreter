@@ -64,7 +64,7 @@ export inline void Print(temp char* message)
 //  == PRINT LINE ==
 //
 
-export void PrintLine()
+export inline void PrintLine()
 {
     Print('\r');
     Print('\n');
@@ -76,13 +76,13 @@ export macro PrintLine(message)
     PrintLine();
 }
 
-export void PrintLine(char message)
+export inline void PrintLine(char message)
 {
     Print(message);
     PrintLine();
 }
 
-export void PrintLine(int message)
+export inline void PrintLine(int message)
 {
     Print(message);
     PrintLine();

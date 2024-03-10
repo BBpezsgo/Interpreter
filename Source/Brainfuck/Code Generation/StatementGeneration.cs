@@ -1,4 +1,4 @@
-﻿using Ansi = Win32.Ansi;
+﻿using Ansi = Win32.Console.Ansi;
 
 namespace LanguageCore.Brainfuck.Generator;
 
@@ -449,11 +449,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             int indexAddress = Stack.NextAddress;
             GenerateCodeForStatement(statement.Index);
 
+            if (pointerType.To.Size != 1)
             {
                 int multiplierAddress = Stack.Push(pointerType.To.Size);
-
                 Code.MULTIPLY(indexAddress, multiplierAddress, multiplierAddress + 1, multiplierAddress + 2);
-
                 Stack.Pop(); // multiplierAddress
             }
 
@@ -854,7 +853,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         CodeSnapshot codeSnapshot = SnapshotCode();
         GeneratorSnapshot genSnapshot = Snapshot();
-        int initialCodeLength = codeSnapshot.Code.GetFinalCode().Length;
+        int initialCodeLength = codeSnapshot.Code.GetFinalCode(true).Length;
 
         if (IsUnrollable(@for))
         {
@@ -862,7 +861,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 CodeSnapshot unrolledCode = SnapshotCode();
 
-                int unrolledLength = unrolledCode.Code.GetFinalCode().Length - initialCodeLength;
+                int unrolledLength = unrolledCode.Code.GetFinalCode(true).Length - initialCodeLength;
                 GeneratorSnapshot unrolledSnapshot = Snapshot();
 
                 Restore(genSnapshot);
@@ -873,7 +872,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     GenerateCodeForStatement(@for, false);
 
                     CodeSnapshot notUnrolledCode = SnapshotCode();
-                    int notUnrolledLength = notUnrolledCode.Code.GetFinalCode().Length - initialCodeLength;
+                    int notUnrolledLength = notUnrolledCode.Code.GetFinalCode(true).Length - initialCodeLength;
                     GeneratorSnapshot notUnrolledSnapshot = Snapshot();
 
                     if (unrolledLength <= notUnrolledLength)
@@ -1339,8 +1338,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         {
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
-            Uri? prevFile = CurrentFile;
-            CurrentFile = macro.FilePath;
+            // Uri? prevFile = CurrentFile;
+            // CurrentFile = macro.FilePath;
 
             InMacro.Push(true);
 
@@ -1354,7 +1353,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             InMacro.Pop();
 
-            CurrentFile = prevFile;
+            // CurrentFile = prevFile;
             return;
         }
 
@@ -1387,8 +1386,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             if (!functionCall.SaveValue)
             {
+                Uri? savedFile = CurrentFile;
+                CurrentFile = null;
                 foreach (Statement runtimeStatement in runtimeStatements)
                 { GenerateCodeForStatement(runtimeStatement); }
+                CurrentFile = savedFile;
                 return;
             }
         }
@@ -2048,51 +2050,68 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         GeneralType instanceType = FindType(newInstance.Type);
 
-        if (instanceType is PointerType pointerType)
+        switch (instanceType)
         {
-            // int pointerAddress = Stack.NextAddress;
-            Allocate(pointerType.To.Size, newInstance);
-
-            if (!newInstance.SaveValue)
-            { Stack.Pop(); }
-        }
-        else if (instanceType is StructType structType)
-        {
-            structType.Struct.References.Add((newInstance.Type, CurrentFile, CurrentMacro.Last));
-
-            int address = Stack.PushVirtual(structType.Struct.Size);
-
-            foreach (CompiledField field in structType.Struct.Fields)
+            case PointerType pointerType:
             {
-                if (field.Type is not BuiltinType builtinType)
-                { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.FilePath); }
+                int pointerAddress = Stack.NextAddress;
+                Allocate(pointerType.To.Size, newInstance);
 
-                int offset = structType.Struct.FieldOffsets[field.Identifier.Content];
+                int temp = Stack.PushVirtual(1);
+                Code.CopyValueWithTemp(pointerAddress, temp + 1, temp);
 
-                int offsettedAddress = address + offset;
-
-                switch (builtinType.Type)
+                for (int i = 0; i < pointerType.To.Size; i++)
                 {
-                    case BasicType.Byte:
-                        Code.SetValue(offsettedAddress, (byte)0);
-                        break;
-                    case BasicType.Integer:
-                        Code.SetValue(offsettedAddress, (byte)0);
-                        AnalysisCollection?.Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.FilePath));
-                        break;
-                    case BasicType.Char:
-                        Code.SetValue(offsettedAddress, (char)'\0');
-                        break;
-                    case BasicType.Float:
-                        throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, structType.Struct.FilePath);
-                    case BasicType.Void:
-                    default:
-                        throw new CompilerException($"Unknown field type \"{builtinType}\"", field.Identifier, structType.Struct.FilePath);
+                    Heap.Set(temp, 0);
+                    Code.AddValue(temp, 1);
                 }
+
+                Stack.Pop();
+
+                if (!newInstance.SaveValue)
+                { Stack.Pop(); }
+                break;
             }
+
+            case StructType structType:
+            {
+                structType.Struct.References.Add((newInstance.Type, CurrentFile, CurrentMacro.Last));
+
+                int address = Stack.PushVirtual(structType.Struct.Size);
+
+                foreach (CompiledField field in structType.Struct.Fields)
+                {
+                    if (field.Type is not BuiltinType builtinType)
+                    { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.FilePath); }
+                    int offset = structType.Struct.FieldOffsets[field.Identifier.Content];
+
+                    int offsettedAddress = address + offset;
+
+                    switch (builtinType.Type)
+                    {
+                        case BasicType.Byte:
+                            Code.SetValue(offsettedAddress, 0);
+                            break;
+                        case BasicType.Integer:
+                            Code.SetValue(offsettedAddress, 0);
+                            AnalysisCollection?.Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.FilePath));
+                            break;
+                        case BasicType.Char:
+                            Code.SetValue(offsettedAddress, '\0');
+                            break;
+                        case BasicType.Float:
+                            throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, structType.Struct.FilePath);
+                        default:
+                            throw new CompilerException($"Unknown field type \"{builtinType}\"", field.Identifier, structType.Struct.FilePath);
+                    }
+                }
+
+                break;
+            }
+
+            default:
+                throw new CompilerException($"Unknown type definition {instanceType}", newInstance.Type, CurrentFile);
         }
-        else
-        { throw new CompilerException($"Unknown type definition {instanceType}", newInstance.Type, CurrentFile); }
     }
     void GenerateCodeForStatement(Field field)
     {
@@ -2182,7 +2201,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (value is Literal literal &&
             literal.Type == LiteralType.String)
         {
-            GenerateCodeForPrinter(literal.Value);
+            GenerateCodeForPrinter(literal.Value, literal.Position);
             return;
         }
 
@@ -2201,7 +2220,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             Code.SetPointer(0);
         }
     }
-    void GenerateCodeForPrinter(string value)
+    void GenerateCodeForPrinter(string value) => GenerateCodeForPrinter(value, Position.UnknownPosition);
+    void GenerateCodeForPrinter(string value, Position position)
     {
         using (CommentBlock($"Print string value \"{value}\""))
         {
@@ -2212,6 +2232,26 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             byte prevValue = 0;
             for (int i = 0; i < value.Length; i++)
             {
+                using DebugInfoBlock debugBlock = DebugBlock(
+                    (position == Position.UnknownPosition) ?
+                    Position.UnknownPosition :
+                    new Position(
+                        new Range<SinglePosition>(
+                            new SinglePosition(
+                                position.Range.Start.Line,
+                                position.Range.Start.Character + i
+                            ),
+                            new SinglePosition(
+                                position.Range.Start.Line,
+                                position.Range.Start.Character + i + 1
+                            )
+                        ),
+                        new Range<int>(
+                            position.AbsoluteRange.Start + i,
+                            position.AbsoluteRange.Start + i + 1
+                        )
+                    ));
+
                 Code.SetPointer(address);
                 byte charToPrint = CharCode.GetByte(value[i]);
 
@@ -2408,16 +2448,32 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     #endregion
 
-    int Allocate(int size, IPositioned position)
+    void Allocate(int size, IPositioned position)
     {
         StatementWithValue[] parameters = new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) };
 
         if (!TryGetBuiltinFunction("alloc", FindStatementTypes(parameters), out CompiledFunction? allocator))
         { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] not found", position, CurrentFile); }
+        if (!allocator.ReturnSomething)
+        { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] should return something", position, CurrentFile); }
 
-        int pointerAddress = Stack.NextAddress;
+        if (!allocator.CanUse(CurrentFile))
+        {
+            AnalysisCollection?.Errors.Add(new Error($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
+            return;
+        }
+
+        if (TryEvaluate(allocator, parameters, out DataItem? returnValue, out Statement[]? runtimeStatements))
+        {
+            if (returnValue.HasValue && runtimeStatements.Length == 0)
+            {
+                Stack.Push(returnValue.Value);
+                return;
+            }
+        }
+
         GenerateCodeForFunction(allocator, parameters, null, position);
-        return pointerAddress;
+        return;
     }
 
     void GenerateDeallocator(StatementWithValue value)
@@ -2540,7 +2596,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         CodeSnapshot originalCode = SnapshotCode();
         GeneratorSnapshot originalSnapshot = Snapshot();
-        int originalCodeLength = originalCode.Code.GetFinalCode().Length;
+        int originalCodeLength = originalCode.Code.GetFinalCode(true).Length;
 
         CodeSnapshot? inlinedCode = null;
         int inlinedLength = default;
@@ -2553,7 +2609,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 GenerateCodeForStatement(inlined);
 
                 inlinedCode = SnapshotCode();
-                inlinedLength = inlinedCode.Value.Code.GetFinalCode().Length - originalCodeLength;
+                inlinedLength = inlinedCode.Value.Code.GetFinalCode(true).Length - originalCodeLength;
                 inlinedSnapshot = Snapshot();
             }
         }
@@ -2566,7 +2622,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GenerateCodeForFunction_(function, parameters, typeArguments, callerPosition);
 
         CodeSnapshot notInlinedCode = SnapshotCode();
-        int notInlinedLength = notInlinedCode.Code.GetFinalCode().Length - originalCodeLength;
+        int notInlinedLength = notInlinedCode.Code.GetFinalCode(true).Length - originalCodeLength;
         GeneratorSnapshot notInlinedSnapshot = Snapshot();
 
         if (inlinedCode is not null &&
@@ -2584,9 +2640,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     void GenerateCodeForFunction_(CompiledFunction function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
     {
-        int instructionStart = 0;
-        if (GenerateDebugInformation)
-        { instructionStart = Code.GetFinalCode().Length; }
+        using DebugFunctionBlock<CompiledFunction> debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.Attributes.HasAttribute("External", "stdout"))
         {
@@ -2605,21 +2659,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 foreach (StatementWithValue parameter in parameters)
                 { GenerateCodeForPrinter(parameter); }
-
-                if (GenerateDebugInformation)
-                {
-                    DebugInfo.FunctionInformations.Add(new FunctionInformations()
-                    {
-                        File = function.FilePath,
-                        Identifier = function.Identifier.Content,
-                        ReadableIdentifier = function.ToReadable(),
-                        Instructions = (instructionStart, Code.GetFinalCode().Length),
-                        IsMacro = false,
-                        IsValid = true,
-                        SourcePosition = function.Position,
-                    });
-                }
-
                 return;
             }
         }
@@ -2640,20 +2679,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     throw new CompilerException($"Function with attribute \"[External(\"stdin\")]\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
                 }
                 Code += ',';
-            }
-
-            if (GenerateDebugInformation)
-            {
-                DebugInfo.FunctionInformations.Add(new FunctionInformations()
-                {
-                    File = function.FilePath,
-                    Identifier = function.Identifier.Content,
-                    ReadableIdentifier = function.ToReadable(),
-                    Instructions = (instructionStart, Code.GetFinalCode().Length),
-                    IsMacro = false,
-                    IsValid = true,
-                    SourcePosition = function.Position,
-                });
             }
 
             return;
@@ -2856,27 +2881,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         InMacro.Pop();
         CurrentMacro.Pop();
-
-        if (GenerateDebugInformation)
-        {
-            DebugInfo.FunctionInformations.Add(new FunctionInformations()
-            {
-                File = function.FilePath,
-                Identifier = function.Identifier.Content,
-                ReadableIdentifier = function.ToReadable(),
-                Instructions = (instructionStart, Code.GetFinalCode().Length),
-                IsMacro = false,
-                IsValid = true,
-                SourcePosition = function.Position,
-            });
-        }
     }
 
     void GenerateCodeForFunction(CompiledOperator function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
     {
-        int instructionStart = 0;
-        if (GenerateDebugInformation)
-        { instructionStart = Code.GetFinalCode().Length; }
+        using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.Attributes.HasAttribute("StandardOutput"))
         {
@@ -2895,21 +2904,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 foreach (StatementWithValue parameter in parameters)
                 { GenerateCodeForPrinter(parameter); }
-
-                if (GenerateDebugInformation)
-                {
-                    DebugInfo.FunctionInformations.Add(new FunctionInformations()
-                    {
-                        File = function.FilePath,
-                        Identifier = function.Identifier.Content,
-                        ReadableIdentifier = function.ToReadable(),
-                        Instructions = (instructionStart, Code.GetFinalCode().Length),
-                        IsMacro = false,
-                        IsValid = true,
-                        SourcePosition = function.Position,
-                    });
-                }
-
                 return;
             }
         }
@@ -2930,20 +2924,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     throw new CompilerException($"Function with \"StandardInput\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
                 }
                 Code += ',';
-            }
-
-            if (GenerateDebugInformation)
-            {
-                DebugInfo.FunctionInformations.Add(new FunctionInformations()
-                {
-                    File = function.FilePath,
-                    Identifier = function.Identifier.Content,
-                    ReadableIdentifier = function.ToReadable(),
-                    Instructions = (instructionStart, Code.GetFinalCode().Length),
-                    IsMacro = false,
-                    IsValid = true,
-                    SourcePosition = function.Position,
-                });
             }
 
             return;
@@ -3151,27 +3131,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         InMacro.Pop();
         CurrentMacro.Pop();
-
-        if (GenerateDebugInformation)
-        {
-            DebugInfo.FunctionInformations.Add(new FunctionInformations()
-            {
-                File = function.FilePath,
-                Identifier = function.Identifier.Content,
-                ReadableIdentifier = function.ToReadable(),
-                Instructions = (instructionStart, Code.GetFinalCode().Length),
-                IsMacro = false,
-                IsValid = true,
-                SourcePosition = function.Position,
-            });
-        }
     }
 
     void GenerateCodeForFunction(CompiledGeneralFunction function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
     {
-        int instructionStart = 0;
-        if (GenerateDebugInformation)
-        { instructionStart = Code.GetFinalCode().Length; }
+        using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ParameterCount != parameters.Length)
         { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
@@ -3357,27 +3321,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         InMacro.Pop();
         CurrentMacro.Pop();
-
-        if (GenerateDebugInformation)
-        {
-            DebugInfo.FunctionInformations.Add(new FunctionInformations()
-            {
-                File = function.FilePath,
-                Identifier = function.Identifier.Content,
-                ReadableIdentifier = function.ToReadable(),
-                Instructions = (instructionStart, Code.GetFinalCode().Length),
-                IsMacro = false,
-                IsValid = true,
-                SourcePosition = function.Position,
-            });
-        }
     }
 
     void GenerateCodeForFunction(CompiledConstructor function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, ConstructorCall callerPosition)
     {
-        int instructionStart = 0;
-        if (GenerateDebugInformation)
-        { instructionStart = Code.GetFinalCode().Length; }
+        using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ParameterCount - 1 != parameters.Length)
         { throw new CompilerException($"Wrong number of parameters passed to constructor \"{function.ToReadable()}\" (required {function.ParameterCount - 1} passed {parameters.Length})", callerPosition, CurrentFile); }
@@ -3579,20 +3527,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         InMacro.Pop();
         CurrentMacro.Pop();
-
-        if (GenerateDebugInformation)
-        {
-            DebugInfo.FunctionInformations.Add(new FunctionInformations()
-            {
-                File = function.FilePath,
-                Identifier = function.Identifier.ToString(),
-                ReadableIdentifier = function.ToReadable(),
-                Instructions = (instructionStart, Code.GetFinalCode().Length),
-                IsMacro = false,
-                IsValid = true,
-                SourcePosition = function.Position,
-            });
-        }
     }
 
     /// <returns>

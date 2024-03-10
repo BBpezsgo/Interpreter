@@ -145,10 +145,10 @@ public partial struct DataItem :
             },
             RuntimeType.Integer => value.Type switch
             {
-                RuntimeType.Byte => new DataItem(value.VByte),
+                RuntimeType.Byte => new DataItem((int)value.VByte),
                 RuntimeType.Integer => value,
                 RuntimeType.Single => value,
-                RuntimeType.Char => new DataItem((byte)value.VChar),
+                RuntimeType.Char => new DataItem((int)value.VChar),
                 _ => value,
             },
             RuntimeType.Single => value.Type switch
@@ -164,6 +164,49 @@ public partial struct DataItem :
                 RuntimeType.Byte => new DataItem((char)value.VByte),
                 RuntimeType.Integer => (value.VInt is >= char.MinValue and <= char.MaxValue) ? new DataItem((char)value.VInt) : value,
                 RuntimeType.Single => value,
+                RuntimeType.Char => value,
+                _ => value,
+            },
+            _ => value,
+        };
+
+        return value.Type == targetType;
+    }
+
+    public static DataItem Cast(DataItem value, RuntimeType targetType)
+    {
+        value = targetType switch
+        {
+            RuntimeType.Null => DataItem.Null,
+            RuntimeType.Byte => value.Type switch
+            {
+                RuntimeType.Byte => value,
+                RuntimeType.Integer => new DataItem((byte)value.VInt),
+                RuntimeType.Single => new DataItem((byte)value.VSingle),
+                RuntimeType.Char => new DataItem((byte)value.VChar),
+                _ => value,
+            },
+            RuntimeType.Integer => value.Type switch
+            {
+                RuntimeType.Byte => new DataItem((int)value.VByte),
+                RuntimeType.Integer => value,
+                RuntimeType.Single => new DataItem((int)value.VSingle),
+                RuntimeType.Char => new DataItem((int)value.VChar),
+                _ => value,
+            },
+            RuntimeType.Single => value.Type switch
+            {
+                RuntimeType.Byte => new DataItem((float)value.VByte),
+                RuntimeType.Integer => new DataItem((float)value.VInt),
+                RuntimeType.Single => value,
+                RuntimeType.Char => new DataItem((float)value.VChar),
+                _ => value,
+            },
+            RuntimeType.Char => value.Type switch
+            {
+                RuntimeType.Byte => new DataItem((char)value.VByte),
+                RuntimeType.Integer => new DataItem((char)value.VInt),
+                RuntimeType.Single => new DataItem((char)value.VSingle),
                 RuntimeType.Char => value,
                 _ => value,
             },

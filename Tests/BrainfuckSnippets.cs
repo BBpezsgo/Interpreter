@@ -302,6 +302,7 @@ public class BrainfuckSnippets
     [DataRow(0, 1, 0)]
     [DataRow(2, 4, 8)]
     [DataRow(16, 16, 255)]
+    [DataRow(16, 1, 16)]
     public void MULTIPLY(int x, int y, int expected)
     {
         CompiledCode code = new();

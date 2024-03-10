@@ -2050,10 +2050,7 @@ public abstract class CodeGenerator
 
         if (function.Block is null ||
             function.Block.Statements.Length == 0)
-        {
-            return false;
-            // throw new CompilerException($"Function \"{function.ToReadable()}\" has no statements", function.Block, function.FilePath);
-        }
+        { return false; }
 
         if (function.Block.Statements.Length == 1)
         {
@@ -2065,8 +2062,6 @@ public abstract class CodeGenerator
             if (!InlineMacro(function.Block, parameters, out inlined))
             { return false; }
         }
-
-        // inlined = Collapse(inlined, parameters);
 
         if (inlined is KeywordCall keywordCall &&
             keywordCall.Identifier.Equals(StatementKeywords.Return) &&
@@ -3005,11 +3000,9 @@ public abstract class CodeGenerator
         value = default;
         runtimeStatements = default;
 
-        if (TryCompute(parameters, EvaluationContext.Empty, out DataItem[]? parameterValues))
-        {
-            if (TryEvaluate(function, parameterValues, out value, out runtimeStatements))
-            { return true; }
-        }
+        if (TryCompute(parameters, EvaluationContext.Empty, out DataItem[]? parameterValues) &&
+            TryEvaluate(function, parameterValues, out value, out runtimeStatements))
+        { return true; }
 
         if (!InlineMacro(function, out Statement? inlined, parameters))
         { return false; }
@@ -3101,7 +3094,7 @@ public abstract class CodeGenerator
     }
     bool TryEvaluate(ForLoop forLoop, EvaluationContext context)
     {
-        int iterations = 64;
+        int iterations = 5048;
 
         context.PushScope();
 
@@ -3321,6 +3314,7 @@ public abstract class CodeGenerator
             IndexCall v => TryCompute(v, context, out value),
             ModifiedStatement => false,
             NewInstance => false,
+            ConstructorCall => false,
             _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
     }

@@ -11,7 +11,7 @@ public enum Opcode : byte
     ///     <c><see cref="PreparationInstruction.parameter"/></c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from Instruction
@@ -39,13 +39,13 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from Instruction or value
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchStackAddress"/>)
     /// </para>
@@ -59,13 +59,13 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from value
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchStackAddress"/>)
     /// </para>
@@ -83,13 +83,13 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> relative address</c> (depends on the addressing mode)<br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c><see cref="int"/> saved CP</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>
@@ -102,7 +102,7 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> CP</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// </summary>
     RETURN,
 
@@ -114,7 +114,7 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> relative address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>
@@ -127,7 +127,7 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> relative address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>
@@ -154,7 +154,7 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> basepointer</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     "basepointer"
@@ -249,13 +249,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     none
@@ -270,13 +270,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     none
@@ -291,13 +291,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     none
@@ -312,13 +312,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     none
@@ -333,13 +333,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     none
@@ -354,13 +354,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     none
@@ -375,13 +375,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -396,13 +396,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     none
@@ -416,13 +416,13 @@ public enum Opcode : byte
     ///     <c>value</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from value
@@ -440,13 +440,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -461,13 +461,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -482,13 +482,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -502,13 +502,13 @@ public enum Opcode : byte
     ///     <c>left</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -524,13 +524,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -545,13 +545,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -569,13 +569,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -590,13 +590,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -611,13 +611,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -632,13 +632,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -653,13 +653,13 @@ public enum Opcode : byte
     ///     <c>right</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from left side
@@ -676,19 +676,19 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from value
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>
@@ -722,13 +722,13 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> size</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
     ///     <c><see cref="int"/> pointer</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     Inherits from Instruction
@@ -742,7 +742,7 @@ public enum Opcode : byte
     ///     <c><see cref="int"/> pointer</c><br/>
     /// </para>
     /// <br/><br/>
-    /// 
+    ///
     /// <para>
     ///     <b>Tag:</b><br/>
     ///     none

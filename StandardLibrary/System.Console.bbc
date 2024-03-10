@@ -42,6 +42,11 @@ inline int _FindMaxPowOf10(int num)
 // https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
 export inline void Print(int message)
 {
+    if (message < 0)
+    {
+        Print('-');
+        message = message * -1;
+    }
     int pow10 = _FindMaxPowOf10(message);
     while (pow10)
     {

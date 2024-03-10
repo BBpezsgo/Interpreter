@@ -230,7 +230,7 @@ public static class Utils
     public static byte[] GenerateBrainfuckMemory(int length)
     {
         byte[] result = new byte[length];
-        int offset = LanguageCore.Brainfuck.BasicHeapCodeHelper.GetOffsettedStart(BrainfuckSettings.HeapStart) + (LanguageCore.Brainfuck.BasicHeapCodeHelper.BLOCK_SIZE * BrainfuckSettings.HeapSize) + LanguageCore.Brainfuck.BasicHeapCodeHelper.OFFSET_DATA;
+        int offset = LanguageCore.Brainfuck.HeapCodeHelper.GetOffsettedStart(BrainfuckSettings.HeapStart) + (LanguageCore.Brainfuck.HeapCodeHelper.BLOCK_SIZE * BrainfuckSettings.HeapSize) + LanguageCore.Brainfuck.HeapCodeHelper.OFFSET_DATA;
         result[offset] = 126;
         return result;
     }

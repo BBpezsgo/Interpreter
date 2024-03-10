@@ -1,5 +1,6 @@
 ﻿using System.Runtime.Versioning;
 using Win32;
+using Win32.Console;
 
 namespace LanguageCore.Brainfuck;
 
@@ -16,16 +17,17 @@ public partial class InterpreterCompact
 
             switch (Code[i].OpCode)
             {
-                case OpCodesCompact.POINTER_R: code = ">"; break;
-                case OpCodesCompact.POINTER_L: code = "<"; break;
-                case OpCodesCompact.ADD: code = "+"; break;
-                case OpCodesCompact.SUB: code = "-"; break;
-                case OpCodesCompact.BRANCH_START: code = "["; break;
-                case OpCodesCompact.BRANCH_END: code = "]"; break;
-                case OpCodesCompact.OUT: code = "."; break;
-                case OpCodesCompact.IN: code = ","; break;
-                case OpCodesCompact.CLEAR: code = "[-]"; break;
-                case OpCodesCompact.MOVE:
+                case OpCodesCompact.PointerRight: code = ">"; break;
+                case OpCodesCompact.PointerLeft: code = "<"; break;
+                case OpCodesCompact.Add: code = "+"; break;
+                case OpCodesCompact.Sub: code = "-"; break;
+                case OpCodesCompact.BranchStart: code = "["; break;
+                case OpCodesCompact.BranchEnd: code = "]"; break;
+                case OpCodesCompact.Out: code = "."; break;
+                case OpCodesCompact.In: code = ","; break;
+                case OpCodesCompact.Break: code = "$"; break;
+                case OpCodesCompact.Clear: code = "[-]"; break;
+                case OpCodesCompact.Move:
                 {
                     StringBuilder result = new();
                     result.Append('(');

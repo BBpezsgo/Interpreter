@@ -114,9 +114,9 @@ public partial struct DataItem :
         DataItem.TryCast(ref x, y.Type);
         DataItem.TryCast(ref y, x.Type);
 
-        if (!xBefore.Equals(x) &&
-            !yBefore.Equals(y))
-        { throw new InternalException(); }
+        // if (!xBefore.Equals(x) &&
+        //     !yBefore.Equals(y))
+        // { throw new InternalException(); }
 
         if (x.Type != y.Type)
         { throw new InternalException(); }

@@ -16,21 +16,21 @@ public partial class Interpreter : InterpreterBase<OpCodes>
     {
         switch (instruction)
         {
-            case OpCodes.ADD:
+            case OpCodes.Add:
                 Memory[_memoryPointer]++;
                 break;
-            case OpCodes.SUB:
+            case OpCodes.Sub:
                 Memory[_memoryPointer]--;
                 break;
-            case OpCodes.POINTER_R:
+            case OpCodes.PointerRight:
                 if (_memoryPointer++ >= Memory.Length)
                 { throw new BrainfuckRuntimeException($"Memory overflow", CurrentContext); }
                 break;
-            case OpCodes.POINTER_L:
+            case OpCodes.PointerLeft:
                 if (_memoryPointer-- <= 0)
                 { throw new BrainfuckRuntimeException($"Memory underflow", CurrentContext); }
                 break;
-            case OpCodes.BRANCH_START:
+            case OpCodes.BranchStart:
                 if (Memory[_memoryPointer] == 0)
                 {
                     int depth = 0;
@@ -38,19 +38,19 @@ public partial class Interpreter : InterpreterBase<OpCodes>
                     {
                         _codePointer++;
                         if (IsDone) break;
-                        if (Code[_codePointer] == OpCodes.BRANCH_END)
+                        if (Code[_codePointer] == OpCodes.BranchEnd)
                         {
                             if (depth == 0) return;
                             if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
                             depth--;
                         }
-                        else if (Code[_codePointer] == OpCodes.BRANCH_START)
+                        else if (Code[_codePointer] == OpCodes.BranchStart)
                         { depth++; }
                     }
                     throw new BrainfuckRuntimeException($"Unclosed bracket", CurrentContext);
                 }
                 break;
-            case OpCodes.BRANCH_END:
+            case OpCodes.BranchEnd:
                 if (Memory[_memoryPointer] != 0)
                 {
                     int depth = 0;
@@ -58,23 +58,26 @@ public partial class Interpreter : InterpreterBase<OpCodes>
                     {
                         _codePointer--;
                         if (IsDone) break;
-                        if (Code[_codePointer] == OpCodes.BRANCH_START)
+                        if (Code[_codePointer] == OpCodes.BranchStart)
                         {
                             if (depth == 0) return;
                             if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
                             depth--;
                         }
-                        else if (Code[_codePointer] == OpCodes.BRANCH_END)
+                        else if (Code[_codePointer] == OpCodes.BranchEnd)
                         { depth++; }
                     }
                     throw new BrainfuckRuntimeException($"Unexpected closing bracket", CurrentContext);
                 }
                 break;
-            case OpCodes.OUT:
+            case OpCodes.Out:
                 OnOutput?.Invoke(Memory[_memoryPointer]);
                 break;
-            case OpCodes.IN:
+            case OpCodes.In:
                 Memory[_memoryPointer] = OnInput?.Invoke() ?? 0;
+                break;
+            case OpCodes.Break:
+                _isPaused = true;
                 break;
             default:
                 throw new BrainfuckRuntimeException($"Unknown instruction {Code[_codePointer]}", CurrentContext);

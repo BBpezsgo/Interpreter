@@ -1,7 +1,7 @@
 ﻿using System.Runtime.Versioning;
 using Microsoft.Win32.SafeHandles;
 using Win32;
-using Win32.LowLevel;
+using Win32.Console;
 
 namespace ConsoleGUI;
 
@@ -172,7 +172,7 @@ internal sealed class ConsoleGUI
             this.MouseEvents,
         };
 
-        ConsoleHandler.Setup();
+        Terminal.Setup();
 
         ConsoleListener.MouseEvent += MouseEventThread;
         ConsoleListener.KeyEvent += KeyEventThread;
@@ -211,7 +211,7 @@ internal sealed class ConsoleGUI
 
         ConsoleListener.Stop();
 
-        ConsoleHandler.Restore();
+        Terminal.Restore();
     }
 
     public void Start()
@@ -269,8 +269,8 @@ internal sealed class ConsoleGUI
 
     void RefreshConsole()
     {
-        Mouse.Tick();
-        Keyboard.Tick();
+        ConsoleMouse.Tick();
+        ConsoleKeyboard.Tick();
 
         NextRefreshConsole = false;
 
@@ -302,7 +302,7 @@ internal sealed class ConsoleGUI
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Debug.WriteLine(exception.ToString());
+            Debug.WriteLine(exception.ToString());
             return;
         }
 
@@ -327,20 +327,20 @@ internal sealed class ConsoleGUI
     {
         if (ConsoleHandle.IsInvalid)
         {
-            System.Diagnostics.Debug.Fail("Console handle is invalid");
+            Debug.Fail("Console handle is invalid");
             return;
         }
         if (ConsoleHandle.IsClosed)
         {
-            System.Diagnostics.Debug.Fail("Console handle is closed");
+            Debug.Fail("Console handle is closed");
             return;
         }
 
         if (Kernel32.WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
-            new Win32.Common.SmallSize((short)Console.WindowWidth, (short)Console.WindowHeight),
+            new SmallSize((short)Console.WindowWidth, (short)Console.WindowHeight),
             new Coord(0, 0),
             ref rect) == 0)
-        { throw Win32.Common.WindowsException.Get(); }
+        { throw WindowsException.Get(); }
     }
 
     void KeyEventThread(KeyEvent e) => KeyEvents.Add(e);
@@ -445,7 +445,7 @@ internal sealed class ConsoleGUI
     void MouseEvent(MouseEvent e)
     {
         MousePosition = e.MousePosition;
-        Mouse.Feed(e);
+        ConsoleMouse.Feed(e);
 
         for (int i = Elements.Length - 1; i >= 0; i--)
         {
@@ -460,7 +460,7 @@ internal sealed class ConsoleGUI
                 if (element is WindowElement wat) wat.OnMouseEventBase(e);
             }
             catch (Exception exception)
-            { System.Diagnostics.Debug.WriteLine(exception.ToString()); }
+            { Debug.WriteLine(exception.ToString()); }
         }
         if (FilledElement is Element elementWithEvents)
         {
@@ -475,7 +475,7 @@ internal sealed class ConsoleGUI
                         element.OnMouseEvent(e);
                     }
                     catch (Exception exception)
-                    { System.Diagnostics.Debug.WriteLine(exception.ToString()); }
+                    { Debug.WriteLine(exception.ToString()); }
                 }
             }
             try
@@ -485,7 +485,7 @@ internal sealed class ConsoleGUI
                 DrawElement(elementWithEvents);
             }
             catch (Exception exception)
-            { System.Diagnostics.Debug.WriteLine(exception.ToString()); }
+            { Debug.WriteLine(exception.ToString()); }
         }
     }
 }

@@ -3,7 +3,7 @@ using System.IO;
 using System.Runtime.Versioning;
 using LanguageCore;
 using LanguageCore.Runtime;
-using Win32;
+using Win32.Console;
 
 #nullable disable
 

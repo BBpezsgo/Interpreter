@@ -1,6 +1,7 @@
 ﻿using System.Runtime.Versioning;
 using System.Threading;
 using Win32;
+using Win32.Console;
 
 namespace LanguageCore.Brainfuck;
 
@@ -41,8 +42,14 @@ public partial class InterpreterBase<TCode>
 
         Console.Clear();
 
+        int steps = 0;
+
         while (Step())
         {
+            if (wait < 0 && wait + steps++ < 0 && !_isPaused)
+            { continue; }
+            steps = 0;
+
             Draw();
 
             if (!autoTick || _isPaused)
@@ -59,15 +66,14 @@ public partial class InterpreterBase<TCode>
         }
 
         Draw();
+
+        ConsoleListener.Stop();
     }
 
     [SupportedOSPlatform("windows")]
     void SetupUI()
     {
-        short width = ConsoleHandler.WindowWidth;
-        short height = ConsoleHandler.WindowHeight;
-
-        _rendererContext.Renderer ??= new ConsoleRenderer(width, height);
+        _rendererContext.Renderer ??= new ConsoleRenderer((short)Console.WindowWidth, (short)Console.WindowHeight);
         ConsoleListener.Start();
 
         if (_rendererContext.InputBuffer is null)
@@ -111,7 +117,7 @@ public partial class InterpreterBase<TCode>
 
         {
             const int Margin = 40;
-            _rendererContext.CodeDisplayPosition = Math.Clamp(_rendererContext.CodeDisplayPosition, _codePointer - Margin, _codePointer  );
+            _rendererContext.CodeDisplayPosition = Math.Clamp(_rendererContext.CodeDisplayPosition, _codePointer - Margin, _codePointer);
 
             // if (_rendererContext.CodeDisplayPosition + _codePointer < Margin)
             // { _rendererContext.CodeDisplayPosition = Margin + _codePointer; }
@@ -145,17 +151,17 @@ public partial class InterpreterBase<TCode>
         height -= originalCodeRect.Height;
         line += originalCodeRect.Height;
 
-        /*
-        _rendererContext._renderer.Text(0, line++, new string('─', width), CharColor.Gray);
-        _rendererContext._renderer.Text(1, line - 1, "|Output|", CharColor.Gray);
+        _rendererContext.Renderer.Text(0, line++, new string('─', width), CharColor.Gray);
+        _rendererContext.Renderer.Text(1, line - 1, "|Output|", CharColor.Gray);
         SmallRect outputRect = new(0, line, width, height);
-        DrawOutput(_rendererContext._renderer, _rendererContext.outputBuffer, outputRect);
+        DrawOutput(_rendererContext.Renderer, _rendererContext.OutputBuffer, outputRect);
         line += outputRect.Height;
-        */
 
+        /*
         SmallRect stackTraceRect = new(0, line, width, 10);
         DrawStackTrace(_rendererContext.Renderer, stackTraceRect);
         line += stackTraceRect.Height;
+        */
 
         _rendererContext.Renderer.Render();
     }
@@ -182,20 +188,22 @@ public partial class InterpreterBase<TCode>
         if (!DebugInfo.OriginalFiles.TryGetValue(sourceLocation.Uri, out ImmutableArray<Tokenizing.Token> originalCode))
         { return; }
 
+        int _startToken = -1;
         for (int i = 0; i < originalCode.Length; i++)
         {
-            if (originalCode[i].Position.Range.Contains(sourceLocation.SourcePosition.Range.Start) ||
-                originalCode[i].Position.Range.Contains(sourceLocation.SourcePosition.Range.End))
-            {
-                StartToken = i;
-                break;
-            }
+            Tokenizing.Token token = originalCode[i];
+
+            if (!sourceLocation.SourcePosition.AbsoluteRange.Contains(token.Position.AbsoluteRange.Start))
+            { continue; }
+            if (!sourceLocation.SourcePosition.AbsoluteRange.Contains(token.Position.AbsoluteRange.End))
+            { continue; }
+
+            _startToken = i;
+            break;
         }
 
-        if (StartToken == -1)
-        { return; }
-
-        StartToken = Math.Max(0, StartToken - 30);
+        if (_startToken != -1)
+        { StartToken = Math.Max(0, _startToken - 30); }
 
         int startLine = originalCode[StartToken].Position.Range.Start.Line;
 
@@ -337,13 +345,13 @@ public partial class InterpreterBase<TCode>
 
             { // Address
                 // int j = (i - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE;
-                int k = (i - heapStart) % BasicHeapCodeHelper.BLOCK_SIZE;
+                int k = (i - heapStart) % HeapCodeHelper.BLOCK_SIZE;
 
                 bool showAddress = (i & 0b_1111) == 0;
                 showAddress = showAddress || i == heapStart;
 
                 bool showBackground = showAddress;
-                showBackground = showBackground || (i > heapStart + 2 && k == BasicHeapCodeHelper.OFFSET_DATA);
+                showBackground = showBackground || (i > heapStart + 2 && k == HeapCodeHelper.OFFSET_DATA);
 
                 if (showAddress || showBackground)
                 {
@@ -354,7 +362,7 @@ public partial class InterpreterBase<TCode>
                     { bg = CharColor.Blue; }
 
                     if (i > heapStart + 2 &&
-                        k == BasicHeapCodeHelper.OFFSET_DATA)
+                        k == HeapCodeHelper.OFFSET_DATA)
                     {
                         bg = CharColor.Green;
                         fg = CharColor.White;

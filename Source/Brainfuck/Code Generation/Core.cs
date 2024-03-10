@@ -27,8 +27,7 @@ public struct BrainfuckGeneratorResult
 {
     public string Code;
     public int Optimizations;
-
-    public DebugInformation DebugInfo;
+    public DebugInformation? DebugInfo;
 }
 
 [Flags]
@@ -138,10 +137,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             DebugInfo = debugInfo;
             Position = position;
 
-            if (debugInfo == null) return;
+            if (debugInfo is null) return;
             if (position == Position.UnknownPosition) return;
 
-            InstructionStart = code.GetFinalCode().Length;
+            InstructionStart = code.GetFinalCode(true).Length;
             CurrentFile = currentFile;
         }
 
@@ -151,16 +150,59 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         public void Dispose()
         {
-            if (DebugInfo == null) return;
+            if (DebugInfo is null) return;
             if (Position == Position.UnknownPosition) return;
 
-            int end = Code.GetFinalCode().Length;
+            int end = Code.GetFinalCode(true).Length;
             if (InstructionStart == end) return;
             DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
             {
                 Instructions = (InstructionStart, end),
                 SourcePosition = Position,
                 Uri = CurrentFile,
+            });
+        }
+    }
+
+    readonly struct DebugFunctionBlock<TFunction> : IDisposable
+        where TFunction : FunctionThingDefinition
+    {
+        readonly int InstructionStart;
+        readonly CompiledCode Code;
+        readonly DebugInformation? DebugInfo;
+        readonly Uri? Uri;
+        readonly string Identifier;
+        readonly string ReadableIdentifier;
+        readonly Position Position;
+
+        public DebugFunctionBlock(CompiledCode code, DebugInformation? debugInfo, Uri? uri, string identifier, string readableIdentifier, Position position)
+        {
+            Code = code;
+            DebugInfo = debugInfo;
+            Position = position;
+            Uri = uri;
+            Identifier = identifier;
+            ReadableIdentifier = readableIdentifier;
+
+            if (debugInfo is null) return;
+            if (position == Position.UnknownPosition) return;
+
+            InstructionStart = code.GetFinalCode(true).Length;
+        }
+
+        public void Dispose()
+        {
+            if (DebugInfo is null) return;
+
+            DebugInfo.FunctionInformations.Add(new FunctionInformations()
+            {
+                File = Uri,
+                Identifier = Identifier,
+                ReadableIdentifier = ReadableIdentifier,
+                Instructions = (InstructionStart, Code.GetFinalCode(true).Length),
+                IsMacro = false,
+                IsValid = true,
+                SourcePosition = Position,
             });
         }
     }
@@ -183,7 +225,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         public string? VariableCanBeDiscarded;
 
-        public readonly DebugInformation DebugInfo;
+        public readonly DebugInformation? DebugInfo;
 
         public GeneratorSnapshot(CodeGeneratorForBrainfuck v)
         {
@@ -202,20 +244,20 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             VariableCanBeDiscarded = new string(v.VariableCanBeDiscarded);
 
-            DebugInfo = v.DebugInfo.Duplicate();
+            DebugInfo = v.DebugInfo?.Duplicate();
         }
     }
 
     readonly struct CodeSnapshot
     {
         public readonly CompiledCode Code;
-        public readonly BasicHeapCodeHelper Heap;
+        public readonly HeapCodeHelper Heap;
         public readonly StackCodeHelper Stack;
 
         public CodeSnapshot(CodeGeneratorForBrainfuck generator)
         {
             Code = generator.Code.Duplicate();
-            Heap = new BasicHeapCodeHelper(Code, generator.Heap.Start, generator.Heap.Size);
+            Heap = new HeapCodeHelper(Code, generator.Heap.Start, generator.Heap.Size);
             if (generator.Heap.IsInitialized) Heap.InitVirtual();
             Stack = new StackCodeHelper(Code, generator.Stack);
         }
@@ -287,7 +329,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     CompiledCode Code;
     StackCodeHelper Stack;
-    BasicHeapCodeHelper Heap;
+    HeapCodeHelper Heap;
 
     readonly Stack<Variable> Variables;
 
@@ -309,13 +351,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     string? VariableCanBeDiscarded;
 
-    DebugInformation DebugInfo;
+    DebugInformation? DebugInfo;
 
     readonly bool ShowProgress;
 
     readonly PrintCallback? PrintCallback;
-
-    readonly bool GenerateDebugInformation;
 
     readonly int MaxRecursiveDepth;
 
@@ -326,7 +366,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         this.Variables = new Stack<Variable>();
         this.Code = new CompiledCode();
         this.Stack = new StackCodeHelper(this.Code, settings.StackStart, settings.StackSize);
-        this.Heap = new BasicHeapCodeHelper(this.Code, settings.HeapStart, settings.HeapSize);
+        this.Heap = new HeapCodeHelper(this.Code, settings.HeapStart, settings.HeapSize);
         this.CurrentMacro = new Stack<ISameCheck>();
         this.VariableCleanupStack = new Stack<int>();
         this.GeneratorSettings = settings;
@@ -335,9 +375,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         this.BreakCount = new Stack<int>();
         this.BreakTagStack = new Stack<int>();
         this.InMacro = new Stack<bool>();
-        this.DebugInfo = new DebugInformation(compilerResult.Tokens);
+        this.DebugInfo = settings.GenerateDebugInformation ? new DebugInformation(compilerResult.Tokens) : null;
         this.PrintCallback = printCallback;
-        this.GenerateDebugInformation = settings.GenerateDebugInformation;
         this.ShowProgress = settings.ShowProgress;
         this.MaxRecursiveDepth = 4;
     }
@@ -410,14 +449,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         VariableCanBeDiscarded = new string(snapshot.VariableCanBeDiscarded);
 
-        DebugInfo = snapshot.DebugInfo.Duplicate();
+        DebugInfo = snapshot.DebugInfo?.Duplicate();
     }
 
     CodeSnapshot SnapshotCode() => new(this);
     void RestoreCode(CodeSnapshot snapshot)
     {
         Code = snapshot.Code.Duplicate();
-        Heap = new BasicHeapCodeHelper(Code, snapshot.Heap.Start, snapshot.Heap.Size);
+        Heap = new HeapCodeHelper(Code, snapshot.Heap.Start, snapshot.Heap.Size);
         if (snapshot.Heap.IsInitialized) Heap.InitVirtual();
         Stack = new StackCodeHelper(Code, snapshot.Stack);
     }
@@ -442,8 +481,48 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         return new GeneratorCodeBlock(this);
     }
 
-    DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position, CurrentFile);
-    DebugInfoBlock DebugBlock(Position position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position, CurrentFile);
+    DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, DebugInfo, position, CurrentFile);
+    DebugInfoBlock DebugBlock(Position position) => new(Code, DebugInfo, position, CurrentFile);
+
+    DebugFunctionBlock<CompiledFunction> FunctionBlock(CompiledFunction function, Dictionary<string, GeneralType>? typeArguments) => new(
+        Code,
+        DebugInfo,
+        function.FilePath,
+        function.Identifier.Content,
+        function.ToReadable(typeArguments),
+        function.Position);
+
+    DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledOperator function, Dictionary<string, GeneralType>? typeArguments) => new(
+        Code,
+        DebugInfo,
+        function.FilePath,
+        function.Identifier.Content,
+        function.ToReadable(typeArguments),
+        function.Position);
+
+    DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledGeneralFunction function, Dictionary<string, GeneralType>? typeArguments) => new(
+        Code,
+        DebugInfo,
+        function.FilePath,
+        function.Identifier.Content,
+        function.ToReadable(typeArguments),
+        function.Position);
+
+    DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledConstructor function, Dictionary<string, GeneralType>? typeArguments) => new(
+        Code,
+        DebugInfo,
+        function.FilePath,
+        function.Identifier.ToString(),
+        function.ToReadable(typeArguments),
+        function.Position);
+
+    DebugFunctionBlock<CompiledOperator> FunctionBlock(MacroDefinition function) => new(
+        Code,
+        DebugInfo,
+        function.FilePath,
+        function.Identifier.ToString(),
+        function.ToReadable(),
+        function.Position);
 
     protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
     {

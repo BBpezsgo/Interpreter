@@ -42,8 +42,8 @@ public class Interpreter
 
         public System.IO.Stream SystemStream;
 
-        public bool SystemHasData => (SystemStream.Position >= SystemStream.Length);
-        public int RemainingBufferSize => (BufferSize - Length);
+        public bool SystemHasData => SystemStream.Position >= SystemStream.Length;
+        public int RemainingBufferSize => BufferSize - Length;
 
         public InputStream(int id, int memoryAddress, int bufferSize, System.IO.Stream stream)
             : base(id, memoryAddress, bufferSize)
@@ -436,16 +436,16 @@ public class Interpreter
         {
             error.FeedDebugInfo(CompilerResult.DebugInfo);
 
-            OnOutput?.Invoke(this, "Runtime Exception: " + error.ToString(), LogType.Error);
+            OnOutput?.Invoke(this, $"Runtime Exception: {error}", LogType.Error);
 
             OnExecuted?.Invoke(this);
             IsExecutingCode = false;
 
             if (!HandleErrors) throw;
         }
-        catch (System.Exception error)
+        catch (Exception error)
         {
-            OnOutput?.Invoke(this, "Internal Exception: " + error.Message, LogType.Error);
+            OnOutput?.Invoke(this, $"Internal Exception: {error.Message}", LogType.Error);
 
             OnExecuted?.Invoke(this);
             IsExecutingCode = false;

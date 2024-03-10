@@ -1,26 +1,26 @@
 void GetHeader(int* ptr, ref int size, ref int allocated)
 {
-	int value = *ptr;
-	if (value >= 127) // value & 0b_1000_0000
+    int value = *ptr;
+    if (value >= 127) // value & 0b_1000_0000
     {
-		value -= 127; // value &= ~0b_1000_0000
+        value -= 127; // value &= ~0b_1000_0000
 
-		size = value;
-		allocated = 1;
-	}
+        size = value;
+        allocated = 1;
+    }
     else
     {
-		size = value;
-		allocated = 0;
-	}
+        size = value;
+        allocated = 0;
+    }
 }
 
 void SetHeader(int* ptr, int size, int allocated)
 {
-	int value = size;
-	if (allocated)
+    int value = size;
+    if (allocated)
     { value += 127; } // value |= 0b_1000_0000
-	*ptr = value;
+    *ptr = value;
 }
 
 [Builtin("alloc")]
@@ -43,13 +43,14 @@ export int* Alloc(int sizeNeed)
         int* dataPointer = headerPointer + 1;
         
         // Print("Block #");
-        // Print(headerPointer);
+        // Print(headerPointer as int);
         // Print(": ");
         // Print("Size: ");
         // Print(blockSize);
         // Print("  Used: ");
         // Print(blockUsed);
         // PrintLine();
+        // PrintLine(dataPointer as int);
 
         if (blockUsed == 0)
         {
@@ -60,6 +61,8 @@ export int* Alloc(int sizeNeed)
                 SetHeader(headerPointer, sizeNeed, 1);
                 
                 // PrintLine("Perfect match");
+                // Print("Returning ");
+                // PrintLine(dataPointer as int);
 
                 return dataPointer;
             }
@@ -74,19 +77,18 @@ export int* Alloc(int sizeNeed)
                 
                 int* nextHeaderPointer = dataPointer + sizeNeed;
 
-                // If the next block is exists
-                // if (1)
-                // {
-                    // Calculate remaining size
-                    int _remainingSize = blockSize - sizeNeed - 1;
+                // Calculate remaining size
+                int _remainingSize = blockSize - sizeNeed - 1;
                     
-                    // If a larger block is allocated than needed
-                    if (_remainingSize >= 0)
-                    {
-                        // Update the next block's header
-                        SetHeader(nextHeaderPointer, _remainingSize, 0);
-                    }
-                // }
+                // If a larger block is allocated than needed
+                if (_remainingSize >= 0)
+                {
+                    // Update the next block's header
+                    SetHeader(nextHeaderPointer, _remainingSize, 0);
+                }
+                
+                // Print("Returning ");
+                // PrintLine(dataPointer as int);
                 
                 return dataPointer;
             }
@@ -100,7 +102,7 @@ export int* Alloc(int sizeNeed)
 template<T>
 export void Dealloc(T* ptr)
 {
-	int* position = ptr as int*;
+    int* position = ptr as int*;
 
     int size;
     int allocated;
@@ -110,12 +112,12 @@ export void Dealloc(T* ptr)
     // PrintLine(size);
     SetHeader(ptr - 1, size, 0);
 
-	// *(ptr - 1) = 0;
+    // *(ptr - 1) = 0;
 
-	while (size)
+    while (size)
     {
-		*position = 0;
-		size--;
-		position++;
-	}
+        *position = 0;
+        size--;
+        position++;
+    }
 }

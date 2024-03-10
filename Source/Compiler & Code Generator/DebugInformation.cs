@@ -262,9 +262,9 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         {
             SourceCodeLocation loc = SourceCodeLocations[i];
 
-            if (loc.Instructions.Start > offset)
+            if (loc.Instructions.Start > from)
             { loc.Instructions.Start += offset; }
-            if (loc.Instructions.End > offset)
+            if (loc.Instructions.End > from)
             { loc.Instructions.End += offset; }
 
             SourceCodeLocations[i] = loc;
@@ -274,9 +274,9 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         {
             FunctionInformations func = FunctionInformations[i];
 
-            if (func.Instructions.Start > offset)
+            if (func.Instructions.Start > from)
             { func.Instructions.Start += offset; }
-            if (func.Instructions.End > offset)
+            if (func.Instructions.End > from)
             { func.Instructions.End += offset; }
 
             FunctionInformations[i] = func;
@@ -286,9 +286,9 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         {
             ScopeInformations scope = ScopeInformations[i];
 
-            if (scope.Location.Instructions.Start > offset)
+            if (scope.Location.Instructions.Start > from)
             { scope.Location.Instructions.Start += offset; }
-            if (scope.Location.Instructions.End > offset)
+            if (scope.Location.Instructions.End > from)
             { scope.Location.Instructions.End += offset; }
 
             ScopeInformations[i] = scope;

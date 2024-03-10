@@ -1,24 +1,37 @@
 #bf "cos" "float" "float";
 #bf "sin" "float" "float";
 
-[External("cos")]
-export float Cos(float v);
-
-[External("sin")]
-export float Sin(float v);
-
-/*
-export int Pow(int a, int b)
+export inline float Sin(float x)
 {
-    if (b == 0) { return 1; };
-    if (b < 0)
-    { return 1 / Pow(a, Abs(b)); };
-    int answer = 1;
-    for (int i = 1; i <= b; i++)
-    { answer = answer * a; };
-    return answer;
+    float value = x;
+    float sum = value;
+    int fac = 1;
+    
+    for (int counter = 0; counter < 100; counter++)
+	{
+        fac += 2;
+        value *= -1 * x * x / (fac * (fac - 1));
+        sum += value;
+    }
+
+    return sum;
 }
-*/
+
+export inline float Cos(float x)
+{
+    float value = 1f;
+    float sum = value;
+    int fac = 0;
+    
+    for (int counter = 0; counter < 100; counter++)
+	{
+        fac += 2;
+        value *= -1 * x * x / (fac * (fac - 1));
+        sum += value;
+    }
+
+    return sum;
+}
 
 // https://stackoverflow.com/a/101613
 export int Pow(int base, int exp)

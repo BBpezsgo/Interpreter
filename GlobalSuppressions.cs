@@ -14,3 +14,4 @@
 [assembly: SuppressMessage("Roslynator", "RCS1218:Simplify code branching")]
 [assembly: SuppressMessage("Roslynator", "RCS1173:Use coalesce expression instead of 'if'")]
 [assembly: SuppressMessage("Roslynator", "RCS1256:Invalid argument null check")]
+[assembly: SuppressMessage("Roslynator", "RCS1075:Avoid empty catch clause that catches System.Exception")]

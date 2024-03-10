@@ -2,7 +2,7 @@
 
 namespace LanguageCore.Brainfuck;
 
-[DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
+[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public readonly struct CompactCodeSegment
 {
     public OpCodesCompact OpCode { get; }
@@ -25,77 +25,134 @@ public readonly struct CompactCodeSegment
         Count = 1;
     }
 
-    public override string? ToString() => $"{ToString(OpCode)} x{Count}";
-    static string ToString(OpCodesCompact opCode) => opCode switch
+    string GetDebuggerDisplay() => $"{OpCode switch
     {
-        OpCodesCompact.POINTER_R => ">",
-        OpCodesCompact.POINTER_L => "<",
-        OpCodesCompact.ADD => "+",
-        OpCodesCompact.SUB => "-",
-        OpCodesCompact.BRANCH_START => "[",
-        OpCodesCompact.BRANCH_END => "]",
-        OpCodesCompact.OUT => ".",
-        OpCodesCompact.IN => ",",
-        _ => opCode.ToString(),
-    };
+        OpCodesCompact.PointerRight => ">",
+        OpCodesCompact.PointerLeft => "<",
+        OpCodesCompact.Add => "+",
+        OpCodesCompact.Sub => "-",
+        OpCodesCompact.BranchStart => "[",
+        OpCodesCompact.BranchEnd => "]",
+        OpCodesCompact.Out => ".",
+        OpCodesCompact.In => ",",
+        OpCodesCompact.Break => "$",
+        _ => OpCode.ToString(),
+    }} x{Count}";
+
+    public override string ToString()
+    {
+        StringBuilder result = new();
+
+        switch (OpCode)
+        {
+            case OpCodesCompact.PointerRight:
+                result.Append('>');
+                break;
+            case OpCodesCompact.PointerLeft:
+                result.Append('<');
+                break;
+            case OpCodesCompact.Add:
+                result.Append('+');
+                break;
+            case OpCodesCompact.Sub:
+                result.Append('-');
+                break;
+            case OpCodesCompact.BranchStart:
+                result.Append('[');
+                break;
+            case OpCodesCompact.BranchEnd:
+                result.Append(']');
+                break;
+            case OpCodesCompact.Out:
+                result.Append('.');
+                break;
+            case OpCodesCompact.In:
+                result.Append(',');
+                break;
+            case OpCodesCompact.Clear:
+                result.Append("[-]");
+                break;
+            case OpCodesCompact.Move:
+                result.Append('(');
+                result.Append('M');
+
+                if (Arg1 != 0) result.Append($"{Arg1};");
+                if (Arg2 != 0) result.Append($"{Arg2};");
+                if (Arg3 != 0) result.Append($"{Arg3};");
+                if (Arg4 != 0) result.Append($"{Arg4};");
+
+                result.Append(')');
+                break;
+            default:
+                result.Append("NULL");
+                break;
+        }
+        if (Count > 1) result.Append(Count);
+
+        return result.ToString();
+    }
 }
 
 [SuppressMessage("Roslynator", "RCS1154")]
 public enum OpCodes
 {
     NULL = '\0',
-    POINTER_R = '>',
-    POINTER_L = '<',
-    ADD = '+',
-    SUB = '-',
-    BRANCH_START = '[',
-    BRANCH_END = ']',
-    OUT = '.',
-    IN = ',',
+    PointerRight = '>',
+    PointerLeft = '<',
+    Add = '+',
+    Sub = '-',
+    BranchStart = '[',
+    BranchEnd = ']',
+    Out = '.',
+    In = ',',
+    Break = '$',
 }
 
 [SuppressMessage("Roslynator", "RCS1154")]
 public enum OpCodesCompact
 {
     NULL = '\0',
-    POINTER_R = '>',
-    POINTER_L = '<',
-    ADD = '+',
-    SUB = '-',
-    BRANCH_START = '[',
-    BRANCH_END = ']',
-    OUT = '.',
-    IN = ',',
+    PointerRight = '>',
+    PointerLeft = '<',
+    Add = '+',
+    Sub = '-',
+    BranchStart = '[',
+    BranchEnd = ']',
+    Out = '.',
+    In = ',',
+    Break = '$',
 
-    CLEAR = 'C',
-    MOVE = 'M',
+    Clear = 'C',
+    Move = 'M',
 }
 
 public static class CompactCode
 {
     public static OpCodes ToOpCode(char c) => c switch
     {
-        '>' => OpCodes.POINTER_R,
-        '<' => OpCodes.POINTER_L,
-        '+' => OpCodes.ADD,
-        '-' => OpCodes.SUB,
-        '[' => OpCodes.BRANCH_START,
-        ']' => OpCodes.BRANCH_END,
-        '.' => OpCodes.OUT,
-        ',' => OpCodes.IN,
+        '>' => OpCodes.PointerRight,
+        '<' => OpCodes.PointerLeft,
+        '+' => OpCodes.Add,
+        '-' => OpCodes.Sub,
+        '[' => OpCodes.BranchStart,
+        ']' => OpCodes.BranchEnd,
+        '.' => OpCodes.Out,
+        ',' => OpCodes.In,
+        '$' => OpCodes.Break,
         _ => 0,
     };
 
     public static char FromOpCode(OpCodes c) => c switch
     {
-        OpCodes.POINTER_R => '>',
-        OpCodes.POINTER_L => '<',
-        OpCodes.ADD => '+',
-        OpCodes.SUB => '-',
-        OpCodes.BRANCH_START => '[',
-        OpCodes.BRANCH_END => ']',
-        OpCodes.OUT => '.',
-        OpCodes.IN => ',',
+        OpCodes.PointerRight => '>',
+        OpCodes.PointerLeft => '<',
+        OpCodes.Add => '+',
+        OpCodes.Sub => '-',
+        OpCodes.BranchStart => '[',
+        OpCodes.BranchEnd => ']',
+        OpCodes.Out => '.',
+        OpCodes.In => ',',
+        OpCodes.Break => '$',
         _ => '\0',
     };
 
@@ -118,7 +175,7 @@ public static class CompactCode
     static readonly OpCodesCompact[] Duplicatable = new OpCodesCompact[]
     {
         (OpCodesCompact)'>', (OpCodesCompact)'<',
-        (OpCodesCompact)'+', (OpCodesCompact)'-'
+        (OpCodesCompact)'+', (OpCodesCompact)'-',
     };
 
     static int ExpectStuff(ReadOnlySpan<char> code, ref int index, char increment, char decrement)
@@ -148,7 +205,6 @@ public static class CompactCode
         slice = slice[..(end + 1)];
         if (slice.Length < 6)
         { return false; }
-        int originalSliceLength = slice.Length;
 
         slice = slice[1..^1];
 
@@ -250,14 +306,14 @@ public static class CompactCode
         else
         { return false; }
 
-        result = new CompactCodeSegment(OpCodesCompact.MOVE)
+        result = new CompactCodeSegment(OpCodesCompact.Move)
         {
             Arg1 = destinations.Count >= 1 ? (sbyte)destinations[0].Offset : (sbyte)0,
             Arg2 = destinations.Count >= 2 ? (sbyte)destinations[1].Offset : (sbyte)0,
             Arg3 = destinations.Count >= 3 ? (sbyte)destinations[2].Offset : (sbyte)0,
             Arg4 = destinations.Count >= 4 ? (sbyte)destinations[3].Offset : (sbyte)0,
         };
-        debugInfo?.OffsetCodeFrom(index, -(originalSliceLength - 1));
+        debugInfo?.OffsetCodeFrom(index, -(slice.Length + 2 - 1));
         index += slice.Length + 2 - 1;
         return true;
     }
@@ -276,7 +332,7 @@ public static class CompactCode
 
             if (i < code.Length - 3 && code.Slice(i, 3).SequenceEqual("[-]"))
             {
-                result.Add(new CompactCodeSegment(OpCodesCompact.CLEAR));
+                result.Add(new CompactCodeSegment(OpCodesCompact.Clear));
                 debugInfo?.OffsetCodeFrom(i, -2);
                 i += 2;
                 continue;

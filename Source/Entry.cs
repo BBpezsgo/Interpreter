@@ -252,6 +252,14 @@ public static class Entry
                     BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
                     Output.WriteLine();
 
+                    /*
+                    Output.WriteLine();
+                    Output.WriteLine($" === COMPACTED ===");
+                    Output.WriteLine();
+                    BrainfuckCode.PrintCode(string.Join(null, CompactCode.Generate(generated.Code, false, null)));
+                    Output.WriteLine();
+                    */
+
                     pauseBeforeRun = true;
                 }
 
@@ -279,7 +287,7 @@ public static class Entry
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     { throw new PlatformNotSupportedException($"Console rendering is only supported on Windows"); }
 
-                    interpreter.RunWithUI(true, 1);
+                    interpreter.RunWithUI(true, -100);
 
                     Console.ReadKey();
                 }
@@ -321,7 +329,7 @@ public static class Entry
                         finalIndex = Math.Min(interpreter.Memory.Length, finalIndex + zerosToShow);
 
                         int heapStart = BrainfuckGeneratorSettings.Default.HeapStart;
-                        int heapEnd = heapStart + (BrainfuckGeneratorSettings.Default.HeapSize * BasicHeapCodeHelper.BLOCK_SIZE);
+                        int heapEnd = heapStart + (BrainfuckGeneratorSettings.Default.HeapSize * HeapCodeHelper.BLOCK_SIZE);
 
                         for (int i = 0; i < finalIndex; i++)
                         {
@@ -341,9 +349,9 @@ public static class Entry
 
                             if (i > heapStart + 2)
                             {
-                                int j = (i - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE;
-                                int k = (i - heapStart) % BasicHeapCodeHelper.BLOCK_SIZE;
-                                if (k == BasicHeapCodeHelper.OFFSET_DATA)
+                                int j = (i - heapStart) / HeapCodeHelper.BLOCK_SIZE;
+                                int k = (i - heapStart) % HeapCodeHelper.BLOCK_SIZE;
+                                if (k == HeapCodeHelper.OFFSET_DATA)
                                 {
                                     bg = ConsoleColor.DarkGreen;
                                     if (cell == 0)

@@ -1,7 +1,4 @@
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-
-namespace LanguageCore.Brainfuck;
+﻿namespace LanguageCore.Brainfuck;
 
 public static class CharCode
 {
@@ -18,6 +15,7 @@ public static class BrainfuckCode
         '<', '>',
         '[', ']',
         '.', ',',
+        '$',
     };
 
     public static string RemoveNoncodes(string code, bool showProgress)

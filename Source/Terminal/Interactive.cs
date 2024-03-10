@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Win32;
-using Win32.LowLevel;
+using Win32.Console;
 using Color = System.Drawing.Color;
 
 namespace LanguageCore.Interactive;
@@ -295,7 +295,7 @@ public class Interactive
             return;
         }
 
-        if (e.VirtualKeyCode == VirtualKeyCode.BACK)
+        if (e.VirtualKeyCode == VirtualKeyCode.Back)
         {
             if (Input.Length > 0 && CursorPosition > 0)
             {
@@ -309,7 +309,7 @@ public class Interactive
             return;
         }
 
-        if (e.VirtualKeyCode == VirtualKeyCode.LEFT)
+        if (e.VirtualKeyCode == VirtualKeyCode.Left)
         {
             CursorPosition--;
             CursorPosition = Math.Clamp(CursorPosition, 0, Input.Length);
@@ -317,7 +317,7 @@ public class Interactive
             return;
         }
 
-        if (e.VirtualKeyCode == VirtualKeyCode.RIGHT)
+        if (e.VirtualKeyCode == VirtualKeyCode.Right)
         {
             CursorPosition++;
             CursorPosition = Math.Clamp(CursorPosition, 0, Input.Length);
@@ -325,21 +325,21 @@ public class Interactive
             return;
         }
 
-        if (e.VirtualKeyCode == VirtualKeyCode.UP)
+        if (e.VirtualKeyCode == VirtualKeyCode.Up)
         {
             CursorPosition = 0;
             ShouldRender = true;
             return;
         }
 
-        if (e.VirtualKeyCode == VirtualKeyCode.DOWN)
+        if (e.VirtualKeyCode == VirtualKeyCode.Down)
         {
             CursorPosition = Input.Length;
             ShouldRender = true;
             return;
         }
 
-        if (e.VirtualKeyCode == VirtualKeyCode.RETURN)
+        if (e.VirtualKeyCode == VirtualKeyCode.Return)
         {
             Entered = true;
             EnableInput = false;
@@ -349,7 +349,7 @@ public class Interactive
             return;
         }
 
-        if (e.VirtualKeyCode == VirtualKeyCode.ESCAPE)
+        if (e.VirtualKeyCode == VirtualKeyCode.Escape)
         {
             Escaped = true;
             EnableInput = false;

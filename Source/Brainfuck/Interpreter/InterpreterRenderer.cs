@@ -1,5 +1,6 @@
 ﻿using System.Runtime.Versioning;
 using Win32;
+using Win32.Console;
 
 namespace LanguageCore.Brainfuck;
 

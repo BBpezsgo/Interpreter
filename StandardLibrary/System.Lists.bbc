@@ -56,15 +56,15 @@ struct List
 
     export void Add(T item)
     {
-        if (this._length + 1 >= this._capacity)
+        if (this._length + 1 > this._capacity)
         {
             if (this._capacity)
             { this.EnsureCapacity(this._capacity * 2); }
             else
             { this.EnsureCapacity(4); }
         }
+        this._ptr[this._length] = item;
         this._length++;
-        this._ptr[this._length - 1] = item;
     }
 
     export T Remove(int index)

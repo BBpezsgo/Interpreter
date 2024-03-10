@@ -17,25 +17,25 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
     {
         switch (instruction.OpCode)
         {
-            case OpCodesCompact.CLEAR:
+            case OpCodesCompact.Clear:
             {
                 Memory[_memoryPointer] = 0;
                 break;
             }
 
-            case OpCodesCompact.ADD:
+            case OpCodesCompact.Add:
             {
                 Memory[_memoryPointer] = (byte)(Memory[_memoryPointer] + instruction.Count);
                 break;
             }
 
-            case OpCodesCompact.SUB:
+            case OpCodesCompact.Sub:
             {
                 Memory[_memoryPointer] = (byte)(Memory[_memoryPointer] - instruction.Count);
                 break;
             }
 
-            case OpCodesCompact.POINTER_R:
+            case OpCodesCompact.PointerRight:
             {
                 _memoryPointer += instruction.Count;
                 _memoryPointerRange = Range.Union(_memoryPointerRange, _memoryPointer);
@@ -44,7 +44,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                 break;
             }
 
-            case OpCodesCompact.POINTER_L:
+            case OpCodesCompact.PointerLeft:
             {
                 _memoryPointer -= instruction.Count;
                 _memoryPointerRange = Range.Union(_memoryPointerRange, _memoryPointer);
@@ -53,7 +53,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                 break;
             }
 
-            case OpCodesCompact.BRANCH_START:
+            case OpCodesCompact.BranchStart:
             {
                 if (instruction.Count != 1)
                 { throw new NotImplementedException(); }
@@ -64,13 +64,13 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                     {
                         _codePointer++;
                         if (IsDone) break;
-                        if (Code[_codePointer].OpCode == OpCodesCompact.BRANCH_END)
+                        if (Code[_codePointer].OpCode == OpCodesCompact.BranchEnd)
                         {
                             if (depth == 0) return;
                             if (depth < 0) throw new BrainfuckRuntimeException("Wat", CurrentContext);
                             depth--;
                         }
-                        else if (Code[_codePointer].OpCode == OpCodesCompact.BRANCH_START)
+                        else if (Code[_codePointer].OpCode == OpCodesCompact.BranchStart)
                         { depth++; }
                     }
                     throw new BrainfuckRuntimeException("Unclosed bracket", CurrentContext);
@@ -78,7 +78,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                 break;
             }
 
-            case OpCodesCompact.BRANCH_END:
+            case OpCodesCompact.BranchEnd:
             {
                 if (instruction.Count != 1)
                 { throw new NotImplementedException(); }
@@ -89,13 +89,13 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                     {
                         _codePointer--;
                         if (IsDone) break;
-                        if (Code[_codePointer].OpCode == OpCodesCompact.BRANCH_START)
+                        if (Code[_codePointer].OpCode == OpCodesCompact.BranchStart)
                         {
                             if (depth == 0) return;
                             if (depth < 0) throw new BrainfuckRuntimeException("Wat", CurrentContext);
                             depth--;
                         }
-                        else if (Code[_codePointer].OpCode == OpCodesCompact.BRANCH_END)
+                        else if (Code[_codePointer].OpCode == OpCodesCompact.BranchEnd)
                         { depth++; }
                     }
                     throw new BrainfuckRuntimeException("Unexpected closing bracket", CurrentContext);
@@ -103,7 +103,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                 break;
             }
 
-            case OpCodesCompact.OUT:
+            case OpCodesCompact.Out:
             {
                 if (instruction.Count != 1)
                 { throw new NotImplementedException(); }
@@ -111,7 +111,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                 break;
             }
 
-            case OpCodesCompact.IN:
+            case OpCodesCompact.In:
             {
                 if (instruction.Count != 1)
                 { throw new NotImplementedException(); }
@@ -119,7 +119,13 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                 break;
             }
 
-            case OpCodesCompact.MOVE:
+            case OpCodesCompact.Break:
+            {
+                _isPaused = true;
+                break;
+            }
+
+            case OpCodesCompact.Move:
             {
                 byte data = Memory[_memoryPointer];
                 Memory[_memoryPointer] = 0;

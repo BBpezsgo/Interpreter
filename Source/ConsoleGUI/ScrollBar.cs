@@ -1,5 +1,5 @@
 ﻿using System.Runtime.Versioning;
-using Win32;
+using Win32.Console;
 
 namespace ConsoleGUI;
 
@@ -63,7 +63,7 @@ public class ScrollBar
         currentPos.X -= (short)sender.Rect.X;
         currentPos.Y -= (short)((short)sender.Rect.Y + (short)1);
 
-        Coord pressedPos = Mouse.LeftPressedAt;
+        Coord pressedPos = ConsoleMouse.LeftPressedAt;
         pressedPos.X -= (short)sender.Rect.X;
         pressedPos.Y -= (short)((short)sender.Rect.Y + (short)1);
 

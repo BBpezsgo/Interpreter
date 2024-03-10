@@ -3,7 +3,7 @@
 using Statement;
 using Tokenizing;
 
-public class MacroDefinition : IExportable, IInFile
+public class MacroDefinition : IExportable, IPositioned
 {
     public Token Keyword { get; }
     public ImmutableArray<Token> Modifiers { get; }
@@ -12,6 +12,7 @@ public class MacroDefinition : IExportable, IInFile
     public Block Block { get; }
     public Uri? FilePath { get; set; }
     public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
+    public Position Position => new Position(Parameters).Union(Keyword, Identifier, Block);
 
     public MacroDefinition(MacroDefinition other)
     {

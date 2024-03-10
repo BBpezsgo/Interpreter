@@ -52,6 +52,7 @@ public static class Minifier
         result = span.ToString();
         return res;
     }
+
     static bool RemoveRedundantClears(ref ReadOnlySpan<char> result)
     {
         PredictedNumber<int> alreadyThere = 0;
@@ -59,7 +60,7 @@ public static class Minifier
         {
             if (result[i] == '[' &&
                 i + 3 + 1 < result.Length &&
-                result.Slice(i, 3).Equals("[-]", StringComparison.Ordinal) &&
+                result.Slice(i, 3).SequenceEqual("[-]") &&
                 !alreadyThere.IsUnknown)
             {
                 ReadOnlySpan<char> slice = result[(i + 3)..];
@@ -85,34 +86,14 @@ public static class Minifier
                 }
             }
 
-            switch (result[i])
+            alreadyThere = result[i] switch
             {
-                case '+':
-                {
-                    alreadyThere++;
-                    break;
-                }
-                case '-':
-                {
-                    alreadyThere--;
-                    break;
-                }
-                case '<':
-                case '>':
-                case '[':
-                case ',':
-                {
-                    alreadyThere = PredictedNumber<int>.Unknown;
-                    break;
-                }
-                case ']':
-                {
-                    alreadyThere = 0;
-                    break;
-                }
-                case '.':
-                default: break;
-            }
+                '+' => alreadyThere + 1,
+                '-' => alreadyThere - 1,
+                ']' => 0,
+                '.' => alreadyThere,
+                _ => PredictedNumber<int>.Unknown,
+            };
         }
 
         return false;

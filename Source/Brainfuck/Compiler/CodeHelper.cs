@@ -1,6 +1,6 @@
-﻿using System.Runtime.CompilerServices;
+﻿namespace LanguageCore.Brainfuck;
 
-namespace LanguageCore.Brainfuck;
+using Ansi = Win32.Console.Ansi;
 
 public readonly struct AutoPrintCodeString
 {
@@ -604,9 +604,11 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         this.MovePointerUnsafe(-conditionOffset);
     }
 
-    public string GetFinalCode()
+    public string GetFinalCode(bool showProgress)
     {
-        string result = Minifier.Minify(BrainfuckCode.RemoveNoncodes(CachedFinalCode.ToString(), true));
+        string result = CachedFinalCode.ToString();
+        result = BrainfuckCode.RemoveNoncodes(result, showProgress);
+        result = Minifier.Minify(result);
         CachedFinalCode = new StringBuilder(result);
         return result;
     }
@@ -687,7 +689,7 @@ public class StackCodeHelper
 
         if (Size > MaxSize)
         {
-            Code.OUT_STRING(address, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Stack overflow")}\n");
+            Code.OUT_STRING(address, $"\n{Ansi.StyleText(Ansi.BrightForegroundRed, "Stack overflow")}\n");
             Code.Append("[-]+[]");
         }
 
@@ -704,7 +706,7 @@ public class StackCodeHelper
 
         if (Size > MaxSize)
         {
-            Code.OUT_STRING(address, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Stack overflow")}\n");
+            Code.OUT_STRING(address, $"\n{Ansi.StyleText(Ansi.BrightForegroundRed, "Stack overflow")}\n");
             Code.Append("[-]+[]");
         }
 
@@ -718,7 +720,7 @@ public class StackCodeHelper
 
         if (Size >= MaxSize)
         {
-            Code.OUT_STRING(address, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Stack overflow")}\n");
+            Code.OUT_STRING(address, $"\n{Ansi.StyleText(Ansi.BrightForegroundRed, "Stack overflow")}\n");
             Code.Append("[-]+[]");
         }
 
@@ -796,14 +798,13 @@ public class StackCodeHelper
     public int PopVirtual() => TheStack.Pop();
 }
 
-public class BasicHeapCodeHelper
+public class HeapCodeHelper
 {
     CompiledCode Code;
+    bool _isInitialized;
 
     public readonly int Start;
     public readonly int Size;
-
-    bool _isInitialized = false;
 
     public bool IsInitialized => _isInitialized;
     public int OffsettedStart => GetOffsettedStart(Start);
@@ -815,7 +816,7 @@ public class BasicHeapCodeHelper
     public const int OFFSET_VALUE_CARRY = 1;
     public const int OFFSET_DATA = 2;
 
-    public BasicHeapCodeHelper(CompiledCode code, int start, int size)
+    public HeapCodeHelper(CompiledCode code, int start, int size)
     {
         Code = code;
         Start = start;
@@ -928,7 +929,7 @@ public class BasicHeapCodeHelper
         Code.StartBlock("Initialize HEAP");
 
         // SetAbsolute(0, 126);
-        Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_DATA, 126);
+        Code.SetValue(OffsettedStart + OFFSET_DATA, 126);
         Code.SetPointer(0);
 
         _isInitialized = true;
@@ -963,8 +964,6 @@ public class BasicHeapCodeHelper
     {
         ThrowIfNotInitialized();
 
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
-
         Code.MoveValue(pointerAddress, OffsettedStart);
         Code.MoveValue(valueAddress, OffsettedStart + 1);
 
@@ -984,8 +983,6 @@ public class BasicHeapCodeHelper
     public void SetAbsolute(int pointer, int value)
     {
         ThrowIfNotInitialized();
-
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
         Code.SetValue(OffsettedStart, pointer);
         Code.SetValue(OffsettedStart + 1, value);
@@ -1007,8 +1004,6 @@ public class BasicHeapCodeHelper
     {
         ThrowIfNotInitialized();
 
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
-
         Code.MoveValue(pointerAddress, OffsettedStart);
         Code.MoveValue(valueAddress, OffsettedStart + 1);
 
@@ -1028,8 +1023,6 @@ public class BasicHeapCodeHelper
     public void Subtract(int pointerAddress, int valueAddress)
     {
         ThrowIfNotInitialized();
-
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
         Code.MoveValue(pointerAddress, OffsettedStart);
         Code.MoveValue(valueAddress, OffsettedStart + 1);
@@ -1084,458 +1077,5 @@ public class BasicHeapCodeHelper
 
         Code.MoveValue(Start + OFFSET_VALUE_CARRY, resultAddress);
         Code.SetPointer(resultAddress);
-    }
-}
-
-public class HeapCodeHelper
-{
-    CompiledCode Code;
-
-    public readonly int Start;
-    public readonly int Size;
-
-    int OffsettedStart => Start + BLOCK_SIZE;
-
-    public const int BLOCK_SIZE = 4;
-    public const int OFFSET_ADDRESS_CARRY = 0;
-    public const int OFFSET_VALUE_CARRY = 1;
-    public const int OFFSET_STATUS = 2;
-    public const int OFFSET_DATA = 3;
-
-    public HeapCodeHelper(CompiledCode code, int start, int size)
-    {
-        Code = code;
-        Start = start;
-        Size = size;
-    }
-
-    /*
-     *  LAYOUT:
-     *  START 0 0 (a c s v) (a c s v) ...
-     *  a: Carrying address
-     *  c: Carrying value
-     *  s: Status
-     *  v: Value
-     */
-
-    /// <summary>
-    /// <b>Expected pointer:</b> <c>OFFSET_ADDRESS_CARRY</c>
-    /// <br/>
-    /// <b>Pointer:</b> <c>OffsettedStart</c>
-    /// </summary>
-    void GoBack()
-    {
-        // Go back
-        Code += '[';
-        Code.ClearCurrent();
-        Code.MovePointerUnsafe(-BLOCK_SIZE);
-        Code += ']';
-
-        // Fix overshoot
-        Code.MovePointerUnsafe(BLOCK_SIZE);
-    }
-
-    /// <summary>
-    /// <b>Expected pointer:</b> <c>OFFSET_ADDRESS_CARRY</c>
-    /// <br/>
-    /// <b>Pointer:</b> <c>OffsettedStart</c>
-    /// </summary>
-    void CarryBack()
-    {
-        // Go back
-        Code += '[';
-        Code.ClearCurrent();
-        Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_VALUE_CARRY - BLOCK_SIZE);
-        Code.MovePointerUnsafe(-BLOCK_SIZE);
-        Code += ']';
-
-        // Fix overshoot
-        Code.MovePointerUnsafe(BLOCK_SIZE);
-    }
-
-    /// <summary>
-    /// <b>Expected pointer:</b> <c>OffsettedStart</c> or <c>OFFSET_ADDRESS_CARRY</c>
-    /// <br/>
-    /// <b>Pointer:</b> <c>OFFSET_ADDRESS_CARRY</c>
-    /// </summary>
-    void GoTo()
-    {
-        // Condition on carrying address
-        Code += '[';
-
-        // Copy the address and leave 1 behind
-        Code.MoveValueUnsafe(OFFSET_ADDRESS_CARRY, false, BLOCK_SIZE + OFFSET_ADDRESS_CARRY);
-        Code.AddValue(1);
-
-        // Move to the next block
-        Code.MovePointerUnsafe(BLOCK_SIZE);
-
-        // Decrement 1 and check if zero
-        //   Yes => Destination reached -> leave 1
-        //   No => Repeat
-        Code += "- ] +";
-    }
-
-    /// <summary>
-    /// <b>Expected pointer:</b> <c>OffsettedStart</c> or <c>OFFSET_ADDRESS_CARRY</c>
-    /// <br/>
-    /// <b>Pointer:</b> <c>OFFSET_ADDRESS_CARRY</c>
-    /// </summary>
-    void CarryTo()
-    {
-        // Condition on carrying address
-        Code += '[';
-
-        // Copy the address and leave 1 behind
-        Code.MoveValueUnsafe(OFFSET_ADDRESS_CARRY, false, BLOCK_SIZE + OFFSET_ADDRESS_CARRY);
-        Code.AddValue(1);
-
-        // Copy the value
-        Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, false, BLOCK_SIZE + OFFSET_VALUE_CARRY);
-
-        // Move to the next block
-        Code.MovePointerUnsafe(BLOCK_SIZE);
-
-        // Decrement 1 and check if zero
-        //   Yes => Destination reached -> leave 1
-        //   No => Repeat
-        Code += "- ] +";
-    }
-
-    public void Init()
-    {
-        Code.StartBlock("Initialize HEAP");
-
-        Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY, 1);
-        Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_STATUS, 1);
-        Code.SetPointer(0);
-
-        Code.EndBlock();
-    }
-
-    public void Destroy()
-    {
-        Code.StartBlock("Destroy HEAP");
-
-        Code.ClearValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY);
-        Code.ClearValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_STATUS);
-        Code.SetPointer(0);
-
-        Code.EndBlock();
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> <see cref="OffsettedStart"/>
-    /// </summary>
-    public void Set(int pointerAddress, int valueAddress)
-    {
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
-
-        Code.MoveValue(pointerAddress, OffsettedStart);
-        Code.MoveValue(valueAddress, OffsettedStart + 1);
-
-        Code.SetPointer(OffsettedStart);
-
-        CarryTo();
-
-        // Copy the carried value to the address
-        Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, true, OFFSET_DATA);
-
-        // Set status to 1
-        Code.SetValueUnsafe(OFFSET_STATUS, 1);
-
-        GoBack();
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> <see cref="OffsettedStart"/>
-    /// </summary>
-    public void Add(int pointerAddress, int valueAddress)
-    {
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
-
-        Code.MoveValue(pointerAddress, OffsettedStart);
-        Code.MoveValue(valueAddress, OffsettedStart + 1);
-
-        Code.SetPointer(OffsettedStart);
-
-        CarryTo();
-
-        // Copy the carried value to the address
-        Code.MoveAddValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_DATA);
-
-        // Set status to 1
-        Code.SetValueUnsafe(OFFSET_STATUS, 1);
-
-        GoBack();
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> <see cref="OffsettedStart"/>
-    /// </summary>
-    public void Subtract(int pointerAddress, int valueAddress)
-    {
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
-
-        Code.MoveValue(pointerAddress, OffsettedStart);
-        Code.MoveValue(valueAddress, OffsettedStart + 1);
-
-        Code.SetPointer(OffsettedStart);
-
-        CarryTo();
-
-        // Copy the carried value to the address
-        Code.MoveSubValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_DATA);
-
-        // Set status to 1
-        Code.SetValueUnsafe(OFFSET_STATUS, 1);
-
-        GoBack();
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> <see cref="OffsettedStart"/>
-    /// </summary>
-    public void Free(int pointerAddress)
-    {
-        Code.ClearValue(OffsettedStart);
-
-        Code.MoveValue(pointerAddress, OffsettedStart);
-
-        Code.SetPointer(OffsettedStart);
-
-        GoTo();
-
-        // Set the value
-        Code.ClearValueUnsafe(OFFSET_DATA);
-
-        // Set status to 0
-        Code.SetValueUnsafe(OFFSET_STATUS, 0);
-
-        GoBack();
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> <paramref name="resultAddress"/>
-    /// </summary>
-    public void Allocate(int resultAddress)
-    {
-        Code.SetPointer(OffsettedStart);
-
-        Code.JumpStartUnsafe(OFFSET_STATUS);
-
-        // Out of memory check
-        Code.JumpStartUnsafe(OFFSET_ADDRESS_CARRY);
-        Code.OUT_STRING_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Not enough of memory")}\n");
-        Code.JumpEndUnsafe(OFFSET_ADDRESS_CARRY);
-
-        // Increment address carry
-        Code.AddValueUnsafe(OFFSET_ADDRESS_CARRY, 1);
-
-        // Increment result carry & carry (bruh)
-        Code.AddValueUnsafe(OFFSET_VALUE_CARRY, 1);
-        Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_VALUE_CARRY + BLOCK_SIZE);
-
-        Code.MovePointerUnsafe(BLOCK_SIZE);
-
-        Code.JumpEndUnsafe(OFFSET_STATUS);
-
-        Code.AddValueUnsafe(OFFSET_ADDRESS_CARRY, 1);
-
-        // Set status to 1
-        Code.SetValueUnsafe(OFFSET_STATUS, 1);
-
-        CarryBack();
-
-        Code.MoveValue(Start + OFFSET_VALUE_CARRY, resultAddress);
-        Code.SetPointer(resultAddress);
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> <paramref name="resultAddress"/>
-    /// </summary>
-    public void AllocateFrom(int resultAddress, int startSearchAddress)
-    {
-        Code.MoveValue(startSearchAddress, OffsettedStart);
-
-        Code.SetPointer(OffsettedStart);
-
-        this.GoTo();
-
-        Code.JumpStartUnsafe(OFFSET_STATUS);
-
-        // Out of memory check
-        Code.JumpStartUnsafe(OFFSET_ADDRESS_CARRY);
-        Code.OUT_STRING_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Not enough of memory")}\n");
-        Code.JumpEndUnsafe(OFFSET_ADDRESS_CARRY);
-
-        // Increment address carry
-        Code.AddValueUnsafe(OFFSET_ADDRESS_CARRY, 1);
-
-        // Increment result carry & carry (bruh)
-        Code.AddValueUnsafe(OFFSET_VALUE_CARRY, 1);
-        Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_VALUE_CARRY + BLOCK_SIZE);
-
-        Code.MovePointerUnsafe(BLOCK_SIZE);
-
-        Code.JumpEndUnsafe(OFFSET_STATUS);
-
-        Code.AddValueUnsafe(OFFSET_ADDRESS_CARRY, 1);
-
-        // Set status to 1
-        Code.SetValueUnsafe(OFFSET_STATUS, 1);
-
-        CarryBack();
-
-        Code.MoveValue(Start + OFFSET_VALUE_CARRY, resultAddress);
-        Code.SetPointer(resultAddress);
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> <paramref name="resultAddress"/>
-    /// </summary>
-    public void Get(int pointerAddress, int resultAddress)
-    {
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
-
-        Code.MoveValue(pointerAddress, OffsettedStart);
-
-        Code.SetPointer(OffsettedStart);
-
-        GoTo();
-
-        Code.SetValueUnsafe(OFFSET_ADDRESS_CARRY, 0);
-        Code.CopyValueWithTempUnsafe(OFFSET_DATA, OFFSET_ADDRESS_CARRY, OFFSET_VALUE_CARRY);
-        Code.SetValueUnsafe(OFFSET_ADDRESS_CARRY, 1);
-
-        CarryBack();
-
-        Code.MoveValue(Start + OFFSET_VALUE_CARRY, resultAddress);
-        Code.SetPointer(resultAddress);
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> <paramref name="resultAddress"/>
-    /// </summary>
-    public void GetStatus(int pointerAddress, int resultAddress)
-    {
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
-
-        Code.MoveValue(pointerAddress, OffsettedStart);
-
-        Code.SetPointer(OffsettedStart);
-
-        GoTo();
-
-        Code.SetValueUnsafe(OFFSET_ADDRESS_CARRY, 0);
-        Code.CopyValueWithTempUnsafe(OFFSET_STATUS, OFFSET_ADDRESS_CARRY, OFFSET_VALUE_CARRY);
-        Code.SetValueUnsafe(OFFSET_ADDRESS_CARRY, 1);
-
-        CarryBack();
-
-        Code.MoveValue(Start + OFFSET_VALUE_CARRY, resultAddress);
-        Code.SetPointer(resultAddress);
-    }
-
-    public void Allocate(int resultAddress, int requiredSizeAddress, int tempAddressesStart)
-    {
-        /*
-            int result = Alloc();
-            int i = size;
-            while (i) {
-                i--;
-
-                int result2 = Alloc(result);
-                int tempAddress3 = (result2 - 1 != result);
-                if (tempAddress3) {
-                    Free(result);
-                    Free(result2);
-                    result = result2;
-                    i = size;
-                }
-            };
-            return result;
-         */
-
-        int intermediateResultAddress = tempAddressesStart + 1;
-        int i = tempAddressesStart;
-
-        tempAddressesStart += 2;
-
-        // int result = Alloc();
-        Allocate(resultAddress);
-
-        // int i = size;
-        Code.CopyValueWithTemp(requiredSizeAddress, tempAddressesStart, i);
-
-        // i--;
-        Code.AddValue(i, -1);
-
-        // while (i) {
-        Code.JumpStart(i);
-
-        {
-            int copiedResult = tempAddressesStart;
-            int temp = tempAddressesStart + 1;
-
-            // int result2 = Alloc(result);
-            Code.CopyValueWithTemp(resultAddress, temp, copiedResult);
-            this.AllocateFrom(intermediateResultAddress, copiedResult);
-
-            Code.ClearValue(temp);
-            Code.ClearValue(copiedResult);
-        }
-
-        {
-            // if (result2 - 1 != result) {
-
-            int copiedResult = tempAddressesStart + 1;
-            int resultSub1 = tempAddressesStart;
-            int temp = tempAddressesStart + 2;
-
-            Code.CopyValueWithTemp(resultAddress, temp, copiedResult);
-
-            Code.CopyValueWithTemp(intermediateResultAddress, temp, resultSub1);
-            Code.AddValue(resultSub1, -1);
-
-            Code.MoveSubValue(copiedResult, resultSub1);
-
-            Code.ClearValue(copiedResult);
-            Code.ClearValue(temp);
-
-            Code.JumpStart(resultSub1);
-            Code.ClearValue(resultSub1);
-        }
-
-        {
-            int temp = tempAddressesStart;
-
-            // delete result;
-            this.Free(resultAddress);
-
-            // result = result2;
-            Code.CopyValueWithTemp(intermediateResultAddress, temp, resultAddress);
-
-            // delete result2;
-            this.Free(intermediateResultAddress);
-
-            // i = size;
-            Code.CopyValueWithTemp(requiredSizeAddress, temp, i);
-
-            Code.ClearValue(temp);
-        }
-
-        {
-            int temp = tempAddressesStart;
-            // }
-            Code.ClearValue(temp);
-            Code.JumpEnd(temp);
-        }
-
-        // i--;
-        Code.AddValue(i, -1);
-
-        // }
-        Code.JumpEnd(i);
     }
 }

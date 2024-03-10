@@ -77,18 +77,18 @@ public abstract partial class InterpreterBase : IDisposable
 
     public byte[] GetRawHeap(BrainfuckGeneratorSettings settings)
     {
-        int heapStart = BasicHeapCodeHelper.GetOffsettedStart(settings.HeapStart);
+        int heapStart = HeapCodeHelper.GetOffsettedStart(settings.HeapStart);
         // int heapEnd = brainfuckGeneratorSettings.HeapStart + brainfuckGeneratorSettings.HeapSize * BasicHeapCodeHelper.BLOCK_SIZE;
 
-        byte[] result = new byte[(Memory.Length - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE];
+        byte[] result = new byte[(Memory.Length - heapStart) / HeapCodeHelper.BLOCK_SIZE];
 
-        for (int i = heapStart; i < Memory.Length; i += BasicHeapCodeHelper.BLOCK_SIZE)
+        for (int i = heapStart; i < Memory.Length; i += HeapCodeHelper.BLOCK_SIZE)
         {
             // byte addressCarry = Memory[i + BasicHeapCodeHelper.OFFSET_ADDRESS_CARRY];
             // byte valueCarry = Memory[i + BasicHeapCodeHelper.OFFSET_VALUE_CARRY];
-            byte data = Memory[i + BasicHeapCodeHelper.OFFSET_DATA];
+            byte data = Memory[i + HeapCodeHelper.OFFSET_DATA];
 
-            int heapAddress = (i - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE;
+            int heapAddress = (i - heapStart) / HeapCodeHelper.BLOCK_SIZE;
             result[heapAddress] = data;
         }
 

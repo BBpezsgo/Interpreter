@@ -91,6 +91,8 @@ public class WillBeCompilerException
 
     public CompilerException Instantiate(Position position, Uri? uri) => new(Message, position, uri);
     public CompilerException Instantiate(IPositioned? position, Uri? uri) => new(Message, position, uri);
+
+    public override string ToString() => Message;
 }
 
 public sealed class NotSupportedException : CompilerException

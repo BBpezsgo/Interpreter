@@ -317,7 +317,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
         functionCall.Reference = compiledFunction;
 
-        if (TryEvaluate(compiledFunction, functionCall.MethodParameters, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+        StatementWithValue[] convertedParameters = new StatementWithValue[functionCall.MethodParameters.Length];
+        for (int i = 0; i < functionCall.MethodParameters.Length; i++)
+        {
+            convertedParameters[i] = functionCall.MethodParameters[i];
+            GeneralType passed = FindStatementType(functionCall.MethodParameters[i]);
+            GeneralType defined = compiledFunction.ParameterTypes[i];
+            if (passed.Equals(defined)) continue;
+            convertedParameters[i] = new TypeCast(
+                convertedParameters[i],
+                Token.CreateAnonymous("as"),
+                defined.ToTypeInstance());
+        }
+
+        if (Settings.OptimizeCode &&
+            TryEvaluate(compiledFunction, convertedParameters, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -337,8 +351,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             StatementWithValue passedParameter = functionCall.PrevStatement;
             GeneralType passedParameterType = FindStatementType(passedParameter);
+            GeneralType definedParameterType = compiledFunction.ParameterTypes[0];
+            if (!passedParameterType.Equals(definedParameterType))
+            {
+                passedParameter = new TypeCast(
+                    passedParameter,
+                    Token.CreateAnonymous("as"),
+                    definedParameterType.ToTypeInstance());
+            }
             AddComment(" Param prev:");
-            GenerateCodeForStatement(functionCall.PrevStatement);
+            GenerateCodeForStatement(passedParameter);
             parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
         }
 
@@ -348,6 +370,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GeneralType passedParameterType = FindStatementType(passedParameter);
             ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
             GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+
+            if (!passedParameterType.Equals(definedParameterType))
+            {
+                passedParameter = new TypeCast(
+                    passedParameter,
+                    Token.CreateAnonymous("as"),
+                    definedParameterType.ToTypeInstance());
+                passedParameterType = FindStatementType(passedParameter);
+            }
 
             AddComment($" Param {i}:");
 
@@ -1180,11 +1211,36 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(WhileLoop whileLoop)
     {
-        bool conditionIsComputed = TryCompute(whileLoop.Condition, out DataItem computedCondition);
-        if (conditionIsComputed && !(bool)computedCondition && TrimUnreachableCode)
+        if (Settings.OptimizeCode &&
+            TryCompute(whileLoop.Condition, out DataItem condition))
         {
-            AddComment("Unreachable code not compiled");
-            AnalysisCollection?.Informations.Add(new Information($"Unreachable code not compiled", whileLoop.Block, CurrentFile));
+            if (condition)
+            {
+                AddComment("while (1) {");
+
+                OnScopeEnter(whileLoop.Block);
+
+                int beginOffset = GeneratedCode.Count;
+
+                BreakInstructions.Push(new List<int>());
+
+                GenerateCodeForStatement(whileLoop.Block, true);
+
+                AddComment("Jump Back");
+                AddInstruction(Opcode.JUMP_BY, beginOffset - GeneratedCode.Count);
+
+                FinishJumpInstructions(BreakInstructions.Last);
+
+                OnScopeExit(whileLoop.Block.Brackets.End.Position);
+
+                BreakInstructions.Pop();
+
+                AddComment("}");
+            }
+            else
+            {
+                AddComment("while (0) { }");
+            }
             return;
         }
 
@@ -1214,30 +1270,51 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
 
-        if (conditionIsComputed &&
-            !(bool)computedCondition)
-        { AnalysisCollection?.Warnings.Add(new Warning($"Bruh", whileLoop.Keyword, CurrentFile)); }
-
         BreakInstructions.Pop();
     }
     void GenerateCodeForStatement(ForLoop forLoop)
     {
         AddComment("for (...) {");
 
-        OnScopeEnter(forLoop.Block);
+        OnScopeEnter(forLoop.Position, Enumerable.Repeat(forLoop.VariableDeclaration, 1));
 
-        {
-            CleanupItem cleanupItem = GenerateCodeForVariable(forLoop.VariableDeclaration);
-            if (cleanupItem.SizeOnStack != 0)
-            { CleanupStack[^1] = new List<CleanupItem>(CleanupStack[^1]) { cleanupItem }.ToArray(); }
-        }
-
-        AddComment("FOR Declaration");
-        // Index variable
+        AddComment("For-loop variable");
         GenerateCodeForStatement(forLoop.VariableDeclaration);
 
-        AddComment("FOR Condition");
-        // Index condition
+        if (Settings.OptimizeCode &&
+            TryCompute(forLoop.Condition, out DataItem condition))
+        {
+            if (condition)
+            {
+                AddComment("For-loop condition");
+                int beginOffset = GeneratedCode.Count;
+
+                BreakInstructions.Push(new List<int>());
+
+                GenerateCodeForStatement(forLoop.Block);
+
+                AddComment("For-loop expression");
+                GenerateCodeForStatement(forLoop.Expression);
+
+                AddComment("Jump back");
+                AddInstruction(Opcode.JUMP_BY, beginOffset - GeneratedCode.Count);
+
+                FinishJumpInstructions(BreakInstructions.Pop());
+
+                OnScopeExit(forLoop.Position.After());
+
+                AddComment("}");
+            }
+            else
+            {
+                OnScopeExit(forLoop.Position.After());
+
+                AddComment("}");
+            }
+            return;
+        }
+
+        AddComment("For-loop condition");
         int conditionOffsetFor = GeneratedCode.Count;
         GenerateCodeForStatement(forLoop.Condition);
         AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
@@ -1245,10 +1322,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         BreakInstructions.Push(new List<int>());
 
-        GenerateCodeForStatement(forLoop.Block, true);
+        GenerateCodeForStatement(forLoop.Block);
 
-        AddComment("FOR Expression");
-        // Index expression
+        AddComment("For-loop expression");
         GenerateCodeForStatement(forLoop.Expression);
 
         AddComment("Jump back");
@@ -1269,17 +1345,34 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (ifSegment is IfBranch partIf)
             {
+                if (Settings.OptimizeCode &&
+                    TryCompute(partIf.Condition, out DataItem condition))
+                {
+                    if (!condition)
+                    {
+                        AddComment("if (0) { }");
+                        continue;
+                    }
+                    else
+                    {
+                        AddComment("if (1) {");
+                        GenerateCodeForStatement(partIf.Block);
+                        AddComment("}");
+                        break;
+                    }
+                }
+
                 AddComment("if (...) {");
 
-                AddComment("IF Condition");
+                AddComment("If condition");
                 GenerateCodeForStatement(partIf.Condition);
-                AddComment("IF Jump to Next");
+                AddComment("If jump-to-next");
                 int jumpNextInstruction = GeneratedCode.Count;
                 AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
 
                 GenerateCodeForStatement(partIf.Block);
 
-                AddComment("IF Jump to End");
+                AddComment("If jump-to-end");
                 jumpOutInstructions.Add(GeneratedCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
 
@@ -1289,17 +1382,34 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else if (ifSegment is ElseIfBranch partElseif)
             {
+                if (Settings.OptimizeCode &&
+                    TryCompute(partElseif.Condition, out DataItem condition))
+                {
+                    if (!condition)
+                    {
+                        AddComment("elseif (0) { }");
+                        continue;
+                    }
+                    else
+                    {
+                        AddComment("elseif (1) {");
+                        GenerateCodeForStatement(partElseif.Block);
+                        AddComment("}");
+                        break;
+                    }
+                }
+
                 AddComment("elseif (...) {");
 
-                AddComment("ELSEIF Condition");
+                AddComment("Elseif condition");
                 GenerateCodeForStatement(partElseif.Condition);
-                AddComment("ELSEIF Jump to Next");
+                AddComment("Elseif jump-to-next");
                 int jumpNextInstruction = GeneratedCode.Count;
                 AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
 
                 GenerateCodeForStatement(partElseif.Block);
 
-                AddComment("IF Jump to End");
+                AddComment("Elseif jump-to-end");
                 jumpOutInstructions.Add(GeneratedCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
 
@@ -1557,8 +1667,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         AddInstruction(Opcode.GET_BASEPOINTER);
                         AddInstruction(Opcode.MATH_ADD);
                         break;
-                    case AddressingMode.StackRelative:
-                        throw new UnreachableException();
                     default:
                         throw new UnreachableException();
                 }
@@ -1646,7 +1754,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         AddInstruction(Opcode.MATH_ADD);
                         break;
                     case AddressingMode.StackRelative:
-                        throw new UnreachableException();
                     default:
                         throw new UnreachableException();
                 }
@@ -1674,6 +1781,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (statementType.Size != targetType.Size)
         { throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.Size}) to {targetType} (size of {targetType.Size})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
 
+        if (Settings.OptimizeCode &&
+            targetType is BuiltinType targetBuiltinType &&
+            TryComputeSimple(typeCast.PrevStatement, out DataItem prevValue) &&
+            DataItem.TryCast(ref prevValue, targetBuiltinType.RuntimeType))
+        {
+            AddInstruction(Opcode.PUSH_VALUE, prevValue);
+            return;
+        }
+
         GenerateCodeForStatement(typeCast.PrevStatement, targetType);
 
         GeneralType type = FindStatementType(typeCast.PrevStatement, targetType);
@@ -1684,9 +1800,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (type is BuiltinType && targetType is BuiltinType targetBuiltinType)
+        if (type is BuiltinType && targetType is BuiltinType targetBuiltinType2)
         {
-            AddInstruction(Opcode.PUSH_VALUE, new DataItem((byte)targetBuiltinType.Type.Convert()));
+            AddInstruction(Opcode.PUSH_VALUE, new DataItem((byte)targetBuiltinType2.Type.Convert()));
             AddInstruction(Opcode.TYPE_SET);
         }
     }
@@ -1697,6 +1813,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
     /// </param>
     void GenerateCodeForStatement(Block block, bool silent = false)
     {
+        if (Settings.OptimizeCode &&
+            block.Statements.Length == 0)
+        {
+            AddComment("Statements { }");
+            return;
+        }
+
         if (silent)
         {
             AddComment("Statements {");
@@ -1755,15 +1878,34 @@ public partial class CodeGeneratorForMain : CodeGenerator
         });
     }
 
-    CleanupItem[] CompileVariables(Block block, bool addComments = true)
+    CleanupItem[] CompileVariables(IEnumerable<Statement> statements, bool addComments = true)
     {
         if (addComments) AddComment("Variables {");
 
         List<CleanupItem> result = new();
 
-        foreach (Statement s in block.Statements)
+        foreach (Statement statement in statements)
         {
-            CleanupItem item = GenerateCodeForVariable(s);
+            CleanupItem item = GenerateCodeForVariable(statement);
+            if (item.SizeOnStack == 0) continue;
+
+            result.Add(item);
+        }
+
+        if (addComments) AddComment("}");
+
+        return result.ToArray();
+    }
+
+    CleanupItem[] CompileVariables(IEnumerable<VariableDeclaration> statements, bool addComments = true)
+    {
+        if (addComments) AddComment("Variables {");
+
+        List<CleanupItem> result = new();
+
+        foreach (VariableDeclaration statement in statements)
+        {
+            CleanupItem item = GenerateCodeForVariable(statement);
             if (item.SizeOnStack == 0) continue;
 
             result.Add(item);
@@ -2128,14 +2270,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    void OnScopeEnter(Block block)
+    void OnScopeEnter(Block block) => OnScopeEnter(block.Position, block.Statements.OfType<VariableDeclaration>());
+
+    void OnScopeEnter(Position position, IEnumerable<VariableDeclaration> variables)
     {
         CurrentScopeDebug.Push(new ScopeInformations()
         {
             Location = new SourceCodeLocation()
             {
                 Instructions = (GeneratedCode.Count, GeneratedCode.Count),
-                SourcePosition = block.Position,
+                SourcePosition = position,
                 Uri = CurrentFile,
             },
             Stack = new List<StackElementInformations>(),
@@ -2143,9 +2287,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Scope enter");
 
-        CompileConstants(block.Statements);
+        CompileConstants(variables);
 
-        CleanupStack.Push(CompileVariables(block, CurrentContext is null));
+        CleanupStack.Push(CompileVariables(variables, CurrentContext is null));
         ReturnInstructions.Push(new List<int>());
     }
 
@@ -2216,7 +2360,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int size;
 
-        if (TryCompute(newVariable.InitialValue, out DataItem computedInitialValue))
+        if (Settings.OptimizeCode &&
+            TryCompute(newVariable.InitialValue, out DataItem computedInitialValue))
         {
             newVariable.InitialValue.PredictedValue = computedInitialValue;
 
@@ -2270,6 +2415,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return CleanupItem.Null;
     }
     CleanupItem[] GenerateCodeForVariable(Statement[] sts)
+    {
+        List<CleanupItem> result = new();
+        for (int i = 0; i < sts.Length; i++)
+        {
+            CleanupItem item = GenerateCodeForVariable(sts[i]);
+            if (item.SizeOnStack == 0) continue;
+
+            result.Add(item);
+        }
+        return result.ToArray();
+    }
+    CleanupItem[] GenerateCodeForVariable(VariableDeclaration[] sts)
     {
         List<CleanupItem> result = new();
         for (int i = 0; i < sts.Length; i++)

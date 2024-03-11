@@ -374,6 +374,8 @@ public abstract class GeneralType :
             yield return GeneralType.InsertTypeParameters(type, typeArguments) ?? type;
         }
     }
+
+    public abstract TypeInstance ToTypeInstance();
 }
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -450,6 +452,8 @@ public class BuiltinType : GeneralType,
         BasicType.Char => TypeKeywords.Char,
         _ => throw new UnreachableException(),
     };
+
+    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(ToString());
 }
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -529,6 +533,8 @@ public class StructType : GeneralType,
 
         return result.ToString();
     }
+
+    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(Struct.Identifier.Content, TypeParameters.Select(v => v.ToTypeInstance()));
 }
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -575,6 +581,8 @@ public class GenericType : GeneralType,
     }
     public override int GetHashCode() => HashCode.Combine(Identifier);
     public override string ToString() => Identifier;
+
+    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(Identifier);
 }
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -620,6 +628,8 @@ public class EnumType : GeneralType,
     }
     public override int GetHashCode() => HashCode.Combine(Enum);
     public override string ToString() => Enum.Identifier.Content;
+
+    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(Enum.Identifier.Content);
 }
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -662,6 +672,8 @@ public class PointerType : GeneralType,
     }
     public override int GetHashCode() => HashCode.Combine(To);
     public override string ToString() => $"{To}*";
+
+    public override TypeInstance ToTypeInstance() => TypeInstancePointer.CreateAnonymous(To.ToTypeInstance());
 }
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -717,6 +729,8 @@ public class ArrayType : GeneralType,
     }
     public override int GetHashCode() => HashCode.Combine(Of, Length);
     public override string ToString() => $"{Of}[{Length}]";
+
+    public override TypeInstance ToTypeInstance() => new TypeInstanceStackArray(Of.ToTypeInstance(), Literal.CreateAnonymous(new DataItem(Size), Position.UnknownPosition));
 }
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -797,4 +811,6 @@ public class FunctionType : GeneralType,
 
     public static bool operator ==(FunctionType? left, FunctionType? right) => EqualityComparer<FunctionType>.Default.Equals(left, right);
     public static bool operator !=(FunctionType? left, FunctionType? right) => !(left == right);
+
+    public override TypeInstance ToTypeInstance() => new TypeInstanceFunction(ReturnType.ToTypeInstance(), Parameters.Select(v => v.ToTypeInstance()));
 }

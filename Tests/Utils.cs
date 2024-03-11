@@ -221,16 +221,26 @@ public static class Utils
     const int TestCount = 50;
     static readonly int TestFileNameWidth = (int)Math.Floor(Math.Log10(TestCount)) + 1;
 
-    public static LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckSettings => new(LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default)
+    public static LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckGeneratorSettings => new(LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default)
     {
         GenerateDebugInformation = false,
         ShowProgress = false,
     };
 
+    public static GeneratorSettings MainGeneratorSettings => new(GeneratorSettings.Default)
+    {
+
+    };
+
+    public static CompilerSettings CompilerSettings => new(CompilerSettings.Default)
+    {
+
+    };
+
     public static byte[] GenerateBrainfuckMemory(int length)
     {
         byte[] result = new byte[length];
-        int offset = LanguageCore.Brainfuck.HeapCodeHelper.GetOffsettedStart(BrainfuckSettings.HeapStart) + (LanguageCore.Brainfuck.HeapCodeHelper.BLOCK_SIZE * BrainfuckSettings.HeapSize) + LanguageCore.Brainfuck.HeapCodeHelper.OFFSET_DATA;
+        int offset = LanguageCore.Brainfuck.HeapCodeHelper.GetOffsettedStart(BrainfuckGeneratorSettings.HeapStart) + (LanguageCore.Brainfuck.HeapCodeHelper.BLOCK_SIZE * BrainfuckGeneratorSettings.HeapSize) + LanguageCore.Brainfuck.HeapCodeHelper.OFFSET_DATA;
         result[offset] = 126;
         return result;
     }
@@ -302,8 +312,8 @@ public static class Utils
 
         AnalysisCollection analysisCollection = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings() { BasePath = BasePath }, null, analysisCollection);
-        BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, GeneratorSettings.Default, null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, null, analysisCollection);
+        BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
 
         analysisCollection.Throw();
 
@@ -344,8 +354,8 @@ public static class Utils
 
         AnalysisCollection analysisCollection = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath }, null, analysisCollection);
-        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckSettings, null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, null, analysisCollection);
+        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, analysisCollection);
 
         analysisCollection.Throw();
 
@@ -368,7 +378,7 @@ public static class Utils
         AnalysisCollection analysisCollection = new();
 
         CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath }, null, analysisCollection);
-        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckSettings, null, analysisCollection);
+        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, analysisCollection);
 
         analysisCollection.Throw();
 
@@ -392,8 +402,8 @@ public static class Utils
         byte InputCallback() => LanguageCore.Brainfuck.CharCode.GetByte(inputBuffer.Read());
 
         AnalysisCollection analysisCollection = new();
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath }, null, analysisCollection);
-        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckSettings, null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, null, analysisCollection);
+        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, analysisCollection);
         analysisCollection.Throw();
 
         {
@@ -427,7 +437,7 @@ public static class Utils
     {
         AnalysisCollection analysisCollection = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath, }, null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, null, analysisCollection);
 
         LanguageCore.ASM.Generator.AsmGeneratorResult code = LanguageCore.ASM.Generator.CodeGeneratorForAsm.Generate(compiled, default, null, analysisCollection);
 

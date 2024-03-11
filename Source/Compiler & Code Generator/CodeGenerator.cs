@@ -167,33 +167,52 @@ public abstract class CodeGenerator
             if (statement is not VariableDeclaration variableDeclaration ||
                 !variableDeclaration.Modifiers.Contains("const"))
             { continue; }
-
-            if (variableDeclaration.InitialValue == null)
-            { throw new CompilerException($"Constant value must have initial value", variableDeclaration, variableDeclaration.FilePath); }
-
-            if (!TryCompute(variableDeclaration.InitialValue, out DataItem constantValue))
-            { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.FilePath); }
-
-            if (variableDeclaration.Type != StatementKeywords.Var)
-            {
-                GeneralType constantType = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
-                variableDeclaration.Type.SetAnalyzedType(constantType);
-
-                if (constantType is not BuiltinType builtinType)
-                { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, CurrentFile); }
-
-                DataItem.TryCast(ref constantValue, builtinType.RuntimeType);
-            }
-
-            if (GetConstant(variableDeclaration.Identifier.Content, out _))
-            { throw new CompilerException($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.FilePath); }
-
-            CompiledConstants.Push(new CompiledVariableConstant(constantValue, variableDeclaration));
+            CompileConstant(variableDeclaration);
             count++;
         }
         ConstantsStack.Push(count);
         return count;
     }
+
+    protected int CompileConstants(IEnumerable<VariableDeclaration> statements)
+    {
+        int count = 0;
+        foreach (VariableDeclaration statement in statements)
+        {
+            if (!statement.Modifiers.Contains("const"))
+            { continue; }
+            CompileConstant(statement);
+            count++;
+        }
+        ConstantsStack.Push(count);
+        return count;
+    }
+
+    protected void CompileConstant(VariableDeclaration variableDeclaration)
+    {
+        if (variableDeclaration.InitialValue == null)
+        { throw new CompilerException($"Constant value must have initial value", variableDeclaration, variableDeclaration.FilePath); }
+
+        if (!TryCompute(variableDeclaration.InitialValue, out DataItem constantValue))
+        { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.FilePath); }
+
+        if (variableDeclaration.Type != StatementKeywords.Var)
+        {
+            GeneralType constantType = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
+            variableDeclaration.Type.SetAnalyzedType(constantType);
+
+            if (constantType is not BuiltinType builtinType)
+            { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, CurrentFile); }
+
+            DataItem.TryCast(ref constantValue, builtinType.RuntimeType);
+        }
+
+        if (GetConstant(variableDeclaration.Identifier.Content, out _))
+        { throw new CompilerException($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.FilePath); }
+
+        CompiledConstants.Push(new CompiledVariableConstant(constantValue, variableDeclaration));
+    }
+
     protected void CleanupConstants()
     {
         int count = ConstantsStack.Pop();
@@ -612,10 +631,31 @@ public abstract class CodeGenerator
         Token functionIdentifier = functionCallStatement.Identifier;
         StatementWithValue[] passedParameters = functionCallStatement.MethodParameters;
 
+        bool res;
         if (GetFunction(functionIdentifier.Content, passedParameters.Length, out CompiledFunction? possibleFunction, out _))
-        { return GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters, possibleFunction.ParameterTypes), out compiledFunction, out error); }
+        { res = GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters, possibleFunction.ParameterTypes), out compiledFunction, out error); }
         else
-        { return GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters), out compiledFunction, out error); }
+        { res = GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters), out compiledFunction, out error); }
+
+        if (!res && compiledFunction is not null)
+        {
+            res = res || Utils.SequenceEquals(functionCallStatement.MethodParameters, compiledFunction.ParameterTypes, (passed, defined) =>
+            {
+                GeneralType passedType = FindStatementType(passed);
+
+                if (passedType.Equals(defined))
+                { return true; }
+
+                if (defined is BuiltinType builtinType &&
+                    TryCompute(passed, out DataItem passedValue) &&
+                    DataItem.TryCast(ref passedValue, builtinType.RuntimeType))
+                { return true; }
+
+                return false;
+            });
+        }
+
+        return res;
     }
 
     protected bool GetFunction(string identifier, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
@@ -654,6 +694,7 @@ public abstract class CodeGenerator
     {
         compiledFunction = null;
         error = null;
+        bool isPerfect = false;
 
         foreach (CompiledFunction function in CompiledFunctions)
         {
@@ -663,16 +704,19 @@ public abstract class CodeGenerator
             if (!GeneralType.AreEquals(function.ParameterTypes, parameters))
             {
                 error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: parameter types doesn not match with ({function.ToReadable()})");
+                compiledFunction ??= function;
                 continue;
             }
 
-            if (compiledFunction is not null)
+            if (compiledFunction is not null && error is null)
             {
                 error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: multiple functions matched");
                 return false;
             }
 
             compiledFunction = function;
+            error = null;
+            isPerfect = true;
         }
 
         foreach (CompliableTemplate<CompiledFunction> function in compilableFunctions)
@@ -682,16 +726,19 @@ public abstract class CodeGenerator
             if (!GeneralType.AreEquals(function.Function.ParameterTypes, parameters))
             {
                 error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: parameter types doesn not match with ({function.Function.ToReadable()})");
+                compiledFunction ??= function.Function;
                 continue;
             }
 
-            if (compiledFunction is not null)
+            if (compiledFunction is not null && error is null)
             {
                 error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: multiple functions matched");
                 return false;
             }
 
             compiledFunction = function.Function;
+            error = null;
+            isPerfect = true;
         }
 
         if (compiledFunction is null)
@@ -706,20 +753,23 @@ public abstract class CodeGenerator
                 if (!GeneralType.AreEquals(function.ParameterTypes, parameters))
                 {
                     error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: parameter types doesn not match with ({function.ToReadable()})");
+                    compiledFunction ??= function;
                     continue;
                 }
 
-                if (compiledFunction is not null)
+                if (compiledFunction is not null && error is null)
                 {
                     error = new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found: multiple functions matched");
                     return false;
                 }
 
                 compiledFunction = function;
+                error = null;
+                isPerfect = true;
             }
         }
 
-        if (compiledFunction is not null)
+        if (compiledFunction is not null && isPerfect)
         { return true; }
 
         error ??= new WillBeCompilerException($"Function {CompiledFunction.ToReadable(identifier, parameters)} not found");
@@ -1600,7 +1650,7 @@ public abstract class CodeGenerator
         {
             if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compiledFunctionTemplate))
             {
-                throw new CompilerException($"Function \"{functionCall.ToReadable(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile);
+                throw notFoundError.Instantiate(functionCall, CurrentFile);
             }
 
             compiledFunction = compiledFunctionTemplate.Function;
@@ -2891,7 +2941,20 @@ public abstract class CodeGenerator
                 return true;
             }
 
-            if (TryEvaluate(function, functionCall.MethodParameters, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+            StatementWithValue[] convertedParameters = new StatementWithValue[functionCall.MethodParameters.Length];
+            for (int i = 0; i < functionCall.MethodParameters.Length; i++)
+            {
+                convertedParameters[i] = functionCall.MethodParameters[i];
+                GeneralType passed = FindStatementType(functionCall.MethodParameters[i]);
+                GeneralType defined = function.ParameterTypes[i];
+                if (passed.Equals(defined)) continue;
+                convertedParameters[i] = new TypeCast(
+                    convertedParameters[i],
+                    Token.CreateAnonymous("as"),
+                    defined.ToTypeInstance());
+            }
+
+            if (TryEvaluate(function, convertedParameters, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -3031,6 +3094,15 @@ public abstract class CodeGenerator
 
         if (function.Block is null)
         { return false; }
+
+        for (int i = 0; i < parameterValues.Length; i++)
+        {
+            if (!function.Parameters[i].Type.Equals(new BuiltinType(parameterValues[i].Type).ToTypeInstance()))
+            {
+                Debugger.Break();
+                return false;
+            }
+        }
 
         Dictionary<string, DataItem> variables = new();
 

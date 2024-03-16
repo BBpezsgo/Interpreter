@@ -13,50 +13,73 @@ It's my own programming language with three different output formats: bytecodes 
 I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tutorial series](https://www.youtube.com/watch?v=2DTNDrdqGlo&list=PLZjGMBjt_VVAMW53XnMtNfAQowZwMviBF) showing how to make a parser and a compiler. I basically copied the code with minimal changes. When the series ended, I was left on my own, so I improved the code myself.
 
 ## Command line arguments
-
+> 
 > `BBCodeInterpreter.exe` is the compiled compiler program
 > 
-> `[stuff]` - "stuff" is an **optional** argument
+> `[stuff]` - "stuff" is an **optional** argument.
 > 
-> `<stuff>` - "stuff" is a **required** argument
+> `<stuff>` - You **should** specify this argument with a value (in this example you don't have to specify "stuff" but any value that doesn't contain any whitespaces).
 > 
-> `stuff1|stuff2` you can use **one** of the listed arguments separated by `|` (in this example "stuff1" or "stuff2")
+> `stuff1|stuff2` you can use **one** of the listed arguments separated by `|` (in this example "stuff1" or "stuff2").
+> 
+> `stuff1;stuff2` you can use **any combination** of the listed arguments (or none) separated by `;` (in this example "stuff1" or "stuff2").
 
 `BBCodeInterpreter.exe [options...] <source path>`
 
 ### Options:
 
-**Logging:**
-- `--hide-debug|-hd` Hides debug logs
-- `--hide-info|-hi` Hides information logs
-- `--hide-system|-hs` Hides system logs
-- `--hide-warning|-hw` Hides warning logs
-
-**Code Generator:**
-- `--print-instructions|-pi` Prints the generated instructions
-- `--no-nullcheck|-nn` Disables the check for null pointers (and throw runtime exceptions) when accessing something by a pointer (accessing a field, calling a method, etc.)
-- `--dont-optimize|-do` Disables basic optimization
-- `--no-debug-info|-ndi` Disables the generation of debug informations (if you compiling into brainfuck, generating debug informations will take a lots of time)
-
-**Interpreter:**
-- `--stack-size|-ss <size>` Sets the interpreter's stack size (only valid with the default mode)
-- `--heap-size|-hs <size>` Sets the interpreter's HEAP size (only valid with the default mode)
-
 **Modes:**
 > Use only one of these!
+
 - `--brainfuck|-bf` Compiles and executes the code with a brainfuck interpreter.
 > [!WARNING]
 > Expect buggy behavior and missing features!
+
 - `--asm` Generates an assembly file, assemble it with nasm and execute the result exe file.
 > [!WARNING]
 > Expect buggy behavior and missing features!
-- The default mode is custom bytecodes that the interpreter can execute (this will automatically execute after the compiling)
+
+- The default mode is custom bytecodes that the interpreter can execute (this will automatically execute after the compiling).
+
+**Logging:**
+- `--hide-debug|-hd` Hides debug logs
+
+- `--hide-info|-hi` Hides information logs
+
+- `--hide-warning|--hide-warnings|-hw` Hides warning logs
+
+- `--show-progress|-sp` Prints some progress bars and labels during compilation.
+
+**Code Generator:**
+- `--print-instructions|-pi [final;commented;simplified;f;c;s]` Prints the generated instructions. For brainfuck, you can also specify which formats you want to see the generated code in:
+
+  - `final|f` Prints the final instructions.
+  - `commented|c` Prints the instructions with generated comments.
+  - `simplified|s` Prints the simplified form of the instructions.
+
+- `--no-nullcheck|-nn` Disables the check for null pointers (and throw runtime exceptions) when accessing something by a pointer (accessing a field, calling a method, etc.).
+
+- `--dont-optimize|-do` Disables basic optimization.
+
+- `--no-debug-info|-ndi` Disables the generation of debug informations (if you compiling into brainfuck, generating debug informations will take a lots of time).
+
+- `--output|-o <file path>` Specified the output file path where the generated code will be saved. This option only works for brainfuck.
+
+- `--basepath|-bp <folder path>` Sets the path where .dll ([read more](https://github.com/BBpezsgo/Interpreter/wiki/Advanced-Topics#importing-dll-files)) and other source files will be searched for `using` statements.
+
+**Runtime:**
+- `--stack-size|-ss <size>` Sets the interpreter's stack size (only valid for the default mode).
+
+- `--heap-size|-hs <size>` Specifies the HEAP size (only valid for the default and brainfuck modes).
+
+- `--console-gui|-cg` I use this mode for debugging.
 
 **Other:**
 - `--throw-errors|-te` With this option, the program crashes on any exception and lets the .NET runtime handle them.
-- `--basepath|-bp <base folder path>` Sets a path where .dll ([read more](https://github.com/BBpezsgo/Interpreter/wiki/Advanced-Topics#importing-dll-files)) and other source files will be searched for `using` statements. If it's not there, it will look for them in the directory where the input file is.
-- `--console-gui|-cg` I use this mode for debugging
-- `--no-pause|-np` With this option, the program exits at the end of execution without printing "Press any key to exit" and doesn't wait for any key press
+
+- `--no-pause|-np` With this option, the program exits at the end of execution without printing "Press any key to exit" and doesn't wait for any key press.
+
+- `--dont-normalize-args|nna` With this option, it will not normalizes the arguments and will use as passed to the program.
 
 ## Hello World:
 ```cs

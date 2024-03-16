@@ -261,7 +261,6 @@ public class Interactive
             ConsoleListener.Start();
 
             ConsoleListener.KeyEvent += OnKey;
-            ConsoleListener.MouseEvent += OnMouse;
             ConsoleListener.WindowBufferSizeEvent += OnWindowResize;
         }
     }
@@ -269,11 +268,6 @@ public class Interactive
     void OnWindowResize(WindowBufferSizeEvent e)
     {
         ShouldRender = true;
-    }
-
-    void OnMouse(MouseEvent e)
-    {
-
     }
 
     void OnKey(KeyEvent e)

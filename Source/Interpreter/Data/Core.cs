@@ -226,19 +226,52 @@ public readonly partial struct DataItem
         _ => DataItem.Null,
     };
 
-    public static bool TryShrinkToByte(ref DataItem value)
+    public static bool TryShrinkTo8bit(ref DataItem value)
+    {
+        switch (value.Type)
+        {
+            case RuntimeType.Byte: return true;
+
+            case RuntimeType.Char:
+            {
+                if (value._char < byte.MinValue || value._char > byte.MaxValue)
+                { return false; }
+                value = new DataItem((byte)value._char);
+                return true;
+            }
+
+            case RuntimeType.Integer:
+            {
+                if (value._integer < byte.MinValue || value._integer > byte.MaxValue)
+                { return false; }
+                value = new DataItem((byte)value._integer);
+                return true;
+            }
+
+            default: return false;
+        }
+    }
+
+    public static bool TryShrinkTo16bit(ref DataItem value)
     {
         switch (value.Type)
         {
             case RuntimeType.Byte:
+            {
+                value = new DataItem((char)value._integer);
                 return true;
+            }
+
+            case RuntimeType.Char: return true;
+
             case RuntimeType.Integer:
-                if (value._integer < byte.MinValue || value._integer > byte.MaxValue)
-                {
-                    return false;
-                }
-                value = new DataItem((byte)value._integer);
+            {
+                if (value._integer < char.MinValue || value._integer > char.MaxValue)
+                { return false; }
+                value = new DataItem((char)value._integer);
                 return true;
+            }
+
             default:
                 return false;
         }

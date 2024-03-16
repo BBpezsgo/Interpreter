@@ -85,16 +85,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 if (InFunction || InMacro.Last)
                 {
-                    int offset = ReturnValueOffset;
-                    for (int i = 0; i < returnValueType.Size; i++)
-                    { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, offset - i); }
+                    StackStore(new ValueAddress(ReturnValueOffset, AddressingMode.BasePointerRelative), returnValueType.Size);
                 }
                 else
                 {
                     if (returnValueType is not BuiltinType)
                     { throw new CompilerException($"Exit code must be a built-in type (not {returnValueType})", returnValue, CurrentFile); }
 
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.Absolute, 0);
+                    AddInstruction(Opcode.StackStore, AddressingMode.Absolute, 0);
                 }
             }
 
@@ -102,12 +100,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (CanReturn)
             {
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem(true));
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, ReturnFlagOffset);
+                AddInstruction(Opcode.Push, new DataItem(true));
+                AddInstruction(Opcode.StackStore, AddressingMode.BasePointerRelative, ReturnFlagOffset);
             }
 
             ReturnInstructions.Last.Add(GeneratedCode.Count);
-            AddInstruction(Opcode.JUMP_BY, 0);
+            AddInstruction(Opcode.Jump, 0);
 
             AddComment("}");
 
@@ -124,7 +122,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             StatementWithValue throwValue = keywordCall.Parameters[0];
 
             GenerateCodeForStatement(throwValue);
-            AddInstruction(Opcode.THROW);
+            AddInstruction(Opcode.Throw);
 
             return;
         }
@@ -138,7 +136,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { throw new NotImplementedException(); }
 
             BreakInstructions.Last.Add(GeneratedCode.Count);
-            AddInstruction(Opcode.JUMP_BY, 0);
+            AddInstruction(Opcode.Jump, 0);
 
             AddComment("}");
 
@@ -156,7 +154,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             OnGotStatementType(keywordCall, new BuiltinType(BasicType.Integer));
             keywordCall.PredictedValue = valueType.Size;
 
-            AddInstruction(Opcode.PUSH_VALUE, valueType.Size);
+            AddInstruction(Opcode.Push, valueType.Size);
 
             return;
         }
@@ -179,7 +177,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (!GetGeneralFunctionTemplate(deletablePointerType, FindStatementTypes(keywordCall.Parameters).ToArray(), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                 {
                     GenerateCodeForStatement(keywordCall.Parameters[0], new BuiltinType(BasicType.Integer));
-                    AddInstruction(Opcode.HEAP_FREE);
+                    AddInstruction(Opcode.Free);
                     AddComment("}");
 
                     if (deletablePointerType.To is not BuiltinType)
@@ -210,7 +208,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment(" Clear Param0:");
 
-            AddInstruction(Opcode.HEAP_FREE);
+            AddInstruction(Opcode.Free);
 
             AddComment("}");
 
@@ -238,7 +236,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             OnGotStatementType(functionCall, new BuiltinType(BasicType.Integer));
             functionCall.PredictedValue = paramType.Size;
 
-            AddInstruction(Opcode.PUSH_VALUE, paramType.Size);
+            AddInstruction(Opcode.Push, paramType.Size);
 
             return;
         }
@@ -336,7 +334,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             runtimeStatements.Length == 0)
         {
             functionCall.PredictedValue = returnValue.Value;
-            AddInstruction(Opcode.PUSH_VALUE, returnValue.Value);
+            AddInstruction(Opcode.Push, returnValue.Value);
             return;
         }
 
@@ -539,7 +537,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             for (int i = 0; i < passedParameter.Size; i++)
-            { AddInstruction(Opcode.POP_VALUE); }
+            { AddInstruction(Opcode.Pop); }
         }
     }
 
@@ -566,14 +564,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.BuiltinFunctionName == "alloc")
         {
             GenerateCodeForStatement(functionCall.Parameters[0], new BuiltinType(BasicType.Integer));
-            AddInstruction(Opcode.HEAP_ALLOC);
+            AddInstruction(Opcode.Allocate);
             return;
         }
 
         if (compiledFunction.BuiltinFunctionName == "free")
         {
             GenerateCodeForStatement(functionCall.Parameters[0], new BuiltinType(BasicType.Integer));
-            AddInstruction(Opcode.HEAP_FREE);
+            AddInstruction(Opcode.Free);
             return;
         }
 
@@ -611,10 +609,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 { returnValueOffset -= parameterCleanup[i].Size; }
 
                 AddComment($" Function name string pointer (cache):");
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Absolute, cacheAddress);
+                AddInstruction(Opcode.StackLoad, AddressingMode.Absolute, cacheAddress);
 
                 AddComment(" .:");
-                AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.Parameters.Length);
+                AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
 
                 if (compiledFunction.ReturnSomething)
                 {
@@ -622,13 +620,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     {
                         AddComment($" Store return value:");
                         for (int i = 0; i < returnValueSize; i++)
-                        { AddInstruction(Opcode.STORE_VALUE, AddressingMode.StackRelative, returnValueOffset); }
+                        { AddInstruction(Opcode.StackStore, AddressingMode.StackRelative, returnValueOffset); }
                     }
                     else
                     {
                         AddComment($" Clear return value:");
                         for (int i = 0; i < returnValueSize; i++)
-                        { AddInstruction(Opcode.POP_VALUE); }
+                        { AddInstruction(Opcode.Pop); }
                     }
                 }
 
@@ -649,10 +647,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
 
                 AddComment($" Load Function Name String Pointer:");
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, functionNameOffset);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, functionNameOffset);
 
                 AddComment(" .:");
-                AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.Parameters.Length);
+                AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
 
                 if (compiledFunction.ReturnSomething)
                 {
@@ -660,13 +658,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     {
                         AddComment($" Store return value:");
                         for (int i = 0; i < returnValueSize; i++)
-                        { AddInstruction(Opcode.STORE_VALUE, AddressingMode.StackRelative, returnValueOffset); }
+                        { AddInstruction(Opcode.StackStore, AddressingMode.StackRelative, returnValueOffset); }
                     }
                     else
                     {
                         AddComment($" Clear return value:");
                         for (int i = 0; i < returnValueSize; i++)
-                        { AddInstruction(Opcode.POP_VALUE); }
+                        { AddInstruction(Opcode.Pop); }
                     }
                 }
 
@@ -674,7 +672,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment(" Deallocate Function Name String:");
 
-                AddInstruction(Opcode.HEAP_FREE);
+                AddInstruction(Opcode.Free);
             }
 
             AddComment("}");
@@ -696,7 +694,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             AddComment(" Clear Return Value:");
             for (int i = 0; i < returnValueSize; i++)
-            { AddInstruction(Opcode.POP_VALUE); }
+            { AddInstruction(Opcode.Pop); }
         }
 
         AddComment("}");
@@ -735,7 +733,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             AddComment(" Clear Return Value:");
             for (int i = 0; i < returnValueSize; i++)
-            { AddInstruction(Opcode.POP_VALUE); }
+            { AddInstruction(Opcode.Pop); }
         }
 
         AddComment("}");
@@ -774,7 +772,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             AddComment(" Clear Return Value:");
             for (int i = 0; i < returnValueSize; i++)
-            { AddInstruction(Opcode.POP_VALUE); }
+            { AddInstruction(Opcode.Pop); }
         }
 
         AddComment("}");
@@ -852,14 +850,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment(" Clear Params:");
         for (int i = 0; i < paramsSize; i++)
         {
-            AddInstruction(Opcode.POP_VALUE);
+            AddInstruction(Opcode.Pop);
         }
 
         if (functionType.ReturnSomething && !anyCall.SaveValue)
         {
             AddComment(" Clear Return Value:");
             for (int i = 0; i < returnValueSize; i++)
-            { AddInstruction(Opcode.POP_VALUE); }
+            { AddInstruction(Opcode.Pop); }
         }
 
         AddComment("}");
@@ -871,7 +869,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
             @operator.PredictedValue = predictedValue;
 
-            AddInstruction(Opcode.PUSH_VALUE, predictedValue);
+            AddInstruction(Opcode.Push, predictedValue);
             return;
         }
 
@@ -907,7 +905,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment(" Function Name:");
                 if (ExternalFunctionsCache.TryGetValue(operatorDefinition.ExternalFunctionName, out int cacheAddress))
-                { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Absolute, cacheAddress); }
+                { AddInstruction(Opcode.StackLoad, AddressingMode.Absolute, cacheAddress); }
                 else
                 { GenerateCodeForLiteralString(operatorDefinition.ExternalFunctionName); }
 
@@ -918,10 +916,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 { offset -= parameterCleanup[i].Size; }
 
                 AddComment($" Function name string pointer:");
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, offset);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, offset);
 
                 AddComment(" .:");
-                AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.Parameters.Length);
+                AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
 
                 GenerateCodeForParameterCleanup(parameterCleanup, @operator.Operator.Position);
 
@@ -929,27 +927,27 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (!@operator.SaveValue)
                 {
                     AddComment($" Clear Return Value:");
-                    AddInstruction(Opcode.POP_VALUE);
+                    AddInstruction(Opcode.Pop);
                 }
                 else
                 { thereIsReturnValue = true; }
 
                 AddComment(" Deallocate Function Name String:");
 
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
-                AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
-                AddInstruction(Opcode.HEAP_FREE);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
+                AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
+                AddInstruction(Opcode.Free);
 
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
-                AddInstruction(Opcode.HEAP_FREE);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
+                AddInstruction(Opcode.Free);
 
                 if (thereIsReturnValue)
                 {
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.StackRelative, -2);
+                    AddInstruction(Opcode.StackStore, AddressingMode.StackRelative, -2);
                 }
                 else
                 {
-                    AddInstruction(Opcode.POP_VALUE);
+                    AddInstruction(Opcode.Pop);
                 }
 
                 AddComment("}");
@@ -973,7 +971,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 AddComment(" Clear Return Value:");
                 for (int i = 0; i < returnValueSize; i++)
-                { AddInstruction(Opcode.POP_VALUE); }
+                { AddInstruction(Opcode.Pop); }
             }
 
             AddComment("}");
@@ -989,18 +987,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(@operator.Left);
 
-            if (opcode == Opcode.LOGIC_AND)
+            if (opcode == Opcode.LogicAND)
             {
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -1);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -1);
                 jumpInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JUMP_BY_IF_FALSE);
+                AddInstruction(Opcode.JumpIfZero);
             }
-            else if (opcode == Opcode.LOGIC_OR)
+            else if (opcode == Opcode.LogicOR)
             {
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -1);
-                AddInstruction(Opcode.LOGIC_NOT);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -1);
+                AddInstruction(Opcode.LogicNOT);
                 jumpInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JUMP_BY_IF_FALSE);
+                AddInstruction(Opcode.JumpIfZero);
             }
 
             if (@operator.Right != null) GenerateCodeForStatement(@operator.Right);
@@ -1031,14 +1029,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 OnGotStatementType(literal, new BuiltinType(BasicType.Integer));
 
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.GetInt()));
+                AddInstruction(Opcode.Push, new DataItem(literal.GetInt()));
                 break;
             }
             case LiteralType.Float:
             {
                 OnGotStatementType(literal, new BuiltinType(BasicType.Float));
 
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.GetFloat()));
+                AddInstruction(Opcode.Push, new DataItem(literal.GetFloat()));
                 break;
             }
             case LiteralType.String:
@@ -1051,7 +1049,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 OnGotStatementType(literal, new BuiltinType(BasicType.Char));
 
                 if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", CurrentFile);
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.Value[0]));
+                AddInstruction(Opcode.Push, new DataItem(literal.Value[0]));
                 break;
             }
             default: throw new UnreachableException();
@@ -1064,8 +1062,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Allocate String object {");
 
-        AddInstruction(Opcode.PUSH_VALUE, 1 + literal.Length);
-        AddInstruction(Opcode.HEAP_ALLOC);
+        AddInstruction(Opcode.Push, 1 + literal.Length);
+        AddInstruction(Opcode.Allocate);
 
         AddComment("}");
 
@@ -1083,28 +1081,28 @@ public partial class CodeGeneratorForMain : CodeGenerator
         for (int i = 0; i < literal.Length; i++)
         {
             // Prepare value
-            AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal[i]));
+            AddInstruction(Opcode.Push, new DataItem(literal[i]));
 
             // Calculate pointer
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-            AddInstruction(Opcode.PUSH_VALUE, i);
-            AddInstruction(Opcode.MATH_ADD);
+            AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
+            AddInstruction(Opcode.Push, i);
+            AddInstruction(Opcode.MathAdd);
 
             // Set value
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+            AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
         }
 
         {
             // Prepare value
-            AddInstruction(Opcode.PUSH_VALUE, new DataItem('\0'));
+            AddInstruction(Opcode.Push, new DataItem('\0'));
 
             // Calculate pointer
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-            AddInstruction(Opcode.PUSH_VALUE, literal.Length);
-            AddInstruction(Opcode.MATH_ADD);
+            AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
+            AddInstruction(Opcode.Push, literal.Length);
+            AddInstruction(Opcode.MathAdd);
 
             // Set value
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+            AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
         }
 
         AddComment("}");
@@ -1120,7 +1118,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             variable.PredictedValue = constant.Value;
             variable.Reference = constant;
 
-            AddInstruction(Opcode.PUSH_VALUE, constant.Value);
+            AddInstruction(Opcode.Push, constant.Value);
             return;
         }
 
@@ -1133,10 +1131,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             ValueAddress address = GetBaseAddress(param);
 
-            AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
+            AddInstruction(Opcode.StackLoad, address.AddressingMode, address.Address);
 
             if (address.IsReference)
-            { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Runtime); }
+            { AddInstruction(Opcode.StackLoad, AddressingMode.Runtime); }
 
             return;
         }
@@ -1171,7 +1169,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (compiledFunction.InstructionOffset == -1)
             { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction, CurrentFile)); }
 
-            AddInstruction(Opcode.PUSH_VALUE, compiledFunction.InstructionOffset);
+            AddInstruction(Opcode.Push, compiledFunction.InstructionOffset);
 
             return;
         }
@@ -1207,7 +1205,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForStatement(Pointer memoryAddressFinder)
     {
         GenerateCodeForStatement(memoryAddressFinder.PrevStatement);
-        AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
+        AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
     }
     void GenerateCodeForStatement(WhileLoop whileLoop)
     {
@@ -1227,7 +1225,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 GenerateCodeForStatement(whileLoop.Block, true);
 
                 AddComment("Jump Back");
-                AddInstruction(Opcode.JUMP_BY, beginOffset - GeneratedCode.Count);
+                AddInstruction(Opcode.Jump, beginOffset - GeneratedCode.Count);
 
                 FinishJumpInstructions(BreakInstructions.Last);
 
@@ -1253,14 +1251,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(whileLoop.Condition);
 
         int conditionJumpOffset = GeneratedCode.Count;
-        AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
+        AddInstruction(Opcode.JumpIfZero, 0);
 
         BreakInstructions.Push(new List<int>());
 
         GenerateCodeForStatement(whileLoop.Block, true);
 
         AddComment("Jump Back");
-        AddInstruction(Opcode.JUMP_BY, conditionOffset - GeneratedCode.Count);
+        AddInstruction(Opcode.Jump, conditionOffset - GeneratedCode.Count);
 
         FinishJumpInstructions(BreakInstructions.Last);
 
@@ -1297,7 +1295,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 GenerateCodeForStatement(forLoop.Expression);
 
                 AddComment("Jump back");
-                AddInstruction(Opcode.JUMP_BY, beginOffset - GeneratedCode.Count);
+                AddInstruction(Opcode.Jump, beginOffset - GeneratedCode.Count);
 
                 FinishJumpInstructions(BreakInstructions.Pop());
 
@@ -1317,7 +1315,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("For-loop condition");
         int conditionOffsetFor = GeneratedCode.Count;
         GenerateCodeForStatement(forLoop.Condition);
-        AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
+        AddInstruction(Opcode.JumpIfZero, 0);
         int conditionJumpOffsetFor = GeneratedCode.Count - 1;
 
         BreakInstructions.Push(new List<int>());
@@ -1328,7 +1326,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(forLoop.Expression);
 
         AddComment("Jump back");
-        AddInstruction(Opcode.JUMP_BY, conditionOffsetFor - GeneratedCode.Count);
+        AddInstruction(Opcode.Jump, conditionOffsetFor - GeneratedCode.Count);
         GeneratedCode[conditionJumpOffsetFor].Parameter = GeneratedCode.Count - conditionJumpOffsetFor;
 
         FinishJumpInstructions(BreakInstructions.Pop());
@@ -1368,13 +1366,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 GenerateCodeForStatement(partIf.Condition);
                 AddComment("If jump-to-next");
                 int jumpNextInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
+                AddInstruction(Opcode.JumpIfZero, 0);
 
                 GenerateCodeForStatement(partIf.Block);
 
                 AddComment("If jump-to-end");
                 jumpOutInstructions.Add(GeneratedCode.Count);
-                AddInstruction(Opcode.JUMP_BY, 0);
+                AddInstruction(Opcode.Jump, 0);
 
                 AddComment("}");
 
@@ -1405,13 +1403,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 GenerateCodeForStatement(partElseif.Condition);
                 AddComment("Elseif jump-to-next");
                 int jumpNextInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
+                AddInstruction(Opcode.JumpIfZero, 0);
 
                 GenerateCodeForStatement(partElseif.Block);
 
                 AddComment("Elseif jump-to-end");
                 jumpOutInstructions.Add(GeneratedCode.Count);
-                AddInstruction(Opcode.JUMP_BY, 0);
+                AddInstruction(Opcode.Jump, 0);
 
                 AddComment("}");
 
@@ -1445,16 +1443,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             case PointerType pointerType:
             {
-                AddInstruction(Opcode.PUSH_VALUE, pointerType.To.Size);
-                AddInstruction(Opcode.HEAP_ALLOC);
+                AddInstruction(Opcode.Push, pointerType.To.Size);
+                AddInstruction(Opcode.Allocate);
 
                 for (int offset = 0; offset < pointerType.To.Size; offset++)
                 {
-                    AddInstruction(Opcode.PUSH_VALUE, 0);
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-                    AddInstruction(Opcode.PUSH_VALUE, offset);
-                    AddInstruction(Opcode.MATH_ADD);
-                    AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+                    AddInstruction(Opcode.Push, 0);
+                    AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
+                    AddInstruction(Opcode.Push, offset);
+                    AddInstruction(Opcode.MathAdd);
+                    AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
                 }
 
                 break;
@@ -1509,7 +1507,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(newInstance);
 
         for (int i = 0; i < newInstanceType.Size; i++)
-        { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -newInstanceType.Size); }
+        { AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -newInstanceType.Size); }
 
         parameterCleanup = GenerateCodeForParameterPassing(constructorCall, compiledFunction);
         parameterCleanup.Insert(0, (newInstanceType.Size, false, newInstanceType));
@@ -1538,7 +1536,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             OnGotStatementType(field, new BuiltinType(enumValue.Type));
 
-            AddInstruction(Opcode.PUSH_VALUE, enumValue);
+            AddInstruction(Opcode.Push, enumValue);
             return;
         }
 
@@ -1547,7 +1545,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             OnGotStatementType(field, new BuiltinType(BasicType.Integer));
             field.PredictedValue = arrayType.Length;
 
-            AddInstruction(Opcode.PUSH_VALUE, arrayType.Length);
+            AddInstruction(Opcode.Push, arrayType.Length);
             return;
         }
 
@@ -1563,9 +1561,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             CheckPointerNull();
 
-            AddInstruction(Opcode.PUSH_VALUE, fieldOffset);
-            AddInstruction(Opcode.MATH_ADD);
-            AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
+            AddInstruction(Opcode.Push, fieldOffset);
+            AddInstruction(Opcode.MathAdd);
+            AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
 
             return;
         }
@@ -1631,7 +1629,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     { throw new NotImplementedException(); }
 
                     ValueAddress offset = GetBaseAddress(param, (int)computedIndexData * arrayType.Of.Size);
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, offset.Address);
+                    AddInstruction(Opcode.StackLoad, AddressingMode.BasePointerRelative, offset.Address);
 
                     if (offset.IsReference)
                     { throw new NotImplementedException(); }
@@ -1655,7 +1653,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             {
                 ValueAddress address = GetDataAddress(identifier);
-                AddInstruction(Opcode.PUSH_VALUE, address.Address);
+                AddInstruction(Opcode.Push, address.Address);
 
                 switch (address.AddressingMode)
                 {
@@ -1664,17 +1662,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     case AddressingMode.Runtime:
                         throw new NotImplementedException();
                     case AddressingMode.BasePointerRelative:
-                        AddInstruction(Opcode.GET_BASEPOINTER);
-                        AddInstruction(Opcode.MATH_ADD);
+                        AddInstruction(Opcode.GetBasePointer);
+                        AddInstruction(Opcode.MathAdd);
                         break;
                     default:
                         throw new UnreachableException();
                 }
 
                 GenerateCodeForStatement(index.Index);
-                AddInstruction(Opcode.MATH_ADD);
+                AddInstruction(Opcode.MathAdd);
 
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Runtime);
+                AddInstruction(Opcode.StackLoad, AddressingMode.Runtime);
                 return;
             }
 
@@ -1694,18 +1692,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             GenerateCodeForStatement(index.PrevStatement);
 
-            AddInstruction(Opcode.PUSH_VALUE, pointerType.To.Size);
+            AddInstruction(Opcode.Push, pointerType.To.Size);
             GeneralType indexType = FindStatementType(index.Index);
             if (indexType is not BuiltinType)
             { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", index.Index, CurrentFile); }
             GenerateCodeForStatement(index.Index);
-            AddInstruction(Opcode.MATH_MULT);
+            AddInstruction(Opcode.MathMult);
 
-            AddInstruction(Opcode.MATH_ADD);
+            AddInstruction(Opcode.MathAdd);
 
             CheckPointerNull();
 
-            AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
+            AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
 
             return;
         }
@@ -1737,11 +1735,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (address.IsReference)
             {
-                AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
+                AddInstruction(Opcode.StackLoad, address.AddressingMode, address.Address);
             }
             else
             {
-                AddInstruction(Opcode.PUSH_VALUE, address.Address);
+                AddInstruction(Opcode.Push, address.Address);
 
                 switch (address.AddressingMode)
                 {
@@ -1750,8 +1748,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     case AddressingMode.Runtime:
                         throw new NotImplementedException();
                     case AddressingMode.BasePointerRelative:
-                        AddInstruction(Opcode.GET_BASEPOINTER);
-                        AddInstruction(Opcode.MATH_ADD);
+                        AddInstruction(Opcode.GetBasePointer);
+                        AddInstruction(Opcode.MathAdd);
                         break;
                     case AddressingMode.StackRelative:
                     default:
@@ -1786,7 +1784,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             TryComputeSimple(typeCast.PrevStatement, out DataItem prevValue) &&
             DataItem.TryCast(ref prevValue, targetBuiltinType.RuntimeType))
         {
-            AddInstruction(Opcode.PUSH_VALUE, prevValue);
+            AddInstruction(Opcode.Push, prevValue);
             return;
         }
 
@@ -1802,8 +1800,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (type is BuiltinType && targetType is BuiltinType targetBuiltinType2)
         {
-            AddInstruction(Opcode.PUSH_VALUE, new DataItem((byte)targetBuiltinType2.Type.Convert()));
-            AddInstruction(Opcode.TYPE_SET);
+            AddInstruction(Opcode.Push, new DataItem((byte)targetBuiltinType2.Type.Convert()));
+            AddInstruction(Opcode.TypeSet);
         }
     }
 
@@ -1932,7 +1930,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             else
             {
                 for (int x = 0; x < item.SizeOnStack; x++)
-                { AddInstruction(Opcode.POP_VALUE); }
+                { AddInstruction(Opcode.Pop); }
             }
 
             CompiledVariables.RemoveAt(CompiledVariables.Count - 1);
@@ -1970,8 +1968,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (address.IsReference)
             {
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, address.Address);
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.Runtime);
+                AddInstruction(Opcode.StackLoad, AddressingMode.BasePointerRelative, address.Address);
+                AddInstruction(Opcode.StackStore, AddressingMode.Runtime);
             }
             else
             {
@@ -2029,7 +2027,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             ValueAddress pointerAddress = new(-valueType.Size - 1, AddressingMode.StackRelative);
             HeapStore(pointerAddress, fieldOffset);
 
-            AddInstruction(Opcode.POP_VALUE);
+            AddInstruction(Opcode.Pop);
             return;
         }
 
@@ -2112,18 +2110,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
-            AddInstruction(Opcode.PUSH_VALUE, pointerType.To.Size);
+            AddInstruction(Opcode.Push, pointerType.To.Size);
             GeneralType indexType = FindStatementType(statementToSet.Index);
             if (indexType is not BuiltinType)
             { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", statementToSet.Index, CurrentFile); }
             GenerateCodeForStatement(statementToSet.Index);
-            AddInstruction(Opcode.MATH_MULT);
+            AddInstruction(Opcode.MathMult);
 
-            AddInstruction(Opcode.MATH_ADD);
+            AddInstruction(Opcode.MathAdd);
 
             CheckPointerNull();
 
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+            AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
 
             return;
         }
@@ -2154,7 +2152,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(value);
         GenerateCodeForStatement(statementToSet.PrevStatement);
 
-        AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+        AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
     }
     void GenerateCodeForValueSetter(VariableDeclaration statementToSet, StatementWithValue value)
     {
@@ -2175,7 +2173,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             TryCompute(value, out DataItem yeah))
         {
             value.PredictedValue = yeah;
-            AddInstruction(Opcode.PUSH_VALUE, yeah);
+            AddInstruction(Opcode.Push, yeah);
         }
         else if (variable.Type is ArrayType arrayType)
         {
@@ -2190,7 +2188,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             for (int i = 0; i < literal.Value.Length; i++)
             {
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.Value[i]));
+                AddInstruction(Opcode.Push, new DataItem(literal.Value[i]));
             }
         }
         else
@@ -2203,7 +2201,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int destination = variable.MemoryAddress;
         int size = variable.Type.Size;
         for (int offset = 1; offset <= size; offset++)
-        { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, destination + size - offset); }
+        { AddInstruction(Opcode.StackStore, AddressingMode.BasePointerRelative, destination + size - offset); }
     }
 
     void GenerateDeallocator(GeneralType deallocateableType, Position position)
@@ -2219,7 +2217,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (!GetGeneralFunctionTemplate(deallocateablePointerType, new GeneralType[] { deallocateablePointerType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
             {
                 AddComment($"Pointer value should be already there");
-                AddInstruction(Opcode.HEAP_FREE);
+                AddInstruction(Opcode.Free);
                 AddComment("}");
 
                 if (deallocateablePointerType.To is not BuiltinType)
@@ -2249,7 +2247,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" Clear Param0:");
 
-        AddInstruction(Opcode.HEAP_FREE);
+        AddInstruction(Opcode.Free);
 
         AddComment("}");
     }
@@ -2304,10 +2302,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (CanReturn)
         {
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, ReturnFlagOffset);
-            AddInstruction(Opcode.LOGIC_NOT);
+            AddInstruction(Opcode.StackLoad, AddressingMode.BasePointerRelative, ReturnFlagOffset);
+            AddInstruction(Opcode.LogicNOT);
             ReturnInstructions.Last.Add(GeneratedCode.Count);
-            AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
+            AddInstruction(Opcode.JumpIfZero, 0);
         }
 
         CleanupConstants();
@@ -2369,7 +2367,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             size = 1;
 
-            AddInstruction(Opcode.PUSH_VALUE, computedInitialValue);
+            AddInstruction(Opcode.Push, computedInitialValue);
             compiledVariable.IsInitialized = true;
 
             if (size <= 0)
@@ -2388,7 +2386,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             for (int i = 0; i < literalStatement.Value.Length; i++)
             {
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem(literalStatement.Value[i]));
+                AddInstruction(Opcode.Push, new DataItem(literalStatement.Value[i]));
             }
         }
         else
@@ -2501,7 +2499,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int instructionStart = GeneratedCode.Count;
 
         CanReturn = true;
-        AddInstruction(Opcode.PUSH_VALUE, new DataItem(false));
+        AddInstruction(Opcode.Push, new DataItem(false));
         TagCount.Last++;
 
         OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath));
@@ -2566,7 +2564,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         OnScopeExit(function.Block.Brackets.End.Position);
 
-        AddInstruction(Opcode.POP_VALUE);
+        AddInstruction(Opcode.Pop);
         TagCount.Last--;
 
         AddComment("Return");
@@ -2681,8 +2679,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Type = StackElementType.Value,
         });
 
-        AddInstruction(Opcode.GET_BASEPOINTER);
-        AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, 0);
+        AddInstruction(Opcode.GetBasePointer);
+        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackRelative, 0);
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
         {
@@ -2700,7 +2698,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions.Push(new List<int>());
 
         CanReturn = true;
-        AddInstruction(Opcode.PUSH_VALUE, new DataItem(false));
+        AddInstruction(Opcode.Push, new DataItem(false));
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
         {
             Address = ReturnFlagOffset,
@@ -2731,13 +2729,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CleanupConstants();
 
         CanReturn = false;
-        AddInstruction(Opcode.POP_VALUE);
+        AddInstruction(Opcode.Pop);
         TagCount.Last--;
 
         InMacro.Pop();
         TagCount.Pop();
 
-        AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.Runtime, 0);
+        AddInstruction(Opcode.SetBasePointer, AddressingMode.Runtime, 0);
 
         AddComment("}");
 

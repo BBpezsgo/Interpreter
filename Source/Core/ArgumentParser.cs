@@ -25,6 +25,10 @@ public struct ProgramArguments
     public bool DoNotPause;
     public bool ShowProgress;
 
+    public string? OutputFile;
+
+    public InstructionPrintFlags InstructionPrintFlags;
+
     public static ProgramArguments Default => new()
     {
         ThrowErrors = false,
@@ -38,6 +42,8 @@ public struct ProgramArguments
         DoNotPause = false,
         File = null,
         ShowProgress = false,
+        OutputFile = null,
+        InstructionPrintFlags = InstructionPrintFlags.None,
     };
 }
 
@@ -46,6 +52,15 @@ public enum ProgramRunType
     Normal,
     Brainfuck,
     ASM,
+}
+
+[Flags]
+public enum InstructionPrintFlags
+{
+    None = 0x00,
+    Final = 0x01,
+    Commented = 0x02,
+    Simplified = 0x04,
 }
 
 public static class ArgumentNormalizer
@@ -111,91 +126,117 @@ public static class ArgumentNormalizer
 
 public static class ArgumentParser
 {
-    static bool ExpectArg(string[] args, ref int i, [NotNullWhen(true)] out string? result, params string[] name)
+    class ArgumentsSource
     {
-        result = null;
+        readonly ImmutableArray<string> Arguments;
+        int Index;
 
-        if (i >= args.Length - 1)
-        { return false; }
+        public bool Has => Index < Arguments.Length - 1;
+        public object Current => Arguments[Index];
 
-        for (int j = 0; j < name.Length; j++)
+        public ArgumentsSource(IEnumerable<string> args)
         {
-            if (args[i] == name[j])
-            {
-                result = args[i];
-                i++;
-                return true;
-            }
+            Arguments = args.ToImmutableArray();
+            Index = 0;
         }
 
-        return false;
-    }
+        public bool TryConsume([NotNullWhen(true)] out string? result, params string[] name)
+        {
+            result = null;
 
-    static bool ExpectParam(string[] args, ref int i, out int param)
-    {
-        param = default;
+            if (Index >= Arguments.Length - 1)
+            { return false; }
 
-        if (i >= args.Length - 1)
-        { return false; }
+            for (int j = 0; j < name.Length; j++)
+            {
+                if (Arguments[Index] == name[j])
+                {
+                    result = Arguments[Index];
+                    Index++;
+                    return true;
+                }
+            }
 
-        if (!int.TryParse(args[i], out int @int))
-        { return false; }
+            return false;
+        }
 
-        i++;
-        param = @int;
-        return true;
-    }
+        public bool TryConsume(out int result)
+        {
+            result = default;
 
-    static bool ExpectParam(string[] args, ref int i, [NotNullWhen(true)] out string? param)
-    {
-        param = default;
+            if (Index >= Arguments.Length - 1)
+            { return false; }
 
-        if (i >= args.Length - 1)
-        { return false; }
+            if (!int.TryParse(Arguments[Index], out int @int))
+            { return false; }
 
-        param = args[i];
-        i++;
-        return true;
+            Index++;
+            result = @int;
+            return true;
+        }
+
+        public bool TryConsume([NotNullWhen(true)] out string? result)
+        {
+            result = default;
+
+            if (Index >= Arguments.Length - 1)
+            { return false; }
+
+            result = Arguments[Index];
+            Index++;
+            return true;
+        }
+
+        public IEnumerable<string> TryConsumeAll(params string[] words)
+        {
+            while (true)
+            {
+                if (TryConsume(out string? result, words))
+                { yield return result; }
+                else
+                { break; }
+            }
+        }
     }
 
     static ProgramArguments ParseInternal(string[] args)
     {
         ProgramArguments result = ProgramArguments.Default;
+        ArgumentsSource _args = new(args);
 #pragma warning disable IDE0018 // Inline variable declaration
         string? arg;
 #pragma warning restore IDE0018
 
         if (args.Length > 1)
         {
-            int i = 0;
-            while (i < args.Length - 1)
+            while (_args.Has)
             {
-                if (ExpectArg(args, ref i, out _, "--show-progress", "-sp"))
+                if (_args.TryConsume(out _, "--show-progress", "-sp"))
                 {
                     result.ShowProgress = true;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--dont-normalize-args", "-nna"))
+                if (_args.TryConsume(out _, "--dont-normalize-args", "-nna"))
                 {
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--no-nullcheck", "-nn"))
+                if (_args.TryConsume(out _, "--no-nullcheck", "-nn"))
                 {
                     result.GeneratorSettings.CheckNullPointers = false;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--no-pause", "-np"))
+                if (_args.TryConsume(out _, "--no-pause", "-np"))
                 {
                     result.DoNotPause = true;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out arg, "--heap-size", "-hs"))
+                if (_args.TryConsume(out arg, "--heap-size", "-hs"))
                 {
-                    if (!ExpectParam(args, ref i, out int heapSize))
+                    if (!_args.TryConsume(out int heapSize))
                     { throw new ArgumentException($"Expected number value after argument \"{arg}\""); }
 
                     result.BytecodeInterpreterSettings.HeapSize = heapSize;
@@ -204,7 +245,7 @@ public static class ArgumentParser
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--brainfuck", "-bf"))
+                if (_args.TryConsume(out _, "--brainfuck", "-bf"))
                 {
                     if (result.RunType != ProgramRunType.Normal)
                     { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.Brainfuck}"); }
@@ -213,7 +254,7 @@ public static class ArgumentParser
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--asm"))
+                if (_args.TryConsume(out _, "--asm"))
                 {
                     if (result.RunType != ProgramRunType.Normal)
                     { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.ASM}"); }
@@ -222,72 +263,103 @@ public static class ArgumentParser
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--console-gui", "-cg"))
+                if (_args.TryConsume(out _, "--console-gui", "-cg"))
                 {
                     result.ConsoleGUI = true;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out arg, "--basepath", "-bp"))
+                if (_args.TryConsume(out arg, "--basepath", "-bp"))
                 {
-                    if (!ExpectParam(args, ref i, out result.CompilerSettings.BasePath))
+                    if (!_args.TryConsume(out result.CompilerSettings.BasePath))
                     { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
 
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--throw-errors", "-te"))
+                if (_args.TryConsume(out arg, "--output", "-o"))
+                {
+                    if (!_args.TryConsume(out result.OutputFile))
+                    { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
+
+                    continue;
+                }
+
+                if (_args.TryConsume(out _, "--throw-errors", "-te"))
                 {
                     result.ThrowErrors = true;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--hide-debug", "-hd"))
+                if (_args.TryConsume(out _, "--hide-debug", "-hd"))
                 {
                     result.LogFlags &= ~LogType.Debug;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--hide-warning", "--hide-warnings", "-hw"))
+                if (_args.TryConsume(out _, "--hide-warning", "--hide-warnings", "-hw"))
                 {
                     result.LogFlags &= ~LogType.Warning;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--hide-info", "-hi"))
+                if (_args.TryConsume(out _, "--hide-info", "-hi"))
                 {
                     result.LogFlags &= ~LogType.Normal;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--dont-optimize", "-do"))
+                if (_args.TryConsume(out _, "--dont-optimize", "-do"))
                 {
                     result.GeneratorSettings.DontOptimize = true;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--no-debug-info", "-ndi"))
+                if (_args.TryConsume(out _, "--no-debug-info", "-ndi"))
                 {
                     result.GeneratorSettings.GenerateDebugInstructions = false;
                     result.BrainfuckGeneratorSettings.GenerateDebugInformation = false;
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out arg, "--stack-size", "-ss"))
+                if (_args.TryConsume(out arg, "--stack-size", "-ss"))
                 {
-                    if (!ExpectParam(args, ref i, out result.BytecodeInterpreterSettings.StackMaxSize))
+                    if (!_args.TryConsume(out result.BytecodeInterpreterSettings.StackMaxSize))
                     { throw new ArgumentException($"Expected int value after argument \"{arg}\""); }
 
                     continue;
                 }
 
-                if (ExpectArg(args, ref i, out _, "--print-instructions", "-pi"))
+                if (_args.TryConsume(out _, "--print-instructions", "-pi"))
                 {
+                    foreach (string flag in _args.TryConsumeAll(
+                        "final", "commented", "simplified",
+                        "f", "c", "s"))
+                    {
+                        switch (flag)
+                        {
+                            case "final":
+                            case "f":
+                                result.InstructionPrintFlags |= InstructionPrintFlags.Final;
+                                break;
+                            case "commented":
+                            case "c":
+                                result.InstructionPrintFlags |= InstructionPrintFlags.Commented;
+                                break;
+                            case "simplified":
+                            case "s":
+                                result.InstructionPrintFlags |= InstructionPrintFlags.Simplified;
+                                break;
+                        }
+                    }
+
+                    if (result.InstructionPrintFlags == InstructionPrintFlags.None)
+                    { result.InstructionPrintFlags = InstructionPrintFlags.Final; }
                     result.GeneratorSettings.PrintInstructions = true;
                     continue;
                 }
 
-                throw new ArgumentException($"Unknown argument \"{args[i]}\"");
+                throw new ArgumentException($"Unknown argument \"{_args.Current}\"");
             }
         }
 

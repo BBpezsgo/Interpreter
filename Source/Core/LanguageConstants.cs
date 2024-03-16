@@ -1,7 +1,6 @@
 ﻿namespace LanguageCore;
 
 using Compiler;
-using LanguageCore.Tokenizing;
 using Runtime;
 
 public static class DeclarationKeywords
@@ -108,25 +107,25 @@ public static class LanguageOperators
 {
     public static readonly ImmutableDictionary<string, Opcode> OpCodes = new Dictionary<string, Opcode>()
     {
-        { "!", Opcode.LOGIC_NOT },
-        { "+", Opcode.MATH_ADD },
-        { "<", Opcode.LOGIC_LT },
-        { ">", Opcode.LOGIC_MT },
-        { "-", Opcode.MATH_SUB },
-        { "*", Opcode.MATH_MULT },
-        { "/", Opcode.MATH_DIV },
-        { "%", Opcode.MATH_MOD },
-        { "==", Opcode.LOGIC_EQ },
-        { "!=", Opcode.LOGIC_NEQ },
-        { "&&", Opcode.LOGIC_AND },
-        { "||", Opcode.LOGIC_OR },
-        { "&", Opcode.BITS_AND },
-        { "|", Opcode.BITS_OR },
-        { "^", Opcode.BITS_XOR },
-        { "<=", Opcode.LOGIC_LTEQ },
-        { ">=", Opcode.LOGIC_MTEQ },
-        { "<<", Opcode.BITS_SHIFT_LEFT },
-        { ">>", Opcode.BITS_SHIFT_RIGHT },
+        { "!", Opcode.LogicNOT },
+        { "+", Opcode.MathAdd },
+        { "<", Opcode.LogicLT },
+        { ">", Opcode.LogicMT },
+        { "-", Opcode.MathSub },
+        { "*", Opcode.MathMult },
+        { "/", Opcode.MathDiv },
+        { "%", Opcode.MathMod },
+        { "==", Opcode.LogicEQ },
+        { "!=", Opcode.LogicNEQ },
+        { "&&", Opcode.LogicAND },
+        { "||", Opcode.LogicOR },
+        { "&", Opcode.BitsAND },
+        { "|", Opcode.BitsOR },
+        { "^", Opcode.BitsXOR },
+        { "<=", Opcode.LogicLTEQ },
+        { ">=", Opcode.LogicMTEQ },
+        { "<<", Opcode.BitsShiftLeft },
+        { ">>", Opcode.BitsShiftRight },
     }.ToImmutableDictionary();
 
     public static readonly ImmutableDictionary<string, int> ParameterCounts = new Dictionary<string, int>()

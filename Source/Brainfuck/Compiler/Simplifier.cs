@@ -13,8 +13,15 @@ public static class Simplifier
             char v = code[i];
             if (multipleChar != '\0' && multipleChar != v)
             {
-                result.Append(multipleChar);
-                if (multipleCount != 1) result.Append(multipleCount);
+                if (multipleCount > 2)
+                {
+                    result.Append(multipleChar);
+                    result.Append(multipleCount);
+                }
+                else
+                {
+                    result.Append(multipleChar, Math.Max(1, multipleCount));
+                }
 
                 multipleChar = '\0';
                 multipleCount = 0;

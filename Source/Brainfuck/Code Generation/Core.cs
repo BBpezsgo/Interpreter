@@ -739,7 +739,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (!TryCompute(pointer.PrevStatement, out DataItem addressToSet))
         { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.PrevStatement, CurrentFile); }
 
-        if (!DataItem.TryShrinkToByte(ref addressToSet))
+        if (!DataItem.TryShrinkTo8bit(ref addressToSet))
         { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, CurrentFile); }
 
         address = addressToSet.VByte;

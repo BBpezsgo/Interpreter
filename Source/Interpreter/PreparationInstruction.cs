@@ -34,8 +34,8 @@ public class PreparationInstruction
 
         result.Append(Opcode.ToString());
 
-        if (Opcode == Opcode.LOAD_VALUE ||
-            Opcode == Opcode.STORE_VALUE)
+        if (Opcode == Opcode.StackLoad ||
+            Opcode == Opcode.StackStore)
         {
             result.Append(' ');
             result.Append(AddressingMode.ToString());

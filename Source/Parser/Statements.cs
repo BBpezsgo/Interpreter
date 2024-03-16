@@ -316,9 +316,7 @@ public class LinkedElse : LinkedIfThing
     public override Position Position => new(Keyword, Block);
 
     public LinkedElse(Token keyword, Statement block) : base(keyword, block)
-    {
-
-    }
+    { }
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {

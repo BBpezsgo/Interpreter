@@ -1668,9 +1668,9 @@ public abstract class CodeGenerator
             { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
         }
         else
-        { opcode = Opcode.UNKNOWN; }
+        { opcode = Opcode._; }
 
-        if (opcode == Opcode.UNKNOWN)
+        if (opcode == Opcode._)
         { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
 
         if (GetOperator(@operator, out CompiledOperator? operatorDefinition))

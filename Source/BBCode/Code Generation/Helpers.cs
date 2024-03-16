@@ -14,20 +14,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"This should be an \"{new BuiltinType(BasicType.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
 
         int returnToValueInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.PUSH_VALUE, 0);
+        AddInstruction(Opcode.Push, 0);
 
-        AddInstruction(Opcode.GET_BASEPOINTER);
+        AddInstruction(Opcode.GetBasePointer);
 
         StackLoad(new ValueAddress(address), address.Type.Size);
 
-        AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 3);
+        AddInstruction(Opcode.Push, GeneratedCode.Count + 3);
 
-        AddInstruction(Opcode.MATH_SUB);
+        AddInstruction(Opcode.MathSub);
 
-        AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, -1);
+        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackRelative, -1);
 
         int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.JUMP_BY, AddressingMode.Runtime);
+        AddInstruction(Opcode.Jump, AddressingMode.Runtime);
 
         GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
 
@@ -40,21 +40,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"This should be an \"{new BuiltinType(BasicType.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
 
         int returnToValueInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.PUSH_VALUE, 0);
+        AddInstruction(Opcode.Push, 0);
 
-        AddInstruction(Opcode.GET_BASEPOINTER);
+        AddInstruction(Opcode.GetBasePointer);
 
         ValueAddress offset = GetBaseAddress(address);
-        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, offset.Address);
+        AddInstruction(Opcode.StackLoad, AddressingMode.BasePointerRelative, offset.Address);
 
-        AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 3);
+        AddInstruction(Opcode.Push, GeneratedCode.Count + 3);
 
-        AddInstruction(Opcode.MATH_SUB);
+        AddInstruction(Opcode.MathSub);
 
-        AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, -1);
+        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackRelative, -1);
 
         int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.JUMP_BY, AddressingMode.Runtime);
+        AddInstruction(Opcode.Jump, AddressingMode.Runtime);
 
         GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
 
@@ -69,19 +69,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"This should be an \"{new BuiltinType(BasicType.Integer)}\" or function pointer and not \"{addressType}\"", address, CurrentFile); }
 
         int returnToValueInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.PUSH_VALUE, 0); // Saved code pointer
+        AddInstruction(Opcode.Push, 0); // Saved code pointer
 
-        AddInstruction(Opcode.GET_BASEPOINTER); // Saved base pointer
+        AddInstruction(Opcode.GetBasePointer); // Saved base pointer
 
         GenerateCodeForStatement(address);
 
-        AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 3);
-        AddInstruction(Opcode.MATH_SUB);
+        AddInstruction(Opcode.Push, GeneratedCode.Count + 3);
+        AddInstruction(Opcode.MathSub);
 
-        AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, -1);
+        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackRelative, -1);
 
         int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.JUMP_BY, AddressingMode.Runtime);
+        AddInstruction(Opcode.Jump, AddressingMode.Runtime);
 
         GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
 
@@ -91,14 +91,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
     int Call(int absoluteAddress)
     {
         int returnToValueInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.PUSH_VALUE, 0);
+        AddInstruction(Opcode.Push, 0);
 
-        AddInstruction(Opcode.GET_BASEPOINTER);
+        AddInstruction(Opcode.GetBasePointer);
 
-        AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, 0);
+        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackRelative, 0);
 
         int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.JUMP_BY, AddressingMode.Absolute, absoluteAddress - GeneratedCode.Count);
+        AddInstruction(Opcode.Jump, AddressingMode.Absolute, absoluteAddress - GeneratedCode.Count);
 
         GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
 
@@ -107,8 +107,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void Return()
     {
-        AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.Runtime, 0);
-        AddInstruction(Opcode.SET_CODEPOINTER, AddressingMode.Runtime);
+        AddInstruction(Opcode.SetBasePointer, AddressingMode.Runtime, 0);
+        AddInstruction(Opcode.SetCodePointer, AddressingMode.Runtime);
     }
 
     /// <exception cref="NotImplementedException"/>
@@ -140,7 +140,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return size;
         }
 
-        AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(type));
+        AddInstruction(Opcode.Push, GetInitialValue(type));
         return 1;
     }
 
@@ -157,8 +157,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (address.IsReference)
         {
-            AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Runtime);
+            AddInstruction(Opcode.StackLoad, address.AddressingMode, address.Address);
+            AddInstruction(Opcode.StackLoad, AddressingMode.Runtime);
             throw new NotImplementedException();
         }
 
@@ -172,12 +172,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AddressingMode.Absolute:
             case AddressingMode.BasePointerRelative:
             case AddressingMode.StackRelative:
-                AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
+                AddInstruction(Opcode.StackLoad, address.AddressingMode, address.Address);
                 break;
 
             case AddressingMode.Runtime:
-                AddInstruction(Opcode.PUSH_VALUE, address.Address);
-                AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode);
+                AddInstruction(Opcode.Push, address.Address);
+                AddInstruction(Opcode.StackLoad, address.AddressingMode);
                 break;
             default: throw new UnreachableException();
         }
@@ -197,17 +197,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
         switch (address.AddressingMode)
         {
             case AddressingMode.Absolute:
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.Absolute, address.Address);
+                AddInstruction(Opcode.StackStore, AddressingMode.Absolute, address.Address);
                 break;
             case AddressingMode.BasePointerRelative:
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, address.Address);
+                AddInstruction(Opcode.StackStore, AddressingMode.BasePointerRelative, address.Address);
                 break;
             case AddressingMode.StackRelative:
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.StackRelative, address.Address);
+                AddInstruction(Opcode.StackStore, AddressingMode.StackRelative, address.Address);
                 break;
             case AddressingMode.Runtime:
-                AddInstruction(Opcode.PUSH_VALUE, address.Address);
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.Runtime);
+                AddInstruction(Opcode.Push, address.Address);
+                AddInstruction(Opcode.StackStore, AddressingMode.Runtime);
                 break;
             default: throw new UnreachableException();
         }
@@ -218,12 +218,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!Settings.CheckNullPointers) return;
         AddComment($"Check for pointer zero {{");
         if (preservePointer)
-        { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -1); }
-        AddInstruction(Opcode.LOGIC_NOT);
+        { AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -1); }
+        AddInstruction(Opcode.LogicNOT);
         int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.JUMP_BY_IF_FALSE);
+        AddInstruction(Opcode.JumpIfZero);
         GenerateCodeForLiteralString(exceptionMessage);
-        AddInstruction(Opcode.THROW);
+        AddInstruction(Opcode.Throw);
         GeneratedCode[jumpInstruction].Parameter = GeneratedCode.Count - jumpInstruction;
         AddComment($"}}");
     }
@@ -234,9 +234,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CheckPointerNull(exceptionMessage: nullExceptionMessage);
 
-        AddInstruction(Opcode.PUSH_VALUE, offset);
-        AddInstruction(Opcode.MATH_ADD);
-        AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
+        AddInstruction(Opcode.Push, offset);
+        AddInstruction(Opcode.MathAdd);
+        AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
     }
 
     void HeapStore(ValueAddress pointerAddress, int offset, string nullExceptionMessage = "null pointer")
@@ -245,9 +245,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CheckPointerNull(exceptionMessage: nullExceptionMessage);
 
-        AddInstruction(Opcode.PUSH_VALUE, offset);
-        AddInstruction(Opcode.MATH_ADD);
-        AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+        AddInstruction(Opcode.Push, offset);
+        AddInstruction(Opcode.MathAdd);
+        AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
     }
 
     #endregion

@@ -117,4 +117,47 @@ public static class Nasm
 
         throw new ProcessException(nasm, process.ExitCode, stdOutput, stdError);
     }
+
+    /// <exception cref="ProcessNotStartedException"/>
+    /// <exception cref="NotImplementedException"/>
+    /// <exception cref="NasmException"/>
+    /// <exception cref="FileNotFoundException"/>
+    /// <exception cref="ProcessException"/>
+    public static void AssembleRaw(string inputFile, string outputFile)
+    {
+        if (!File.Exists(inputFile))
+        { throw new FileNotFoundException($"Input file not found", inputFile); }
+
+        if (File.Exists(outputFile))
+        { File.Delete(outputFile); }
+
+        if (!Utils.GetFullPath("nasm.exe", out string? nasm))
+        { throw new FileNotFoundException($"NASM not found", "nasm.exe"); }
+
+        using Process? process = Process.Start(new ProcessStartInfo(nasm, $"{inputFile} -f bin -o {outputFile}")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        }) ?? throw new ProcessNotStartedException(nasm);
+        process.WaitForExit();
+
+        if (process.ExitCode == 0)
+        { return; }
+
+        string stdOutput = process.StandardOutput.ReadToEnd();
+        string stdError = process.StandardError.ReadToEnd();
+
+        string[] errorLines = stdError.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
+
+        for (int i = 0; i < errorLines.Length; i++)
+        {
+            string errorLine = errorLines[i].Trim();
+            if (string.IsNullOrWhiteSpace(errorLine)) continue;
+            NasmException? nasmException = NasmException.Parse(errorLine);
+            if (nasmException != null) throw nasmException;
+            else throw new NotImplementedException();
+        }
+
+        throw new ProcessException(nasm, process.ExitCode, stdOutput, stdError);
+    }
 }

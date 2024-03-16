@@ -4,26 +4,30 @@ public sealed class StringTokenizer : Tokenizer
 {
     readonly string Text;
 
-    StringTokenizer(TokenizerSettings settings, string? text) : base(settings)
+    StringTokenizer(TokenizerSettings settings, string? text, Uri? file) : base(settings, file)
     {
         Text = text ?? string.Empty;
     }
 
     /// <inheritdoc cref="TokenizeInternal"/>
     public static TokenizerResult Tokenize(string? text)
-        => Tokenize(text, TokenizerSettings.Default);
+        => Tokenize(text, null, TokenizerSettings.Default);
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string? text, TokenizerSettings settings)
-        => new StringTokenizer(settings, text).TokenizeInternal();
+    public static TokenizerResult Tokenize(string? text, Uri? file)
+        => Tokenize(text, file, TokenizerSettings.Default);
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string? text, ConsoleProgressBar progress)
-        => Tokenize(text, TokenizerSettings.Default, progress);
+    public static TokenizerResult Tokenize(string? text, Uri? file, TokenizerSettings settings)
+        => new StringTokenizer(settings, text, file).TokenizeInternal();
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string? text, TokenizerSettings settings, ConsoleProgressBar progress)
-        => new StringTokenizer(settings, text).TokenizeInternal(progress);
+    public static TokenizerResult Tokenize(string? text, Uri? file, ConsoleProgressBar progress)
+        => Tokenize(text, file, TokenizerSettings.Default, progress);
+
+    /// <inheritdoc cref="TokenizeInternal"/>
+    public static TokenizerResult Tokenize(string? text, Uri? file, TokenizerSettings settings, ConsoleProgressBar progress)
+        => new StringTokenizer(settings, text, file).TokenizeInternal(progress);
 
     TokenizerResult TokenizeInternal()
     {

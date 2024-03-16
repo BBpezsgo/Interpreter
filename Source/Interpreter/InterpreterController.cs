@@ -164,7 +164,7 @@ public class Interpreter
     }
 
     [MemberNotNullWhen(true, nameof(BytecodeInterpreter))]
-    public bool Initialize(Instruction[] program, BytecodeInterpreterSettings settings, Dictionary<string, ExternalFunctionBase> externalFunctions)
+    public bool Initialize(ImmutableArray<Instruction> program, BytecodeInterpreterSettings settings, Dictionary<string, ExternalFunctionBase> externalFunctions)
     {
         if (IsExecutingCode)
         {
@@ -407,7 +407,7 @@ public class Interpreter
 
     public void Update()
     {
-        if (BytecodeInterpreter != null && BytecodeInterpreter.Memory.Heap != null && Streams != null)
+        if (BytecodeInterpreter != null && Streams != null)
         {
             for (int i = 0; i < Streams.Count; i++)
             { Streams[i].Tick(BytecodeInterpreter.Memory.Heap); }

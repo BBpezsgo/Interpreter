@@ -439,7 +439,10 @@ public static class Utils
 
         CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, null, analysisCollection);
 
-        LanguageCore.ASM.Generator.AsmGeneratorResult code = LanguageCore.ASM.Generator.CodeGeneratorForAsm.Generate(compiled, default, null, analysisCollection);
+        LanguageCore.ASM.Generator.AsmGeneratorResult code = LanguageCore.ASM.Generator.CodeGeneratorForAsm.Generate(compiled, new LanguageCore.ASM.Generator.AsmGeneratorSettings()
+        {
+            Is16Bits = true,
+        }, null, analysisCollection);
 
         analysisCollection.Throw();
 

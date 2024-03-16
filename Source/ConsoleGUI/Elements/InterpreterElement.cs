@@ -83,7 +83,7 @@ public sealed class InterpreterElement : WindowElement
         };
         StackPanel.OnBeforeDraw += StackElement_OnBeforeDraw;
 
-        StackScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Memory.Stack.Count + 30), StackPanel);
+        StackScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Memory.StackLength + 30), StackPanel);
 
         StackPanel.OnMouseEventInvoked += StackScrollBar.FeedEvent;
         StackPanel.OnKeyEventInvoked += StackScrollBar.FeedEvent;
@@ -530,7 +530,7 @@ public sealed class InterpreterElement : WindowElement
         {
             Instruction instruction = _instruction.Value;
 
-            if (instruction.Opcode == Opcode.HEAP_SET)
+            if (instruction.Opcode == Opcode.HeapSet)
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
                 { storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].VInt); }
@@ -538,7 +538,7 @@ public sealed class InterpreterElement : WindowElement
                 { storeIndicators.Add((int)instruction.Parameter); }
             }
 
-            if (instruction.Opcode == Opcode.HEAP_GET)
+            if (instruction.Opcode == Opcode.HeapGet)
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
                 {
@@ -554,7 +554,7 @@ public sealed class InterpreterElement : WindowElement
         for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Heap!.Size; i++)
         {
             DataItem item = this.Interpreter.BytecodeInterpreter.Memory.Heap[i];
-            bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull) && (this.Interpreter.BytecodeInterpreter.Memory.Heap is not null);
+            bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull);
             (int, bool) header = (default, default);
 
             if (isHeader)
@@ -688,13 +688,13 @@ public sealed class InterpreterElement : WindowElement
         {
             Instruction instruction = instruction_.Value;
 
-            if (instruction.Opcode == Opcode.STORE_VALUE)
+            if (instruction.Opcode == Opcode.StackStore)
             {
                 storeIndicators.Add(this.Interpreter.BytecodeInterpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
             }
 
-            if (instruction.Opcode == Opcode.STORE_VALUE ||
-                instruction.Opcode == Opcode.HEAP_SET)
+            if (instruction.Opcode == Opcode.StackStore ||
+                instruction.Opcode == Opcode.HeapSet)
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
                 { loadIndicators.Add(stackSize - 2); }
@@ -702,29 +702,29 @@ public sealed class InterpreterElement : WindowElement
                 { loadIndicators.Add(stackSize - 1); }
             }
 
-            if (instruction.Opcode == Opcode.LOAD_VALUE)
+            if (instruction.Opcode == Opcode.StackLoad)
             {
                 loadIndicators.Add(this.Interpreter.BytecodeInterpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
                 storeIndicators.Add(stackSize);
             }
 
-            if (instruction.Opcode == Opcode.PUSH_VALUE ||
-                instruction.Opcode == Opcode.GET_BASEPOINTER ||
-                instruction.Opcode == Opcode.HEAP_GET)
+            if (instruction.Opcode == Opcode.Push ||
+                instruction.Opcode == Opcode.GetBasePointer ||
+                instruction.Opcode == Opcode.HeapGet)
             { storeIndicators.Add(stackSize); }
 
-            if (instruction.Opcode == Opcode.POP_VALUE)
+            if (instruction.Opcode == Opcode.Pop)
             { loadIndicators.Add(stackSize - 1); }
 
-            if (instruction.Opcode == Opcode.MATH_ADD ||
-                instruction.Opcode == Opcode.MATH_DIV ||
-                instruction.Opcode == Opcode.MATH_MOD ||
-                instruction.Opcode == Opcode.MATH_MULT ||
-                instruction.Opcode == Opcode.MATH_SUB ||
-                instruction.Opcode == Opcode.BITS_AND ||
-                instruction.Opcode == Opcode.BITS_OR ||
-                instruction.Opcode == Opcode.LOGIC_AND ||
-                instruction.Opcode == Opcode.LOGIC_OR)
+            if (instruction.Opcode == Opcode.MathAdd ||
+                instruction.Opcode == Opcode.MathDiv ||
+                instruction.Opcode == Opcode.MathMod ||
+                instruction.Opcode == Opcode.MathMult ||
+                instruction.Opcode == Opcode.MathSub ||
+                instruction.Opcode == Opcode.BitsAND ||
+                instruction.Opcode == Opcode.BitsOR ||
+                instruction.Opcode == Opcode.LogicAND ||
+                instruction.Opcode == Opcode.LogicOR)
             {
                 loadIndicators.Add(stackSize - 1);
                 storeIndicators.Add(stackSize - 2);
@@ -1039,10 +1039,10 @@ public sealed class InterpreterElement : WindowElement
             b.AddText(instruction.Opcode.ToString());
             b.AddText(' ');
 
-            if (instruction.Opcode == Opcode.LOAD_VALUE ||
-                instruction.Opcode == Opcode.STORE_VALUE ||
-                instruction.Opcode == Opcode.HEAP_GET ||
-                instruction.Opcode == Opcode.HEAP_SET)
+            if (instruction.Opcode == Opcode.StackLoad ||
+                instruction.Opcode == Opcode.StackStore ||
+                instruction.Opcode == Opcode.HeapGet ||
+                instruction.Opcode == Opcode.HeapSet)
             {
                 b.AddText(instruction.AddressingMode.ToString());
                 b.AddText(' ');

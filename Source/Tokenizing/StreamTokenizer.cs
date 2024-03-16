@@ -8,50 +8,50 @@ public class StreamTokenizer : Tokenizer,
     readonly Stream Stream;
     bool IsDisposed;
 
-    StreamTokenizer(TokenizerSettings settings, Stream stream) : base(settings)
+    StreamTokenizer(TokenizerSettings settings, Stream stream, Uri? file) : base(settings, file)
     { Stream = stream; }
 
     /// <inheritdoc cref="TokenizeInternal"/>
     public static TokenizerResult Tokenize(string filePath)
-        => StreamTokenizer.Tokenize(File.OpenRead(filePath), TokenizerSettings.Default);
+        => StreamTokenizer.Tokenize(System.IO.File.OpenRead(filePath), new Uri(filePath), TokenizerSettings.Default);
 
     /// <inheritdoc cref="TokenizeInternal"/>
     public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings)
-        => StreamTokenizer.Tokenize(File.OpenRead(filePath), settings);
+        => StreamTokenizer.Tokenize(System.IO.File.OpenRead(filePath), new Uri(filePath), settings);
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream)
-        => StreamTokenizer.Tokenize(stream, TokenizerSettings.Default);
+    public static TokenizerResult Tokenize(Stream stream, Uri? file)
+        => StreamTokenizer.Tokenize(stream, file, TokenizerSettings.Default);
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream, TokenizerSettings settings)
+    public static TokenizerResult Tokenize(Stream stream, Uri? file, TokenizerSettings settings)
     {
-        using StreamTokenizer tokenizer = new(settings, stream);
+        using StreamTokenizer tokenizer = new(settings, stream, file);
         return tokenizer.TokenizeInternal();
     }
 
     /// <inheritdoc cref="TokenizeInternal"/>
     public static TokenizerResult Tokenize(string filePath, ConsoleProgressBar progress)
     {
-        FileStream stream = File.OpenRead(filePath);
-        return StreamTokenizer.Tokenize(stream, TokenizerSettings.Default, progress, (int)stream.Length);
+        FileStream stream = System.IO.File.OpenRead(filePath);
+        return StreamTokenizer.Tokenize(stream, new Uri(filePath), TokenizerSettings.Default, progress, (int)stream.Length);
     }
 
     /// <inheritdoc cref="TokenizeInternal"/>
     public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings, ConsoleProgressBar progress)
     {
-        FileStream stream = File.OpenRead(filePath);
-        return StreamTokenizer.Tokenize(stream, settings, progress, (int)stream.Length);
+        FileStream stream = System.IO.File.OpenRead(filePath);
+        return StreamTokenizer.Tokenize(stream, new Uri(filePath), settings, progress, (int)stream.Length);
     }
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream, ConsoleProgressBar progress, int totalBytes)
-        => StreamTokenizer.Tokenize(stream, TokenizerSettings.Default, progress, totalBytes);
+    public static TokenizerResult Tokenize(Stream stream, Uri? file, ConsoleProgressBar progress, int totalBytes)
+        => StreamTokenizer.Tokenize(stream, file, TokenizerSettings.Default, progress, totalBytes);
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream, TokenizerSettings settings, ConsoleProgressBar progress, int totalBytes)
+    public static TokenizerResult Tokenize(Stream stream, Uri? file, TokenizerSettings settings, ConsoleProgressBar progress, int totalBytes)
     {
-        using StreamTokenizer tokenizer = new(settings, stream);
+        using StreamTokenizer tokenizer = new(settings, stream, file);
         return tokenizer.TokenizeInternal(progress, totalBytes);
     }
 

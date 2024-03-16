@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.Runtime;
 
-public class HEAP : IReadOnlyHeap
+public struct HEAP : IReadOnlyHeap
 {
     readonly DataItem[] heap;
 
@@ -9,14 +9,13 @@ public class HEAP : IReadOnlyHeap
         ushort _size = (ushort)size;
         FixSize(ref _size);
 
-        this.heap = new DataItem[_size];
-
-        this.heap[0] = GetHeader((ushort)(_size - 1), false);
+        heap = new DataItem[_size];
+        heap[0] = GetHeader((ushort)(_size - 1), false);
     }
 
-    public int Size => this.heap.Length;
+    public readonly int Size => heap.Length;
 
-    public int UsedSize
+    public readonly int UsedSize
     {
         get
         {
@@ -42,7 +41,7 @@ public class HEAP : IReadOnlyHeap
         }
     }
 
-    public int FreeSize
+    public readonly int FreeSize
     {
         get
         {
@@ -68,7 +67,7 @@ public class HEAP : IReadOnlyHeap
         }
     }
 
-    public DataItem this[int i]
+    public readonly DataItem this[int i]
     {
         get
         {
@@ -84,7 +83,7 @@ public class HEAP : IReadOnlyHeap
         }
     }
 
-    public DataItem[] ToArray() => heap.ToList().ToArray();
+    public readonly DataItem[] ToArray() => heap.ToList().ToArray();
 
     const int BLOCK_SIZE_MASK = 0b_0000_0000_0000_0000_1111_1111_1111_1111;
     const int BLOCK_STAT_MASK = 0b_0000_0000_0000_1111_0000_0000_0000_0000;
@@ -101,7 +100,7 @@ public class HEAP : IReadOnlyHeap
         { size = 1; }
     }
 
-    public void DebugPrint()
+    public readonly void DebugPrint()
     {
 #if DEBUG
         int endlessSafe = heap.Length;
@@ -149,7 +148,7 @@ public class HEAP : IReadOnlyHeap
 
     public const int BLOCK_HEADER_SIZE = 1;
 
-    public int Allocate(int sizeNeed)
+    public readonly int Allocate(int sizeNeed)
     {
         if (sizeNeed < ushort.MinValue || sizeNeed > ushort.MaxValue)
         { throw new OverflowException(); }
@@ -157,7 +156,7 @@ public class HEAP : IReadOnlyHeap
         return Allocate((ushort)sizeNeed);
     }
 
-    int Allocate(ushort sizeNeed)
+    readonly int Allocate(ushort sizeNeed)
     {
         FixSize(ref sizeNeed);
 
@@ -214,7 +213,7 @@ public class HEAP : IReadOnlyHeap
         throw new RuntimeException($"HEAP error: Failed to find free space (size {sizeNeed})");
     }
 
-    public void Deallocate(int pointer)
+    public readonly void Deallocate(int pointer)
     {
         int headerPointer = pointer - BLOCK_HEADER_SIZE;
 
@@ -234,7 +233,7 @@ public class HEAP : IReadOnlyHeap
     /// <see langword="true"/> if any block has been joined, <see langword="false"/> otherwise
     /// </returns>
     /// <exception cref="EndlessLoopException"/>
-    bool JoinFreeBlocks()
+    readonly bool JoinFreeBlocks()
     {
         int endlessSafe = heap.Length;
 
@@ -272,7 +271,7 @@ public class HEAP : IReadOnlyHeap
         return false;
     }
 
-    void Clear(int from, int length)
+    readonly void Clear(int from, int length)
     {
         for (int i = from; i < from + length; i++)
         { heap[i] = DataItem.Null; }
@@ -282,7 +281,7 @@ public class HEAP : IReadOnlyHeap
     /// (used, free, headersSize)
     /// </returns>
     /// <exception cref="EndlessLoopException"/>
-    public (int, int, int) Diagnostics()
+    public readonly (int, int, int) Diagnostics()
     {
         int used = 0;
         int free = 0;

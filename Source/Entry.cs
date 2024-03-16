@@ -175,11 +175,6 @@ public static class Entry
             {
                 Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
 
-                BrainfuckCompilerFlags compileOptions =
-                    arguments.GeneratorSettings.PrintInstructions
-                    ? BrainfuckCompilerFlags.PrintFinal | BrainfuckCompilerFlags.PrintCompiled
-                    : BrainfuckCompilerFlags.None;
-
                 BrainfuckGeneratorResult generated;
                 Token[] tokens;
                 BrainfuckGeneratorSettings generatorSettings = arguments.BrainfuckGeneratorSettings;
@@ -221,7 +216,7 @@ public static class Entry
 
                 bool pauseBeforeRun = false;
 
-                if ((compileOptions & BrainfuckCompilerFlags.PrintCompiled) != 0)
+                if (arguments.InstructionPrintFlags.HasFlag(InstructionPrintFlags.Commented))
                 {
                     Output.WriteLine();
                     Output.WriteLine($" === COMPILED ===");
@@ -238,7 +233,7 @@ public static class Entry
                 generated.Code = Minifier.Minify(generated.Code);
                 Output.LogDebug($"Minification: {prevCodeLength} -> {generated.Code.Length} ({((float)generated.Code.Length - prevCodeLength) / (float)generated.Code.Length * 100f:#}%)");
 
-                if ((compileOptions & BrainfuckCompilerFlags.PrintFinal) != 0)
+                if (arguments.InstructionPrintFlags.HasFlag(InstructionPrintFlags.Final))
                 {
                     Output.WriteLine();
                     Output.WriteLine($" === FINAL ===");
@@ -246,27 +241,33 @@ public static class Entry
                     BrainfuckCode.PrintCode(generated.Code);
                     Output.WriteLine();
 
+                    pauseBeforeRun = true;
+                }
+
+                if (arguments.InstructionPrintFlags.HasFlag(InstructionPrintFlags.Simplified))
+                {
                     Output.WriteLine();
                     Output.WriteLine($" === SIMPLIFIED ===");
                     Output.WriteLine();
                     BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
                     Output.WriteLine();
 
-                    /*
-                    Output.WriteLine();
-                    Output.WriteLine($" === COMPACTED ===");
-                    Output.WriteLine();
-                    BrainfuckCode.PrintCode(string.Join(null, CompactCode.Generate(generated.Code, false, null)));
-                    Output.WriteLine();
-                    */
-
                     pauseBeforeRun = true;
                 }
 
-                if ((compileOptions & BrainfuckCompilerFlags.WriteToFile) != 0)
+                /*
+                Output.WriteLine();
+                Output.WriteLine($" === COMPACTED ===");
+                Output.WriteLine();
+                BrainfuckCode.PrintCode(string.Join(null, CompactCode.Generate(generated.Code, false, null)));
+                Output.WriteLine();
+                */
+
+                if (arguments.OutputFile is not null)
                 {
-                    string compiledFilePath = Path.Combine(Path.GetDirectoryName(arguments.File!.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{arguments.File!.FullName}\""), Path.GetFileNameWithoutExtension(arguments.File!.FullName) + ".bf");
-                    File.WriteAllText(compiledFilePath, generated.Code);
+                    Output.WriteLine($"Writing to \"{arguments.OutputFile}\" ...");
+                    // string compiledFilePath = Path.Combine(Path.GetDirectoryName(arguments.File!.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{arguments.File!.FullName}\""), Path.GetFileNameWithoutExtension(arguments.File!.FullName) + ".bf");
+                    File.WriteAllText(arguments.OutputFile, generated.Code);
                 }
 
                 InterpreterCompact interpreter = new()
@@ -426,11 +427,16 @@ public static class Entry
             }
             case ProgramRunType.ASM:
             {
+                bool is16Bits = false;
+
                 AnalysisCollection analysisCollection = new();
 
                 CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
 
-                AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, default, Output.Log, analysisCollection);
+                AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, new AsmGeneratorSettings()
+                {
+                    Is16Bits = is16Bits,
+                }, Output.Log, analysisCollection);
 
                 analysisCollection.Throw();
                 analysisCollection.Print();
@@ -442,19 +448,36 @@ public static class Entry
 
                 string outputFile = Path.Combine(fileDirectoryPath, fileNameNoExt);
 
-                ASM.Assembler.Assemble(code.AssemblyCode, outputFile);
-
-                outputFile += ".exe";
-
-                if (File.Exists(outputFile))
+                if (is16Bits)
                 {
-                    Process? process = Process.Start(new ProcessStartInfo(outputFile)) ?? throw new InternalException($"Failed to start process \"{outputFile}\"");
-                    process.WaitForExit();
-                    Console.WriteLine();
-                    Console.WriteLine($"Exit code: {process.ExitCode}");
+                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    { throw new PlatformNotSupportedException($"Console rendering is only supported on Windows"); }
 
-                    if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out ProcessRuntimeException? runtimeException))
-                    { throw runtimeException; }
+                    ASM.Assembler.AssembleRaw(code.AssemblyCode, outputFile, true);
+
+                    outputFile += ".bin";
+                    if (File.Exists(outputFile))
+                    {
+                        Intel.I8086 i8086 = new(outputFile);
+                        while (!i8086.IsHalted)
+                        { i8086.Clock(); }
+                    }
+                }
+                else
+                {
+                    ASM.Assembler.Assemble(code.AssemblyCode, outputFile, true);
+
+                    outputFile += ".exe";
+                    if (File.Exists(outputFile))
+                    {
+                        Process? process = Process.Start(new ProcessStartInfo(outputFile)) ?? throw new InternalException($"Failed to start process \"{outputFile}\"");
+                        process.WaitForExit();
+                        Console.WriteLine();
+                        Console.WriteLine($"Exit code: {process.ExitCode}");
+
+                        if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out ProcessRuntimeException? runtimeException))
+                        { throw runtimeException; }
+                    }
                 }
 
                 break;

@@ -2,47 +2,26 @@
 
 public enum Opcode : byte
 {
-    UNKNOWN = 0,
+    _ = 0,
 
     #region === STACK OPERATIONS ===
     /// <summary>
-    /// <para>
-    ///     <b>Stack elements added:</b><br/>
-    ///     <c><see cref="PreparationInstruction.parameter"/></c><br/>
-    /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from Instruction
-    /// </para>
+    /// <b>Stack elements added:</b><br/>
+    /// <c><see cref="PreparationInstruction.parameter"/></c><br/>
     /// </summary>
-    PUSH_VALUE,
+    Push,
     /// <summary>
-    /// <para>
-    ///     <b>Expected stack elements:</b><br/>
-    ///     <c>...</c><br/>
-    ///     <c>any value</c><br/>
-    /// </para>
-    /// <br/><br/>
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     none
-    /// </para>
+    /// <b>Expected stack elements:</b><br/>
+    /// <c>...</c><br/>
+    /// <c>any value</c><br/>
     /// </summary>
-    POP_VALUE,
+    Pop,
 
     /// <summary>
     /// <para>
-    ///     <b>Expected stack elements:</b><br/>
-    ///     <c>...</c><br/>
-    ///     <c><see cref="int"/> address</c> (optional)<br/>
-    /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from Instruction or value
+    /// <b>Expected stack elements:</b><br/>
+    /// <c>...</c><br/>
+    /// <c><see cref="int"/> address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
     ///
@@ -50,19 +29,13 @@ public enum Opcode : byte
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchStackAddress"/>)
     /// </para>
     /// </summary>
-    LOAD_VALUE,
+    StackLoad,
     /// <summary>
     /// <para>
-    ///     <b>Expected stack elements:</b><br/>
-    ///     <c>...</c><br/>
-    ///     <c>value</c><br/>
-    ///     <c><see cref="int"/> address</c> (optional)<br/>
-    /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from value
+    /// <b>Expected stack elements:</b><br/>
+    /// <c>...</c><br/>
+    /// <c>value</c><br/>
+    /// <c><see cref="int"/> address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
     ///
@@ -70,11 +43,11 @@ public enum Opcode : byte
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchStackAddress"/>)
     /// </para>
     /// </summary>
-    STORE_VALUE,
+    StackStore,
     #endregion
 
     #region === FLOW CONTROL ===
-    EXIT,
+    Exit,
 
     /// <summary>
     /// <para>
@@ -94,24 +67,22 @@ public enum Opcode : byte
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>
     /// </summary>
-    CALL,
+    Call,
     /// <summary>
     /// <para>
-    ///     <b>Expected stack elements:</b><br/>
-    ///     <c>...</c><br/>
-    ///     <c><see cref="int"/> CP</c><br/>
+    /// <b>Expected stack elements:</b><br/>
+    /// <c>...</c><br/>
+    /// <c><see cref="int"/> CP</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
     /// </summary>
-    RETURN,
+    Return,
 
     /// <summary>
     /// <para>
-    ///     <b>Expected stack elements:</b><br/>
-    ///     <c>...</c><br/>
-    ///     <c>condition</c><br/>
-    ///     <c><see cref="int"/> relative address</c> (optional)<br/>
+    /// <b>Expected stack elements:</b><br/>
+    /// <c>...</c><br/>
+    /// <c>condition</c><br/>
+    /// <c><see cref="int"/> relative address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
     ///
@@ -119,12 +90,12 @@ public enum Opcode : byte
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>
     /// </summary>
-    JUMP_BY_IF_FALSE,
+    JumpIfZero,
     /// <summary>
     /// <para>
-    ///     <b>Expected stack elements:</b><br/>
-    ///     <c>...</c><br/>
-    ///     <c><see cref="int"/> relative address</c> (optional)<br/>
+    /// <b>Expected stack elements:</b><br/>
+    /// <c>...</c><br/>
+    /// <c><see cref="int"/> relative address</c> (optional)<br/>
     /// </para>
     /// <br/><br/>
     ///
@@ -132,43 +103,35 @@ public enum Opcode : byte
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>
     /// </summary>
-    JUMP_BY,
+    Jump,
 
     /// <summary>
     /// <para>
-    ///     <b>Expected stack elements:</b><br/>
-    ///     <c>...</c><br/>
-    ///     <c>parameters</c> (as much as needed)<br/>
-    ///     <c><see cref="int"/> function name address (string pointer)</c><br/>
-    /// </para><br/><br/>
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from external or <c>"return v"</c>
+    /// <b>Expected stack elements:</b><br/>
+    /// <c>...</c><br/>
+    /// <c>parameters</c> (as much as needed)<br/>
+    /// <c><see cref="int"/> function name address (string pointer)</c><br/>
     /// </para>
     /// </summary>
-    CALL_EXTERNAL,
+    CallExternal,
 
     /// <summary>
     /// <para>
-    ///     <b>Stack elements added:</b><br/>
-    ///     <c><see cref="int"/> basepointer</c><br/>
-    /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     "basepointer"
+    /// <b>Stack elements added:</b><br/>
+    /// <c><see cref="int"/> basepointer</c><br/>
     /// </para>
     /// </summary>
-    GET_BASEPOINTER,
+    GetBasePointer,
 
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
     ///     <c>...</c><br/>
     ///     <c><see cref="int"/> value</c> (optional)<br/>
-    /// </para><br/><br/>
-    /// <para><br/><br/>
+    /// </para>
+    /// <br/><br/>
+    ///
+    /// <para>
     ///     <see cref="AddressingMode"/>s:
     ///     <list type="table">
     ///         <item>
@@ -198,15 +161,17 @@ public enum Opcode : byte
     ///     </list>
     /// </para>
     /// </summary>
-    SET_BASEPOINTER,
+    SetBasePointer,
 
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
     ///     <c>...</c><br/>
     ///     <c><see cref="int"/> value</c> (optional)<br/>
-    /// </para><br/><br/>
-    /// <para><br/><br/>
+    /// </para>
+    /// <br/><br/>
+    ///
+    /// <para>
     ///     <see cref="AddressingMode"/>s:
     ///     <list type="table">
     ///         <item>
@@ -228,16 +193,16 @@ public enum Opcode : byte
     ///     </list>
     /// </para>
     /// </summary>
-    SET_CODEPOINTER,
+    SetCodePointer,
 
     /// <summary>
     /// <para>
-    ///     <b>Expected stack elements:</b><br/>
-    ///     <c>...</c><br/>
-    ///     <c>*<see cref="string"/> message</c><br/>
+    /// <b>Expected stack elements:</b><br/>
+    /// <c>...</c><br/>
+    /// <c>*<see cref="string"/> message</c><br/>
     /// </para>
     /// </summary>
-    THROW,
+    Throw,
     #endregion
 
     #region === LOGIC OPERATIONS ===
@@ -254,14 +219,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     none
-    /// </para>
     /// </summary>
-    LOGIC_LT,
+    LogicLT,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -275,14 +234,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     none
-    /// </para>
     /// </summary>
-    LOGIC_MT,
+    LogicMT,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -296,14 +249,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     none
-    /// </para>
     /// </summary>
-    LOGIC_LTEQ,
+    LogicLTEQ,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -317,14 +264,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     none
-    /// </para>
     /// </summary>
-    LOGIC_MTEQ,
+    LogicMTEQ,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -338,14 +279,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     none
-    /// </para>
     /// </summary>
-    LOGIC_OR,
+    LogicOR,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -359,14 +294,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     none
-    /// </para>
     /// </summary>
-    LOGIC_AND,
+    LogicAND,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -380,14 +309,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    LOGIC_EQ,
+    LogicEQ,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -401,14 +324,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     none
-    /// </para>
     /// </summary>
-    LOGIC_NEQ,
+    LogicNEQ,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -419,16 +336,9 @@ public enum Opcode : byte
     ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
-    ///     <c>result</c><br/>
-    /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from value
-    /// </para>
+    ///     <c>result</c><br/
     /// </summary>
-    LOGIC_NOT,
+    LogicNOT,
     #endregion
 
     #region === BITWISE OPERATIONS ===
@@ -445,14 +355,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    BITS_AND,
+    BitsAND,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -466,14 +370,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    BITS_OR,
+    BitsOR,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -487,14 +385,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    BITS_XOR,
+    BitsXOR,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -507,14 +399,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    BITS_NOT,
+    BitsNOT,
 
     /// <summary>
     /// <para>
@@ -529,14 +415,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    BITS_SHIFT_LEFT,
+    BitsShiftLeft,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -550,14 +430,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    BITS_SHIFT_RIGHT,
+    BitsShiftRight,
     #endregion
 
     #region === MATH OPERATIONS ===
@@ -574,14 +448,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    MATH_ADD,
+    MathAdd,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -595,14 +463,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    MATH_SUB,
+    MathSub,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -616,14 +478,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    MATH_MULT,
+    MathMult,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -637,14 +493,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    MATH_DIV,
+    MathDiv,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -658,14 +508,8 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c>result</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from left side
-    /// </para>
     /// </summary>
-    MATH_MOD,
+    MathMod,
     #endregion
 
     #region === HEAP OPERATIONS ===
@@ -684,16 +528,10 @@ public enum Opcode : byte
     /// <br/><br/>
     ///
     /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from value
-    /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>
     /// </summary>
-    HEAP_GET,
+    HeapGet,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
@@ -704,16 +542,10 @@ public enum Opcode : byte
     /// <br/><br/>
     ///
     /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from value
-    /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
     /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
     /// </para>
     /// </summary>
-    HEAP_SET,
+    HeapSet,
 
     /// <summary>
     /// <para>
@@ -727,32 +559,20 @@ public enum Opcode : byte
     ///     <b>Stack elements added:</b><br/>
     ///     <c><see cref="int"/> pointer</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     Inherits from Instruction
-    /// </para>
     /// </summary>
-    HEAP_ALLOC,
+    Allocate,
     /// <summary>
     /// <para>
     ///     <b>Expected stack elements:</b><br/>
     ///     <c>...</c><br/>
     ///     <c><see cref="int"/> pointer</c><br/>
     /// </para>
-    /// <br/><br/>
-    ///
-    /// <para>
-    ///     <b>Tag:</b><br/>
-    ///     none
-    /// </para>
     /// </summary>
-    HEAP_FREE,
+    Free,
     #endregion
 
     #region === TYPE OPERATINS ===
-    TYPE_GET,
-    TYPE_SET,
+    TypeGet,
+    TypeSet,
     #endregion
 }

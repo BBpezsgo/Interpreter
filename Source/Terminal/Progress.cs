@@ -33,6 +33,7 @@ public struct ConsoleProgressBar : IDisposable
 
     bool _isFast;
     float _progress;
+    float _printedProgress;
 
     public ConsoleProgressBar(ConsoleColor color, bool show)
     {
@@ -40,6 +41,7 @@ public struct ConsoleProgressBar : IDisposable
         _color = color;
         _show = show && ConsoleProgress.IsEnabled;
         _progress = 0f;
+        _printedProgress = 0f;
         _time = DateTime.UtcNow.TimeOfDay.TotalSeconds;
         _isFast = true;
 
@@ -66,6 +68,9 @@ public struct ConsoleProgressBar : IDisposable
             { return; }
         }
 
+        if ((int)(_printedProgress * Console.WindowWidth) == (int)(_progress * Console.WindowWidth))
+        { return; }
+
         (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
 
         Console.SetCursorPosition(0, _line);
@@ -83,6 +88,8 @@ public struct ConsoleProgressBar : IDisposable
         Console.ResetColor();
 
         Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top);
+
+        _printedProgress = _progress;
     }
 
     public readonly void Dispose()

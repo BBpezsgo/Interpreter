@@ -29,7 +29,7 @@ public readonly struct CleanupItem
 
 public struct BBCodeGeneratorResult
 {
-    public Instruction[] Code;
+    public ImmutableArray<Instruction> Code;
     public DebugInformation DebugInfo;
 }
 
@@ -82,8 +82,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly List<UndefinedOffset<CompiledGeneralFunction>> UndefinedGeneralFunctionOffsets;
     readonly List<UndefinedOffset<CompiledConstructor>> UndefinedConstructorOffsets;
 
-    readonly bool TrimUnreachableCode = true;
-
     bool CanReturn;
 
     readonly DebugInformation GeneratedDebugInfo;
@@ -118,8 +116,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             AddComment($"Create string \"{function}\" {{");
 
-            AddInstruction(Opcode.PUSH_VALUE, function.Length + 1);
-            AddInstruction(Opcode.HEAP_ALLOC);
+            AddInstruction(Opcode.Push, function.Length + 1);
+            AddInstruction(Opcode.Allocate);
 
             ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count + 1);
             offset += function.Length;
@@ -127,28 +125,28 @@ public partial class CodeGeneratorForMain : CodeGenerator
             for (int i = 0; i < function.Length; i++)
             {
                 // Prepare value
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem(function[i]));
+                AddInstruction(Opcode.Push, new DataItem(function[i]));
 
                 // Calculate pointer
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-                AddInstruction(Opcode.PUSH_VALUE, i);
-                AddInstruction(Opcode.MATH_ADD);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
+                AddInstruction(Opcode.Push, i);
+                AddInstruction(Opcode.MathAdd);
 
                 // Set value
-                AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+                AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
             }
 
             {
                 // Prepare value
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem('\0'));
+                AddInstruction(Opcode.Push, new DataItem('\0'));
 
                 // Calculate pointer
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-                AddInstruction(Opcode.PUSH_VALUE, function.Length);
-                AddInstruction(Opcode.MATH_ADD);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
+                AddInstruction(Opcode.Push, function.Length);
+                AddInstruction(Opcode.MathAdd);
 
                 // Set value
-                AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
+                AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
             }
 
             AddComment("}");
@@ -213,7 +211,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
         }
 
-        AddInstruction(Opcode.PUSH_VALUE, new DataItem(0));
+        AddInstruction(Opcode.Push, new DataItem(0));
 
         if (settings.ExternalFunctionsCache)
         { GenerateExternalFunctionsCache(usedExternalFunctions); }
@@ -229,11 +227,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             AddComment("Clear external functions cache {");
             for (int i = 0; i < ExternalFunctionsCache.Count; i++)
-            { AddInstruction(Opcode.HEAP_FREE); }
+            { AddInstruction(Opcode.Free); }
             AddComment("}");
         }
 
-        AddInstruction(Opcode.EXIT);
+        AddInstruction(Opcode.Exit);
 
         while (true)
         {
@@ -261,7 +259,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         return new BBCodeGeneratorResult()
         {
-            Code = GeneratedCode.Select(v => new Instruction(v)).ToArray(),
+            Code = GeneratedCode.Select(v => new Instruction(v)).ToImmutableArray(),
             DebugInfo = GeneratedDebugInfo,
         };
     }

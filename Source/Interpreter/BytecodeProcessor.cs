@@ -4,17 +4,17 @@ namespace LanguageCore.Runtime;
 
 public class BytecodeProcessor
 {
-    public readonly Memory Memory;
+    public Memory Memory;
 
     public readonly FrozenDictionary<string, ExternalFunctionBase> ExternalFunctions;
 
     public int CodePointer;
     public int BasePointer;
 
-    public ref Instruction CurrentInstruction => ref Memory.Code[CodePointer];
+    public Instruction CurrentInstruction => Memory.Code[CodePointer];
     public bool IsDone => CodePointer >= Memory.Code.Length;
 
-    public BytecodeProcessor(Instruction[] code, int heapSize, FrozenDictionary<string, ExternalFunctionBase> externalFunctions)
+    public BytecodeProcessor(ImmutableArray<Instruction> code, int heapSize, FrozenDictionary<string, ExternalFunctionBase> externalFunctions)
     {
         ExternalFunctions = externalFunctions;
 
@@ -35,62 +35,62 @@ public class BytecodeProcessor
     {
         switch (CurrentInstruction.Opcode)
         {
-            case Opcode.UNKNOWN: throw new InternalException("Unknown instruction");
+            case Opcode._: throw new InternalException("Unknown instruction");
 
-            case Opcode.EXIT: EXIT(); break;
+            case Opcode.Exit: EXIT(); break;
 
-            case Opcode.PUSH_VALUE: PUSH_VALUE(); break;
-            case Opcode.POP_VALUE: POP_VALUE(); break;
+            case Opcode.Push: PUSH_VALUE(); break;
+            case Opcode.Pop: POP_VALUE(); break;
 
-            case Opcode.LOAD_VALUE: LOAD_VALUE(); break;
-            case Opcode.STORE_VALUE: STORE_VALUE(); break;
+            case Opcode.StackLoad: LOAD_VALUE(); break;
+            case Opcode.StackStore: STORE_VALUE(); break;
 
-            case Opcode.JUMP_BY_IF_FALSE: JUMP_BY_IF_FALSE(); break;
-            case Opcode.JUMP_BY: JUMP_BY(); break;
-            case Opcode.THROW: THROW(); break;
+            case Opcode.JumpIfZero: JUMP_BY_IF_FALSE(); break;
+            case Opcode.Jump: JUMP_BY(); break;
+            case Opcode.Throw: THROW(); break;
 
-            case Opcode.CALL: CALL(); break;
-            case Opcode.RETURN: RETURN(); break;
+            case Opcode.Call: CALL(); break;
+            case Opcode.Return: RETURN(); break;
 
-            case Opcode.CALL_EXTERNAL: CALL_EXTERNAL(); break;
+            case Opcode.CallExternal: CALL_EXTERNAL(); break;
 
-            case Opcode.MATH_ADD: MATH_ADD(); break;
-            case Opcode.MATH_SUB: MATH_SUB(); break;
-            case Opcode.MATH_MULT: MATH_MULT(); break;
-            case Opcode.MATH_DIV: MATH_DIV(); break;
-            case Opcode.MATH_MOD: MATH_MOD(); break;
+            case Opcode.MathAdd: MATH_ADD(); break;
+            case Opcode.MathSub: MATH_SUB(); break;
+            case Opcode.MathMult: MATH_MULT(); break;
+            case Opcode.MathDiv: MATH_DIV(); break;
+            case Opcode.MathMod: MATH_MOD(); break;
 
-            case Opcode.BITS_SHIFT_LEFT: BITSHIFT_LEFT(); break;
-            case Opcode.BITS_SHIFT_RIGHT: BITSHIFT_RIGHT(); break;
+            case Opcode.BitsShiftLeft: BITSHIFT_LEFT(); break;
+            case Opcode.BitsShiftRight: BITSHIFT_RIGHT(); break;
 
-            case Opcode.BITS_AND: BITS_AND(); break;
-            case Opcode.BITS_OR: BITS_OR(); break;
-            case Opcode.BITS_XOR: BITS_XOR(); break;
-            case Opcode.BITS_NOT: BITS_NOT(); break;
+            case Opcode.BitsAND: BITS_AND(); break;
+            case Opcode.BitsOR: BITS_OR(); break;
+            case Opcode.BitsXOR: BITS_XOR(); break;
+            case Opcode.BitsNOT: BITS_NOT(); break;
 
-            case Opcode.LOGIC_LT: LOGIC_LT(); break;
-            case Opcode.LOGIC_MT: LOGIC_MT(); break;
-            case Opcode.LOGIC_EQ: LOGIC_EQ(); break;
-            case Opcode.LOGIC_NEQ: LOGIC_NEQ(); break;
-            case Opcode.LOGIC_LTEQ: LOGIC_LTEQ(); break;
-            case Opcode.LOGIC_MTEQ: LOGIC_MTEQ(); break;
-            case Opcode.LOGIC_NOT: LOGIC_NOT(); break;
-            case Opcode.LOGIC_OR: LOGIC_OR(); break;
-            case Opcode.LOGIC_AND: LOGIC_AND(); break;
+            case Opcode.LogicLT: LOGIC_LT(); break;
+            case Opcode.LogicMT: LOGIC_MT(); break;
+            case Opcode.LogicEQ: LOGIC_EQ(); break;
+            case Opcode.LogicNEQ: LOGIC_NEQ(); break;
+            case Opcode.LogicLTEQ: LOGIC_LTEQ(); break;
+            case Opcode.LogicMTEQ: LOGIC_MTEQ(); break;
+            case Opcode.LogicNOT: LOGIC_NOT(); break;
+            case Opcode.LogicOR: LOGIC_OR(); break;
+            case Opcode.LogicAND: LOGIC_AND(); break;
 
-            case Opcode.HEAP_GET: HEAP_GET(); break;
-            case Opcode.HEAP_SET: HEAP_SET(); break;
+            case Opcode.HeapGet: HEAP_GET(); break;
+            case Opcode.HeapSet: HEAP_SET(); break;
 
-            case Opcode.HEAP_ALLOC: HEAP_ALLOC(); break;
-            case Opcode.HEAP_FREE: HEAP_FREE(); break;
+            case Opcode.Allocate: HEAP_ALLOC(); break;
+            case Opcode.Free: HEAP_FREE(); break;
 
-            case Opcode.GET_BASEPOINTER: GET_BASEPOINTER(); break;
-            case Opcode.SET_BASEPOINTER: SET_BASEPOINTER(); break;
+            case Opcode.GetBasePointer: GET_BASEPOINTER(); break;
+            case Opcode.SetBasePointer: SET_BASEPOINTER(); break;
 
-            case Opcode.SET_CODEPOINTER: SET_CODEPOINTER(); break;
+            case Opcode.SetCodePointer: SET_CODEPOINTER(); break;
 
-            case Opcode.TYPE_GET: TYPE_GET(); break;
-            case Opcode.TYPE_SET: TYPE_SET(); break;
+            case Opcode.TypeGet: TYPE_GET(); break;
+            case Opcode.TypeSet: TYPE_SET(); break;
 
             default: throw new UnreachableException();
         }
@@ -100,10 +100,10 @@ public class BytecodeProcessor
     int FetchStackAddress() => CurrentInstruction.AddressingMode switch
     {
         AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-        AddressingMode.Runtime => (int)Memory.Stack.Pop(),
+        AddressingMode.Runtime => (int)Memory.Pop(),
 
         AddressingMode.BasePointerRelative => BasePointer + (int)CurrentInstruction.Parameter,
-        AddressingMode.StackRelative => Memory.Stack.Count + (int)CurrentInstruction.Parameter,
+        AddressingMode.StackRelative => Memory.StackLength + (int)CurrentInstruction.Parameter,
 
         _ => throw new InternalException($"Invalid stack addressing mode {CurrentInstruction.AddressingMode}"),
     };
@@ -112,7 +112,7 @@ public class BytecodeProcessor
     int FetchHeapAddress() => CurrentInstruction.AddressingMode switch
     {
         AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-        AddressingMode.Runtime => (int)Memory.Stack.Pop(),
+        AddressingMode.Runtime => (int)Memory.Pop(),
 
         _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
     };
@@ -121,7 +121,7 @@ public class BytecodeProcessor
     DataItem FetchData() => CurrentInstruction.AddressingMode switch
     {
         AddressingMode.Absolute => CurrentInstruction.Parameter,
-        AddressingMode.Runtime => Memory.Stack.Pop(),
+        AddressingMode.Runtime => Memory.Pop(),
 
         _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
     };
@@ -132,22 +132,22 @@ public class BytecodeProcessor
 
     void HEAP_ALLOC()
     {
-        DataItem sizeData = Memory.Stack.Pop();
+        DataItem sizeData = Memory.Pop();
         int size = sizeData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_ALLOC, got {sizeData.Type}");
 
-        int block = Memory.Heap.Allocate(size);
+        int block = Memory.Allocate(size);
 
-        Memory.Stack.Push(new DataItem(block));
+        Memory.Push(new DataItem(block));
 
         Step();
     }
 
     void HEAP_FREE()
     {
-        DataItem pointerData = Memory.Stack.Pop();
+        DataItem pointerData = Memory.Pop();
         int pointer = pointerData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_DEALLOC, got {pointerData.Type}");
 
-        Memory.Heap.Deallocate(pointer);
+        Memory.Free(pointer);
 
         Step();
     }
@@ -155,16 +155,16 @@ public class BytecodeProcessor
     void HEAP_GET()
     {
         int address = FetchHeapAddress();
-        DataItem value = Memory.Heap[address];
-        Memory.Stack.Push(value);
+        DataItem value = Memory.HeapGet(address);
+        Memory.Push(value);
         Step();
     }
 
     void HEAP_SET()
     {
         int address = FetchHeapAddress();
-        DataItem value = Memory.Stack.Pop();
-        Memory.Heap[address] = value;
+        DataItem value = Memory.Pop();
+        Memory.HeapSet(address, value);
         Step();
     }
 
@@ -175,9 +175,9 @@ public class BytecodeProcessor
     /// <exception cref="UserException"/>
     void THROW()
     {
-        int pointer = (int)Memory.Stack.Pop();
-        string? value = Memory.Heap.GetString(pointer);
-        Memory.Heap.Deallocate(pointer);
+        int pointer = (int)Memory.Pop();
+        string? value = Memory.HeapGetString(pointer);
+        Memory.Free(pointer);
         throw new UserException(value ?? "null");
     }
 
@@ -185,14 +185,14 @@ public class BytecodeProcessor
     {
         int relativeAddress = (int)FetchData();
 
-        Memory.Stack.Push(new DataItem(CodePointer));
+        Memory.Push(new DataItem(CodePointer));
 
         Step(relativeAddress);
     }
 
     void RETURN()
     {
-        DataItem codePointer = Memory.Stack.Pop();
+        DataItem codePointer = Memory.Pop();
 
         CodePointer = (int)codePointer;
     }
@@ -208,7 +208,7 @@ public class BytecodeProcessor
     {
         int relativeAddress = (int)FetchData();
 
-        DataItem condition = Memory.Stack.Pop();
+        DataItem condition = Memory.Pop();
 
         if (condition)
         { Step(); }
@@ -227,146 +227,146 @@ public class BytecodeProcessor
 
     void BITSHIFT_LEFT()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide << rightSide);
+        Memory.Push(leftSide << rightSide);
 
         Step();
     }
 
     void BITSHIFT_RIGHT()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide >> rightSide);
+        Memory.Push(leftSide >> rightSide);
 
         Step();
     }
 
     void LOGIC_LT()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(new DataItem(leftSide < rightSide));
+        Memory.Push(new DataItem(leftSide < rightSide));
 
         Step();
     }
 
     void LOGIC_NOT()
     {
-        DataItem v = Memory.Stack.Pop();
-        Memory.Stack.Push(!v);
+        DataItem v = Memory.Pop();
+        Memory.Push(!v);
         Step();
     }
 
     void LOGIC_MT()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(new DataItem(leftSide > rightSide));
+        Memory.Push(new DataItem(leftSide > rightSide));
 
         Step();
     }
 
     void LOGIC_AND()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(new DataItem((bool)leftSide && (bool)rightSide));
+        Memory.Push(new DataItem((bool)leftSide && (bool)rightSide));
 
         Step();
     }
 
     void LOGIC_OR()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(new DataItem((bool)leftSide || (bool)rightSide));
+        Memory.Push(new DataItem((bool)leftSide || (bool)rightSide));
 
         Step();
     }
 
     void LOGIC_EQ()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(new DataItem(leftSide == rightSide));
+        Memory.Push(new DataItem(leftSide == rightSide));
 
         Step();
     }
 
     void LOGIC_NEQ()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(new DataItem(leftSide != rightSide));
+        Memory.Push(new DataItem(leftSide != rightSide));
 
         Step();
     }
 
     void BITS_OR()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide | rightSide);
+        Memory.Push(leftSide | rightSide);
 
         Step();
     }
 
     void BITS_XOR()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide ^ rightSide);
+        Memory.Push(leftSide ^ rightSide);
 
         Step();
     }
 
     void BITS_NOT()
     {
-        DataItem rightSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
 
-        Memory.Stack.Push(~rightSide);
+        Memory.Push(~rightSide);
 
         Step();
     }
 
     void LOGIC_LTEQ()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(new DataItem(leftSide <= rightSide));
+        Memory.Push(new DataItem(leftSide <= rightSide));
 
         Step();
     }
 
     void LOGIC_MTEQ()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(new DataItem(leftSide >= rightSide));
+        Memory.Push(new DataItem(leftSide >= rightSide));
 
         Step();
     }
 
     void BITS_AND()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide & rightSide);
+        Memory.Push(leftSide & rightSide);
 
         Step();
     }
@@ -377,50 +377,50 @@ public class BytecodeProcessor
 
     void MATH_ADD()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide + rightSide);
+        Memory.Push(leftSide + rightSide);
 
         Step();
     }
 
     void MATH_DIV()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide / rightSide);
+        Memory.Push(leftSide / rightSide);
 
         Step();
     }
 
     void MATH_SUB()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide - rightSide);
+        Memory.Push(leftSide - rightSide);
 
         Step();
     }
 
     void MATH_MULT()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide * rightSide);
+        Memory.Push(leftSide * rightSide);
 
         Step();
     }
 
     void MATH_MOD()
     {
-        DataItem rightSide = Memory.Stack.Pop();
-        DataItem leftSide = Memory.Stack.Pop();
+        DataItem rightSide = Memory.Pop();
+        DataItem leftSide = Memory.Pop();
 
-        Memory.Stack.Push(leftSide % rightSide);
+        Memory.Push(leftSide % rightSide);
 
         Step();
     }
@@ -432,14 +432,14 @@ public class BytecodeProcessor
     void PUSH_VALUE()
     {
         DataItem value = CurrentInstruction.Parameter;
-        Memory.Stack.Push(value);
+        Memory.Push(value);
 
         Step();
     }
 
     void POP_VALUE()
     {
-        Memory.Stack.Pop();
+        Memory.Pop();
 
         Step();
     }
@@ -447,8 +447,8 @@ public class BytecodeProcessor
     void STORE_VALUE()
     {
         int address = FetchStackAddress();
-        DataItem value = Memory.Stack.Pop();
-        Memory.Stack[address] = value;
+        DataItem value = Memory.Pop();
+        Memory.StackSet(address, value);
 
         Step();
     }
@@ -456,8 +456,8 @@ public class BytecodeProcessor
     void LOAD_VALUE()
     {
         int address = FetchStackAddress();
-        DataItem value = Memory.Stack[address];
-        Memory.Stack.Push(value);
+        DataItem value = Memory.StackGet(address);
+        Memory.Push(value);
 
         Step();
     }
@@ -468,7 +468,7 @@ public class BytecodeProcessor
 
     void GET_BASEPOINTER()
     {
-        Memory.Stack.Push(new DataItem(BasePointer));
+        Memory.Push(new DataItem(BasePointer));
 
         Step();
     }
@@ -477,10 +477,10 @@ public class BytecodeProcessor
     {
         BasePointer = CurrentInstruction.AddressingMode switch
         {
-            AddressingMode.Runtime => (int)Memory.Stack.Pop(),
+            AddressingMode.Runtime => (int)Memory.Pop(),
             AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-            AddressingMode.StackRelative => Memory.Stack.Count + (int)CurrentInstruction.Parameter,
-            _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SET_BASEPOINTER}"),
+            AddressingMode.StackRelative => Memory.StackLength + (int)CurrentInstruction.Parameter,
+            _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SetBasePointer}"),
         };
 
         Step();
@@ -490,30 +490,30 @@ public class BytecodeProcessor
     {
         CodePointer = CurrentInstruction.AddressingMode switch
         {
-            AddressingMode.Runtime => (int)Memory.Stack.Pop(),
+            AddressingMode.Runtime => (int)Memory.Pop(),
             AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-            _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SET_CODEPOINTER}"),
+            _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SetCodePointer}"),
         };
     }
 
     void TYPE_SET()
     {
-        RuntimeType targetType = (RuntimeType)(byte)Memory.Stack.Pop();
-        DataItem value = Memory.Stack.Pop();
+        RuntimeType targetType = (RuntimeType)(byte)Memory.Pop();
+        DataItem value = Memory.Pop();
 
         if (!DataItem.TryCast(ref value, targetType))
         { throw new RuntimeException($"Cannot cast {value.Type} to {targetType}"); }
 
-        Memory.Stack.Push(value);
+        Memory.Push(value);
 
         Step();
     }
 
     void TYPE_GET()
     {
-        DataItem value = Memory.Stack.Pop();
+        DataItem value = Memory.Pop();
         byte type = (byte)value.Type;
-        Memory.Stack.Push(new DataItem(type));
+        Memory.Push(new DataItem(type));
 
         Step();
     }
@@ -524,18 +524,18 @@ public class BytecodeProcessor
 
     void OnExternalReturnValue(DataItem returnValue)
     {
-        Memory.Stack.Push(returnValue);
+        Memory.Push(returnValue);
     }
 
     /// <exception cref="InternalException"/>
     /// <exception cref="RuntimeException"/>
     void CALL_EXTERNAL()
     {
-        DataItem functionNameDataItem = Memory.Stack.Pop();
+        DataItem functionNameDataItem = Memory.Pop();
         if (functionNameDataItem.Type != RuntimeType.Integer)
         { throw new InternalException($"Instruction CALL_EXTERNAL need a String pointer (int) DataItem parameter from the stack, received {functionNameDataItem.Type} {functionNameDataItem}"); }
 
-        string? functionName = Memory.Heap.GetString((int)functionNameDataItem)
+        string? functionName = Memory.HeapGetString((int)functionNameDataItem)
             ?? throw new RuntimeException($"Function name is null");
 
         if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase? function))
@@ -545,7 +545,7 @@ public class BytecodeProcessor
 
         List<DataItem> parameters = new();
         for (int i = 1; i <= (int)CurrentInstruction.Parameter; i++)
-        { parameters.Add(Memory.Stack[^i]); }
+        { parameters.Add(Memory.StackGet(^i)); }
         parameters.Reverse();
 
         if (function is ExternalFunctionManaged managedFunction)
@@ -559,7 +559,7 @@ public class BytecodeProcessor
             {
                 DataItem returnValue = simpleFunction.Call(this, parameters.ToArray());
                 // returnValue.Tag ??= $"{function.Name}() result";
-                Memory.Stack.Push(returnValue);
+                Memory.Push(returnValue);
             }
             else
             {
@@ -579,9 +579,24 @@ public readonly struct Memory
 {
     public readonly Stack<DataItem> Stack;
     public readonly HEAP Heap;
-    public readonly Instruction[] Code;
+    public readonly ImmutableArray<Instruction> Code;
 
-    public Memory(int heapSize, Instruction[] code)
+    public readonly int StackLength => Stack.Count;
+    public readonly int HeapSize => Heap.Size;
+
+    public readonly void HeapSet(int index, DataItem data) => Heap[index] = data;
+    public readonly DataItem HeapGet(int index) => Heap[index];
+    public readonly string? HeapGetString(int pointer) => Heap.GetString(pointer);
+    public readonly int Allocate(int size) => Heap.Allocate(size);
+    public readonly void Free(int pointer) => Heap.Deallocate(pointer);
+
+    public readonly void StackSet(int index, DataItem data) => Stack[index] = data;
+    public readonly DataItem StackGet(int index) => Stack[index];
+    public readonly DataItem StackGet(Index index) => Stack[index];
+    public readonly void Push(DataItem data) => Stack.Push(data);
+    public readonly DataItem Pop() => Stack.Pop();
+
+    public Memory(int heapSize, ImmutableArray<Instruction> code)
     {
         Code = code;
 

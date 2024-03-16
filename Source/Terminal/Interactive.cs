@@ -114,7 +114,7 @@ class InteractiveCompiler
         { return; }
 
         _text = text;
-        _tokens = StringTokenizer.Tokenize(_text);
+        _tokens = StringTokenizer.Tokenize(_text, null);
         _parsed = default;
         _compiled = default;
         _generated = default;
@@ -160,7 +160,7 @@ class InteractiveCompiler
 
     void CompileTask()
     {
-        _tokens = StringTokenizer.Tokenize(_text);
+        _tokens = StringTokenizer.Tokenize(_text, null);
         _parsed = default;
         _compiled = default;
         _generated = default;

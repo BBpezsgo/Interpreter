@@ -1,0 +1,21 @@
+using System;
+
+char* input = ReadLine();
+
+int current = 0;
+for (int i = 0; input[i]; i++)
+{
+	char c = input[i];
+	while (c < current)
+	{
+		Print('-');
+		current--;
+	}
+	while (c > current)
+	{
+		Print('+');
+		current++;
+	}
+	Print('.');
+}
+PrintLine();

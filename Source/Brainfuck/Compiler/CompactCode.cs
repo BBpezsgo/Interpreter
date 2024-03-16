@@ -320,6 +320,7 @@ public static class CompactCode
 
     public static CompactCodeSegment[] Generate(ReadOnlySpan<char> code, bool showProgress, DebugInformation? debugInfo)
     {
+        using ConsoleProgressLabel progressLabel = new("Compacting code ...", ConsoleColor.DarkGray, showProgress);
         using ConsoleProgressBar progress = new(ConsoleColor.DarkGray, showProgress);
 
         List<CompactCodeSegment> result = new();

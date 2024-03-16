@@ -43,7 +43,7 @@ public static partial class Utils
 
     public static bool TryReplace(ref string @string, string oldValue, string? newValue)
     {
-        string result = @string.Replace(oldValue, newValue, StringComparison.Ordinal);
+        string result = @string.Replace(oldValue, newValue);
         bool replaced = !object.ReferenceEquals(result, @string);
         @string = result;
         return replaced;

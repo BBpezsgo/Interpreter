@@ -10,6 +10,11 @@ public static class Output
     public static bool LogInfos => (arguments.LogFlags & LogType.Normal) != 0;
     public static bool LogWarnings => (arguments.LogFlags & LogType.Warning) != 0;
 
+    const ConsoleColor InfoColor = ConsoleColor.Blue;
+    const ConsoleColor WarningColor = ConsoleColor.DarkYellow;
+    const ConsoleColor ErrorColor = ConsoleColor.Red;
+    const ConsoleColor DebugColor = ConsoleColor.DarkGray;
+
     public static void SetProgramArguments(ProgramArguments arguments) => Output.arguments = arguments;
 
     public static void Log(string message, LogType logType)
@@ -32,13 +37,13 @@ public static class Output
     }
 
     public static void LogInfo(string message)
-    { if (LogInfos) LogColor(message, ConsoleColor.Blue); }
+    { if (LogInfos) LogColor(message, InfoColor); }
 
     public static void LogInfo(Information information)
     {
         if (!LogInfos) return;
 
-        Console.ForegroundColor = ConsoleColor.Blue;
+        Console.ForegroundColor = InfoColor;
         Console.WriteLine(information.ToString());
         string? arrows = information.GetArrows();
         if (arrows != null)
@@ -50,7 +55,7 @@ public static class Output
     {
         if (!LogInfos) return;
 
-        Console.ForegroundColor = ConsoleColor.Blue;
+        Console.ForegroundColor = InfoColor;
         Console.WriteLine(hint.ToString());
         string? arrows = hint.GetArrows();
         if (arrows != null)
@@ -59,11 +64,11 @@ public static class Output
     }
 
     public static void LogError(string message)
-    { LogColor(message, ConsoleColor.Red); }
+    { LogColor(message, ErrorColor); }
 
     public static void LogError(LanguageException exception)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
+        Console.ForegroundColor = ErrorColor;
         Console.WriteLine(exception.ToString());
         string? arrows = exception.GetArrows();
         if (arrows != null)
@@ -73,7 +78,7 @@ public static class Output
 
     public static void LogError(Error error)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
+        Console.ForegroundColor = ErrorColor;
         Console.WriteLine(error.ToString());
         string? arrows = error.GetArrows();
         if (arrows != null)
@@ -83,19 +88,19 @@ public static class Output
 
     public static void LogError(Exception exception)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
+        Console.ForegroundColor = ErrorColor;
         Console.WriteLine(exception.ToString());
         Console.ResetColor();
     }
 
     public static void LogWarning(string message)
-    { if (LogWarnings) LogColor(message, ConsoleColor.DarkYellow); }
+    { if (LogWarnings) LogColor(message, WarningColor); }
 
     public static void LogWarning(Warning warning)
     {
         if (LogWarnings)
         {
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.ForegroundColor = WarningColor;
             Console.WriteLine(warning.ToString());
             string? arrows = warning.GetArrows();
             if (arrows != null)
@@ -105,7 +110,7 @@ public static class Output
     }
 
     public static void LogDebug(string message)
-    { if (LogDebugs) LogColor(message, ConsoleColor.DarkGray); }
+    { if (LogDebugs) LogColor(message, DebugColor); }
 
     static void LogColor(string message, ConsoleColor color)
     {
@@ -123,8 +128,9 @@ public static class Output
 [Flags]
 public enum LogType
 {
-    Normal = 0b_00010,
-    Warning = 0b_00100,
-    Error = 0b_01000,
-    Debug = 0b_10000,
+    None = 0x0,
+    Normal = 0x1,
+    Warning = 0x2,
+    Error = 0x4,
+    Debug = 0x8,
 }

@@ -46,7 +46,7 @@ public static class Minifier
     {
         ReadOnlySpan<char> span = result.AsSpan();
         bool res = RemoveRedundantClears(ref span);
-        result = span.ToString();
+        result = new string(span);
         return res;
     }
 
@@ -62,13 +62,15 @@ public static class Minifier
             {
                 ReadOnlySpan<char> slice = result[(i + 3)..];
 
-                string yeah;
+                string? yeah = null;
                 if (alreadyThere.Value > 0)
                 { yeah = new string('+', alreadyThere.Value); }
-                else
+                else if (alreadyThere.Value < 0)
                 { yeah = new string('-', -alreadyThere.Value); }
 
-                if (slice.StartsWith(yeah) && slice.Length - alreadyThere.Value > 0)
+                if (yeah is not null &&
+                    slice.StartsWith(yeah) &&
+                    slice.Length - alreadyThere.Value > 0)
                 {
                     slice = slice[yeah.Length..];
                     result = result[..i];
@@ -100,7 +102,7 @@ public static class Minifier
     {
         ReadOnlySpan<char> span = result.AsSpan();
         bool res = RemoveRedundantBranches(ref span);
-        result = span.ToString();
+        result = new string(span);
         return res;
     }
 

@@ -31,7 +31,7 @@ public class TokenizerTests
     {
         string text = "a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -49,7 +49,7 @@ public class TokenizerTests
     {
         string text = "ab";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -67,7 +67,7 @@ public class TokenizerTests
     {
         string text = "";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -79,7 +79,7 @@ public class TokenizerTests
     {
         string? text = null;
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -91,7 +91,7 @@ public class TokenizerTests
     {
         string text = " a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -109,7 +109,7 @@ public class TokenizerTests
     {
         string text = "a\r\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -127,7 +127,7 @@ public class TokenizerTests
     {
         string text = " \r\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -139,7 +139,7 @@ public class TokenizerTests
     {
         string text = " a\r\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -157,7 +157,7 @@ public class TokenizerTests
     {
         string text = "\r\na";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -175,7 +175,7 @@ public class TokenizerTests
     {
         string text = "\r\n a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -193,7 +193,7 @@ public class TokenizerTests
     {
         string text = "\r";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -205,7 +205,7 @@ public class TokenizerTests
     {
         string text = "\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -217,7 +217,7 @@ public class TokenizerTests
     {
         string text = " ";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -229,7 +229,7 @@ public class TokenizerTests
     {
         string text = "\ra";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -247,7 +247,7 @@ public class TokenizerTests
     {
         string text = "\r a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -265,7 +265,7 @@ public class TokenizerTests
     {
         string text = "\na";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -283,7 +283,7 @@ public class TokenizerTests
     {
         string text = "\n a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -301,7 +301,7 @@ public class TokenizerTests
     {
         string text = @"""""";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -319,7 +319,7 @@ public class TokenizerTests
     {
         string text = @"""a""";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -337,7 +337,7 @@ public class TokenizerTests
     {
         string text = "'a'";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -355,7 +355,7 @@ public class TokenizerTests
     {
         string text = "563";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -373,7 +373,7 @@ public class TokenizerTests
     {
         string text = ".563";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -391,7 +391,7 @@ public class TokenizerTests
     {
         string text = ".563f";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -409,7 +409,7 @@ public class TokenizerTests
     {
         string text = @"""\n""";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -428,7 +428,7 @@ public class TokenizerTests
     {
         string text = @"""\u4685""";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -447,7 +447,7 @@ public class TokenizerTests
     {
         string text = @"'\n'";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -466,7 +466,7 @@ public class TokenizerTests
     {
         string text = @"'\u4685'";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -486,7 +486,7 @@ public class TokenizerTests
     {
         string text = @"'\7'";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -505,7 +505,7 @@ public class TokenizerTests
     {
         string text = "''";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -523,7 +523,7 @@ public class TokenizerTests
     {
         string text = "// hello";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -542,7 +542,7 @@ public class TokenizerTests
     {
         string text = "// hello\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -561,7 +561,7 @@ public class TokenizerTests
     {
         string text = "/* hello */";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(

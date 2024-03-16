@@ -109,11 +109,11 @@ public class SourceCodeManager
         if (res.Content.Headers.ContentLength.HasValue)
         {
             using ConsoleProgressBar progress = new(ConsoleColor.DarkGray, true);
-            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), progress, (int)res.Content.Headers.ContentLength.Value);
+            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), uri, progress, (int)res.Content.Headers.ContentLength.Value);
         }
         else
         {
-            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream());
+            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), uri);
         }
 
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);

@@ -6,7 +6,7 @@ public struct RuntimeContext
 {
     public int[] CallTrace;
     public int CodePointer;
-    public Instruction[] Code;
+    public ImmutableArray<Instruction> Code;
     public Stack<DataItem> Stack;
     public int CodeSampleStart;
 }
@@ -56,7 +56,7 @@ public class BytecodeInterpreter : BytecodeProcessor
     // Safety
     int LastInstructionPointer;
 
-    public BytecodeInterpreter(Instruction[] code, FrozenDictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings) : base(code, settings.HeapSize, externalFunctions)
+    public BytecodeInterpreter(ImmutableArray<Instruction> code, FrozenDictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings) : base(code, settings.HeapSize, externalFunctions)
     {
         UserInvokes = new Queue<UserInvoke>();
         Settings = settings;

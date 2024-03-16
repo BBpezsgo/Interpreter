@@ -17,7 +17,7 @@ public static class AnyTokenizer
             using HttpResponseMessage res = client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead).Result;
             res.EnsureSuccessStatusCode();
 
-            return StreamTokenizer.Tokenize(res.Content.ReadAsStream(), settings);
+            return StreamTokenizer.Tokenize(res.Content.ReadAsStream(), uri, settings);
         }
     }
 }

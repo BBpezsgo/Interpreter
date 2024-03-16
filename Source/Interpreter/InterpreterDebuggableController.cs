@@ -72,40 +72,40 @@ public class InterpreterDebuggabble : Interpreter
             Instruction nextInstruction = nextInstruction_.Value;
 
             ExternalFunctionOperation =
-                nextInstruction.Opcode == Opcode.CALL_EXTERNAL;
+                nextInstruction.Opcode == Opcode.CallExternal;
 
             StackOperation =
-                nextInstruction.Opcode == Opcode.STORE_VALUE ||
-                nextInstruction.Opcode == Opcode.PUSH_VALUE ||
-                nextInstruction.Opcode == Opcode.POP_VALUE ||
-                nextInstruction.Opcode == Opcode.LOAD_VALUE;
+                nextInstruction.Opcode == Opcode.StackStore ||
+                nextInstruction.Opcode == Opcode.Push ||
+                nextInstruction.Opcode == Opcode.Pop ||
+                nextInstruction.Opcode == Opcode.StackLoad;
 
             HeapOperation =
-                nextInstruction.Opcode == Opcode.HEAP_ALLOC ||
-                nextInstruction.Opcode == Opcode.HEAP_FREE ||
-                nextInstruction.Opcode == Opcode.HEAP_GET ||
-                nextInstruction.Opcode == Opcode.HEAP_SET;
+                nextInstruction.Opcode == Opcode.Allocate ||
+                nextInstruction.Opcode == Opcode.Free ||
+                nextInstruction.Opcode == Opcode.HeapGet ||
+                nextInstruction.Opcode == Opcode.HeapSet;
 
             AluOperation =
-                nextInstruction.Opcode == Opcode.BITS_SHIFT_LEFT ||
-                nextInstruction.Opcode == Opcode.BITS_SHIFT_RIGHT ||
+                nextInstruction.Opcode == Opcode.BitsShiftLeft ||
+                nextInstruction.Opcode == Opcode.BitsShiftRight ||
 
-                nextInstruction.Opcode == Opcode.BITS_AND ||
-                nextInstruction.Opcode == Opcode.LOGIC_EQ ||
-                nextInstruction.Opcode == Opcode.LOGIC_LT ||
-                nextInstruction.Opcode == Opcode.LOGIC_LTEQ ||
-                nextInstruction.Opcode == Opcode.LOGIC_MT ||
-                nextInstruction.Opcode == Opcode.LOGIC_MTEQ ||
-                nextInstruction.Opcode == Opcode.LOGIC_NEQ ||
-                nextInstruction.Opcode == Opcode.LOGIC_NOT ||
-                nextInstruction.Opcode == Opcode.BITS_OR ||
-                nextInstruction.Opcode == Opcode.BITS_XOR ||
+                nextInstruction.Opcode == Opcode.BitsAND ||
+                nextInstruction.Opcode == Opcode.LogicEQ ||
+                nextInstruction.Opcode == Opcode.LogicLT ||
+                nextInstruction.Opcode == Opcode.LogicLTEQ ||
+                nextInstruction.Opcode == Opcode.LogicMT ||
+                nextInstruction.Opcode == Opcode.LogicMTEQ ||
+                nextInstruction.Opcode == Opcode.LogicNEQ ||
+                nextInstruction.Opcode == Opcode.LogicNOT ||
+                nextInstruction.Opcode == Opcode.BitsOR ||
+                nextInstruction.Opcode == Opcode.BitsXOR ||
 
-                nextInstruction.Opcode == Opcode.MATH_ADD ||
-                nextInstruction.Opcode == Opcode.MATH_DIV ||
-                nextInstruction.Opcode == Opcode.MATH_MOD ||
-                nextInstruction.Opcode == Opcode.MATH_MULT ||
-                nextInstruction.Opcode == Opcode.MATH_SUB;
+                nextInstruction.Opcode == Opcode.MathAdd ||
+                nextInstruction.Opcode == Opcode.MathDiv ||
+                nextInstruction.Opcode == Opcode.MathMod ||
+                nextInstruction.Opcode == Opcode.MathMult ||
+                nextInstruction.Opcode == Opcode.MathSub;
         }
         else
         {

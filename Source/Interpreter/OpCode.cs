@@ -336,7 +336,8 @@ public enum Opcode : byte
     ///
     /// <para>
     ///     <b>Stack elements added:</b><br/>
-    ///     <c>result</c><br/
+    ///     <c>result</c><br/>
+    /// </para>
     /// </summary>
     LogicNOT,
     #endregion

@@ -6,7 +6,7 @@ using Parser.Statement;
 public class CompiledOperator : FunctionDefinition,
     ISameCheck,
     ISameCheck<CompiledOperator>,
-    IReferenceable<OperatorCall>,
+    IReferenceable<StatementWithValue>,
     IDuplicatable<CompiledOperator>,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
@@ -19,7 +19,7 @@ public class CompiledOperator : FunctionDefinition,
     public new CompiledStruct? Context { get; }
     public int InstructionOffset { get; set; } = -1;
     public bool ReturnSomething => Type != BasicType.Void;
-    public List<Reference<OperatorCall>> References { get; }
+    public List<Reference<StatementWithValue>> References { get; }
     public override bool IsTemplate
     {
         get
@@ -39,7 +39,7 @@ public class CompiledOperator : FunctionDefinition,
         this.ParameterTypes = parameterTypes.ToImmutableArray();
 
         this.Context = context;
-        this.References = new List<Reference<OperatorCall>>();
+        this.References = new List<Reference<StatementWithValue>>();
     }
 
     public CompiledOperator(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledOperator other) : base(other)
@@ -48,7 +48,7 @@ public class CompiledOperator : FunctionDefinition,
         this.ParameterTypes = parameterTypes.ToImmutableArray();
 
         this.Context = other.Context;
-        this.References = new List<Reference<OperatorCall>>(other.References);
+        this.References = new List<Reference<StatementWithValue>>(other.References);
     }
 
     public bool IsSame(CompiledOperator other)

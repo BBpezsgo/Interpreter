@@ -118,7 +118,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (type is StructType structType)
         {
-            IReadOnlyDictionary<string, GeneralType>? typeParameters = structType.TypeParametersMap;
+            ImmutableDictionary<string, GeneralType>? typeParameters = structType.TypeParameters;
             int size = 0;
             foreach (CompiledField field in structType.Struct.Fields)
             {

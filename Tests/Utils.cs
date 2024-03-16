@@ -740,12 +740,12 @@ public readonly struct AssemblyResult : IResult
 
 public static class AssertUtils
 {
-    public static int GetHashCollisions<T>(params T[] values)
+    public static int GetHashCollisions<T>(params T[] values) where T : notnull
     {
         int[] hashes = new int[values.Length];
 
         for (int i = 0; i < values.Length; i++)
-        { hashes[i] = (values[i]!.GetHashCode()); }
+        { hashes[i] = values[i].GetHashCode(); }
 
         Array.Sort(hashes, values);
 
@@ -753,7 +753,7 @@ public static class AssertUtils
 
         for (int i = 1; i < hashes.Length; i++)
         {
-            if (hashes[i] == hashes[i - 1] && !values[i]!.Equals(values[i - 1]))
+            if (hashes[i] == hashes[i - 1] && !values[i].Equals(values[i - 1]))
             {
 #if DEBUG
                 int aHash = hashes[i];

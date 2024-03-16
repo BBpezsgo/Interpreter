@@ -117,8 +117,8 @@ public sealed class Parser
     public static ParserResult Parse(Token[] tokens, Uri? file)
         => new Parser(tokens, file).ParseInternal();
 
-    public static Statement.Statement ParseInteractive(Token[] tokens)
-        => new Parser(tokens, null).ParseInteractiveInternal();
+    public static Statement.Statement ParseStatement(Token[] tokens, Uri? file)
+        => new Parser(tokens, file).ParseStatementInternal();
 
     ParserResult ParseInternal()
     {
@@ -148,7 +148,7 @@ public sealed class Parser
             Tokens);
     }
 
-    Statement.Statement ParseInteractiveInternal()
+    Statement.Statement ParseStatementInternal()
     {
         if (ExpectStatementUnchecked(out Statement.Statement? statement))
         {
@@ -1378,8 +1378,8 @@ public sealed class Parser
 
         baseBranch = ifSegmentType switch
         {
-            BaseBranch.IfPart.If => new IfBranch(keyword, condition!, block),
-            BaseBranch.IfPart.ElseIf => new ElseIfBranch(keyword, condition!, block),
+            BaseBranch.IfPart.If => new IfBranch(keyword, condition ?? throw new InternalException(), block),
+            BaseBranch.IfPart.ElseIf => new ElseIfBranch(keyword, condition ?? throw new InternalException(), block),
             BaseBranch.IfPart.Else => new ElseBranch(keyword, block),
             _ => throw new UnreachableException(),
         };
@@ -1490,7 +1490,7 @@ public sealed class Parser
             if (!ExpectOneValue(out StatementWithValue? statement))
             { throw new SyntaxException($"Expected value after operator \"{unaryPrefixOperator}\" (not \"{CurrentToken}\")", unaryPrefixOperator.Position.After(), File); }
 
-            result = new OperatorCall(unaryPrefixOperator, statement);
+            result = new UnaryOperatorCall(unaryPrefixOperator, statement);
             return true;
         }
 
@@ -1505,15 +1505,15 @@ public sealed class Parser
 
             int rightSidePrecedence = OperatorPrecedence(binaryOperator.Content);
 
-            OperatorCall? rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
+            BinaryOperatorCall? rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
             if (rightmostStatement != null)
             {
-                OperatorCall operatorCall = new(binaryOperator, rightmostStatement.Right!, rightStatement);
+                BinaryOperatorCall operatorCall = new(binaryOperator, rightmostStatement.Right, rightStatement);
                 rightmostStatement.Right = operatorCall;
             }
             else
             {
-                OperatorCall operatorCall = new(binaryOperator, leftStatement, rightStatement);
+                BinaryOperatorCall operatorCall = new(binaryOperator, leftStatement, rightStatement);
                 leftStatement = operatorCall;
             }
         }
@@ -1652,13 +1652,13 @@ public sealed class Parser
         return true;
     }
 
-    static OperatorCall? FindRightmostStatement(Statement.Statement? statement, int rightSidePrecedence)
+    static BinaryOperatorCall? FindRightmostStatement(Statement.Statement? statement, int rightSidePrecedence)
     {
-        if (statement is not OperatorCall leftSide) return null;
+        if (statement is not BinaryOperatorCall leftSide) return null;
         if (OperatorPrecedence(leftSide.Operator.Content) >= rightSidePrecedence) return null;
         if (leftSide.SurroundingBracelet.HasValue) return null;
 
-        OperatorCall? right = FindRightmostStatement(leftSide.Right, rightSidePrecedence);
+        BinaryOperatorCall? right = FindRightmostStatement(leftSide.Right, rightSidePrecedence);
 
         if (right == null) return leftSide;
         return right;

@@ -121,7 +121,7 @@ class InteractiveCompiler
 
         if (_tokens.Length != 0)
         {
-            _parsed = Parser.ParseInteractive(_tokens);
+            _parsed = Parser.ParseStatement(_tokens, null);
 
             Dictionary<string, ExternalFunctionBase> externalFunctions = new();
             new Interpreter().GenerateExternalFunctions(externalFunctions);
@@ -167,7 +167,7 @@ class InteractiveCompiler
 
         if (_tokens.Length != 0)
         {
-            _parsed = Parser.ParseInteractive(_tokens);
+            _parsed = Parser.ParseStatement(_tokens, null);
 
             Dictionary<string, ExternalFunctionBase> externalFunctions = new();
             new Interpreter().GenerateExternalFunctions(externalFunctions);
@@ -790,9 +790,10 @@ public class Interactive
             return;
         }
 
+        // TODO: Remove ! operator
         if (interpreter.BytecodeInterpreter!.Memory.Stack.Count > 0)
         {
-            DataItem exitCode = interpreter.BytecodeInterpreter!.Memory.Stack.Last;
+            DataItem exitCode = interpreter.BytecodeInterpreter.Memory.Stack.Last;
 
             AnsiBuilder output = new();
 

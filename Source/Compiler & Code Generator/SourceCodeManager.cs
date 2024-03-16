@@ -218,10 +218,13 @@ public class SourceCodeManager
         {
             FileInfo file = new(parent.LocalPath);
 
-            if (basePath != null)
-            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, file.Directory!.FullName), filename), UriKind.Absolute); }
+            if (file.Directory is null)
+            { throw new InternalException($"File \"{file}\" doesn't have a directory"); }
 
-            yield return new Uri(Path.GetFullPath(filename, file.Directory!.FullName), UriKind.Absolute);
+            if (basePath != null)
+            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, file.Directory.FullName), filename), UriKind.Absolute); }
+
+            yield return new Uri(Path.GetFullPath(filename, file.Directory.FullName), UriKind.Absolute);
         }
         else
         {

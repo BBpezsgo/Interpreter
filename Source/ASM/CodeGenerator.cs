@@ -4,7 +4,6 @@
 
 namespace LanguageCore.ASM.Generator;
 
-using System.Diagnostics.CodeAnalysis;
 using BBCode.Generator;
 using Compiler;
 using Parser;
@@ -51,7 +50,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     readonly Stack<bool> InMacro;
 
     readonly int ByteSize = 1;
-    readonly int IntSize = 2;
+    int IntSize => Is16Bits ? 2 : 4;
     bool Is16Bits => GeneratorSettings.Is16Bits;
 
     #endregion
@@ -600,7 +599,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         return parameterCleanup;
     }
 
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(OperatorCall functionCall, CompiledOperator compiledFunction)
+    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(BinaryOperatorCall functionCall, CompiledOperator compiledFunction)
     {
         Stack<ParameterCleanupItem> parameterCleanup = new();
 
@@ -792,50 +791,32 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     void GenerateCodeForStatement(Statement statement)
     {
-        if (statement is KeywordCall instructionStatement)
-        { GenerateCodeForStatement(instructionStatement); }
-        else if (statement is FunctionCall functionCall)
-        { GenerateCodeForStatement(functionCall); }
-        else if (statement is IfContainer @if)
-        { GenerateCodeForStatement(@if); }
-        else if (statement is WhileLoop @while)
-        { GenerateCodeForStatement(@while); }
-        else if (statement is LiteralStatement literal)
-        { GenerateCodeForStatement(literal); }
-        else if (statement is Identifier variable)
-        { GenerateCodeForStatement(variable); }
-        else if (statement is OperatorCall expression)
-        { GenerateCodeForStatement(expression); }
-        else if (statement is AddressGetter addressGetter)
-        { GenerateCodeForStatement(addressGetter); }
-        else if (statement is Pointer pointer)
-        { GenerateCodeForStatement(pointer); }
-        else if (statement is Assignment assignment)
-        { GenerateCodeForStatement(assignment); }
-        else if (statement is ShortOperatorCall shortOperatorCall)
-        { GenerateCodeForStatement(shortOperatorCall); }
-        else if (statement is CompoundAssignment compoundAssignment)
-        { GenerateCodeForStatement(compoundAssignment); }
-        else if (statement is VariableDeclaration variableDeclaration)
-        { GenerateCodeForStatement(variableDeclaration); }
-        else if (statement is TypeCast typeCast)
-        { GenerateCodeForStatement(typeCast); }
-        else if (statement is NewInstance newInstance)
-        { GenerateCodeForStatement(newInstance); }
-        else if (statement is ConstructorCall constructorCall)
-        { GenerateCodeForStatement(constructorCall); }
-        else if (statement is Field field)
-        { GenerateCodeForStatement(field); }
-        else if (statement is IndexCall indexCall)
-        { GenerateCodeForStatement(indexCall); }
-        else if (statement is AnyCall anyCall)
-        { GenerateCodeForStatement(anyCall); }
-        else if (statement is Block block)
-        { GenerateCodeForStatement(block); }
-        else if (statement is ModifiedStatement modifiedStatement)
-        { GenerateCodeForStatement(modifiedStatement); }
-        else
-        { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
+        switch (statement)
+        {
+            case KeywordCall v: GenerateCodeForStatement(v); break;
+            case FunctionCall v: GenerateCodeForStatement(v); break;
+            case IfContainer v: GenerateCodeForStatement(v); break;
+            case WhileLoop v: GenerateCodeForStatement(v); break;
+            case LiteralStatement v: GenerateCodeForStatement(v); break;
+            case Identifier v: GenerateCodeForStatement(v); break;
+            case BinaryOperatorCall v: GenerateCodeForStatement(v); break;
+            case UnaryOperatorCall v: GenerateCodeForStatement(v); break;
+            case AddressGetter v: GenerateCodeForStatement(v); break;
+            case Pointer v: GenerateCodeForStatement(v); break;
+            case Assignment v: GenerateCodeForStatement(v); break;
+            case ShortOperatorCall v: GenerateCodeForStatement(v); break;
+            case CompoundAssignment v: GenerateCodeForStatement(v); break;
+            case VariableDeclaration v: GenerateCodeForStatement(v); break;
+            case TypeCast v: GenerateCodeForStatement(v); break;
+            case NewInstance v: GenerateCodeForStatement(v); break;
+            case ConstructorCall v: GenerateCodeForStatement(v); break;
+            case Field v: GenerateCodeForStatement(v); break;
+            case IndexCall v: GenerateCodeForStatement(v); break;
+            case AnyCall v: GenerateCodeForStatement(v); break;
+            case Block v: GenerateCodeForStatement(v); break;
+            case ModifiedStatement v: GenerateCodeForStatement(v); break;
+            default: throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);
+        }
 
         if (statement is FunctionCall statementWithValue &&
             !statementWithValue.SaveValue &&
@@ -1240,7 +1221,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         throw new CompilerException($"Symbol \"{statement.Content}\" not found", statement, CurrentFile);
     }
-    void GenerateCodeForStatement(OperatorCall statement)
+    void GenerateCodeForStatement(BinaryOperatorCall statement)
     {
         if (GetOperator(statement, out _))
         {
@@ -1252,11 +1233,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageOperators.ParameterCounts[statement.Operator.Content]} passed {statement.ParameterCount}", statement.Operator, CurrentFile); }
 
             GenerateCodeForStatement(statement.Left);
-
-            if (statement.Right != null)
-            {
-                GenerateCodeForStatement(statement.Right);
-            }
+            GenerateCodeForStatement(statement.Right);
 
             switch (opcode)
             {
@@ -1402,22 +1379,6 @@ public class CodeGeneratorForAsm : CodeGenerator
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
-                case Opcode.LogicNOT:
-                {
-                    string label1 = Builder.CodeBuilder.NewLabel();
-                    string label2 = Builder.CodeBuilder.NewLabel();
-
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, 0);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfNotEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
-                    Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
-                    Builder.CodeBuilder.AppendLabel(label2);
-                    break;
-                }
 
                 case Opcode.BitsAND:
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
@@ -1497,6 +1458,45 @@ public class CodeGeneratorForAsm : CodeGenerator
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
                     break;
                 }
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+        else
+        { throw new CompilerException($"Unknown operator \"{statement.Operator.Content}\"", statement.Operator, CurrentFile); }
+    }
+    void GenerateCodeForStatement(UnaryOperatorCall statement)
+    {
+        if (GetOperator(statement, out _))
+        {
+            throw new NotImplementedException();
+        }
+        else if (LanguageOperators.OpCodes.TryGetValue(statement.Operator.Content, out Opcode opcode))
+        {
+            if (LanguageOperators.ParameterCounts[statement.Operator.Content] != statement.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageOperators.ParameterCounts[statement.Operator.Content]} passed {statement.ParameterCount}", statement.Operator, CurrentFile); }
+
+            GenerateCodeForStatement(statement.Left);
+
+            switch (opcode)
+            {
+                case Opcode.LogicNOT:
+                {
+                    string label1 = Builder.CodeBuilder.NewLabel();
+                    string label2 = Builder.CodeBuilder.NewLabel();
+
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfNotEQ, label1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendLabel(label1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
+                    Builder.CodeBuilder.AppendLabel(label2);
+                    break;
+                }
+
                 default:
                     throw new NotImplementedException();
             }

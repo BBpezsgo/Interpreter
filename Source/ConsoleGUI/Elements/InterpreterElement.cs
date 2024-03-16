@@ -551,7 +551,7 @@ public sealed class InterpreterElement : WindowElement
         }
 
         int nextHeader = 0;
-        for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Heap!.Size; i++)
+        for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Heap.Size; i++)
         {
             DataItem item = this.Interpreter.BytecodeInterpreter.Memory.Heap[i];
             bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull);

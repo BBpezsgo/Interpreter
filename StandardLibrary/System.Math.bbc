@@ -1,6 +1,7 @@
 #bf "cos" "float" "float";
 #bf "sin" "float" "float";
 
+// https://stackoverflow.com/a/67122267
 export inline float Sin(float x)
 {
     float value = x;
@@ -17,6 +18,7 @@ export inline float Sin(float x)
     return sum;
 }
 
+// https://stackoverflow.com/a/67122267
 export inline float Cos(float x)
 {
     float value = 1f;

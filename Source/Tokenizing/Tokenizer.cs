@@ -2,7 +2,7 @@
 
 public abstract partial class Tokenizer
 {
-        /// <exception cref="InternalException"/>
+    /// <exception cref="InternalException"/>
     /// <exception cref="TokenizerException"/>
     protected void ProcessCharacter(char currChar, int offsetTotal)
     {
@@ -12,8 +12,9 @@ public abstract partial class Tokenizer
         char prevChar = PreviousChar;
         PreviousChar = currChar;
 
-        if (currChar == '\r' ||
-            (currChar == '\n' && prevChar != '\r'))
+        if (prevChar is '\r' && currChar is '\n') // CRLF
+        { breakLine = true; }
+        else if (currChar is '\n') // LF
         { breakLine = true; }
 
         if (currChar is '\r' or '\n')
@@ -421,7 +422,6 @@ FinishCharacter:
         CurrentColumn++;
         if (breakLine) CurrentLine++;
         if (returnLine) CurrentColumn = 0;
-        return;
     }
 
     /// <exception cref="InternalException"/>
@@ -472,8 +472,12 @@ FinishCharacter:
                 number.TokenType = PreparationTokenType.LiteralNumber;
                 op.TokenType = PreparationTokenType.Operator;
 
+                number.Position = PreprocessorResult.TransformPosition(number.Position);
                 Tokens.Add(number.Instantiate());
+
+                op.Position = PreprocessorResult.TransformPosition(op.Position);
                 Tokens.Add(op.Instantiate());
+
                 goto Finish;
             }
         }
@@ -494,6 +498,7 @@ FinishCharacter:
             { CurrentToken.TokenType = PreparationTokenType.LiteralFloat; }
         }
 
+        CurrentToken.Position = PreprocessorResult.TransformPosition(CurrentToken.Position);
         Tokens.Add(CurrentToken.Instantiate());
 
 Finish:

@@ -522,7 +522,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             case ForLoop v: GenerateCodeForStatement(v); break;
             case Literal v: GenerateCodeForStatement(v); break;
             case Identifier v: GenerateCodeForStatement(v); break;
-            case OperatorCall v: GenerateCodeForStatement(v); break;
+            case BinaryOperatorCall v: GenerateCodeForStatement(v); break;
+            case UnaryOperatorCall v: GenerateCodeForStatement(v); break;
             case AddressGetter v: GenerateCodeForStatement(v); break;
             case Pointer v: GenerateCodeForStatement(v); break;
             case Assignment v: GenerateCodeForStatement(v); break;
@@ -906,6 +907,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         if (shouldUnroll)
         {
+            GeneratorSnapshot generatorSnapshot = Snapshot();
+            CodeSnapshot codeSnapshot = SnapshotCode();
+
             try
             {
                 Block[] unrolled = Unroll(@for, new Dictionary<StatementWithValue, DataItem>());
@@ -918,7 +922,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 return true;
             }
             catch (CompilerException)
-            { }
+            {
+                Restore(generatorSnapshot);
+                RestoreCode(codeSnapshot);
+            }
         }
 
         using (CommentBlock($"For"))
@@ -1120,7 +1127,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     void GenerateCodeForStatement(CompoundAssignment statement)
     {
         {
-            OperatorCall @operator = statement.GetOperatorCall();
+            BinaryOperatorCall @operator = statement.GetOperatorCall();
             if (GetOperator(@operator, out _) || GetOperatorTemplate(@operator, out _))
             {
                 GenerateCodeForStatement(statement.ToAssignment());
@@ -1237,7 +1244,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     void GenerateCodeForStatement(ShortOperatorCall statement)
     {
         {
-            OperatorCall @operator = statement.GetOperatorCall();
+            BinaryOperatorCall @operator = statement.GetOperatorCall();
             if (GetOperator(@operator, out _) || GetOperatorTemplate(@operator, out _))
             {
                 GenerateCodeForStatement(statement.ToAssignment());
@@ -1523,7 +1530,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         throw new CompilerException($"Symbol \"{statement}\" not found", statement, CurrentFile);
     }
-    void GenerateCodeForStatement(OperatorCall statement)
+    void GenerateCodeForStatement(BinaryOperatorCall statement)
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
@@ -1578,7 +1585,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock("Compute equality"))
                     {
@@ -1597,7 +1604,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Move & add right-side (from {rightAddress}) to left-side (to {leftAddress})"))
                     { Code.MoveAddValue(rightAddress, leftAddress); }
@@ -1633,7 +1640,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Move & sub right-side (from {rightAddress}) from left-side (to {leftAddress})"))
                     { Code.MoveSubValue(rightAddress, leftAddress); }
@@ -1668,7 +1675,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet MULTIPLY({leftAddress} {rightAddress})"))
                     {
@@ -1687,7 +1694,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet DIVIDE({leftAddress} {rightAddress})"))
                     {
@@ -1706,7 +1713,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet MOD({leftAddress} {rightAddress})"))
                     {
@@ -1725,7 +1732,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet LT({leftAddress} {rightAddress})"))
                     {
@@ -1744,7 +1751,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet MT({leftAddress} {rightAddress})"))
                     {
@@ -1765,7 +1772,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet LTEQ({leftAddress} {rightAddress})"))
                     {
@@ -1785,7 +1792,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet LTEQ({leftAddress} {rightAddress})"))
                     {
@@ -1804,7 +1811,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet NEQ({leftAddress} {rightAddress})"))
                     {
@@ -1828,7 +1835,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet AND({leftAddress} {rightAddress})"))
                     { Code.LOGIC_AND(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2); }
@@ -1854,7 +1861,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int rightAddress = Stack.NextAddress;
                     using (CommentBlock("Compute right-side value"))
-                    { GenerateCodeForStatement(statement.Right!); }
+                    { GenerateCodeForStatement(statement.Right); }
 
                     using (CommentBlock($"Snippet AND({leftAddress} {rightAddress})"))
                     { Code.LOGIC_OR(leftAddress, rightAddress, rightAddress + 1); }
@@ -1948,6 +1955,67 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         break;
                     }
                     throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
+                }
+                default: throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
+            }
+        }
+    }
+    void GenerateCodeForStatement(UnaryOperatorCall statement)
+    {
+        using DebugInfoBlock debugBlock = DebugBlock(statement);
+
+        {
+            Dictionary<string, GeneralType> typeArguments = new();
+
+            if (!GetOperator(statement, out CompiledOperator? compiledOperator))
+            {
+                if (GetOperatorTemplate(statement, out CompliableTemplate<CompiledOperator> compilableFunction))
+                {
+                    compiledOperator = compilableFunction.Function;
+                    typeArguments = compilableFunction.TypeArguments;
+                }
+            }
+
+            if (compiledOperator is not null)
+            {
+                statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
+
+                if (!compiledOperator.CanUse(CurrentFile))
+                {
+                    AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
+                    return;
+                }
+
+                typeArguments = Utils.ConcatDictionary(typeArguments, compiledOperator.Context?.CurrentTypeArguments);
+
+                GenerateCodeForFunction(compiledOperator, statement.Parameters.ToArray(), typeArguments, statement);
+
+                if (!statement.SaveValue)
+                { Stack.Pop(); }
+                return;
+            }
+        }
+
+        if (TryCompute(statement, out DataItem computed))
+        {
+            Stack.Push(computed);
+            Optimizations++;
+            return;
+        }
+
+        using (CommentBlock($"Expression {statement.Left} {statement.Operator}"))
+        {
+            switch (statement.Operator.Content)
+            {
+                case "!":
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (CommentBlock("Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    Code.LOGIC_NOT(leftAddress, leftAddress + 1);
+
+                    break;
                 }
                 default: throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
             }

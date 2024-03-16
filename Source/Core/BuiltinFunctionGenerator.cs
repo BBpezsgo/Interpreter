@@ -293,7 +293,7 @@ public static unsafe class ExternalFunctionGenerator
         functions.AddSimpleExternalFunction(name, types, (sender, args) =>
         {
             CheckParameters(name, types, args);
-            TResult result = callback.Invoke()!;
+            TResult result = callback.Invoke();
 
             return DataItem.GetValue(result);
         });
@@ -307,7 +307,7 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(name, types, args);
             TResult result = callback.Invoke(
-                GetValue<T0>(sender, args[0]))!;
+                GetValue<T0>(sender, args[0]));
 
             return DataItem.GetValue(result);
         });
@@ -322,7 +322,7 @@ public static unsafe class ExternalFunctionGenerator
             CheckParameters(name, types, args);
             TResult result = callback.Invoke(
                 GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]))!;
+                GetValue<T1>(sender, args[1]));
 
             return DataItem.GetValue(result);
         });
@@ -338,7 +338,7 @@ public static unsafe class ExternalFunctionGenerator
             TResult result = callback.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
-                GetValue<T2>(sender, args[2]))!;
+                GetValue<T2>(sender, args[2]));
 
             return DataItem.GetValue(result);
         });
@@ -355,7 +355,7 @@ public static unsafe class ExternalFunctionGenerator
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
                 GetValue<T2>(sender, args[2]),
-                GetValue<T3>(sender, args[3]))!;
+                GetValue<T3>(sender, args[3]));
 
             return DataItem.GetValue(result);
         });
@@ -373,7 +373,7 @@ public static unsafe class ExternalFunctionGenerator
                 GetValue<T1>(sender, args[1]),
                 GetValue<T2>(sender, args[2]),
                 GetValue<T3>(sender, args[3]),
-                GetValue<T4>(sender, args[4]))!;
+                GetValue<T4>(sender, args[4]));
 
             return DataItem.GetValue(result);
         });
@@ -392,7 +392,7 @@ public static unsafe class ExternalFunctionGenerator
                 GetValue<T2>(sender, args[2]),
                 GetValue<T3>(sender, args[3]),
                 GetValue<T4>(sender, args[4]),
-                GetValue<T5>(sender, args[5]))!;
+                GetValue<T5>(sender, args[5]));
 
             return DataItem.GetValue(result);
         });

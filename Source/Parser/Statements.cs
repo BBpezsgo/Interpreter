@@ -767,25 +767,17 @@ public class KeywordCall : StatementWithValue, IReadable
     }
 }
 
-public class OperatorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledOperator>
+public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledOperator>
 {
     public Token Operator { get; }
     public StatementWithValue Left { get; }
-    public StatementWithValue? Right { get; set; }
+    public StatementWithValue Right { get; set; }
     public CompiledOperator? Reference { get; set; }
     public override Position Position => new(Operator, Left, Right);
+    public StatementWithValue[] Parameters => new StatementWithValue[] { Left, Right };
+    public int ParameterCount => 2;
 
-    public StatementWithValue[] Parameters =>
-        Right is not null ?
-        (new StatementWithValue[] { Left, Right }) :
-        (new StatementWithValue[] { Left });
-
-    public int ParameterCount =>
-        Right is not null ?
-        2 :
-        1;
-
-    public OperatorCall(Token op, StatementWithValue left, StatementWithValue? right = null)
+    public BinaryOperatorCall(Token op, StatementWithValue left, StatementWithValue right)
     {
         Operator = op;
         Left = left;
@@ -797,27 +789,19 @@ public class OperatorCall : StatementWithValue, IReadable, IReferenceableTo<Comp
         StringBuilder result = new();
         result.Append(SurroundingBracelet?.Start);
 
-        if (Left != null)
-        {
-            if (Left.ToString().Length < Stringify.CozyLength)
-            { result.Append(Left); }
-            else
-            { result.Append("..."); }
-
-            result.Append(' ');
-            result.Append(Operator);
-            result.Append(' ');
-
-            if (Right != null)
-            {
-                if (Right.ToString().Length < Stringify.CozyLength)
-                { result.Append(Right); }
-                else
-                { result.Append("..."); }
-            }
-        }
+        if (Left.ToString().Length < Stringify.CozyLength)
+        { result.Append(Left); }
         else
-        { result.Append(Operator); }
+        { result.Append("..."); }
+
+        result.Append(' ');
+        result.Append(Operator);
+        result.Append(' ');
+
+        if (Right.ToString().Length < Stringify.CozyLength)
+        { result.Append(Right); }
+        else
+        { result.Append("..."); }
 
         result.Append(SurroundingBracelet?.End);
         result.Append(Semicolon);
@@ -847,16 +831,78 @@ public class OperatorCall : StatementWithValue, IReadable, IReferenceableTo<Comp
         foreach (Statement substatement in Left.GetStatementsRecursively(true))
         { yield return substatement; }
 
-        if (Right != null)
-        {
-            foreach (Statement substatement in Right.GetStatementsRecursively(true))
-            { yield return substatement; }
-        }
+        foreach (Statement substatement in Right.GetStatementsRecursively(true))
+        { yield return substatement; }
     }
 }
 
+public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledOperator>
+{
+    public Token Operator { get; }
+    public StatementWithValue Left { get; }
+    public CompiledOperator? Reference { get; set; }
+    public override Position Position => new(Operator, Left);
+    public StatementWithValue[] Parameters => new StatementWithValue[] { Left };
+    public int ParameterCount => 1;
+
+    public UnaryOperatorCall(Token op, StatementWithValue left)
+    {
+        Operator = op;
+        Left = left;
+    }
+
+    public override string ToString()
+    {
+        StringBuilder result = new();
+        result.Append(SurroundingBracelet?.Start);
+
+        if (Left.ToString().Length < Stringify.CozyLength)
+        { result.Append(Left); }
+        else
+        { result.Append("..."); }
+
+        result.Append(' ');
+
+        result.Append(Operator);
+
+        result.Append(SurroundingBracelet?.End);
+        result.Append(Semicolon);
+        return result.ToString();
+    }
+
+    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
+    {
+        StringBuilder result = new();
+
+        result.Append(Operator.Content);
+        result.Append('(');
+        for (int i = 0; i < Parameters.Length; i++)
+        {
+            if (i > 0) { result.Append(", "); }
+            result.Append(typeSearch.Invoke(Parameters[i]).ToString());
+        }
+        result.Append(')');
+
+        return result.ToString();
+    }
+
+    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    {
+        if (includeThis) yield return this;
+
+        foreach (Statement substatement in Left.GetStatementsRecursively(true))
+        { yield return substatement; }
+    }
+}
+
+/// <summary>
+/// Increment and decrement operator
+/// </summary>
 public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<CompiledOperator>
 {
+    /// <summary>
+    /// This should be "++" or "--"
+    /// </summary>
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public CompiledOperator? Reference { get; set; }
@@ -909,7 +955,7 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
     /// <exception cref="NotImplementedException"/>
     public override Assignment ToAssignment()
     {
-        OperatorCall operatorCall = GetOperatorCall();
+        BinaryOperatorCall operatorCall = GetOperatorCall();
         Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
         return new Assignment(assignmentToken, Left, operatorCall);
     }
@@ -923,20 +969,20 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
     }
 
     /// <exception cref="NotImplementedException"/>
-    public OperatorCall GetOperatorCall()
+    public BinaryOperatorCall GetOperatorCall()
     {
         switch (Operator.Content)
         {
             case "++":
             {
                 Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
-                return new OperatorCall(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one);
+                return new BinaryOperatorCall(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one);
             }
 
             case "--":
             {
                 Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
-                return new OperatorCall(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one);
+                return new BinaryOperatorCall(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one);
             }
 
             default: throw new NotImplementedException();
@@ -1043,11 +1089,11 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo<CompiledOperat
 
     public override Assignment ToAssignment()
     {
-        OperatorCall statementToAssign = GetOperatorCall();
+        BinaryOperatorCall statementToAssign = GetOperatorCall();
         return new Assignment(Token.CreateAnonymous("=", TokenType.Operator, Operator.Position), Left, statementToAssign);
     }
 
-    public OperatorCall GetOperatorCall() => new(
+    public BinaryOperatorCall GetOperatorCall() => new(
         Token.CreateAnonymous(Operator.Content.Replace("=", string.Empty, StringComparison.Ordinal), TokenType.Operator, Operator.Position),
         Left,
         Right);

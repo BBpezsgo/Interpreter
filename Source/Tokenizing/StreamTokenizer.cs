@@ -8,7 +8,7 @@ public class StreamTokenizer : Tokenizer,
     readonly Stream Stream;
     bool IsDisposed;
 
-    StreamTokenizer(TokenizerSettings settings, Stream stream, Uri? file) : base(settings, file)
+    StreamTokenizer(TokenizerSettings settings, Stream stream, Uri? file) : base(settings, file, Preprocessor.PreprocessorResult.Empty)
     { Stream = stream; }
 
     /// <inheritdoc cref="TokenizeInternal"/>

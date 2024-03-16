@@ -395,7 +395,7 @@ public sealed class Compiler
         for (int j = 0; j < @struct.Fields.Length; j++)
         {
             FieldDefinition field = @struct.Fields[j];
-            CompiledField newField = new(GeneralType.From(field.Type, FindType), null!, field);
+            CompiledField newField = new(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field);
             compiledFields[j] = newField;
         }
 

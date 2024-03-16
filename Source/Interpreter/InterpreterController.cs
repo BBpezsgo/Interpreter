@@ -259,7 +259,7 @@ public class Interpreter
 
         externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char));
 
-        externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter!.SleepTime(t, null));
+        externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter! /* This can't be null */ .SleepTime(t, null));
 
         #endregion
 
@@ -344,7 +344,7 @@ public class Interpreter
                     byte[] buffer = new byte[count];
                     for (int j = 0; j < count; j++)
                     {
-                        buffer[j] = BytecodeInterpreter!.Memory.Heap[j + stream.MemoryAddress].Byte ?? 0;
+                        buffer[j] = BytecodeInterpreter! /* This can't be null */ .Memory.Heap[j + stream.MemoryAddress].Byte ?? 0;
                     }
 
                     stream.Flush(buffer);

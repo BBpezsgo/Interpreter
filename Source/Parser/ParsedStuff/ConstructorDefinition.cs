@@ -19,7 +19,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
         TypeInstance type,
         IEnumerable<Token> modifiers,
         ParameterDefinitionCollection parameters)
-        : base(modifiers, null!, parameters, null)
+        : base(modifiers, new Token(TokenType.Identifier, type.ToString(), true, type.Position), parameters, null)
     {
         Identifier = type;
     }

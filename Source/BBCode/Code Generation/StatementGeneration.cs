@@ -449,7 +449,44 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return parameterCleanup;
     }
 
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(OperatorCall functionCall, CompiledOperator compiledFunction)
+    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(BinaryOperatorCall functionCall, CompiledOperator compiledFunction)
+    {
+        Stack<ParameterCleanupItem> parameterCleanup = new();
+
+        for (int i = 0; i < functionCall.Parameters.Length; i++)
+        {
+            StatementWithValue passedParameter = functionCall.Parameters[i];
+            GeneralType passedParameterType = FindStatementType(passedParameter);
+            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
+            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+
+            AddComment($" Param {i}:");
+
+            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
+
+            canDeallocate = canDeallocate && passedParameterType is PointerType;
+
+            if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
+            {
+                if (explicitDeallocate && !canDeallocate)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
+            }
+            else
+            {
+                if (explicitDeallocate)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                canDeallocate = false;
+            }
+
+            GenerateCodeForStatement(passedParameter, definedParameterType);
+
+            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
+        }
+
+        return parameterCleanup;
+    }
+
+    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(UnaryOperatorCall functionCall, CompiledOperator compiledFunction)
     {
         Stack<ParameterCleanupItem> parameterCleanup = new();
 
@@ -701,8 +738,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForFunctionCall_Variable(FunctionCall functionCall, CompiledVariable compiledVariable)
     {
-        FunctionType functionType = (compiledVariable.Type as FunctionType)!;
-        OnGotStatementType(functionCall, (compiledVariable.Type as FunctionType)!.ReturnType);
+        FunctionType functionType = (FunctionType)compiledVariable.Type;
+        OnGotStatementType(functionCall, functionType.ReturnType);
 
         if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
         { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
@@ -740,8 +777,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForFunctionCall_Variable(FunctionCall functionCall, CompiledParameter compiledParameter)
     {
-        FunctionType functionType = (compiledParameter.Type as FunctionType)!;
-        OnGotStatementType(functionCall, (compiledParameter.Type as FunctionType)!.ReturnType);
+        FunctionType functionType = (FunctionType)compiledParameter.Type;
+        OnGotStatementType(functionCall, functionType.ReturnType);
 
         if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
         { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
@@ -862,7 +899,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
-    void GenerateCodeForStatement(OperatorCall @operator)
+    void GenerateCodeForStatement(BinaryOperatorCall @operator)
     {
         if (Settings.OptimizeCode && TryCompute(@operator, out DataItem predictedValue))
         {
@@ -1012,7 +1049,154 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (@operator.ParameterCount != 2)
             { throw new CompilerException($"Wrong number of parameters passed to assignment operator '{@operator.Operator.Content}': required {2} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
 
-            GenerateCodeForValueSetter(@operator.Left, @operator.Right!);
+            GenerateCodeForValueSetter(@operator.Left, @operator.Right);
+        }
+        else
+        { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
+    }
+    void GenerateCodeForStatement(UnaryOperatorCall @operator)
+    {
+        if (Settings.OptimizeCode && TryCompute(@operator, out DataItem predictedValue))
+        {
+            OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
+            @operator.PredictedValue = predictedValue;
+
+            AddInstruction(Opcode.Push, predictedValue);
+            return;
+        }
+
+        if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
+        {
+            operatorDefinition.References.Add((@operator, CurrentFile, CurrentContext));
+            @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
+            @operator.Reference = operatorDefinition;
+            OnGotStatementType(@operator, operatorDefinition.Type);
+
+            AddComment($"Call {operatorDefinition.Identifier} {{");
+
+            Stack<ParameterCleanupItem> parameterCleanup;
+
+            if (!operatorDefinition.CanUse(CurrentFile))
+            {
+                AnalysisCollection?.Errors.Add(new Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
+                AddComment("}");
+                return;
+            }
+
+            if (@operator.ParameterCount != operatorDefinition.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {@operator.ParameterCount}", @operator, CurrentFile); }
+
+            if (operatorDefinition.IsExternal)
+            {
+                if (!ExternalFunctions.TryGetValue(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase? externalFunction))
+                {
+                    AnalysisCollection?.Errors.Add(new Error($"External function \"{operatorDefinition.ExternalFunctionName}\" not found", @operator.Operator, CurrentFile));
+                    AddComment("}");
+                    return;
+                }
+
+                AddComment(" Function Name:");
+                if (ExternalFunctionsCache.TryGetValue(operatorDefinition.ExternalFunctionName, out int cacheAddress))
+                { AddInstruction(Opcode.StackLoad, AddressingMode.Absolute, cacheAddress); }
+                else
+                { GenerateCodeForLiteralString(operatorDefinition.ExternalFunctionName); }
+
+                int offset = -1;
+
+                parameterCleanup = GenerateCodeForParameterPassing(@operator, operatorDefinition);
+                for (int i = 0; i < parameterCleanup.Count; i++)
+                { offset -= parameterCleanup[i].Size; }
+
+                AddComment($" Function name string pointer:");
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, offset);
+
+                AddComment(" .:");
+                AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
+
+                GenerateCodeForParameterCleanup(parameterCleanup, @operator.Operator.Position);
+
+                bool thereIsReturnValue = false;
+                if (!@operator.SaveValue)
+                {
+                    AddComment($" Clear Return Value:");
+                    AddInstruction(Opcode.Pop);
+                }
+                else
+                { thereIsReturnValue = true; }
+
+                AddComment(" Deallocate Function Name String:");
+
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
+                AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
+                AddInstruction(Opcode.Free);
+
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
+                AddInstruction(Opcode.Free);
+
+                if (thereIsReturnValue)
+                {
+                    AddInstruction(Opcode.StackStore, AddressingMode.StackRelative, -2);
+                }
+                else
+                {
+                    AddInstruction(Opcode.Pop);
+                }
+
+                AddComment("}");
+                return;
+            }
+
+            int returnValueSize = GenerateInitialValue(operatorDefinition.Type);
+
+            parameterCleanup = GenerateCodeForParameterPassing(@operator, operatorDefinition);
+
+            AddComment(" .:");
+
+            int jumpInstruction = Call(operatorDefinition.InstructionOffset);
+
+            if (operatorDefinition.InstructionOffset == -1)
+            { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, CurrentFile)); }
+
+            GenerateCodeForParameterCleanup(parameterCleanup, @operator.Operator.Position);
+
+            if (!@operator.SaveValue)
+            {
+                AddComment(" Clear Return Value:");
+                for (int i = 0; i < returnValueSize; i++)
+                { AddInstruction(Opcode.Pop); }
+            }
+
+            AddComment("}");
+        }
+        else if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
+        {
+            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+
+            FindStatementType(@operator);
+
+            int jumpInstruction = -1;
+
+            GenerateCodeForStatement(@operator.Left);
+
+            if (opcode == Opcode.LogicAND)
+            {
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -1);
+                jumpInstruction = GeneratedCode.Count;
+                AddInstruction(Opcode.JumpIfZero);
+            }
+            else if (opcode == Opcode.LogicOR)
+            {
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -1);
+                AddInstruction(Opcode.LogicNOT);
+                jumpInstruction = GeneratedCode.Count;
+                AddInstruction(Opcode.JumpIfZero);
+            }
+
+            AddInstruction(opcode);
+
+            if (jumpInstruction != -1)
+            { GeneratedCode[jumpInstruction].Parameter = GeneratedCode.Count - jumpInstruction; }
         }
         else
         { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
@@ -1582,7 +1766,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     switch (compiledField.Protection)
         //     {
         //         case Protection.Private:
-        //             if (CurrentContext.Context.Identifier.Content != compiledField.Class!.Identifier.Content)
+        //             if (CurrentContext.Context.Identifier.Content != compiledField.Class.Identifier.Content)
         //             { throw new CompilerException($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Identifier}\" due to it's protection level", field, CurrentFile); }
         //             break;
         //         case Protection.Public:
@@ -1848,7 +2032,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case VariableDeclaration v: GenerateCodeForStatement(v); break;
             case FunctionCall v: GenerateCodeForStatement(v); break;
             case KeywordCall v: GenerateCodeForStatement(v); break;
-            case OperatorCall v: GenerateCodeForStatement(v); break;
+            case BinaryOperatorCall v: GenerateCodeForStatement(v); break;
+            case UnaryOperatorCall v: GenerateCodeForStatement(v); break;
             case AnyAssignment v: GenerateCodeForStatement(v.ToAssignment()); break;
             case LiteralStatement v: GenerateCodeForStatement(v); break;
             case Identifier v: GenerateCodeForStatement(v, expectedType); break;
@@ -1925,7 +2110,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (item.ShouldDeallocate)
             {
                 if (item.SizeOnStack != 1) throw new InternalException();
-                GenerateDeallocator(item.Type!, position);
+                if (item.Type is null) throw new InternalException();
+                GenerateDeallocator(item.Type, position);
             }
             else
             {
@@ -2460,7 +2646,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     bool GenerateCodeForFunction(FunctionThingDefinition function)
     {
-        if (LanguageConstants.KeywordList.Contains(function.Identifier.ToString()))
+        if (function.Identifier is not null &&
+            LanguageConstants.KeywordList.Contains(function.Identifier.ToString()))
         { throw new CompilerException($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
 
         if (function.Identifier is not null)

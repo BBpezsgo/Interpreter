@@ -90,7 +90,11 @@ public static class Entry
 #if AOT
                     Output.LogDebug($"Skipping loading DLL-s because the compiler compiled in AOT mode");
 #else
-                    string dllsFolderPath = Path.Combine(arguments.File.Directory!.FullName, arguments.CompilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
+
+                    if (arguments.File.Directory is null)
+                    { throw new InternalException($"File \"{arguments.File}\" doesn't have a directory"); }
+
+                    string dllsFolderPath = Path.Combine(arguments.File.Directory.FullName, arguments.CompilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
                     if (Directory.Exists(dllsFolderPath))
                     {
                         DirectoryInfo dllsFolder = new(dllsFolderPath);
@@ -182,7 +186,7 @@ public static class Entry
                 AnalysisCollection analysisCollection = new();
                 if (arguments.ThrowErrors)
                 {
-                    tokens = StreamTokenizer.Tokenize(arguments.File!.FullName);
+                    tokens = StreamTokenizer.Tokenize(arguments.File.FullName);
                     CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
@@ -193,8 +197,8 @@ public static class Entry
                 {
                     try
                     {
-                        tokens = StreamTokenizer.Tokenize(arguments.File!.FullName);
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File!, null, arguments.CompilerSettings, Output.Log, analysisCollection);
+                        tokens = StreamTokenizer.Tokenize(arguments.File.FullName);
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
@@ -266,7 +270,7 @@ public static class Entry
                 if (arguments.OutputFile is not null)
                 {
                     Output.WriteLine($"Writing to \"{arguments.OutputFile}\" ...");
-                    // string compiledFilePath = Path.Combine(Path.GetDirectoryName(arguments.File!.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{arguments.File!.FullName}\""), Path.GetFileNameWithoutExtension(arguments.File!.FullName) + ".bf");
+                    // string compiledFilePath = Path.Combine(Path.GetDirectoryName(arguments.File.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{arguments.File.FullName}\""), Path.GetFileNameWithoutExtension(arguments.File!.FullName) + ".bf");
                     File.WriteAllText(arguments.OutputFile, generated.Code);
                 }
 

@@ -259,12 +259,13 @@ public abstract class GeneralType :
             if (definedStructType.Struct.Identifier.Content != passedStructType.Struct.Identifier.Content) return false;
             if (definedStructType.Struct.TemplateInfo is not null && passedStructType.Struct.TemplateInfo is not null)
             {
-                if (definedStructType.Struct.TemplateInfo.TypeParameters.Length != passedStructType.TypeParameters.Length)
+                if (definedStructType.Struct.TemplateInfo.TypeParameters.Length != passedStructType.TypeParameters.Count)
                 { throw new NotImplementedException(); }
-                for (int j = 0; j < definedStructType.Struct.TemplateInfo.TypeParameters.Length; j++)
+
+                for (int i = 0; i < definedStructType.Struct.TemplateInfo.TypeParameters.Length; i++)
                 {
-                    string typeParamName = definedStructType.Struct.TemplateInfo.TypeParameters[j].Content;
-                    GeneralType typeParamValue = passedStructType.TypeParameters[j];
+                    string typeParamName = definedStructType.Struct.TemplateInfo.TypeParameters[i].Content;
+                    GeneralType typeParamValue = passedStructType.TypeParameters[typeParamName];
 
                     if (typeParameters.TryGetValue(typeParamName, out GeneralType? addedTypeParameter))
                     { if (addedTypeParameter != typeParamValue) return false; }
@@ -304,7 +305,7 @@ public abstract class GeneralType :
             case StructType structType:
             {
                 if (structType.Struct.TemplateInfo == null) return true;
-                return structType.TypeParameters.Length > 0;
+                return structType.TypeParameters is not null;
             }
 
             default: throw new NotImplementedException();
@@ -461,8 +462,7 @@ public class StructType : GeneralType,
     IEquatable<StructType>
 {
     public CompiledStruct Struct { get; }
-    public ImmutableArray<GeneralType> TypeParameters { get; protected init; }
-    public IReadOnlyDictionary<string, GeneralType>? TypeParametersMap => Struct.TemplateInfo?.ToDictionary(TypeParameters);
+    public ImmutableDictionary<string, GeneralType> TypeParameters { get; }
 
     public override int Size
     {
@@ -486,15 +486,24 @@ public class StructType : GeneralType,
     {
         Struct = @struct;
         if (@struct.TemplateInfo is not null)
-        { TypeParameters = @struct.TemplateInfo.TypeParameterNames.Select(v => new GenericType(v)).Cast<GeneralType>().ToImmutableArray(); }
+        {
+            TypeParameters = @struct.TemplateInfo.TypeParameterNames
+                .Select(v => new KeyValuePair<string, GeneralType>(v, new GenericType(v)))
+                .ToImmutableDictionary();
+        }
         else
-        { TypeParameters = ImmutableArray.Create<GeneralType>(); }
+        { TypeParameters = ImmutableDictionary<string, GeneralType>.Empty; }
     }
 
     public StructType(CompiledStruct @struct, IEnumerable<GeneralType> typeParameters)
     {
         Struct = @struct;
-        TypeParameters = typeParameters.ToImmutableArray();
+        if (@struct.TemplateInfo is not null)
+        {
+            TypeParameters = @struct.TemplateInfo.ToDictionary(typeParameters.ToArray()).ToImmutableDictionary();
+        }
+        else
+        { TypeParameters = ImmutableDictionary<string, GeneralType>.Empty; }
     }
 
     public override bool Equals(object? other) => Equals(other as StructType);
@@ -526,15 +535,15 @@ public class StructType : GeneralType,
         StringBuilder result = new();
         result.Append(Struct.Identifier.Content);
 
-        if (TypeParameters.Length > 0)
-        { result.Append($"<{string.Join(", ", TypeParameters)}>"); }
+        if (TypeParameters is not null)
+        { result.Append($"<{string.Join(", ", TypeParameters.Values)}>"); }
         else if (Struct.TemplateInfo is not null)
         { result.Append($"<{string.Join(", ", Struct.TemplateInfo.TypeParameters)}>"); }
 
         return result.ToString();
     }
 
-    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(Struct.Identifier.Content, TypeParameters.Select(v => v.ToTypeInstance()));
+    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(Struct.Identifier.Content, TypeParameters?.Values.Select(v => v.ToTypeInstance()));
 }
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -700,12 +709,21 @@ public class ArrayType : GeneralType,
     /// <exception cref="CompilerException"/>
     public ArrayType(TypeInstanceStackArray type, FindType? typeFinder, ComputeValue? constComputer = null)
     {
-        if ((
-                constComputer is null ||
-                constComputer.Invoke(type.StackArraySize!, out DataItem stackArraySize)
-           ) &&
-           !CodeGenerator.TryComputeSimple(type.StackArraySize, out stackArraySize))
-        { throw new CompilerException($"Failed to compute array size value", type.StackArraySize, null); }
+        DataItem stackArraySize;
+
+        if (type.StackArraySize is null)
+        { throw new InternalException(); }
+
+        if (constComputer is not null)
+        {
+            if (!constComputer.Invoke(type.StackArraySize, out stackArraySize))
+            { throw new CompilerException($"Failed to compute array size value", type.StackArraySize, null); }
+        }
+        else
+        {
+            if (!CodeGenerator.TryComputeSimple(type.StackArraySize, out stackArraySize))
+            { throw new CompilerException($"Can't compute array size value", type.StackArraySize, null); }
+        }
 
         Of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer);
         Length = (int)stackArraySize;

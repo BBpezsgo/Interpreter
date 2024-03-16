@@ -243,7 +243,8 @@ public abstract class CodeGenerator
             modifiedStatement.Modifier.Equals(ModifierKeywords.Temp))
         {
             if (modifiedStatement.Statement is LiteralStatement ||
-                modifiedStatement.Statement is OperatorCall)
+                modifiedStatement.Statement is BinaryOperatorCall ||
+                modifiedStatement.Statement is UnaryOperatorCall)
             {
                 AnalysisCollection?.Hints.Add(new Hint($"Unnecessary explicit temp modifier (this kind of statements (\"{modifiedStatement.Statement.GetType().Name}\") are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
             }
@@ -258,7 +259,13 @@ public abstract class CodeGenerator
             return true;
         }
 
-        if (statement is OperatorCall)
+        if (statement is BinaryOperatorCall)
+        {
+            explicitly = false;
+            return true;
+        }
+
+        if (statement is UnaryOperatorCall)
         {
             explicitly = false;
             return true;
@@ -912,7 +919,7 @@ public abstract class CodeGenerator
     #endregion
 
     /// <exception cref="CompilerException"/>
-    protected bool GetOperator(OperatorCall @operator, [NotNullWhen(true)] out CompiledOperator? compiledOperator)
+    protected bool GetOperator(BinaryOperatorCall @operator, [NotNullWhen(true)] out CompiledOperator? compiledOperator)
     {
         GeneralType[] parameters = FindStatementTypes(@operator.Parameters);
 
@@ -935,7 +942,58 @@ public abstract class CodeGenerator
         return found;
     }
 
-    protected bool GetOperatorTemplate(OperatorCall @operator, out CompliableTemplate<CompiledOperator> compiledOperator)
+    /// <exception cref="CompilerException"/>
+    protected bool GetOperator(UnaryOperatorCall @operator, [NotNullWhen(true)] out CompiledOperator? compiledOperator)
+    {
+        GeneralType[] parameters = FindStatementTypes(@operator.Parameters);
+
+        bool found = false;
+        compiledOperator = null;
+
+        foreach (CompiledOperator function in CompiledOperators)
+        {
+            if (function.IsTemplate) continue;
+            if (function.Identifier.Content != @operator.Operator.Content) continue;
+            if (!GeneralType.AreEquals(function.ParameterTypes, parameters)) continue;
+
+            if (found)
+            { throw new CompilerException($"Duplicated operator definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
+
+            compiledOperator = function;
+            found = true;
+        }
+
+        return found;
+    }
+
+    protected bool GetOperatorTemplate(BinaryOperatorCall @operator, out CompliableTemplate<CompiledOperator> compiledOperator)
+    {
+        GeneralType[] parameters = FindStatementTypes(@operator.Parameters);
+
+        bool found = false;
+        compiledOperator = default;
+
+        foreach (CompiledOperator function in CompiledOperators)
+        {
+            if (!function.IsTemplate) continue;
+            if (function.Identifier.Content != @operator.Operator.Content) continue;
+
+            Dictionary<string, GeneralType> typeArguments = new(TypeArguments);
+
+            if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, parameters, typeArguments)) continue;
+
+            if (found)
+            { throw new CompilerException($"Duplicated operator definitions: {compiledOperator} and {function} are the same", function.Identifier, function.FilePath); }
+
+            compiledOperator = new CompliableTemplate<CompiledOperator>(function, typeArguments);
+
+            found = true;
+        }
+
+        return found;
+    }
+
+    protected bool GetOperatorTemplate(UnaryOperatorCall @operator, out CompliableTemplate<CompiledOperator> compiledOperator)
     {
         GeneralType[] parameters = FindStatementTypes(@operator.Parameters);
 
@@ -1343,7 +1401,7 @@ public abstract class CodeGenerator
     }
     protected ValueAddress GetDataAddress(IndexCall indexCall)
     {
-        ValueAddress address = GetBaseAddress(indexCall.PrevStatement!);
+        ValueAddress address = GetBaseAddress(indexCall.PrevStatement);
         if (address.IsReference)
         { throw new NotImplementedException(); }
         int currentOffset = GetDataOffset(indexCall);
@@ -1435,7 +1493,7 @@ public abstract class CodeGenerator
     /// <exception cref="NotImplementedException"/>
     protected ValueAddress GetBaseAddress(IndexCall statement)
     {
-        ValueAddress address = GetBaseAddress(statement.PrevStatement!);
+        ValueAddress address = GetBaseAddress(statement.PrevStatement);
         bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement) is PointerType;
         return new ValueAddress(address.Address, address.AddressingMode, address.IsReference, inHeap);
     }
@@ -1451,7 +1509,7 @@ public abstract class CodeGenerator
 
     /// <exception cref="NotImplementedException"/>
     protected bool IsItInHeap(IndexCall indexCall)
-        => IsItInHeap(indexCall.PrevStatement!) || FindStatementType(indexCall.PrevStatement) is PointerType;
+        => IsItInHeap(indexCall.PrevStatement) || FindStatementType(indexCall.PrevStatement) is PointerType;
 
     /// <exception cref="NotImplementedException"/>
     protected bool IsItInHeap(Field field)
@@ -1618,13 +1676,16 @@ public abstract class CodeGenerator
         if (prevType is ArrayType arrayType)
         { return OnGotStatementType(index, arrayType.Of); }
 
-        if (!GetIndexGetter(prevType, out CompiledFunction? indexer, out _))
+        if (!GetIndexGetter(prevType, out CompiledFunction? indexer, out WillBeCompilerException? notFoundException))
         {
             if (GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
             {
                 indexer = indexerTemplate.Function;
+                notFoundException = null;
             }
         }
+
+        if (notFoundException != null) indexer = null;
 
         if (indexer == null && prevType is PointerType pointerType)
         {
@@ -1660,7 +1721,7 @@ public abstract class CodeGenerator
         return OnGotStatementType(functionCall, compiledFunction.Type);
     }
 
-    protected GeneralType FindStatementType(OperatorCall @operator, GeneralType? expectedType)
+    protected GeneralType FindStatementType(BinaryOperatorCall @operator, GeneralType? expectedType)
     {
         if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
         {
@@ -1680,9 +1741,6 @@ public abstract class CodeGenerator
         }
 
         GeneralType leftType = FindStatementType(@operator.Left);
-        if (@operator.Right == null)
-        { return OnGotStatementType(@operator, leftType); }
-
         GeneralType rightType = FindStatementType(@operator.Right);
 
         if (!leftType.CanBeBuiltin || !rightType.CanBeBuiltin || leftType == BasicType.Void || rightType == BasicType.Void)
@@ -1693,8 +1751,6 @@ public abstract class CodeGenerator
 
         DataItem predictedValue = @operator.Operator.Content switch
         {
-            "!" => !leftValue,
-
             "+" => leftValue + rightValue,
             "-" => leftValue - rightValue,
             "*" => leftValue * rightValue,
@@ -1717,6 +1773,53 @@ public abstract class CodeGenerator
             "!=" => new DataItem(leftValue != rightValue),
             "<=" => new DataItem(leftValue <= rightValue),
             ">=" => new DataItem(leftValue >= rightValue),
+
+            _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
+        };
+
+        BuiltinType result = new(predictedValue.Type);
+
+        if (expectedType is not null)
+        {
+            if (CanConvertImplicitly(result, expectedType))
+            { return OnGotStatementType(@operator, expectedType); }
+
+            if (result == BasicType.Integer &&
+                expectedType is PointerType)
+            { return OnGotStatementType(@operator, expectedType); }
+        }
+
+        return OnGotStatementType(@operator, result);
+    }
+    protected GeneralType FindStatementType(UnaryOperatorCall @operator, GeneralType? expectedType)
+    {
+        if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
+        {
+            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+        }
+        else
+        { opcode = Opcode._; }
+
+        if (opcode == Opcode._)
+        { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
+
+        if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
+        {
+            @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
+            return OnGotStatementType(@operator, operatorDefinition.Type);
+        }
+
+        GeneralType leftType = FindStatementType(@operator.Left);
+
+        if (!leftType.CanBeBuiltin || leftType == BasicType.Void)
+        { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content}", @operator.Operator, CurrentFile); }
+
+        DataItem leftValue = GetInitialValue(leftType);
+
+        DataItem predictedValue = @operator.Operator.Content switch
+        {
+            "!" => !leftValue,
 
             _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
         };
@@ -1872,8 +1975,7 @@ public abstract class CodeGenerator
                 if (structType.Struct.TemplateInfo is null)
                 { return definedField.Type; }
 
-                IReadOnlyDictionary<string, GeneralType> typeArguments = structType.TypeParametersMap!;
-                return GeneralType.InsertTypeParameters(definedField.Type, typeArguments) ?? definedField.Type;
+                return GeneralType.InsertTypeParameters(definedField.Type, structType.TypeParameters) ?? definedField.Type;
             }
 
             throw new CompilerException($"Field definition \"{field.Identifier}\" not found in type \"{prevStatementType}\"", field.Identifier, CurrentFile);
@@ -1925,7 +2027,8 @@ public abstract class CodeGenerator
         {
             null => null,
             FunctionCall v => FindStatementType(v),
-            OperatorCall v => FindStatementType(v, expectedType),
+            BinaryOperatorCall v => FindStatementType(v, expectedType),
+            UnaryOperatorCall v => FindStatementType(v, expectedType),
             LiteralStatement v => FindStatementType(v, expectedType),
             Identifier v => FindStatementType(v, expectedType),
             AddressGetter v => FindStatementType(v),
@@ -2145,11 +2248,21 @@ public abstract class CodeGenerator
         return true;
     }
 
-    static OperatorCall InlineMacro(OperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
+    static BinaryOperatorCall InlineMacro(BinaryOperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             op: operatorCall.Operator,
             left: InlineMacro(operatorCall.Left, parameters),
             right: InlineMacro(operatorCall.Right, parameters))
+        {
+            SurroundingBracelet = operatorCall.SurroundingBracelet,
+            SaveValue = operatorCall.SaveValue,
+            Semicolon = operatorCall.Semicolon,
+        };
+
+    static UnaryOperatorCall InlineMacro(UnaryOperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
+        => new(
+            op: operatorCall.Operator,
+            left: InlineMacro(operatorCall.Left, parameters))
         {
             SurroundingBracelet = operatorCall.SurroundingBracelet,
             SaveValue = operatorCall.SaveValue,
@@ -2595,7 +2708,8 @@ public abstract class CodeGenerator
     {
         null => null,
         Identifier v => InlineMacro(v, parameters),
-        OperatorCall v => InlineMacro(v, parameters),
+        BinaryOperatorCall v => InlineMacro(v, parameters),
+        UnaryOperatorCall v => InlineMacro(v, parameters),
         KeywordCall v => InlineMacro(v, parameters),
         FunctionCall v => InlineMacro(v, parameters),
         AnyCall v => InlineMacro(v, parameters),
@@ -2758,7 +2872,73 @@ public abstract class CodeGenerator
         value = DataItem.Null;
         return false;
     }
-    bool TryCompute(OperatorCall @operator, EvaluationContext context, out DataItem value)
+    bool TryCompute(BinaryOperatorCall @operator, EvaluationContext context, out DataItem value)
+    {
+        if (context.TryGetValue(@operator, out value))
+        { return true; }
+
+        if (GetOperator(@operator, out CompiledOperator? compiledOperator))
+        {
+            if (TryCompute(@operator.Parameters, context, out DataItem[]? parameterValues) &&
+                TryEvaluate(compiledOperator, parameterValues, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+                returnValue.HasValue &&
+                runtimeStatements.Length == 0)
+            {
+                value = returnValue.Value;
+                return true;
+            }
+
+            value = DataItem.Null;
+            return false;
+        }
+
+        if (!TryCompute(@operator.Left, context, out DataItem leftValue))
+        {
+            value = DataItem.Null;
+            return false;
+        }
+
+        string op = @operator.Operator.Content;
+
+        if (TryCompute(@operator.Right, context, out DataItem rightValue))
+        {
+            value = Compute(op, leftValue, rightValue);
+            return true;
+        }
+
+        switch (op)
+        {
+            case "&&":
+            {
+                if (!(bool)leftValue)
+                {
+                    value = new DataItem(false);
+                    return true;
+                }
+                break;
+            }
+            case "||":
+            {
+                if ((bool)leftValue)
+                {
+                    value = new DataItem(true);
+                    return true;
+                }
+                break;
+            }
+            default:
+                if (context is not null &&
+                    context.TryGetValue(@operator, out value))
+                { return true; }
+
+                value = DataItem.Null;
+                return false;
+        }
+
+        value = leftValue;
+        return true;
+    }
+    bool TryCompute(UnaryOperatorCall @operator, EvaluationContext context, out DataItem value)
     {
         if (context.TryGetValue(@operator, out value))
         { return true; }
@@ -2790,44 +2970,6 @@ public abstract class CodeGenerator
         {
             value = !leftValue;
             return true;
-        }
-
-        if (@operator.Right != null)
-        {
-            if (TryCompute(@operator.Right, context, out DataItem rightValue))
-            {
-                value = Compute(op, leftValue, rightValue);
-                return true;
-            }
-
-            switch (op)
-            {
-                case "&&":
-                {
-                    if (!(bool)leftValue)
-                    {
-                        value = new DataItem(false);
-                        return true;
-                    }
-                    break;
-                }
-                case "||":
-                {
-                    if ((bool)leftValue)
-                    {
-                        value = new DataItem(true);
-                        return true;
-                    }
-                    break;
-                }
-                default:
-                    if (context is not null &&
-                        context.TryGetValue(@operator, out value))
-                    { return true; }
-
-                    value = DataItem.Null;
-                    return false;
-            }
         }
 
         value = leftValue;
@@ -3088,10 +3230,6 @@ public abstract class CodeGenerator
         value = null;
         runtimeStatements = null;
 
-        if (function.ReturnSomething &&
-            function.Type is not BuiltinType)
-        { return false; }
-
         if (function.Block is null)
         { return false; }
 
@@ -3107,7 +3245,13 @@ public abstract class CodeGenerator
         Dictionary<string, DataItem> variables = new();
 
         if (function.ReturnSomething)
-        { variables.Add("@return", GetInitialValue((function.Type as BuiltinType)!.Type)); }
+        {
+            if (function.Type is not BuiltinType returnType)
+            { return false; }
+
+            if (function.ReturnSomething)
+            { variables.Add("@return", GetInitialValue(returnType.Type)); }
+        }
 
         for (int i = 0; i < parameterValues.Length; i++)
         { variables.Add(function.Parameters[i].Identifier.Content, parameterValues[i]); }
@@ -3127,7 +3271,11 @@ public abstract class CodeGenerator
         { return false; }
 
         if (function.ReturnSomething)
-        { value = context.LastScope!["@return"]; }
+        {
+            if (context.LastScope is null)
+            { throw new InternalException(); }
+            value = context.LastScope["@return"];
+        }
 
         runtimeStatements = context.RuntimeStatements.ToArray();
 
@@ -3375,7 +3523,8 @@ public abstract class CodeGenerator
         return statement switch
         {
             LiteralStatement v => TryCompute(v, out value),
-            OperatorCall v => TryCompute(v, context, out value),
+            BinaryOperatorCall v => TryCompute(v, context, out value),
+            UnaryOperatorCall v => TryCompute(v, context, out value),
             Pointer v => TryCompute(v, context, out value),
             KeywordCall v => TryCompute(v, out value),
             FunctionCall v => TryCompute(v, context, out value),
@@ -3391,7 +3540,51 @@ public abstract class CodeGenerator
         };
     }
 
-    public static bool TryComputeSimple(OperatorCall @operator, out DataItem value)
+    public static bool TryComputeSimple(BinaryOperatorCall @operator, out DataItem value)
+    {
+        if (!TryComputeSimple(@operator.Left, out DataItem leftValue))
+        {
+            value = DataItem.Null;
+            return false;
+        }
+
+        string op = @operator.Operator.Content;
+
+        if (TryComputeSimple(@operator.Right, out DataItem rightValue))
+        {
+            value = Compute(op, leftValue, rightValue);
+            return true;
+        }
+
+        switch (op)
+        {
+            case "&&":
+            {
+                if (!leftValue)
+                {
+                    value = new DataItem(false);
+                    return true;
+                }
+                break;
+            }
+            case "||":
+            {
+                if (leftValue)
+                {
+                    value = new DataItem(true);
+                    return true;
+                }
+                break;
+            }
+            default:
+                value = DataItem.Null;
+                return false;
+        }
+
+        value = leftValue;
+        return true;
+    }
+    public static bool TryComputeSimple(UnaryOperatorCall @operator, out DataItem value)
     {
         if (!TryComputeSimple(@operator.Left, out DataItem leftValue))
         {
@@ -3403,42 +3596,8 @@ public abstract class CodeGenerator
 
         if (op == "!")
         {
-            value = !leftValue;
+            value = leftValue;
             return true;
-        }
-
-        if (@operator.Right != null)
-        {
-            if (TryComputeSimple(@operator.Right, out DataItem rightValue))
-            {
-                value = Compute(op, leftValue, rightValue);
-                return true;
-            }
-
-            switch (op)
-            {
-                case "&&":
-                {
-                    if (!leftValue)
-                    {
-                        value = new DataItem(false);
-                        return true;
-                    }
-                    break;
-                }
-                case "||":
-                {
-                    if (leftValue)
-                    {
-                        value = new DataItem(true);
-                        return true;
-                    }
-                    break;
-                }
-                default:
-                    value = DataItem.Null;
-                    return false;
-            }
         }
 
         value = leftValue;
@@ -3466,7 +3625,8 @@ public abstract class CodeGenerator
         return statement switch
         {
             LiteralStatement v => TryCompute(v, out value),
-            OperatorCall v => TryComputeSimple(v, out value),
+            BinaryOperatorCall v => TryComputeSimple(v, out value),
+            UnaryOperatorCall v => TryComputeSimple(v, out value),
             IndexCall v => TryComputeSimple(v, out value),
             _ => false,
         };

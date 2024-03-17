@@ -7,6 +7,10 @@ using Tokenizing;
 
 public static class Extensions
 {
+    public static IEnumerable<T> Duplicate<T>(this IEnumerable<T> values)
+        where T : IDuplicatable<T>
+        => values.Select(item => item.Duplicate());
+
     public static int IndexOf(this StringBuilder stringBuilder, ReadOnlySpan<char> value)
     {
         foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())

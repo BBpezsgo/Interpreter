@@ -230,11 +230,11 @@ public static class Entry
                     pauseBeforeRun = true;
                 }
 
-                generated.Code = BrainfuckCode.RemoveNoncodes(generated.Code, true);
+                generated.Code = BrainfuckCode.RemoveNoncodes(generated.Code, true, generated.DebugInfo);
 
                 Output.LogDebug($"Minify code ...");
                 int prevCodeLength = generated.Code.Length;
-                generated.Code = Minifier.Minify(generated.Code);
+                generated.Code = Minifier.Minify(generated.Code, generated.DebugInfo);
                 Output.LogDebug($"Minification: {prevCodeLength} -> {generated.Code.Length} ({((float)generated.Code.Length - prevCodeLength) / (float)generated.Code.Length * 100f:#}%)");
 
                 if (arguments.InstructionPrintFlags.HasFlag(InstructionPrintFlags.Final))

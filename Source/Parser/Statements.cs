@@ -769,13 +769,14 @@ public class KeywordCall : StatementWithValue, IReadable
 
 public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledOperator>
 {
+    public const int ParameterCount = 2;
+
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; set; }
     public CompiledOperator? Reference { get; set; }
     public override Position Position => new(Operator, Left, Right);
     public StatementWithValue[] Parameters => new StatementWithValue[] { Left, Right };
-    public int ParameterCount => 2;
 
     public BinaryOperatorCall(Token op, StatementWithValue left, StatementWithValue right)
     {
@@ -838,12 +839,13 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
 
 public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledOperator>
 {
+    public const int ParameterCount = 1;
+
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public CompiledOperator? Reference { get; set; }
     public override Position Position => new(Operator, Left);
     public StatementWithValue[] Parameters => new StatementWithValue[] { Left };
-    public int ParameterCount => 1;
 
     public UnaryOperatorCall(Token op, StatementWithValue left)
     {

@@ -4,7 +4,8 @@ public class Stack<T> : List<T>, IReadOnlyStack<T>
 {
     public T Last
     {
-        get => this[^1];
+        /// <exception cref="InvalidOperationException"/>
+        get => Count > 0 ? this[^1] : throw new InvalidOperationException("Stack is empty");
         set => this[^1] = value;
     }
 
@@ -68,7 +69,7 @@ public class Stack<T> : List<T>, IReadOnlyStack<T>
     public T Pop()
     {
         if (Count == 0)
-        { throw new InvalidOperationException($"Stack is empty"); }
+        { throw new InvalidOperationException("Stack is empty"); }
 
         T val = this[^1];
         RemoveAt(Count - 1);

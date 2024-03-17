@@ -377,16 +377,14 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     void GenerateCodeForSetter(Statement statement, StatementWithValue value)
     {
-        if (statement is Identifier variableIdentifier)
-        { GenerateCodeForSetter(variableIdentifier, value); }
-        else if (statement is Pointer pointerToSet)
-        { GenerateCodeForSetter(pointerToSet, value); }
-        else if (statement is IndexCall index)
-        { GenerateCodeForSetter(index, value); }
-        else if (statement is Field field)
-        { GenerateCodeForSetter(field, value); }
-        else
-        { throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, CurrentFile); }
+        switch (statement)
+        {
+            case Identifier v: GenerateCodeForSetter(v, value); break;
+            case Pointer v: GenerateCodeForSetter(v, value); break;
+            case IndexCall v: GenerateCodeForSetter(v, value); break;
+            case Field v: GenerateCodeForSetter(v, value); break;
+            default: throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, CurrentFile);
+        }
     }
 
     void GenerateCodeForSetter(Identifier statement, StatementWithValue value)
@@ -1229,8 +1227,8 @@ public class CodeGeneratorForAsm : CodeGenerator
         }
         else if (LanguageOperators.OpCodes.TryGetValue(statement.Operator.Content, out Opcode opcode))
         {
-            if (LanguageOperators.ParameterCounts[statement.Operator.Content] != statement.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageOperators.ParameterCounts[statement.Operator.Content]} passed {statement.ParameterCount}", statement.Operator, CurrentFile); }
+            if (LanguageOperators.ParameterCounts[statement.Operator.Content] != BinaryOperatorCall.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageOperators.ParameterCounts[statement.Operator.Content]} passed {BinaryOperatorCall.ParameterCount}", statement.Operator, CurrentFile); }
 
             GenerateCodeForStatement(statement.Left);
             GenerateCodeForStatement(statement.Right);
@@ -1473,8 +1471,8 @@ public class CodeGeneratorForAsm : CodeGenerator
         }
         else if (LanguageOperators.OpCodes.TryGetValue(statement.Operator.Content, out Opcode opcode))
         {
-            if (LanguageOperators.ParameterCounts[statement.Operator.Content] != statement.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageOperators.ParameterCounts[statement.Operator.Content]} passed {statement.ParameterCount}", statement.Operator, CurrentFile); }
+            if (LanguageOperators.ParameterCounts[statement.Operator.Content] != UnaryOperatorCall.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageOperators.ParameterCounts[statement.Operator.Content]} passed {UnaryOperatorCall.ParameterCount}", statement.Operator, CurrentFile); }
 
             GenerateCodeForStatement(statement.Left);
 

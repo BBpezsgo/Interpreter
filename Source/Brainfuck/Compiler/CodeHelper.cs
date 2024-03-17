@@ -2,6 +2,11 @@
 
 using Ansi = Win32.Console.Ansi;
 
+public interface IBrainfuckGenerator
+{
+    public CompiledCode Code { get; }
+}
+
 public readonly struct AutoPrintCodeString
 {
     readonly StringBuilder v;
@@ -53,6 +58,40 @@ public readonly struct AutoPrintCodeString
     public override string ToString() => v.ToString();
 }
 
+public readonly struct AutoJumpBlock : IDisposable
+{
+    readonly IBrainfuckGenerator Generator;
+    readonly int ConditionAddress;
+    readonly bool ClearCondition;
+
+    public AutoJumpBlock(IBrainfuckGenerator generator, int conditionAddress, bool clearCondition)
+    {
+        Generator = generator;
+        ConditionAddress = conditionAddress;
+        ClearCondition = clearCondition;
+    }
+
+    public void Dispose()
+    {
+        Generator.Code.JumpEnd(ConditionAddress, ClearCondition);
+    }
+}
+
+public readonly struct AutoCodeBlock : IDisposable
+{
+    readonly IBrainfuckGenerator Generator;
+
+    public AutoCodeBlock(IBrainfuckGenerator generator)
+    {
+        Generator = generator;
+    }
+
+    public void Dispose()
+    {
+        Generator.Code.EndBlock();
+    }
+}
+
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class CompiledCode : IDuplicatable<CompiledCode>
 {
@@ -100,17 +139,20 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         this.indent += indent;
         return this.indent;
     }
+
     public void LineBreak()
     {
         Code.Append("\r\n");
         Code.Append(' ', indent);
     }
+
     public void CommentLine(string text)
     {
         LineBreak();
         Code.Append(BrainfuckCode.ReplaceCodes(text, '_'));
         LineBreak();
     }
+
     public void StartBlock()
     {
         LineBreak();
@@ -118,6 +160,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         this.indent += 2;
         LineBreak();
     }
+
     public void StartBlock(string label)
     {
         LineBreak();
@@ -127,6 +170,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         this.indent += 2;
         LineBreak();
     }
+
     public void EndBlock()
     {
         this.indent -= 2;
@@ -135,7 +179,55 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         LineBreak();
     }
 
+    public AutoCodeBlock Block(IBrainfuckGenerator generator)
+    {
+        StartBlock();
+        return new AutoCodeBlock(generator);
+    }
+
+    public AutoCodeBlock Block(IBrainfuckGenerator generator, string label)
+    {
+        StartBlock(label);
+        return new AutoCodeBlock(generator);
+    }
+
     #endregion
+
+    /// <summary>
+    /// <para>
+    /// <b>Pointer:</b>
+    /// <paramref name="conditionAddress"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="conditionAddress"/>[ ... <paramref name="conditionAddress"/>]
+    /// </code>
+    /// </para>
+    /// </summary>
+    public AutoJumpBlock LoopBlock(IBrainfuckGenerator generator, int conditionAddress)
+    {
+        JumpStart(conditionAddress);
+        return new AutoJumpBlock(generator, conditionAddress, false);
+    }
+
+    /// <summary>
+    /// <para>
+    /// <b>Pointer:</b>
+    /// <paramref name="conditionAddress"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="conditionAddress"/>[ ... <paramref name="conditionAddress"/>[-]]
+    /// </code>
+    /// </para>
+    /// </summary>
+    public AutoJumpBlock ConditionalBlock(IBrainfuckGenerator generator, int conditionAddress)
+    {
+        JumpStart(conditionAddress);
+        return new AutoJumpBlock(generator, conditionAddress, true);
+    }
 
     /// <summary>
     /// <b>Requires 1 more cell to the right of the <paramref name="target"/>!</b><br/>
@@ -164,6 +256,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         MoveAddValue(tempAddress, source);
         EndBlock();
     }
+
     /// <summary>
     /// <b>Pointer:</b> <paramref name="tempAddress"/> or not modified
     /// </summary>
@@ -174,6 +267,14 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         { CopyValueWithTemp(source, tempAddress, targets[i]); }
     }
 
+    /// <summary>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="address"/>
+    /// </code>
+    /// </para>
+    /// </summary>
     public void SetPointer(int address) => MovePointer(address - pointer);
 
     public void MovePointer(int offset)
@@ -199,7 +300,15 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     }
 
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> Not modified
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// +++++++ ... <paramref name="value"/>
+    /// </code>
+    /// </para>
     /// </summary>
     public void AddValue(int value)
     {
@@ -221,15 +330,21 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         }
     }
 
-    /// <summary>
-    /// <b>Pointer:</b> Not modified
-    /// </summary>
+    /// <inheritdoc cref="AddValue(int, int)"/>
     /// <exception cref="NotSupportedException"/>
     /// <exception cref="InternalException"/>
     public void AddValue(Runtime.DataItem value) => AddValue(GetInteger(value));
 
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> <paramref name="address"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="address"/> +++++++ ... <paramref name="value"/>
+    /// </code>
+    /// </para>
     /// </summary>
     public void AddValue(int address, int value)
     {
@@ -238,7 +353,15 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     }
 
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> <paramref name="address"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="address"/> +++++++ ... <paramref name="value"/>
+    /// </code>
+    /// </para>
     /// </summary>
     public void AddValue(int address, Runtime.DataItem value)
     {
@@ -246,14 +369,20 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         AddValue(value);
     }
 
-    /// <summary>
-    /// <b>Pointer:</b> <paramref name="address"/>
-    /// </summary>
+    /// <inheritdoc cref="SetValue(int, int)"/>
     public void SetValue(int address, char value)
         => SetValue(address, CharCode.GetByte(value));
 
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> <paramref name="address"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="address"/>[-] +++++++ ... <paramref name="value"/>
+    /// </code>
+    /// </para>
     /// </summary>
     public void SetValue(int address, int value)
     {
@@ -268,15 +397,21 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         AddValue(value);
     }
 
-    /// <summary>
-    /// <b>Pointer:</b> <paramref name="address"/>
-    /// </summary>
+    /// <inheritdoc cref="SetValue(int, int)"/>
     /// <exception cref="NotSupportedException"/>
     /// <exception cref="InternalException"/>
     public void SetValue(int address, Runtime.DataItem value) => SetValue(address, GetInteger(value));
 
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> <paramref name="address"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="address"/>[-]
+    /// </code>
+    /// </para>
     /// </summary>
     public void ClearValue(int address)
     {
@@ -285,7 +420,15 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     }
 
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> Last of <paramref name="addresses"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="addresses"/>[-]
+    /// </code>
+    /// </para>
     /// </summary>
     public void ClearValue(params int[] addresses)
     {
@@ -294,7 +437,15 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     }
 
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> <paramref name="from"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="to"/>[-] <paramref name="from"/>[-<paramref name="to"/>+<paramref name="from"/>]
+    /// </code>
+    /// </para>
     /// </summary>
     public void MoveValue(int from, params int[] to)
     {
@@ -309,7 +460,14 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         EndBlock();
     }
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> <paramref name="from"/>
+    /// </para>
+    /// <para>
+    /// <code>
+    /// <paramref name="from"/>[-<paramref name="to"/>+<paramref name="from"/>]
+    /// </code>
+    /// </para>
     /// </summary>
     public void MoveAddValue(int from, params int[] to)
     {
@@ -335,7 +493,15 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         this.JumpEnd(from);
     }
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> Not modified
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// [-]
+    /// </code>
+    /// </para>
     /// </summary>
     public void ClearCurrent()
     {

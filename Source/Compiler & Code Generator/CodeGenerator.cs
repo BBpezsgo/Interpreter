@@ -69,6 +69,32 @@ public abstract class CodeGenerator
         public override string ToString() => Function?.ToString() ?? "null";
     }
 
+    protected class ControlFlowBlock : IDuplicatable<ControlFlowBlock>
+    {
+        public readonly int FlagAddress;
+        public readonly Stack<int> PendingJumps;
+        public readonly Stack<bool> Doings;
+
+        public ControlFlowBlock(int flagAddress)
+        {
+            FlagAddress = flagAddress;
+
+            PendingJumps = new Stack<int>();
+            PendingJumps.Push(0);
+
+            Doings = new Stack<bool>();
+            Doings.Push(false);
+        }
+
+        public ControlFlowBlock Duplicate()
+        {
+            ControlFlowBlock result = new(FlagAddress);
+            result.PendingJumps.Set(PendingJumps);
+            result.Doings.Set(Doings);
+            return result;
+        }
+    }
+
     protected delegate void BuiltinFunctionCompiler(params StatementWithValue[] parameters);
 
     protected ImmutableArray<CompiledStruct> CompiledStructs;
@@ -1725,8 +1751,8 @@ public abstract class CodeGenerator
     {
         if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
         {
-            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != BinaryOperatorCall.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {BinaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
         }
         else
         { opcode = Opcode._; }
@@ -1795,8 +1821,8 @@ public abstract class CodeGenerator
     {
         if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
         {
-            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != UnaryOperatorCall.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {UnaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
         }
         else
         { opcode = Opcode._; }
@@ -2724,6 +2750,72 @@ public abstract class CodeGenerator
         ConstructorCall v => InlineMacro(v, parameters),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
+
+    #endregion
+
+    #region Control Flow Usage
+
+    [Flags]
+    public enum ControlFlowUsage
+    {
+        None = 0x0,
+
+        Return = 0x1,
+        ConditionalReturn = 0x2,
+        AnyReturn = Return | ConditionalReturn,
+
+        Break = 0x4,
+    }
+
+    public static ControlFlowUsage FindControlFlowUsage(IEnumerable<Statement> statements, bool inDepth = false)
+    {
+        ControlFlowUsage result = ControlFlowUsage.None;
+        foreach (Statement statement in statements)
+        { result |= FindControlFlowUsage(statement, inDepth); }
+        return result;
+    }
+
+    public static ControlFlowUsage FindControlFlowUsage(Statement statement, bool inDepth = false) => statement switch
+    {
+        Block v => FindControlFlowUsage(v.Statements, true),
+        KeywordCall v => FindControlFlowUsage(v, inDepth),
+        WhileLoop v => FindControlFlowUsage(v.Block.Statements, true),
+        ForLoop v => FindControlFlowUsage(v.Block.Statements, true),
+        IfContainer v => FindControlFlowUsage(v.Parts, true),
+        BaseBranch v => FindControlFlowUsage(v.Block, true),
+
+        Assignment => ControlFlowUsage.None,
+        VariableDeclaration => ControlFlowUsage.None,
+        AnyCall => ControlFlowUsage.None,
+        ShortOperatorCall => ControlFlowUsage.None,
+        CompoundAssignment => ControlFlowUsage.None,
+
+        _ => throw new NotImplementedException(statement.GetType().Name),
+    };
+
+    static ControlFlowUsage FindControlFlowUsage(KeywordCall statement, bool inDepth = false)
+    {
+        switch (statement.Identifier.Content)
+        {
+            case StatementKeywords.Return:
+            {
+                if (inDepth) return ControlFlowUsage.ConditionalReturn;
+                else return ControlFlowUsage.Return;
+            }
+
+            case StatementKeywords.Break:
+            {
+                return ControlFlowUsage.Break;
+            }
+
+            case StatementKeywords.Delete:
+            {
+                return ControlFlowUsage.None;
+            }
+
+            default: throw new NotImplementedException(statement.ToString());
+        }
+    }
 
     #endregion
 

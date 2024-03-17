@@ -928,8 +928,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return;
             }
 
-            if (@operator.ParameterCount != operatorDefinition.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {@operator.ParameterCount}", @operator, CurrentFile); }
+            if (BinaryOperatorCall.ParameterCount != operatorDefinition.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {BinaryOperatorCall.ParameterCount}", @operator, CurrentFile); }
 
             if (operatorDefinition.IsExternal)
             {
@@ -1015,8 +1015,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
         {
-            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != BinaryOperatorCall.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {BinaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
 
             FindStatementType(@operator);
 
@@ -1046,8 +1046,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else if (@operator.Operator.Content == "=")
         {
-            if (@operator.ParameterCount != 2)
-            { throw new CompilerException($"Wrong number of parameters passed to assignment operator '{@operator.Operator.Content}': required {2} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+            if (BinaryOperatorCall.ParameterCount != 2)
+            { throw new CompilerException($"Wrong number of parameters passed to assignment operator '{@operator.Operator.Content}': required {2} passed {BinaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
 
             GenerateCodeForValueSetter(@operator.Left, @operator.Right);
         }
@@ -1083,8 +1083,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return;
             }
 
-            if (@operator.ParameterCount != operatorDefinition.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {@operator.ParameterCount}", @operator, CurrentFile); }
+            if (UnaryOperatorCall.ParameterCount != operatorDefinition.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {UnaryOperatorCall.ParameterCount}", @operator, CurrentFile); }
 
             if (operatorDefinition.IsExternal)
             {
@@ -1170,8 +1170,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
         {
-            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != UnaryOperatorCall.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {UnaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
 
             FindStatementType(@operator);
 

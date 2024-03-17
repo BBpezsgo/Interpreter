@@ -87,7 +87,7 @@ public struct BrainfuckGeneratorSettings
     }
 }
 
-public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
+public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, IBrainfuckGenerator
 {
     const string ReturnVariableName = "@return";
 
@@ -123,38 +123,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
 
         readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.Size} bytes at {Address})";
-    }
-
-    public readonly struct GeneratorCodeBlock : IDisposable
-    {
-        readonly CodeGeneratorForBrainfuck Generator;
-
-        public GeneratorCodeBlock(CodeGeneratorForBrainfuck generator)
-        {
-            this.Generator = generator;
-        }
-
-        public void Dispose()
-        {
-            this.Generator.Code.EndBlock();
-        }
-    }
-
-    public readonly struct GeneratorJumpBlock : IDisposable
-    {
-        readonly CodeGeneratorForBrainfuck Generator;
-        readonly int ConditionAddress;
-
-        public GeneratorJumpBlock(CodeGeneratorForBrainfuck generator, int conditionAddress)
-        {
-            this.Generator = generator;
-            this.ConditionAddress = conditionAddress;
-        }
-
-        public void Dispose()
-        {
-            this.Generator.Code.JumpEnd(this.ConditionAddress);
-        }
     }
 
     readonly struct DebugInfoBlock : IDisposable
@@ -246,10 +214,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         public readonly Stack<Variable> Variables;
 
         public readonly Stack<int> VariableCleanupStack;
-        public readonly Stack<int> ReturnCount;
-        public readonly Stack<int> BreakCount;
-        public readonly Stack<int> ReturnTagStack;
-        public readonly Stack<int> BreakTagStack;
+        public readonly Stack<ControlFlowBlock> Returns;
+        public readonly Stack<ControlFlowBlock> Breaks;
         public readonly Stack<bool> InMacro;
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
@@ -266,10 +232,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             Variables = new Stack<Variable>(v.Variables);
 
             VariableCleanupStack = new Stack<int>(v.VariableCleanupStack);
-            ReturnCount = new Stack<int>(v.ReturnCount);
-            BreakCount = new Stack<int>(v.BreakCount);
-            ReturnTagStack = new Stack<int>(v.ReturnTagStack);
-            BreakTagStack = new Stack<int>(v.BreakTagStack);
+            Returns = new Stack<ControlFlowBlock>(v.Returns.Duplicate());
+            Breaks = new Stack<ControlFlowBlock>(v.Breaks.Duplicate());
             InMacro = new Stack<bool>(v.InMacro);
 
             Optimizations = v.Optimizations;
@@ -300,8 +264,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     struct GeneratorStackFrame
     {
         public Dictionary<string, GeneralType>? savedTypeArguments;
-        public int[] savedBreakTagStack;
-        public int[] savedBreakCount;
+        public ControlFlowBlock[] savedBreaks;
         public Variable[] savedVariables;
         public Uri? savedFilePath;
         public IConstant[] savedConstants;
@@ -316,11 +279,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (typeArguments != null)
         { SetTypeArguments(typeArguments, out newFrame.savedTypeArguments); }
 
-        newFrame.savedBreakTagStack = BreakTagStack.ToArray();
-        BreakTagStack.Clear();
-
-        newFrame.savedBreakCount = BreakCount.ToArray();
-        BreakCount.Clear();
+        newFrame.savedBreaks = Breaks.Duplicate().ToArray();
+        Breaks.Clear();
 
         newFrame.savedVariables = Variables.ToArray();
         Variables.Clear();
@@ -347,13 +307,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         CompiledConstants.Set(frame.savedConstants);
 
-        if (BreakCount.Count > 0 ||
-            BreakTagStack.Count > 0)
+        if (Breaks.Count > 0)
         { throw new InternalException(); }
 
-        BreakCount.Set(frame.savedBreakCount);
-
-        BreakTagStack.Set(frame.savedBreakTagStack);
+        Breaks.Set(frame.savedBreaks);
 
         if (frame.savedTypeArguments != null)
         { SetTypeArguments(frame.savedTypeArguments); }
@@ -364,16 +321,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     CompiledCode Code;
     StackCodeHelper Stack;
     HeapCodeHelper Heap;
+    CompiledCode IBrainfuckGenerator.Code => Code;
 
     readonly Stack<Variable> Variables;
 
     readonly Stack<int> VariableCleanupStack;
-    readonly Stack<int> ReturnCount;
-    readonly Stack<int> BreakCount;
-    /// <summary> Contains the "return tag" address </summary>
-    readonly Stack<int> ReturnTagStack;
-    /// <summary> Contains the "break tag" address </summary>
-    readonly Stack<int> BreakTagStack;
+
+    readonly Stack<ControlFlowBlock> Returns;
+    readonly Stack<ControlFlowBlock> Breaks;
+
     readonly Stack<bool> InMacro;
 
     [DebuggerBrowsable(DebuggerBrowsableState.Never)]
@@ -404,10 +360,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         this.CurrentMacro = new Stack<ISameCheck>();
         this.VariableCleanupStack = new Stack<int>();
         this.GeneratorSettings = settings;
-        this.ReturnCount = new Stack<int>();
-        this.ReturnTagStack = new Stack<int>();
-        this.BreakCount = new Stack<int>();
-        this.BreakTagStack = new Stack<int>();
+        this.Returns = new Stack<ControlFlowBlock>();
+        this.Breaks = new Stack<ControlFlowBlock>();
         this.InMacro = new Stack<bool>();
         this.DebugInfo = settings.GenerateDebugInformation ? new DebugInformation(compilerResult.Tokens) : null;
         this.PrintCallback = printCallback;
@@ -427,17 +381,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         VariableCleanupStack.Clear();
         VariableCleanupStack.AddRange(snapshot.VariableCleanupStack);
 
-        ReturnCount.Clear();
-        ReturnCount.AddRange(snapshot.ReturnCount);
+        Returns.Clear();
+        Returns.AddRange(snapshot.Returns);
 
-        BreakCount.Clear();
-        BreakCount.AddRange(snapshot.BreakCount);
-
-        ReturnTagStack.Clear();
-        ReturnTagStack.AddRange(snapshot.ReturnTagStack);
-
-        BreakTagStack.Clear();
-        BreakTagStack.AddRange(snapshot.BreakTagStack);
+        Breaks.Clear();
+        Breaks.AddRange(snapshot.Breaks);
 
         InMacro.Clear();
         InMacro.AddRange(snapshot.InMacro);
@@ -459,26 +407,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         Heap = new HeapCodeHelper(Code, snapshot.Heap.Start, snapshot.Heap.Size);
         if (snapshot.Heap.IsInitialized) Heap.InitVirtual();
         Stack = new StackCodeHelper(Code, snapshot.Stack);
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> <paramref name="conditionAddress"/>
-    /// </summary>
-    public GeneratorJumpBlock JumpBlock(int conditionAddress)
-    {
-        Code.JumpStart(conditionAddress);
-        return new GeneratorJumpBlock(this, conditionAddress);
-    }
-
-    public GeneratorCodeBlock CommentBlock()
-    {
-        Code.StartBlock();
-        return new GeneratorCodeBlock(this);
-    }
-    public GeneratorCodeBlock CommentBlock(string label)
-    {
-        Code.StartBlock(label);
-        return new GeneratorCodeBlock(this);
     }
 
     DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, DebugInfo, position, CurrentFile);
@@ -590,7 +518,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     void CleanupVariables(int n)
     {
         if (n == 0) return;
-        using (CommentBlock($"Clean up variables ({n})"))
+        using (Code.Block(this, $"Clean up variables ({n})"))
         {
             for (int i = 0; i < n; i++)
             {
@@ -779,11 +707,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         Heap.Init();
 
-        using (CommentBlock($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
-        {
-            ReturnCount.Push(0);
-            ReturnTagStack.Push(Stack.Push(1));
-        }
+        ControlFlowBlock? returnBlock = BeginReturnBlock(null, FindControlFlowUsage(compilerResult.TopLevelStatements));
 
         {
             InMacro.Push(false);
@@ -801,19 +725,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         PrintCallback?.Invoke("  Finishing up ...", LogType.Debug);
 
-        FinishReturnStatements();
+        if (returnBlock is not null)
+        { FinishReturnStatements(Returns.Pop(), true); }
 
-        using (CommentBlock($"Finish \"return\" block"))
-        {
-            if (ReturnTagStack.Pop() != Stack.LastAddress)
-            { throw new InternalException(); }
-            Stack.Pop();
-        }
-
-        if (ReturnCount.Count > 0 ||
-            ReturnTagStack.Count > 0 ||
-            BreakCount.Count > 0 ||
-            BreakTagStack.Count > 0)
+        if (Returns.Count > 0 ||
+            Breaks.Count > 0)
         { throw new InternalException(); }
 
         if (GeneratorSettings.ClearGlobalVariablesBeforeExit)

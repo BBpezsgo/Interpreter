@@ -7,6 +7,39 @@ using Tokenizing;
 
 public static class Extensions
 {
+    public static int IndexOf(this StringBuilder stringBuilder, ReadOnlySpan<char> value)
+    {
+        foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+        {
+            int res = chunk.Span.IndexOf(value);
+            if (res != -1)
+            { return res; }
+        }
+        return -1;
+    }
+
+    public static int IndexOf(this StringBuilder stringBuilder, ReadOnlySpan<char> value, StringComparison comparisonType)
+    {
+        foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+        {
+            int res = chunk.Span.IndexOf(value, comparisonType);
+            if (res != -1)
+            { return res; }
+        }
+        return -1;
+    }
+
+    public static int IndexOf(this StringBuilder stringBuilder, char value)
+    {
+        foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+        {
+            int res = chunk.Span.IndexOf(value);
+            if (res != -1)
+            { return res; }
+        }
+        return -1;
+    }
+
     public static bool Get(this IEnumerable<AttributeUsage> attributes, string? identifier, [NotNullWhen(true)] out AttributeUsage? attribute)
         => (attribute = Get(attributes, identifier)) is not null;
     public static AttributeUsage? Get(this IEnumerable<AttributeUsage> attributes, string? identifier)

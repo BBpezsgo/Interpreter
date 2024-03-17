@@ -229,7 +229,7 @@ public static class Utils
 
     public static GeneratorSettings MainGeneratorSettings => new(GeneratorSettings.Default)
     {
-
+        GenerateDebugInstructions = false,
     };
 
     public static CompilerSettings CompilerSettings => new(CompilerSettings.Default)

@@ -854,7 +854,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         CodeSnapshot codeSnapshot = SnapshotCode();
         GeneratorSnapshot genSnapshot = Snapshot();
-        int initialCodeLength = codeSnapshot.Code.GetFinalCode(true).Length;
+        int initialCodeLength = codeSnapshot.Code.Code.Length;
 
         if (IsUnrollable(@for))
         {
@@ -862,7 +862,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 CodeSnapshot unrolledCode = SnapshotCode();
 
-                int unrolledLength = unrolledCode.Code.GetFinalCode(true).Length - initialCodeLength;
+                int unrolledLength = unrolledCode.Code.Code.Length - initialCodeLength;
                 GeneratorSnapshot unrolledSnapshot = Snapshot();
 
                 Restore(genSnapshot);
@@ -873,7 +873,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     GenerateCodeForStatement(@for, false);
 
                     CodeSnapshot notUnrolledCode = SnapshotCode();
-                    int notUnrolledLength = notUnrolledCode.Code.GetFinalCode(true).Length - initialCodeLength;
+                    int notUnrolledLength = notUnrolledCode.Code.Code.Length - initialCodeLength;
                     GeneratorSnapshot notUnrolledSnapshot = Snapshot();
 
                     if (unrolledLength <= notUnrolledLength)
@@ -2664,7 +2664,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         CodeSnapshot originalCode = SnapshotCode();
         GeneratorSnapshot originalSnapshot = Snapshot();
-        int originalCodeLength = originalCode.Code.GetFinalCode(true).Length;
+        int originalCodeLength = originalCode.Code.Code.Length;
 
         CodeSnapshot? inlinedCode = null;
         int inlinedLength = default;
@@ -2677,7 +2677,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 GenerateCodeForStatement(inlined);
 
                 inlinedCode = SnapshotCode();
-                inlinedLength = inlinedCode.Value.Code.GetFinalCode(true).Length - originalCodeLength;
+                inlinedLength = inlinedCode.Value.Code.Code.Length - originalCodeLength;
                 inlinedSnapshot = Snapshot();
             }
         }
@@ -2690,7 +2690,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GenerateCodeForFunction_(function, parameters, typeArguments, callerPosition);
 
         CodeSnapshot notInlinedCode = SnapshotCode();
-        int notInlinedLength = notInlinedCode.Code.GetFinalCode(true).Length - originalCodeLength;
+        int notInlinedLength = notInlinedCode.Code.Code.Length - originalCodeLength;
         GeneratorSnapshot notInlinedSnapshot = Snapshot();
 
         if (inlinedCode is not null &&

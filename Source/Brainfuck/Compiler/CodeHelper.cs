@@ -59,7 +59,6 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     const int HALF_BYTE = byte.MaxValue / 2;
 
     public StringBuilder Code;
-    StringBuilder CachedFinalCode;
 
     const int InitialSize = 1024;
 
@@ -73,7 +72,6 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     public CompiledCode()
     {
         this.Code = new StringBuilder(InitialSize);
-        this.CachedFinalCode = new StringBuilder();
         this.indent = 0;
         this.pointer = 0;
         this.branchDepth = 0;
@@ -184,8 +182,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         {
             for (int i = 0; i < (-offset); i++)
             {
-                Code.Append('<');
-                CachedFinalCode.Append('<');
+                Append('<');
                 pointer--;
             }
             return;
@@ -194,8 +191,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         {
             for (int i = 0; i < offset; i++)
             {
-                Code.Append('>');
-                CachedFinalCode.Append('>');
+                Append('>');
                 pointer++;
             }
             return;
@@ -211,8 +207,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         {
             for (int i = 0; i < (-value); i++)
             {
-                Code.Append('-');
-                CachedFinalCode.Append('-');
+                Append('-');
             }
             return;
         }
@@ -220,8 +215,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         {
             for (int i = 0; i < value; i++)
             {
-                Code.Append('+');
-                CachedFinalCode.Append('+');
+                Append('+');
             }
             return;
         }
@@ -345,8 +339,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     /// </summary>
     public void ClearCurrent()
     {
-        Code.Append("[-]");
-        CachedFinalCode.Append("[-]");
+        Append("[-]");
     }
 
     /// <summary>
@@ -354,8 +347,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     /// </summary>
     public void JumpStart()
     {
-        Code.Append('[');
-        CachedFinalCode.Append('[');
+        Append('[');
         branchDepth++;
     }
 
@@ -364,8 +356,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     /// </summary>
     public void JumpEnd()
     {
-        Code.Append(']');
-        CachedFinalCode.Append(']');
+        Append(']');
         branchDepth--;
     }
 
@@ -390,34 +381,62 @@ public class CompiledCode : IDuplicatable<CompiledCode>
 
     public static CompiledCode operator +(CompiledCode a, string b)
     {
-        a.Code.Append(b);
-        a.CachedFinalCode.Append(b);
+        a.Append(b);
         return a;
     }
 
     public static CompiledCode operator +(CompiledCode a, char b)
     {
-        a.Code.Append(b);
-        a.CachedFinalCode.Append(b);
+        a.Append(b);
         return a;
     }
 
-    public override int GetHashCode() => HashCode.Combine(Code);
-    public override string ToString()
+    public override string ToString() => Code.ToString();
+
+    public string ToString(Runtime.DebugInformation? debugInformation)
     {
-        string result = Code.ToString();
-
-        while (true)
+        if (debugInformation is null)
         {
-            if (result.Contains("\r\n\r\n", StringComparison.Ordinal))
-            { result = result.Replace("\r\n\r\n", "\r\n", StringComparison.Ordinal); }
-            if (result.Contains(" \r\n", StringComparison.Ordinal))
-            { result = result.Replace(" \r\n", "\r\n", StringComparison.Ordinal); }
-            else
-            { break; }
-        }
+            string result = Code.ToString();
 
-        return result;
+            while (true)
+            {
+                if (result.Contains("\r\n\r\n", StringComparison.Ordinal))
+                { result = result.Replace("\r\n\r\n", "\r\n", StringComparison.Ordinal); }
+                else if (result.Contains(" \r\n", StringComparison.Ordinal))
+                { result = result.Replace(" \r\n", "\r\n", StringComparison.Ordinal); }
+                else
+                { break; }
+            }
+
+            return result;
+        }
+        else
+        {
+            StringBuilder result = new(Code.ToString());
+            int index;
+
+            while (true)
+            {
+                if ((index = result.IndexOf("\r\n\r\n", StringComparison.Ordinal)) != -1)
+                {
+                    result.Remove(index, 2);
+                    debugInformation?.OffsetCodeFrom(index, -2);
+                    continue;
+                }
+
+                if ((index = result.IndexOf(" \r\n", StringComparison.Ordinal)) != -1)
+                {
+                    result.Remove(index, 1);
+                    debugInformation?.OffsetCodeFrom(index, -1);
+                    continue;
+                }
+
+                break;
+            }
+
+            return result.ToString();
+        }
     }
 
     /// <summary>
@@ -440,13 +459,9 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         int _step = Math.Abs(step);
         char _code = (step < 0) ? '<' : '>';
 
-        Code.Append('[');
-        Code.Append(_code, _step);
-        Code.Append(']');
-
-        CachedFinalCode.Append('[');
-        CachedFinalCode.Append(_code, _step);
-        CachedFinalCode.Append(']');
+        Append('[');
+        Append(_code, _step);
+        Append(']');
     }
 
     /// <summary>
@@ -477,13 +492,11 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     {
         if (offset < 0)
         {
-            Code.Append('<', -offset);
-            CachedFinalCode.Append('<', -offset);
+            Append('<', -offset);
         }
         else if (offset > 0)
         {
-            Code.Append('>', offset);
-            CachedFinalCode.Append('>', offset);
+            Append('>', offset);
         }
     }
 
@@ -588,8 +601,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     public void JumpStartUnsafe(int conditionOffset)
     {
         this.MovePointerUnsafe(conditionOffset);
-        this.Code.Append('[');
-        this.CachedFinalCode.Append('[');
+        this.Append('[');
         this.MovePointerUnsafe(-conditionOffset);
     }
 
@@ -599,35 +611,17 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     public void JumpEndUnsafe(int conditionOffset)
     {
         this.MovePointerUnsafe(conditionOffset);
-        this.Code.Append(']');
-        this.CachedFinalCode.Append(']');
+        this.Append(']');
         this.MovePointerUnsafe(-conditionOffset);
     }
 
-    public string GetFinalCode(bool showProgress)
-    {
-        string result = CachedFinalCode.ToString();
-        result = BrainfuckCode.RemoveNoncodes(result, showProgress);
-        result = Minifier.Minify(result);
-        CachedFinalCode = new StringBuilder(result);
-        return result;
-    }
-
-    public void Append(string code)
-    {
-        this.Code.Append(code);
-        this.CachedFinalCode.Append(code);
-    }
-    public void Append(char code)
-    {
-        this.Code.Append(code);
-        this.CachedFinalCode.Append(code);
-    }
+    public void Append(string code) => this.Code.Append(code);
+    public void Append(char code) => this.Code.Append(code);
+    public void Append(char code, int count) => this.Code.Append(code, count);
 
     public CompiledCode Duplicate() => new()
     {
         branchDepth = BranchDepth,
-        CachedFinalCode = new(CachedFinalCode.ToString()),
         Code = new(Code.ToString()),
         indent = indent,
         pointer = pointer,

@@ -9,7 +9,7 @@ public struct SourceCodeLocation
 
     public readonly bool Contains(int instruction) =>
         Instructions.Start <= instruction &&
-        Instructions.End >= instruction;
+        Instructions.End > instruction;
 
     public override readonly string ToString() => $"({Instructions} -> {SourcePosition.ToStringRange()})";
     readonly string GetDebuggerDisplay() => ToString();
@@ -91,6 +91,10 @@ public struct FunctionInformations
     public string ReadableIdentifier;
     public bool IsMacro;
     public MutableRange<int> Instructions;
+
+    public readonly bool Contains(int instruction) =>
+        Instructions.Start <= instruction &&
+        Instructions.End > instruction;
 
     public override readonly string ToString()
     {
@@ -182,7 +186,7 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         for (int i = 0; i < SourceCodeLocations.Count; i++)
         {
             SourceCodeLocation _sourceLocation = SourceCodeLocations[i];
-            if (!_sourceLocation.Instructions.Contains(instruction))
+            if (!_sourceLocation.Contains(instruction))
             { continue; }
             if (success && sourceLocation.Instructions.Size() < _sourceLocation.Instructions.Size())
             { continue; }
@@ -205,7 +209,7 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         {
             FunctionInformations function = FunctionInformations[i];
 
-            if (function.Instructions.Contains(codePointer))
+            if (function.Contains(codePointer))
             { return function; }
         }
         return default;
@@ -218,7 +222,7 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         {
             FunctionInformations info = FunctionInformations[i];
 
-            if (info.Instructions.Contains(codePointer))
+            if (info.Contains(codePointer))
             { result.Add(info); }
         }
         result.Sort((a, b) => a.Instructions.Size() - b.Instructions.Size());
@@ -306,73 +310,4 @@ public class DebugInformation : IDuplicatable<DebugInformation>
 
         return copy;
     }
-
-    /*
-    public void RemoveCode(int start, int count)
-    {
-        for (int i = 0; i < SourceCodeLocations.Count; i++)
-        {
-            SourceCodeLocation item = SourceCodeLocations[i];
-
-            // Before
-            if (item.Instructions.End <= start) continue;
-
-            // After
-            if (item.Instructions.Start > start + count)
-            {
-                item.Instructions = new Range<int>(item.Instructions.Start - count, item.Instructions.End - count);
-                goto Finish;
-            }
-
-            // Inside
-            if (item.Instructions.Contains(start) && item.Instructions.Contains(start + count))
-            {
-                item.Instructions = new Range<int>(item.Instructions.Start, item.Instructions.End - count);
-                goto Finish;
-            }
-
-            item.Instructions = new Range<int>(item.Instructions.Start, item.Instructions.End - count);
-
-        Finish:
-            SourceCodeLocations[i] = item;
-        }
-
-        for (int i = 0; i < FunctionInformations.Count; i++)
-        {
-            FunctionInformations item = FunctionInformations[i];
-
-            // Before
-            if (item.Instructions.End <= start) continue;
-
-            // After
-            if (item.Instructions.Start > start + count)
-            {
-                item.Instructions = new Range<int>(item.Instructions.Start - count, item.Instructions.End - count);
-                goto Finish;
-            }
-
-            // Inside
-            if (item.Instructions.Contains(start) && item.Instructions.Contains(start + count))
-            {
-                item.Instructions = new Range<int>(item.Instructions.Start, item.Instructions.End - count);
-                goto Finish;
-            }
-
-            item.Instructions = new Range<int>(item.Instructions.Start, item.Instructions.End - count);
-
-        Finish:
-            FunctionInformations[i] = item;
-        }
-
-        KeyValuePair<int, List<string>>[] codeComments = CodeComments.ToArray();
-        for (int i = 0; i < codeComments.Length; i++)
-        {
-            KeyValuePair<int, List<string>> item = codeComments[i];
-            if (item.Key <= start) continue;
-            codeComments[i] = new KeyValuePair<int, List<string>>(item.Key - count, item.Value);
-        }
-        CodeComments.Clear();
-        CodeComments.AddRange(codeComments);
-    }
-    */
 }

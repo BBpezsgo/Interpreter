@@ -5,9 +5,9 @@ public partial class Interpreter : InterpreterBase<OpCodes>
     public Interpreter(OutputCallback? onOutput = null, InputCallback? onInput = null)
         : base(onOutput, onInput) { }
 
-    protected override OpCodes[] ParseCode(string code, bool showProgress, Runtime.DebugInformation? debugInfo)
+    protected override OpCodes[] ParseCode(string code, bool showProgress, Runtime.DebugInformation? debugInformation)
     {
-        code = BrainfuckCode.RemoveNoncodes(code, showProgress);
+        code = BrainfuckCode.RemoveNoncodes(code, showProgress, debugInformation);
         return CompactCode.ToOpCode(code);
     }
 

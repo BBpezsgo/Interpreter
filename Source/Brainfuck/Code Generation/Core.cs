@@ -91,6 +91,40 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 {
     const string ReturnVariableName = "@return";
 
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+    struct Variable
+    {
+        public readonly string Name;
+        public readonly int Address;
+
+        public readonly bool HaveToClean;
+        public readonly bool DeallocateOnClean;
+
+        public readonly GeneralType Type;
+        public readonly int Size;
+
+        public bool IsDiscarded;
+        public bool IsInitialized;
+
+        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, GeneralType type)
+            : this(name, address, haveToClean, deallocateOnClean, type, type.Size) { }
+        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, GeneralType type, int size)
+        {
+            Name = name;
+            Address = address;
+
+            HaveToClean = haveToClean;
+            DeallocateOnClean = deallocateOnClean;
+
+            Type = type;
+            IsDiscarded = false;
+            Size = size;
+            IsInitialized = false;
+        }
+
+        readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.Size} bytes at {Address})";
+    }
+
     public readonly struct GeneratorCodeBlock : IDisposable
     {
         readonly CodeGeneratorForBrainfuck Generator;
@@ -140,7 +174,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (debugInfo is null) return;
             if (position == Position.UnknownPosition) return;
 
-            InstructionStart = code.GetFinalCode(true).Length;
+            InstructionStart = code.Code.Length;
             CurrentFile = currentFile;
         }
 
@@ -153,7 +187,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (DebugInfo is null) return;
             if (Position == Position.UnknownPosition) return;
 
-            int end = Code.GetFinalCode(true).Length;
+            int end = Code.Code.Length;
             if (InstructionStart == end) return;
             DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
             {
@@ -187,7 +221,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (debugInfo is null) return;
             if (position == Position.UnknownPosition) return;
 
-            InstructionStart = code.GetFinalCode(true).Length;
+            InstructionStart = code.Code.Length;
         }
 
         public void Dispose()
@@ -199,7 +233,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 File = Uri,
                 Identifier = Identifier,
                 ReadableIdentifier = ReadableIdentifier,
-                Instructions = (InstructionStart, Code.GetFinalCode(true).Length),
+                Instructions = (InstructionStart, Code.Code.Length),
                 IsMacro = false,
                 IsValid = true,
                 SourcePosition = Position,
@@ -379,40 +413,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         this.PrintCallback = printCallback;
         this.ShowProgress = settings.ShowProgress;
         this.MaxRecursiveDepth = 4;
-    }
-
-    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    struct Variable
-    {
-        public readonly string Name;
-        public readonly int Address;
-
-        public readonly bool HaveToClean;
-        public readonly bool DeallocateOnClean;
-
-        public readonly GeneralType Type;
-        public readonly int Size;
-
-        public bool IsDiscarded;
-        public bool IsInitialized;
-
-        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, GeneralType type)
-            : this(name, address, haveToClean, deallocateOnClean, type, type.Size) { }
-        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, GeneralType type, int size)
-        {
-            Name = name;
-            Address = address;
-
-            HaveToClean = haveToClean;
-            DeallocateOnClean = deallocateOnClean;
-
-            Type = type;
-            IsDiscarded = false;
-            Size = size;
-            IsInitialized = false;
-        }
-
-        readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.Size} bytes at {Address})";
     }
 
     GeneratorSnapshot Snapshot() => new(this);

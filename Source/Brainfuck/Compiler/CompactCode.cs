@@ -190,7 +190,7 @@ public static class CompactCode
         return result;
     }
 
-    static bool TryGenerateDataMovement(ReadOnlySpan<char> code, ref int index, [NotNullWhen(true)] out CompactCodeSegment result, DebugInformation? debugInfo)
+    static bool TryGenerateDataMovement(ReadOnlySpan<char> code, ref int index, [NotNullWhen(true)] out CompactCodeSegment result, DebugInformation? debugInfo, ref int removed)
     {
         result = default;
 
@@ -313,8 +313,9 @@ public static class CompactCode
             Arg3 = destinations.Count >= 3 ? (sbyte)destinations[2].Offset : (sbyte)0,
             Arg4 = destinations.Count >= 4 ? (sbyte)destinations[3].Offset : (sbyte)0,
         };
-        debugInfo?.OffsetCodeFrom(index, -(slice.Length + 2 - 1));
+        debugInfo?.OffsetCodeFrom(index - removed, -(slice.Length + 2 - 1));
         index += slice.Length + 2 - 1;
+        removed += slice.Length + 2 - 1;
         return true;
     }
 
@@ -324,6 +325,7 @@ public static class CompactCode
         using ConsoleProgressBar progress = new(ConsoleColor.DarkGray, showProgress);
 
         List<CompactCodeSegment> result = new();
+        int removed = 0;
 
         for (int i = 0; i < code.Length; i++)
         {
@@ -334,12 +336,13 @@ public static class CompactCode
             if (i < code.Length - 3 && code.Slice(i, 3).SequenceEqual("[-]"))
             {
                 result.Add(new CompactCodeSegment(OpCodesCompact.Clear));
-                debugInfo?.OffsetCodeFrom(i, -2);
+                debugInfo?.OffsetCodeFrom(i - removed, -2);
                 i += 2;
+                removed += 2;
                 continue;
             }
 
-            if (TryGenerateDataMovement(code, ref i, out CompactCodeSegment dataMovement, debugInfo))
+            if (TryGenerateDataMovement(code, ref i, out CompactCodeSegment dataMovement, debugInfo, ref removed))
             {
                 result.Add(dataMovement);
                 continue;
@@ -351,7 +354,8 @@ public static class CompactCode
                 {
                     Count = result[^1].Count + 1,
                 };
-                debugInfo?.OffsetCodeFrom(i, -1);
+                debugInfo?.OffsetCodeFrom(i - removed, -1);
+                removed++;
                 continue;
             }
 

@@ -5,10 +5,10 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
     public InterpreterCompact(OutputCallback? onOutput = null, InputCallback? onInput = null)
         : base(onOutput, onInput) { }
 
-    protected override CompactCodeSegment[] ParseCode(string code, bool showProgress, Runtime.DebugInformation? debugInfo)
+    protected override CompactCodeSegment[] ParseCode(string code, bool showProgress, Runtime.DebugInformation? debugInformation)
     {
-        code = BrainfuckCode.RemoveNoncodes(code, showProgress);
-        return CompactCode.Generate(code, showProgress, debugInfo);
+        code = BrainfuckCode.RemoveNoncodes(code, showProgress, debugInformation);
+        return CompactCode.Generate(code, showProgress, debugInformation);
     }
 
     /// <exception cref="BrainfuckRuntimeException"/>

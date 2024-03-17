@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.Brainfuck;
+﻿using LanguageCore.Runtime;
+
+namespace LanguageCore.Brainfuck;
 
 public static class CharCode
 {
@@ -18,39 +20,46 @@ public static class BrainfuckCode
         '$',
     };
 
-    public static string RemoveNoncodes(string code, bool showProgress)
+    public static string RemoveNoncodes(string code, bool showProgress, DebugInformation? debugInformation)
     {
+        StringBuilder result = new(code.Length);
+
         if (showProgress)
         {
             using ConsoleProgressLabel label = new($"Remove comments ...", ConsoleColor.DarkGray, true);
             label.Print();
 
             using ConsoleProgressBar progress = new(ConsoleColor.DarkGray, true);
-            StringBuilder result = new(code.Length);
 
             for (int i = 0; i < code.Length; i++)
             {
-                if ((i & 0b_0011_1111_1111_1111) == 0)
-                { progress.Print(i, code.Length); }
+                progress.Print(i, code.Length);
 
-                if (!CodeCharacters.Contains(code[i])) continue;
+                if (!CodeCharacters.Contains(code[i]))
+                {
+                    debugInformation?.OffsetCodeFrom(result.Length, -1);
+                    continue;
+                }
+
+
                 result.Append(code[i]);
             }
-
-            return result.ToString();
         }
         else
         {
-            StringBuilder result = new(code.Length);
-
             for (int i = 0; i < code.Length; i++)
             {
-                if (!CodeCharacters.Contains(code[i])) continue;
+                if (!CodeCharacters.Contains(code[i]))
+                {
+                    debugInformation?.OffsetCodeFrom(result.Length, -1);
+                    continue;
+                }
+
                 result.Append(code[i]);
             }
-
-            return result.ToString();
         }
+
+        return result.ToString();
     }
 
     public static string RemoveCodes(string code)
@@ -139,36 +148,99 @@ public static class BrainfuckCode
         Console.ResetColor();
     }
 
+    public static ConsoleColor GetColor(char code) => code switch
+    {
+        '>' or '<' => ConsoleColor.Red,
+        '+' or '-' => ConsoleColor.Blue,
+        '[' or ']' => ConsoleColor.Green,
+        '.' or ',' => ConsoleColor.Magenta,
+        _ => CodeCharacters.Contains(code) ? ConsoleColor.Magenta : ConsoleColor.DarkGray,
+    };
+
     /// <summary>
     /// <b>Warning:</b> This will not call <see cref="Console.ResetColor"/>
     /// </summary>
     public static void PrintCodeChar(char code)
     {
-        switch (code)
-        {
-            case '>':
-            case '<':
-                Console.ForegroundColor = ConsoleColor.Red;
-                break;
-            case '+':
-            case '-':
-                Console.ForegroundColor = ConsoleColor.Blue;
-                break;
-            case '[':
-            case ']':
-                Console.ForegroundColor = ConsoleColor.Green;
-                break;
-            case '.':
-            case ',':
-                Console.ForegroundColor = ConsoleColor.Magenta;
-                break;
-            default:
-                if (CodeCharacters.Contains(code))
-                { Console.ForegroundColor = ConsoleColor.Magenta; }
-                else
-                { Console.ForegroundColor = ConsoleColor.DarkGray; }
-                break;
-        }
+        Console.ForegroundColor = GetColor(code);
         Console.Write(code);
+    }
+
+    public static void PrintDebugInfo(string code, DebugInformation? debugInformation)
+    {
+        if (debugInformation == null)
+        { return; }
+
+        int j = 0;
+        FunctionInformations last = default;
+        for (int i = 0; i < code.Length; i++)
+        {
+            char c = code[i];
+            ImmutableArray<FunctionInformations> funcInfos = debugInformation.GetFunctionInformationsNested(i);
+            if (funcInfos.Length > 0)
+            {
+                if (!last.IsValid || last.Instructions != funcInfos[0].Instructions)
+                {
+                    j++;
+                    last = funcInfos[0];
+                }
+                if (j % 2 == 0)
+                {
+                    Console.BackgroundColor = ConsoleColor.Gray;
+                }
+                else
+                {
+                    Console.BackgroundColor = ConsoleColor.DarkGray;
+                }
+            }
+            else
+            { Console.BackgroundColor = ConsoleColor.Black; }
+
+            Console.ForegroundColor = BrainfuckCode.GetColor(c);
+            Console.Write(c);
+        }
+        Console.ResetColor();
+        Console.WriteLine();
+    }
+
+    public static void PrintDebugInfo(CompactCodeSegment[] code, DebugInformation? debugInformation)
+    {
+        if (debugInformation == null)
+        { return; }
+
+        int j = 0;
+        FunctionInformations last = default;
+        for (int i = 0; i < code.Length; i++)
+        {
+            CompactCodeSegment c = code[i];
+            ImmutableArray<FunctionInformations> funcInfos = debugInformation.GetFunctionInformationsNested(i);
+            if (funcInfos.Length > 0)
+            {
+                if (!last.IsValid || last.Instructions != funcInfos[0].Instructions)
+                {
+                    j++;
+                    last = funcInfos[0];
+                }
+                if (j % 2 == 0)
+                {
+                    Console.BackgroundColor = ConsoleColor.Gray;
+                }
+                else
+                {
+                    Console.BackgroundColor = ConsoleColor.DarkGray;
+                }
+            }
+            else
+            { Console.BackgroundColor = ConsoleColor.Black; }
+
+            string yeah = c.ToString();
+            for (int k = 0; k < yeah.Length; k++)
+            {
+                Console.ForegroundColor = BrainfuckCode.GetColor(yeah[k]);
+                Console.Write(yeah[k]);
+            }
+        }
+        Console.ResetColor();
+        Console.WriteLine();
     }
 }

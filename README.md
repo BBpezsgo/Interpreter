@@ -71,8 +71,8 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 - `--stack-size|-ss <size>` Sets the interpreter's stack size (only valid for the default mode).
 
 - `--heap-size|-hs <size>` Specifies the HEAP size (only valid for the default and brainfuck modes).
-  > [!NOTE]
-  > For brainfuck, if you specify zero, the HEAP will not be initialized, and wherever you try to access it, it will not compile.
+> [!NOTE]
+> For brainfuck, if you specify zero, the HEAP will not be initialized, and wherever you try to access it, it will not compile.
 
 - `--console-gui|-cg` I use this mode for debugging.
 

@@ -20,6 +20,209 @@ public static class BrainfuckCode
         '$',
     };
 
+    public static string GenerateModification(int modification, char increment, char decrement)
+    {
+        if (modification > 0) return new string(increment, modification);
+        else if (modification < 0) return new string(decrement, -modification);
+        else return string.Empty;
+    }
+
+    public static bool GetDataMovement(ReadOnlySpan<char> code, [NotNullWhen(true)] out ImmutableArray<(int Offset, int Modification)> result, out int removed)
+    {
+        result = ImmutableArray.Create<(int Offset, int Modification)>();
+        removed = 0;
+
+        if (code[0] != '[')
+        { return false; }
+
+        int end = code.IndexOf(']');
+        if (end < 0)
+        { return false; }
+
+        code = code[..(end + 1)];
+        if (code.Length < 6)
+        { return false; }
+
+        code = code[1..^1];
+
+        List<(int Offset, int Modification)> destinations = new();
+
+        if (code[0] is '+' or '-')
+        {
+            int subIndex = 0;
+
+            int sourceModification = Modifications(code, ref subIndex, '+', '-');
+
+            if (sourceModification != -1)
+            { return false; }
+
+            int moveBack;
+
+            while (true)
+            {
+                int movement = Modifications(code, ref subIndex, '>', '<');
+                if (movement == 0)
+                { return false; }
+
+                if (subIndex >= code.Length)
+                {
+                    moveBack = movement;
+                    break;
+                }
+                int modification = Modifications(code, ref subIndex, '+', '-');
+                if (modification == 0)
+                { return false; }
+
+                destinations.Add((movement, modification));
+                if (destinations.Count > 4)
+                { return false; }
+            }
+
+            if (destinations.Count == 0)
+            { return false; }
+
+            for (int i = 0; i < destinations.Count; i++)
+            {
+                if (destinations[i].Modification != 1)
+                { return false; }
+            }
+
+            int totalMovement = 0;
+            for (int i = 0; i < destinations.Count; i++)
+            {
+                totalMovement += destinations[i].Offset;
+                destinations[i] = (totalMovement, destinations[i].Modification);
+            }
+
+            if (totalMovement + moveBack != 0)
+            { return false; }
+        }
+        else if (code[0] is '>' or '<')
+        {
+            int subIndex = 0;
+
+            while (true)
+            {
+                int movement = Modifications(code, ref subIndex, '>', '<');
+                if (movement == 0)
+                { break; }
+
+                int modification = Modifications(code, ref subIndex, '+', '-');
+                if (modification == 0)
+                { return false; }
+
+                destinations.Add((movement, modification));
+                if (destinations.Count > 4)
+                { return false; }
+            }
+
+            if (destinations.Count == 0)
+            { return false; }
+
+            int totalMovement = 0;
+            for (int i = 0; i < destinations.Count; i++)
+            {
+                totalMovement += destinations[i].Offset;
+                destinations[i] = (totalMovement, destinations[i].Modification);
+            }
+
+            if (destinations[^1].Offset != 0)
+            { return false; }
+            int sourceModification = destinations[^1].Modification;
+            if (sourceModification != -1)
+            { return false; }
+
+            destinations.RemoveAt(destinations.Count - 1);
+
+            for (int i = 0; i < destinations.Count; i++)
+            {
+                if (destinations[i].Modification != 1)
+                { return false; }
+            }
+        }
+        else
+        { return false; }
+
+        result = destinations.ToImmutableArray();
+        removed = code.Length + 2 - 1;
+        return true;
+    }
+
+    public static int ContiguousLength(ReadOnlySpan<char> values, char value)
+    {
+        for (int i = 0; i < values.Length; i++)
+        {
+            if (!values[i].Equals(value))
+            { return i; }
+        }
+
+        return values.Length;
+    }
+
+    public static int Modifications(ReadOnlySpan<char> code, char increment, char decrement)
+    {
+        int result = 0;
+
+        for (int i = 0; i < code.Length; i++)
+        {
+            if (code[i] == increment) result++;
+            else if (code[i] == decrement) result--;
+            else break;
+        }
+
+        return result;
+    }
+
+    public static int Modifications(ReadOnlySpan<char> values, char increment, char decrement, out int length)
+    {
+        int result = 0;
+        length = 0;
+
+        for (int i = 0; i < values.Length; i++)
+        {
+            if (values[i].Equals(increment))
+            { result++; length++; }
+            else if (values[i].Equals(decrement))
+            { result--; length++; }
+            else
+            { break; }
+        }
+
+        return result;
+    }
+
+    public static int Modifications(ReadOnlySpan<char> code, ref int i, char increment, char decrement)
+    {
+        int result = 0;
+
+        for (; i < code.Length; i++)
+        {
+            if (code[i] == increment) result++;
+            else if (code[i] == decrement) result--;
+            else break;
+        }
+
+        return result;
+    }
+
+    public static int Modifications(ReadOnlySpan<char> values, ref int i, char increment, char decrement, out int length)
+    {
+        int result = 0;
+        length = 0;
+
+        for (; i < values.Length; i++)
+        {
+            if (values[i].Equals(increment))
+            { result++; length++; }
+            else if (values[i].Equals(decrement))
+            { result--; length++; }
+            else
+            { break; }
+        }
+
+        return result;
+    }
+
     public static string RemoveNoncodes(string code, bool showProgress, DebugInformation? debugInformation)
     {
         StringBuilder result = new(code.Length);
@@ -40,7 +243,6 @@ public static class BrainfuckCode
                     debugInformation?.OffsetCodeFrom(result.Length, -1);
                     continue;
                 }
-
 
                 result.Append(code[i]);
             }

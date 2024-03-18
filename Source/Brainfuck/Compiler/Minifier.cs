@@ -32,10 +32,19 @@ public static class Minifier
                 if (Remove(ref result, "-+"))
                 { continue; }
 
+                if (Remove(ref result, "+[-]"))
+                { continue; }
+
+                if (Remove(ref result, "-[-]"))
+                { continue; }
+
                 if (RemoveRedundantInitializations(ref result, null))
                 { continue; }
 
                 if (RemoveRedundantClears(ref result, null))
+                { continue; }
+
+                if (CorrectInitializationAddresses(ref result, debugInformation))
                 { continue; }
 
                 break;
@@ -61,10 +70,19 @@ public static class Minifier
                 if (Remove(ref result, "-+", debugInformation))
                 { continue; }
 
+                if (Remove(ref result, "+[-]", debugInformation))
+                { continue; }
+
+                if (Remove(ref result, "-[-]", debugInformation))
+                { continue; }
+
                 if (RemoveRedundantInitializations(ref result, debugInformation))
                 { continue; }
 
                 if (RemoveRedundantClears(ref result, debugInformation))
+                { continue; }
+
+                if (CorrectInitializationAddresses(ref result, debugInformation))
                 { continue; }
 
                 break;
@@ -108,27 +126,28 @@ public static class Minifier
             if (result[i] == '[' &&
                 i + 3 + 1 < result.Length &&
                 result.Slice(i, 3).SequenceEqual("[-]") &&
-                !alreadyThere.IsUnknown)
+                !alreadyThere.IsUnknown &&
+                alreadyThere != 0)
             {
-                string? redundantModification = null;
-                if (alreadyThere.Value > 0)
-                { redundantModification = new string('+', alreadyThere.Value); }
-                else if (alreadyThere.Value < 0)
-                { redundantModification = new string('-', -alreadyThere.Value); }
-
                 ReadOnlySpan<char> slice = result[(i + 3)..];
 
-                if (redundantModification is not null &&
-                    slice.StartsWith(redundantModification) &&
-                    slice.Length - alreadyThere.Value > 0)
+                int redundantModification = BrainfuckCode.Modifications(slice, '+', '-', out int redundantModificationLength);
+
+                if (redundantModification != 0 &&
+                    slice.Length - redundantModificationLength > 0)
                 {
-                    slice = slice[redundantModification.Length..];
+                    slice = slice[redundantModificationLength..];
 
-                    debugInformation?.OffsetCodeFrom(i, -(redundantModification.Length + 3));
+                    int correction = redundantModification - alreadyThere.Value;
+                    int correctionLength = Math.Abs(correction);
+                    ReadOnlySpan<char> correction_ = correctionLength > 0 ? new string(correction > 0 ? '+' : '-', correctionLength) : string.Empty;
 
-                    Span<char> final = new char[i + slice.Length];
+                    debugInformation?.OffsetCodeFrom(i, -(redundantModificationLength + 3 - correctionLength));
+
+                    Span<char> final = new char[i + slice.Length + correctionLength];
                     result[..i].CopyTo(final[..i]);
-                    slice.CopyTo(final[i..]);
+                    correction_.CopyTo(final[i..]);
+                    slice.CopyTo(final[(i + correctionLength)..]);
                     result = final;
 
                     return true;
@@ -200,6 +219,84 @@ public static class Minifier
 
                 result = final;
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    static bool CorrectInitializationAddresses(ref string result, DebugInformation? debugInformation)
+    {
+        ReadOnlySpan<char> span = result.AsSpan();
+        bool res = CorrectInitializationAddresses(ref span, debugInformation);
+        result = new string(span);
+        return res;
+    }
+
+    static bool CorrectInitializationAddresses(ref ReadOnlySpan<char> result, DebugInformation? debugInformation)
+    {
+        PredictedNumber<int> alreadyThere = 0;
+        int initializationStarted = -1;
+
+        for (int i = 0; i < result.Length; i++)
+        {
+            if (!alreadyThere.IsUnknown &&
+                BrainfuckCode.GetDataMovement(result[i..], out ImmutableArray<(int Offset, int Modification)> destinations, out int removed) &&
+                destinations.Length == 1 &&
+                destinations[0].Modification == 1)
+            {
+                int movementLength = removed + 1;
+                ReadOnlySpan<char> slice = result[initializationStarted..(i + movementLength)];
+                if (slice[^1] is not ']') throw new InternalException();
+                string initialization = BrainfuckCode.GenerateModification(alreadyThere.Value, '+', '-');
+                if (!slice[..initialization.Length].SequenceEqual(initialization)) throw new InternalException();
+
+                string offset = BrainfuckCode.GenerateModification(destinations[0].Offset, '>', '<');
+                string backOffset = BrainfuckCode.GenerateModification(-destinations[0].Offset, '>', '<');
+                string corrected = offset + initialization + backOffset;
+                removed = slice.Length - corrected.Length;
+
+                debugInformation?.OffsetCodeFrom(i, -removed);
+
+                Span<char> newResult = new char[result.Length - removed];
+                result[..initializationStarted].CopyTo(newResult[..initializationStarted]);
+                corrected.CopyTo(newResult[initializationStarted..(i + movementLength - removed)]);
+                result[(i + movementLength)..].CopyTo(newResult[(i + movementLength - removed)..]);
+                result = newResult;
+                return true;
+            }
+
+            switch (result[i])
+            {
+                case '+':
+                {
+                    alreadyThere++;
+                    if (initializationStarted == -1) initializationStarted = i;
+                    break;
+                }
+
+                case '-':
+                {
+                    alreadyThere--;
+                    if (initializationStarted == -1) initializationStarted = i;
+                    break;
+                }
+
+                case ']':
+                {
+                    alreadyThere = 0;
+                    initializationStarted = -1;
+                    break;
+                }
+
+                // case '.': break;
+
+                default:
+                {
+                    alreadyThere = PredictedNumber<int>.Unknown;
+                    initializationStarted = -1;
+                    break;
+                }
             }
         }
 

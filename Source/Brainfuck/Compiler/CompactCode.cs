@@ -194,128 +194,19 @@ public static class CompactCode
     {
         result = default;
 
-        if (code[index] != '[')
-        { return false; }
-
-        ReadOnlySpan<char> slice = code[index..];
-        int end = slice.IndexOf(']');
-        if (end < 0)
-        { return false; }
-
-        slice = slice[..(end + 1)];
-        if (slice.Length < 6)
-        { return false; }
-
-        slice = slice[1..^1];
-
-        List<(int Offset, int Modification)> destinations = new();
-
-        if (slice[0] is '+' or '-')
-        {
-            int subIndex = 0;
-
-            int sourceModification = ExpectStuff(slice, ref subIndex, '+', '-');
-
-            if (sourceModification != -1)
-            { return false; }
-
-            int moveBack;
-
-            while (true)
-            {
-                int movement = ExpectStuff(slice, ref subIndex, '>', '<');
-                if (movement == 0)
-                { return false; }
-
-                if (subIndex >= slice.Length)
-                {
-                    moveBack = movement;
-                    break;
-                }
-                int modification = ExpectStuff(slice, ref subIndex, '+', '-');
-                if (modification == 0)
-                { return false; }
-
-                destinations.Add((movement, modification));
-                if (destinations.Count > 4)
-                { return false; }
-            }
-
-            if (destinations.Count == 0)
-            { return false; }
-
-            for (int i = 0; i < destinations.Count; i++)
-            {
-                if (destinations[i].Modification != 1)
-                { return false; }
-            }
-
-            int totalMovement = 0;
-            for (int i = 0; i < destinations.Count; i++)
-            {
-                totalMovement += destinations[i].Offset;
-                destinations[i] = (totalMovement, destinations[i].Modification);
-            }
-
-            if (totalMovement + moveBack != 0)
-            { return false; }
-        }
-        else if (slice[0] is '>' or '<')
-        {
-            int subIndex = 0;
-
-            while (true)
-            {
-                int movement = ExpectStuff(slice, ref subIndex, '>', '<');
-                if (movement == 0)
-                { break; }
-
-                int modification = ExpectStuff(slice, ref subIndex, '+', '-');
-                if (modification == 0)
-                { return false; }
-
-                destinations.Add((movement, modification));
-                if (destinations.Count > 4)
-                { return false; }
-            }
-
-            if (destinations.Count == 0)
-            { return false; }
-
-            int totalMovement = 0;
-            for (int i = 0; i < destinations.Count; i++)
-            {
-                totalMovement += destinations[i].Offset;
-                destinations[i] = (totalMovement, destinations[i].Modification);
-            }
-
-            if (destinations[^1].Offset != 0)
-            { return false; }
-            int sourceModification = destinations[^1].Modification;
-            if (sourceModification != -1)
-            { return false; }
-
-            destinations.RemoveAt(destinations.Count - 1);
-
-            for (int i = 0; i < destinations.Count; i++)
-            {
-                if (destinations[i].Modification != 1)
-                { return false; }
-            }
-        }
-        else
+        if (!BrainfuckCode.GetDataMovement(code[index..], out ImmutableArray<(int Offset, int Modification)> destinations, out int _removed))
         { return false; }
 
         result = new CompactCodeSegment(OpCodesCompact.Move)
         {
-            Arg1 = destinations.Count >= 1 ? (sbyte)destinations[0].Offset : (sbyte)0,
-            Arg2 = destinations.Count >= 2 ? (sbyte)destinations[1].Offset : (sbyte)0,
-            Arg3 = destinations.Count >= 3 ? (sbyte)destinations[2].Offset : (sbyte)0,
-            Arg4 = destinations.Count >= 4 ? (sbyte)destinations[3].Offset : (sbyte)0,
+            Arg1 = destinations.Length >= 1 ? (sbyte)destinations[0].Offset : (sbyte)0,
+            Arg2 = destinations.Length >= 2 ? (sbyte)destinations[1].Offset : (sbyte)0,
+            Arg3 = destinations.Length >= 3 ? (sbyte)destinations[2].Offset : (sbyte)0,
+            Arg4 = destinations.Length >= 4 ? (sbyte)destinations[3].Offset : (sbyte)0,
         };
-        debugInfo?.OffsetCodeFrom(index - removed, -(slice.Length + 2 - 1));
-        index += slice.Length + 2 - 1;
-        removed += slice.Length + 2 - 1;
+        debugInfo?.OffsetCodeFrom(index - removed, -_removed);
+        index += _removed;
+        removed += _removed;
         return true;
     }
 

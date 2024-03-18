@@ -472,12 +472,8 @@ FinishCharacter:
                 number.TokenType = PreparationTokenType.LiteralNumber;
                 op.TokenType = PreparationTokenType.Operator;
 
-                number.Position = PreprocessorResult.TransformPosition(number.Position);
                 Tokens.Add(number.Instantiate());
-
-                op.Position = PreprocessorResult.TransformPosition(op.Position);
                 Tokens.Add(op.Instantiate());
-
                 goto Finish;
             }
         }
@@ -498,7 +494,6 @@ FinishCharacter:
             { CurrentToken.TokenType = PreparationTokenType.LiteralFloat; }
         }
 
-        CurrentToken.Position = PreprocessorResult.TransformPosition(CurrentToken.Position);
         Tokens.Add(CurrentToken.Instantiate());
 
 Finish:

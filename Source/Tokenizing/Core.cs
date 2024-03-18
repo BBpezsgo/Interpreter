@@ -12,7 +12,6 @@ public abstract partial class Tokenizer
     protected readonly List<Warning> Warnings;
     protected readonly TokenizerSettings Settings;
     protected readonly Uri? File;
-    readonly Preprocessor.PreprocessorResult PreprocessorResult;
 
     readonly PreparationToken CurrentToken;
     int CurrentColumn;
@@ -20,7 +19,7 @@ public abstract partial class Tokenizer
     char PreviousChar;
     string? SavedUnicode;
 
-    protected Tokenizer(TokenizerSettings settings, Uri? file, Preprocessor.PreprocessorResult preprocessorResult)
+    protected Tokenizer(TokenizerSettings settings, Uri? file)
     {
         CurrentToken = new(default);
         CurrentColumn = 0;
@@ -37,7 +36,6 @@ public abstract partial class Tokenizer
         SavedUnicode = null;
 
         File = file;
-        PreprocessorResult = preprocessorResult;
     }
 
     protected SinglePosition CurrentSinglePosition => new(CurrentLine, CurrentColumn);

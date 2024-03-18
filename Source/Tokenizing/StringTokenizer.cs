@@ -4,14 +4,14 @@ public sealed class StringTokenizer : Tokenizer
 {
     readonly string Text;
 
-    StringTokenizer(TokenizerSettings settings, string? text, Uri? file) : base(settings, file, Preprocessor.PreprocessorResult.Empty)
+    StringTokenizer(TokenizerSettings settings, string? text, Uri? file) : base(settings, file)
     {
         Text = text ?? string.Empty;
     }
 
-    StringTokenizer(TokenizerSettings settings, Preprocessor.PreprocessorResult text, Uri? file) : base(settings, file, text)
+    StringTokenizer(TokenizerSettings settings, Uri? file) : base(settings, file)
     {
-        Text = text.Text ?? string.Empty;
+        Text = string.Empty;
     }
 
     /// <inheritdoc cref="TokenizeInternal"/>
@@ -28,22 +28,6 @@ public sealed class StringTokenizer : Tokenizer
 
     /// <inheritdoc cref="TokenizeInternal"/>
     public static TokenizerResult Tokenize(string? text, Uri? file, TokenizerSettings settings, ConsoleProgressBar progress)
-        => new StringTokenizer(settings, text, file).TokenizeInternal(progress);
-
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Preprocessor.PreprocessorResult text)
-        => Tokenize(text, null, TokenizerSettings.Default);
-
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Preprocessor.PreprocessorResult text, Uri? file)
-        => Tokenize(text, file, TokenizerSettings.Default);
-
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Preprocessor.PreprocessorResult text, Uri? file, TokenizerSettings settings)
-        => new StringTokenizer(settings, text, file).TokenizeInternal();
-
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Preprocessor.PreprocessorResult text, Uri? file, TokenizerSettings settings, ConsoleProgressBar progress)
         => new StringTokenizer(settings, text, file).TokenizeInternal(progress);
 
     TokenizerResult TokenizeInternal()

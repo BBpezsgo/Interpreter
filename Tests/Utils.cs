@@ -688,7 +688,7 @@ public readonly struct MainResult : IResult
     public readonly IReadOnlyHeap Heap { get; }
     public readonly IReadOnlyStack<DataItem> Stack { get; }
 
-    public MainResult(string stdOut, string stdErr, BytecodeInterpreter interpreter)
+    public MainResult(string stdOut, string stdErr, BytecodeProcessor interpreter)
     {
         StdOutput = stdOut;
         StdError = stdErr;

@@ -122,16 +122,15 @@ public abstract class CodeGenerator
     readonly List<CompliableTemplate<CompiledGeneralFunction>> compilableGeneralFunctions = new();
     readonly List<CompliableTemplate<CompiledConstructor>> compilableConstructors = new();
 
-    protected readonly Dictionary<string, GeneralType> TypeArguments;
-
-    protected readonly AnalysisCollection? AnalysisCollection;
-
     protected Uri? CurrentFile;
     protected bool InFunction;
+    protected readonly Stack<bool> InMacro;
+    protected readonly Dictionary<string, GeneralType> TypeArguments;
+    protected DebugInformation? DebugInfo;
 
     protected readonly GeneratorSettings Settings;
-
     protected readonly PrintCallback? Print;
+    protected readonly AnalysisCollection? AnalysisCollection;
 
     protected CodeGenerator()
     {
@@ -154,16 +153,14 @@ public abstract class CodeGenerator
         compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
         compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
 
-        TypeArguments = new Dictionary<string, GeneralType>();
-
-        AnalysisCollection = null;
-
         CurrentFile = null;
         InFunction = false;
+        InMacro = new Stack<bool>();
+        TypeArguments = new Dictionary<string, GeneralType>();
 
         Settings = GeneratorSettings.Default;
-
         Print = null;
+        AnalysisCollection = null;
     }
 
     protected CodeGenerator(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : this()

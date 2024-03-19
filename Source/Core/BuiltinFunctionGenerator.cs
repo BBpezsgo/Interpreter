@@ -20,7 +20,7 @@ public abstract class ExternalFunctionBase : ISimpleReadable
     public bool CheckParameterLength => ((byte)Flags & (byte)ExternalFunctionCheckFlags.CheckParamLength) != 0;
     public bool CheckParameterType => ((byte)Flags & (byte)ExternalFunctionCheckFlags.CheckParamType) != 0;
 
-    public BytecodeInterpreter? BytecodeInterpreter;
+    public BytecodeProcessor? BytecodeInterpreter;
 
     protected ExternalFunctionBase(string name, IEnumerable<RuntimeType> parameters, bool returnSomething, ExternalFunctionCheckFlags flags)
     {
@@ -433,7 +433,7 @@ public static unsafe class ExternalFunctionGenerator
         return data.ToType<T>();
     }
 
-    public static void SetInterpreter(this Dictionary<string, ExternalFunctionBase> functions, BytecodeInterpreter interpreter)
+    public static void SetInterpreter(this Dictionary<string, ExternalFunctionBase> functions, BytecodeProcessor interpreter)
     {
         foreach (KeyValuePair<string, ExternalFunctionBase> item in functions)
         { item.Value.BytecodeInterpreter = interpreter; }

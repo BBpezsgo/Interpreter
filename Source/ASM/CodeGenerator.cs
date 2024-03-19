@@ -47,7 +47,6 @@ public class CodeGeneratorForAsm : CodeGenerator
     readonly List<(CompiledFunction Function, string Label)> FunctionLabels;
     readonly List<CompiledFunction> GeneratedFunctions;
     readonly Stack<int> FunctionFrameSize;
-    readonly Stack<bool> InMacro;
 
     readonly int ByteSize = 1;
     int IntSize => Is16Bits ? 2 : 4;
@@ -62,7 +61,6 @@ public class CodeGeneratorForAsm : CodeGenerator
         FunctionLabels = new List<(CompiledFunction Function, string Label)>();
         GeneratedFunctions = new List<CompiledFunction>();
         FunctionFrameSize = new Stack<int>();
-        InMacro = new Stack<bool>();
     }
 
     #region Memory Helpers

@@ -8,11 +8,11 @@ public class CompiledVariable : VariableDeclaration, IHaveCompiledType
     public int MemoryAddress { get; }
     public bool IsInitialized { get; set; }
 
-    public CompiledVariable(int memoryOffset, GeneralType type, VariableDeclaration declaration) : base(declaration)
+    public CompiledVariable(int memoryAddress, GeneralType type, VariableDeclaration declaration) : base(declaration)
     {
-        base.CompiledType = type;
-        this.Type = type;
-        this.MemoryAddress = memoryOffset;
-        this.IsInitialized = false;
+        CompiledType = type;
+        Type = type;
+        MemoryAddress = memoryAddress;
+        IsInitialized = false;
     }
 }

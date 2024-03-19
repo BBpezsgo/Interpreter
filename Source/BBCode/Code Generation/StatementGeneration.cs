@@ -29,11 +29,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void AddComment(string comment)
     {
+        if (DebugInfo is null) return;
         int index = InstructionInsertIndex >= 0 ? InstructionInsertIndex : GeneratedCode.Count;
-        if (GeneratedDebugInfo.CodeComments.TryGetValue(index, out List<string>? comments))
+        if (DebugInfo.CodeComments.TryGetValue(index, out List<string>? comments))
         { comments.Add(comment); }
         else
-        { GeneratedDebugInfo.CodeComments.Add(index, new List<string>() { comment }); }
+        { DebugInfo.CodeComments.Add(index, new List<string>() { comment }); }
     }
 
     #endregion
@@ -286,7 +287,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForInlinedMacro(inlinedMacro);
 
-            GeneratedDebugInfo.FunctionInformations.Add(new FunctionInformations()
+            DebugInfo?.FunctionInformations.Add(new FunctionInformations()
             {
                 IsValid = true,
                 IsMacro = true,
@@ -2053,7 +2054,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             default: throw new InternalException($"Unimplemented statement {statement.GetType().Name}");
         }
 
-        GeneratedDebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
+        DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
         {
             Instructions = (startInstruction, GeneratedCode.Count - 1),
             SourcePosition = statement.Position,
@@ -2498,7 +2499,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         ScopeInformations scope = CurrentScopeDebug.Pop();
         scope.Location.Instructions.End = GeneratedCode.Count - 1;
-        GeneratedDebugInfo.ScopeInformations.Add(scope);
+        DebugInfo?.ScopeInformations.Add(scope);
     }
 
     #region GenerateCodeFor...
@@ -2761,7 +2762,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (function.Identifier is not null)
         {
-            GeneratedDebugInfo.FunctionInformations.Add(new FunctionInformations()
+            DebugInfo?.FunctionInformations.Add(new FunctionInformations()
             {
                 IsValid = true,
                 IsMacro = false,
@@ -2928,7 +2929,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         ScopeInformations scope = CurrentScopeDebug.Pop();
         scope.Location.Instructions.End = GeneratedCode.Count - 1;
-        GeneratedDebugInfo.ScopeInformations.Add(scope);
+        DebugInfo?.ScopeInformations.Add(scope);
     }
 
     void CompileParameters(ParameterDefinition[] parameters)

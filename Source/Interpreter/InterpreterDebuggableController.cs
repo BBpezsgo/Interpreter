@@ -43,14 +43,16 @@ public class InterpreterDebuggabble : Interpreter
     {
         get
         {
-            if (!DebugInfo.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
+            if (DebugInfo is null ||
+                !DebugInfo.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
             { return -1; }
 
             return sourceLocation.SourcePosition.Range.Start.Line;
         }
         set
         {
-            if (!DebugInfo.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
+            if (DebugInfo is null ||
+                !DebugInfo.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
             { return; }
 
             AbsoluteBreakpoint = sourceLocation.SourcePosition.Range.Start.Line;
@@ -62,7 +64,7 @@ public class InterpreterDebuggabble : Interpreter
     public bool AluOperation { get; private set; }
     public readonly Records<float> HeapUsage = new();
 
-    DebugInformation DebugInfo => CompilerResult.DebugInfo;
+    DebugInformation? DebugInfo => CompilerResult.DebugInfo;
 
     public void DoUpdate()
     {

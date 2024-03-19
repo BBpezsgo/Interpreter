@@ -229,7 +229,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
         public GeneratorSnapshot(CodeGeneratorForBrainfuck v)
         {
-            Variables = new Stack<Variable>(v.Variables);
+            Variables = new Stack<Variable>(v.CompiledVariables);
 
             VariableCleanupStack = new Stack<int>(v.VariableCleanupStack);
             Returns = new Stack<ControlFlowBlock>(v.Returns.Duplicate());
@@ -282,14 +282,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         newFrame.savedBreaks = Breaks.Duplicate().ToArray();
         Breaks.Clear();
 
-        newFrame.savedVariables = Variables.ToArray();
-        Variables.Clear();
+        newFrame.savedVariables = CompiledVariables.ToArray();
+        CompiledVariables.Clear();
 
         if (CurrentMacro.Count == 1)
         {
-            Variables.PushRange(newFrame.savedVariables);
-            for (int i = 0; i < Variables.Count; i++)
-            { Variables[i] = new Variable(Variables[i].Name, Variables[i].Address, false, Variables[i].DeallocateOnClean, Variables[i].Type, Variables[i].Size); }
+            CompiledVariables.PushRange(newFrame.savedVariables);
+            for (int i = 0; i < CompiledVariables.Count; i++)
+            { CompiledVariables[i] = new Variable(CompiledVariables[i].Name, CompiledVariables[i].Address, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size); }
         }
 
         newFrame.savedFilePath = CurrentFile;
@@ -303,7 +303,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     {
         CurrentFile = frame.savedFilePath;
 
-        Variables.Set(frame.savedVariables);
+        CompiledVariables.Set(frame.savedVariables);
 
         CompiledConstants.Set(frame.savedConstants);
 
@@ -323,14 +323,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     HeapCodeHelper Heap;
     CompiledCode IBrainfuckGenerator.Code => Code;
 
-    readonly Stack<Variable> Variables;
+    readonly new Stack<Variable> CompiledVariables;
 
     readonly Stack<int> VariableCleanupStack;
 
     readonly Stack<ControlFlowBlock> Returns;
     readonly Stack<ControlFlowBlock> Breaks;
-
-    readonly Stack<bool> InMacro;
 
     [DebuggerBrowsable(DebuggerBrowsableState.Never)]
     int Optimizations;
@@ -340,8 +338,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     readonly BrainfuckGeneratorSettings GeneratorSettings;
 
     string? VariableCanBeDiscarded;
-
-    DebugInformation? DebugInfo;
 
     readonly bool ShowProgress;
 
@@ -353,7 +349,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection, print)
     {
-        this.Variables = new Stack<Variable>();
+        this.CompiledVariables = new Stack<Variable>();
         this.Code = new CompiledCode();
         this.Stack = new StackCodeHelper(this.Code, settings.StackStart, settings.StackSize);
         this.Heap = new HeapCodeHelper(this.Code, settings.HeapStart, settings.HeapSize);
@@ -362,7 +358,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         this.GeneratorSettings = settings;
         this.Returns = new Stack<ControlFlowBlock>();
         this.Breaks = new Stack<ControlFlowBlock>();
-        this.InMacro = new Stack<bool>();
         this.DebugInfo = settings.GenerateDebugInformation ? new DebugInformation(compilerResult.Tokens) : null;
         this.PrintCallback = printCallback;
         this.ShowProgress = settings.ShowProgress;
@@ -372,8 +367,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     GeneratorSnapshot Snapshot() => new(this);
     void Restore(GeneratorSnapshot snapshot)
     {
-        Variables.Clear();
-        Variables.AddRange(snapshot.Variables);
+        CompiledVariables.Clear();
+        CompiledVariables.AddRange(snapshot.Variables);
 
         // Stack = snapshot.Stack;
         // Heap = snapshot.Heap;
@@ -454,7 +449,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
-        if (CodeGeneratorForBrainfuck.GetVariable(Variables, symbolName, out Variable variable))
+        if (CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, symbolName, out Variable variable))
         {
             type = variable.Type;
             return true;
@@ -522,11 +517,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         {
             for (int i = 0; i < n; i++)
             {
-                Variable variable = Variables.Last;
+                Variable variable = CompiledVariables.Last;
 
                 if (!variable.HaveToClean)
                 {
-                    Variables.Pop();
+                    CompiledVariables.Pop();
                     continue;
                 }
 
@@ -546,7 +541,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
                         );
                 }
 
-                Variables.Pop();
+                CompiledVariables.Pop();
                 Stack.Pop();
             }
         }
@@ -560,7 +555,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         {
             if (_statement is not Identifier identifier)
             { continue; }
-            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, identifier.Content, out Variable _variable))
+            if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, identifier.Content, out Variable _variable))
             { continue; }
             if (_variable.Name != variable.Name)
             { continue; }
@@ -614,7 +609,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         if (index.PrevStatement is not Identifier arrayIdentifier)
         { throw new CompilerException($"This must be an identifier", index.PrevStatement, CurrentFile); }
 
-        if (!CodeGeneratorForBrainfuck.GetVariable(Variables, arrayIdentifier.Content, out Variable variable))
+        if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, arrayIdentifier.Content, out Variable variable))
         { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, CurrentFile); }
 
         if (variable.Type is ArrayType arrayType)
@@ -678,7 +673,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     bool TryGetAddress(Identifier identifier, out int address, out int size)
     {
-        if (!CodeGeneratorForBrainfuck.GetVariable(Variables, identifier.Content, out Variable variable))
+        if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, identifier.Content, out Variable variable))
         { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
         address = variable.Address;
@@ -698,7 +693,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         int constantCount = CompileConstants(compilerResult.TopLevelStatements);
 
         Variable returnVariable = new(ReturnVariableName, Stack.PushVirtual(1), false, false, new BuiltinType(BasicType.Integer));
-        Variables.Add(returnVariable);
+        CompiledVariables.Add(returnVariable);
 
         if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(compilerResult.TopLevelStatements)); }

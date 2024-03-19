@@ -226,7 +226,7 @@ public sealed class InterpreterElement : WindowElement
 
         sender.DrawBuffer.ResetColor();
 
-        int[] calltraceRaw = this.Interpreter.BytecodeInterpreter.TraceCalls();
+        ImmutableArray<int> calltraceRaw = this.Interpreter.BytecodeInterpreter.TraceCalls();
 
         FunctionInformations[] callstack = this.Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(calltraceRaw).ToArray();
 

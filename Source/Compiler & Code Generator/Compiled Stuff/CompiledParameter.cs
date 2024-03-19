@@ -1,6 +1,5 @@
-﻿namespace LanguageCore.BBCode.Generator;
+﻿namespace LanguageCore.Compiler;
 
-using Compiler;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -14,9 +13,9 @@ public class CompiledParameter : ParameterDefinition,
 
     public CompiledParameter(int index, int memoryAddress, GeneralType type, ParameterDefinition definition) : base(definition)
     {
-        this.Type = type;
-        this.Index = index;
-        this.MemoryAddress = memoryAddress;
+        Type = type;
+        Index = index;
+        MemoryAddress = memoryAddress;
     }
 
     public CompiledParameter(GeneralType type, ParameterDefinition definition)

@@ -148,7 +148,7 @@ public class Interpreter
 
     public bool IsExecutingCode;
 
-    public BytecodeInterpreter? BytecodeInterpreter;
+    public BytecodeProcessor? BytecodeInterpreter;
 
     protected bool IsPaused;
     ExternalFunctionManaged? ReturnValueConsumer;
@@ -182,7 +182,7 @@ public class Interpreter
             Streams.Clear();
         }
 
-        BytecodeInterpreter = new BytecodeInterpreter(program, externalFunctions.ToFrozenDictionary(), settings);
+        BytecodeInterpreter = new BytecodeProcessor(program, externalFunctions.ToFrozenDictionary(), settings);
         externalFunctions.SetInterpreter(BytecodeInterpreter);
 
         State = InterpreterState.Initialized;
@@ -259,7 +259,7 @@ public class Interpreter
 
         externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char));
 
-        externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter! /* This can't be null */ .SleepTime(t, null));
+        externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter! /* This can't be null */ .SetSleep(new TimeSleep(t)));
 
         #endregion
 
@@ -423,7 +423,7 @@ public class Interpreter
         }
         catch (UserException error)
         {
-            error.FeedDebugInfo(CompilerResult.DebugInfo);
+            if (CompilerResult.DebugInfo is not null) error.FeedDebugInfo(CompilerResult.DebugInfo);
 
             OnOutput?.Invoke(this, $"User Exception: {error}", LogType.Error);
 
@@ -434,7 +434,7 @@ public class Interpreter
         }
         catch (RuntimeException error)
         {
-            error.FeedDebugInfo(CompilerResult.DebugInfo);
+            if (CompilerResult.DebugInfo is not null) error.FeedDebugInfo(CompilerResult.DebugInfo);
 
             OnOutput?.Invoke(this, $"Runtime Exception: {error}", LogType.Error);
 

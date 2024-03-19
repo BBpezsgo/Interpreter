@@ -2,36 +2,298 @@
 
 namespace LanguageCore.Runtime;
 
+public readonly struct RuntimeContext
+{
+    public ImmutableArray<int> CallTrace { get; init; }
+    public int CodePointer { get; init; }
+    public ImmutableArray<Instruction> Code { get; init; }
+    public IReadOnlyStack<DataItem> Stack { get; init; }
+    public int CodeSampleStart { get; init; }
+}
+
+public sealed class UserInvoke
+{
+    public int InstructionOffset { get; }
+    public ImmutableArray<DataItem> Arguments { get; }
+    public Action<DataItem> Callback { get; }
+    public bool NeedReturnValue { get; }
+    public bool IsInvoking { get; set; }
+
+    public UserInvoke(int instructionOffset, IEnumerable<DataItem> arguments, Action<DataItem> callback)
+    {
+        InstructionOffset = instructionOffset;
+        Arguments = arguments.ToImmutableArray();
+        Callback = callback;
+        NeedReturnValue = true;
+
+        IsInvoking = false;
+    }
+
+    public UserInvoke(int instructionOffset, IEnumerable<DataItem> arguments, Action callback)
+        : this(instructionOffset, arguments, _ => callback.Invoke())
+    {
+        NeedReturnValue = false;
+    }
+}
+
+public struct BytecodeInterpreterSettings
+{
+    public int StackMaxSize;
+    public int HeapSize;
+
+    public static BytecodeInterpreterSettings Default => new()
+    {
+        StackMaxSize = 128,
+        HeapSize = 2048,
+    };
+}
+
+public interface ISleep
+{
+    /// <summary>
+    /// Executes every time <see cref="BytecodeProcessor.Tick"/> is called.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> if it is sleeping, <see langword="false"/> otherwise.
+    /// </returns>
+    public bool Tick();
+}
+
+public class TickSleep : ISleep
+{
+    readonly int _ticks;
+    int _elapsed;
+
+    public TickSleep(int ticks)
+    {
+        _ticks = ticks;
+    }
+
+    public bool Tick()
+    {
+        _elapsed++;
+        return _elapsed < _ticks;
+    }
+}
+
+public class TimeSleep : ISleep
+{
+    readonly double _timeout;
+    readonly double _started;
+
+    public TimeSleep(double timeout, double now)
+    {
+        _timeout = timeout;
+        _started = now;
+    }
+
+    public TimeSleep(double timeout)
+    {
+        _timeout = timeout;
+        _started = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+    }
+
+    public bool Tick()
+    {
+        double now = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+        return now - _started < _timeout;
+    }
+}
+
 public class BytecodeProcessor
 {
+    const int CodeSampleRange = 20;
+
+    Instruction CurrentInstruction => Memory.Code[CodePointer];
+    public bool IsDone => CodePointer >= Memory.Code.Length;
+
+    readonly BytecodeInterpreterSettings Settings;
+
+    bool IsUserInvoking => UserInvokes.Count > 0 && UserInvokes.Peek().IsInvoking;
+    readonly Queue<UserInvoke> UserInvokes;
+
+    ISleep? Sleep;
+
     public Memory Memory;
 
-    public readonly FrozenDictionary<string, ExternalFunctionBase> ExternalFunctions;
+    readonly FrozenDictionary<string, ExternalFunctionBase> ExternalFunctions;
 
     public int CodePointer;
     public int BasePointer;
 
-    public Instruction CurrentInstruction => Memory.Code[CodePointer];
-    public bool IsDone => CodePointer >= Memory.Code.Length;
+    int LastInstructionPointer;
 
-    public BytecodeProcessor(ImmutableArray<Instruction> code, int heapSize, FrozenDictionary<string, ExternalFunctionBase> externalFunctions)
+    public BytecodeProcessor(ImmutableArray<Instruction> code, FrozenDictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings)
     {
+        UserInvokes = new Queue<UserInvoke>();
+        Settings = settings;
+        LastInstructionPointer = -1;
+
         ExternalFunctions = externalFunctions;
 
         BasePointer = 0;
         CodePointer = 0;
 
-        Memory = new(heapSize, code);
+        Memory = new(settings.HeapSize, code);
     }
 
-    public void Step() => CodePointer++;
-    public void Step(int num) => CodePointer += num;
+    public void SetSleep(ISleep sleep) => Sleep = sleep;
+
+    public void Call(int instructionOffset, Action<DataItem> callback, params DataItem[] arguments)
+        => UserInvokes.Enqueue(new UserInvoke(instructionOffset, arguments, callback));
+    public void Call(int instructionOffset, Action callback, params DataItem[] arguments)
+        => UserInvokes.Enqueue(new UserInvoke(instructionOffset, arguments, callback));
+
+    RuntimeContext GetContext() => new()
+    {
+        CallTrace = TraceCalls(),
+        CodePointer = CodePointer,
+        Code = Memory.Code[Math.Max(CodePointer - CodeSampleRange, 0)..Math.Clamp(CodePointer + CodeSampleRange, 0, Memory.Code.Length - 1)],
+        Stack = Memory.Stack,
+        CodeSampleStart = Math.Max(CodePointer - CodeSampleRange, 0),
+    };
+
+    public ImmutableArray<int> TraceCalls()
+    {
+        bool CanTraceCallsWith(int basePointer) =>
+            basePointer >= 2 &&
+            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset < Memory.Stack.Count &&
+            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset < Memory.Stack.Count;
+
+        void TraceCalls(List<int> callTrace, int basePointer)
+        {
+            if (!CanTraceCallsWith(basePointer)) return;
+
+            DataItem savedCodePointerD = Memory.Stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset];
+            DataItem savedBasePointerD = Memory.Stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset];
+
+            if (!savedCodePointerD.Integer.HasValue) return;
+            if (!savedBasePointerD.Integer.HasValue) return;
+
+            int savedCodePointer = savedCodePointerD.Integer ?? 0;
+            int savedBasePointer = savedBasePointerD.Integer ?? 0;
+
+            callTrace.Add(savedCodePointer);
+
+            if (savedBasePointer == BasePointer) return;
+            TraceCalls(callTrace, savedBasePointer);
+        }
+
+        if (!CanTraceCallsWith(BasePointer))
+        { return ImmutableArray.Create<int>(); }
+
+        List<int> callTrace = new();
+
+        TraceCalls(callTrace, BasePointer);
+
+        int[] callTraceResult = callTrace.ToArray();
+        Array.Reverse(callTraceResult);
+        return callTraceResult.ToImmutableArray();
+    }
+
+    public int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
+    {
+        AddressingMode.Absolute => offset,
+        AddressingMode.BasePointerRelative => BasePointer + offset,
+        AddressingMode.StackRelative => Memory.StackLength + offset,
+        AddressingMode.Runtime => Memory.Stack.Last.VInt,
+        _ => offset,
+    };
+
+    void Step() => CodePointer++;
+    void Step(int num) => CodePointer += num;
+
+    /// <exception cref="RuntimeException"/>
+    /// <exception cref="UserException"/>
+    /// <exception cref="InternalException"/>
+    public bool Tick()
+    {
+        if (Memory.Stack.Count > Settings.StackMaxSize)
+        { throw new RuntimeException("Stack size exceed the StackMaxSize", GetContext()); }
+
+        if (Sleep is not null)
+        {
+            if (Sleep.Tick())
+            { return true; }
+            else
+            { Sleep = null; }
+        }
+
+        if (IsDone)
+        {
+            if (IsUserInvoking)
+            {
+                UserInvoke userInvoke = UserInvokes.Dequeue();
+
+                for (int i = 0; i < userInvoke.Arguments.Length; i++)
+                {
+                    if (Memory.Stack.Count == 0)
+                    { throw new InternalException($"Tried to pop user-invoked function's parameters but the stack is empty"); }
+                    Memory.Stack.Pop();
+                }
+
+                if (Memory.Stack.Count == 0)
+                { throw new InternalException($"Tried to pop user-invoked function's return value but the stack is empty"); }
+
+                DataItem returnValue = userInvoke.NeedReturnValue ? Memory.Stack.Pop() : DataItem.Null;
+                userInvoke.Callback?.Invoke(returnValue);
+                return true;
+            }
+
+            LastInstructionPointer = -1;
+
+            if (UserInvokes.Count > 0)
+            {
+                UserInvoke userInvoke = UserInvokes.Peek();
+
+                CodePointer = userInvoke.InstructionOffset;
+                Memory.Stack.Push(new DataItem(0));
+                Memory.Stack.PushRange(userInvoke.Arguments);
+
+                Memory.Stack.Push(new DataItem(0));
+                Memory.Stack.Push(new DataItem(Memory.Code.Length));
+
+                BasePointer = Memory.Stack.Count;
+
+                userInvoke.IsInvoking = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        try
+        {
+            Process();
+        }
+        catch (UserException error)
+        {
+            error.Context = GetContext();
+            throw;
+        }
+        catch (RuntimeException error)
+        {
+            error.Context = GetContext();
+            throw;
+        }
+        catch (Exception error)
+        {
+            throw new RuntimeException(error.Message, error, GetContext());
+        }
+
+        if (LastInstructionPointer == CodePointer)
+        { throw new RuntimeException($"Execution stuck at instruction {LastInstructionPointer}", GetContext()); }
+
+        LastInstructionPointer = CodePointer;
+
+        return true;
+    }
 
     /// <exception cref="RuntimeException"/>
     /// <exception cref="UserException"/>
     /// <exception cref="InternalException"/>
     /// <exception cref="Exception"/>
-    public void Process()
+    void Process()
     {
         switch (CurrentInstruction.Opcode)
         {

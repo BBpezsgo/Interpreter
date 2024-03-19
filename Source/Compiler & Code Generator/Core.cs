@@ -28,7 +28,7 @@ public readonly struct ValueAddress
         InHeap = false;
     }
 
-    public ValueAddress(BBCode.Generator.CompiledParameter parameter, int address)
+    public ValueAddress(CompiledParameter parameter, int address)
     {
         Address = address;
         AddressingMode = AddressingMode.BasePointerRelative;

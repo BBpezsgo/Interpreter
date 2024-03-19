@@ -457,6 +457,15 @@ public class VariableDeclaration : Statement, IInFile, IHaveType
             { yield return substatement; }
         }
     }
+
+    public static VariableDeclaration CreateAnonymous(GeneralType type, string name, StatementWithValue? initialValue = null)
+        => CreateAnonymous(type.ToTypeInstance(), name, initialValue);
+
+    public static VariableDeclaration CreateAnonymous(TypeInstance type, string name, StatementWithValue? initialValue = null) => new(
+        Enumerable.Empty<Token>(),
+        type,
+        Token.CreateAnonymous(name),
+        initialValue);
 }
 
 public class TypeStatement : StatementWithValue

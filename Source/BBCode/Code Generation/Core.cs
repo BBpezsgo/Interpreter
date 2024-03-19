@@ -30,7 +30,7 @@ public readonly struct CleanupItem
 public struct BBCodeGeneratorResult
 {
     public ImmutableArray<Instruction> Code;
-    public DebugInformation DebugInfo;
+    public DebugInformation? DebugInfo;
 }
 
 public partial class CodeGeneratorForMain : CodeGenerator
@@ -73,7 +73,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     readonly Stack<List<int>> ReturnInstructions;
     readonly Stack<List<int>> BreakInstructions;
-    readonly Stack<bool> InMacro;
 
     readonly List<PreparationInstruction> GeneratedCode;
 
@@ -84,7 +83,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     bool CanReturn;
 
-    readonly DebugInformation GeneratedDebugInfo;
     readonly Stack<ScopeInformations> CurrentScopeDebug = new();
     readonly CompileLevel CompileLevel;
 
@@ -95,7 +93,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         this.ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
         this.GeneratedCode = new List<PreparationInstruction>();
         this.ExternalFunctionsCache = new Dictionary<string, int>();
-        this.GeneratedDebugInfo = new DebugInformation(compilerResult.Tokens);
+        this.DebugInfo = new DebugInformation(compilerResult.Tokens);
         this.CleanupStack = new Stack<CleanupItem[]>();
         this.ReturnInstructions = new Stack<List<int>>();
         this.BreakInstructions = new Stack<List<int>>();
@@ -103,7 +101,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         this.UndefinedOperatorFunctionOffsets = new List<UndefinedOffset<CompiledOperator>>();
         this.UndefinedGeneralFunctionOffsets = new List<UndefinedOffset<CompiledGeneralFunction>>();
         this.UndefinedConstructorOffsets = new List<UndefinedOffset<CompiledConstructor>>();
-        this.InMacro = new Stack<bool>();
         this.TagCount = new Stack<int>();
         this.CompileLevel = settings.CompileLevel;
     }
@@ -260,7 +257,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return new BBCodeGeneratorResult()
         {
             Code = GeneratedCode.Select(v => new Instruction(v)).ToImmutableArray(),
-            DebugInfo = GeneratedDebugInfo,
+            DebugInfo = DebugInfo,
         };
     }
 

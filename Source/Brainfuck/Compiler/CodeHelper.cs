@@ -95,25 +95,24 @@ public readonly struct AutoCodeBlock : IDisposable
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class CompiledCode : IDuplicatable<CompiledCode>
 {
-    const int HALF_BYTE = byte.MaxValue / 2;
-
-    public StringBuilder Code;
-
+    const int HalfByte = byte.MaxValue / 2;
     const int InitialSize = 1024;
 
-    int indent;
-    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int pointer;
-    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int branchDepth;
+    public int Pointer => _pointer;
+    public int BranchDepth => _branchDepth;
+    public int Length => _code.Length;
 
-    public int Pointer => pointer;
-    public int BranchDepth => branchDepth;
+    StringBuilder _code;
+    int _indent;
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int _pointer;
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int _branchDepth;
 
     public CompiledCode()
     {
-        this.Code = new StringBuilder(InitialSize);
-        this.indent = 0;
-        this.pointer = 0;
-        this.branchDepth = 0;
+        this._code = new StringBuilder(InitialSize);
+        this._indent = 0;
+        this._pointer = 0;
+        this._branchDepth = 0;
     }
 
     /// <exception cref="NotImplementedException"/>
@@ -136,46 +135,46 @@ public class CompiledCode : IDuplicatable<CompiledCode>
 
     public int Indent(int indent)
     {
-        this.indent += indent;
-        return this.indent;
+        this._indent += indent;
+        return this._indent;
     }
 
     public void LineBreak()
     {
-        Code.Append("\r\n");
-        Code.Append(' ', indent);
+        _code.Append("\r\n");
+        _code.Append(' ', _indent);
     }
 
     public void CommentLine(string text)
     {
         LineBreak();
-        Code.Append(BrainfuckCode.ReplaceCodes(text, '_'));
+        _code.Append(BrainfuckCode.ReplaceCodes(text, '_'));
         LineBreak();
     }
 
     public void StartBlock()
     {
         LineBreak();
-        Code.Append('{');
-        this.indent += 2;
+        _code.Append('{');
+        this._indent += 2;
         LineBreak();
     }
 
     public void StartBlock(string label)
     {
         LineBreak();
-        this.Code.Append(BrainfuckCode.ReplaceCodes(label, '_'));
-        this.Code.Append(' ');
-        this.Code.Append('{');
-        this.indent += 2;
+        this._code.Append(BrainfuckCode.ReplaceCodes(label, '_'));
+        this._code.Append(' ');
+        this._code.Append('{');
+        this._indent += 2;
         LineBreak();
     }
 
     public void EndBlock()
     {
-        this.indent -= 2;
+        this._indent -= 2;
         LineBreak();
-        Code.Append('}');
+        _code.Append('}');
         LineBreak();
     }
 
@@ -275,7 +274,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     /// </code>
     /// </para>
     /// </summary>
-    public void SetPointer(int address) => MovePointer(address - pointer);
+    public void SetPointer(int address) => MovePointer(address - _pointer);
 
     public void MovePointer(int offset)
     {
@@ -284,7 +283,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
             for (int i = 0; i < (-offset); i++)
             {
                 Append('<');
-                pointer--;
+                _pointer--;
             }
             return;
         }
@@ -293,7 +292,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
             for (int i = 0; i < offset; i++)
             {
                 Append('>');
-                pointer++;
+                _pointer++;
             }
             return;
         }
@@ -389,7 +388,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         SetPointer(address);
         ClearCurrent();
 
-        if (value > HALF_BYTE)
+        if (value > HalfByte)
         {
             value -= 256;
         }
@@ -514,7 +513,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     public void JumpStart()
     {
         Append('[');
-        branchDepth++;
+        _branchDepth++;
     }
 
     /// <summary>
@@ -523,7 +522,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     public void JumpEnd()
     {
         Append(']');
-        branchDepth--;
+        _branchDepth--;
     }
 
     /// <summary>
@@ -557,13 +556,13 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         return a;
     }
 
-    public override string ToString() => Code.ToString();
+    public override string ToString() => _code.ToString();
 
     public string ToString(Runtime.DebugInformation? debugInformation)
     {
         if (debugInformation is null)
         {
-            string result = Code.ToString();
+            string result = _code.ToString();
 
             while (true)
             {
@@ -579,7 +578,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         }
         else
         {
-            StringBuilder result = new(Code.ToString());
+            StringBuilder result = new(_code.ToString());
             int index;
 
             while (true)
@@ -610,7 +609,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
     /// </summary>
     public void FixPointer(int pointer)
     {
-        this.pointer = pointer;
+        this._pointer = pointer;
     }
 
     string GetDebuggerDisplay()
@@ -685,7 +684,7 @@ public class CompiledCode : IDuplicatable<CompiledCode>
 
         ClearCurrent();
 
-        if (value > HALF_BYTE)
+        if (value > HalfByte)
         { value -= 256; }
 
         AddValue(value);
@@ -781,56 +780,61 @@ public class CompiledCode : IDuplicatable<CompiledCode>
         this.MovePointerUnsafe(-conditionOffset);
     }
 
-    public void Append(string code) => this.Code.Append(code);
-    public void Append(char code) => this.Code.Append(code);
-    public void Append(char code, int count) => this.Code.Append(code, count);
+    public void Append(string code) => _code.Append(code);
+    public void Append(char code) => _code.Append(code);
+    public void Append(char code, int count) => _code.Append(code, count);
+    public void Insert(int index, string? value) => _code.Insert(index, value);
 
     public CompiledCode Duplicate() => new()
     {
-        branchDepth = BranchDepth,
-        Code = new(Code.ToString()),
-        indent = indent,
-        pointer = pointer,
+        _branchDepth = BranchDepth,
+        _code = new(_code.ToString()),
+        _indent = _indent,
+        _pointer = _pointer,
     };
 }
 
 public class StackCodeHelper
 {
-    readonly CompiledCode Code;
-    readonly Stack<int> TheStack;
-
     /// <summary>
     /// Adds up all the stack element's size
     /// </summary>
-    public int Size => TheStack.Sum();
-    public readonly int Start;
-    public readonly int MaxSize;
-
-    public int NextAddress => Start + TheStack.Sum();
-
+    public int Size => _stack.Sum();
+    public int Start { get; }
+    public int MaxSize { get; }
+    public int NextAddress => Start + _stack.Sum();
     public int LastAddress
     {
         get
         {
-            if (TheStack.Count == 0) return Start;
-            return Start + TheStack.Sum() - TheStack[^1];
+            if (_stack.Count == 0) return Start;
+            return Start + _stack.Sum() - _stack[^1];
         }
     }
+    public int MaxUsedSize => _maxUsedSize;
+    public bool WillOverflow => _willOverflow;
+
+    readonly CompiledCode _code;
+    readonly Stack<int> _stack;
+    int _maxUsedSize;
+    bool _willOverflow;
 
     public StackCodeHelper(CompiledCode code, int start, int size)
     {
-        this.Code = code;
-        this.TheStack = new Stack<int>();
+        this._code = code;
+        this._stack = new Stack<int>();
         this.Start = start;
         this.MaxSize = size;
     }
 
     public StackCodeHelper(CompiledCode code, StackCodeHelper other)
     {
-        this.Code = code;
-        this.TheStack = new Stack<int>(other.TheStack);
-        this.Start = other.Start;
-        this.MaxSize = other.MaxSize;
+        _code = code;
+        _stack = new Stack<int>(other._stack);
+        _maxUsedSize = other._maxUsedSize;
+        _willOverflow = other._willOverflow;
+        Start = other.Start;
+        MaxSize = other.MaxSize;
     }
 
     /// <summary>
@@ -847,13 +851,7 @@ public class StackCodeHelper
     {
         int address = PushVirtual(1);
 
-        if (Size > MaxSize)
-        {
-            Code.OUT_STRING(address, $"\n{Ansi.StyleText(Ansi.BrightForegroundRed, "Stack overflow")}\n");
-            Code.Append("[-]+[]");
-        }
-
-        Code.SetValue(address, v);
+        _code.SetValue(address, v);
         return address;
     }
 
@@ -864,13 +862,7 @@ public class StackCodeHelper
     {
         int address = PushVirtual(1);
 
-        if (Size > MaxSize)
-        {
-            Code.OUT_STRING(address, $"\n{Ansi.StyleText(Ansi.BrightForegroundRed, "Stack overflow")}\n");
-            Code.Append("[-]+[]");
-        }
-
-        Code.SetValue(address, v);
+        _code.SetValue(address, v);
         return address;
     }
 
@@ -880,11 +872,16 @@ public class StackCodeHelper
 
         if (Size >= MaxSize)
         {
-            Code.OUT_STRING(address, $"\n{Ansi.StyleText(Ansi.BrightForegroundRed, "Stack overflow")}\n");
-            Code.Append("[-]+[]");
+            _code.OUT_STRING(address, $"\n{Ansi.StyleText(Ansi.BrightForegroundRed, "Stack overflow")}\n");
+            _code.Append("[-]+[]");
+            _willOverflow = true;
+            Debugger.Break();
         }
 
-        TheStack.Push(size);
+        _stack.Push(size);
+
+        _maxUsedSize = Math.Max(_maxUsedSize, Size);
+
         return address;
     }
 
@@ -899,7 +896,7 @@ public class StackCodeHelper
         {
             int offsettedSource = address + offset;
             int offsettedTarget = target + offset;
-            Code.MoveValue(offsettedSource, offsettedTarget);
+            _code.MoveValue(offsettedSource, offsettedTarget);
         }
         return size;
     }
@@ -915,7 +912,7 @@ public class StackCodeHelper
         {
             int offsettedSource = address + offset;
             int offsettedTarget = target + offset;
-            Code.MoveAddValue(offsettedSource, offsettedTarget);
+            _code.MoveAddValue(offsettedSource, offsettedTarget);
         }
         return size;
     }
@@ -944,7 +941,7 @@ public class StackCodeHelper
         int address = NextAddress;
         for (int offset = 0; offset < size; offset++)
         {
-            Code.ClearValue(address + offset);
+            _code.ClearValue(address + offset);
         }
     }
 
@@ -955,30 +952,27 @@ public class StackCodeHelper
         { Pop(); }
     }
 
-    public int PopVirtual() => TheStack.Pop();
+    public int PopVirtual() => _stack.Pop();
 }
 
 public class HeapCodeHelper
 {
-    CompiledCode Code;
-    bool _isInitialized;
-
-    public readonly int Start;
-    public readonly int Size;
-
-    public bool IsInitialized => _isInitialized;
+    public int Start { get; }
+    public int Size { get; }
     public int OffsettedStart => GetOffsettedStart(Start);
+    public bool IsUsed => _isUsed;
 
-    public static int GetOffsettedStart(int start) => start + BLOCK_SIZE;
+    public const int BlockSize = 3;
+    public const int AddressCarryOffset = 0;
+    public const int ValueCarryOffset = 1;
+    public const int DataOffset = 2;
 
-    public const int BLOCK_SIZE = 3;
-    public const int OFFSET_ADDRESS_CARRY = 0;
-    public const int OFFSET_VALUE_CARRY = 1;
-    public const int OFFSET_DATA = 2;
+    bool _isUsed;
+    CompiledCode _code;
 
     public HeapCodeHelper(CompiledCode code, int start, int size)
     {
-        Code = code;
+        _code = code;
         Start = start;
         Size = size;
     }
@@ -991,10 +985,12 @@ public class HeapCodeHelper
      *  v: Value
      */
 
+    public static int GetOffsettedStart(int start) => start + BlockSize;
+
     void ThrowIfNotInitialized()
     {
-        if (!_isInitialized)
-        { throw new InternalException($"Heap isn't initialized"); }
+        if (Size <= 0)
+        { throw new InternalException($"Heap size is {Size}"); }
     }
 
     /// <summary>
@@ -1005,13 +1001,13 @@ public class HeapCodeHelper
     void GoBack()
     {
         // Go back
-        Code += '[';
-        Code.ClearCurrent();
-        Code.MovePointerUnsafe(-BLOCK_SIZE);
-        Code += ']';
+        _code += '[';
+        _code.ClearCurrent();
+        _code.MovePointerUnsafe(-BlockSize);
+        _code += ']';
 
         // Fix overshoot
-        Code.MovePointerUnsafe(BLOCK_SIZE);
+        _code.MovePointerUnsafe(BlockSize);
     }
 
     /// <summary>
@@ -1022,14 +1018,14 @@ public class HeapCodeHelper
     void CarryBack()
     {
         // Go back
-        Code += '[';
-        Code.ClearCurrent();
-        Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_VALUE_CARRY - BLOCK_SIZE);
-        Code.MovePointerUnsafe(-BLOCK_SIZE);
-        Code += ']';
+        _code += '[';
+        _code.ClearCurrent();
+        _code.MoveValueUnsafe(ValueCarryOffset, ValueCarryOffset - BlockSize);
+        _code.MovePointerUnsafe(-BlockSize);
+        _code += ']';
 
         // Fix overshoot
-        Code.MovePointerUnsafe(BLOCK_SIZE);
+        _code.MovePointerUnsafe(BlockSize);
     }
 
     /// <summary>
@@ -1040,19 +1036,19 @@ public class HeapCodeHelper
     void GoTo()
     {
         // Condition on carrying address
-        Code += '[';
+        _code += '[';
 
         // Copy the address and leave 1 behind
-        Code.MoveValueUnsafe(OFFSET_ADDRESS_CARRY, false, BLOCK_SIZE + OFFSET_ADDRESS_CARRY);
-        Code.AddValue(1);
+        _code.MoveValueUnsafe(AddressCarryOffset, false, BlockSize + AddressCarryOffset);
+        _code.AddValue(1);
 
         // Move to the next block
-        Code.MovePointerUnsafe(BLOCK_SIZE);
+        _code.MovePointerUnsafe(BlockSize);
 
         // Decrement 1 and check if zero
         //   Yes => Destination reached -> leave 1
         //   No => Repeat
-        Code += "- ] +";
+        _code += "- ] +";
     }
 
     /// <summary>
@@ -1063,58 +1059,67 @@ public class HeapCodeHelper
     void CarryTo()
     {
         // Condition on carrying address
-        Code += '[';
+        _code += '[';
 
         // Copy the address and leave 1 behind
-        Code.MoveValueUnsafe(OFFSET_ADDRESS_CARRY, false, BLOCK_SIZE + OFFSET_ADDRESS_CARRY);
-        Code.AddValue(1);
+        _code.MoveValueUnsafe(AddressCarryOffset, false, BlockSize + AddressCarryOffset);
+        _code.AddValue(1);
 
         // Copy the value
-        Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, false, BLOCK_SIZE + OFFSET_VALUE_CARRY);
+        _code.MoveValueUnsafe(ValueCarryOffset, false, BlockSize + ValueCarryOffset);
 
         // Move to the next block
-        Code.MovePointerUnsafe(BLOCK_SIZE);
+        _code.MovePointerUnsafe(BlockSize);
 
         // Decrement 1 and check if zero
         //   Yes => Destination reached -> leave 1
         //   No => Repeat
-        Code += "- ] +";
+        _code += "- ] +";
     }
 
     public void Init()
     {
-        if (_isInitialized) return;
         if (Size <= 0) return;
+        if (Size > 126) throw new CompilerException($"HEAP size must be smaller than 127", null, null);
 
-        Code.StartBlock("Initialize HEAP");
+        _code.StartBlock("Initialize HEAP");
 
-        // SetAbsolute(0, 126);
-        Code.SetValue(OffsettedStart + OFFSET_DATA, 126);
-        Code.SetPointer(0);
+        _code.SetValue(OffsettedStart + DataOffset, Size);
+        _code.SetPointer(0);
 
-        _isInitialized = true;
-
-        Code.EndBlock();
+        _code.EndBlock();
     }
 
-    public void InitVirtual()
+    public string? LateInit()
     {
-        _isInitialized = true;
+        if (Size <= 0) return null;
+        if (Size > 126) throw new CompilerException($"HEAP size must be smaller than 127", null, null);
+
+        CompiledCode code = new();
+
+        code.StartBlock("Initialize HEAP");
+
+        code.SetValue(OffsettedStart + DataOffset, Size);
+        code.SetPointer(0);
+
+        code.EndBlock();
+
+        return code.ToString();
     }
 
     public void Destroy()
     {
-        Code.StartBlock("Destroy HEAP");
+        _code.StartBlock("Destroy HEAP");
 
         int start = OffsettedStart;
-        int end = start + (BLOCK_SIZE * (Size + 4));
+        int end = start + (BlockSize * (Size + 4));
 
-        for (int i = start; i < end; i += BLOCK_SIZE)
-        { Code.ClearValue(i + OFFSET_DATA); }
+        for (int i = start; i < end; i += BlockSize)
+        { _code.ClearValue(i + DataOffset); }
 
-        Code.SetPointer(0);
+        _code.SetPointer(0);
 
-        Code.EndBlock();
+        _code.EndBlock();
     }
 
     /// <summary>
@@ -1124,17 +1129,19 @@ public class HeapCodeHelper
     {
         ThrowIfNotInitialized();
 
-        Code.MoveValue(pointerAddress, OffsettedStart);
-        Code.MoveValue(valueAddress, OffsettedStart + 1);
+        _code.MoveValue(pointerAddress, OffsettedStart);
+        _code.MoveValue(valueAddress, OffsettedStart + 1);
 
-        Code.SetPointer(OffsettedStart);
+        _code.SetPointer(OffsettedStart);
 
         CarryTo();
 
         // Copy the carried value to the address
-        Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, true, OFFSET_DATA);
+        _code.MoveValueUnsafe(ValueCarryOffset, true, DataOffset);
 
         GoBack();
+
+        _isUsed = true;
     }
 
     /// <summary>
@@ -1144,17 +1151,19 @@ public class HeapCodeHelper
     {
         ThrowIfNotInitialized();
 
-        Code.SetValue(OffsettedStart, pointer);
-        Code.SetValue(OffsettedStart + 1, value);
+        _code.SetValue(OffsettedStart, pointer);
+        _code.SetValue(OffsettedStart + 1, value);
 
-        Code.SetPointer(OffsettedStart);
+        _code.SetPointer(OffsettedStart);
 
         CarryTo();
 
         // Copy the carried value to the address
-        Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, true, OFFSET_DATA);
+        _code.MoveValueUnsafe(ValueCarryOffset, true, DataOffset);
 
         GoBack();
+
+        _isUsed = true;
     }
 
     /// <summary>
@@ -1164,17 +1173,19 @@ public class HeapCodeHelper
     {
         ThrowIfNotInitialized();
 
-        Code.MoveValue(pointerAddress, OffsettedStart);
-        Code.MoveValue(valueAddress, OffsettedStart + 1);
+        _code.MoveValue(pointerAddress, OffsettedStart);
+        _code.MoveValue(valueAddress, OffsettedStart + 1);
 
-        Code.SetPointer(OffsettedStart);
+        _code.SetPointer(OffsettedStart);
 
         CarryTo();
 
         // Copy the carried value to the address
-        Code.MoveAddValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_DATA);
+        _code.MoveAddValueUnsafe(ValueCarryOffset, DataOffset);
 
         GoBack();
+
+        _isUsed = true;
     }
 
     /// <summary>
@@ -1184,17 +1195,19 @@ public class HeapCodeHelper
     {
         ThrowIfNotInitialized();
 
-        Code.MoveValue(pointerAddress, OffsettedStart);
-        Code.MoveValue(valueAddress, OffsettedStart + 1);
+        _code.MoveValue(pointerAddress, OffsettedStart);
+        _code.MoveValue(valueAddress, OffsettedStart + 1);
 
-        Code.SetPointer(OffsettedStart);
+        _code.SetPointer(OffsettedStart);
 
         CarryTo();
 
         // Copy the carried value to the address
-        Code.MoveSubValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_DATA);
+        _code.MoveSubValueUnsafe(ValueCarryOffset, DataOffset);
 
         GoBack();
+
+        _isUsed = true;
     }
 
     /// <summary>
@@ -1209,9 +1222,11 @@ public class HeapCodeHelper
     {
         for (int offset = 0; offset < size; offset++)
         {
-            Code.AddValue(pointerAddress, 1);
+            _code.AddValue(pointerAddress, 1);
             Get(pointerAddress, resultAddress + offset);
         }
+
+        _isUsed = true;
     }
 
     /// <summary>
@@ -1221,21 +1236,23 @@ public class HeapCodeHelper
     {
         ThrowIfNotInitialized();
 
-        Code.ClearValue(OffsettedStart, OffsettedStart + 1);
+        _code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
-        Code.MoveValue(pointerAddress, OffsettedStart);
+        _code.MoveValue(pointerAddress, OffsettedStart);
 
-        Code.SetPointer(OffsettedStart);
+        _code.SetPointer(OffsettedStart);
 
         GoTo();
 
-        Code.SetValueUnsafe(OFFSET_ADDRESS_CARRY, 0);
-        Code.CopyValueWithTempUnsafe(OFFSET_DATA, OFFSET_ADDRESS_CARRY, OFFSET_VALUE_CARRY);
-        Code.SetValueUnsafe(OFFSET_ADDRESS_CARRY, 1);
+        _code.SetValueUnsafe(AddressCarryOffset, 0);
+        _code.CopyValueWithTempUnsafe(DataOffset, AddressCarryOffset, ValueCarryOffset);
+        _code.SetValueUnsafe(AddressCarryOffset, 1);
 
         CarryBack();
 
-        Code.MoveValue(Start + OFFSET_VALUE_CARRY, resultAddress);
-        Code.SetPointer(resultAddress);
+        _code.MoveValue(Start + ValueCarryOffset, resultAddress);
+        _code.SetPointer(resultAddress);
+
+        _isUsed = true;
     }
 }

@@ -50,37 +50,25 @@ public enum BrainfuckPrintFlags
 public struct BrainfuckGeneratorSettings
 {
     public bool ClearGlobalVariablesBeforeExit;
-    public int StackStart;
     public int StackSize;
-    public int HeapStart;
     public int HeapSize;
     public bool GenerateDebugInformation;
     public bool ShowProgress;
+    public readonly int HeapStart => StackSize + 1;
 
-    public static BrainfuckGeneratorSettings Default
+    public static BrainfuckGeneratorSettings Default => new()
     {
-        get
-        {
-            BrainfuckGeneratorSettings result = new()
-            {
-                ClearGlobalVariablesBeforeExit = true,
-                StackStart = 0,
-                HeapStart = 64,
-                HeapSize = 64,
-                GenerateDebugInformation = true,
-                ShowProgress = true,
-            };
-            result.StackSize = result.HeapStart - 1;
-            return result;
-        }
-    }
+        ClearGlobalVariablesBeforeExit = true,
+        StackSize = 63,
+        HeapSize = 64,
+        GenerateDebugInformation = true,
+        ShowProgress = true,
+    };
 
     public BrainfuckGeneratorSettings(BrainfuckGeneratorSettings other)
     {
         ClearGlobalVariablesBeforeExit = other.ClearGlobalVariablesBeforeExit;
-        StackStart = other.StackStart;
         StackSize = other.StackSize;
-        HeapStart = other.HeapStart;
         HeapSize = other.HeapSize;
         GenerateDebugInformation = other.GenerateDebugInformation;
         ShowProgress = other.ShowProgress;
@@ -142,7 +130,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             if (debugInfo is null) return;
             if (position == Position.UnknownPosition) return;
 
-            InstructionStart = code.Code.Length;
+            InstructionStart = code.Length;
             CurrentFile = currentFile;
         }
 
@@ -155,7 +143,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             if (DebugInfo is null) return;
             if (Position == Position.UnknownPosition) return;
 
-            int end = Code.Code.Length;
+            int end = Code.Length;
             if (InstructionStart == end) return;
             DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
             {
@@ -189,7 +177,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             if (debugInfo is null) return;
             if (position == Position.UnknownPosition) return;
 
-            InstructionStart = code.Code.Length;
+            InstructionStart = code.Length;
         }
 
         public void Dispose()
@@ -201,7 +189,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
                 File = Uri,
                 Identifier = Identifier,
                 ReadableIdentifier = ReadableIdentifier,
-                Instructions = (InstructionStart, Code.Code.Length),
+                Instructions = (InstructionStart, Code.Length),
                 IsMacro = false,
                 IsValid = true,
                 SourcePosition = Position,
@@ -256,7 +244,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         {
             Code = generator.Code.Duplicate();
             Heap = new HeapCodeHelper(Code, generator.Heap.Start, generator.Heap.Size);
-            if (generator.Heap.IsInitialized) Heap.InitVirtual();
             Stack = new StackCodeHelper(Code, generator.Stack);
         }
     }
@@ -323,7 +310,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     HeapCodeHelper Heap;
     CompiledCode IBrainfuckGenerator.Code => Code;
 
-    readonly new Stack<Variable> CompiledVariables;
+    new readonly Stack<Variable> CompiledVariables;
 
     readonly Stack<int> VariableCleanupStack;
 
@@ -341,27 +328,24 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     readonly bool ShowProgress;
 
-    readonly PrintCallback? PrintCallback;
-
     readonly int MaxRecursiveDepth;
 
     #endregion
 
     public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection, print)
     {
-        this.CompiledVariables = new Stack<Variable>();
-        this.Code = new CompiledCode();
-        this.Stack = new StackCodeHelper(this.Code, settings.StackStart, settings.StackSize);
-        this.Heap = new HeapCodeHelper(this.Code, settings.HeapStart, settings.HeapSize);
-        this.CurrentMacro = new Stack<ISameCheck>();
-        this.VariableCleanupStack = new Stack<int>();
-        this.GeneratorSettings = settings;
-        this.Returns = new Stack<ControlFlowBlock>();
-        this.Breaks = new Stack<ControlFlowBlock>();
-        this.DebugInfo = settings.GenerateDebugInformation ? new DebugInformation(compilerResult.Tokens) : null;
-        this.PrintCallback = printCallback;
-        this.ShowProgress = settings.ShowProgress;
-        this.MaxRecursiveDepth = 4;
+        CompiledVariables = new Stack<Variable>();
+        Code = new CompiledCode();
+        Stack = new StackCodeHelper(Code, 0, settings.StackSize);
+        Heap = new HeapCodeHelper(Code, settings.HeapStart, settings.HeapSize);
+        CurrentMacro = new Stack<ISameCheck>();
+        VariableCleanupStack = new Stack<int>();
+        GeneratorSettings = settings;
+        Returns = new Stack<ControlFlowBlock>();
+        Breaks = new Stack<ControlFlowBlock>();
+        DebugInfo = settings.GenerateDebugInformation ? new DebugInformation(compilerResult.Tokens) : null;
+        ShowProgress = settings.ShowProgress;
+        MaxRecursiveDepth = 4;
     }
 
     GeneratorSnapshot Snapshot() => new(this);
@@ -400,7 +384,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     {
         Code = snapshot.Code.Duplicate();
         Heap = new HeapCodeHelper(Code, snapshot.Heap.Start, snapshot.Heap.Size);
-        if (snapshot.Heap.IsInitialized) Heap.InitVirtual();
         Stack = new StackCodeHelper(Code, snapshot.Stack);
     }
 
@@ -685,8 +668,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
     {
-        PrintCallback?.Invoke("Generating code ...", LogType.Debug);
-        PrintCallback?.Invoke("  Precompiling ...", LogType.Debug);
+        Print?.Invoke("Generating code ...", LogType.Debug);
+        Print?.Invoke("  Precompiling ...", LogType.Debug);
 
         CurrentFile = compilerResult.File;
 
@@ -700,13 +683,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         else
         { PrecompileVariables(compilerResult.TopLevelStatements); }
 
-        Heap.Init();
-
         ControlFlowBlock? returnBlock = BeginReturnBlock(null, FindControlFlowUsage(compilerResult.TopLevelStatements));
 
         {
             InMacro.Push(false);
-            PrintCallback?.Invoke("  Generating top level statements ...", LogType.Debug);
+            Print?.Invoke("  Generating top level statements ...", LogType.Debug);
 
             using ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress);
 
@@ -718,7 +699,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             InMacro.Pop();
         }
 
-        PrintCallback?.Invoke("  Finishing up ...", LogType.Debug);
+        Print?.Invoke("  Finishing up ...", LogType.Debug);
 
         if (returnBlock is not null)
         { FinishReturnStatements(Returns.Pop(), true); }
@@ -736,10 +717,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
         Code.SetPointer(0);
 
+        if (Heap.IsUsed)
+        {
+            string? heapInit = Heap.LateInit();
+            Code.Insert(0, heapInit);
+        }
+
         if (Code.BranchDepth != 0)
         { throw new InternalException($"Unbalanced branches", CurrentFile); }
 
         CurrentFile = null;
+
+        Print?.Invoke($"Used stack size: {Stack.MaxUsedSize} bytes", LogType.Debug);
+
+        if (Stack.WillOverflow)
+        { AnalysisCollection?.Warnings.Add(new Warning($"Stack will probably overflow", Position.UnknownPosition, null)); }
 
         return new BrainfuckGeneratorResult()
         {

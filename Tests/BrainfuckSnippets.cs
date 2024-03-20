@@ -45,7 +45,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.LOGIC_LT(0, 1, 2, 3);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected, y);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -66,7 +66,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.LOGIC_MT(0, 1, 2, 3, 4);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, 0, 0, expected);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -88,7 +88,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.LOGIC_LTEQ(0, 1, 2, 3);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected, y);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -109,7 +109,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.LOGIC_EQ(0, 1, 2, 3);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected, y);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -130,7 +130,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.LOGIC_NEQ(0, 1, 2, 3);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected, y);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -146,7 +146,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x);
         code.LOGIC_NOT(0, 1);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -164,7 +164,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.LOGIC_OR(0, 1, 2);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected, 0);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -182,7 +182,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.LOGIC_AND(0, 1, 2, 3);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected, y);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -204,7 +204,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x);
         code.BITS_NOT(0, 1);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -230,7 +230,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.MATH_DIV(0, 1, 2, 3, 4, 5);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected, y);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -249,7 +249,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.MATH_MOD(0, 1, 2);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected, y);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -268,7 +268,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x);
         code.MATH_MUL_SELF(0, 1, 2);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -288,7 +288,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.MATH_POW(0, 1, 2, 3, 4);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -309,7 +309,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.MULTIPLY(0, 1, 2, 3);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, expected, y);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -335,7 +335,7 @@ public class BrainfuckSnippets
         InitializeValues(code, x, y);
         code.SWAP(0, 1, 2);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, y, x);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());
@@ -363,7 +363,7 @@ public class BrainfuckSnippets
         InitializeValues(code, a, x, y);
         code.MUX(0, 1, 2, 3);
 
-        Evaluate(code.Code.ToString(), out byte[] memory, out int mp);
+        Evaluate(code.ToString(), out byte[] memory, out int mp);
 
         byte[] expectedMemory = MakeMemory(memory.Length, 0, 0, 0, expected);
         AssertUtils.AreEqual(expectedMemory, memory.ToArray());

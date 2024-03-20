@@ -2806,9 +2806,8 @@ public abstract class CodeGenerator
             }
 
             case StatementKeywords.Delete:
-            {
-                return ControlFlowUsage.None;
-            }
+            case StatementKeywords.Throw:
+                return ControlFlowUsage.None;            
 
             default: throw new NotImplementedException(statement.ToString());
         }

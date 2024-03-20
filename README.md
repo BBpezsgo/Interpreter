@@ -50,6 +50,8 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 - `--show-progress|-sp` Prints some progress bars and labels during compilation.
 
+- `--print-heap|-ph` Prints the HEAP. (only works with brainfuck)
+
 **Code Generator:**
 - `--print-instructions|-pi [final;commented;simplified;f;c;s]` Prints the generated instructions. For brainfuck, you can also specify which formats you want to see the generated code in:
 
@@ -73,6 +75,9 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 - `--heap-size|-hs <size>` Specifies the HEAP size (only valid for the default and brainfuck modes).
 > [!NOTE]
 > For brainfuck, if you specify zero, the HEAP will not be initialized, and wherever you try to access it, it will not compile.
+
+> [!NOTE]
+> Because of how HEAP represented in brainfuck, its size can't be larger than 126.
 
 - `--console-gui|-cg` I use this mode for debugging.
 

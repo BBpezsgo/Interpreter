@@ -27,7 +27,7 @@ public struct ProgramArguments
 
     public string? OutputFile;
 
-    public InstructionPrintFlags InstructionPrintFlags;
+    public PrintFlags PrintFlags;
 
     public static ProgramArguments Default => new()
     {
@@ -43,7 +43,7 @@ public struct ProgramArguments
         File = null,
         ShowProgress = false,
         OutputFile = null,
-        InstructionPrintFlags = InstructionPrintFlags.None,
+        PrintFlags = PrintFlags.None,
     };
 }
 
@@ -55,12 +55,13 @@ public enum ProgramRunType
 }
 
 [Flags]
-public enum InstructionPrintFlags
+public enum PrintFlags
 {
     None = 0x00,
     Final = 0x01,
     Commented = 0x02,
     Simplified = 0x04,
+    Heap = 0x08,
 }
 
 public static class ArgumentNormalizer
@@ -324,9 +325,18 @@ public static class ArgumentParser
 
                 if (_args.TryConsume(out arg, "--stack-size", "-ss"))
                 {
-                    if (!_args.TryConsume(out result.BytecodeInterpreterSettings.StackMaxSize))
+                    if (!_args.TryConsume(out int value))
                     { throw new ArgumentException($"Expected int value after argument \"{arg}\""); }
 
+                    result.BytecodeInterpreterSettings.StackMaxSize = value;
+                    result.BrainfuckGeneratorSettings.StackSize = value;
+
+                    continue;
+                }
+
+                if (_args.TryConsume(out arg, "--print-heap", "-ph"))
+                {
+                    result.PrintFlags |= PrintFlags.Heap;
                     continue;
                 }
 
@@ -340,21 +350,21 @@ public static class ArgumentParser
                         {
                             case "final":
                             case "f":
-                                result.InstructionPrintFlags |= InstructionPrintFlags.Final;
+                                result.PrintFlags |= PrintFlags.Final;
                                 break;
                             case "commented":
                             case "c":
-                                result.InstructionPrintFlags |= InstructionPrintFlags.Commented;
+                                result.PrintFlags |= PrintFlags.Commented;
                                 break;
                             case "simplified":
                             case "s":
-                                result.InstructionPrintFlags |= InstructionPrintFlags.Simplified;
+                                result.PrintFlags |= PrintFlags.Simplified;
                                 break;
                         }
                     }
 
-                    if (result.InstructionPrintFlags == InstructionPrintFlags.None)
-                    { result.InstructionPrintFlags = InstructionPrintFlags.Final; }
+                    if (result.PrintFlags == PrintFlags.None)
+                    { result.PrintFlags = PrintFlags.Final; }
                     result.GeneratorSettings.PrintInstructions = true;
                     continue;
                 }

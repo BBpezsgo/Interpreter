@@ -345,13 +345,13 @@ public partial class InterpreterBase<TCode>
 
             { // Address
                 // int j = (i - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE;
-                int k = (i - heapStart) % HeapCodeHelper.BLOCK_SIZE;
+                int k = (i - heapStart) % HeapCodeHelper.BlockSize;
 
                 bool showAddress = (i & 0b_1111) == 0;
                 showAddress = showAddress || i == heapStart;
 
                 bool showBackground = showAddress;
-                showBackground = showBackground || (i > heapStart + 2 && k == HeapCodeHelper.OFFSET_DATA);
+                showBackground = showBackground || (i > heapStart + 2 && k == HeapCodeHelper.DataOffset);
 
                 if (showAddress || showBackground)
                 {
@@ -362,7 +362,7 @@ public partial class InterpreterBase<TCode>
                     { bg = CharColor.Blue; }
 
                     if (i > heapStart + 2 &&
-                        k == HeapCodeHelper.OFFSET_DATA)
+                        k == HeapCodeHelper.DataOffset)
                     {
                         bg = CharColor.Green;
                         fg = CharColor.White;

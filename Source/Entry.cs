@@ -220,7 +220,7 @@ public static class Entry
 
                 bool pauseBeforeRun = false;
 
-                if (arguments.InstructionPrintFlags.HasFlag(InstructionPrintFlags.Commented))
+                if (arguments.PrintFlags.HasFlag(PrintFlags.Commented))
                 {
                     Output.WriteLine();
                     Output.WriteLine($" === COMPILED ===");
@@ -237,7 +237,7 @@ public static class Entry
                 generated.Code = Minifier.Minify(generated.Code, generated.DebugInfo);
                 Output.LogDebug($"Minification: {prevCodeLength} -> {generated.Code.Length} ({((float)generated.Code.Length - prevCodeLength) / (float)generated.Code.Length * 100f:#}%)");
 
-                if (arguments.InstructionPrintFlags.HasFlag(InstructionPrintFlags.Final))
+                if (arguments.PrintFlags.HasFlag(PrintFlags.Final))
                 {
                     Output.WriteLine();
                     Output.WriteLine($" === FINAL ===");
@@ -248,7 +248,7 @@ public static class Entry
                     pauseBeforeRun = true;
                 }
 
-                if (arguments.InstructionPrintFlags.HasFlag(InstructionPrintFlags.Simplified))
+                if (arguments.PrintFlags.HasFlag(PrintFlags.Simplified))
                 {
                     Output.WriteLine();
                     Output.WriteLine($" === SIMPLIFIED ===");
@@ -298,9 +298,9 @@ public static class Entry
                 }
                 else
                 {
-                    Output.WriteLine();
-                    Output.WriteLine($" === OUTPUT ===");
-                    Output.WriteLine();
+                    // Output.WriteLine();
+                    // Output.WriteLine($" === OUTPUT ===");
+                    // Output.WriteLine();
 
                     if (false)
                     {
@@ -318,6 +318,7 @@ public static class Entry
                         interpreter.Run();
                     }
 
+                    if (arguments.PrintFlags.HasFlag(PrintFlags.Heap))
                     {
                         Output.WriteLine();
                         Output.WriteLine();
@@ -333,13 +334,19 @@ public static class Entry
                         finalIndex = Math.Max(finalIndex, interpreter.MemoryPointer);
                         finalIndex = Math.Min(interpreter.Memory.Length, finalIndex + zerosToShow);
 
-                        int heapStart = BrainfuckGeneratorSettings.Default.HeapStart;
-                        int heapEnd = heapStart + (BrainfuckGeneratorSettings.Default.HeapSize * HeapCodeHelper.BLOCK_SIZE);
+                        int heapStart = arguments.BrainfuckGeneratorSettings.HeapStart;
+                        int heapEnd = heapStart + (arguments.BrainfuckGeneratorSettings.HeapSize * HeapCodeHelper.BlockSize);
 
                         for (int i = 0; i < finalIndex; i++)
                         {
-                            if (i % 15 == 0 && i > 0)
-                            { Console.WriteLine(); }
+                            if (i % 16 == 0)
+                            {
+                                if (i > 0)
+                                { Console.WriteLine(); }
+                                Console.ForegroundColor = ConsoleColor.DarkGray;
+                                Console.Write($"{i}: ");
+                                Console.ResetColor();
+                            }
 
                             byte cell = interpreter.Memory[i];
 
@@ -354,9 +361,9 @@ public static class Entry
 
                             if (i > heapStart + 2)
                             {
-                                int j = (i - heapStart) / HeapCodeHelper.BLOCK_SIZE;
-                                int k = (i - heapStart) % HeapCodeHelper.BLOCK_SIZE;
-                                if (k == HeapCodeHelper.OFFSET_DATA)
+                                int j = (i - heapStart) / HeapCodeHelper.BlockSize;
+                                int k = (i - heapStart) % HeapCodeHelper.BlockSize;
+                                if (k == HeapCodeHelper.DataOffset)
                                 {
                                     bg = ConsoleColor.DarkGreen;
                                     if (cell == 0)
@@ -395,7 +402,7 @@ public static class Entry
                             Console.WriteLine();
                         }
 
-                        // byte[] heap = interpreter.GetHeap(BrainfuckGeneratorSettings.Default);
+                        // byte[] heap = interpreter.GetHeap(arguments.BrainfuckGeneratorSettings);
                         // Output.WriteLine();
                         // Output.WriteLine();
                         // Output.WriteLine($" === HEAP ===");

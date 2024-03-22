@@ -2,7 +2,7 @@
 
 using Tokenizing;
 
-public class StructDefinition : IExportable, IInFile, IPositioned
+public class StructDefinition : IExportable, IPositioned
 {
     public ImmutableArray<AttributeUsage> Attributes { get; }
     public Token Identifier { get; }
@@ -12,12 +12,13 @@ public class StructDefinition : IExportable, IInFile, IPositioned
     public ImmutableArray<FieldDefinition> Fields { get; }
     public ImmutableArray<Token> Modifiers { get; }
     public TemplateInfo? TemplateInfo { get; init; }
-    public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
-    public virtual Position Position => new(Identifier, BracketStart, BracketEnd);
     public ImmutableArray<FunctionDefinition> Methods { get; }
     public ImmutableArray<GeneralFunctionDefinition> GeneralMethods { get; }
     public ImmutableArray<FunctionDefinition> Operators { get; }
     public ImmutableArray<ConstructorDefinition> Constructors { get; }
+
+    public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
+    public virtual Position Position => new(Identifier, BracketStart, BracketEnd);
 
     public StructDefinition(StructDefinition other)
     {
@@ -51,6 +52,7 @@ public class StructDefinition : IExportable, IInFile, IPositioned
         foreach (GeneralFunctionDefinition generalMethod in generalMethods) generalMethod.Context = this;
         foreach (FunctionDefinition @operator in operators) @operator.Context = this;
         foreach (ConstructorDefinition constructor in constructors) constructor.Context = this;
+        foreach (FieldDefinition field in fields) field.Context = this;
 
         Identifier = name;
         BracketStart = bracketStart;

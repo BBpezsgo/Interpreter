@@ -12,20 +12,11 @@ public class CompiledConstructor : ConstructorDefinition,
     ITemplateable<CompiledConstructor>,
     IHaveInstructionOffset
 {
-    public GeneralType Type { get; }
+    public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct Context { get; }
     public int InstructionOffset { get; set; } = -1;
     public List<Reference<ConstructorCall>> References { get; }
-    public override bool IsTemplate
-    {
-        get
-        {
-            if (TemplateInfo is not null) return true;
-            if (Context != null && Context.TemplateInfo != null) return true;
-            return false;
-        }
-    }
 
     public CompiledConstructor(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
     {

@@ -7,6 +7,7 @@ public class AttributeUsage : IPositioned
 {
     public Token Identifier { get; }
     public ImmutableArray<Literal> Parameters { get; }
+
     public Position Position =>
         new Position(Parameters)
         .Union(Identifier);

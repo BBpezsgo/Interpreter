@@ -1222,8 +1222,8 @@ public class HeapCodeHelper
     {
         for (int offset = 0; offset < size; offset++)
         {
-            _code.AddValue(pointerAddress, 1);
             Get(pointerAddress, resultAddress + offset);
+            _code.AddValue(pointerAddress, 1);
         }
 
         _isUsed = true;

@@ -425,22 +425,22 @@ public sealed class Parser
             return false;
         }
 
-        if (!ExpectOperator("<", out Token? leftP))
+        if (!ExpectOperator("<", out Token? startBracket))
         { throw new SyntaxException($"There should be an \"<\" (after \"{keyword}\" keyword) and not \"{CurrentToken}\"", keyword.Position.After(), File); }
 
         List<Token> parameters = new();
 
-        Token? rightP;
+        Token? endBracket;
 
         bool expectParameter = false;
-        while (!ExpectOperator(">", out rightP) || expectParameter)
+        while (!ExpectOperator(">", out endBracket) || expectParameter)
         {
             if (!ExpectIdentifier(out Token? parameter))
             { throw new SyntaxException("Expected identifier or \">\"", PreviousToken?.Position.After(), File); }
 
             parameters.Add(parameter);
 
-            if (ExpectOperator(">", out rightP))
+            if (ExpectOperator(">", out endBracket))
             { break; }
 
             if (!ExpectOperator(","))
@@ -449,7 +449,7 @@ public sealed class Parser
             { expectParameter = true; }
         }
 
-        templateInfo = new(keyword, leftP, parameters, rightP);
+        templateInfo = new(keyword, new TokenPair(startBracket, endBracket), parameters);
 
         return true;
     }

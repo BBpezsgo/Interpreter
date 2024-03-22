@@ -188,7 +188,7 @@ public abstract class CodeGenerator
         foreach (Statement statement in statements)
         {
             if (statement is not VariableDeclaration variableDeclaration ||
-                !variableDeclaration.Modifiers.Contains("const"))
+                !variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
             { continue; }
             CompileConstant(variableDeclaration);
             count++;
@@ -202,7 +202,7 @@ public abstract class CodeGenerator
         int count = 0;
         foreach (VariableDeclaration statement in statements)
         {
-            if (!statement.Modifiers.Contains("const"))
+            if (!statement.Modifiers.Contains(ModifierKeywords.Const))
             { continue; }
             CompileConstant(statement);
             count++;
@@ -269,7 +269,7 @@ public abstract class CodeGenerator
                 modifiedStatement.Statement is BinaryOperatorCall ||
                 modifiedStatement.Statement is UnaryOperatorCall)
             {
-                AnalysisCollection?.Hints.Add(new Hint($"Unnecessary explicit temp modifier (this kind of statements (\"{modifiedStatement.Statement.GetType().Name}\") are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
+                AnalysisCollection?.Hints.Add(new Hint($"Unnecessary explicit temp modifier ({modifiedStatement.Statement.GetType().Name} statements are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
             }
 
             explicitly = true;
@@ -2807,7 +2807,7 @@ public abstract class CodeGenerator
 
             case StatementKeywords.Delete:
             case StatementKeywords.Throw:
-                return ControlFlowUsage.None;            
+                return ControlFlowUsage.None;
 
             default: throw new NotImplementedException(statement.ToString());
         }

@@ -418,7 +418,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         Code,
         DebugInfo,
         function.FilePath,
-        function.Identifier.ToString(),
+        function.Type.ToString(),
         function.ToReadable(typeArguments),
         function.Position);
 
@@ -702,7 +702,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         Print?.Invoke("  Finishing up ...", LogType.Debug);
 
         if (returnBlock is not null)
-        { FinishReturnStatements(Returns.Pop(), true); }
+        { FinishControlFlowStatements(Returns.Pop(), true, "return"); }
 
         if (Returns.Count > 0 ||
             Breaks.Count > 0)

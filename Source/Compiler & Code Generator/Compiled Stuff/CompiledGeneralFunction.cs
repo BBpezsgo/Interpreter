@@ -2,7 +2,6 @@
 
 using Parser;
 using Parser.Statement;
-using Tokenizing;
 
 public class CompiledGeneralFunction : GeneralFunctionDefinition,
     ISameCheck,
@@ -12,24 +11,18 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
     ITemplateable<CompiledGeneralFunction>,
-    IHaveInstructionOffset
+    IHaveInstructionOffset,
+    ICompiledFunction
 {
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct Context { get; }
     public int InstructionOffset { get; set; } = -1;
-    public bool ReturnSomething => Type != BasicType.Void;
     public List<Reference<Statement>> References { get; }
 
-    public override bool IsTemplate
-    {
-        get
-        {
-            if (TemplateInfo is not null) return true;
-            if (Context != null && Context.TemplateInfo != null) return true;
-            return false;
-        }
-    }
+    public bool ReturnSomething => Type != BasicType.Void;
+    IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
+    IReadOnlyList<GeneralType> ICompiledFunction.ParameterTypes => ParameterTypes;
 
     public CompiledGeneralFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
     {
@@ -85,6 +78,7 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
             }
         }
         result.Append(')');
+        result.Append(' ');
 
         result.Append(Block?.ToString() ?? ";");
 

@@ -6,20 +6,19 @@ using Tokenizing;
 public abstract class FunctionThingDefinition :
     IExportable,
     IPositioned,
-    ISimpleReadable,
-    IInFile
+    ISimpleReadable
 {
     public ImmutableArray<Token> Modifiers { get; }
     public Token Identifier { get; }
-    public ParameterDefinitionCollection Parameters { get; set; }
+    public ParameterDefinitionCollection Parameters { get; }
     public Statement.Block? Block { get; init; }
     public TemplateInfo? TemplateInfo { get; }
     public Uri? FilePath { get; set; }
 
     /// <summary>
-    /// The first parameter is labeled as 'this'
+    /// The first parameter is labeled as "this"
     /// </summary>
-    public bool IsMethod => (Parameters.Count > 0) && Parameters[0].Modifiers.Contains(ModifierKeywords.This);
+    public bool IsExtension => (Parameters.Count > 0) && Parameters[0].Modifiers.Contains(ModifierKeywords.This);
     public int ParameterCount => Parameters.Count;
     public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
     public bool IsMacro => Modifiers.Contains("macro");
@@ -63,21 +62,21 @@ public abstract class FunctionThingDefinition :
         StringBuilder result = new();
         result.Append(Identifier.ToString());
         result.Append('(');
-        for (int j = 0; j < Parameters.Count; j++)
+        for (int i = 0; i < Parameters.Count; i++)
         {
-            if (j > 0) result.Append(", ");
-            if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
+            if (i > 0) result.Append(", ");
+            if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[i].Modifiers.Length > 0)
             {
-                result.AppendJoin(' ', Parameters[j].Modifiers);
+                result.AppendJoin(' ', Parameters[i].Modifiers);
                 result.Append(' ');
             }
 
-            result.Append(Parameters[j].Type.ToString());
+            result.Append(Parameters[i].Type.ToString());
 
             if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
             {
                 result.Append(' ');
-                result.Append(Parameters[j].Identifier.ToString());
+                result.Append(Parameters[i].Identifier.ToString());
             }
         }
         result.Append(')');
@@ -86,26 +85,26 @@ public abstract class FunctionThingDefinition :
 
     public string ToReadable(IReadOnlyDictionary<string, GeneralType>? typeArguments, ToReadableFlags flags = ToReadableFlags.None)
     {
-        if (typeArguments == null) return ToReadable(flags);
+        if (typeArguments is null) return ToReadable(flags);
         StringBuilder result = new();
         result.Append(Identifier.ToString());
 
         result.Append('(');
-        for (int j = 0; j < Parameters.Count; j++)
+        for (int i = 0; i < Parameters.Count; i++)
         {
-            if (j > 0) { result.Append(", "); }
-            if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
+            if (i > 0) { result.Append(", "); }
+            if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[i].Modifiers.Length > 0)
             {
-                result.AppendJoin(' ', Parameters[j].Modifiers);
+                result.AppendJoin(' ', Parameters[i].Modifiers);
                 result.Append(' ');
             }
 
-            result.Append(Parameters[j].Type.ToString(typeArguments));
+            result.Append(Parameters[i].Type.ToString(typeArguments));
 
             if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
             {
                 result.Append(' ');
-                result.Append(Parameters[j].Identifier.ToString());
+                result.Append(Parameters[i].Identifier.ToString());
             }
         }
         result.Append(')');

@@ -151,6 +151,7 @@ public interface ICompiledFunction
     public bool ReturnSomething => Type != BasicType.Void;
     public Block? Block { get; }
     public IReadOnlyList<ParameterDefinition> Parameters { get; }
+    public IReadOnlyList<GeneralType> ParameterTypes { get; }
 }
 
 public interface ITemplateable<TSelf> where TSelf : notnull

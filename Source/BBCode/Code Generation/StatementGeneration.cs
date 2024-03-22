@@ -43,7 +43,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForStatement(VariableDeclaration newVariable)
     {
-        if (newVariable.Modifiers.Contains("const")) return;
+        if (newVariable.Modifiers.Contains(ModifierKeywords.Const)) return;
 
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
@@ -367,8 +367,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             StatementWithValue passedParameter = functionCall.Parameters[i];
             GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
-            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsExtension ? (i + 1) : i];
+            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsExtension ? (i + 1) : i];
 
             if (!passedParameterType.Equals(definedParameterType))
             {
@@ -458,8 +458,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             StatementWithValue passedParameter = functionCall.Parameters[i];
             GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
-            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsExtension ? (i + 1) : i];
+            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsExtension ? (i + 1) : i];
 
             AddComment($" Param {i}:");
 
@@ -495,8 +495,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             StatementWithValue passedParameter = functionCall.Parameters[i];
             GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
-            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsExtension ? (i + 1) : i];
+            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsExtension ? (i + 1) : i];
 
             AddComment($" Param {i}:");
 
@@ -532,8 +532,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             StatementWithValue passedParameter = constructorCall.Parameters[i];
             GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = constructor.Parameters[constructor.IsMethod ? (i + 1) : i];
-            GeneralType definedParameterType = constructor.ParameterTypes[constructor.IsMethod ? (i + 1) : i];
+            ParameterDefinition definedParameter = constructor.Parameters[constructor.IsExtension ? (i + 1) : i];
+            GeneralType definedParameterType = constructor.ParameterTypes[constructor.IsExtension ? (i + 1) : i];
 
             AddComment($" Param {i}:");
 
@@ -593,8 +593,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
         { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
 
-        if (functionCall.IsMethodCall != compiledFunction.IsMethod)
-        { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.Identifier}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
+        if (functionCall.IsMethodCall != compiledFunction.IsExtension)
+        { throw new CompilerException($"You called the {(compiledFunction.IsExtension ? "method" : "function")} \"{functionCall.Identifier}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
 
         if (compiledFunction.IsMacro)
         { AnalysisCollection?.Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
@@ -2506,7 +2506,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     CleanupItem GenerateCodeForVariable(VariableDeclaration newVariable)
     {
-        if (newVariable.Modifiers.Contains("const")) return CleanupItem.Null;
+        if (newVariable.Modifiers.Contains(ModifierKeywords.Const)) return CleanupItem.Null;
 
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 

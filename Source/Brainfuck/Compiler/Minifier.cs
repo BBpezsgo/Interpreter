@@ -6,7 +6,13 @@ public static class Minifier
 {
     public static string Minify(string code, DebugInformation? debugInformation)
     {
-        string result = code;
+        Span<char> result = code.ToCharArray();
+        Minify(ref result, debugInformation);
+        return new string(result);
+    }
+
+    public static void Minify(ref Span<char> result, DebugInformation? debugInformation)
+    {
         int pass = 1;
         int prevLength = result.Length;
 
@@ -90,35 +96,28 @@ public static class Minifier
         }
 
         label.Dispose();
-
-        return result;
     }
 
-    static bool Remove(ref string @string, string value, DebugInformation debugInformation)
+    static bool Remove(ref Span<char> @string, ReadOnlySpan<char> value, DebugInformation debugInformation)
     {
-        int indexOf = @string.IndexOf(value);
-        if (indexOf == -1) return false;
-        @string = @string[..indexOf] + @string[(indexOf + value.Length)..];
-        debugInformation.OffsetCodeFrom(indexOf, -value.Length);
+        int i = @string.IndexOf(value);
+        if (i == -1) return false;
+        @string[(i + value.Length)..].CopyTo(@string[i..]);
+        @string = @string[..^value.Length];
+        debugInformation.OffsetCodeFrom(i, -value.Length);
         return true;
     }
 
-    static bool Remove(ref string @string, string value)
+    static bool Remove(ref Span<char> @string, ReadOnlySpan<char> value)
     {
-        string old = @string;
-        @string = @string.Replace(value, null);
-        return !object.ReferenceEquals(old, @string);
+        int i = @string.IndexOf(value);
+        if (i == -1) return false;
+        @string[(i + value.Length)..].CopyTo(@string[i..]);
+        @string = @string[..^value.Length];
+        return true;
     }
 
-    static bool RemoveRedundantInitializations(ref string result, DebugInformation? debugInformation)
-    {
-        ReadOnlySpan<char> span = result.AsSpan();
-        bool res = RemoveRedundantInitializations(ref span, debugInformation);
-        result = new string(span);
-        return res;
-    }
-
-    static bool RemoveRedundantInitializations(ref ReadOnlySpan<char> result, DebugInformation? debugInformation)
+    static bool RemoveRedundantInitializations(ref Span<char> result, DebugInformation? debugInformation)
     {
         PredictedNumber<int> alreadyThere = 0;
         for (int i = 0; i < result.Length; i++)
@@ -144,11 +143,29 @@ public static class Minifier
 
                     debugInformation?.OffsetCodeFrom(i, -(redundantModificationLength + 3 - correctionLength));
 
+                    int newLength = i + correctionLength + slice.Length;
+
+                    if (newLength > result.Length)
+                    {
+                        Span<char> extendedResult = new char[newLength];
+                        result[..i].CopyTo(extendedResult[..i]);
+                        result = extendedResult;
+                    }
+                    else
+                    {
+                        result = result[..(newLength)];
+                    }
+
+                    correction_.CopyTo(result[i..]);
+                    slice.CopyTo(result[(i + correctionLength)..]);
+
+                    /*
                     Span<char> final = new char[i + slice.Length + correctionLength];
                     result[..i].CopyTo(final[..i]);
                     correction_.CopyTo(final[i..]);
                     slice.CopyTo(final[(i + correctionLength)..]);
                     result = final;
+                    */
 
                     return true;
                 }
@@ -167,15 +184,7 @@ public static class Minifier
         return false;
     }
 
-    static bool RemoveRedundantClears(ref string result, DebugInformation? debugInformation)
-    {
-        ReadOnlySpan<char> span = result.AsSpan();
-        bool res = RemoveRedundantClears(ref span, debugInformation);
-        result = new string(span);
-        return res;
-    }
-
-    static bool RemoveRedundantClears(ref ReadOnlySpan<char> result, DebugInformation? debugInformation)
+    static bool RemoveRedundantClears(ref Span<char> result, DebugInformation? debugInformation)
     {
         for (int i = 0; i < result.Length; i++)
         {
@@ -212,12 +221,18 @@ public static class Minifier
 
                 debugInformation?.OffsetCodeFrom(i + 1, -removed);
 
+                result = result[..^removed];
+                slice.CopyTo(result[(i + 1)..]);
+
+                /*
                 Span<char> final = new char[result.Length - removed];
 
                 result[..(i + 1)].CopyTo(final);
                 slice.CopyTo(final[(i + 1)..]);
 
                 result = final;
+                */
+
                 return true;
             }
         }
@@ -225,15 +240,7 @@ public static class Minifier
         return false;
     }
 
-    static bool CorrectInitializationAddresses(ref string result, DebugInformation? debugInformation)
-    {
-        ReadOnlySpan<char> span = result.AsSpan();
-        bool res = CorrectInitializationAddresses(ref span, debugInformation);
-        result = new string(span);
-        return res;
-    }
-
-    static bool CorrectInitializationAddresses(ref ReadOnlySpan<char> result, DebugInformation? debugInformation)
+    static bool CorrectInitializationAddresses(ref Span<char> result, DebugInformation? debugInformation)
     {
         PredictedNumber<int> alreadyThere = 0;
         int initializationStarted = -1;
@@ -258,11 +265,19 @@ public static class Minifier
 
                 debugInformation?.OffsetCodeFrom(i, -removed);
 
+                result = result[..^removed];
+
+                corrected.CopyTo(result[initializationStarted..(i + movementLength - removed)]);
+                result[(i + movementLength)..].CopyTo(result[(i + movementLength - removed)..]);
+
+                /*
                 Span<char> newResult = new char[result.Length - removed];
                 result[..initializationStarted].CopyTo(newResult[..initializationStarted]);
                 corrected.CopyTo(newResult[initializationStarted..(i + movementLength - removed)]);
                 result[(i + movementLength)..].CopyTo(newResult[(i + movementLength - removed)..]);
                 result = newResult;
+                */
+
                 return true;
             }
 

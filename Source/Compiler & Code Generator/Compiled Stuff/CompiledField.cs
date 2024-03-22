@@ -7,12 +7,11 @@ public class CompiledField : FieldDefinition,
     IInContext<CompiledStruct>
 {
     public new GeneralType Type { get; }
-    public CompiledStruct Context { get; set; }
+    public new CompiledStruct Context { get; set; }
 
     public Protection Protection => ProtectionToken?.Content switch
     {
         ProtectionKeywords.Private => Protection.Private,
-        "public" => Protection.Public,
         null => Protection.Public,
         _ => Protection.Public,
     };

@@ -120,8 +120,8 @@ public enum OpCodesCompact
     BranchEnd = ']',
     Out = '.',
     In = ',',
-    Break = '$',
 
+    Break = '$',
     Clear = 'C',
     Move = 'M',
 }
@@ -210,6 +210,20 @@ public static class CompactCode
         return true;
     }
 
+    static bool TryGenerateClear(ReadOnlySpan<char> code, ref int index, [NotNullWhen(true)] out CompactCodeSegment result, DebugInformation? debugInfo, ref int removed)
+    {
+        result = default;
+
+        if (!BrainfuckCode.ExpectSequence(code[index..], "[-]"))
+        { return false; }
+
+        result = new CompactCodeSegment(OpCodesCompact.Clear);
+        debugInfo?.OffsetCodeFrom(index - removed, -2);
+        index += 2;
+        removed += 2;
+        return true;
+    }
+
     public static CompactCodeSegment[] Generate(ReadOnlySpan<char> code, bool showProgress, DebugInformation? debugInfo)
     {
         using ConsoleProgressLabel progressLabel = new("Compacting code ...", ConsoleColor.DarkGray, showProgress);
@@ -224,18 +238,15 @@ public static class CompactCode
 
             OpCodesCompact c = (OpCodesCompact)ToOpCode(code[i]);
 
-            if (i < code.Length - 3 && code.Slice(i, 3).SequenceEqual("[-]"))
-            {
-                result.Add(new CompactCodeSegment(OpCodesCompact.Clear));
-                debugInfo?.OffsetCodeFrom(i - removed, -2);
-                i += 2;
-                removed += 2;
-                continue;
-            }
-
             if (TryGenerateDataMovement(code, ref i, out CompactCodeSegment dataMovement, debugInfo, ref removed))
             {
                 result.Add(dataMovement);
+                continue;
+            }
+
+            if (TryGenerateClear(code, ref i, out CompactCodeSegment clear, debugInfo, ref removed))
+            {
+                result.Add(clear);
                 continue;
             }
 

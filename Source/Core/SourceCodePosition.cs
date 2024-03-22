@@ -153,8 +153,9 @@ public readonly struct Position :
 public struct SinglePosition :
     IEquatable<SinglePosition>,
     IComparisonOperators<SinglePosition, SinglePosition, bool>,
-    IEqualityOperators<SinglePosition, SinglePosition, bool>,
-    IMinMaxValue<SinglePosition>
+    IMinMaxValue<SinglePosition>,
+    IComparable<SinglePosition>,
+    IComparable
 {
     public int Line;
     public int Character;
@@ -226,6 +227,17 @@ public struct SinglePosition :
     public override readonly bool Equals(object? obj) => obj is SinglePosition position && Equals(position);
     public readonly bool Equals(SinglePosition other) => Line == other.Line && Character == other.Character;
     public override readonly int GetHashCode() => HashCode.Combine(Line, Character);
+    public readonly int CompareTo(SinglePosition other)
+    {
+        if (Line < other.Line) return -1;
+        if (Line > other.Line) return 1;
+
+        if (Character < other.Character) return -1;
+        if (Character > other.Character) return 1;
+
+        return 0;
+    }
+    public readonly int CompareTo(object? obj) => obj is SinglePosition other ? CompareTo(other) : 0;
 }
 
 public static class PositionExtensions
@@ -239,6 +251,30 @@ public static class PositionExtensions
             Range.Union(a.Range, b.Range),
             Range.Union(a.AbsoluteRange, b.AbsoluteRange)
             );
+    }
+
+    public static Position Union(this Position a, params Position[]? b)
+    {
+        if (b is null) return a;
+
+        Position result = a;
+
+        for (int i = 0; i < b.Length; i++)
+        { result = PositionExtensions.Union(result, b[i]); }
+
+        return result;
+    }
+
+    public static Position Union(this Position a, IEnumerable<Position>? b)
+    {
+        if (b is null) return a;
+
+        Position result = a;
+
+        foreach (Position element in b)
+        { result = PositionExtensions.Union(result, element); }
+
+        return result;
     }
 
     public static Position Union(this Position a, IPositioned? b)

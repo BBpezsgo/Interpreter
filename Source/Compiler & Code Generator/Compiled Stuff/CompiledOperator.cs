@@ -18,20 +18,11 @@ public class CompiledOperator : FunctionDefinition,
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct? Context { get; }
     public int InstructionOffset { get; set; } = -1;
-    public bool ReturnSomething => Type != BasicType.Void;
     public List<Reference<StatementWithValue>> References { get; }
-    public override bool IsTemplate
-    {
-        get
-        {
-            if (TemplateInfo != null) return true;
-            if (Context != null && Context.TemplateInfo != null) return true;
-            return false;
-        }
-    }
-    public bool IsExternal => Attributes.TryGetAttribute<string>("External", out _);
-    public string ExternalFunctionName => Attributes.TryGetAttribute("External", out string? name) ? name : string.Empty;
+
+    public bool ReturnSomething => Type != BasicType.Void;
     IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
+    IReadOnlyList<GeneralType> ICompiledFunction.ParameterTypes => ParameterTypes;
 
     public CompiledOperator(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
     {

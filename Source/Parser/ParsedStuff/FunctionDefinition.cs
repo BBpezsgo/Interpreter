@@ -12,6 +12,24 @@ public class FunctionDefinition : FunctionThingDefinition,
     public override Position Position => base.Position.Union(Type);
     public StructDefinition? Context { get; set; }
 
+    [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
+    public bool IsExternal => Attributes.TryGetAttribute<string>("External", out _);
+    public string? ExternalFunctionName => Attributes.TryGetAttribute<string>("External", out string? name) ? name : null;
+
+    [MemberNotNullWhen(true, nameof(BuiltinFunctionName))]
+    public bool IsBuiltin => Attributes.TryGetAttribute<string>("Builtin", out _);
+    public string? BuiltinFunctionName => Attributes.TryGetAttribute<string>("Builtin", out string? name) ? name : null;
+
+    public override bool IsTemplate
+    {
+        get
+        {
+            if (TemplateInfo != null) return true;
+            if (Context != null && Context.TemplateInfo != null) return true;
+            return false;
+        }
+    }
+
     public FunctionDefinition(FunctionDefinition other) : base(other)
     {
         Attributes = other.Attributes;

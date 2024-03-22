@@ -1,13 +1,17 @@
 ﻿namespace LanguageCore.Parser;
 
+using Compiler;
 using Tokenizing;
 
-public class FieldDefinition : IPositioned
+public class FieldDefinition :
+    IPositioned,
+    IInContext<StructDefinition>
 {
     public Token Identifier { get; }
     public TypeInstance Type { get; }
     public Token? ProtectionToken { get; }
     public Token? Semicolon { get; set; }
+    [NotNull] public StructDefinition? Context { get; set; }
     public Position Position => new(Identifier, Type, ProtectionToken);
 
     public FieldDefinition(FieldDefinition other)
@@ -16,6 +20,7 @@ public class FieldDefinition : IPositioned
         Type = other.Type;
         ProtectionToken = other.ProtectionToken;
         Semicolon = other.Semicolon;
+        Context = other.Context;
     }
 
     public FieldDefinition(Token identifier, TypeInstance type, Token? protectionToken)

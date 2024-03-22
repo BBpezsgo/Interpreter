@@ -18,61 +18,29 @@ public class CompiledFunction : FunctionDefinition,
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct? Context { get; }
     public int InstructionOffset { get; set; } = -1;
-    public bool ReturnSomething => Type != BasicType.Void;
     public List<Reference<StatementWithValue>> References { get; }
+
+    public bool ReturnSomething => Type != BasicType.Void;
     public TypeInstance TypeToken => base.Type;
-
-    public override bool IsTemplate
-    {
-        get
-        {
-            if (TemplateInfo != null) return true;
-            if (Context != null && Context.TemplateInfo != null) return true;
-            return false;
-        }
-    }
-
-    [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
-    public bool IsExternal => Attributes.TryGetAttribute<string>("External", out _);
-    public string? ExternalFunctionName
-    {
-        get
-        {
-            if (Attributes.TryGetAttribute<string>("External", out string? name))
-            { return name; }
-            return null;
-        }
-    }
-
-    [MemberNotNullWhen(true, nameof(BuiltinFunctionName))]
-    public bool IsBuiltin => Attributes.TryGetAttribute<string>("Builtin", out _);
-    public string? BuiltinFunctionName
-    {
-        get
-        {
-            if (Attributes.TryGetAttribute("Builtin", out string? name))
-            { return name; }
-            return null;
-        }
-    }
     IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
+    IReadOnlyList<GeneralType> ICompiledFunction.ParameterTypes => ParameterTypes;
 
     public CompiledFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
-        this.Type = type;
-        this.ParameterTypes = parameterTypes.ToImmutableArray();
+        Type = type;
+        ParameterTypes = parameterTypes.ToImmutableArray();
 
-        this.Context = context;
-        this.References = new List<Reference<StatementWithValue>>();
+        Context = context;
+        References = new List<Reference<StatementWithValue>>();
     }
 
     public CompiledFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledFunction other) : base(other)
     {
-        this.Type = type;
-        this.ParameterTypes = parameterTypes.ToImmutableArray();
+        Type = type;
+        ParameterTypes = parameterTypes.ToImmutableArray();
 
-        this.Context = other.Context;
-        this.References = new List<Reference<StatementWithValue>>(other.References);
+        Context = other.Context;
+        References = new List<Reference<StatementWithValue>>(other.References);
     }
 
     public bool IsSame(CompiledFunction other)

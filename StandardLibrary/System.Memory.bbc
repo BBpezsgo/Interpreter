@@ -23,6 +23,57 @@ void SetHeader(int* ptr, int size, int allocated)
     *ptr = value;
 }
 
+int JoinFreeBlocks()
+{
+    int* headerPointer = 0;
+    int prevBlockSize = 0;
+    while (headerPointer < 127)
+    {
+        int blockSize;
+        int blockUsed;
+        GetHeader(headerPointer, ref blockSize, ref blockUsed);
+        
+        // Print(headerPointer as int);
+        // Print(": { size: ");
+        // Print(blockSize);
+        // Print(" used: ");
+        // Print(blockUsed);
+        // PrintLine(" }");
+
+        // This is a free block that is not at the beginning of the heap
+        if (headerPointer != 0 && blockUsed == 0)
+        {
+            int* prevOffset = headerPointer - prevBlockSize - 1;
+
+            int d;
+            int prevBlockUsed;
+            GetHeader(prevOffset, ref d, ref prevBlockUsed);
+
+            // The previous block is also free
+            if (prevBlockUsed == 0)
+            {
+                // Print("Set ");
+                // Print(prevOffset as int);
+                // Print(" to { size: ");
+                // Print(blockSize + prevBlockSize + 1);
+                // Print(" }");
+                // PrintLine();
+
+                // Update the previous block's header
+                SetHeader(prevOffset, blockSize + prevBlockSize + 1, 0);
+                // Remove the current block's header
+                *headerPointer = 0;
+                return 1;
+            }
+        }
+
+        prevBlockSize = blockSize;
+
+        // Jump to the next block's header offset
+        headerPointer += blockSize + 1;
+    }
+}
+
 [Builtin("alloc")]
 export int* Alloc(int sizeNeed)
 {
@@ -37,6 +88,8 @@ export int* Alloc(int sizeNeed)
     int* headerPointer = 0;
     while (1)
     {
+        if (headerPointer >= 126) { throw "Out of memory"; }
+
         int blockSize;
         int blockUsed;
         GetHeader(headerPointer, ref blockSize, ref blockUsed);
@@ -103,11 +156,21 @@ template<T>
 export void Dealloc(T* ptr)
 {
     int* position = ptr as int*;
+    // Print("Deallocate ");
+    // Print(position - 1);
+    // PrintLine();
 
     int size;
     int allocated;
 
     GetHeader(ptr - 1, ref size, ref allocated);
+    
+    if (allocated == 0)
+    {
+        // PrintLine("Not allocated");
+        return;
+    }
+
     // Print("Size: ");
     // PrintLine(size);
     SetHeader(ptr - 1, size, 0);
@@ -120,4 +183,7 @@ export void Dealloc(T* ptr)
         size--;
         position++;
     }
+
+    // JoinFreeBlocks();
+    while (JoinFreeBlocks()) { }
 }

@@ -774,8 +774,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 using (DebugBlock(@if.Semicolon ?? @if.Block.Semicolon))
                 {
-                    ContinueReturnStatements();
-                    ContinueBreakStatements();
+                    ContinueControlFlowStatements(Returns, "return");
+                    ContinueControlFlowStatements(Breaks, "break");
                 }
             }
 
@@ -831,11 +831,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
 
             if (breakBlock is not null)
-            { FinishBreakStatements(Breaks.Pop(), true); }
+            { FinishControlFlowStatements(Breaks.Pop(), true, "break"); }
 
             Stack.Pop(); // Pop Condition
 
-            ContinueReturnStatements();
+            ContinueControlFlowStatements(Returns, "return");
         }
     }
     void GenerateCodeForStatement(ForLoop @for)
@@ -973,7 +973,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
 
             if (breakBlock is not null)
-            { FinishBreakStatements(Breaks.Pop(), true); }
+            { FinishControlFlowStatements(Breaks.Pop(), true, "break"); }
 
             Stack.Pop();
 
@@ -2019,10 +2019,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         using (DebugBlock(block.Brackets.End))
         {
             if (Returns.Count > 0)
-            { FinishReturnStatements(Returns.Last, false); }
+            { FinishControlFlowStatements(Returns.Last, false, "return"); }
 
             if (Breaks.Count > 0)
-            { FinishBreakStatements(Breaks.Last, false); }
+            { FinishControlFlowStatements(Breaks.Last, false, "break"); }
 
             CleanupVariables(VariableCleanupStack.Pop());
         }
@@ -2178,14 +2178,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (!structPointerType.Struct.FieldOffsets.TryGetValue(field.Identifier.Content, out int fieldOffset))
             { throw new CompilerException($"Could not get the field offset of field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
 
-            int resultAddress = Stack.Push(0);
+            if (!structPointerType.Struct.GetField(field.Identifier.Content, out CompiledField? _field))
+            { throw new CompilerException($"Could not get the field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
+
+            int resultAddress = Stack.Push(_field.Type.Size);
 
             int pointerAddress = Stack.NextAddress;
             GenerateCodeForStatement(field.PrevStatement);
 
             Code.AddValue(pointerAddress, fieldOffset);
 
-            Heap.Get(pointerAddress, resultAddress, pointerType.To.Size);
+            Heap.Get(pointerAddress, resultAddress, _field.Type.Size);
 
             Stack.Pop();
 
@@ -2556,6 +2559,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         if (destructor.ReturnSomething)
         { Stack.Pop(); }
+
+        GenerateCodeForFunction(deallocator, parameters, null, value);
     }
 
     int GenerateCodeForLiteralString(Literal literal)
@@ -2677,6 +2682,130 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
     }
 
+    void GenerateCodeForParameterPassing<TFunction>(TFunction function, StatementWithValue[] parameters, Stack<Variable> compiledParameters, List<IConstant> constantParameters)
+        where TFunction : ICompiledFunction, ISimpleReadable
+    {
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            StatementWithValue passed = parameters[i];
+            ParameterDefinition defined = function.Parameters[i];
+
+            GeneralType definedType = function.ParameterTypes[i];
+            GeneralType passedType = FindStatementType(passed, definedType);
+
+            if (passedType != definedType)
+            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
+
+            foreach (Variable compiledParameter in compiledParameters)
+            {
+                if (compiledParameter.Name == defined.Identifier.Content)
+                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
+            }
+
+            foreach (IConstant constantParameter in constantParameters)
+            {
+                if (constantParameter.Identifier == defined.Identifier.Content)
+                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
+            }
+
+            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains(ModifierKeywords.Const))
+            { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
+
+            bool deallocateOnClean = defined.Modifiers.Contains(ModifierKeywords.Temp);
+            deallocateOnClean = deallocateOnClean && passedType is PointerType;
+
+            if (StatementCanBeDeallocated(passed, out bool explicitDeallocate))
+            {
+                if (explicitDeallocate && !deallocateOnClean)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passed, CurrentFile)); }
+            }
+            else
+            {
+                if (explicitDeallocate)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate {passedType}", passed, CurrentFile)); }
+                deallocateOnClean = false;
+            }
+
+            if (passed is ModifiedStatement modifiedStatement)
+            {
+                if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
+                { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, CurrentFile); }
+
+                switch (modifiedStatement.Modifier.Content)
+                {
+                    case ModifierKeywords.Ref:
+                    {
+                        Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
+
+                        if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, modifiedVariable.Content, out Variable v))
+                        { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
+
+                        if (v.Type != definedType)
+                        { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+
+                        compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
+                        continue;
+                    }
+                    case ModifierKeywords.Const:
+                    {
+                        StatementWithValue valueStatement = modifiedStatement.Statement;
+                        if (!TryCompute(valueStatement, out DataItem constValue))
+                        { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
+
+                        constantParameters.Add(new CompiledParameterConstant(constValue, defined));
+                        continue;
+                    }
+                    case ModifierKeywords.Temp:
+                    {
+                        passed = modifiedStatement.Statement;
+                        break;
+                    }
+                    default:
+                        throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
+                }
+            }
+
+            if (passed is StatementWithValue value)
+            {
+                if (defined.Modifiers.Contains(ModifierKeywords.Ref))
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
+
+                if (defined.Modifiers.Contains(ModifierKeywords.Const))
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed, CurrentFile); }
+
+                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
+
+                bool parameterFound = false;
+                Variable compiledParameter = default;
+                foreach (Variable compiledParameter_ in compiledParameters)
+                {
+                    if (compiledParameter_.Name == defined.Identifier.Content)
+                    {
+                        parameterFound = true;
+                        compiledParameter = compiledParameter_;
+                    }
+                }
+
+                if (!parameterFound)
+                { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
+
+                if (compiledParameter.Type != definedType)
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
+
+                using (Code.Block(this, $"SET {defined.Identifier.Content} TO _something_"))
+                {
+                    GenerateCodeForStatement(value);
+
+                    using (Code.Block(this, $"STORE LAST TO {compiledParameter.Address}"))
+                    { Stack.PopAndStore(compiledParameter.Address); }
+                }
+                continue;
+            }
+
+            throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
+        }
+    }
+
     void GenerateCodeForFunction_(CompiledFunction function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
     {
         using DebugFunctionBlock<CompiledFunction> debugFunction = FunctionBlock(function, typeArguments);
@@ -2750,113 +2879,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CurrentMacro.Push(function);
         InMacro.Push(false);
 
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            StatementWithValue passed = parameters[i];
-            ParameterDefinition defined = function.Parameters[i];
-
-            GeneralType definedType = function.ParameterTypes[i];
-            GeneralType passedType = FindStatementType(passed, definedType);
-
-            if (passedType != definedType)
-            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
-
-            foreach (Variable compiledParameter in compiledParameters)
-            {
-                if (compiledParameter.Name == defined.Identifier.Content)
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
-            }
-
-            foreach (IConstant constantParameter in constantParameters)
-            {
-                if (constantParameter.Identifier == defined.Identifier.Content)
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
-            }
-
-            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains("const"))
-            { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
-
-            bool deallocateOnClean = false;
-
-            if (passed is ModifiedStatement modifiedStatement)
-            {
-                if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
-                { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, CurrentFile); }
-
-                switch (modifiedStatement.Modifier.Content)
-                {
-                    case ModifierKeywords.Ref:
-                    {
-                        Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
-
-                        if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, modifiedVariable.Content, out Variable v))
-                        { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
-
-                        if (v.Type != definedType)
-                        { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
-
-                        compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
-                        continue;
-                    }
-                    case ModifierKeywords.Const:
-                    {
-                        StatementWithValue valueStatement = modifiedStatement.Statement;
-                        if (!TryCompute(valueStatement, out DataItem constValue))
-                        { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
-
-                        constantParameters.Add(new CompiledParameterConstant(constValue, defined));
-                        continue;
-                    }
-                    case ModifierKeywords.Temp:
-                    {
-                        deallocateOnClean = true;
-                        passed = modifiedStatement.Statement;
-                        break;
-                    }
-                    default:
-                        throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
-                }
-            }
-
-            if (passed is StatementWithValue value)
-            {
-                if (defined.Modifiers.Contains(ModifierKeywords.Ref))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
-
-                if (defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
-
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
-
-                bool parameterFound = false;
-                Variable compiledParameter = default;
-                foreach (Variable compiledParameter_ in compiledParameters)
-                {
-                    if (compiledParameter_.Name == defined.Identifier.Content)
-                    {
-                        parameterFound = true;
-                        compiledParameter = compiledParameter_;
-                    }
-                }
-
-                if (!parameterFound)
-                { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
-
-                if (compiledParameter.Type != definedType)
-                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
-
-                using (Code.Block(this, $"SET {defined.Identifier.Content} TO _something_"))
-                {
-                    GenerateCodeForStatement(value);
-
-                    using (Code.Block(this, $"STORE LAST TO {compiledParameter.Address}"))
-                    { Stack.PopAndStore(compiledParameter.Address); }
-                }
-                continue;
-            }
-
-            throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
-        }
+        GenerateCodeForParameterPassing(function, parameters, compiledParameters, constantParameters);
 
         GeneratorStackFrame frame = PushStackFrame(typeArguments);
         CompiledVariables.PushIf(returnVariable);
@@ -2957,7 +2980,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 if (function.Type.Size != 1)
                 {
-                    throw new CompilerException($"Function with \"StandardInput\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
+                    throw new CompilerException($"Function with attribute \"StandardInput\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
                 }
                 Code += ',';
             }
@@ -2992,113 +3015,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CurrentMacro.Push(function);
         InMacro.Push(false);
 
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            StatementWithValue passed = parameters[i];
-            ParameterDefinition defined = function.Parameters[i];
-
-            GeneralType passedType = FindStatementType(passed);
-            GeneralType definedType = function.ParameterTypes[i];
-
-            if (passedType != definedType)
-            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
-
-            foreach (Variable compiledParameter in compiledParameters)
-            {
-                if (compiledParameter.Name == defined.Identifier.Content)
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
-            }
-
-            foreach (IConstant constantParameter in constantParameters)
-            {
-                if (constantParameter.Identifier == defined.Identifier.Content)
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
-            }
-
-            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains("const"))
-            { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
-
-            bool deallocateOnClean = false;
-
-            if (passed is ModifiedStatement modifiedStatement)
-            {
-                if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
-                { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, CurrentFile); }
-
-                switch (modifiedStatement.Modifier.Content)
-                {
-                    case ModifierKeywords.Ref:
-                    {
-                        Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
-
-                        if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, modifiedVariable.Content, out Variable v))
-                        { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
-
-                        if (v.Type != definedType)
-                        { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
-
-                        compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
-                        continue;
-                    }
-                    case "const":
-                    {
-                        StatementWithValue valueStatement = modifiedStatement.Statement;
-                        if (!TryCompute(valueStatement, out DataItem constValue))
-                        { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
-
-                        constantParameters.Add(new CompiledParameterConstant(constValue, defined));
-                        continue;
-                    }
-                    case ModifierKeywords.Temp:
-                    {
-                        deallocateOnClean = true;
-                        passed = modifiedStatement.Statement;
-                        break;
-                    }
-                    default:
-                        throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
-                }
-            }
-
-            if (passed is StatementWithValue value)
-            {
-                if (defined.Modifiers.Contains(ModifierKeywords.Ref))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
-
-                if (defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
-
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
-
-                bool parameterFound = false;
-                Variable compiledParameter = default;
-                foreach (Variable compiledParameter_ in compiledParameters)
-                {
-                    if (compiledParameter_.Name == defined.Identifier.Content)
-                    {
-                        parameterFound = true;
-                        compiledParameter = compiledParameter_;
-                    }
-                }
-
-                if (!parameterFound)
-                { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
-
-                if (compiledParameter.Type != definedType)
-                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
-
-                using (Code.Block(this, $"SET {defined.Identifier.Content} TO _something_"))
-                {
-                    GenerateCodeForStatement(value);
-
-                    using (Code.Block(this, $"STORE LAST TO {compiledParameter.Address}"))
-                    { Stack.PopAndStore(compiledParameter.Address); }
-                }
-                continue;
-            }
-
-            throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
-        }
+        GenerateCodeForParameterPassing(function, parameters, compiledParameters, constantParameters);
 
         GeneratorStackFrame frame = PushStackFrame(typeArguments);
         CompiledVariables.PushIf(returnVariable);
@@ -3188,113 +3105,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CurrentMacro.Push(function);
         InMacro.Push(false);
 
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            StatementWithValue passed = parameters[i];
-            ParameterDefinition defined = function.Parameters[i];
-
-            GeneralType passedType = FindStatementType(passed);
-            GeneralType definedType = function.ParameterTypes[i];
-
-            if (passedType != definedType)
-            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
-
-            foreach (Variable compiledParameter in compiledParameters)
-            {
-                if (compiledParameter.Name == defined.Identifier.Content)
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
-            }
-
-            foreach (IConstant constantParameter in constantParameters)
-            {
-                if (constantParameter.Identifier == defined.Identifier.Content)
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
-            }
-
-            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains("const"))
-            { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
-
-            bool deallocateOnClean = false;
-
-            if (passed is ModifiedStatement modifiedStatement)
-            {
-                if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
-                { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, CurrentFile); }
-
-                switch (modifiedStatement.Modifier.Content)
-                {
-                    case ModifierKeywords.Ref:
-                    {
-                        Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
-
-                        if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, modifiedVariable.Content, out Variable v))
-                        { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
-
-                        if (v.Type != definedType)
-                        { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
-
-                        compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
-                        continue;
-                    }
-                    case "const":
-                    {
-                        StatementWithValue valueStatement = modifiedStatement.Statement;
-                        if (!TryCompute(valueStatement, out DataItem constValue))
-                        { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
-
-                        constantParameters.Add(new CompiledParameterConstant(constValue, defined));
-                        continue;
-                    }
-                    case ModifierKeywords.Temp:
-                    {
-                        deallocateOnClean = true;
-                        break;
-                    }
-                    default:
-                        throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
-                }
-            }
-
-            if (passed is StatementWithValue value)
-            {
-                if (defined.Modifiers.Contains(ModifierKeywords.Ref))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
-
-                if (defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
-
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
-
-                bool parameterFound = false;
-                Variable compiledParameter = default;
-                foreach (Variable compiledParameter_ in compiledParameters)
-                {
-                    if (compiledParameter_.Name == defined.Identifier.Content)
-                    {
-                        parameterFound = true;
-                        compiledParameter = compiledParameter_;
-                    }
-                }
-
-                if (!parameterFound)
-                { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
-
-                if (compiledParameter.Type != definedType)
-                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
-
-                using (Code.Block(this, $"SET {defined.Identifier.Content} TO _something_"))
-                {
-                    GenerateCodeForStatement(value);
-
-                    using (Code.Block(this, $"STORE LAST TO {compiledParameter.Address}"))
-                    { Stack.PopAndStore(compiledParameter.Address); }
-                }
-            }
-            else
-            {
-                throw new NotImplementedException($"Statement \"{passed.GetType().Name}\" does not return a value");
-            }
-        }
+        GenerateCodeForParameterPassing(function, parameters, compiledParameters, constantParameters);
 
         GeneratorStackFrame frame = PushStackFrame(typeArguments);
         CompiledVariables.PushIf(returnVariable);
@@ -3410,7 +3221,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
             }
 
-            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains("const"))
+            if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains(ModifierKeywords.Const))
             { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
             bool deallocateOnClean = false;
@@ -3435,7 +3246,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
                         continue;
                     }
-                    case "const":
+                    case ModifierKeywords.Const:
                     {
                         StatementWithValue valueStatement = modifiedStatement.Statement;
                         if (!TryCompute(valueStatement, out DataItem constValue))
@@ -3460,8 +3271,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (defined.Modifiers.Contains(ModifierKeywords.Ref))
                 { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
 
-                if (defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"const\" modifier", passed, CurrentFile); }
+                if (defined.Modifiers.Contains(ModifierKeywords.Const))
+                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed, CurrentFile); }
 
                 PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
 
@@ -3589,6 +3400,44 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         return true;
     }
 
+    void FinishControlFlowStatements(ControlFlowBlock block, bool popFlag, string kind)
+    {
+        int pendingJumps = block.PendingJumps.Pop();
+        block.Doings.Pop();
+        using (Code.Block(this, $"Finish {pendingJumps} \"{kind}\" statements"))
+        {
+            Code.ClearValue(Stack.NextAddress);
+            Code.CommentLine($"Pointer: {Code.Pointer}");
+            for (int i = 0; i < pendingJumps; i++)
+            {
+                Code.JumpEnd();
+                Code.LineBreak();
+            }
+            Code.CommentLine($"Pointer: {Code.Pointer}");
+        }
+
+        if (!popFlag) return;
+
+        using (Code.Block(this, $"Finish \"{kind}\" block"))
+        {
+            if (block.FlagAddress != Stack.LastAddress)
+            { throw new InternalException(); }
+            Stack.Pop();
+        }
+    }
+
+    void ContinueControlFlowStatements(Stack<ControlFlowBlock> controlFlowBlocks, string kind)
+    {
+        if (controlFlowBlocks.Count == 0) return;
+
+        using (Code.Block(this, $"Continue \"{kind}\" statements"))
+        {
+            Code.CopyValue(controlFlowBlocks.Last.FlagAddress, Stack.NextAddress);
+            Code.JumpStart(Stack.NextAddress);
+            controlFlowBlocks.Last.PendingJumps.Last++;
+        }
+    }
+
     ControlFlowBlock? BeginReturnBlock(IPositioned? positioned, ControlFlowUsage usage)
     {
         if ((usage & ControlFlowUsage.AnyReturn) == ControlFlowUsage.None)
@@ -3608,44 +3457,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
     }
 
-    void FinishReturnStatements(ControlFlowBlock block, bool popFlag)
-    {
-        int pendingJumps = block.PendingJumps.Pop();
-        block.Doings.Pop();
-        using (Code.Block(this, $"Finish {pendingJumps} \"return\" statements"))
-        {
-            Code.ClearValue(Stack.NextAddress);
-            Code.CommentLine($"Pointer: {Code.Pointer}");
-            for (int i = 0; i < pendingJumps; i++)
-            {
-                Code.JumpEnd();
-                Code.LineBreak();
-            }
-            Code.CommentLine($"Pointer: {Code.Pointer}");
-        }
-
-        if (!popFlag) return;
-
-        using (Code.Block(this, $"Finish \"return\" block"))
-        {
-            if (block.FlagAddress != Stack.LastAddress)
-            { throw new InternalException(); }
-            Stack.Pop();
-        }
-    }
-
-    void ContinueReturnStatements()
-    {
-        if (Returns.Count == 0) return;
-
-        using (Code.Block(this, "Continue \"return\" statements"))
-        {
-            Code.CopyValue(Returns.Last.FlagAddress, Stack.NextAddress);
-            Code.JumpStart(Stack.NextAddress);
-            Returns.Last.PendingJumps.Last++;
-        }
-    }
-
     ControlFlowBlock? BeginBreakBlock(IPositioned? positioned, ControlFlowUsage usage)
     {
         if ((usage & ControlFlowUsage.Break) == ControlFlowUsage.None)
@@ -3662,44 +3473,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             ControlFlowBlock block = new(flagAddress);
             Breaks.Push(block);
             return block;
-        }
-    }
-
-    void FinishBreakStatements(ControlFlowBlock block, bool popFlag)
-    {
-        int pendingJumps = block.PendingJumps.Pop();
-        block.Doings.Pop();
-        using (Code.Block(this, $"Finish {pendingJumps} \"break\" statements"))
-        {
-            Code.ClearValue(Stack.NextAddress);
-            Code.CommentLine($"Pointer: {Code.Pointer}");
-            for (int i = 0; i < pendingJumps; i++)
-            {
-                Code.JumpEnd();
-                Code.LineBreak();
-            }
-            Code.CommentLine($"Pointer: {Code.Pointer}");
-        }
-
-        if (!popFlag) return;
-
-        using (Code.Block(this, $"Finish \"break\" block"))
-        {
-            if (block.FlagAddress != Stack.LastAddress)
-            { throw new InternalException(); }
-            Stack.Pop();
-        }
-    }
-
-    void ContinueBreakStatements()
-    {
-        if (Breaks.Count == 0) return;
-
-        using (Code.Block(this, "Continue \"break\" statements"))
-        {
-            Code.CopyValue(Breaks.Last.FlagAddress, Stack.NextAddress);
-            Code.JumpStart(Stack.NextAddress);
-            Breaks.Last.PendingJumps.Last++;
         }
     }
 }

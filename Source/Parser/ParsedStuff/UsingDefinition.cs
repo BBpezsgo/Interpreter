@@ -6,6 +6,11 @@ public class UsingDefinition : IPositioned
 {
     public ImmutableArray<Token> Path { get; }
     public Token Keyword { get; }
+    /// <summary> Set by the Compiler </summary>
+    public string? CompiledUri { get; set; }
+    /// <summary> Set by the Compiler </summary>
+    public double? DownloadTime { get; set; }
+
     public string PathString
     {
         get
@@ -22,11 +27,6 @@ public class UsingDefinition : IPositioned
     public Position Position =>
         new Position(Path)
         .Union(Keyword);
-
-    /// <summary> Set by the Compiler </summary>
-    public string? CompiledUri { get; set; }
-    /// <summary> Set by the Compiler </summary>
-    public double? DownloadTime { get; set; }
 
     public UsingDefinition(Token keyword, IEnumerable<Token> path)
     {

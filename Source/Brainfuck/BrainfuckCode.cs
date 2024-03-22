@@ -148,6 +148,17 @@ public static class BrainfuckCode
         return true;
     }
 
+    public static bool ExpectSequence(ReadOnlySpan<char> code, ReadOnlySpan<char> sequence)
+    {
+        if (code.Length < sequence.Length)
+        { return false; }
+        code = code[..sequence.Length];
+        if (!code.SequenceEqual(sequence))
+        { return false; }
+
+        return true;
+    }
+
     public static int ContiguousLength(ReadOnlySpan<char> values, char value)
     {
         for (int i = 0; i < values.Length; i++)

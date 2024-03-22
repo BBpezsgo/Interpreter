@@ -9,11 +9,6 @@ public sealed class StringTokenizer : Tokenizer
         Text = text ?? string.Empty;
     }
 
-    StringTokenizer(TokenizerSettings settings, Uri? file) : base(settings, file)
-    {
-        Text = string.Empty;
-    }
-
     /// <inheritdoc cref="TokenizeInternal"/>
     public static TokenizerResult Tokenize(string? text)
         => Tokenize(text, null, TokenizerSettings.Default);

@@ -90,7 +90,7 @@ public abstract class GeneralType :
             if (type.GenericTypes.HasValue)
             {
                 IEnumerable<GeneralType> typeParameters = GeneralType.FromArray(type.GenericTypes.Value, typeFinder);
-                return new StructType(resultStructType.Struct, typeParameters);
+                return new StructType(resultStructType.Struct, typeParameters.ToImmutableList());
             }
             else
             {
@@ -347,14 +347,14 @@ public abstract class GeneralType :
 
                     foreach (KeyValuePair<string, GeneralType> item in typeArguments)
                     {
-                        if (structType.Struct.TryGetTypeArgumentIndex(item.Key, out int j))
-                        { structTypeParameterValues[j] = item.Value; }
+                        if (structType.Struct.TryGetTypeArgumentIndex(item.Key, out int i))
+                        { structTypeParameterValues[i] = item.Value; }
                     }
 
-                    for (int j = 0; j < structTypeParameterValues.Length; j++)
+                    for (int i = 0; i < structTypeParameterValues.Length; i++)
                     {
-                        if (structTypeParameterValues[j] is null ||
-                            structTypeParameterValues[j] is GenericType)
+                        if (structTypeParameterValues[i] is null ||
+                            structTypeParameterValues[i] is GenericType)
                         { return null; }
                     }
 
@@ -487,20 +487,28 @@ public class StructType : GeneralType,
         Struct = @struct;
         if (@struct.TemplateInfo is not null)
         {
-            TypeParameters = @struct.TemplateInfo.TypeParameterNames
-                .Select(v => new KeyValuePair<string, GeneralType>(v, new GenericType(v)))
+            TypeParameters = @struct.TemplateInfo.TypeParameters
+                .Select(v => new KeyValuePair<string, GeneralType>(v.Content, new GenericType(v.Content)))
                 .ToImmutableDictionary();
         }
         else
         { TypeParameters = ImmutableDictionary<string, GeneralType>.Empty; }
     }
 
-    public StructType(CompiledStruct @struct, IEnumerable<GeneralType> typeParameters)
+    public StructType(CompiledStruct @struct, IReadOnlyList<GeneralType> typeParameters)
     {
         Struct = @struct;
         if (@struct.TemplateInfo is not null)
         {
-            TypeParameters = @struct.TemplateInfo.ToDictionary(typeParameters.ToArray()).ToImmutableDictionary();
+            Dictionary<string, GeneralType> result = new(@struct.TemplateInfo.TypeParameters.Length);
+
+            if (@struct.TemplateInfo.TypeParameters.Length != typeParameters.Count)
+            { throw new InternalException("Length of generic parameter not matching with argument length"); }
+
+            for (int i = 0; i < @struct.TemplateInfo.TypeParameters.Length; i++)
+            { result.Add(@struct.TemplateInfo.TypeParameters[i].Content, typeParameters[i]); }
+
+            TypeParameters = result.ToImmutableDictionary();
         }
         else
         { TypeParameters = ImmutableDictionary<string, GeneralType>.Empty; }

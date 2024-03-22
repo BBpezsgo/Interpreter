@@ -194,13 +194,13 @@ public class TextSectionBuilder : SectionBuilder
 
     #region Call_stdcall
 
-    /// <inheritdoc cref="Call_stdcall(string, int, string?[])"/>
-    public void Call_stdcall(string label, int parametersSize, params InstructionOperand[] parameters)
+    /// <inheritdoc cref="Call_stdcall(string, string?[])"/>
+    public void Call_stdcall(string label, params InstructionOperand[] parameters)
     {
         string[] parametersString = new string[parameters.Length];
         for (int i = 0; i < parameters.Length; i++)
         { parametersString[i] = parameters[i].ToString(); }
-        Call_stdcall(label, parametersSize, parametersString);
+        Call_stdcall(label, parametersString);
     }
 
     /// <summary>
@@ -208,7 +208,7 @@ public class TextSectionBuilder : SectionBuilder
     /// Return value: <see cref="Registers.AX"/>
     /// </para>
     /// </summary>
-    public void Call_stdcall(string label, int parametersSize, params string?[] parameters)
+    public void Call_stdcall(string label, params string?[] parameters)
     {
         if (label.StartsWith('_') && label.Contains('@'))
         { Import(label); }
@@ -223,8 +223,8 @@ public class TextSectionBuilder : SectionBuilder
         AppendInstruction(Instruction.Call, label);
     }
 
-    /// <inheritdoc cref="Call_stdcall(string, int, string?[])"/>
-    public void Call_stdcall(string label, int parametersSize)
+    /// <inheritdoc cref="Call_stdcall(string, string?[])"/>
+    public void Call_stdcall(string label)
     {
         if (label.StartsWith('_') && label.Contains('@'))
         { Import(label); }

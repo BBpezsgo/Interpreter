@@ -7,12 +7,21 @@ public class ConstructorDefinition : FunctionThingDefinition,
     ISimpleReadable,
     IInContext<StructDefinition?>
 {
-    public new TypeInstance Identifier { get; }
+    public TypeInstance Type { get; }
     public StructDefinition? Context { get; set; }
+    public override bool IsTemplate
+    {
+        get
+        {
+            if (TemplateInfo is not null) return true;
+            if (Context != null && Context.TemplateInfo != null) return true;
+            return false;
+        }
+    }
 
     public ConstructorDefinition(ConstructorDefinition other) : base(other)
     {
-        Identifier = other.Identifier;
+        Type = other.Type;
     }
 
     public ConstructorDefinition(
@@ -21,7 +30,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
         ParameterDefinitionCollection parameters)
         : base(modifiers, new Token(TokenType.Identifier, type.ToString(), true, type.Position), parameters, null)
     {
-        Identifier = type;
+        Type = type;
     }
 
     public override string ToString()
@@ -29,7 +38,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
         StringBuilder result = new();
         if (IsExport)
         { result.Append("export "); }
-        result.Append(Identifier.ToString());
+        result.Append(Type.ToString());
         result.Append(Parameters.ToString());
         result.Append(Block?.ToString() ?? ";");
         return result.ToString();
@@ -39,7 +48,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
     public new string ToReadable(ToReadableFlags flags = ToReadableFlags.None)
     {
         StringBuilder result = new();
-        result.Append(Identifier.ToString());
+        result.Append(Type.ToString());
         result.Append('(');
         for (int j = 0; j < Parameters.Count; j++)
         {
@@ -66,7 +75,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
     {
         if (typeArguments == null) return ToReadable(flags);
         StringBuilder result = new();
-        result.Append(Identifier.ToString(typeArguments));
+        result.Append(Type.ToString(typeArguments));
 
         result.Append('(');
         for (int j = 0; j < Parameters.Count; j++)

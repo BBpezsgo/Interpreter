@@ -51,7 +51,8 @@ struct List
 
     export destructor()
     {
-        delete this._ptr as int*;
+        if (this._ptr)
+        { delete this._ptr as int*; }
     }
 
     export void Add(T item)

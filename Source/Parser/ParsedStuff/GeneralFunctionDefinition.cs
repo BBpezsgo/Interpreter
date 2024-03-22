@@ -1,12 +1,22 @@
 ﻿namespace LanguageCore.Parser;
 
-using LanguageCore.Compiler;
+using Compiler;
 using Tokenizing;
 
 public class GeneralFunctionDefinition : FunctionThingDefinition,
     IInContext<StructDefinition>
 {
     [NotNull] public StructDefinition? Context { get; set; }
+
+    public override bool IsTemplate
+    {
+        get
+        {
+            if (TemplateInfo is not null) return true;
+            if (Context != null && Context.TemplateInfo != null) return true;
+            return false;
+        }
+    }
 
     public GeneralFunctionDefinition(GeneralFunctionDefinition other) : base(other)
     {

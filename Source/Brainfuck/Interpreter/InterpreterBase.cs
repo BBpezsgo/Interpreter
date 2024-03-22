@@ -48,11 +48,14 @@ public abstract partial class InterpreterBase : IDisposable
         _isPaused = false;
     }
 
+    /// <exception cref="BrainfuckRuntimeException"/>
     public abstract bool Step();
 
+    /// <exception cref="BrainfuckRuntimeException"/>
     public void Run()
     { while (Step()) ; }
 
+    /// <exception cref="BrainfuckRuntimeException"/>
     public void Run(int stepsBeforeSleep)
     {
         int step = 0;
@@ -157,6 +160,7 @@ public abstract partial class InterpreterBase<TCode> : InterpreterBase
 
     protected abstract TCode[] ParseCode(string code, bool showProgress, DebugInformation? debugInfo);
 
+    /// <exception cref="BrainfuckRuntimeException"/>
     public override bool Step()
     {
         if (IsDone) return false;
@@ -167,5 +171,6 @@ public abstract partial class InterpreterBase<TCode> : InterpreterBase
         return !IsDone;
     }
 
+    /// <exception cref="BrainfuckRuntimeException"/>
     protected abstract void Evaluate(TCode instruction);
 }

@@ -334,7 +334,7 @@ public static class ArgumentParser
                     continue;
                 }
 
-                if (_args.TryConsume(out arg, "--print-heap", "-ph"))
+                if (_args.TryConsume(out _, "--print-heap", "-ph"))
                 {
                     result.PrintFlags |= PrintFlags.Heap;
                     continue;

@@ -86,7 +86,7 @@ public class CompiledStruct : StructDefinition,
         if (typeParameters == null || typeParameters.Length == 0)
         { return; }
 
-        string[] typeParameterNames = TemplateInfo.ToDictionary().Keys.ToArray();
+        string[] typeParameterNames = TemplateInfo.TypeParameters.Select(v => v.Content).ToArray();
 
         if (typeParameters.Length != typeParameterNames.Length)
         { throw new CompilerException("Ah", null, null); }
@@ -104,7 +104,7 @@ public class CompiledStruct : StructDefinition,
         if (TemplateInfo == null)
         { return; }
 
-        string[] typeParameterNames = TemplateInfo.ToDictionary().Keys.ToArray();
+        string[] typeParameterNames = TemplateInfo.TypeParameters.Select(v => v.Content).ToArray();
 
         for (int i = 0; i < typeParameterNames.Length; i++)
         {

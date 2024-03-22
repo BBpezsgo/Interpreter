@@ -373,7 +373,7 @@ public partial class InterpreterBase<TCode>
                     else
                     { renderer.Text(_x, _y, $"{i,-4}", fg, bg); }
 
-                    _y++;
+                    // _y++;
                 }
             }
 

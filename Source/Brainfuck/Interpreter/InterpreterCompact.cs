@@ -12,7 +12,6 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
     }
 
     /// <exception cref="BrainfuckRuntimeException"/>
-    /// <exception cref="NotImplementedException"/>
     protected override void Evaluate(CompactCodeSegment instruction)
     {
         switch (instruction.OpCode)
@@ -56,7 +55,8 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.BranchStart:
             {
                 if (instruction.Count != 1)
-                { throw new NotImplementedException(); }
+                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext); }
+            
                 if (Memory[_memoryPointer] == 0)
                 {
                     int depth = 0;
@@ -81,7 +81,8 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.BranchEnd:
             {
                 if (instruction.Count != 1)
-                { throw new NotImplementedException(); }
+                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext); }
+
                 if (Memory[_memoryPointer] != 0)
                 {
                     int depth = 0;
@@ -106,7 +107,8 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.Out:
             {
                 if (instruction.Count != 1)
-                { throw new NotImplementedException(); }
+                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext); }
+
                 OnOutput?.Invoke(Memory[_memoryPointer]);
                 break;
             }
@@ -114,7 +116,8 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.In:
             {
                 if (instruction.Count != 1)
-                { throw new NotImplementedException(); }
+                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext); }
+
                 Memory[_memoryPointer] = OnInput?.Invoke() ?? 0;
                 break;
             }

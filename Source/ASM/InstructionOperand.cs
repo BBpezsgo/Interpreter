@@ -43,7 +43,7 @@ public readonly struct InstructionOperand
                 result.Append(']');
                 return new InstructionOperand(result.ToString());
             }
-            case AddressingMode.StackRelative:
+            case AddressingMode.StackPointerRelative:
             {
                 result.Append('[');
                 result.Append(Registers.SP);

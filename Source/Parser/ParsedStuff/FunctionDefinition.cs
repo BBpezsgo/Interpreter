@@ -13,12 +13,12 @@ public class FunctionDefinition : FunctionThingDefinition,
     public StructDefinition? Context { get; set; }
 
     [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
-    public bool IsExternal => Attributes.TryGetAttribute<string>("External", out _);
-    public string? ExternalFunctionName => Attributes.TryGetAttribute<string>("External", out string? name) ? name : null;
+    public bool IsExternal => Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out _);
+    public string? ExternalFunctionName => Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out string? name) ? name : null;
 
     [MemberNotNullWhen(true, nameof(BuiltinFunctionName))]
-    public bool IsBuiltin => Attributes.TryGetAttribute<string>("Builtin", out _);
-    public string? BuiltinFunctionName => Attributes.TryGetAttribute<string>("Builtin", out string? name) ? name : null;
+    public bool IsBuiltin => Attributes.TryGetAttribute<string>(AttributeConstants.BuiltinIdentifier, out _);
+    public string? BuiltinFunctionName => Attributes.TryGetAttribute<string>(AttributeConstants.BuiltinIdentifier, out string? name) ? name : null;
 
     public override bool IsTemplate
     {

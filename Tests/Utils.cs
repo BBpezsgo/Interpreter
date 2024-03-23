@@ -172,7 +172,7 @@ public readonly struct ExpectedResult
     {
         Assert((IResult)other);
 
-        if (heapShouldBeEmpty && other.Heap.UsedSize != 0)
+        if (heapShouldBeEmpty && HeapUtils.GetUsedSize(other.Heap) != 0)
         { throw new AssertFailedException($"Heap isn't empty"); }
 
         return this;
@@ -237,6 +237,12 @@ public static class Utils
 
     };
 
+    public static BytecodeInterpreterSettings BytecodeInterpreterSettings => new()
+    {
+        HeapSize = HeapSize,
+        StackMaxSize = BytecodeInterpreterSettings.Default.StackMaxSize,
+    };
+
     public static byte[] GenerateBrainfuckMemory(int length)
     {
         byte[] result = new byte[length];
@@ -282,21 +288,7 @@ public static class Utils
 
     public static MainResult RunMain(FileInfo file, string input)
     {
-        InputBuffer inputBuffer = new(input);
-
-        Interpreter interpreter = new();
-
-        StringBuilder stdOutput = new();
-        StringBuilder stdError = new();
-
-        interpreter.OnStdOut += (sender, data) => stdOutput.Append(data);
-        interpreter.OnStdError += (sender, data) => stdError.Append(data);
-
-        interpreter.OnNeedInput += (sender) => sender.OnInput(inputBuffer.Read());
-
-        Dictionary<string, ExternalFunctionBase> externalFunctions = new();
-
-        interpreter.GenerateExternalFunctions(externalFunctions);
+        Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
         if (file.Directory != null)
         {
@@ -317,26 +309,26 @@ public static class Utils
 
         analysisCollection.Throw();
 
-        interpreter.CompilerResult = generatedCode;
-
-        interpreter.Initialize(generatedCode.Code, new BytecodeInterpreterSettings()
+        Interpreter interpreter = new(false, new BytecodeInterpreterSettings()
         {
             HeapSize = HeapSize,
             StackMaxSize = BytecodeInterpreterSettings.Default.StackMaxSize,
-        }, externalFunctions);
+        }, generatedCode.Code)
+        { CompilerResult = generatedCode };
 
-        // Stopwatch stopwatch = Stopwatch.StartNew();
+        InputBuffer inputBuffer = new(input);
+        StringBuilder stdOutput = new();
+        StringBuilder stdError = new();
 
-        while (interpreter.IsExecutingCode)
-        {
-            interpreter.Update();
+        interpreter.OnStdOut += (sender, data) => stdOutput.Append(data);
+        interpreter.OnStdError += (sender, data) => stdError.Append(data);
 
-            // if (stopwatch.ElapsedMilliseconds > BaseTimeout)
-            // {
-            //     stopwatch.Stop();
-            //     throw new TimeExceededException($"Time exceeded ({stopwatch.ElapsedMilliseconds} ms)");
-            // }
-        }
+        interpreter.OnNeedInput += (sender) => sender.OnInput(inputBuffer.Read());
+
+        interpreter.CompilerResult = generatedCode;
+
+        while (!interpreter.BytecodeInterpreter.IsDone)
+        { interpreter.Update(); }
 
         if (interpreter.BytecodeInterpreter == null)
         { throw new UnreachableException($"{nameof(interpreter.BytecodeInterpreter)} is null"); }
@@ -682,21 +674,15 @@ public readonly struct MainResult : IResult
 {
     public readonly string StdOutput { get; }
     public readonly string StdError { get; }
-
     public readonly int ExitCode { get; }
-
-    public readonly IReadOnlyHeap Heap { get; }
-    public readonly IReadOnlyStack<DataItem> Stack { get; }
+    public readonly IReadOnlyList<DataItem> Heap { get; }
 
     public MainResult(string stdOut, string stdErr, BytecodeProcessor interpreter)
     {
         StdOutput = stdOut;
         StdError = stdErr;
-
-        ExitCode = (int)interpreter.Memory.Stack.Last;
-
-        Heap = interpreter.Memory.Heap;
-        Stack = interpreter.Memory.Stack;
+        ExitCode = (int)interpreter.Memory[interpreter.Registers.StackPointer - 1];
+        Heap = interpreter.Memory;
     }
 }
 

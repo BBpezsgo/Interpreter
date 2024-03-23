@@ -1,8 +1,8 @@
-#bf "stream-d" "void" "int";
-#bf "stream-f" "void" "int" "int";
-#bf "stream-c" "int" "int" "int";
-#bf "stream-l" "int" "int";
-#bf "stream-r" "void" "int";
+#bf "stream-dispose" "void" "int";
+#bf "stream-flush" "void" "int" "int";
+#bf "stream-create" "int" "int" "int";
+#bf "stream-length" "int" "int";
+#bf "stream-clear" "void" "int";
 
 class Stream
 {
@@ -79,17 +79,17 @@ class Stream
 	}
 }
 
-[External("stream-d")]
+[External("stream-dispose")]
 void DisposeStream(int id);
 
-[External("stream-f")]
+[External("stream-flush")]
 void FlushStream(int id, int count);
 
-[External("stream-c")]
+[External("stream-create")]
 int CreateStream(int bufferSize, int bufferMemoryAddress);
 
-[External("stream-l")]
+[External("stream-length")]
 int GetStreamLength(int id);
 
-[External("stream-r")]
+[External("stream-clear")]
 void ClearStreamBuffer(int id);

@@ -1,73 +1,44 @@
 ﻿using System.Drawing;
-using System.IO;
 using System.Runtime.Versioning;
 using LanguageCore;
 using LanguageCore.Runtime;
 using Win32.Console;
-
-#nullable disable
 
 namespace ConsoleGUI;
 
 [SupportedOSPlatform("windows")]
 public sealed class InterpreterElement : WindowElement
 {
-    public string File;
-    InterpreterDebuggabble Interpreter;
+    readonly InterpreterDebuggabble Interpreter;
 
-    ScrollBar HeapScrollBar;
-    ScrollBar StackScrollBar;
+    readonly ScrollBar HeapScrollBar;
+    readonly ScrollBar StackScrollBar;
 
     int NextCodeJumpCount;
     int CurrentlyJumping;
-    MainThreadTimer InterpreterTimer;
-    StandardIOElement ConsolePanel;
-    // bool StackAutoScroll;
+    readonly MainThreadTimer InterpreterTimer;
+    readonly StandardIOElement ConsolePanel;
 
-    InterpreterElement() : base()
+    public InterpreterElement(InterpreterDebuggabble interpreter)
     {
+        Interpreter = interpreter;
+
         ClearBuffer();
-        InitElements();
-        HasBorder = false;
 
-        NextCodeJumpCount = 1;
-        CurrentlyJumping = 0;
-        // StackAutoScroll = true;
-    }
-
-    public InterpreterElement(string file, LanguageCore.Compiler.CompilerSettings compilerSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : this()
-    {
-        this.File = file;
-        SetupInterpreter(compilerSettings, interpreterSettings, handleErrors);
-    }
-
-    public InterpreterElement(string file) : this()
-    {
-        this.File = file;
-        SetupInterpreter();
-    }
-
-    public override void Tick(double deltaTime)
-    {
-        this.InterpreterTimer?.Tick(deltaTime);
-    }
-
-    void InitElements()
-    {
-        InlineElement StatePanel = new()
+        InlineElement statePanel = new()
         {
             HasBorder = true,
             Title = "State",
             Layout = new InlineLayout(InlineLayoutSizeMode.Fixed, 4),
         };
-        StatePanel.OnBeforeDraw += StateElement_OnBeforeDraw;
+        statePanel.OnBeforeDraw += StateElement_OnBeforeDraw;
 
-        InlineElement CodePanel = new()
+        InlineElement codePanel = new()
         {
             HasBorder = true,
             Title = "Code",
         };
-        CodePanel.OnBeforeDraw += SourceCodeElement_OnBeforeDraw;
+        codePanel.OnBeforeDraw += SourceCodeElement_OnBeforeDraw;
 
         ConsolePanel = new StandardIOElement
         {
@@ -75,40 +46,41 @@ public sealed class InterpreterElement : WindowElement
             Title = "Console",
         };
 
-        InlineElement StackPanel = new()
+        InlineElement stackPanel = new()
         {
             HasBorder = true,
             Title = "Stack",
             Layout = InlineLayout.Stretchy(130),
         };
-        StackPanel.OnBeforeDraw += StackElement_OnBeforeDraw;
+        stackPanel.OnBeforeDraw += StackElement_OnBeforeDraw;
 
-        StackScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Memory.StackLength + 30), StackPanel);
+        StackScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Registers.StackPointer - Interpreter.BytecodeInterpreter.StackStart + 30), stackPanel);
 
-        StackPanel.OnMouseEventInvoked += StackScrollBar.FeedEvent;
-        StackPanel.OnKeyEventInvoked += StackScrollBar.FeedEvent;
+        stackPanel.OnMouseEventInvoked += StackScrollBar.FeedEvent;
+        stackPanel.OnKeyEventInvoked += StackScrollBar.FeedEvent;
 
-        InlineElement HeapPanel = new()
+        InlineElement heapPanel = new()
         {
             HasBorder = true,
             Title = "HEAP",
         };
 
-        HeapScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Memory.Heap.Size - 3), HeapPanel);
+        HeapScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Memory.Length - 3), heapPanel);
 
-        HeapPanel.OnBeforeDraw += HeapElement_OnBeforeDraw;
-        HeapPanel.OnMouseEventInvoked += HeapScrollBar.FeedEvent;
-        HeapPanel.OnKeyEventInvoked += HeapScrollBar.FeedEvent;
+        heapPanel.OnBeforeDraw += HeapElement_OnBeforeDraw;
+        heapPanel.OnMouseEventInvoked += HeapScrollBar.FeedEvent;
+        heapPanel.OnKeyEventInvoked += HeapScrollBar.FeedEvent;
 
-        InlineElement CallstackPanel = new()
+        InlineElement callStackPanel = new()
         {
             HasBorder = true,
             Title = "Call Stack",
         };
-        CallstackPanel.OnBeforeDraw += CallstackElement_OnBeforeDraw;
+        callStackPanel.OnBeforeDraw += CallstackElement_OnBeforeDraw;
 
-        this.Elements = new Element[]{
-        new HorizontalLayoutElement()
+        Elements = new Element[]
+        {
+            new HorizontalLayoutElement()
             {
                 Rect = new Rectangle(0, 0, Console.WindowWidth, Console.WindowHeight),
                 Elements = new Element[]
@@ -117,60 +89,33 @@ public sealed class InterpreterElement : WindowElement
                     {
                         Elements = new Element[]
                         {
-                            StatePanel,
+                            statePanel,
                             ConsolePanel,
-                            CodePanel,
+                            codePanel,
                         }
                     },
                     new VerticalLayoutElement()
                     {
                         Elements = new Element[]
                         {
-                            StackPanel,
-                            HeapPanel,
-                            CallstackPanel,
+                            stackPanel,
+                            heapPanel,
+                            callStackPanel,
                         }
-                    },
-                },
-            },
-        };
-    }
-
-    void SetupInterpreter() => SetupInterpreter(LanguageCore.Compiler.CompilerSettings.Default, BytecodeInterpreterSettings.Default, false);
-    void SetupInterpreter(LanguageCore.Compiler.CompilerSettings compilerSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
-    {
-        this.InterpreterTimer = new MainThreadTimer(200);
-        this.InterpreterTimer.Elapsed += () =>
-        {
-            if (this.CurrentlyJumping <= 0) return;
-
-            this.CurrentlyJumping--;
-            this.Interpreter.DoUpdate();
-            if (!this.Interpreter.IsExecutingCode)
-            {
-                ConsoleGUI.Instance?.Destroy();
-                return;
+                    }
+                }
             }
-            if (ConsoleGUI.Instance != null) ConsoleGUI.Instance.NextRefreshConsole = true;
         };
-        this.InterpreterTimer.Enabled = true;
 
-        FileInfo fileInfo = new(File);
-        string code = System.IO.File.ReadAllText(fileInfo.FullName);
-        this.Interpreter = new InterpreterDebuggabble();
+        HasBorder = false;
 
-        void PrintOutput(string message, LogType logType)
-        {
-            ConsolePanel.Write(message, logType switch
-            {
-                LogType.Normal => CharColor.Silver,
-                LogType.Warning => CharColor.BrightYellow,
-                LogType.Error => CharColor.BrightRed,
-                LogType.Debug => CharColor.Silver,
-                _ => CharColor.Silver,
-            });
-            ConsolePanel.Write("\n");
-        }
+        NextCodeJumpCount = 1;
+        CurrentlyJumping = 0;
+        // StackAutoScroll = true;
+
+        InterpreterTimer = new MainThreadTimer(200);
+        InterpreterTimer.Elapsed += OnInterpreterTimer;
+        InterpreterTimer.Enabled = true;
 
         Interpreter.OnOutput += (_, p1, p2) => PrintOutput(p1, p2);
 
@@ -180,55 +125,51 @@ public sealed class InterpreterElement : WindowElement
         Interpreter.OnNeedInput += (_) => ConsolePanel.BeginRead();
 
         ConsolePanel.OnInput += Interpreter.OnInput;
-
-        if (!Interpreter.IsExecutingCode)
-        {
-            LanguageCore.Compiler.CompilerResult compiled;
-            LanguageCore.BBCode.Generator.BBCodeGeneratorResult generatedCode;
-
-            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
-            Interpreter.GenerateExternalFunctions(externalFunctions);
-
-            if (handleErrors)
-            {
-                try
-                {
-                    compiled = LanguageCore.Compiler.Compiler.CompileFile(fileInfo, externalFunctions, compilerSettings, PrintOutput);
-                    generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, LanguageCore.Compiler.GeneratorSettings.Default, PrintOutput);
-                }
-                catch (Exception ex)
-                {
-                    PrintOutput(ex.ToString(), LogType.Error);
-                    return;
-                }
-            }
-            else
-            {
-                compiled = LanguageCore.Compiler.Compiler.CompileFile(fileInfo, externalFunctions, compilerSettings, PrintOutput);
-                generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, LanguageCore.Compiler.GeneratorSettings.Default, PrintOutput);
-            }
-
-            Interpreter.CompilerResult = generatedCode;
-            Interpreter.Initialize(generatedCode.Code, new BytecodeInterpreterSettings()
-            {
-                StackMaxSize = interpreterSettings.StackMaxSize,
-                HeapSize = interpreterSettings.HeapSize,
-            }, externalFunctions);
-        }
     }
+
+    void OnInterpreterTimer()
+    {
+        if (CurrentlyJumping <= 0) return;
+
+        CurrentlyJumping--;
+        Interpreter.DoUpdate();
+        if (Interpreter.BytecodeInterpreter.IsDone)
+        {
+            ConsoleGUI.Instance?.Destroy();
+            return;
+        }
+        if (ConsoleGUI.Instance != null) ConsoleGUI.Instance.NextRefreshConsole = true;
+    }
+
+    void PrintOutput(string message, LogType logType)
+    {
+        ConsolePanel.Write(message, logType switch
+        {
+            LogType.Normal => CharColor.Silver,
+            LogType.Warning => CharColor.BrightYellow,
+            LogType.Error => CharColor.BrightRed,
+            LogType.Debug => CharColor.Silver,
+            _ => CharColor.Silver,
+        });
+        ConsolePanel.Write("\n");
+    }
+
+    public override void Tick(double deltaTime) => InterpreterTimer.Tick(deltaTime);
 
     private void CallstackElement_OnBeforeDraw(InlineElement sender)
     {
         sender.ClearBuffer();
         sender.DrawBuffer.StepTo(0);
 
-        if (this.Interpreter.BytecodeInterpreter == null) return;
-
         sender.DrawBuffer.ResetColor();
 
-        ImmutableArray<int> calltraceRaw = this.Interpreter.BytecodeInterpreter.TraceCalls();
+        ImmutableArray<int> calltraceRaw = BytecodeProcessor.TraceCalls(Interpreter.BytecodeInterpreter.Memory, Interpreter.BytecodeInterpreter.Registers.BasePointer);
 
-        FunctionInformations[] callstack = this.Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(calltraceRaw).ToArray();
+        FunctionInformations[] callstack;
+        if (Interpreter.CompilerResult.DebugInfo is not null)
+        { callstack = Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(calltraceRaw).ToArray(); }
+        else
+        { callstack = new FunctionInformations[calltraceRaw.Length]; }
 
         int i;
         for (i = 0; i < callstack.Length; i++)
@@ -322,8 +263,9 @@ public sealed class InterpreterElement : WindowElement
             sender.DrawBuffer.ForegroundColor = CharColor.Silver;
         }
 
+        if (Interpreter.CompilerResult.DebugInfo is not null)
         {
-            FunctionInformations callframe = this.Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(this.Interpreter.BytecodeInterpreter.CodePointer);
+            FunctionInformations callframe = Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(this.Interpreter.BytecodeInterpreter.Registers.CodePointer);
 
             if (callframe.IsValid)
             {
@@ -430,20 +372,6 @@ public sealed class InterpreterElement : WindowElement
         b.ForegroundColor = CharColor.Silver;
 
         b.AddText(' ', 2);
-        if (this.Interpreter.BytecodeInterpreter.CodePointer == this.Interpreter.CompilerResult.Code.Length)
-        {
-            b.AddText("State: ");
-            b.AddText(this.Interpreter.State.ToString());
-        }
-        else
-        {
-            b.AddText("State: Running...");
-        }
-        b.BackgroundColor = CharColor.Black;
-        b.FinishLine(sender.Rect.Width);
-        b.ForegroundColor = CharColor.Silver;
-
-        b.AddText(' ', 2);
 
         if (this.Interpreter.StackOperation)
         {
@@ -533,7 +461,7 @@ public sealed class InterpreterElement : WindowElement
             if (instruction.Opcode == Opcode.HeapSet)
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
-                { storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].VInt); }
+                { storeIndicators.Add(Interpreter.BytecodeInterpreter.Memory[Interpreter.BytecodeInterpreter.Registers.StackPointer - 1].VInt); }
                 else
                 { storeIndicators.Add((int)instruction.Parameter); }
             }
@@ -542,8 +470,8 @@ public sealed class InterpreterElement : WindowElement
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
                 {
-                    if (this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].Type == RuntimeType.Integer)
-                    { loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].VInt); }
+                    if (this.Interpreter.BytecodeInterpreter.Memory[Interpreter.BytecodeInterpreter.Registers.StackPointer - 1].Type == RuntimeType.Integer)
+                    { loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory[Interpreter.BytecodeInterpreter.Registers.StackPointer - 1].VInt); }
                 }
                 else
                 { loadIndicators.Add((int)instruction.Parameter); }
@@ -551,16 +479,16 @@ public sealed class InterpreterElement : WindowElement
         }
 
         int nextHeader = 0;
-        for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Heap.Size; i++)
+        for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Length; i++)
         {
-            DataItem item = this.Interpreter.BytecodeInterpreter.Memory.Heap[i];
-            bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull);
+            DataItem item = this.Interpreter.BytecodeInterpreter.Memory[i];
+            bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory[i].IsNull);
             (int, bool) header = (default, default);
 
             if (isHeader)
             {
-                header = HEAP.GetHeader(item);
-                nextHeader += header.Item1 + HEAP.BLOCK_HEADER_SIZE;
+                header = HeapUtils.GetHeader(item);
+                nextHeader += header.Item1 + HeapUtils.HeaderSize;
             }
 
             if (i < HeapScrollBar.Offset) continue;
@@ -671,13 +599,17 @@ public sealed class InterpreterElement : WindowElement
 
         b.ResetColor();
 
-        CollectedScopeInfo stackDebugInfo = Interpreter.CompilerResult.DebugInfo.GetScopeInformations(Interpreter.BytecodeInterpreter.CodePointer);
+        CollectedScopeInfo stackDebugInfo;
+        if (Interpreter.CompilerResult.DebugInfo is not null)
+        { stackDebugInfo = Interpreter.CompilerResult.DebugInfo.GetScopeInformations(Interpreter.BytecodeInterpreter.Registers.CodePointer); }
+        else
+        { stackDebugInfo = CollectedScopeInfo.Empty; }
 
         Instruction? instruction_ = this.Interpreter.NextInstruction;
 
-        int stackSize = this.Interpreter.BytecodeInterpreter.Memory.Stack.Count;
+        int stackSize = Interpreter.BytecodeInterpreter.Registers.StackPointer - Interpreter.BytecodeInterpreter.StackStart;
 
-        int[] savedBasePointers = DebugInformation.TraceBasePointers(Interpreter.BytecodeInterpreter.Memory.Stack.ToArray(), Interpreter.BytecodeInterpreter.BasePointer);
+        ImmutableArray<int> savedBasePointers = BytecodeProcessor.TraceBasePointers(Interpreter.BytecodeInterpreter.Memory, Interpreter.BytecodeInterpreter.Registers.BasePointer);
 
         bool basepointerShown = false;
 
@@ -697,24 +629,24 @@ public sealed class InterpreterElement : WindowElement
                 instruction.Opcode == Opcode.HeapSet)
             {
                 if (instruction.AddressingMode == AddressingMode.Runtime)
-                { loadIndicators.Add(stackSize - 2); }
+                { loadIndicators.Add(Interpreter.BytecodeInterpreter.StackStart + stackSize - 2); }
                 else
-                { loadIndicators.Add(stackSize - 1); }
+                { loadIndicators.Add(Interpreter.BytecodeInterpreter.StackStart + stackSize - 1); }
             }
 
             if (instruction.Opcode == Opcode.StackLoad)
             {
                 loadIndicators.Add(this.Interpreter.BytecodeInterpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
-                storeIndicators.Add(stackSize);
+                storeIndicators.Add(Interpreter.BytecodeInterpreter.StackStart + stackSize);
             }
 
             if (instruction.Opcode == Opcode.Push ||
                 instruction.Opcode == Opcode.GetBasePointer ||
                 instruction.Opcode == Opcode.HeapGet)
-            { storeIndicators.Add(stackSize); }
+            { storeIndicators.Add(Interpreter.BytecodeInterpreter.StackStart + stackSize); }
 
             if (instruction.Opcode == Opcode.Pop)
-            { loadIndicators.Add(stackSize - 1); }
+            { loadIndicators.Add(Interpreter.BytecodeInterpreter.StackStart + stackSize - 1); }
 
             if (instruction.Opcode == Opcode.MathAdd ||
                 instruction.Opcode == Opcode.MathDiv ||
@@ -726,8 +658,8 @@ public sealed class InterpreterElement : WindowElement
                 instruction.Opcode == Opcode.LogicAND ||
                 instruction.Opcode == Opcode.LogicOR)
             {
-                loadIndicators.Add(stackSize - 1);
-                storeIndicators.Add(stackSize - 2);
+                loadIndicators.Add(Interpreter.BytecodeInterpreter.StackStart + stackSize - 1);
+                storeIndicators.Add(Interpreter.BytecodeInterpreter.StackStart + stackSize - 2);
             }
         }
 
@@ -738,9 +670,12 @@ public sealed class InterpreterElement : WindowElement
 
         stackDrawStart += notVisible;
 
+        stackDrawStart += Interpreter.BytecodeInterpreter.StackStart;
+        stackDrawEnd += Interpreter.BytecodeInterpreter.StackStart;
+
         void DrawElement(int address, DataItem item)
         {
-            if (this.Interpreter.BytecodeInterpreter.BasePointer == address)
+            if (Interpreter.BytecodeInterpreter.Registers.BasePointer == address)
             {
                 b.ForegroundColor = CharColor.BrightBlue;
                 b.AddText('►');
@@ -759,9 +694,7 @@ public sealed class InterpreterElement : WindowElement
                 b.AddText(' ');
             }
 
-            bool addLoadIndicator = false;
-            bool addStoreIndicator = false;
-
+            bool loadIndicatorShown = false;
             for (int j = loadIndicators.Count - 1; j >= 0; j--)
             {
                 if (loadIndicators[j] != address) continue;
@@ -769,10 +702,11 @@ public sealed class InterpreterElement : WindowElement
                 b.AddText('○');
                 b.ForegroundColor = CharColor.Silver;
                 loadIndicators.RemoveAt(j);
-                addLoadIndicator = true;
+                loadIndicatorShown = true;
                 break;
             }
 
+            bool storeIndicatorShown = false;
             for (int j = storeIndicators.Count - 1; j >= 0; j--)
             {
                 if (storeIndicators[j] != address) continue;
@@ -780,14 +714,15 @@ public sealed class InterpreterElement : WindowElement
                 b.AddText('●');
                 b.ForegroundColor = CharColor.Silver;
                 storeIndicators.RemoveAt(j);
-                addStoreIndicator = true;
+                storeIndicatorShown = true;
                 break;
             }
 
-            b.AddText(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - address.ToString(CultureInfo.InvariantCulture).Length);
+            if (!loadIndicatorShown && !storeIndicatorShown)
+            { b.AddText(' '); }
 
             b.AddText(address.ToString(CultureInfo.InvariantCulture));
-            b.AddSpace(5, sender.Rect.Width);
+            b.AddSpace(7, sender.Rect.Width);
 
             b.ForegroundColor = CharColor.Silver;
             b.BackgroundColor = CharColor.Black;
@@ -830,11 +765,11 @@ public sealed class InterpreterElement : WindowElement
         int i;
         for (i = stackDrawStart; i < stackDrawEnd; i++)
         {
-            DataItem item = this.Interpreter.BytecodeInterpreter.Memory.Stack[i];
+            DataItem item = this.Interpreter.BytecodeInterpreter.Memory[i];
 
-            if (stackDebugInfo.TryGet(Interpreter.BytecodeInterpreter.BasePointer, i, out StackElementInformations itemDebugInfo))
+            if (stackDebugInfo.TryGet(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart, i, out StackElementInformations itemDebugInfo))
             {
-                MutableRange<int> range = itemDebugInfo.GetRange(Interpreter.BytecodeInterpreter.BasePointer);
+                MutableRange<int> range = itemDebugInfo.GetRange(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart);
 
                 if (itemDebugInfo.Kind == StackElementKind.Variable ||
                     itemDebugInfo.Kind == StackElementKind.Parameter)
@@ -900,12 +835,12 @@ public sealed class InterpreterElement : WindowElement
         while (
             (
                 !basepointerShown &&
-                i <= this.Interpreter.BytecodeInterpreter.BasePointer
+                i <= this.Interpreter.BytecodeInterpreter.Registers.BasePointer
             ) ||
             loadIndicators.Count > 0 ||
             storeIndicators.Count > 0)
         {
-            if (this.Interpreter.BytecodeInterpreter.BasePointer == i)
+            if (this.Interpreter.BytecodeInterpreter.Registers.BasePointer == i)
             {
                 b.ForegroundColor = CharColor.BrightBlue;
                 b.AddText('►');
@@ -980,49 +915,55 @@ public sealed class InterpreterElement : WindowElement
         }
 
         int indent = 0;
-        for (int i = 0; i < this.Interpreter.BytecodeInterpreter.CodePointer - 5; i++)
+        if (Interpreter.CompilerResult.DebugInfo is not null)
         {
-            if (Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out List<string> comments))
+            for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Registers.CodePointer - 5; i++)
             {
-                for (int j = 0; j < comments.Count; j++)
+                if (Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out List<string>? comments))
                 {
-                    if (!comments[j].EndsWith("{ }", StringComparison.Ordinal) && comments[j].EndsWith('}'))
-                    { indent--; }
-                    if (!comments[j].EndsWith("{ }", StringComparison.Ordinal) && comments[j].EndsWith('{'))
-                    { indent++; }
+                    for (int j = 0; j < comments.Count; j++)
+                    {
+                        if (!comments[j].EndsWith("{ }", StringComparison.Ordinal) && comments[j].EndsWith('}'))
+                        { indent--; }
+                        if (!comments[j].EndsWith("{ }", StringComparison.Ordinal) && comments[j].EndsWith('{'))
+                        { indent++; }
+                    }
                 }
             }
         }
 
         bool IsNextInstruction = false;
-        for (int i = Math.Max(0, this.Interpreter.BytecodeInterpreter.CodePointer - 5); i < this.Interpreter.CompilerResult.Code.Length; i++)
+        for (int i = Math.Max(0, this.Interpreter.BytecodeInterpreter.Registers.CodePointer - 5); i < this.Interpreter.CompilerResult.Code.Length; i++)
         {
-            if (Interpreter.BytecodeInterpreter.CodePointer == i) IsNextInstruction = true;
+            if (Interpreter.BytecodeInterpreter.Registers.CodePointer == i) IsNextInstruction = true;
 
             Instruction instruction = Interpreter.CompilerResult.Code[i];
 
-            if (this.Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out List<string> comments))
+            if (this.Interpreter.CompilerResult.DebugInfo is not null)
             {
-                for (int j = 0; j < comments.Count; j++)
+                if (this.Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out List<string>? comments))
                 {
-                    string comment = comments[j];
-
-                    if (!comment.EndsWith("{ }", StringComparison.Ordinal) && comment.EndsWith('}'))
+                    for (int j = 0; j < comments.Count; j++)
                     {
-                        indent--;
-                    }
+                        string comment = comments[j];
 
-                    LinePrefix(string.Empty);
-                    b.ForegroundColor = CharColor.Gray;
-                    b.AddText(' ', Math.Max(0, indent * 2));
-                    b.AddText(comment);
-                    b.ForegroundColor = CharColor.Silver;
-                    b.BackgroundColor = CharColor.Black;
-                    b.FinishLine(sender.Rect.Width);
+                        if (!comment.EndsWith("{ }", StringComparison.Ordinal) && comment.EndsWith('}'))
+                        {
+                            indent--;
+                        }
 
-                    if (!comment.EndsWith("{ }", StringComparison.Ordinal) && comment.EndsWith('{'))
-                    {
-                        indent++;
+                        LinePrefix(string.Empty);
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText(' ', Math.Max(0, indent * 2));
+                        b.AddText(comment);
+                        b.ForegroundColor = CharColor.Silver;
+                        b.BackgroundColor = CharColor.Black;
+                        b.FinishLine(sender.Rect.Width);
+
+                        if (!comment.EndsWith("{ }", StringComparison.Ordinal) && comment.EndsWith('{'))
+                        {
+                            indent++;
+                        }
                     }
                 }
             }
@@ -1171,7 +1112,7 @@ public sealed class InterpreterElement : WindowElement
 
     public override void OnDestroy()
     {
-        this.Interpreter?.Dispose();
+        this.Interpreter.Dispose();
     }
 
     public override void RefreshSize()

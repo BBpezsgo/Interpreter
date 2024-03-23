@@ -33,7 +33,7 @@ public class Interpreter
 
         public abstract void Dispose();
 
-        public abstract void Tick(HEAP heap);
+        public abstract void Tick(in ArraySegment<DataItem> memory);
     }
 
     protected class InputStream : Stream
@@ -56,17 +56,17 @@ public class Interpreter
             this.SystemStream?.Close();
             this.SystemStream?.Dispose();
 
-            System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: Disposed");
+            Debug.WriteLine($"[STREAM {ID}]: Disposed");
         }
 
         public void ClearBuffer()
         {
             this.Length = 0;
 
-            System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: Buffer cleared");
+            Debug.WriteLine($"[STREAM {ID}]: Buffer cleared");
         }
 
-        public override void Tick(HEAP heap)
+        public override void Tick(in ArraySegment<DataItem> memory)
         {
             if (RemainingBufferSize == 0) return;
             if (SystemHasData) return;
@@ -75,12 +75,10 @@ public class Interpreter
             int readCount = SystemStream.Read(buffer, 0, RemainingBufferSize);
 
             for (int i = 0; i < readCount; i++)
-            {
-                heap[i + MemoryAddress] = new DataItem(buffer[i]);
-            }
+            { memory[i + MemoryAddress] = new DataItem(buffer[i]); }
             Length += readCount;
 
-            System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: (AUTO) Read {readCount} bytes");
+            Debug.WriteLine($"[STREAM {ID}]: (AUTO) Read {readCount} bytes");
         }
     }
 
@@ -101,7 +99,7 @@ public class Interpreter
             this.SystemStream?.Close();
             this.SystemStream?.Dispose();
 
-            System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: Disposed");
+            Debug.WriteLine($"[STREAM {ID}]: Disposed");
         }
 
         public void Flush(byte[] buffer)
@@ -111,10 +109,10 @@ public class Interpreter
             this.SystemStream.Write(buffer, 0, buffer.Length);
             this.SystemStream.Flush();
 
-            System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: Write {buffer.Length} bytes");
+            Debug.WriteLine($"[STREAM {ID}]: Write {buffer.Length} bytes");
         }
 
-        public override void Tick(HEAP heap) { }
+        public override void Tick(in ArraySegment<DataItem> memory) { }
     }
 
     public delegate void OnOutputEventHandler(Interpreter sender, string message, LogType logType);
@@ -131,7 +129,6 @@ public class Interpreter
     /// Call <see cref="OnInput(char)"/> after this invoked
     /// </summary>
     public event OnInputEventHandler? OnNeedInput;
-    public event OnExecutedEventHandler? OnExecuted;
 
     public BBCodeGeneratorResult CompilerResult;
     public Instruction? NextInstruction
@@ -139,71 +136,33 @@ public class Interpreter
         get
         {
             if (this.BytecodeInterpreter == null) return null;
-            if (this.BytecodeInterpreter.CodePointer < 0 || this.BytecodeInterpreter.CodePointer >= this.CompilerResult.Code.Length) return null;
-            return this.CompilerResult.Code[this.BytecodeInterpreter.CodePointer];
+            if (this.BytecodeInterpreter.Registers.CodePointer < 0 || this.BytecodeInterpreter.Registers.CodePointer >= this.CompilerResult.Code.Length) return null;
+            return this.CompilerResult.Code[this.BytecodeInterpreter.Registers.CodePointer];
         }
     }
 
-    public InterpreterState State;
-
-    public bool IsExecutingCode;
-
-    public BytecodeProcessor? BytecodeInterpreter;
+    public readonly BytecodeProcessor BytecodeInterpreter;
 
     protected bool IsPaused;
     ExternalFunctionManaged? ReturnValueConsumer;
 
-    protected List<Stream> Streams;
+    protected readonly List<Stream> Streams;
 
-    protected bool HandleErrors;
+    readonly bool ThrowExceptions;
 
-    public Interpreter()
+    public Interpreter(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program)
     {
         Streams = new List<Stream>();
-        HandleErrors = true;
-    }
+        ThrowExceptions = handleErrors!;
 
-    [MemberNotNullWhen(true, nameof(BytecodeInterpreter))]
-    public bool Initialize(ImmutableArray<Instruction> program, BytecodeInterpreterSettings settings, Dictionary<string, ExternalFunctionBase> externalFunctions)
-    {
-        if (IsExecutingCode)
-        {
-            OnOutput?.Invoke(this, "Can't run the program: currently running another", LogType.Warning);
-            return false;
-        }
-        IsExecutingCode = true;
-
-        if (Streams == null)
-        { Streams = new List<Stream>(); }
-        else
-        {
-            for (int i = 0; i < Streams.Count; i++)
-            { Streams[i]?.Dispose(); }
-            Streams.Clear();
-        }
-
-        BytecodeInterpreter = new BytecodeProcessor(program, externalFunctions.ToFrozenDictionary(), settings);
-        externalFunctions.SetInterpreter(BytecodeInterpreter);
-
-        State = InterpreterState.Initialized;
-
-        return true;
+        BytecodeInterpreter = new BytecodeProcessor(program, GenerateExternalFunctions().ToFrozenDictionary(), settings);
     }
 
     public void Dispose()
     {
-        IsExecutingCode = false;
-
-        if (Streams != null)
-        {
-            for (int i = 0; i < Streams.Count; i++)
-            {
-                Streams[i].Dispose();
-            }
-            Streams.Clear();
-        }
-
-        State = InterpreterState.Destroyed;
+        foreach (Stream stream in Streams)
+        { stream.Dispose(); }
+        Streams.Clear();
     }
 
     /// <summary>
@@ -224,17 +183,19 @@ public class Interpreter
         IsPaused = false;
     }
 
-    public void GenerateExternalFunctions(Dictionary<string, ExternalFunctionBase> externalFunctions)
+    Dictionary<int, ExternalFunctionBase> GenerateExternalFunctions()
     {
+        Dictionary<int, ExternalFunctionBase> externalFunctions = new();
+
         #region Console
 
-        externalFunctions.AddManagedExternalFunction("stdin", Array.Empty<RuntimeType>(), (DataItem[] parameters, ExternalFunctionManaged function) =>
+        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, Array.Empty<RuntimeType>(), (DataItem[] parameters, ExternalFunctionManaged function) =>
         {
             this.IsPaused = true;
             this.ReturnValueConsumer = function;
             if (this.OnNeedInput == null)
             {
-                this.OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", LogType.Warning);
+                this.OnOutput?.Invoke(this, $"Event {OnNeedInput} does not have listeners", LogType.Warning);
                 this.OnInput('\0');
             }
             else
@@ -243,7 +204,7 @@ public class Interpreter
             }
         });
 
-        externalFunctions.AddExternalFunction("stdout", (char @char) => OnStdOut?.Invoke(this, @char));
+        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, (char @char) => OnStdOut?.Invoke(this, @char));
 
         externalFunctions.AddExternalFunction("console-set",
             (char @char, int x, int y) =>
@@ -259,38 +220,13 @@ public class Interpreter
 
         externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char));
 
-        externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter! /* This can't be null */ .SetSleep(new TimeSleep(t)));
-
-        #endregion
-
-        #region Math
-
-        externalFunctions.AddExternalFunction<float, float>("cos", MathF.Cos);
-        externalFunctions.AddExternalFunction<float, float>("sin", MathF.Sin);
-
-        #endregion
-
-        #region Enviroment
-
-        externalFunctions.AddExternalFunction("utc-time", () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
-        externalFunctions.AddExternalFunction("local-time", () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
-        externalFunctions.AddExternalFunction("utc-date-day", () => (int)DateTime.Now.DayOfYear);
-        externalFunctions.AddExternalFunction("local-date-day", () => (int)DateTime.Now.DayOfYear);
-        externalFunctions.AddExternalFunction("utc-date-year", () => (int)DateTime.Now.Year);
-        externalFunctions.AddExternalFunction("local-date-year", () => (int)DateTime.Now.Year);
-
-        #endregion
-
-        #region Casts
-
-        externalFunctions.AddExternalFunction("float-to-int", (float v) => (int)v);
-        externalFunctions.AddExternalFunction("int-to-float", (int v) => (float)v);
+        externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter! /* This can't be null */ .Sleep(new TimeSleep(t)));
 
         #endregion
 
         #region Streams
 
-        externalFunctions.AddExternalFunction("stream-c",
+        externalFunctions.AddExternalFunction("stream-create",
             (int bufferSize, int bufferMemoryAddress) =>
             {
                 int newID = 1;
@@ -315,7 +251,7 @@ public class Interpreter
 
                 return newID;
             });
-        externalFunctions.AddExternalFunction("stream-d",
+        externalFunctions.AddExternalFunction("stream-dispose",
             (int id) =>
             {
                 for (int i = Streams.Count - 1; i >= 0; i--)
@@ -331,7 +267,7 @@ public class Interpreter
 
                 throw new RuntimeException($"Stream {id} not found");
             });
-        externalFunctions.AddExternalFunction("stream-f",
+        externalFunctions.AddExternalFunction("stream-flush",
             (int id, int count) =>
             {
                 for (int i = 0; i < Streams.Count; i++)
@@ -344,7 +280,7 @@ public class Interpreter
                     byte[] buffer = new byte[count];
                     for (int j = 0; j < count; j++)
                     {
-                        buffer[j] = BytecodeInterpreter! /* This can't be null */ .Memory.Heap[j + stream.MemoryAddress].Byte ?? 0;
+                        buffer[j] = BytecodeInterpreter! /* This can't be null */ .Memory[j + stream.MemoryAddress].Byte ?? 0;
                     }
 
                     stream.Flush(buffer);
@@ -354,7 +290,7 @@ public class Interpreter
 
                 throw new RuntimeException($"Stream {id} not found");
             });
-        externalFunctions.AddExternalFunction("stream-l",
+        externalFunctions.AddExternalFunction("stream-length",
             (int id) =>
             {
                 for (int i = 0; i < Streams.Count; i++)
@@ -369,7 +305,7 @@ public class Interpreter
 
                 throw new RuntimeException($"Stream {id} not found");
             });
-        externalFunctions.AddExternalFunction("stream-r",
+        externalFunctions.AddExternalFunction("stream-clear",
             (int id) =>
             {
                 for (int i = 0; i < Streams.Count; i++)
@@ -388,38 +324,83 @@ public class Interpreter
             });
 
         #endregion
+
+        AddStaticExternalFunctions(externalFunctions);
+
+        return externalFunctions;
     }
 
-    protected void OnCodeExecuted()
+    public static Dictionary<int, ExternalFunctionBase> GetExternalFunctions()
     {
-        OnExecuted?.Invoke(this);
-        IsExecutingCode = false;
+        Dictionary<int, ExternalFunctionBase> externalFunctions = new();
 
-        State = InterpreterState.CodeExecuted;
+        AddRuntimeExternalFunctions(externalFunctions);
 
-        if (Streams != null)
-        {
-            for (int i = 0; i < Streams.Count; i++)
-            { Streams[i].Dispose(); }
-            Streams.Clear();
-        }
+        AddStaticExternalFunctions(externalFunctions);
+
+        return externalFunctions;
+    }
+
+    static void AddRuntimeExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
+    {
+        #region Console
+
+        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, Array.Empty<RuntimeType>(), (DataItem[] parameters, ExternalFunctionManaged function) => { });
+        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, (char @char) => { });
+        externalFunctions.AddExternalFunction("console-set", (char @char, int x, int y) => { });
+        externalFunctions.AddExternalFunction("console-clear", () => { });
+        externalFunctions.AddExternalFunction("stderr", (char @char) => { });
+        externalFunctions.AddExternalFunction("sleep", (int t) => { });
+
+        #endregion
+
+        #region Streams
+
+        externalFunctions.AddExternalFunction("stream-create", (int bufferSize, int bufferMemoryAddress) => 0);
+        externalFunctions.AddExternalFunction("stream-dispose", (int id) => { });
+        externalFunctions.AddExternalFunction("stream-flush", (int id, int count) => { });
+        externalFunctions.AddExternalFunction("stream-length", (int id) => 0);
+        externalFunctions.AddExternalFunction("stream-clear", (int id) => { });
+
+        #endregion
+    }
+
+    static void AddStaticExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
+    {
+        #region Enviroment
+
+        externalFunctions.AddExternalFunction("utc-time", () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
+        externalFunctions.AddExternalFunction("local-time", () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
+        externalFunctions.AddExternalFunction("utc-date-day", () => (int)DateTime.Now.DayOfYear);
+        externalFunctions.AddExternalFunction("local-date-day", () => (int)DateTime.Now.DayOfYear);
+        externalFunctions.AddExternalFunction("utc-date-year", () => (int)DateTime.Now.Year);
+        externalFunctions.AddExternalFunction("local-date-year", () => (int)DateTime.Now.Year);
+
+        #endregion
+
+        #region Casts
+
+        externalFunctions.AddExternalFunction("float-to-int", (float v) => (int)v);
+        externalFunctions.AddExternalFunction("int-to-float", (int v) => (float)v);
+
+        #endregion
     }
 
     public void Update()
     {
-        if (BytecodeInterpreter != null && Streams != null)
-        {
-            for (int i = 0; i < Streams.Count; i++)
-            { Streams[i].Tick(BytecodeInterpreter.Memory.Heap); }
-        }
+        for (int i = 0; i < Streams.Count; i++)
+        { Streams[i].Tick(BytecodeInterpreter.Memory); }
 
-        if (!IsExecutingCode || IsPaused) return;
+        if (BytecodeInterpreter.IsDone || IsPaused) return;
 
         try
         {
-            bool didSomething = BytecodeInterpreter?.Tick() ?? false;
-            if (didSomething) return;
-            else OnCodeExecuted();
+            if (!BytecodeInterpreter.Tick())
+            {
+                for (int i = 0; i < Streams.Count; i++)
+                { Streams[i].Dispose(); }
+                Streams.Clear();
+            }
         }
         catch (UserException error)
         {
@@ -427,10 +408,9 @@ public class Interpreter
 
             OnOutput?.Invoke(this, $"User Exception: {error}", LogType.Error);
 
-            OnExecuted?.Invoke(this);
-            IsExecutingCode = false;
+            BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;
 
-            if (!HandleErrors) throw;
+            if (ThrowExceptions) throw;
         }
         catch (RuntimeException error)
         {
@@ -438,19 +418,17 @@ public class Interpreter
 
             OnOutput?.Invoke(this, $"Runtime Exception: {error}", LogType.Error);
 
-            OnExecuted?.Invoke(this);
-            IsExecutingCode = false;
+            BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;
 
-            if (!HandleErrors) throw;
+            if (ThrowExceptions) throw;
         }
         catch (Exception error)
         {
             OnOutput?.Invoke(this, $"Internal Exception: {error.Message}", LogType.Error);
 
-            OnExecuted?.Invoke(this);
-            IsExecutingCode = false;
+            BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;
 
-            if (!HandleErrors) throw;
+            if (ThrowExceptions) throw;
         }
     }
 }

@@ -77,9 +77,9 @@ public sealed class Parser
         "!", "~",
     };
 
-#pragma warning disable IDE0052, CA1823 // Remove unread private members
+#pragma warning disable RCS1213, IDE0052, CA1823 // Remove unread private members
     static readonly string[] UnaryPostfixOperators = Array.Empty<string>();
-#pragma warning restore IDE0052, CA1823
+#pragma warning restore RCS1213, IDE0052, CA1823
 
     // === Result ===
     readonly List<Error> Errors = new();

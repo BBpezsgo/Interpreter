@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore;
 
-public class Stack<T> : List<T>, IReadOnlyStack<T>
+public class Stack<T> : List<T>
 {
     public T Last
     {
@@ -9,85 +9,60 @@ public class Stack<T> : List<T>, IReadOnlyStack<T>
         set => this[^1] = value;
     }
 
-    T IReadOnlyStack<T>.this[Index index] => base[index];
-
     public Stack() { }
     public Stack(int capacity) : base(capacity) { }
     public Stack(IEnumerable<T> items) : base(items) { }
+}
 
+public static class StackUtils
+{
     /// <exception cref="InvalidOperationException"/>
-    public void Pop(int count)
+    public static T Last<T>(this IList<T> list)
     {
-        if (Count < count)
-        { throw new InvalidOperationException($"Count ({count}) is larger than the number of items in the stack ({Count})"); }
-
-        for (int i = 0; i < count; i++)
-        { RemoveAt(Count - 1); }
+        if (list.Count == 0)
+        { throw new InvalidOperationException("Stack is empty"); }
+        return list[^1];
     }
 
     /// <exception cref="InvalidOperationException"/>
-    public void Pop(int count, ref T[] buffer)
+    /// <exception cref="NotSupportedException"/>
+    public static void Pop<T>(this IList<T> list, int count)
     {
-        if (Count < count)
-        { throw new InvalidOperationException($"Count ({count}) is larger than the number of items in the stack ({Count})"); }
-
-        buffer = new T[count];
+        if (list.Count < count)
+        { throw new InvalidOperationException($"Count ({count}) is larger than the number of items in the stack ({list.Count})"); }
 
         for (int i = 0; i < count; i++)
-        {
-            buffer[i] = this[^1];
-            RemoveAt(Count - 1);
-        }
+        { list.RemoveAt(list.Count - 1); }
     }
 
-    /// <exception cref="ArgumentOutOfRangeException"/>
-    /// <exception cref="InvalidOperationException"/>
-    public void Pop(int count, T[] buffer)
-    {
-        if (buffer.Length < count)
-        { throw new ArgumentOutOfRangeException(nameof(count), count, $"Count ({count}) is larger than the size of the buffer ({buffer.Length})"); }
+    /// <exception cref="NotSupportedException"/>
+    public static void Push<T>(this ICollection<T> list, T item) => list.Add(item);
 
-        if (Count < count)
-        { throw new InvalidOperationException($"Count ({count}) is larger than the number of items in the stack ({Count})"); }
-
-        for (int i = 0; i < count; i++)
-        {
-            buffer[i] = this[^1];
-            RemoveAt(Count - 1);
-        }
-    }
-
-    public void Push(T item) => Add(item);
-
-    public void PushIf<TItem>(TItem? item) where TItem : struct, T
+    /// <exception cref="NotSupportedException"/>
+    public static void PushIf<T>(this ICollection<T> list, T? item) where T : struct
     {
         if (!item.HasValue) return;
-        Add(item.Value);
+        list.Add(item.Value);
+    }
+
+    /// <exception cref="NotSupportedException"/>
+    public static void PushIf<T>(this ICollection<T> list, T? item) where T : class
+    {
+        if (item is null) return;
+        list.Add(item);
     }
 
     /// <exception cref="InvalidOperationException"/>
-    public T Pop()
+    /// <exception cref="NotSupportedException"/>
+    public static T Pop<T>(this IList<T> list)
     {
-        if (Count == 0)
+        if (list.Count == 0)
         { throw new InvalidOperationException("Stack is empty"); }
 
-        T val = this[^1];
-        RemoveAt(Count - 1);
+        T val = list[^1];
+        list.RemoveAt(list.Count - 1);
         return val;
     }
 
-    public void PushRange(IEnumerable<T> values) => AddRange(values);
-}
-
-public interface IReadOnlyStack<T> : IReadOnlyList<T>
-{
-    public T Last { get; }
-
-    public T this[Index index] { get; }
-
-    public T[] ToArray();
-
-    public bool Contains(T item);
-
-    public void CopyTo(T[] array, int arrayIndex);
+    public static void PushRange<T>(this List<T> list, IEnumerable<T> values) => list.AddRange(values);
 }

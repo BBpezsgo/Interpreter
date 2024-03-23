@@ -7,7 +7,7 @@ public readonly struct RuntimeContext
     public ImmutableArray<int> CallTrace { get; init; }
     public int CodePointer { get; init; }
     public ImmutableArray<Instruction> Code { get; init; }
-    public IReadOnlyStack<DataItem> Stack { get; init; }
+    public IReadOnlyList<DataItem> Stack { get; init; }
     public int CodeSampleStart { get; init; }
 }
 
@@ -104,40 +104,43 @@ public class BytecodeProcessor
 {
     const int CodeSampleRange = 20;
 
-    Instruction CurrentInstruction => Memory.Code[CodePointer];
-    public bool IsDone => CodePointer >= Memory.Code.Length;
+    Instruction CurrentInstruction => Code[Registers.CodePointer];
+    public bool IsDone => Registers.CodePointer >= Code.Length;
 
     readonly BytecodeInterpreterSettings Settings;
 
     bool IsUserInvoking => UserInvokes.Count > 0 && UserInvokes.Peek().IsInvoking;
     readonly Queue<UserInvoke> UserInvokes;
 
-    ISleep? Sleep;
+    ISleep? CurrentSleep;
 
-    public Memory Memory;
+    public Registers Registers;
+    public readonly DataItem[] Memory;
 
-    readonly FrozenDictionary<string, ExternalFunctionBase> ExternalFunctions;
+    public ImmutableArray<Instruction> Code;
 
-    public int CodePointer;
-    public int BasePointer;
+    const int StackSize = 256;
+    public int StackStart => Settings.HeapSize;
 
-    int LastInstructionPointer;
+    readonly FrozenDictionary<int, ExternalFunctionBase> ExternalFunctions;
 
-    public BytecodeProcessor(ImmutableArray<Instruction> code, FrozenDictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings)
+    public BytecodeProcessor(ImmutableArray<Instruction> code, FrozenDictionary<int, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings)
     {
         UserInvokes = new Queue<UserInvoke>();
         Settings = settings;
-        LastInstructionPointer = -1;
-
         ExternalFunctions = externalFunctions;
 
-        BasePointer = 0;
-        CodePointer = 0;
+        Code = code;
 
-        Memory = new(settings.HeapSize, code);
+        Memory = new DataItem[settings.HeapSize + StackSize];
+        HeapUtils.Init(Memory);
+
+        Registers.StackPointer = Settings.HeapSize;
+
+        externalFunctions.SetInterpreter(this);
     }
 
-    public void SetSleep(ISleep sleep) => Sleep = sleep;
+    public void Sleep(ISleep sleep) => CurrentSleep = sleep;
 
     public void Call(int instructionOffset, Action<DataItem> callback, params DataItem[] arguments)
         => UserInvokes.Enqueue(new UserInvoke(instructionOffset, arguments, callback));
@@ -146,77 +149,103 @@ public class BytecodeProcessor
 
     RuntimeContext GetContext() => new()
     {
-        CallTrace = TraceCalls(),
-        CodePointer = CodePointer,
-        Code = Memory.Code[Math.Max(CodePointer - CodeSampleRange, 0)..Math.Clamp(CodePointer + CodeSampleRange, 0, Memory.Code.Length - 1)],
-        Stack = Memory.Stack,
-        CodeSampleStart = Math.Max(CodePointer - CodeSampleRange, 0),
+        CallTrace = TraceCalls(Memory, Registers.BasePointer),
+        CodePointer = Registers.CodePointer,
+        Code = Code[Math.Max(Registers.CodePointer - CodeSampleRange, 0)..Math.Clamp(Registers.CodePointer + CodeSampleRange, 0, Code.Length - 1)],
+        Stack = Memory,
+        CodeSampleStart = Math.Max(Registers.CodePointer - CodeSampleRange, 0),
     };
 
-    public ImmutableArray<int> TraceCalls()
+    public static ImmutableArray<int> TraceCalls(IReadOnlyList<DataItem> stack, int basePointer)
     {
-        bool CanTraceCallsWith(int basePointer) =>
+        static bool CanTraceCallsWith(IReadOnlyList<DataItem> stack, int basePointer) =>
             basePointer >= 2 &&
-            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset < Memory.Stack.Count &&
-            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset < Memory.Stack.Count;
+            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset < stack.Count &&
+            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset < stack.Count;
 
-        void TraceCalls(List<int> callTrace, int basePointer)
+        static void TraceCalls(IReadOnlyList<DataItem> stack, List<int> callTrace, int basePointer)
         {
-            if (!CanTraceCallsWith(basePointer)) return;
+            if (!CanTraceCallsWith(stack, basePointer)) return;
 
-            DataItem savedCodePointerD = Memory.Stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset];
-            DataItem savedBasePointerD = Memory.Stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset];
+            DataItem savedCodePointerD = stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset];
+            DataItem savedBasePointerD = stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset];
 
             if (!savedCodePointerD.Integer.HasValue) return;
             if (!savedBasePointerD.Integer.HasValue) return;
 
-            int savedCodePointer = savedCodePointerD.Integer ?? 0;
-            int savedBasePointer = savedBasePointerD.Integer ?? 0;
+            int savedCodePointer = savedCodePointerD.Integer.Value;
+            int savedBasePointer = savedBasePointerD.Integer.Value;
 
             callTrace.Add(savedCodePointer);
 
-            if (savedBasePointer == BasePointer) return;
-            TraceCalls(callTrace, savedBasePointer);
+            if (savedBasePointer == basePointer) return;
+            TraceCalls(stack, callTrace, savedBasePointer);
         }
 
-        if (!CanTraceCallsWith(BasePointer))
+        if (!CanTraceCallsWith(stack, basePointer))
         { return ImmutableArray.Create<int>(); }
 
         List<int> callTrace = new();
 
-        TraceCalls(callTrace, BasePointer);
+        TraceCalls(stack, callTrace, basePointer);
 
         int[] callTraceResult = callTrace.ToArray();
         Array.Reverse(callTraceResult);
         return callTraceResult.ToImmutableArray();
     }
 
+    public static ImmutableArray<int> TraceBasePointers(IReadOnlyList<DataItem> stack, int basePointer)
+    {
+        static bool CanTraceBPsWith(IReadOnlyList<DataItem> stack, int basePointer) =>
+            basePointer >= 1 &&
+            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset < stack.Count;
+
+        static void TraceBasePointers(List<int> result, IReadOnlyList<DataItem> stack, int basePointer)
+        {
+            if (!CanTraceBPsWith(stack, basePointer)) return;
+
+            DataItem savedBasePointerD = stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset];
+            if (savedBasePointerD.Type != RuntimeType.Integer) return;
+            int newBasePointer = savedBasePointerD.VInt;
+            result.Add(newBasePointer);
+            if (newBasePointer == basePointer) return;
+            TraceBasePointers(result, stack, newBasePointer);
+        }
+
+        if (!CanTraceBPsWith(stack, basePointer))
+        { return ImmutableArray.Create<int>(); }
+
+        List<int> result = new();
+        TraceBasePointers(result, stack, basePointer);
+        return result.ToImmutableArray();
+    }
+
     public int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
     {
         AddressingMode.Absolute => offset,
-        AddressingMode.BasePointerRelative => BasePointer + offset,
-        AddressingMode.StackRelative => Memory.StackLength + offset,
-        AddressingMode.Runtime => Memory.Stack.Last.VInt,
+        AddressingMode.BasePointerRelative => Registers.BasePointer + offset,
+        AddressingMode.StackPointerRelative => Registers.StackPointer + offset,
+        AddressingMode.Runtime => Memory[Registers.StackPointer - 1].VInt,
         _ => offset,
     };
 
-    void Step() => CodePointer++;
-    void Step(int num) => CodePointer += num;
+    void Step() => Registers.CodePointer++;
+    void Step(int num) => Registers.CodePointer += num;
 
     /// <exception cref="RuntimeException"/>
     /// <exception cref="UserException"/>
     /// <exception cref="InternalException"/>
     public bool Tick()
     {
-        if (Memory.Stack.Count > Settings.StackMaxSize)
-        { throw new RuntimeException("Stack size exceed the StackMaxSize", GetContext()); }
+        // if (Registers.StackPointer > Settings.StackMaxSize)
+        // { throw new RuntimeException("Stack size exceed the StackMaxSize", GetContext()); }
 
-        if (Sleep is not null)
+        if (CurrentSleep is not null)
         {
-            if (Sleep.Tick())
+            if (CurrentSleep.Tick())
             { return true; }
             else
-            { Sleep = null; }
+            { CurrentSleep = null; }
         }
 
         if (IsDone)
@@ -226,34 +255,26 @@ public class BytecodeProcessor
                 UserInvoke userInvoke = UserInvokes.Dequeue();
 
                 for (int i = 0; i < userInvoke.Arguments.Length; i++)
-                {
-                    if (Memory.Stack.Count == 0)
-                    { throw new InternalException($"Tried to pop user-invoked function's parameters but the stack is empty"); }
-                    Memory.Stack.Pop();
-                }
+                { Pop(); }
 
-                if (Memory.Stack.Count == 0)
-                { throw new InternalException($"Tried to pop user-invoked function's return value but the stack is empty"); }
-
-                DataItem returnValue = userInvoke.NeedReturnValue ? Memory.Stack.Pop() : DataItem.Null;
+                DataItem returnValue = userInvoke.NeedReturnValue ? Pop() : DataItem.Null;
                 userInvoke.Callback?.Invoke(returnValue);
                 return true;
             }
-
-            LastInstructionPointer = -1;
 
             if (UserInvokes.Count > 0)
             {
                 UserInvoke userInvoke = UserInvokes.Peek();
 
-                CodePointer = userInvoke.InstructionOffset;
-                Memory.Stack.Push(new DataItem(0));
-                Memory.Stack.PushRange(userInvoke.Arguments);
+                Registers.CodePointer = userInvoke.InstructionOffset;
+                Push(new DataItem(0));
+                for (int i = 0; i < userInvoke.Arguments.Length; i++)
+                { Push(userInvoke.Arguments[i]); }
 
-                Memory.Stack.Push(new DataItem(0));
-                Memory.Stack.Push(new DataItem(Memory.Code.Length));
+                Push(new DataItem(0));
+                Push(new DataItem(Code.Length));
 
-                BasePointer = Memory.Stack.Count;
+                Registers.BasePointer = Registers.StackPointer;
 
                 userInvoke.IsInvoking = true;
                 return true;
@@ -261,6 +282,8 @@ public class BytecodeProcessor
 
             return false;
         }
+
+        int lastCodePointer = Registers.CodePointer;
 
         try
         {
@@ -281,10 +304,8 @@ public class BytecodeProcessor
             throw new RuntimeException(error.Message, error, GetContext());
         }
 
-        if (LastInstructionPointer == CodePointer)
-        { throw new RuntimeException($"Execution stuck at instruction {LastInstructionPointer}", GetContext()); }
-
-        LastInstructionPointer = CodePointer;
+        if (lastCodePointer == Registers.CodePointer)
+        { throw new RuntimeException($"Execution stuck at instruction {lastCodePointer}", GetContext()); }
 
         return true;
     }
@@ -354,27 +375,29 @@ public class BytecodeProcessor
             case Opcode.TypeGet: TYPE_GET(); break;
             case Opcode.TypeSet: TYPE_SET(); break;
 
+            case Opcode.GetRegister: GET_REGISTER(); break;
+
             default: throw new UnreachableException();
         }
     }
 
+    #region Memory Manipulation
+
     /// <exception cref="InternalException"/>
     int FetchStackAddress() => CurrentInstruction.AddressingMode switch
     {
-        AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-        AddressingMode.Runtime => (int)Memory.Pop(),
+        AddressingMode.Runtime => (int)Pop(),
+        AddressingMode.BasePointerRelative => Registers.BasePointer + (int)CurrentInstruction.Parameter,
+        AddressingMode.StackPointerRelative => Registers.StackPointer + (int)CurrentInstruction.Parameter,
 
-        AddressingMode.BasePointerRelative => BasePointer + (int)CurrentInstruction.Parameter,
-        AddressingMode.StackRelative => Memory.StackLength + (int)CurrentInstruction.Parameter,
-
-        _ => throw new InternalException($"Invalid stack addressing mode {CurrentInstruction.AddressingMode}"),
+        _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
     };
 
     /// <exception cref="InternalException"/>
     int FetchHeapAddress() => CurrentInstruction.AddressingMode switch
     {
         AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-        AddressingMode.Runtime => (int)Memory.Pop(),
+        AddressingMode.Runtime => (int)Pop(),
 
         _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
     };
@@ -383,10 +406,24 @@ public class BytecodeProcessor
     DataItem FetchData() => CurrentInstruction.AddressingMode switch
     {
         AddressingMode.Absolute => CurrentInstruction.Parameter,
-        AddressingMode.Runtime => Memory.Pop(),
+        AddressingMode.Runtime => Pop(),
 
         _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
     };
+
+    void Push(DataItem data)
+    {
+        Memory[Registers.StackPointer] = data;
+        Registers.StackPointer++;
+    }
+
+    DataItem Pop()
+    {
+        Registers.StackPointer--;
+        return Memory[Registers.StackPointer];
+    }
+
+    #endregion
 
     #region Instruction Methods
 
@@ -394,22 +431,22 @@ public class BytecodeProcessor
 
     void HEAP_ALLOC()
     {
-        DataItem sizeData = Memory.Pop();
-        int size = sizeData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_ALLOC, got {sizeData.Type}");
+        DataItem sizeData = Pop();
+        int size = sizeData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode {nameof(Opcode.Allocate)}, got {sizeData.Type}");
 
-        int block = Memory.Allocate(size);
+        int block = HeapUtils.Allocate(Memory, size);
 
-        Memory.Push(new DataItem(block));
+        Push(new DataItem(block));
 
         Step();
     }
 
     void HEAP_FREE()
     {
-        DataItem pointerData = Memory.Pop();
-        int pointer = pointerData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_DEALLOC, got {pointerData.Type}");
+        DataItem pointerData = Pop();
+        int pointer = pointerData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode {nameof(Opcode.Free)}, got {pointerData.Type}");
 
-        Memory.Free(pointer);
+        HeapUtils.Deallocate(Memory, pointer);
 
         Step();
     }
@@ -417,16 +454,16 @@ public class BytecodeProcessor
     void HEAP_GET()
     {
         int address = FetchHeapAddress();
-        DataItem value = Memory.HeapGet(address);
-        Memory.Push(value);
+        DataItem value = Memory[address];
+        Push(value);
         Step();
     }
 
     void HEAP_SET()
     {
         int address = FetchHeapAddress();
-        DataItem value = Memory.Pop();
-        Memory.HeapSet(address, value);
+        DataItem value = Pop();
+        Memory[address] = value;
         Step();
     }
 
@@ -437,9 +474,8 @@ public class BytecodeProcessor
     /// <exception cref="UserException"/>
     void THROW()
     {
-        int pointer = (int)Memory.Pop();
-        string? value = Memory.HeapGetString(pointer);
-        Memory.Free(pointer);
+        int pointer = (int)Pop();
+        string? value = HeapUtils.GetString(Memory, pointer);
         throw new UserException(value ?? "null");
     }
 
@@ -447,16 +483,16 @@ public class BytecodeProcessor
     {
         int relativeAddress = (int)FetchData();
 
-        Memory.Push(new DataItem(CodePointer));
+        Push(new DataItem(Registers.CodePointer));
 
         Step(relativeAddress);
     }
 
     void RETURN()
     {
-        DataItem codePointer = Memory.Pop();
+        DataItem codePointer = Pop();
 
-        CodePointer = (int)codePointer;
+        Registers.CodePointer = (int)codePointer;
     }
 
     void JUMP_BY()
@@ -470,7 +506,7 @@ public class BytecodeProcessor
     {
         int relativeAddress = (int)FetchData();
 
-        DataItem condition = Memory.Pop();
+        DataItem condition = Pop();
 
         if (condition)
         { Step(); }
@@ -480,7 +516,7 @@ public class BytecodeProcessor
 
     void EXIT()
     {
-        CodePointer = Memory.Code.Length;
+        Registers.CodePointer = Code.Length;
     }
 
     #endregion
@@ -489,146 +525,146 @@ public class BytecodeProcessor
 
     void BITSHIFT_LEFT()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide << rightSide);
+        Push(leftSide << rightSide);
 
         Step();
     }
 
     void BITSHIFT_RIGHT()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide >> rightSide);
+        Push(leftSide >> rightSide);
 
         Step();
     }
 
     void LOGIC_LT()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(new DataItem(leftSide < rightSide));
+        Push(new DataItem(leftSide < rightSide));
 
         Step();
     }
 
     void LOGIC_NOT()
     {
-        DataItem v = Memory.Pop();
-        Memory.Push(!v);
+        DataItem v = Pop();
+        Push(!v);
         Step();
     }
 
     void LOGIC_MT()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(new DataItem(leftSide > rightSide));
+        Push(new DataItem(leftSide > rightSide));
 
         Step();
     }
 
     void LOGIC_AND()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(new DataItem((bool)leftSide && (bool)rightSide));
+        Push(new DataItem((bool)leftSide && (bool)rightSide));
 
         Step();
     }
 
     void LOGIC_OR()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(new DataItem((bool)leftSide || (bool)rightSide));
+        Push(new DataItem((bool)leftSide || (bool)rightSide));
 
         Step();
     }
 
     void LOGIC_EQ()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(new DataItem(leftSide == rightSide));
+        Push(new DataItem(leftSide == rightSide));
 
         Step();
     }
 
     void LOGIC_NEQ()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(new DataItem(leftSide != rightSide));
+        Push(new DataItem(leftSide != rightSide));
 
         Step();
     }
 
     void BITS_OR()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide | rightSide);
+        Push(leftSide | rightSide);
 
         Step();
     }
 
     void BITS_XOR()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide ^ rightSide);
+        Push(leftSide ^ rightSide);
 
         Step();
     }
 
     void BITS_NOT()
     {
-        DataItem rightSide = Memory.Pop();
+        DataItem rightSide = Pop();
 
-        Memory.Push(~rightSide);
+        Push(~rightSide);
 
         Step();
     }
 
     void LOGIC_LTEQ()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(new DataItem(leftSide <= rightSide));
+        Push(new DataItem(leftSide <= rightSide));
 
         Step();
     }
 
     void LOGIC_MTEQ()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(new DataItem(leftSide >= rightSide));
+        Push(new DataItem(leftSide >= rightSide));
 
         Step();
     }
 
     void BITS_AND()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide & rightSide);
+        Push(leftSide & rightSide);
 
         Step();
     }
@@ -639,50 +675,50 @@ public class BytecodeProcessor
 
     void MATH_ADD()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide + rightSide);
+        Push(leftSide + rightSide);
 
         Step();
     }
 
     void MATH_DIV()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide / rightSide);
+        Push(leftSide / rightSide);
 
         Step();
     }
 
     void MATH_SUB()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide - rightSide);
+        Push(leftSide - rightSide);
 
         Step();
     }
 
     void MATH_MULT()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide * rightSide);
+        Push(leftSide * rightSide);
 
         Step();
     }
 
     void MATH_MOD()
     {
-        DataItem rightSide = Memory.Pop();
-        DataItem leftSide = Memory.Pop();
+        DataItem rightSide = Pop();
+        DataItem leftSide = Pop();
 
-        Memory.Push(leftSide % rightSide);
+        Push(leftSide % rightSide);
 
         Step();
     }
@@ -694,14 +730,14 @@ public class BytecodeProcessor
     void PUSH_VALUE()
     {
         DataItem value = CurrentInstruction.Parameter;
-        Memory.Push(value);
+        Push(value);
 
         Step();
     }
 
     void POP_VALUE()
     {
-        Memory.Pop();
+        Pop();
 
         Step();
     }
@@ -709,8 +745,8 @@ public class BytecodeProcessor
     void STORE_VALUE()
     {
         int address = FetchStackAddress();
-        DataItem value = Memory.Pop();
-        Memory.StackSet(address, value);
+        DataItem value = Pop();
+        Memory[address] = value;
 
         Step();
     }
@@ -718,8 +754,8 @@ public class BytecodeProcessor
     void LOAD_VALUE()
     {
         int address = FetchStackAddress();
-        DataItem value = Memory.StackGet(address);
-        Memory.Push(value);
+        DataItem value = Memory[address];
+        Push(value);
 
         Step();
     }
@@ -730,18 +766,18 @@ public class BytecodeProcessor
 
     void GET_BASEPOINTER()
     {
-        Memory.Push(new DataItem(BasePointer));
+        Push(new DataItem(Registers.BasePointer));
 
         Step();
     }
 
     void SET_BASEPOINTER()
     {
-        BasePointer = CurrentInstruction.AddressingMode switch
+        Registers.BasePointer = CurrentInstruction.AddressingMode switch
         {
-            AddressingMode.Runtime => (int)Memory.Pop(),
+            AddressingMode.Runtime => (int)Pop(),
             AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-            AddressingMode.StackRelative => Memory.StackLength + (int)CurrentInstruction.Parameter,
+            AddressingMode.StackPointerRelative => Registers.StackPointer + (int)CurrentInstruction.Parameter,
             _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SetBasePointer}"),
         };
 
@@ -750,9 +786,9 @@ public class BytecodeProcessor
 
     void SET_CODEPOINTER()
     {
-        CodePointer = CurrentInstruction.AddressingMode switch
+        Registers.CodePointer = CurrentInstruction.AddressingMode switch
         {
-            AddressingMode.Runtime => (int)Memory.Pop(),
+            AddressingMode.Runtime => (int)Pop(),
             AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
             _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SetCodePointer}"),
         };
@@ -760,22 +796,22 @@ public class BytecodeProcessor
 
     void TYPE_SET()
     {
-        RuntimeType targetType = (RuntimeType)(byte)Memory.Pop();
-        DataItem value = Memory.Pop();
+        RuntimeType targetType = (RuntimeType)(byte)Pop();
+        DataItem value = Pop();
 
         if (!DataItem.TryCast(ref value, targetType))
         { throw new RuntimeException($"Cannot cast {value.Type} to {targetType}"); }
 
-        Memory.Push(value);
+        Push(value);
 
         Step();
     }
 
     void TYPE_GET()
     {
-        DataItem value = Memory.Pop();
+        DataItem value = Pop();
         byte type = (byte)value.Type;
-        Memory.Push(new DataItem(type));
+        Push(new DataItem(type));
 
         Step();
     }
@@ -786,28 +822,27 @@ public class BytecodeProcessor
 
     void OnExternalReturnValue(DataItem returnValue)
     {
-        Memory.Push(returnValue);
+        Push(returnValue);
     }
 
     /// <exception cref="InternalException"/>
     /// <exception cref="RuntimeException"/>
     void CALL_EXTERNAL()
     {
-        DataItem functionNameDataItem = Memory.Pop();
-        if (functionNameDataItem.Type != RuntimeType.Integer)
-        { throw new InternalException($"Instruction CALL_EXTERNAL need a String pointer (int) DataItem parameter from the stack, received {functionNameDataItem.Type} {functionNameDataItem}"); }
+        DataItem functionId_ = Pop();
+        if (functionId_.Type != RuntimeType.Integer)
+        { throw new RuntimeException($"Invalid operand {functionId_} for instruction {nameof(Opcode.CallExternal)}"); }
 
-        string? functionName = Memory.HeapGetString((int)functionNameDataItem)
-            ?? throw new RuntimeException($"Function name is null");
+        int functionId = functionId_.VInt;
 
-        if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase? function))
-        { throw new RuntimeException($"Undefined function \"{functionName}\""); }
+        if (!ExternalFunctions.TryGetValue(functionId, out ExternalFunctionBase? function))
+        { throw new RuntimeException($"Undefined external function {functionId}"); }
 
         int parameterCount = (int)CurrentInstruction.Parameter;
 
         List<DataItem> parameters = new();
-        for (int i = 1; i <= (int)CurrentInstruction.Parameter; i++)
-        { parameters.Add(Memory.StackGet(^i)); }
+        for (int i = 0; i < (int)CurrentInstruction.Parameter; i++)
+        { parameters.Add(Memory[Registers.StackPointer - 1 - i]); }
         parameters.Reverse();
 
         if (function is ExternalFunctionManaged managedFunction)
@@ -820,8 +855,7 @@ public class BytecodeProcessor
             if (function.ReturnSomething)
             {
                 DataItem returnValue = simpleFunction.Call(this, parameters.ToArray());
-                // returnValue.Tag ??= $"{function.Name}() result";
-                Memory.Push(returnValue);
+                Push(returnValue);
             }
             else
             {
@@ -834,35 +868,26 @@ public class BytecodeProcessor
 
     #endregion
 
+    void GET_REGISTER()
+    {
+        int? register = CurrentInstruction.Parameter.Integer;
+        switch (register)
+        {
+            case 1: Push(Registers.CodePointer); break;
+            case 2: Push(Registers.StackPointer); break;
+            case 3: Push(Registers.BasePointer); break;
+            default: throw new RuntimeException($"Invalid register {register}");
+        }
+
+        Step();
+    }
+
     #endregion
 }
 
-public readonly struct Memory
+public struct Registers
 {
-    public readonly Stack<DataItem> Stack;
-    public readonly HEAP Heap;
-    public readonly ImmutableArray<Instruction> Code;
-
-    public readonly int StackLength => Stack.Count;
-    public readonly int HeapSize => Heap.Size;
-
-    public readonly void HeapSet(int index, DataItem data) => Heap[index] = data;
-    public readonly DataItem HeapGet(int index) => Heap[index];
-    public readonly string? HeapGetString(int pointer) => Heap.GetString(pointer);
-    public readonly int Allocate(int size) => Heap.Allocate(size);
-    public readonly void Free(int pointer) => Heap.Deallocate(pointer);
-
-    public readonly void StackSet(int index, DataItem data) => Stack[index] = data;
-    public readonly DataItem StackGet(int index) => Stack[index];
-    public readonly DataItem StackGet(Index index) => Stack[index];
-    public readonly void Push(DataItem data) => Stack.Push(data);
-    public readonly DataItem Pop() => Stack.Pop();
-
-    public Memory(int heapSize, ImmutableArray<Instruction> code)
-    {
-        Code = code;
-
-        Stack = new Stack<DataItem>();
-        Heap = new HEAP(heapSize);
-    }
+    public int CodePointer;
+    public int BasePointer;
+    public int StackPointer;
 }

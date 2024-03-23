@@ -23,7 +23,7 @@ public readonly struct CompilerResult
     public readonly CompiledConstructor[] Constructors;
     public readonly ImmutableDictionary<Uri, ImmutableArray<Token>> Tokens;
 
-    public readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+    public readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
 
     public readonly CompiledStruct[] Structs;
     public readonly CompileTag[] Hashes;
@@ -149,7 +149,7 @@ public readonly struct CompilerResult
         Enumerable.Empty<CompiledGeneralFunction>(),
         Enumerable.Empty<CompiledOperator>(),
         Enumerable.Empty<CompiledConstructor>(),
-        Enumerable.Empty<KeyValuePair<string, ExternalFunctionBase>>(),
+        Enumerable.Empty<KeyValuePair<int, ExternalFunctionBase>>(),
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<CompileTag>(),
         Enumerable.Empty<CompiledEnum>(),
@@ -163,7 +163,7 @@ public readonly struct CompilerResult
         IEnumerable<CompiledGeneralFunction> generalFunctions,
         IEnumerable<CompiledOperator> operators,
         IEnumerable<CompiledConstructor> constructors,
-        IEnumerable<KeyValuePair<string, ExternalFunctionBase>> externalFunctions,
+        IEnumerable<KeyValuePair<int, ExternalFunctionBase>> externalFunctions,
         IEnumerable<CompiledStruct> structs,
         IEnumerable<CompileTag> hashes,
         IEnumerable<CompiledEnum> enums,
@@ -302,18 +302,12 @@ public sealed class Compiler
     readonly List<CompileTag> Tags;
 
     readonly CompilerSettings Settings;
-    readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+    readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
     readonly PrintCallback? PrintCallback;
 
     readonly AnalysisCollection? AnalysisCollection;
 
-    readonly Dictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)> BuiltinFunctions = new()
-    {
-        { "alloc", (new PointerType(new BuiltinType(BasicType.Integer)), [ new BuiltinType(BasicType.Integer) ]) },
-        { "free", (new BuiltinType(BasicType.Void), [ new PointerType(new BuiltinType(BasicType.Integer)) ]) },
-    };
-
-    Compiler(Dictionary<string, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection)
+    Compiler(Dictionary<int, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection)
     {
         Functions = new List<FunctionDefinition>();
         Macros = new List<MacroDefinition>();
@@ -330,7 +324,7 @@ public sealed class Compiler
         CompiledGeneralFunctions = new List<CompiledGeneralFunction>();
         CompiledEnums = new List<CompiledEnum>();
 
-        ExternalFunctions = externalFunctions ?? new Dictionary<string, ExternalFunctionBase>();
+        ExternalFunctions = externalFunctions ?? new Dictionary<int, ExternalFunctionBase>();
         Settings = settings;
         PrintCallback = printCallback;
         AnalysisCollection = analysisCollection;
@@ -417,10 +411,10 @@ public sealed class Compiler
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
-        if (function.Attributes.TryGetAttribute<string>("External", out string? externalName, out AttributeUsage? attribute))
+        if (function.Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out string? externalName, out AttributeUsage? attribute))
         {
-            if (!ExternalFunctions.TryGetValue(externalName, out ExternalFunctionBase? externalFunction))
-            { AnalysisCollection?.Errors.Add(new Error($"External function \"{externalName}\" not found", attribute, function.FilePath)); }
+            if (!ExternalFunctions.TryGet(externalName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+            { AnalysisCollection?.Errors.Add(exception.InstantiateError(attribute, function.FilePath)); }
             else
             {
                 if (externalFunction.Parameters.Length != function.Parameters.Count)
@@ -451,9 +445,9 @@ public sealed class Compiler
             }
         }
 
-        if (function.Attributes.TryGetAttribute<string>("Builtin", out string? builtinName, out attribute))
+        if (function.Attributes.TryGetAttribute<string>(AttributeConstants.BuiltinIdentifier, out string? builtinName, out attribute))
         {
-            if (!BuiltinFunctions.TryGetValue(builtinName, out (GeneralType ReturnValue, GeneralType[] Parameters) builtinFunction))
+            if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out (GeneralType ReturnValue, GeneralType[] Parameters) builtinFunction))
             { AnalysisCollection?.Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", attribute, function.FilePath)); }
             else
             {
@@ -497,9 +491,9 @@ public sealed class Compiler
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
-        if (function.Attributes.TryGetAttribute<string>("External", out string? name, out AttributeUsage? attribute))
+        if (function.Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out string? name, out AttributeUsage? attribute))
         {
-            if (ExternalFunctions.TryGetValue(name, out ExternalFunctionBase? externalFunction))
+            if (ExternalFunctions.TryGet(name, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
             {
                 if (externalFunction.Parameters.Length != function.Parameters.Count)
                 { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.FilePath); }
@@ -524,7 +518,7 @@ public sealed class Compiler
                     function);
             }
 
-            AnalysisCollection?.Errors.Add(new Error($"External function \"{name}\" not found", attribute.Identifier, function.FilePath));
+            AnalysisCollection?.Errors.Add(exception.InstantiateError(attribute.Identifier, function.FilePath));
         }
 
         return new CompiledOperator(
@@ -764,7 +758,7 @@ public sealed class Compiler
                     { AnalysisCollection?.Errors.Add(new Error($"Compile tag \"{tag.Identifier}\" requires minimum 2 parameter", tag.Identifier, tag.FilePath)); break; }
                     string name = tag.Parameters[0].Value;
 
-                    if (ExternalFunctions.ContainsKey(name)) break;
+                    if (ExternalFunctions.TryGet(name, out _, out _)) break;
 
                     string[] bfParams = new string[tag.Parameters.Length - 1];
                     for (int i = 1; i < tag.Parameters.Length; i++)
@@ -1119,7 +1113,7 @@ ExitBreak:
     /// <exception cref="Exception"/>
     public static CompilerResult Compile(
         ParserResult parserResult,
-        Dictionary<string, ExternalFunctionBase>? externalFunctions,
+        Dictionary<int, ExternalFunctionBase>? externalFunctions,
         Uri? file,
         CompilerSettings settings,
         PrintCallback? printCallback = null,
@@ -1138,7 +1132,7 @@ ExitBreak:
     /// <exception cref="Exception"/>
     public static CompilerResult CompileFile(
         FileInfo file,
-        Dictionary<string, ExternalFunctionBase>? externalFunctions,
+        Dictionary<int, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null)
@@ -1150,7 +1144,7 @@ ExitBreak:
 
     public static CompilerResult CompileInteractive(
         Statement statement,
-        Dictionary<string, ExternalFunctionBase>? externalFunctions,
+        Dictionary<int, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
         UsingDefinition[] usings,
         PrintCallback? printCallback = null,

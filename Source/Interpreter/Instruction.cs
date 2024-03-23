@@ -3,28 +3,28 @@
 public enum AddressingMode : byte
 {
     /// <summary>
-    /// <c>CurrentInstruction.ParameterInt</c>
+    /// <c>Parameter</c>
     /// </summary>
     Absolute,
 
     /// <summary>
-    /// <c>Memory.Stack.Pop().ToInt32(null)</c>
+    /// <c>Pop()</c>
     /// </summary>
     Runtime,
 
     /// <summary>
     /// <b>Only for stack!</b>
     /// <br/>
-    /// <c>BasePointer + CurrentInstruction.ParameterInt</c>
+    /// <c>BasePointer + Parameter</c>
     /// </summary>
     BasePointerRelative,
 
     /// <summary>
     /// <b>Only for stack!</b>
     /// <br/>
-    /// <c>Memory.Stack.Count + CurrentInstruction.ParameterInt</c>
+    /// <c>StackPointer + Parameter</c>
     /// </summary>
-    StackRelative,
+    StackPointerRelative,
 }
 
 [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]

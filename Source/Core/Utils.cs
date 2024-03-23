@@ -23,6 +23,15 @@ public enum ToReadableFlags
     Modifiers = 0b_0010,
 }
 
+readonly struct AutoScope : IDisposable
+{
+    readonly Action Callback;
+
+    public AutoScope(Action callback) => Callback = callback;
+
+    public void Dispose() => Callback?.Invoke();
+}
+
 public static partial class Utils
 {
     public static bool TryConvertType(Type type, out LiteralType result)

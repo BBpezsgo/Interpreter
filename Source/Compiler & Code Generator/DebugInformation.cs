@@ -39,11 +39,15 @@ public struct StackElementInformations
     public bool BasepointerRelative;
     public int Size;
 
-    public readonly MutableRange<int> GetRange(int basepointer)
+    public readonly MutableRange<int> GetRange(int basePointer, int stackStart)
     {
         int itemStart = Address;
-        if (BasepointerRelative) itemStart += basepointer;
+
+        if (BasepointerRelative) itemStart += basePointer;
+        else itemStart += stackStart;
+
         int itemEnd = itemStart + Size - 1;
+
         return new MutableRange<int>(itemStart, itemEnd);
     }
 }
@@ -58,17 +62,19 @@ public readonly struct CollectedScopeInfo
 {
     public readonly ImmutableArray<StackElementInformations> Stack;
 
+    public static CollectedScopeInfo Empty => new(Enumerable.Empty<StackElementInformations>());
+
     public CollectedScopeInfo(IEnumerable<StackElementInformations> stack)
     {
         Stack = stack.ToImmutableArray();
     }
 
-    public bool TryGet(int basePointer, int stackAddress, out StackElementInformations result)
+    public bool TryGet(int basePointer, int stackStart, int stackAddress, out StackElementInformations result)
     {
         for (int i = 0; i < Stack.Length; i++)
         {
             StackElementInformations item = Stack[i];
-            MutableRange<int> range = item.GetRange(basePointer);
+            MutableRange<int> range = item.GetRange(basePointer, stackStart);
 
             if (range.Contains(stackAddress))
             {
@@ -140,31 +146,6 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         ScopeInformations = new List<ScopeInformations>();
         CodeComments = new Dictionary<int, List<string>>();
         OriginalFiles = new Dictionary<Uri, ImmutableArray<Tokenizing.Token>>(originalFiles);
-    }
-
-    public static int[] TraceBasePointers(DataItem[] stack, int basePointer)
-    {
-        if (!CanTraceBPsWith(basePointer))
-        { return Array.Empty<int>(); }
-
-        List<int> result = new();
-        TraceBasePointers(result, stack, basePointer);
-        return result.ToArray();
-    }
-
-    static bool CanTraceBPsWith(int basePointer) =>
-        basePointer >= 1;
-
-    static void TraceBasePointers(List<int> result, DataItem[] stack, int basePointer)
-    {
-        if (!CanTraceBPsWith(basePointer)) return;
-        if (basePointer - 1 >= stack.Length) return;
-        DataItem item = stack[basePointer - 1];
-        if (item.Type != RuntimeType.Integer) return;
-        int num = item.VInt;
-        result.Add(num);
-        if (num == basePointer) return;
-        TraceBasePointers(result, stack, num);
     }
 
     public IEnumerable<SourceCodeLocation> GetSourceLocations(int instruction)

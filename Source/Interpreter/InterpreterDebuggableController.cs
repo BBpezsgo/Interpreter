@@ -1,43 +1,11 @@
-﻿using System.Collections;
-
+﻿
 namespace LanguageCore.Runtime;
-
-public readonly struct Record<T>
-{
-    public readonly T Value;
-    public readonly TimeSpan Time;
-
-    public Record(T value, TimeSpan time)
-    {
-        Value = value;
-        Time = time;
-    }
-}
-
-public class Records<T> : IReadOnlyList<Record<T>>
-{
-    readonly List<Record<T>> _records;
-    readonly int _maxSize = 100;
-
-    public int Count => _records.Count;
-    public Record<T> this[int i] => _records[i];
-
-    public Records() => _records = new List<Record<T>>();
-
-    public void Add(T record)
-    {
-        _records.Add(new Record<T>(record, DateTime.Now.TimeOfDay));
-        if (_records.Count > _maxSize)
-        { _records.RemoveAt(0); }
-    }
-    public void Clear() => _records.Clear();
-
-    public IEnumerator<Record<T>> GetEnumerator() => _records.GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => _records.GetEnumerator();
-}
 
 public class InterpreterDebuggabble : Interpreter
 {
+    public InterpreterDebuggabble(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program) : base(handleErrors, settings, program)
+    { }
+
     public int AbsoluteBreakpoint { get; set; } = int.MinValue;
     public int Breakpoint
     {
@@ -62,7 +30,6 @@ public class InterpreterDebuggabble : Interpreter
     public bool HeapOperation { get; private set; }
     public bool ExternalFunctionOperation { get; private set; }
     public bool AluOperation { get; private set; }
-    public readonly Records<float> HeapUsage = new();
 
     DebugInformation? DebugInfo => CompilerResult.DebugInfo;
 
@@ -116,22 +83,12 @@ public class InterpreterDebuggabble : Interpreter
             HeapOperation = false;
         }
         Update();
-        SampleHeap();
     }
 
     public void StepInto()
     {
         AbsoluteBreakpoint = int.MinValue;
         DoUpdate();
-    }
-
-    public void SampleHeap()
-    {
-        if (this.BytecodeInterpreter == null) return;
-        {
-            (int, int, int) heapDiagnostics = this.BytecodeInterpreter.Memory.Heap.Diagnostics();
-            HeapUsage.Add((float)heapDiagnostics.Item1 / (float)this.BytecodeInterpreter.Memory.Heap.Size);
-        }
     }
 
     /// <exception cref="EndlessLoopException"/>
@@ -142,7 +99,7 @@ public class InterpreterDebuggabble : Interpreter
             DoUpdate();
 
             // TODO: Remove ! operator
-            if (BytecodeInterpreter!.CodePointer == AbsoluteBreakpoint) break;
+            if (BytecodeInterpreter!.Registers.CodePointer == AbsoluteBreakpoint) break;
 
             if (endlessSafe-- < 0) throw new EndlessLoopException();
         }

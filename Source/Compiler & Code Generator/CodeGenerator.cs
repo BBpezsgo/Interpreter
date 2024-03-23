@@ -1111,7 +1111,7 @@ public abstract class CodeGenerator
     {
         foreach (CompiledFunction _function in CompiledFunctions)
         {
-            if (!_function.Attributes.HasAttribute("External", "stdout"))
+            if (!_function.Attributes.HasAttribute(AttributeConstants.ExternalIdentifier, ExternalFunctionNames.StdOut))
             { continue; }
 
             if (!_function.CanUse(CurrentFile))

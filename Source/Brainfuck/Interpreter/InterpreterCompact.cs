@@ -56,7 +56,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             {
                 if (instruction.Count != 1)
                 { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext); }
-            
+
                 if (Memory[_memoryPointer] == 0)
                 {
                     int depth = 0;

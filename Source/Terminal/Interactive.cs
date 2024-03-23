@@ -123,8 +123,7 @@ class InteractiveCompiler
         {
             _parsed = Parser.ParseStatement(_tokens, null);
 
-            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
-            new Interpreter().GenerateExternalFunctions(externalFunctions);
+            Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
             Statement parsed2 = _parsed;
             if (parsed2 is StatementWithValue statementWithValue)
@@ -169,8 +168,7 @@ class InteractiveCompiler
         {
             _parsed = Parser.ParseStatement(_tokens, null);
 
-            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
-            new Interpreter().GenerateExternalFunctions(externalFunctions);
+            Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
             Statement parsed2 = _parsed;
             if (parsed2 is StatementWithValue statementWithValue)
@@ -718,23 +716,19 @@ public class Interactive
 
             if (CompilerCache.Tokens == null || CompilerCache.Tokens.Count == 0) return;
 
-            interpreter = new();
+            Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
+
+            BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, GeneratorSettings.Default);
+
+            interpreter = new(true, BytecodeInterpreterSettings.Default, generated.Code)
+            { CompilerResult = generated };
 
             interpreter.OnStdOut += OnInterpreterStandardOut;
             interpreter.OnStdError += OnInterpreterStandardError;
             interpreter.OnOutput += OnInterpreterOutput;
             interpreter.OnNeedInput += OnInterpreterNeedInput;
 
-            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
-            interpreter.GenerateExternalFunctions(externalFunctions);
-
-            BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, GeneratorSettings.Default);
-
-            interpreter.CompilerResult = generated;
-
-            interpreter.Initialize(generated.Code, BytecodeInterpreterSettings.Default, externalFunctions);
-
-            while (interpreter.IsExecutingCode)
+            while (!interpreter.BytecodeInterpreter.IsDone)
             { interpreter.Update(); }
         }
         catch (LanguageException ex)
@@ -785,9 +779,9 @@ public class Interactive
         }
 
         // TODO: Remove ! operator
-        if (interpreter.BytecodeInterpreter!.Memory.Stack.Count > 0)
+        if (interpreter.BytecodeInterpreter!.Memory.Length > 0)
         {
-            DataItem exitCode = interpreter.BytecodeInterpreter.Memory.Stack.Last;
+            DataItem exitCode = interpreter.BytecodeInterpreter.Memory[interpreter.BytecodeInterpreter.Registers.StackPointer - 1];
 
             AnsiBuilder output = new();
 

@@ -199,17 +199,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     struct GeneratorSnapshot
     {
-        public readonly Stack<Variable> Variables;
-
-        public readonly Stack<int> VariableCleanupStack;
-        public readonly Stack<ControlFlowBlock> Returns;
-        public readonly Stack<ControlFlowBlock> Breaks;
-        public readonly Stack<bool> InMacro;
+        public readonly Variable[] Variables;
+        public readonly int[] VariableCleanupStack;
+        public readonly ControlFlowBlock[] Returns;
+        public readonly ControlFlowBlock[] Breaks;
+        public readonly bool[] InMacro;
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         public int Optimizations;
 
-        public readonly Stack<ISameCheck> CurrentMacro;
+        public readonly ISameCheck[] CurrentMacro;
 
         public string? VariableCanBeDiscarded;
 
@@ -217,18 +216,18 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
         public GeneratorSnapshot(CodeGeneratorForBrainfuck v)
         {
-            Variables = new Stack<Variable>(v.CompiledVariables);
+            Variables = v.CompiledVariables.ToArray();
 
-            VariableCleanupStack = new Stack<int>(v.VariableCleanupStack);
-            Returns = new Stack<ControlFlowBlock>(v.Returns.Duplicate());
-            Breaks = new Stack<ControlFlowBlock>(v.Breaks.Duplicate());
-            InMacro = new Stack<bool>(v.InMacro);
+            VariableCleanupStack = v.VariableCleanupStack.ToArray();
+            Returns = v.Returns.Duplicate().ToArray();
+            Breaks = v.Breaks.Duplicate().ToArray();
+            InMacro = v.InMacro.ToArray();
 
             Optimizations = v.Optimizations;
 
-            CurrentMacro = new Stack<ISameCheck>(v.CurrentMacro);
+            CurrentMacro = v.CurrentMacro.ToArray();
 
-            VariableCanBeDiscarded = new string(v.VariableCanBeDiscarded);
+            VariableCanBeDiscarded = v.VariableCanBeDiscarded;
 
             DebugInfo = v.DebugInfo?.Duplicate();
         }

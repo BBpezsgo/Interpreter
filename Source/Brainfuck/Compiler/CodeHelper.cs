@@ -815,14 +815,14 @@ public class StackCodeHelper
     public bool WillOverflow => _willOverflow;
 
     readonly CompiledCode _code;
-    readonly Stack<int> _stack;
+    readonly List<int> _stack;
     int _maxUsedSize;
     bool _willOverflow;
 
     public StackCodeHelper(CompiledCode code, int start, int size)
     {
         this._code = code;
-        this._stack = new Stack<int>();
+        this._stack = new List<int>();
         this.Start = start;
         this.MaxSize = size;
     }
@@ -830,7 +830,7 @@ public class StackCodeHelper
     public StackCodeHelper(CompiledCode code, StackCodeHelper other)
     {
         _code = code;
-        _stack = new Stack<int>(other._stack);
+        _stack = new List<int>(other._stack);
         _maxUsedSize = other._maxUsedSize;
         _willOverflow = other._willOverflow;
         Start = other.Start;

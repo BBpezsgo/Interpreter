@@ -12,5 +12,8 @@ public class WillBeCompilerException
     public CompilerException Instantiate(Position position, Uri? uri) => new(Message, position, uri);
     public CompilerException Instantiate(IPositioned? position, Uri? uri) => new(Message, position, uri);
 
+    public Error InstantiateError(Position position, Uri? uri) => new(Message, position, uri);
+    public Error InstantiateError(IPositioned? position, Uri? uri) => new(Message, position, uri);
+
     public override string ToString() => Message;
 }

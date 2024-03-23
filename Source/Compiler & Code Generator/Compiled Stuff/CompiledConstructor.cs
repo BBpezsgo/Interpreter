@@ -10,13 +10,17 @@ public class CompiledConstructor : ConstructorDefinition,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
     ITemplateable<CompiledConstructor>,
-    IHaveInstructionOffset
+    IHaveInstructionOffset,
+    ICompiledFunction
 {
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct Context { get; }
     public int InstructionOffset { get; set; } = -1;
     public List<Reference<ConstructorCall>> References { get; }
+
+    IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
+    IReadOnlyList<GeneralType> ICompiledFunction.ParameterTypes => ParameterTypes;
 
     public CompiledConstructor(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
     {

@@ -2494,10 +2494,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         StatementWithValue[] parameters = new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) };
 
-        if (!TryGetBuiltinFunction("alloc", FindStatementTypes(parameters), out CompiledFunction? allocator))
-        { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] not found", position, CurrentFile); }
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator))
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, CurrentFile); }
         if (!allocator.ReturnSomething)
-        { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] should return something", position, CurrentFile); }
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", position, CurrentFile); }
 
         if (!allocator.CanUse(CurrentFile))
         {
@@ -2525,8 +2525,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         StatementWithValue[] parameters = new StatementWithValue[] { value };
         GeneralType[] parameterTypes = FindStatementTypes(parameters);
 
-        if (!TryGetBuiltinFunction("free", parameterTypes, out CompiledFunction? deallocator))
-        { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", value, CurrentFile); }
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator))
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
 
         if (deallocateableType is not PointerType)
         {
@@ -2810,7 +2810,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         using DebugFunctionBlock<CompiledFunction> debugFunction = FunctionBlock(function, typeArguments);
 
-        if (function.Attributes.HasAttribute("External", "stdout"))
+        if (function.Attributes.HasAttribute(AttributeConstants.ExternalIdentifier, ExternalFunctionNames.StdOut))
         {
             bool canPrint = true;
 
@@ -2831,7 +2831,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
 
-        if (function.Attributes.HasAttribute("External", "stdin"))
+        if (function.Attributes.HasAttribute(AttributeConstants.ExternalIdentifier, ExternalFunctionNames.StdIn))
         {
             int address = Stack.PushVirtual(1);
             Code.SetPointer(address);
@@ -2844,7 +2844,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 if (function.Type.Size != 1)
                 {
-                    throw new CompilerException($"Function with attribute \"[External(\"stdin\")]\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
+                    throw new CompilerException($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
                 }
                 Code += ',';
             }

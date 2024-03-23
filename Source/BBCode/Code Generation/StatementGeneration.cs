@@ -6,7 +6,7 @@ using Parser.Statement;
 using Runtime;
 using Tokenizing;
 using LiteralStatement = Parser.Statement.Literal;
-using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.GeneralType Type);
+using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.GeneralType Type, Position Position);
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
@@ -93,7 +93,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (returnValueType is not BuiltinType)
                     { throw new CompilerException($"Exit code must be a built-in type (not {returnValueType})", returnValue, CurrentFile); }
 
-                    AddInstruction(Opcode.StackStore, AddressingMode.Absolute, 0);
+                    AddInstruction(Opcode.StackLoad, AddressingMode.BasePointerRelative, AbsoluteGlobalOffset);
+                    AddInstruction(Opcode.StackStore, AddressingMode.Runtime);
                 }
             }
 
@@ -342,33 +343,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
     }
 
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(FunctionCall functionCall, CompiledFunction compiledFunction)
+    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(IReadOnlyList<StatementWithValue> parameters, ICompiledFunction compiledFunction)
     {
         Stack<ParameterCleanupItem> parameterCleanup = new();
 
-        if (functionCall.PrevStatement != null)
+        for (int i = 0; i < parameters.Count; i++)
         {
-            StatementWithValue passedParameter = functionCall.PrevStatement;
+            StatementWithValue passedParameter = parameters[i];
             GeneralType passedParameterType = FindStatementType(passedParameter);
-            GeneralType definedParameterType = compiledFunction.ParameterTypes[0];
-            if (!passedParameterType.Equals(definedParameterType))
-            {
-                passedParameter = new TypeCast(
-                    passedParameter,
-                    Token.CreateAnonymous("as"),
-                    definedParameterType.ToTypeInstance());
-            }
-            AddComment(" Param prev:");
-            GenerateCodeForStatement(passedParameter);
-            parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
-        }
-
-        for (int i = 0; i < functionCall.Parameters.Length; i++)
-        {
-            StatementWithValue passedParameter = functionCall.Parameters[i];
-            GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsExtension ? (i + 1) : i];
-            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsExtension ? (i + 1) : i];
+            ParameterDefinition definedParameter = compiledFunction.Parameters[i];
+            GeneralType definedParameterType = compiledFunction.ParameterTypes[i];
 
             if (!passedParameterType.Equals(definedParameterType))
             {
@@ -379,7 +363,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 passedParameterType = FindStatementType(passedParameter);
             }
 
-            AddComment($" Param {i}:");
+            AddComment($" Pass {definedParameter}:");
 
             bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
 
@@ -399,28 +383,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(passedParameter, definedParameterType);
 
-            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
+            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType, passedParameter.Position));
         }
 
         return parameterCleanup;
     }
 
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(FunctionCall functionCall, FunctionType function)
+    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(IReadOnlyList<StatementWithValue> parameters, FunctionType function)
     {
         Stack<ParameterCleanupItem> parameterCleanup = new();
 
-        if (functionCall.PrevStatement != null)
+        for (int i = 0; i < parameters.Count; i++)
         {
-            StatementWithValue passedParameter = functionCall.PrevStatement;
-            GeneralType passedParameterType = FindStatementType(passedParameter);
-            AddComment(" Param prev:");
-            GenerateCodeForStatement(functionCall.PrevStatement);
-            parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
-        }
-
-        for (int i = 0; i < functionCall.Parameters.Length; i++)
-        {
-            StatementWithValue passedParameter = functionCall.Parameters[i];
+            StatementWithValue passedParameter = parameters[i];
             GeneralType passedParameterType = FindStatementType(passedParameter);
             GeneralType definedParameterType = function.Parameters[i];
 
@@ -444,124 +419,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(passedParameter, definedParameterType);
 
-            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
+            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType, passedParameter.Position));
         }
 
         return parameterCleanup;
     }
 
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(BinaryOperatorCall functionCall, CompiledOperator compiledFunction)
-    {
-        Stack<ParameterCleanupItem> parameterCleanup = new();
-
-        for (int i = 0; i < functionCall.Parameters.Length; i++)
-        {
-            StatementWithValue passedParameter = functionCall.Parameters[i];
-            GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsExtension ? (i + 1) : i];
-            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsExtension ? (i + 1) : i];
-
-            AddComment($" Param {i}:");
-
-            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
-
-            canDeallocate = canDeallocate && passedParameterType is PointerType;
-
-            if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
-            {
-                if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
-            }
-            else
-            {
-                if (explicitDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
-                canDeallocate = false;
-            }
-
-            GenerateCodeForStatement(passedParameter, definedParameterType);
-
-            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
-        }
-
-        return parameterCleanup;
-    }
-
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(UnaryOperatorCall functionCall, CompiledOperator compiledFunction)
-    {
-        Stack<ParameterCleanupItem> parameterCleanup = new();
-
-        for (int i = 0; i < functionCall.Parameters.Length; i++)
-        {
-            StatementWithValue passedParameter = functionCall.Parameters[i];
-            GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsExtension ? (i + 1) : i];
-            GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsExtension ? (i + 1) : i];
-
-            AddComment($" Param {i}:");
-
-            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
-
-            canDeallocate = canDeallocate && passedParameterType is PointerType;
-
-            if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
-            {
-                if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
-            }
-            else
-            {
-                if (explicitDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
-                canDeallocate = false;
-            }
-
-            GenerateCodeForStatement(passedParameter, definedParameterType);
-
-            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
-        }
-
-        return parameterCleanup;
-    }
-
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(ConstructorCall constructorCall, CompiledConstructor constructor)
-    {
-        Stack<ParameterCleanupItem> parameterCleanup = new();
-
-        for (int i = 0; i < constructorCall.Parameters.Length; i++)
-        {
-            StatementWithValue passedParameter = constructorCall.Parameters[i];
-            GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = constructor.Parameters[constructor.IsExtension ? (i + 1) : i];
-            GeneralType definedParameterType = constructor.ParameterTypes[constructor.IsExtension ? (i + 1) : i];
-
-            AddComment($" Param {i}:");
-
-            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
-
-            canDeallocate = canDeallocate && passedParameterType is PointerType;
-
-            if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
-            {
-                if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
-            }
-            else
-            {
-                if (explicitDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
-                canDeallocate = false;
-            }
-
-            GenerateCodeForStatement(passedParameter, definedParameterType);
-
-            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
-        }
-
-        return parameterCleanup;
-    }
-
-    void GenerateCodeForParameterCleanup(Stack<ParameterCleanupItem> parameterCleanup, Position position)
+    void GenerateCodeForParameterCleanup(Stack<ParameterCleanupItem> parameterCleanup)
     {
         AddComment(" Clear Params:");
         while (parameterCleanup.Count > 0)
@@ -570,13 +434,57 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (passedParameter.CanDeallocate && passedParameter.Size == 1)
             {
-                GenerateDeallocator(passedParameter.Type, position);
+                GenerateDeallocator(passedParameter.Type, passedParameter.Position);
                 continue;
             }
 
             for (int i = 0; i < passedParameter.Size; i++)
             { AddInstruction(Opcode.Pop); }
         }
+    }
+
+    void GenerateCodeForFunctionCall_External<TFunction>(IReadOnlyList<StatementWithValue> parameters, bool saveValue, TFunction compiledFunction, ExternalFunctionBase externalFunction)
+        where TFunction : ICompiledFunction, ISimpleReadable
+    {
+        AddComment($"Call {compiledFunction.ToReadable()} {{");
+
+        int returnValueSize = 0;
+        if (compiledFunction.ReturnSomething)
+        {
+            AddComment($"Initial return value {{");
+            returnValueSize = GenerateInitialValue(compiledFunction.Type);
+            AddComment($"}}");
+        }
+
+        int returnValueOffset = -1;
+
+        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(parameters, compiledFunction);
+        for (int i = 0; i < parameterCleanup.Count; i++)
+        { returnValueOffset -= parameterCleanup[i].Size; }
+
+        AddComment(" .:");
+        AddInstruction(Opcode.Push, externalFunction.Id);
+        AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
+
+        if (compiledFunction.ReturnSomething)
+        {
+            if (saveValue)
+            {
+                AddComment($" Store return value:");
+                for (int i = 0; i < returnValueSize; i++)
+                { AddInstruction(Opcode.StackStore, AddressingMode.StackPointerRelative, returnValueOffset); }
+            }
+            else
+            {
+                AddComment($" Clear return value:");
+                for (int i = 0; i < returnValueSize; i++)
+                { AddInstruction(Opcode.Pop); }
+            }
+        }
+
+        GenerateCodeForParameterCleanup(parameterCleanup);
+
+        AddComment("}");
     }
 
     void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
@@ -599,17 +507,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.IsMacro)
         { AnalysisCollection?.Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
 
-        if (compiledFunction.BuiltinFunctionName == "alloc")
+        if (compiledFunction.BuiltinFunctionName == BuiltinFunctions.Allocate)
         {
             GenerateCodeForStatement(functionCall.Parameters[0], new BuiltinType(BasicType.Integer));
             AddInstruction(Opcode.Allocate);
             return;
         }
 
-        if (compiledFunction.BuiltinFunctionName == "free")
+        if (compiledFunction.BuiltinFunctionName == BuiltinFunctions.Free)
         {
             GenerateCodeForStatement(functionCall.Parameters[0], new BuiltinType(BasicType.Integer));
             AddInstruction(Opcode.Free);
+            return;
+        }
+
+        if (compiledFunction.IsExternal)
+        {
+            if (!ExternalFunctions.TryGet(compiledFunction.ExternalFunctionName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+            {
+                AnalysisCollection?.Errors.Add(exception.InstantiateError(functionCall.Identifier, CurrentFile));
+                AddComment("}");
+                return;
+            }
+
+            GenerateCodeForFunctionCall_External(functionCall.MethodParameters, functionCall.SaveValue, compiledFunction, externalFunction);
             return;
         }
 
@@ -625,99 +546,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        if (compiledFunction.IsExternal)
-        {
-            if (!ExternalFunctions.TryGetValue(compiledFunction.ExternalFunctionName, out ExternalFunctionBase? externalFunction))
-            {
-                AnalysisCollection?.Errors.Add(new Error($"External function \"{compiledFunction.ExternalFunctionName}\" not found", functionCall.Identifier, CurrentFile));
-                AddComment("}");
-                return;
-            }
-
-            AddComment(" Function Name:");
-            if (ExternalFunctionsCache.TryGetValue(compiledFunction.ExternalFunctionName, out int cacheAddress))
-            {
-                if (compiledFunction.ExternalFunctionName.Length == 0)
-                { throw new CompilerException($"External function with length of zero", compiledFunction.Attributes.Get("External"), compiledFunction.FilePath); }
-
-                int returnValueOffset = -2;
-
-                parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);
-                for (int i = 0; i < parameterCleanup.Count; i++)
-                { returnValueOffset -= parameterCleanup[i].Size; }
-
-                AddComment($" Function name string pointer (cache):");
-                AddInstruction(Opcode.StackLoad, AddressingMode.Absolute, cacheAddress);
-
-                AddComment(" .:");
-                AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
-
-                if (compiledFunction.ReturnSomething)
-                {
-                    if (functionCall.SaveValue)
-                    {
-                        AddComment($" Store return value:");
-                        for (int i = 0; i < returnValueSize; i++)
-                        { AddInstruction(Opcode.StackStore, AddressingMode.StackRelative, returnValueOffset); }
-                    }
-                    else
-                    {
-                        AddComment($" Clear return value:");
-                        for (int i = 0; i < returnValueSize; i++)
-                        { AddInstruction(Opcode.Pop); }
-                    }
-                }
-
-                GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
-            }
-            else
-            {
-                GenerateCodeForLiteralString(compiledFunction.ExternalFunctionName);
-
-                int functionNameOffset = -1;
-                int returnValueOffset = -3;
-
-                parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);
-                for (int i = 0; i < parameterCleanup.Count; i++)
-                {
-                    functionNameOffset -= parameterCleanup[i].Size;
-                    returnValueOffset -= parameterCleanup[i].Size;
-                }
-
-                AddComment($" Load Function Name String Pointer:");
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, functionNameOffset);
-
-                AddComment(" .:");
-                AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
-
-                if (compiledFunction.ReturnSomething)
-                {
-                    if (functionCall.SaveValue)
-                    {
-                        AddComment($" Store return value:");
-                        for (int i = 0; i < returnValueSize; i++)
-                        { AddInstruction(Opcode.StackStore, AddressingMode.StackRelative, returnValueOffset); }
-                    }
-                    else
-                    {
-                        AddComment($" Clear return value:");
-                        for (int i = 0; i < returnValueSize; i++)
-                        { AddInstruction(Opcode.Pop); }
-                    }
-                }
-
-                GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
-
-                AddComment(" Deallocate Function Name String:");
-
-                AddInstruction(Opcode.Free);
-            }
-
-            AddComment("}");
-            return;
-        }
-
-        parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);
+        parameterCleanup = GenerateCodeForParameterPassing(functionCall.MethodParameters, compiledFunction);
 
         AddComment(" .:");
 
@@ -726,7 +555,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.InstructionOffset == -1)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, functionCall, compiledFunction, CurrentFile)); }
 
-        GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
+        GenerateCodeForParameterCleanup(parameterCleanup);
 
         if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
         {
@@ -749,8 +578,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-        Stack<ParameterCleanupItem> parameterCleanup;
-
         int returnValueSize = 0;
         if (functionType.ReturnSomething)
         {
@@ -759,13 +586,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        parameterCleanup = GenerateCodeForParameterPassing(functionCall, functionType);
+        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(functionCall.MethodParameters, functionType);
 
         AddComment(" .:");
 
         CallRuntime(compiledVariable);
 
-        GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
+        GenerateCodeForParameterCleanup(parameterCleanup);
 
         if (functionType.ReturnSomething && !functionCall.SaveValue)
         {
@@ -788,8 +615,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-        Stack<ParameterCleanupItem> parameterCleanup;
-
         int returnValueSize = 0;
         if (functionType.ReturnSomething)
         {
@@ -798,13 +623,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        parameterCleanup = GenerateCodeForParameterPassing(functionCall, functionType);
+        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(functionCall.MethodParameters, functionType);
 
         AddComment(" .:");
 
         CallRuntime(compiledParameter);
 
-        GenerateCodeForParameterCleanup(parameterCleanup, functionCall.Brackets.End.Position);
+        GenerateCodeForParameterCleanup(parameterCleanup);
 
         if (functionType.ReturnSomething && !functionCall.SaveValue)
         {
@@ -918,14 +743,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
 
-            AddComment($"Call {operatorDefinition.Identifier} {{");
-
-            Stack<ParameterCleanupItem> parameterCleanup;
-
             if (!operatorDefinition.CanUse(CurrentFile))
             {
                 AnalysisCollection?.Errors.Add(new Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
-                AddComment("}");
                 return;
             }
 
@@ -934,67 +754,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (operatorDefinition.IsExternal)
             {
-                if (!ExternalFunctions.TryGetValue(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase? externalFunction))
+                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"External function \"{operatorDefinition.ExternalFunctionName}\" not found", @operator.Operator, CurrentFile));
+                    AnalysisCollection?.Errors.Add(exception.InstantiateError(@operator.Operator, CurrentFile));
                     AddComment("}");
                     return;
                 }
 
-                AddComment(" Function Name:");
-                if (ExternalFunctionsCache.TryGetValue(operatorDefinition.ExternalFunctionName, out int cacheAddress))
-                { AddInstruction(Opcode.StackLoad, AddressingMode.Absolute, cacheAddress); }
-                else
-                { GenerateCodeForLiteralString(operatorDefinition.ExternalFunctionName); }
-
-                int offset = -1;
-
-                parameterCleanup = GenerateCodeForParameterPassing(@operator, operatorDefinition);
-                for (int i = 0; i < parameterCleanup.Count; i++)
-                { offset -= parameterCleanup[i].Size; }
-
-                AddComment($" Function name string pointer:");
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, offset);
-
-                AddComment(" .:");
-                AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
-
-                GenerateCodeForParameterCleanup(parameterCleanup, @operator.Operator.Position);
-
-                bool thereIsReturnValue = false;
-                if (!@operator.SaveValue)
-                {
-                    AddComment($" Clear Return Value:");
-                    AddInstruction(Opcode.Pop);
-                }
-                else
-                { thereIsReturnValue = true; }
-
-                AddComment(" Deallocate Function Name String:");
-
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
-                AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
-                AddInstruction(Opcode.Free);
-
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
-                AddInstruction(Opcode.Free);
-
-                if (thereIsReturnValue)
-                {
-                    AddInstruction(Opcode.StackStore, AddressingMode.StackRelative, -2);
-                }
-                else
-                {
-                    AddInstruction(Opcode.Pop);
-                }
-
-                AddComment("}");
+                GenerateCodeForFunctionCall_External(@operator.Parameters, @operator.SaveValue, operatorDefinition, externalFunction);
                 return;
             }
 
+            AddComment($"Call {operatorDefinition.Identifier} {{");
+
             int returnValueSize = GenerateInitialValue(operatorDefinition.Type);
 
-            parameterCleanup = GenerateCodeForParameterPassing(@operator, operatorDefinition);
+            Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(@operator.Parameters, operatorDefinition);
 
             AddComment(" .:");
 
@@ -1003,7 +778,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (operatorDefinition.InstructionOffset == -1)
             { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, CurrentFile)); }
 
-            GenerateCodeForParameterCleanup(parameterCleanup, @operator.Operator.Position);
+            GenerateCodeForParameterCleanup(parameterCleanup);
 
             if (!@operator.SaveValue)
             {
@@ -1027,13 +802,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (opcode == Opcode.LogicAND)
             {
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -1);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackPointerRelative, -1);
                 jumpInstruction = GeneratedCode.Count;
                 AddInstruction(Opcode.JumpIfZero);
             }
             else if (opcode == Opcode.LogicOR)
             {
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -1);
+                AddInstruction(Opcode.StackLoad, AddressingMode.StackPointerRelative, -1);
                 AddInstruction(Opcode.LogicNOT);
                 jumpInstruction = GeneratedCode.Count;
                 AddInstruction(Opcode.JumpIfZero);
@@ -1048,12 +823,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         else if (@operator.Operator.Content == "=")
         {
             if (BinaryOperatorCall.ParameterCount != 2)
-            { throw new CompilerException($"Wrong number of parameters passed to assignment operator '{@operator.Operator.Content}': required {2} passed {BinaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to assignment operator \"{@operator.Operator.Content}\": required {2} passed {BinaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
 
             GenerateCodeForValueSetter(@operator.Left, @operator.Right);
         }
         else
-        { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
+        { throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile); }
     }
     void GenerateCodeForStatement(UnaryOperatorCall @operator)
     {
@@ -1073,14 +848,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
 
-            AddComment($"Call {operatorDefinition.Identifier} {{");
-
-            Stack<ParameterCleanupItem> parameterCleanup;
-
             if (!operatorDefinition.CanUse(CurrentFile))
             {
                 AnalysisCollection?.Errors.Add(new Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
-                AddComment("}");
                 return;
             }
 
@@ -1089,67 +859,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (operatorDefinition.IsExternal)
             {
-                if (!ExternalFunctions.TryGetValue(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase? externalFunction))
+                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"External function \"{operatorDefinition.ExternalFunctionName}\" not found", @operator.Operator, CurrentFile));
+                    AnalysisCollection?.Errors.Add(exception.InstantiateError(@operator.Operator, CurrentFile));
                     AddComment("}");
                     return;
                 }
 
-                AddComment(" Function Name:");
-                if (ExternalFunctionsCache.TryGetValue(operatorDefinition.ExternalFunctionName, out int cacheAddress))
-                { AddInstruction(Opcode.StackLoad, AddressingMode.Absolute, cacheAddress); }
-                else
-                { GenerateCodeForLiteralString(operatorDefinition.ExternalFunctionName); }
-
-                int offset = -1;
-
-                parameterCleanup = GenerateCodeForParameterPassing(@operator, operatorDefinition);
-                for (int i = 0; i < parameterCleanup.Count; i++)
-                { offset -= parameterCleanup[i].Size; }
-
-                AddComment($" Function name string pointer:");
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, offset);
-
-                AddComment(" .:");
-                AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
-
-                GenerateCodeForParameterCleanup(parameterCleanup, @operator.Operator.Position);
-
-                bool thereIsReturnValue = false;
-                if (!@operator.SaveValue)
-                {
-                    AddComment($" Clear Return Value:");
-                    AddInstruction(Opcode.Pop);
-                }
-                else
-                { thereIsReturnValue = true; }
-
-                AddComment(" Deallocate Function Name String:");
-
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
-                AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
-                AddInstruction(Opcode.Free);
-
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
-                AddInstruction(Opcode.Free);
-
-                if (thereIsReturnValue)
-                {
-                    AddInstruction(Opcode.StackStore, AddressingMode.StackRelative, -2);
-                }
-                else
-                {
-                    AddInstruction(Opcode.Pop);
-                }
-
-                AddComment("}");
+                GenerateCodeForFunctionCall_External(@operator.Parameters, @operator.SaveValue, operatorDefinition, externalFunction);
                 return;
             }
 
+            AddComment($"Call {operatorDefinition.Identifier} {{");
+
             int returnValueSize = GenerateInitialValue(operatorDefinition.Type);
 
-            parameterCleanup = GenerateCodeForParameterPassing(@operator, operatorDefinition);
+            Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(@operator.Parameters, operatorDefinition);
 
             AddComment(" .:");
 
@@ -1158,7 +883,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (operatorDefinition.InstructionOffset == -1)
             { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, CurrentFile)); }
 
-            GenerateCodeForParameterCleanup(parameterCleanup, @operator.Operator.Position);
+            GenerateCodeForParameterCleanup(parameterCleanup);
 
             if (!@operator.SaveValue)
             {
@@ -1172,35 +897,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         else if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
         {
             if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != UnaryOperatorCall.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {UnaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
-
-            FindStatementType(@operator);
-
-            int jumpInstruction = -1;
+            { throw new CompilerException($"Wrong number of parameters passed to operator \"{@operator.Operator.Content}\": required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {UnaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
 
             GenerateCodeForStatement(@operator.Left);
 
-            if (opcode == Opcode.LogicAND)
-            {
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -1);
-                jumpInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JumpIfZero);
-            }
-            else if (opcode == Opcode.LogicOR)
-            {
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -1);
-                AddInstruction(Opcode.LogicNOT);
-                jumpInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JumpIfZero);
-            }
-
             AddInstruction(opcode);
-
-            if (jumpInstruction != -1)
-            { GeneratedCode[jumpInstruction].Parameter = GeneratedCode.Count - jumpInstruction; }
         }
         else
-        { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
+        { throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile); }
     }
     void GenerateCodeForStatement(Assignment setter)
     {
@@ -1252,15 +956,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
 
-        // AddComment("Set String.length {");
-        // // Set String.length
-        // {
-        //     AddInstruction(Opcode.PUSH_VALUE, literal.Length);
-        //     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
-        //     AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
-        // }
-        // AddComment("}");
-
         AddComment("Set string data {");
 
         for (int i = 0; i < literal.Length; i++)
@@ -1269,7 +964,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddInstruction(Opcode.Push, new DataItem(literal[i]));
 
             // Calculate pointer
-            AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
+            AddInstruction(Opcode.StackLoad, AddressingMode.StackPointerRelative, -2);
             AddInstruction(Opcode.Push, i);
             AddInstruction(Opcode.MathAdd);
 
@@ -1282,7 +977,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddInstruction(Opcode.Push, new DataItem('\0'));
 
             // Calculate pointer
-            AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
+            AddInstruction(Opcode.StackLoad, AddressingMode.StackPointerRelative, -2);
             AddInstruction(Opcode.Push, literal.Length);
             AddInstruction(Opcode.MathAdd);
 
@@ -1634,7 +1329,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 for (int offset = 0; offset < pointerType.To.Size; offset++)
                 {
                     AddInstruction(Opcode.Push, 0);
-                    AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
+                    AddInstruction(Opcode.StackLoad, AddressingMode.StackPointerRelative, -2);
                     AddInstruction(Opcode.Push, offset);
                     AddInstruction(Opcode.MathAdd);
                     AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
@@ -1692,10 +1387,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(newInstance);
 
         for (int i = 0; i < newInstanceType.Size; i++)
-        { AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -newInstanceType.Size); }
+        { AddInstruction(Opcode.StackLoad, AddressingMode.StackPointerRelative, -newInstanceType.Size); }
 
-        parameterCleanup = GenerateCodeForParameterPassing(constructorCall, compiledFunction);
-        parameterCleanup.Insert(0, (newInstanceType.Size, false, newInstanceType));
+        parameterCleanup = GenerateCodeForParameterPassing(constructorCall.Parameters, compiledFunction);
+        parameterCleanup.Insert(0, (newInstanceType.Size, false, newInstanceType, newInstance.Position));
 
         AddComment(" .:");
 
@@ -1704,7 +1399,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.InstructionOffset == -1)
         { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructor>(jumpInstruction, false, constructorCall, compiledFunction, CurrentFile)); }
 
-        GenerateCodeForParameterCleanup(parameterCleanup, constructorCall.Brackets.End.Position);
+        GenerateCodeForParameterCleanup(parameterCleanup);
 
         AddComment("}");
     }
@@ -1936,7 +1631,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         AddInstruction(Opcode.GetBasePointer);
                         AddInstruction(Opcode.MathAdd);
                         break;
-                    case AddressingMode.StackRelative:
+                    case AddressingMode.StackPointerRelative:
                     default:
                         throw new UnreachableException();
                 }
@@ -2120,7 +1815,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 { AddInstruction(Opcode.Pop); }
             }
 
-            CompiledVariables.RemoveAt(CompiledVariables.Count - 1);
+            CompiledVariables.Pop();
         }
     }
 
@@ -2211,7 +1906,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
             GenerateCodeForStatement(value);
-            ValueAddress pointerAddress = new(-valueType.Size - 1, AddressingMode.StackRelative);
+            ValueAddress pointerAddress = new(-(valueType.Size + 1), AddressingMode.StackPointerRelative);
             HeapStore(pointerAddress, fieldOffset);
 
             AddInstruction(Opcode.Pop);
@@ -2658,7 +2353,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             for (int i = 0; i < functionDefinition.Attributes.Length; i++)
             {
-                if (functionDefinition.Attributes[i].Identifier.Equals("External"))
+                if (functionDefinition.Attributes[i].Identifier.Equals(AttributeConstants.ExternalIdentifier))
                 { return false; }
             }
         }
@@ -2688,7 +2383,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CanReturn = true;
         AddInstruction(Opcode.Push, new DataItem(false));
-        TagCount.Last++;
+        TagCount[^1]++;
 
         OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath));
 
@@ -2698,7 +2393,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BasepointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = 1,
-            Tag = "RETURN_FLAG",
+            Tag = "Return Flag",
             Type = StackElementType.Value,
         });
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
@@ -2717,6 +2412,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Kind = StackElementKind.Internal,
             Size = 1,
             Tag = "Saved CodePointer",
+            Type = StackElementType.Value,
+        });
+        CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+        {
+            Address = AbsoluteGlobalOffset,
+            BasepointerRelative = true,
+            Kind = StackElementKind.Internal,
+            Size = 1,
+            Tag = "Absolute Global Offset",
             Type = StackElementType.Value,
         });
 
@@ -2753,7 +2457,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         OnScopeExit(function.Block.Brackets.End.Position);
 
         AddInstruction(Opcode.Pop);
-        TagCount.Last--;
+        TagCount[^1]--;
 
         AddComment("Return");
         Return();
@@ -2857,6 +2561,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("TopLevelStatements {");
 
+        // Exit code instruction already added
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
         {
             Address = 0,
@@ -2867,8 +2572,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Type = StackElementType.Value,
         });
 
+        AddInstruction(Opcode.GetRegister, 2);
+        AddInstruction(Opcode.Push, -1);
+        AddInstruction(Opcode.MathAdd);
+
+        CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+        {
+            Address = AbsoluteGlobalOffset,
+            BasepointerRelative = true,
+            Kind = StackElementKind.Internal,
+            Size = 1,
+            Tag = "Absolute Global Offset",
+            Type = StackElementType.Value,
+        });
+
         AddInstruction(Opcode.GetBasePointer);
-        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackRelative, 0);
+        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackPointerRelative, 0);
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
         {
@@ -2893,7 +2612,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BasepointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = 1,
-            Tag = "RETURN_FLAG",
+            Tag = "Return Flag",
             Type = StackElementType.Value,
         });
         TagCount.Last++;
@@ -2924,6 +2643,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         TagCount.Pop();
 
         AddInstruction(Opcode.SetBasePointer, AddressingMode.Runtime, 0);
+        AddInstruction(Opcode.Pop);
 
         AddComment("}");
 

@@ -30,22 +30,118 @@ public static class Entry
         {
             case ProgramRunType.Normal:
             {
-                if (arguments.ConsoleGUI)
-                {
-                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    { throw new PlatformNotSupportedException($"Console rendering is only supported on Windows"); }
+                Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
 
-                    ConsoleGUI.ConsoleGUI gui = new()
-                    {
-                        FilledElement = new ConsoleGUI.InterpreterElement(arguments.File.FullName, arguments.CompilerSettings, arguments.BytecodeInterpreterSettings, !arguments.ThrowErrors)
-                    };
-                    while (!gui.Destroyed)
-                    { gui.Tick(); }
+                Dictionary<int, ExternalFunctionBase> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
+
+#if AOT
+                Output.LogDebug($"Skipping loading DLL-s because the compiler compiled in AOT mode");
+#else
+
+                if (arguments.File.Directory is null)
+                { throw new InternalException($"File \"{arguments.File}\" doesn't have a directory"); }
+
+                string dllsFolderPath = Path.Combine(arguments.File.Directory.FullName, arguments.CompilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
+                if (Directory.Exists(dllsFolderPath))
+                {
+                    DirectoryInfo dllsFolder = new(dllsFolderPath);
+                    Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
+                    FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
+                    foreach (FileInfo dll in dlls)
+                    { externalFunctions.LoadAssembly(dll.FullName); }
                 }
                 else
                 {
-                    Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
-                    Runtime.Interpreter interpreter = new();
+                    Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
+                }
+
+#endif
+
+                BBCodeGeneratorResult generatedCode;
+                AnalysisCollection analysisCollection = new();
+
+                if (!arguments.ThrowErrors)
+                {
+                    try
+                    {
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, Output.Log, analysisCollection);
+                        generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
+                        analysisCollection.Throw();
+                        analysisCollection.Print();
+                    }
+                    catch (LanguageException ex)
+                    {
+                        analysisCollection.Print();
+                        Output.LogError(ex);
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        analysisCollection.Print();
+                        Output.LogError(ex);
+                        return;
+                    }
+                }
+                else
+                {
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, Output.Log, analysisCollection);
+                    generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
+                    analysisCollection.Throw();
+                    analysisCollection.Print();
+                    return;
+                }
+
+                if (arguments.GeneratorSettings.PrintInstructions)
+                {
+                    for (int i = 0; i < generatedCode.Code.Length; i++)
+                    {
+                        Instruction instruction = generatedCode.Code[i];
+
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.Write(instruction.Opcode);
+                        Console.ResetColor();
+                        Console.Write(' ');
+
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.Write(instruction.AddressingMode);
+                        Console.ResetColor();
+                        Console.Write(' ');
+
+                        instruction.Parameter.DebugPrint();
+
+                        Console.WriteLine();
+                    }
+                }
+
+                Runtime.Interpreter interpreter;
+
+                if (arguments.ConsoleGUI)
+                {
+                    InterpreterDebuggabble _interpreter = new(true, arguments.BytecodeInterpreterSettings, generatedCode.Code)
+                    { CompilerResult = generatedCode };
+                    interpreter = _interpreter;
+
+                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    { throw new PlatformNotSupportedException("Console rendering is only supported on Windows"); }
+
+                    Output.WriteLine();
+                    Output.Write("Press any key to start executing");
+                    Console.ReadKey();
+
+                    ConsoleGUI.ConsoleGUI gui = new()
+                    {
+                        FilledElement = new ConsoleGUI.InterpreterElement(_interpreter)
+                    };
+
+                    while (!gui.Destroyed)
+                    { gui.Tick(); }
+
+                    Console.Clear();
+                }
+                else
+                {
+                    interpreter = new(true, arguments.BytecodeInterpreterSettings, generatedCode.Code)
+                    { CompilerResult = generatedCode };
 
                     interpreter.OnStdOut += (sender, data) => Output.Write(char.ToString(data));
                     interpreter.OnStdError += (sender, data) => Output.WriteError(char.ToString(data));
@@ -58,121 +154,30 @@ public static class Entry
                         sender.OnInput(input.KeyChar);
                     };
 
-#if DEBUG
-                    interpreter.OnExecuted += (sender) =>
-                    {
-                        if (sender.BytecodeInterpreter == null) return;
+                    while (!interpreter.BytecodeInterpreter.IsDone)
+                    { interpreter.Update(); }
 
-                        Console.WriteLine();
-                        Console.WriteLine($" ===== HEAP ===== ");
-                        Console.WriteLine();
-
-                        sender.BytecodeInterpreter.Memory.Heap.DebugPrint();
-
-                        if (sender.BytecodeInterpreter.Memory.Stack.Count > 0)
-                        {
-                            Console.WriteLine();
-                            Console.WriteLine($" ===== STACK ===== ");
-                            Console.WriteLine();
-
-                            for (int i = 0; i < sender.BytecodeInterpreter.Memory.Stack.Count; i++)
-                            {
-                                sender.BytecodeInterpreter.Memory.Stack[i].DebugPrint();
-                                Console.WriteLine();
-                            }
-                        }
-                    };
-#endif
-
-                    Dictionary<string, ExternalFunctionBase> externalFunctions = new();
-                    interpreter.GenerateExternalFunctions(externalFunctions);
-
-#if AOT
-                    Output.LogDebug($"Skipping loading DLL-s because the compiler compiled in AOT mode");
-#else
-
-                    if (arguments.File.Directory is null)
-                    { throw new InternalException($"File \"{arguments.File}\" doesn't have a directory"); }
-
-                    string dllsFolderPath = Path.Combine(arguments.File.Directory.FullName, arguments.CompilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
-                    if (Directory.Exists(dllsFolderPath))
-                    {
-                        DirectoryInfo dllsFolder = new(dllsFolderPath);
-                        Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
-                        FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
-                        foreach (FileInfo dll in dlls)
-                        { externalFunctions.LoadAssembly(dll.FullName); }
-                    }
-                    else
-                    {
-                        Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
-                    }
-#endif
-
-                    BBCodeGeneratorResult generatedCode;
-                    AnalysisCollection analysisCollection = new();
-
-                    if (!arguments.ThrowErrors)
-                    {
-                        try
-                        {
-                            CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, Output.Log, analysisCollection);
-                            generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
-                            analysisCollection.Throw();
-                            analysisCollection.Print();
-                        }
-                        catch (LanguageException ex)
-                        {
-                            analysisCollection.Print();
-                            Output.LogError(ex);
-                            return;
-                        }
-                        catch (Exception ex)
-                        {
-                            analysisCollection.Print();
-                            Output.LogError(ex);
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, Output.Log, analysisCollection);
-                        generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
-                        analysisCollection.Throw();
-                        analysisCollection.Print();
-                    }
-
-                    if (arguments.GeneratorSettings.PrintInstructions)
-                    {
-                        for (int i = 0; i < generatedCode.Code.Length; i++)
-                        {
-                            Instruction instruction = generatedCode.Code[i];
-
-                            Console.ForegroundColor = ConsoleColor.DarkYellow;
-                            Console.Write(instruction.Opcode);
-                            Console.ResetColor();
-                            Console.Write(' ');
-
-                            Console.ForegroundColor = ConsoleColor.DarkYellow;
-                            Console.Write(instruction.AddressingMode);
-                            Console.ResetColor();
-                            Console.Write(' ');
-
-                            instruction.Parameter.DebugPrint();
-
-                            Console.WriteLine();
-                        }
-                    }
-
-                    interpreter.CompilerResult = generatedCode;
-                    interpreter.Initialize(generatedCode.Code, arguments.BytecodeInterpreterSettings, externalFunctions);
-
-                    while (interpreter.IsExecutingCode)
-                    {
-                        interpreter.Update();
-                    }
                     Console.ResetColor();
                 }
+
+#if DEBUG
+                Console.WriteLine();
+                Console.WriteLine($" ===== HEAP ===== ");
+                Console.WriteLine();
+
+                HeapUtils.DebugPrint(interpreter.BytecodeInterpreter.Memory);
+
+                Console.WriteLine();
+                Console.WriteLine($" ===== STACK ===== ");
+                Console.WriteLine();
+
+                for (int i = interpreter.BytecodeInterpreter.StackStart; i < interpreter.BytecodeInterpreter.Registers.StackPointer; i++)
+                {
+                    interpreter.BytecodeInterpreter.Memory[i].DebugPrint();
+                    Console.WriteLine();
+                }
+#endif
+
                 break;
             }
             case ProgramRunType.Brainfuck:

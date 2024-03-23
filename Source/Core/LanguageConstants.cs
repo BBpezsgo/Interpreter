@@ -195,3 +195,27 @@ public static class LanguageOperators
         { "||", 2 },
     }.ToImmutableDictionary();
 }
+
+public static class AttributeConstants
+{
+    public const string ExternalIdentifier = "External";
+    public const string BuiltinIdentifier = "Builtin";
+}
+
+public static class BuiltinFunctions
+{
+    public static readonly ImmutableDictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)> Prototypes = new Dictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)>()
+    {
+        { Allocate, (new PointerType(new BuiltinType(BasicType.Integer)), [ new BuiltinType(BasicType.Integer) ]) },
+        { Free, (new BuiltinType(BasicType.Void), [ new PointerType(new BuiltinType(BasicType.Integer)) ]) },
+    }.ToImmutableDictionary();
+
+    public const string Allocate = "alloc";
+    public const string Free = "free";
+}
+
+public static class ExternalFunctionNames
+{
+    public const string StdOut = "stdout";
+    public const string StdIn = "stdin";
+}

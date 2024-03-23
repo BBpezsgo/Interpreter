@@ -55,7 +55,7 @@ public readonly struct ValueAddress
             case AddressingMode.BasePointerRelative:
                 result.Append(" (BPR)");
                 break;
-            case AddressingMode.StackRelative:
+            case AddressingMode.StackPointerRelative:
                 result.Append(" (SR)");
                 break;
             default:

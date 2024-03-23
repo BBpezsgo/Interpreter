@@ -11,6 +11,7 @@ using Parser.Statement;
 using Runtime;
 using Tokenizing;
 using LiteralStatement = Parser.Statement.Literal;
+using Registers = LanguageCore.ASM.Registers;
 using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.GeneralType Type);
 
 public class ImportedAsmFunction
@@ -142,7 +143,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.AX, InstructionOperand.Pointer(Registers.BP, (Math.Abs(address.Address) + 1) * IntSize * Math.Sign(address.Address), "DWORD"));
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
                     return;
-                case AddressingMode.StackRelative:
+                case AddressingMode.StackPointerRelative:
                     throw new NotImplementedException();
                 default: throw new UnreachableException();
             }
@@ -159,7 +160,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
                 break;
 
-            case AddressingMode.StackRelative:
+            case AddressingMode.StackPointerRelative:
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.AX, InstructionOperand.Pointer(Registers.SP, (address.Address + 1) * IntSize, "DWORD"));
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
                 throw new NotImplementedException();
@@ -185,7 +186,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, InstructionOperand.Pointer(Registers.BP, (Math.Abs(address.Address) + 1) * IntSize * Math.Sign(address.Address), "DWORD"), Registers.AX);
                     return;
-                case AddressingMode.StackRelative:
+                case AddressingMode.StackPointerRelative:
                     throw new NotImplementedException();
                 default: throw new UnreachableException();
             }
@@ -201,7 +202,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, InstructionOperand.Pointer(Registers.BP, (address.Address + 1) * IntSize * -1, "DWORD"), Registers.AX);
                 break;
-            case AddressingMode.StackRelative:
+            case AddressingMode.StackPointerRelative:
             case AddressingMode.Runtime:
                 throw new NotImplementedException();
             default: throw new UnreachableException();
@@ -348,7 +349,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         { throw new InternalException($"Variable size ({compiledVariable.Type.Size}) and initial value size ({size}) mismatch"); }
 
         if (FunctionFrameSize.Count > 0)
-        { FunctionFrameSize.Last += size; }
+        { FunctionFrameSize[^1] += size; }
 
         return new CleanupItem(size, newVariable.Modifiers.Contains(ModifierKeywords.Temp), compiledVariable.Type);
     }
@@ -660,7 +661,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         if (functionCall.IsMethodCall != compiledFunction.IsExtension)
         { throw new CompilerException($"You called the {(compiledFunction.IsExtension ? "method" : "function")} \"{functionCall.Identifier}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
 
-        if (compiledFunction.Attributes.HasAttribute("External", "stdout"))
+        if (compiledFunction.Attributes.HasAttribute(AttributeConstants.ExternalIdentifier, ExternalFunctionNames.StdOut))
         {
             StatementWithValue valueToPrint = functionCall.Parameters[0];
             GeneralType valueToPrintType = FindStatementType(valueToPrint);
@@ -697,11 +698,11 @@ public class CodeGeneratorForAsm : CodeGenerator
                 Builder.CodeBuilder.Call_stdcall("_GetStdHandle@4", 4, -11);
 
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LoadEA, Registers.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackRelative));
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LoadEA, Registers.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackPointerRelative));
 
                 Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20,
                     Registers.AX,
-                    (InstructionOperand)new ValueAddress(-2, AddressingMode.StackRelative),
+                    (InstructionOperand)new ValueAddress(-2, AddressingMode.StackPointerRelative),
                     1,
                     Registers.BX,
                     0);
@@ -720,7 +721,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 Builder.CodeBuilder.Call_stdcall("_GetStdHandle@4", 4, -11);
 
                 Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LoadEA, Registers.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackRelative));
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LoadEA, Registers.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackPointerRelative));
 
                 Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20,
                     Registers.AX,
@@ -1655,7 +1656,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             for (int i = 0; i < functionDefinition.Attributes.Length; i++)
             {
-                if (functionDefinition.Attributes[i].Identifier.Equals("External"))
+                if (functionDefinition.Attributes[i].Identifier.Equals(AttributeConstants.ExternalIdentifier))
                 { return; }
             }
         }

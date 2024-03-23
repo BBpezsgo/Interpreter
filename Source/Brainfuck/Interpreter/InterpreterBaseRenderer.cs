@@ -155,7 +155,7 @@ public partial class InterpreterBase<TCode>
         _rendererContext.Renderer.Text(1, line - 1, "|Output|", CharColor.Gray);
         SmallRect outputRect = new(0, line, width, height);
         DrawOutput(_rendererContext.Renderer, _rendererContext.OutputBuffer, outputRect);
-        line += outputRect.Height;
+        // line += outputRect.Height;
 
         /*
         SmallRect stackTraceRect = new(0, line, width, 10);

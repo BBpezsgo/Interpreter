@@ -178,18 +178,6 @@ public static class CompactCode
         (OpCodesCompact)'+', (OpCodesCompact)'-',
     };
 
-    static int ExpectStuff(ReadOnlySpan<char> code, ref int index, char increment, char decrement)
-    {
-        int result = 0;
-        for (; index < code.Length; index++)
-        {
-            if (code[index] == increment) result++;
-            else if (code[index] == decrement) result--;
-            else break;
-        }
-        return result;
-    }
-
     static bool TryGenerateDataMovement(ReadOnlySpan<char> code, ref int index, [NotNullWhen(true)] out CompactCodeSegment result, DebugInformation? debugInfo, ref int removed)
     {
         result = default;

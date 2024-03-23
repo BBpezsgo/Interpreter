@@ -110,7 +110,13 @@ public enum Opcode : byte
     /// <b>Expected stack elements:</b><br/>
     /// <c>...</c><br/>
     /// <c>parameters</c> (as much as needed)<br/>
-    /// <c><see cref="int"/> function name address (string pointer)</c><br/>
+    /// <c><see cref="int"/> function id</c> (popped)<br/>
+    /// </para>
+    /// <br/><br/>
+    ///
+    /// <para>
+    ///     <b>Stack elements added:</b><br/>
+    ///     <c>return value</c><br/>
     /// </para>
     /// </summary>
     CallExternal,
@@ -152,7 +158,7 @@ public enum Opcode : byte
     ///         </item>
     ///         <item>
     ///             <term>
-    ///                 <see cref="AddressingMode.StackRelative"/>
+    ///                 <see cref="AddressingMode.StackPointerRelative"/>
     ///             </term>
     ///             <description>
     ///                 Uses the stack's size as a new value and adds the instruction's parameter as an offset
@@ -575,5 +581,43 @@ public enum Opcode : byte
     #region === TYPE OPERATINS ===
     TypeGet,
     TypeSet,
+    #endregion
+
+    #region === REGISTERS ===
+
+    /// <summary>
+    /// <para>
+    /// <b>Expected stack elements:</b><br/>
+    /// <c>...</c><br/>
+    /// </para>
+    /// <br/><br/>
+    ///
+    /// <para>
+    /// <b>Stack elements added:</b><br/>
+    /// <c>Register value</c><br/>
+    /// </para>
+    /// </summary>
+    /// <remarks>
+    /// <list type="table">
+    ///
+    /// <item>
+    /// <term>1</term>
+    /// <description>CodePointer</description>
+    /// </item>
+    ///
+    /// <item>
+    /// <term>2</term>
+    /// <description>StackPointer</description>
+    /// </item>
+    ///
+    /// <item>
+    /// <term>3</term>
+    /// <description>BasePointer</description>
+    /// </item>
+    ///
+    /// </list>
+    /// </remarks>
+    GetRegister,
+
     #endregion
 }

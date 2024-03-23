@@ -65,8 +65,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Fields
 
-    readonly ImmutableDictionary<string, ExternalFunctionBase> ExternalFunctions;
-    readonly Dictionary<string, int> ExternalFunctionsCache;
+    readonly ImmutableDictionary<int, ExternalFunctionBase> ExternalFunctions;
 
     readonly Stack<CleanupItem[]> CleanupStack;
     ISameCheck? CurrentContext;
@@ -92,7 +91,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         this.ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
         this.GeneratedCode = new List<PreparationInstruction>();
-        this.ExternalFunctionsCache = new Dictionary<string, int>();
         this.DebugInfo = new DebugInformation(compilerResult.Tokens);
         this.CleanupStack = new Stack<CleanupItem[]>();
         this.ReturnInstructions = new Stack<List<int>>();
@@ -103,52 +101,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         this.UndefinedConstructorOffsets = new List<UndefinedOffset<CompiledConstructor>>();
         this.TagCount = new Stack<int>();
         this.CompileLevel = settings.CompileLevel;
-    }
-
-    void GenerateExternalFunctionsCache(IEnumerable<string> usedExternalFunctions)
-    {
-        int offset = 0;
-        AddComment($"Create external functions cache {{");
-        foreach (string function in usedExternalFunctions)
-        {
-            AddComment($"Create string \"{function}\" {{");
-
-            AddInstruction(Opcode.Push, function.Length + 1);
-            AddInstruction(Opcode.Allocate);
-
-            ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count + 1);
-            offset += function.Length;
-
-            for (int i = 0; i < function.Length; i++)
-            {
-                // Prepare value
-                AddInstruction(Opcode.Push, new DataItem(function[i]));
-
-                // Calculate pointer
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
-                AddInstruction(Opcode.Push, i);
-                AddInstruction(Opcode.MathAdd);
-
-                // Set value
-                AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
-            }
-
-            {
-                // Prepare value
-                AddInstruction(Opcode.Push, new DataItem('\0'));
-
-                // Calculate pointer
-                AddInstruction(Opcode.StackLoad, AddressingMode.StackRelative, -2);
-                AddInstruction(Opcode.Push, function.Length);
-                AddInstruction(Opcode.MathAdd);
-
-                // Set value
-                AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
-            }
-
-            AddComment("}");
-        }
-        AddComment("}");
     }
 
     void SetUndefinedFunctionOffsets<TFunction>(IEnumerable<UndefinedOffset<TFunction>> undefinedOffsets)
@@ -210,23 +162,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddInstruction(Opcode.Push, new DataItem(0));
 
-        if (settings.ExternalFunctionsCache)
-        { GenerateExternalFunctionsCache(usedExternalFunctions); }
-
         CurrentFile = compilerResult.File;
 #if DEBUG
         if (CurrentFile == null)
         { Debugger.Break(); }
 #endif
         GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
-
-        if (ExternalFunctionsCache.Count > 0)
-        {
-            AddComment("Clear external functions cache {");
-            for (int i = 0; i < ExternalFunctionsCache.Count; i++)
-            { AddInstruction(Opcode.Free); }
-            AddComment("}");
-        }
 
         AddInstruction(Opcode.Exit);
 

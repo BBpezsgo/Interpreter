@@ -13,7 +13,8 @@ public abstract class ExternalFunctionBase : ISimpleReadable
     public const ExternalFunctionCheckFlags DefaultFlags = ExternalFunctionCheckFlags.CheckParamLength | ExternalFunctionCheckFlags.CheckParamType;
 
     public readonly ImmutableArray<RuntimeType> Parameters;
-    public readonly string Name;
+    public readonly string? Name;
+    public readonly int Id;
     public readonly bool ReturnSomething;
     public readonly ExternalFunctionCheckFlags Flags;
 
@@ -22,8 +23,9 @@ public abstract class ExternalFunctionBase : ISimpleReadable
 
     public BytecodeProcessor? BytecodeInterpreter;
 
-    protected ExternalFunctionBase(string name, IEnumerable<RuntimeType> parameters, bool returnSomething, ExternalFunctionCheckFlags flags)
+    protected ExternalFunctionBase(int id, string? name, IEnumerable<RuntimeType> parameters, bool returnSomething, ExternalFunctionCheckFlags flags)
     {
+        this.Id = id;
         this.Name = name;
         this.Parameters = parameters.ToImmutableArray();
         this.ReturnSomething = returnSomething;
@@ -59,8 +61,8 @@ public class ExternalFunctionSimple : ExternalFunctionBase
     protected Func<BytecodeProcessor, DataItem[], DataItem> callback;
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionSimple(Action<BytecodeProcessor, DataItem[]> callback, string name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
-        : base(name, parameters, false, flags)
+    public ExternalFunctionSimple(Action<BytecodeProcessor, DataItem[]> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
+        : base(id, name, parameters, false, flags)
     {
         this.callback = (sender, v) =>
         {
@@ -70,8 +72,8 @@ public class ExternalFunctionSimple : ExternalFunctionBase
     }
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionSimple(Func<BytecodeProcessor, DataItem[], DataItem> callback, string name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
-        : base(name, parameters, true, flags)
+    public ExternalFunctionSimple(Func<BytecodeProcessor, DataItem[], DataItem> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
+        : base(id, name, parameters, true, flags)
     {
         this.callback = callback;
     }
@@ -96,8 +98,8 @@ public class ExternalFunctionManaged : ExternalFunctionBase
     readonly Func<DataItem[], DataItem> callback;
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionManaged(Action<DataItem[], ExternalFunctionManaged> callback, string name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
-             : base(name, parameters, true, flags)
+    public ExternalFunctionManaged(Action<DataItem[], ExternalFunctionManaged> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
+             : base(id, name, parameters, true, flags)
     {
         this.callback = new Func<DataItem[], DataItem>((p) =>
         {
@@ -116,12 +118,40 @@ public class ExternalFunctionManaged : ExternalFunctionBase
 
 public static unsafe class ExternalFunctionGenerator
 {
+    public static bool TryGet(this IReadOnlyDictionary<int, ExternalFunctionBase> externalFunctions, string name, [NotNullWhen(true)] out ExternalFunctionBase? result, [NotNullWhen(false)] out WillBeCompilerException? exception)
+    {
+        result = null;
+        exception = null;
+
+        foreach (ExternalFunctionBase function in externalFunctions.Values)
+        {
+            if (function.Name == name)
+            {
+                if (result is not null)
+                {
+                    exception = new WillBeCompilerException($"External function with name \"{name}\" not found: duplicated function names");
+                    return false;
+                }
+
+                result = function;
+            }
+        }
+
+        if (result is null)
+        {
+            exception = new WillBeCompilerException($"External function with name \"{name}\" not found");
+            return false;
+        }
+
+        return true;
+    }
+
     [RequiresUnreferencedCode("Loading Assembly")]
-    public static void LoadAssembly(this Dictionary<string, ExternalFunctionBase> externalFunctions, string path)
+    public static void LoadAssembly(this Dictionary<int, ExternalFunctionBase> externalFunctions, string path)
         => ExternalFunctionGenerator.LoadAssembly(externalFunctions, System.Reflection.Assembly.LoadFile(path));
 
     [RequiresUnreferencedCode("Loading Assembly")]
-    public static void LoadAssembly(this Dictionary<string, ExternalFunctionBase> externalFunctions, System.Reflection.Assembly assembly)
+    public static void LoadAssembly(this Dictionary<int, ExternalFunctionBase> externalFunctions, System.Reflection.Assembly assembly)
     {
         Type[] exportedTypes = assembly.GetExportedTypes();
 
@@ -133,11 +163,28 @@ public static unsafe class ExternalFunctionGenerator
         }
     }
 
+    public static int GenerateId(this Dictionary<int, ExternalFunctionBase> functions, string? name)
+    {
+        int result;
+
+        if (name is not null) result = name.GetHashCode();
+        else result = 1;
+
+        while (functions.ContainsKey(result))
+        { result++; }
+
+        return result;
+    }
+
     #region AddExternalFunction()
 
     /// <exception cref="InternalException"/>
     /// <exception cref="RuntimeException"/>
-    static ExternalFunctionSimple AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, System.Reflection.MethodInfo method)
+    static ExternalFunctionSimple AddExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, System.Reflection.MethodInfo method)
+        => functions.AddExternalFunction(functions.GenerateId(method.Name), method);
+    /// <exception cref="InternalException"/>
+    /// <exception cref="RuntimeException"/>
+    static ExternalFunctionSimple AddExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, System.Reflection.MethodInfo method)
     {
         if (!method.IsStatic)
         { throw new InternalException($"Only static functions can be added as an external function"); }
@@ -156,7 +203,7 @@ public static unsafe class ExternalFunctionGenerator
                 { return DataItem.Null; }
                 else
                 { return DataItem.GetValue(returnValue); }
-            }, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
+            }, id, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
         }
         else
         {
@@ -164,87 +211,115 @@ public static unsafe class ExternalFunctionGenerator
             {
                 object?[] parameterValues = GetValues(parameters).ToArray();
                 method.Invoke(null, parameterValues);
-            }, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
+            }, id, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
         }
 
-        functions.AddExternalFunction(method.Name, function);
+        functions.AddExternalFunction(function);
         return function;
     }
 
-    public static void AddManagedExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, RuntimeType[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
-        => functions.AddExternalFunction(name, new ExternalFunctionManaged(callback, name, parameterTypes, flags));
+    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, RuntimeType[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+        => functions.AddExternalFunction(new ExternalFunctionManaged(callback, functions.GenerateId(name), name, parameterTypes, flags));
 
-    public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, RuntimeType[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
-        => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
-    public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, RuntimeType[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
-        => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
+    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, RuntimeType[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+        => functions.AddExternalFunction(new ExternalFunctionManaged(callback, id, name, parameterTypes, flags));
 
-    static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, ExternalFunctionBase function)
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, RuntimeType[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, id, name, parameterTypes, flags));
+
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, RuntimeType[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, functions.GenerateId(name), name, parameterTypes, flags));
+
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, RuntimeType[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, id, name, parameterTypes, flags));
+
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, RuntimeType[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, functions.GenerateId(name), name, parameterTypes, flags));
+
+    static void AddExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, ExternalFunctionBase function)
     {
-        if (!functions.TryAdd(name, function))
+        if (!functions.TryAdd(function.Id, function))
         {
-            functions[name] = function;
-            Output.LogWarning($"External function function \"{name}\" is already defined, so I'll override it");
+            functions[function.Id] = function;
+            Output.LogWarning($"External function \"{function.Name}\" with id {function.Id} is already defined, so I'll override it");
         }
     }
 
-    public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Action callback)
+    public static void AddExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string name, Action callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    public static void AddExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action callback)
     {
         RuntimeType[] types = Array.Empty<RuntimeType>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             callback?.Invoke();
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?> callback)
+    public static void AddExternalFunction<T0>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?> callback)
     {
         RuntimeType[] types = GetTypes<T0>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             callback?.Invoke(
                 GetValue<T0>(sender, args[0]));
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?> callback)
+    public static void AddExternalFunction<T0, T1>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             callback?.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]));
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?> callback)
+    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?, T2?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             callback?.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
                 GetValue<T2>(sender, args[2]));
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?, T2?, T3?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             callback?.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
@@ -252,14 +327,18 @@ public static unsafe class ExternalFunctionGenerator
                 GetValue<T3>(sender, args[3]));
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?, T4?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?, T4?> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?, T2?, T3?, T4?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3, T4>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             callback?.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
@@ -268,14 +347,18 @@ public static unsafe class ExternalFunctionGenerator
                 GetValue<T4>(sender, args[4]));
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?, T4?, T5?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?, T4?, T5?> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?, T2?, T3?, T4?, T5?> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             callback?.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
@@ -287,40 +370,51 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<TResult> callback)
+    public static void AddExternalFunction<TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<TResult> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<TResult> callback)
     {
         RuntimeType[] types = Array.Empty<RuntimeType>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             TResult result = callback.Invoke();
 
             return DataItem.GetValue(result);
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, TResult> callback)
+    public static void AddExternalFunction<T0, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, TResult> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
                 GetValue<T0>(sender, args[0]));
 
             return DataItem.GetValue(result);
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, TResult> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]));
@@ -328,14 +422,18 @@ public static unsafe class ExternalFunctionGenerator
             return DataItem.GetValue(result);
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, T2?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, T2?, TResult> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, T2?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
@@ -344,14 +442,18 @@ public static unsafe class ExternalFunctionGenerator
             return DataItem.GetValue(result);
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, T2?, T3?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, T2?, T3?, TResult> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, T2?, T3?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
@@ -361,14 +463,18 @@ public static unsafe class ExternalFunctionGenerator
             return DataItem.GetValue(result);
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, T2?, T3?, T4?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, T2?, T3?, T4?, TResult> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, T2?, T3?, T4?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3, T4>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
@@ -379,14 +485,18 @@ public static unsafe class ExternalFunctionGenerator
             return DataItem.GetValue(result);
         });
     }
+
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0?, T1?, T2?, T3?, T4?, T5?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, T2?, T3?, T4?, T5?, TResult> callback)
+        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
+    /// <exception cref="NotImplementedException"/>
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, T2?, T3?, T4?, T5?, TResult> callback)
     {
         RuntimeType[] types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
-        functions.AddSimpleExternalFunction(name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
         {
-            CheckParameters(name, types, args);
+            CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
                 GetValue<T0>(sender, args[0]),
                 GetValue<T1>(sender, args[1]),
@@ -428,23 +538,24 @@ public static unsafe class ExternalFunctionGenerator
     static T? GetValue<T>(BytecodeProcessor bytecodeProcessor, DataItem data)
     {
         if (typeof(T) == typeof(string))
-        { return (T?)(object?)bytecodeProcessor.Memory.Heap.GetString((int)data); }
+        { return (T?)(object?)HeapUtils.GetString(bytecodeProcessor.Memory, (int)data); }
 
         return data.ToType<T>();
     }
 
-    public static void SetInterpreter(this Dictionary<string, ExternalFunctionBase> functions, BytecodeProcessor interpreter)
+    public static void SetInterpreter(this IReadOnlyDictionary<int, ExternalFunctionBase> functions, BytecodeProcessor interpreter)
     {
-        foreach (KeyValuePair<string, ExternalFunctionBase> item in functions)
+        foreach (KeyValuePair<int, ExternalFunctionBase> item in functions)
         { item.Value.BytecodeInterpreter = interpreter; }
     }
 
     #endregion
 
     /// <exception cref="RuntimeException"/>
-    static void CheckParameters(string functionName, RuntimeType[] required, DataItem[] passed)
+    static void CheckParameters(int id, string? functionName, RuntimeType[] required, DataItem[] passed)
     {
-        if (passed.Length != required.Length) throw new RuntimeException($"Wrong number of parameters passed to external function '{functionName}' ({passed.Length}) which requires {required.Length}");
+        if (passed.Length != required.Length)
+        { throw new RuntimeException($"Wrong number of parameters passed to external function \"{functionName}\" (with id {id}) ({passed.Length}) which requires {required.Length}"); }
     }
 
     #region GetTypes<>()

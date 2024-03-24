@@ -10,6 +10,86 @@ using Tokenizing;
 
 public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 {
+    void GenerateAllocator(int size, IPositioned position)
+    {
+        StatementWithValue[] parameters = new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) };
+
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator, true))
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, CurrentFile); }
+        if (!allocator.ReturnSomething)
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", position, CurrentFile); }
+
+        if (!allocator.CanUse(CurrentFile))
+        {
+            AnalysisCollection?.Errors.Add(new Error($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
+            return;
+        }
+
+        if (TryEvaluate(allocator, parameters, out DataItem? returnValue, out Statement[]? runtimeStatements))
+        {
+            if (returnValue.HasValue && runtimeStatements.Length == 0)
+            {
+                Stack.Push(returnValue.Value);
+                return;
+            }
+        }
+
+        GenerateCodeForFunction(allocator, parameters, null, position);
+    }
+
+    void GenerateDestructor(StatementWithValue value)
+    {
+        GeneralType deallocateableType = FindStatementType(value);
+
+        StatementWithValue[] parameters = new StatementWithValue[] { value };
+        GeneralType[] parameterTypes = FindStatementTypes(parameters);
+
+        if (deallocateableType is not PointerType)
+        {
+            AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on pointers so I skip this", value, CurrentFile));
+            return;
+        }
+
+        Dictionary<string, GeneralType> typeArguments = new();
+
+        if (!GetGeneralFunction(deallocateableType, parameterTypes, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
+        {
+            if (!GetGeneralFunctionTemplate(deallocateableType, parameterTypes, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
+            {
+                GenerateDeallocator(value);
+                return;
+            }
+            typeArguments = destructorTemplate.TypeArguments;
+            destructor = destructorTemplate.Function;
+        }
+
+        if (!destructor.CanUse(CurrentFile))
+        {
+            AnalysisCollection?.Errors.Add(new Error($"Destructor for type {deallocateableType} cannot be called due to its protection level", value, CurrentFile));
+            return;
+        }
+
+        typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
+
+        GenerateCodeForFunction(destructor, new StatementWithValue[] { value }, typeArguments, value);
+
+        if (destructor.ReturnSomething)
+        { Stack.Pop(); }
+
+        GenerateDeallocator(value);
+    }
+
+    void GenerateDeallocator(StatementWithValue value)
+    {
+        StatementWithValue[] parameters = new StatementWithValue[] { value };
+        GeneralType[] parameterTypes = FindStatementTypes(parameters);
+
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, false))
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
+
+        GenerateCodeForFunction(deallocator, parameters, null, value);
+    }
+
     #region PrecompileVariables
     int PrecompileVariables(Block block)
     { return PrecompileVariables(block.Statements); }
@@ -1055,7 +1135,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 StatementWithValue deletable = statement.Parameters[0];
 
-                GenerateDeallocator(deletable);
+                GenerateDestructor(deletable);
 
                 break;
             }
@@ -2094,7 +2174,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             case PointerType pointerType:
             {
                 int pointerAddress = Stack.NextAddress;
-                Allocate(pointerType.To.Size, newInstance);
+                GenerateAllocator(pointerType.To.Size, newInstance);
 
                 int temp = Stack.PushVirtual(1);
                 Code.CopyValueWithTemp(pointerAddress, temp + 1, temp);
@@ -2490,79 +2570,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     #endregion
 
-    void Allocate(int size, IPositioned position)
-    {
-        StatementWithValue[] parameters = new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) };
-
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator))
-        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, CurrentFile); }
-        if (!allocator.ReturnSomething)
-        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", position, CurrentFile); }
-
-        if (!allocator.CanUse(CurrentFile))
-        {
-            AnalysisCollection?.Errors.Add(new Error($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
-            return;
-        }
-
-        if (TryEvaluate(allocator, parameters, out DataItem? returnValue, out Statement[]? runtimeStatements))
-        {
-            if (returnValue.HasValue && runtimeStatements.Length == 0)
-            {
-                Stack.Push(returnValue.Value);
-                return;
-            }
-        }
-
-        GenerateCodeForFunction(allocator, parameters, null, position);
-        return;
-    }
-
-    void GenerateDeallocator(StatementWithValue value)
-    {
-        GeneralType deallocateableType = FindStatementType(value);
-
-        StatementWithValue[] parameters = new StatementWithValue[] { value };
-        GeneralType[] parameterTypes = FindStatementTypes(parameters);
-
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator))
-        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
-
-        if (deallocateableType is not PointerType)
-        {
-            AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on pointers or pointer so I skip this", value, CurrentFile));
-            return;
-        }
-
-        Dictionary<string, GeneralType> typeArguments = new();
-
-        if (!GetGeneralFunction(deallocateableType, parameterTypes, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
-        {
-            if (!GetGeneralFunctionTemplate(deallocateableType, parameterTypes, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
-            {
-                GenerateCodeForFunction(deallocator, parameters, null, value);
-                return;
-            }
-            typeArguments = destructorTemplate.TypeArguments;
-            destructor = destructorTemplate.Function;
-        }
-
-        if (!destructor.CanUse(CurrentFile))
-        {
-            AnalysisCollection?.Errors.Add(new Error($"Destructor for type {deallocateableType} cannot be called due to its protection level", value, CurrentFile));
-            return;
-        }
-
-        typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
-
-        GenerateCodeForFunction(destructor, new StatementWithValue[] { value }, typeArguments, value);
-
-        if (destructor.ReturnSomething)
-        { Stack.Pop(); }
-
-        GenerateCodeForFunction(deallocator, parameters, null, value);
-    }
-
     int GenerateCodeForLiteralString(Literal literal)
         => GenerateCodeForLiteralString(literal.Value, literal);
     int GenerateCodeForLiteralString(string literal, IPositioned position)
@@ -2573,7 +2580,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         {
             int pointerAddress = Stack.NextAddress;
             using (Code.Block(this, "Allocate String object {"))
-            { Allocate(1 + literal.Length, position); }
+            { GenerateAllocator(1 + literal.Length, position); }
 
             using (Code.Block(this, "Set string data {"))
             {
@@ -2885,8 +2892,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledVariables.PushIf(returnVariable);
         CompiledVariables.PushRange(compiledParameters);
         CurrentFile = function.FilePath;
-        CompiledConstants.PushRange(constantParameters);
-        CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.PushRange(constantParameters);
+        CompiledLocalConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 
@@ -2913,7 +2920,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     if (variable.DeallocateOnClean &&
                         variable.Type is PointerType)
                     {
-                        GenerateDeallocator(
+                        GenerateDestructor(
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name)),
                                 Token.CreateAnonymous(StatementKeywords.As),
@@ -3021,8 +3028,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledVariables.PushIf(returnVariable);
         CompiledVariables.PushRange(compiledParameters);
         CurrentFile = function.FilePath;
-        CompiledConstants.PushRange(constantParameters);
-        CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.PushRange(constantParameters);
+        CompiledLocalConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 
@@ -3049,7 +3056,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     if (variable.DeallocateOnClean &&
                         variable.Type is PointerType)
                     {
-                        GenerateDeallocator(
+                        GenerateDestructor(
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name)),
                                 Token.CreateAnonymous(StatementKeywords.As),
@@ -3110,8 +3117,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GeneratorStackFrame frame = PushStackFrame(typeArguments);
         CompiledVariables.PushIf(returnVariable);
         CompiledVariables.PushRange(compiledParameters);
-        CompiledConstants.PushRange(constantParameters);
-        CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.PushRange(constantParameters);
+        CompiledLocalConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
         if (function.Block is null)
         { throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath); }
@@ -3138,7 +3145,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     if (variable.DeallocateOnClean &&
                         variable.Type is PointerType)
                     {
-                        GenerateDeallocator(
+                        GenerateDestructor(
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name)),
                                 Token.CreateAnonymous(StatementKeywords.As),
@@ -3309,8 +3316,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GeneratorStackFrame frame = PushStackFrame(typeArguments);
         CompiledVariables.PushRange(compiledParameters);
         CurrentFile = function.FilePath;
-        CompiledConstants.PushRange(constantParameters);
-        CompiledConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.PushRange(constantParameters);
+        CompiledLocalConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 
@@ -3338,7 +3345,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     if (variable.DeallocateOnClean &&
                         variable.Type is PointerType)
                     {
-                        GenerateDeallocator(
+                        GenerateDestructor(
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name)),
                                 Token.CreateAnonymous(StatementKeywords.As),

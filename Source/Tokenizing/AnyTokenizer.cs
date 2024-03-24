@@ -4,20 +4,17 @@ namespace LanguageCore.Tokenizing;
 
 public static class AnyTokenizer
 {
-    public static TokenizerResult Tokenize(Uri uri)
-        => AnyTokenizer.Tokenize(uri, TokenizerSettings.Default);
-
-    public static TokenizerResult Tokenize(Uri uri, TokenizerSettings settings)
+    public static TokenizerResult Tokenize(Uri uri, IEnumerable<string> preprocessorVariables, TokenizerSettings? settings = null)
     {
         if (uri.IsFile)
-        { return StreamTokenizer.Tokenize(uri.LocalPath, settings); }
+        { return StreamTokenizer.Tokenize(uri.LocalPath, preprocessorVariables, settings); }
         else
         {
             using HttpClient client = new();
             using HttpResponseMessage res = client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead).Result;
             res.EnsureSuccessStatusCode();
 
-            return StreamTokenizer.Tokenize(res.Content.ReadAsStream(), uri, settings);
+            return StreamTokenizer.Tokenize(res.Content.ReadAsStream(), preprocessorVariables, uri, settings);
         }
     }
 }

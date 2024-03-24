@@ -104,9 +104,10 @@ public abstract class CodeGenerator
     protected ImmutableArray<CompiledConstructor> CompiledConstructors;
     protected ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
     protected ImmutableArray<CompiledEnum> CompiledEnums;
+    protected ImmutableArray<IConstant> CompiledGlobalConstants;
 
-    protected readonly Stack<IConstant> CompiledConstants;
-    protected readonly Stack<int> ConstantsStack;
+    protected readonly Stack<IConstant> CompiledLocalConstants;
+    protected readonly Stack<int> LocalConstantsStack;
 
     protected readonly List<CompiledParameter> CompiledParameters;
     protected readonly List<CompiledVariable> CompiledVariables;
@@ -141,9 +142,10 @@ public abstract class CodeGenerator
         CompiledGeneralFunctions = ImmutableArray.Create<CompiledGeneralFunction>();
         CompiledConstructors = ImmutableArray.Create<CompiledConstructor>();
         CompiledEnums = ImmutableArray.Create<CompiledEnum>();
+        CompiledGlobalConstants = ImmutableArray.Create<IConstant>();
 
-        CompiledConstants = new Stack<IConstant>();
-        ConstantsStack = new Stack<int>();
+        CompiledLocalConstants = new Stack<IConstant>();
+        LocalConstantsStack = new Stack<int>();
 
         CompiledParameters = new List<CompiledParameter>();
         CompiledVariables = new List<CompiledVariable>();
@@ -182,7 +184,19 @@ public abstract class CodeGenerator
 
     #region Helper Functions
 
-    protected int CompileConstants(IEnumerable<Statement> statements)
+    protected void CompileGlobalConstants(IEnumerable<Statement> statements)
+    {
+        foreach (Statement statement in statements)
+        {
+            if (statement is not VariableDeclaration variableDeclaration ||
+                !variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
+            { continue; }
+
+            CompiledGlobalConstants = CompiledGlobalConstants.Add(CompileConstant(variableDeclaration));
+        }
+    }
+
+    protected int CompileLocalConstants(IEnumerable<Statement> statements)
     {
         int count = 0;
         foreach (Statement statement in statements)
@@ -190,28 +204,28 @@ public abstract class CodeGenerator
             if (statement is not VariableDeclaration variableDeclaration ||
                 !variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
             { continue; }
-            CompileConstant(variableDeclaration);
+            CompiledLocalConstants.Push(CompileConstant(variableDeclaration));
             count++;
         }
-        ConstantsStack.Push(count);
+        LocalConstantsStack.Push(count);
         return count;
     }
 
-    protected int CompileConstants(IEnumerable<VariableDeclaration> statements)
+    protected int CompileLocalConstants(IEnumerable<VariableDeclaration> statements)
     {
         int count = 0;
         foreach (VariableDeclaration statement in statements)
         {
             if (!statement.Modifiers.Contains(ModifierKeywords.Const))
             { continue; }
-            CompileConstant(statement);
+            CompiledLocalConstants.Push(CompileConstant(statement));
             count++;
         }
-        ConstantsStack.Push(count);
+        LocalConstantsStack.Push(count);
         return count;
     }
 
-    protected void CompileConstant(VariableDeclaration variableDeclaration)
+    protected CompiledVariableConstant CompileConstant(VariableDeclaration variableDeclaration)
     {
         if (variableDeclaration.InitialValue == null)
         { throw new CompilerException($"Constant value must have initial value", variableDeclaration, variableDeclaration.FilePath); }
@@ -225,7 +239,7 @@ public abstract class CodeGenerator
             variableDeclaration.Type.SetAnalyzedType(constantType);
 
             if (constantType is not BuiltinType builtinType)
-            { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, CurrentFile); }
+            { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, variableDeclaration.FilePath); }
 
             DataItem.TryCast(ref constantValue, builtinType.RuntimeType);
         }
@@ -233,20 +247,31 @@ public abstract class CodeGenerator
         if (GetConstant(variableDeclaration.Identifier.Content, out _))
         { throw new CompilerException($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.FilePath); }
 
-        CompiledConstants.Push(new CompiledVariableConstant(constantValue, variableDeclaration));
+        return new(constantValue, variableDeclaration);
     }
 
-    protected void CleanupConstants()
+    protected void CleanupLocalConstants()
     {
-        int count = ConstantsStack.Pop();
-        CompiledConstants.Pop(count);
+        int count = LocalConstantsStack.Pop();
+        CompiledLocalConstants.Pop(count);
     }
 
     protected bool GetConstant(string identifier, [NotNullWhen(true)] out IConstant? constant)
     {
         constant = null;
 
-        foreach (IConstant _constant in CompiledConstants)
+        foreach (IConstant _constant in CompiledLocalConstants)
+        {
+            if (_constant.Identifier != identifier)
+            { continue; }
+
+            if (constant is not null)
+            { throw new CompilerException($"Constant \"{constant.Identifier}\" defined more than once", constant, constant.FilePath); }
+
+            constant = _constant;
+        }
+
+        foreach (IConstant _constant in CompiledGlobalConstants)
         {
             if (_constant.Identifier != identifier)
             { continue; }
@@ -589,7 +614,7 @@ public abstract class CodeGenerator
         return false;
     }
 
-    protected bool TryGetBuiltinFunction(string builtinName, GeneralType[] parameters, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+    protected bool TryGetBuiltinFunction(string builtinName, GeneralType[] parameters, [NotNullWhen(true)] out CompiledFunction? compiledFunction, bool addCompilable)
     {
         compiledFunction = null;
 
@@ -597,26 +622,44 @@ public abstract class CodeGenerator
         {
             if (function.IsTemplate) continue;
             if (function.BuiltinFunctionName != builtinName) continue;
-
+            if (!GeneralType.AreEquals(function.ParameterTypes, parameters))
+            { continue; }
             if (compiledFunction is not null)
             { return false; }
 
             compiledFunction = function;
         }
 
+        foreach (CompliableTemplate<CompiledFunction> function in compilableFunctions)
+        {
+            if (function.Function.BuiltinFunctionName != builtinName) continue;
+            if (!GeneralType.AreEquals(function.Function.ParameterTypes, parameters))
+            { continue; }
+            if (compiledFunction is not null)
+            { return false; }
+
+            compiledFunction = function.Function;
+        }
+
+        if (compiledFunction is not null)
+        { return true; }
+
         foreach (CompiledFunction function in this.CompiledFunctions)
         {
             if (!function.IsTemplate) continue;
             if (function.BuiltinFunctionName != builtinName) continue;
-
             if (compiledFunction is not null)
             { return false; }
 
-            Dictionary<string, GeneralType> typeArguments = new(TypeArguments);
+            Dictionary<string, GeneralType> typeArguments = new();
 
-            if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, parameters, typeArguments)) continue;
+            if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, parameters, typeArguments))
+            { continue; }
 
-            compiledFunction = new CompliableTemplate<CompiledFunction>(function, typeArguments).Function;
+            CompliableTemplate<CompiledFunction> template = new(function, typeArguments);
+            if (addCompilable)
+            { AddCompilable(template); }
+            compiledFunction = template.Function;
         }
 
         return compiledFunction is not null;

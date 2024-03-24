@@ -43,12 +43,14 @@ public class SourceCodeManager
     readonly List<Uri> AlreadyLoadedCodes;
     readonly AnalysisCollection? AnalysisCollection;
     readonly PrintCallback? Print;
+    readonly IEnumerable<string> PreprocessorVariables;
 
-    public SourceCodeManager(AnalysisCollection? analysisCollection, PrintCallback? printCallback)
+    public SourceCodeManager(AnalysisCollection? analysisCollection, PrintCallback? printCallback, IEnumerable<string> preprocessorVariables)
     {
         AlreadyLoadedCodes = new List<Uri>();
         AnalysisCollection = analysisCollection;
         Print = printCallback;
+        PreprocessorVariables = preprocessorVariables;
     }
 
     bool IsAlreadyLoaded(Uri uri)
@@ -109,11 +111,11 @@ public class SourceCodeManager
         if (res.Content.Headers.ContentLength.HasValue)
         {
             using ConsoleProgressBar progress = new(ConsoleColor.DarkGray, true);
-            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), uri, progress, (int)res.Content.Headers.ContentLength.Value);
+            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), PreprocessorVariables, uri, null, progress, (int)res.Content.Headers.ContentLength.Value);
         }
         else
         {
-            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), uri);
+            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), PreprocessorVariables, uri, null);
         }
 
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
@@ -134,7 +136,7 @@ public class SourceCodeManager
 
         Print?.Invoke($"  Load local file \"{path}\" ...", LogType.Debug);
 
-        TokenizerResult tokens = StreamTokenizer.Tokenize(path);
+        TokenizerResult tokens = StreamTokenizer.Tokenize(path, PreprocessorVariables);
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
 
         ast = Parser.Parse(tokens, new Uri(path, UriKind.Absolute));
@@ -296,11 +298,12 @@ public class SourceCodeManager
     public static CollectorResult Collect(
         UsingDefinition[] usings,
         Uri? file,
-        PrintCallback? printCallback = null,
-        string? basePath = null,
-        AnalysisCollection? analysisCollection = null)
+        PrintCallback? printCallback,
+        string? basePath,
+        AnalysisCollection? analysisCollection,
+        IEnumerable<string> preprocessorVariables)
     {
-        SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback);
+        SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables);
         if (file != null) sourceCodeManager.AlreadyLoadedCodes.Add(file);
         return sourceCodeManager.Entry(usings, file, basePath);
     }
@@ -308,12 +311,13 @@ public class SourceCodeManager
     public static CollectorResult Collect(
         UsingDefinition[] usings,
         FileInfo? file,
+        IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback = null,
         string? basePath = null,
         AnalysisCollection? analysisCollection = null)
     {
         Uri? fileUri = file is null ? null : new Uri(file.FullName, UriKind.Absolute);
-        SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback);
+        SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables);
         if (fileUri != null) sourceCodeManager.AlreadyLoadedCodes.Add(fileUri);
         return sourceCodeManager.Entry(usings, fileUri, basePath);
     }

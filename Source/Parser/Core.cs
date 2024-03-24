@@ -1,4 +1,5 @@
-﻿using LanguageCore.Tokenizing;
+﻿using LanguageCore.Parser.Statement;
+using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser;
 
@@ -88,29 +89,34 @@ public readonly struct ParserResult
 
     public void SetFile(Uri path)
     {
-        for (int i = 0; i < this.Functions.Length; i++)
-        { this.Functions[i].FilePath = path; }
+        for (int i = 0; i < Functions.Length; i++)
+        { Functions[i].FilePath = path; }
 
-        for (int i = 0; i < this.Enums.Length; i++)
-        { this.Enums[i].FilePath = path; }
+        for (int i = 0; i < Enums.Length; i++)
+        { Enums[i].FilePath = path; }
 
-        for (int i = 0; i < this.Macros.Length; i++)
-        { this.Macros[i].FilePath = path; }
+        for (int i = 0; i < Macros.Length; i++)
+        { Macros[i].FilePath = path; }
 
-        for (int i = 0; i < this.Structs.Length; i++)
+        for (int i = 0; i < Structs.Length; i++)
         {
-            this.Structs[i].FilePath = path;
+            Structs[i].FilePath = path;
 
-            foreach (FunctionDefinition method in this.Structs[i].Methods)
+            foreach (FunctionDefinition method in Structs[i].Methods)
             { method.FilePath = path; }
         }
 
-        for (int i = 0; i < this.Hashes.Length; i++)
-        { this.Hashes[i].FilePath = path; }
+        for (int i = 0; i < Hashes.Length; i++)
+        { Hashes[i].FilePath = path; }
 
-        foreach (IInFile item in Statement.StatementExtensions.GetStatements<IInFile>(this))
+        foreach (IInFile item in StatementExtensions.GetStatements<IInFile>(this))
         {
             item.FilePath = path;
+        }
+
+        foreach (IReferenceableTo item in StatementExtensions.GetStatements<IReferenceableTo>(this))
+        {
+            item.OriginalFile = path;
         }
     }
 

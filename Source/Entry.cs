@@ -64,7 +64,7 @@ public static class Entry
                 {
                     try
                     {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, Output.Log, analysisCollection);
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection);
                         generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
@@ -84,7 +84,7 @@ public static class Entry
                 }
                 else
                 {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, Output.Log, analysisCollection);
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
@@ -115,10 +115,30 @@ public static class Entry
 
                 Runtime.Interpreter interpreter;
 
+                static void PrintStuff(Runtime.Interpreter interpreter)
+                {
+#if DEBUG
+                    Console.WriteLine();
+                    Console.WriteLine($" ===== HEAP ===== ");
+                    Console.WriteLine();
+
+                    HeapUtils.DebugPrint(interpreter.BytecodeInterpreter.Memory);
+
+                    Console.WriteLine();
+                    Console.WriteLine($" ===== STACK ===== ");
+                    Console.WriteLine();
+
+                    for (int i = interpreter.BytecodeInterpreter.StackStart; i < interpreter.BytecodeInterpreter.Registers.StackPointer; i++)
+                    {
+                        interpreter.BytecodeInterpreter.Memory[i].DebugPrint();
+                        Console.WriteLine();
+                    }
+#endif
+                }
+
                 if (arguments.ConsoleGUI)
                 {
-                    InterpreterDebuggabble _interpreter = new(true, arguments.BytecodeInterpreterSettings, generatedCode.Code)
-                    { CompilerResult = generatedCode };
+                    InterpreterDebuggabble _interpreter = new(true, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
                     interpreter = _interpreter;
 
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -140,8 +160,7 @@ public static class Entry
                 }
                 else
                 {
-                    interpreter = new(true, arguments.BytecodeInterpreterSettings, generatedCode.Code)
-                    { CompilerResult = generatedCode };
+                    interpreter = new(true, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
 
                     interpreter.OnStdOut += (sender, data) => Output.Write(char.ToString(data));
                     interpreter.OnStdError += (sender, data) => Output.WriteError(char.ToString(data));
@@ -154,29 +173,17 @@ public static class Entry
                         sender.OnInput(input.KeyChar);
                     };
 
-                    while (!interpreter.BytecodeInterpreter.IsDone)
-                    { interpreter.Update(); }
-
-                    Console.ResetColor();
+                    try
+                    {
+                        while (!interpreter.BytecodeInterpreter.IsDone)
+                        { interpreter.Update(); }
+                    }
+                    finally
+                    {
+                        Console.ResetColor();
+                        PrintStuff(interpreter);
+                    }
                 }
-
-#if DEBUG
-                Console.WriteLine();
-                Console.WriteLine($" ===== HEAP ===== ");
-                Console.WriteLine();
-
-                HeapUtils.DebugPrint(interpreter.BytecodeInterpreter.Memory);
-
-                Console.WriteLine();
-                Console.WriteLine($" ===== STACK ===== ");
-                Console.WriteLine();
-
-                for (int i = interpreter.BytecodeInterpreter.StackStart; i < interpreter.BytecodeInterpreter.Registers.StackPointer; i++)
-                {
-                    interpreter.BytecodeInterpreter.Memory[i].DebugPrint();
-                    Console.WriteLine();
-                }
-#endif
 
                 break;
             }
@@ -191,8 +198,8 @@ public static class Entry
                 AnalysisCollection analysisCollection = new();
                 if (arguments.ThrowErrors)
                 {
-                    tokens = StreamTokenizer.Tokenize(arguments.File.FullName);
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
+                    tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck);
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
@@ -202,8 +209,8 @@ public static class Entry
                 {
                     try
                     {
-                        tokens = StreamTokenizer.Tokenize(arguments.File.FullName);
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
+                        tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck);
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
@@ -399,7 +406,7 @@ public static class Entry
                             Console.ResetColor();
                         }
 
-                        if (interpreter.Memory.Length - finalIndex > 0)
+                        if (interpreter.Memory.Length > finalIndex)
                         {
                             Console.ForegroundColor = ConsoleColor.DarkGray;
                             Console.Write($" ... ");
@@ -447,7 +454,7 @@ public static class Entry
 
                 AnalysisCollection analysisCollection = new();
 
-                CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Output.Log, analysisCollection);
+                CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Enumerable.Empty<string>(), Output.Log, analysisCollection);
 
                 AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, new AsmGeneratorSettings()
                 {

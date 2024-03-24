@@ -1,9 +1,3 @@
-#bf "stream-dispose" "void" "int";
-#bf "stream-flush" "void" "int" "int";
-#bf "stream-create" "int" "int" "int";
-#bf "stream-length" "int" "int";
-#bf "stream-clear" "void" "int";
-
 class Stream
 {
 	int Pointer;

@@ -16,6 +16,10 @@ public enum TokenType
 
     Operator,
 
+    PreprocessIdentifier,
+    PreprocessArgument,
+    PreprocessSkipped,
+
     Comment,
     CommentMultiline,
 }

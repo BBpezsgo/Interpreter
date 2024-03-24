@@ -1,0 +1,13 @@
+using System;
+
+char* GetStuff()
+{
+	char* builder = "";
+	builder = (temp builder) + "a";
+	builder = (temp builder) + "b";
+	builder = (temp builder) + "c";
+	builder = (temp builder) + "d";
+	return builder;
+}
+
+PrintLine(temp GetStuff());

@@ -9,6 +9,7 @@ public class CompiledStruct : StructDefinition,
 {
     public new ImmutableArray<CompiledField> Fields { get; }
     public List<Reference<TypeInstance>> References { get; }
+
     public IReadOnlyDictionary<string, GeneralType> CurrentTypeArguments => _currentTypeArguments;
     public IReadOnlyDictionary<string, int> FieldOffsets
     {

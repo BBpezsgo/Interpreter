@@ -19,6 +19,11 @@ public enum PreparationTokenType
     Comment,
     CommentMultiline,
 
+    PREPROCESS_Operator,
+    PREPROCESS_Identifier,
+    PREPROCESS_Argument,
+    PREPROCESS_Skipped,
+
     STRING_EscapeSequence,
     STRING_UnicodeCharacter,
 

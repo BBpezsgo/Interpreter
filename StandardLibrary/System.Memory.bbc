@@ -1,9 +1,16 @@
+#if BRAINFUCK
+const int MaxHeapSize = 126;
+#else
+const int MaxHeapSize = 126;
+*0 = MaxHeapSize;
+#endif
+
 void GetHeader(int* ptr, ref int size, ref int allocated)
 {
     int value = *ptr;
-    if (value >= 127) // value & 0b_1000_0000
+    if (value >= (MaxHeapSize + 1)) // value & 0b_1000_0000
     {
-        value -= 127; // value &= ~0b_1000_0000
+        value -= (MaxHeapSize + 1); // value &= ~0b_1000_0000
 
         size = value;
         allocated = 1;
@@ -19,7 +26,7 @@ void SetHeader(int* ptr, int size, int allocated)
 {
     int value = size;
     if (allocated)
-    { value += 127; } // value |= 0b_1000_0000
+    { value += (MaxHeapSize + 1); } // value |= 0b_1000_0000
     *ptr = value;
 }
 
@@ -27,7 +34,7 @@ int JoinFreeBlocks()
 {
     int* headerPointer = 0;
     int prevBlockSize = 0;
-    while (headerPointer < 127)
+    while (headerPointer < (MaxHeapSize + 1))
     {
         int blockSize;
         int blockUsed;
@@ -88,7 +95,7 @@ export int* Alloc(int sizeNeed)
     int* headerPointer = 0;
     while (1)
     {
-        if (headerPointer >= 126) { throw "Out of memory"; }
+        if (headerPointer >= MaxHeapSize) { throw "Out of memory"; }
 
         int blockSize;
         int blockUsed;
@@ -187,3 +194,10 @@ export void Dealloc(T* ptr)
     // JoinFreeBlocks();
     while (JoinFreeBlocks()) { }
 }
+
+// [Builtin("alloc")]
+// export int* Alloc(int sizeNeed) { }
+// 
+// [Builtin("free")]
+// template<T>
+// export void Dealloc(T* ptr) { }

@@ -3,7 +3,7 @@ namespace LanguageCore.Runtime;
 
 public class InterpreterDebuggabble : Interpreter
 {
-    public InterpreterDebuggabble(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program) : base(handleErrors, settings, program)
+    public InterpreterDebuggabble(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation) : base(handleErrors, settings, program, debugInformation)
     { }
 
     public int AbsoluteBreakpoint { get; set; } = int.MinValue;
@@ -11,16 +11,16 @@ public class InterpreterDebuggabble : Interpreter
     {
         get
         {
-            if (DebugInfo is null ||
-                !DebugInfo.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
+            if (DebugInformation is null ||
+                !DebugInformation.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
             { return -1; }
 
             return sourceLocation.SourcePosition.Range.Start.Line;
         }
         set
         {
-            if (DebugInfo is null ||
-                !DebugInfo.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
+            if (DebugInformation is null ||
+                !DebugInformation.TryGetSourceLocation(AbsoluteBreakpoint, out SourceCodeLocation sourceLocation))
             { return; }
 
             AbsoluteBreakpoint = sourceLocation.SourcePosition.Range.Start.Line;
@@ -30,8 +30,6 @@ public class InterpreterDebuggabble : Interpreter
     public bool HeapOperation { get; private set; }
     public bool ExternalFunctionOperation { get; private set; }
     public bool AluOperation { get; private set; }
-
-    DebugInformation? DebugInfo => CompilerResult.DebugInfo;
 
     public void DoUpdate()
     {

@@ -1,4 +1,5 @@
-﻿namespace LanguageCore.Tokenizing;
+﻿
+namespace LanguageCore.Tokenizing;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class Token :

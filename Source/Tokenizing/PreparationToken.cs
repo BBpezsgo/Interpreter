@@ -39,6 +39,9 @@ sealed class PreparationToken :
         PreparationTokenType.Operator => Tokenizing.TokenType.Operator,
         PreparationTokenType.Comment => Tokenizing.TokenType.Comment,
         PreparationTokenType.CommentMultiline => Tokenizing.TokenType.CommentMultiline,
+        PreparationTokenType.PREPROCESS_Identifier => Tokenizing.TokenType.PreprocessIdentifier,
+        PreparationTokenType.PREPROCESS_Argument => Tokenizing.TokenType.PreprocessArgument,
+        PreparationTokenType.PREPROCESS_Skipped => Tokenizing.TokenType.PreprocessSkipped,
         _ => throw new InternalException($"Token {this} isn't finished (type is {TokenType})"),
     }, Content.ToString(), false, Position);
 

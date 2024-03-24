@@ -1,25 +1,247 @@
-﻿namespace LanguageCore.Tokenizing;
+﻿using LanguageCore.Parser.Statement;
+
+namespace LanguageCore.Tokenizing;
 
 public abstract partial class Tokenizer
 {
+    bool IsBeginningOfLine
+    {
+        get
+        {
+            foreach (Token token in Tokens)
+            {
+                if (token.Position.Range.End.Line != CurrentLine ||
+                    token.TokenType is
+                    TokenType.LineBreak or
+                    TokenType.Whitespace)
+                { continue; }
+                return false;
+            }
+
+            if (CurrentToken.Position.Range.End.Line != CurrentLine ||
+                CurrentToken.TokenType is
+                PreparationTokenType.LineBreak or
+                PreparationTokenType.Whitespace)
+            { return true; }
+
+            return false;
+        }
+    }
+
+    bool ExpectPreprocessArguments
+    {
+        get
+        {
+            for (int i = Tokens.Count - 1; i >= 0; i--)
+            {
+                Token token = Tokens[i];
+
+                if (token.TokenType == TokenType.Whitespace)
+                {
+                    if (token.Content.Contains('\r') || token.Content.Contains('\n'))
+                    { break; }
+                    continue;
+                }
+
+                if (token.TokenType == TokenType.CommentMultiline)
+                { continue; }
+
+                if (token.TokenType == TokenType.PreprocessIdentifier)
+                { return token.Position.Range.End.Line == CurrentLine; }
+
+                break;
+            }
+
+            return false;
+        }
+    }
+
+    PreprocessorTag? LastPreprocess
+    {
+        get
+        {
+            Token? argument = null;
+
+            for (int i = Tokens.Count - 1; i >= 0; i--)
+            {
+                Token token = Tokens[i];
+
+                if (token.TokenType == TokenType.Whitespace)
+                {
+                    if (token.Content.Contains('\r') || token.Content.Contains('\n'))
+                    { break; }
+                    continue;
+                }
+
+                if (token.TokenType == TokenType.CommentMultiline)
+                { continue; }
+
+                if (argument is null &&
+                    token.TokenType == TokenType.PreprocessArgument)
+                {
+                    argument = token;
+                    continue;
+                }
+
+                if (token.TokenType == TokenType.PreprocessIdentifier)
+                { return new PreprocessorTag(token, argument); }
+
+                break;
+            }
+
+            return null;
+        }
+    }
+
+    enum PreprocessPhase
+    {
+        If,
+        Elseif,
+        Else,
+    }
+
+    class PreprocessThing
+    {
+        public PreprocessPhase Phase;
+        public bool Condition;
+    }
+
+    readonly List<PreprocessorTag> UnprocessedPreprocessorTags = new();
+
+    void HandlePreprocess(bool finished)
+    {
+        PreprocessorTag? last = LastPreprocess;
+        if (last is null) return;
+
+        switch (last.Identifier.Content)
+        {
+            case "#if":
+            {
+                if (!finished)
+                { break; }
+
+                if (last.Argument is null)
+                { throw new TokenizerException($"Argument expected after preprocessor tag {last.Identifier}", last.Identifier.Position.After(), File); }
+
+                bool condition = PreprocessorVariables.Contains(last.Argument.Content);
+                PreprocessorConditions.Push(new PreprocessThing()
+                {
+                    Condition = condition,
+                    Phase = PreprocessPhase.If,
+                });
+
+                break;
+            }
+
+            // case "#elseif":
+            // {
+            //     if (PreprocessConditions.Count == 0)
+            //     { throw new TokenizerException($"Unexpected preprocessor tag {last.Identifier}", last.Identifier.Position, File); }
+            // 
+            //     if (last.Argument is null)
+            //     { throw new TokenizerException($"Argument expected after preprocessor tag {last.Identifier}", last.Identifier.Position.After(), File); }
+            // 
+            //     bool condition = PreprocessVariables.Contains(last.Argument.Content);
+            //     PreprocessConditions.Last = PreprocessConditions.Last ? !PreprocessConditions.Last : condition;
+            // 
+            //     break;
+            // }
+
+            case "#else":
+            {
+                if (finished)
+                { break; }
+
+                if (PreprocessorConditions.Count == 0)
+                { throw new TokenizerException($"Unexpected preprocessor tag {last.Identifier}", last.Identifier.Position, File); }
+
+                switch (PreprocessorConditions.Last.Phase)
+                {
+                    case PreprocessPhase.If:
+                        PreprocessorConditions.Last.Condition = !PreprocessorConditions.Last.Condition;
+                        PreprocessorConditions.Last.Phase = PreprocessPhase.Else;
+                        break;
+                    case PreprocessPhase.Else:
+                        throw new TokenizerException($"Unexpected preprocessor tag {last.Identifier}", last.Identifier.Position, File);
+                }
+
+                break;
+            }
+
+            case "#endif":
+            {
+                if (finished)
+                { break; }
+
+                if (PreprocessorConditions.Count == 0)
+                { throw new TokenizerException($"Unexpected preprocessor tag {last.Identifier}", last.Identifier.Position, File); }
+
+                PreprocessorConditions.Pop();
+
+                break;
+            }
+
+            case "#define":
+            {
+                if (!finished)
+                { break; }
+
+                if (IsPreprocessSkipping)
+                { break; }
+
+                if (last.Argument is null)
+                { throw new TokenizerException($"Argument expected after preprocessor tag {last.Identifier}", last.Identifier.Position.After(), File); }
+
+                PreprocessorVariables.Add(last.Argument.Content);
+
+                break;
+            }
+
+            case "#undefine":
+            {
+                if (!finished)
+                { break; }
+
+                if (IsPreprocessSkipping)
+                { break; }
+
+                if (last.Argument is null)
+                { throw new TokenizerException($"Argument expected after preprocessor tag {last.Identifier}", last.Identifier.Position.After(), File); }
+
+                PreprocessorVariables.Remove(last.Argument.Content);
+
+                break;
+            }
+
+            default:
+            {
+                if (finished)
+                { UnprocessedPreprocessorTags.Add(last); }
+                break;
+            }
+        }
+    }
+
+    readonly Stack<PreprocessThing> PreprocessorConditions;
+    readonly HashSet<string> PreprocessorVariables;
+
+    bool IsPreprocessSkipping
+    {
+        get
+        {
+            foreach (PreprocessThing item in PreprocessorConditions)
+            {
+                if (!item.Condition)
+                { return true; }
+            }
+            return false;
+        }
+    }
+
     /// <exception cref="InternalException"/>
     /// <exception cref="TokenizerException"/>
     protected void ProcessCharacter(char currChar, int offsetTotal)
     {
-        bool breakLine = false;
-        bool returnLine = false;
-
-        char prevChar = PreviousChar;
-        PreviousChar = currChar;
-
-        if (prevChar is '\r' && currChar is '\n') // CRLF
-        { breakLine = true; }
-        else if (currChar is '\n') // LF
-        { breakLine = true; }
-
-        if (currChar is '\r' or '\n')
-        { returnLine = true; }
-
         if (CurrentToken.TokenType == PreparationTokenType.STRING_UnicodeCharacter)
         {
             if (SavedUnicode == null) throw new InternalException($"{nameof(SavedUnicode)} is null");
@@ -73,6 +295,82 @@ public abstract partial class Tokenizer
                 SavedUnicode += currChar;
                 goto FinishCharacter;
             }
+        }
+
+        if (IsBeginningOfLine &&
+            currChar == '#' &&
+            CurrentToken.TokenType is
+            PreparationTokenType.Whitespace or
+            PreparationTokenType.PREPROCESS_Skipped)
+        {
+            _ = IsBeginningOfLine;
+            EndToken(offsetTotal);
+            CurrentToken.TokenType = PreparationTokenType.PREPROCESS_Operator;
+            CurrentToken.Content.Append(currChar);
+            goto FinishCharacter;
+        }
+        else if (CurrentToken.TokenType == PreparationTokenType.PREPROCESS_Operator)
+        {
+            if (char.IsAsciiLetter(currChar))
+            {
+                CurrentToken.TokenType = PreparationTokenType.PREPROCESS_Identifier;
+                CurrentToken.Content.Append(currChar);
+            }
+            else
+            {
+                CurrentToken.TokenType = PreparationTokenType.Operator;
+                EndToken(offsetTotal);
+            }
+            goto FinishCharacter;
+        }
+        else if (CurrentToken.TokenType == PreparationTokenType.PREPROCESS_Identifier)
+        {
+            if (char.IsAsciiLetterOrDigit(currChar))
+            {
+                CurrentToken.Content.Append(currChar);
+                goto FinishCharacter;
+            }
+            else
+            {
+                EndToken(offsetTotal);
+                HandlePreprocess(false);
+            }
+        }
+        else if (ExpectPreprocessArguments || CurrentToken.TokenType == PreparationTokenType.PREPROCESS_Argument)
+        {
+            if (CurrentToken.TokenType != PreparationTokenType.PREPROCESS_Argument)
+            { EndToken(offsetTotal); }
+
+            if (char.IsAsciiLetter(currChar))
+            {
+                CurrentToken.TokenType = PreparationTokenType.PREPROCESS_Argument;
+                CurrentToken.Content.Append(currChar);
+                goto FinishCharacter;
+            }
+
+            if (char.IsWhiteSpace(currChar))
+            {
+                EndToken(offsetTotal);
+                HandlePreprocess(true);
+            }
+            else
+            { throw new TokenizerException($"Unexpected character \'{currChar.Escape()}\'", GetCurrentPosition(offsetTotal), File); }
+        }
+
+        if (IsPreprocessSkipping)
+        {
+            if (currChar is '\r' or '\n' ||
+                CurrentLine != CurrentToken.Position.Range.End.Line)
+            {
+                EndToken(offsetTotal);
+                CurrentToken.TokenType = PreparationTokenType.PREPROCESS_Skipped;
+            }
+            else
+            {
+                CurrentToken.Content.Append(currChar);
+                CurrentToken.TokenType = PreparationTokenType.PREPROCESS_Skipped;
+            }
+            goto FinishCharacter;
         }
 
         if (CurrentToken.TokenType == PreparationTokenType.STRING_EscapeSequence)
@@ -420,8 +718,11 @@ public abstract partial class Tokenizer
 
 FinishCharacter:
         CurrentColumn++;
-        if (breakLine) CurrentLine++;
-        if (returnLine) CurrentColumn = 0;
+        if (currChar is '\n')
+        {
+            CurrentLine++;
+            CurrentColumn = 0;
+        }
     }
 
     /// <exception cref="InternalException"/>
@@ -454,10 +755,11 @@ FinishCharacter:
             CurrentToken.TokenType == PreparationTokenType.Whitespace)
         { goto Finish; }
 
-        // Skip empty whitespaces
-        if (Settings.TokenizeWhitespaces &&
-            CurrentToken.TokenType == PreparationTokenType.Whitespace &&
-            CurrentToken.Content.Length == 0)
+        // Skip empty tokens
+        if (CurrentToken.Content.Length == 0 &&
+            CurrentToken.TokenType is
+            PreparationTokenType.Whitespace or
+            PreparationTokenType.PREPROCESS_Skipped)
         { goto Finish; }
 
         if (CurrentToken.TokenType == PreparationTokenType.LiteralFloat)

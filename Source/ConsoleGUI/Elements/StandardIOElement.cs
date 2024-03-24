@@ -82,9 +82,9 @@ public class StandardIOElement : InlineElement
                 if (j == lines.Length - 1 && string.IsNullOrEmpty(lines[j])) continue;
 
                 string line_ = lines[j];
-                b.AddText(line_.TrimEnd());
+                b.AddText(line_);
                 if (j < lines.Length - 1)
-                { b.FinishLine(Rect.Width); }
+                { b.FinishLine(); }
             }
 
             line += lines.Length - 1;

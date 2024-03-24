@@ -13,6 +13,7 @@ public interface IReferenceableTo : IReferenceableTo<object>;
 public interface IReferenceableTo<T> where T : notnull
 {
     public T? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
 }
 
 public readonly struct TokenPair :
@@ -414,7 +415,7 @@ public class LiteralList : StatementWithValue
     }
 }
 
-public class VariableDeclaration : Statement, IInFile, IHaveType
+public class VariableDeclaration : Statement, IHaveType, IExportable
 {
     public TypeInstance Type { get; }
     public Token Identifier { get; }
@@ -425,6 +426,7 @@ public class VariableDeclaration : Statement, IInFile, IHaveType
     public override Position Position =>
         new Position(Type, Identifier, InitialValue)
         .Union(Modifiers);
+    public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
 
     public VariableDeclaration(VariableDeclaration other) : base(other)
     {
@@ -505,6 +507,8 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
     public TokenPair Brackets { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
     public object? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
     public override Position Position => new(PrevStatement, Brackets);
 
     public AnyCall(StatementWithValue prevStatement, IEnumerable<StatementWithValue> parameters, TokenPair brackets)
@@ -571,6 +575,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
                 CompiledType = CompiledType,
                 PredictedValue = PredictedValue,
                 Reference = Reference,
+                OriginalFile = OriginalFile,
             };
             return true;
         }
@@ -585,6 +590,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
                 CompiledType = CompiledType,
                 PredictedValue = PredictedValue,
                 Reference = Reference,
+                OriginalFile = OriginalFile,
             };
             return true;
         }
@@ -614,6 +620,8 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
     public StatementWithValue? PrevStatement { get; }
     public TokenPair Brackets { get; }
     public object? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
     public bool IsMethodCall => PrevStatement != null;
     public StatementWithValue[] MethodParameters
     {
@@ -784,6 +792,8 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; set; }
     public CompiledOperator? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
     public override Position Position => new(Operator, Left, Right);
     public StatementWithValue[] Parameters => new StatementWithValue[] { Left, Right };
 
@@ -853,6 +863,8 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public CompiledOperator? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
     public override Position Position => new(Operator, Left);
     public StatementWithValue[] Parameters => new StatementWithValue[] { Left };
 
@@ -917,6 +929,8 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public CompiledOperator? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
     public StatementWithValue[] Parameters => new StatementWithValue[] { Left };
     public override Position Position => new(Operator, Left);
 
@@ -1010,6 +1024,8 @@ public class Assignment : AnyAssignment, IReferenceableTo<CompiledOperator>
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; }
     public CompiledOperator? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
     public override Position Position => new(Operator, Left, Right);
 
     public Assignment(Token @operator, StatementWithValue left, StatementWithValue right)
@@ -1064,6 +1080,8 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo<CompiledOperat
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; }
+    public Uri? OriginalFile { get; set; }
+
     public override Position Position => new(Operator, Left, Right);
     public CompiledOperator? Reference { get; set; }
 
@@ -1303,6 +1321,8 @@ public class Identifier : StatementWithValue, IReferenceableTo
 {
     public Token Token { get; }
     public object? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
     public string Content => Token.Content;
     public override Position Position => Token.Position;
 
@@ -1603,6 +1623,8 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
     public ImmutableArray<StatementWithValue> Parameters { get; }
     public TokenPair Brackets { get; }
     public ConstructorDefinition? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
     public override Position Position =>
         new Position(Keyword, Type, Brackets)
         .Union(Parameters);
@@ -1684,8 +1706,10 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<General
     public StatementWithValue PrevStatement { get; }
     public StatementWithValue Index { get; }
     public TokenPair Brackets { get; }
-    public override Position Position => new(PrevStatement, Index);
     public GeneralFunctionDefinition? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
+    public override Position Position => new(PrevStatement, Index);
 
     public IndexCall(StatementWithValue prevStatement, StatementWithValue indexStatement, TokenPair brackets)
     {
@@ -1730,6 +1754,8 @@ public class Field : StatementWithValue, IReferenceableTo<FieldDefinition>
     public Token Identifier { get; }
     public StatementWithValue PrevStatement { get; }
     public FieldDefinition? Reference { get; set; }
+    public Uri? OriginalFile { get; set; }
+
     public override Position Position => new(PrevStatement, Identifier);
 
     public Field(StatementWithValue prevStatement, Token fieldName)

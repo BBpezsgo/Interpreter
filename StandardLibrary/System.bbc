@@ -1,8 +1,3 @@
-#bf "sleep" "void" "int";
-
-#bf "int-to-float" "float" "int";
-#bf "float-to-int" "int" "float";
-
 using System.Console;
 using System.String;
 using System.Memory;
@@ -35,34 +30,46 @@ export char* ToString(this int number)
 	if (number == 0)
     { return "0"; }
     
-	char* result = "";
-
 	int v = number;
 
 	int isNegative = v < 0;
 	if (isNegative)
 	{ v = 0 - v; }
+    
+    int numberLength = Log10(v) + 2;
+    if (isNegative)
+    { numberLength++; }
 
-	while (v > 0)
-	{
-        int rem = v % 10;
-        result = (temp result) + ((rem + 48) as char);
-		v = v / 10;
-	}
+	char* result = Alloc(numberLength) as char*;
+    result[numberLength - 1] = '\0';
 
     if (isNegative)
     {
-        char* newResult = Alloc((result.Length() + 1) * sizeof(char)) as char*;
-		CopyString(result, newResult);
-        newResult[result.Length()] = '-';
-        delete result;
-        result = newResult;
+        result[0] = '-'; 
     }
+    
+    int i = numberLength - 2;
+	while (v > 0)
+	{
+        int rem = v % 10;
+        result[i] = ((rem + 48) as char);
+		v = v / 10;
+        i--;
+	}
 
-	char* reversed = result.Reverse();
-	delete result;
+    // if (isNegative)
+    // {
+    //     char* newResult = Alloc((result.Length() + 1) * sizeof(char)) as char*;
+	// 	   CopyString(result, newResult);
+    //     newResult[result.Length()] = '-';
+    //     delete result;
+    //     result = newResult;
+    // }
 
-	return reversed;
+	// char* reversed = result.Reverse();
+	// delete result;
+
+	return result;
 }
 
 [External("sleep")]

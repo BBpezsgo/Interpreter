@@ -26,7 +26,7 @@ public enum Opcode : byte
     /// <br/><br/>
     ///
     /// <para>
-    /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchStackAddress"/>)
+    /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchAddress"/>)
     /// </para>
     /// </summary>
     StackLoad,
@@ -40,7 +40,7 @@ public enum Opcode : byte
     /// <br/><br/>
     ///
     /// <para>
-    /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchStackAddress"/>)
+    /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchAddress"/>)
     /// </para>
     /// </summary>
     StackStore,

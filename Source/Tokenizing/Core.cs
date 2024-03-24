@@ -5,7 +5,7 @@ public abstract partial class Tokenizer
     static readonly ImmutableArray<char> Bracelets = ['{', '}', '(', ')', '[', ']'];
     static readonly ImmutableArray<char> Operators = ['+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~'];
     static readonly ImmutableArray<string> DoubleOperators = ["++", "--", "<<", ">>", "&&", "||"];
-    static readonly ImmutableArray<char> SimpleOperators = [';', ',', '#'];
+    static readonly ImmutableArray<char> SimpleOperators = [';', ','];
 
     protected readonly List<Token> Tokens;
     protected readonly List<SimpleToken> UnicodeCharacters;
@@ -16,26 +16,24 @@ public abstract partial class Tokenizer
     readonly PreparationToken CurrentToken;
     int CurrentColumn;
     int CurrentLine;
-    char PreviousChar;
     string? SavedUnicode;
 
-    protected Tokenizer(TokenizerSettings settings, Uri? file)
+    protected Tokenizer(TokenizerSettings settings, Uri? file, IEnumerable<string> preprocessorVariables)
     {
         CurrentToken = new(default);
         CurrentColumn = 0;
         CurrentLine = 0;
-        PreviousChar = default;
 
         Tokens = new();
         UnicodeCharacters = new();
-
         Warnings = new();
 
         Settings = settings;
-
         SavedUnicode = null;
-
         File = file;
+
+        PreprocessorVariables = new HashSet<string>(preprocessorVariables);
+        PreprocessorConditions = new Stack<PreprocessThing>();
     }
 
     protected SinglePosition CurrentSinglePosition => new(CurrentLine, CurrentColumn);

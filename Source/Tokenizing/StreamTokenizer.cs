@@ -8,51 +8,27 @@ public class StreamTokenizer : Tokenizer,
     readonly Stream Stream;
     bool IsDisposed;
 
-    StreamTokenizer(TokenizerSettings settings, Stream stream, Uri? file) : base(settings, file)
-    { Stream = stream; }
-
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string filePath)
-        => StreamTokenizer.Tokenize(System.IO.File.OpenRead(filePath), new Uri(filePath), TokenizerSettings.Default);
-
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings)
-        => StreamTokenizer.Tokenize(System.IO.File.OpenRead(filePath), new Uri(filePath), settings);
-
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream, Uri? file)
-        => StreamTokenizer.Tokenize(stream, file, TokenizerSettings.Default);
-
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream, Uri? file, TokenizerSettings settings)
+    StreamTokenizer(TokenizerSettings settings, Stream stream, Uri? file, IEnumerable<string> preprocessorVariables) : base(settings, file, preprocessorVariables)
     {
-        using StreamTokenizer tokenizer = new(settings, stream, file);
-        return tokenizer.TokenizeInternal();
+        Stream = stream;
     }
 
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string filePath, ConsoleProgressBar progress)
+    public static TokenizerResult Tokenize(string filePath, IEnumerable<string> preprocessorVariables, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null)
     {
         FileStream stream = System.IO.File.OpenRead(filePath);
-        return StreamTokenizer.Tokenize(stream, new Uri(filePath), TokenizerSettings.Default, progress, (int)stream.Length);
+        return StreamTokenizer.Tokenize(stream, preprocessorVariables, new Uri(filePath), settings, progress, (int)stream.Length);
     }
 
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings, ConsoleProgressBar progress)
+    public static TokenizerResult Tokenize(Stream stream, IEnumerable<string> preprocessorVariables, Uri? file = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null, int? totalBytes = null)
     {
-        FileStream stream = System.IO.File.OpenRead(filePath);
-        return StreamTokenizer.Tokenize(stream, new Uri(filePath), settings, progress, (int)stream.Length);
-    }
+        settings ??= TokenizerSettings.Default;
 
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream, Uri? file, ConsoleProgressBar progress, int totalBytes)
-        => StreamTokenizer.Tokenize(stream, file, TokenizerSettings.Default, progress, totalBytes);
+        using StreamTokenizer tokenizer = new(settings.Value, stream, file, preprocessorVariables);
 
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream, Uri? file, TokenizerSettings settings, ConsoleProgressBar progress, int totalBytes)
-    {
-        using StreamTokenizer tokenizer = new(settings, stream, file);
-        return tokenizer.TokenizeInternal(progress, totalBytes);
+        if (progress.HasValue && totalBytes.HasValue)
+        { return tokenizer.TokenizeInternal(progress.Value, totalBytes.Value); }
+        else
+        { return tokenizer.TokenizeInternal(); }
     }
 
     TokenizerResult TokenizeInternal()
@@ -78,7 +54,7 @@ public class StreamTokenizer : Tokenizer,
 
         EndToken(offsetTotal);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters, Warnings);
     }
 
     TokenizerResult TokenizeInternal(ConsoleProgressBar progress, int total)
@@ -111,7 +87,7 @@ public class StreamTokenizer : Tokenizer,
 
         progress.Print(1f);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters, Warnings);
     }
 
     protected virtual void Dispose(bool disposing)

@@ -68,4 +68,53 @@ public class LanguageException : Exception
         result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
         return result.ToString();
     }
+
+    public static string? GetArrows(Position position, IEnumerable<Tokenizing.Token> text)
+    {
+        if (position.AbsoluteRange == 0) return null;
+        if (position == Position.UnknownPosition) return null;
+        if (position.Range.Start.Line != position.Range.End.Line)
+        { return null; }
+
+        StringBuilder lineBuilder = new();
+        Tokenizing.Token? prevToken = null;
+        foreach (Tokenizing.Token token in text)
+        {
+            if (token.Position.Range.Start.Line != position.Range.Start.Line)
+            {
+                if (lineBuilder.Length > 0)
+                { break; }
+                else
+                { continue; }
+            }
+
+            if (prevToken is null)
+            { lineBuilder.Append(' ', token.Position.Range.Start.Character); }
+            else
+            { lineBuilder.Append(' ', token.Position.Range.Start.Character - lineBuilder.Length); }
+
+            lineBuilder.Append(token.ToOriginalString());
+
+            prevToken = token;
+        }
+
+        lineBuilder.Replace('\t', ' ');
+        string line = lineBuilder.ToString();
+
+        StringBuilder result = new();
+
+
+        int removedLeadingWhitespaces;
+        {
+            string trimmedLine = line.TrimStart();
+            removedLeadingWhitespaces = line.Length - trimmedLine.Length;
+            line = trimmedLine.Trim();
+        }
+
+        result.Append(line);
+        result.AppendLine();
+        result.Append(' ', Math.Max(0, position.Range.Start.Character - removedLeadingWhitespaces));
+        result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
+        return result.ToString();
+    }
 }

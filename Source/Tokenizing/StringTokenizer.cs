@@ -4,26 +4,23 @@ public sealed class StringTokenizer : Tokenizer
 {
     readonly string Text;
 
-    StringTokenizer(TokenizerSettings settings, string? text, Uri? file) : base(settings, file)
+    StringTokenizer(TokenizerSettings settings, string text, Uri? file, IEnumerable<string> preprocessorVariables) : base(settings, file, preprocessorVariables)
     {
-        Text = text ?? string.Empty;
+        Text = text;
     }
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string? text)
-        => Tokenize(text, null, TokenizerSettings.Default);
+    public static TokenizerResult Tokenize(string text, IEnumerable<string> preprocessorVariables, Uri? file = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null)
+    {
+        settings ??= TokenizerSettings.Default;
 
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string? text, Uri? file)
-        => Tokenize(text, file, TokenizerSettings.Default);
+        StringTokenizer tokenizer = new(settings.Value, text, file, preprocessorVariables);
 
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string? text, Uri? file, TokenizerSettings settings)
-        => new StringTokenizer(settings, text, file).TokenizeInternal();
-
-    /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string? text, Uri? file, TokenizerSettings settings, ConsoleProgressBar progress)
-        => new StringTokenizer(settings, text, file).TokenizeInternal(progress);
+        if (progress.HasValue)
+        { return tokenizer.TokenizeInternal(progress.Value); }
+        else
+        { return tokenizer.TokenizeInternal(); }
+    }
 
     TokenizerResult TokenizeInternal()
     {
@@ -34,7 +31,7 @@ public sealed class StringTokenizer : Tokenizer
 
         EndToken(Text.Length);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters, Warnings);
     }
 
     TokenizerResult TokenizeInternal(ConsoleProgressBar progress)
@@ -49,6 +46,6 @@ public sealed class StringTokenizer : Tokenizer
 
         progress.Print(1f);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters.ToArray(), Warnings.ToArray());
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters, Warnings);
     }
 }

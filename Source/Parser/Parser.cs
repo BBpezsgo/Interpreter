@@ -22,7 +22,6 @@ public sealed class Parser
     {
         ProtectionKeywords.Export,
         ModifierKeywords.Inline,
-        "macro",
     };
 
     static readonly string[] GeneralStatementModifiers = new string[]
@@ -32,6 +31,7 @@ public sealed class Parser
 
     static readonly string[] VariableDefinitionModifiers = new string[]
     {
+        ProtectionKeywords.Export,
         ModifierKeywords.Temp,
         ModifierKeywords.Const,
     };
@@ -103,9 +103,9 @@ public sealed class Parser
     /// <exception cref="SyntaxException"/>
     /// <exception cref="InternalException"/>
     /// <exception cref="TokenizerException"/>
-    public static ParserResult ParseFile(string filePath)
+    public static ParserResult ParseFile(string filePath, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings = null, ConsoleProgressBar? tokenizerProgressBar = null)
     {
-        TokenizerResult tokens = StreamTokenizer.Tokenize(filePath);
+        TokenizerResult tokens = StreamTokenizer.Tokenize(filePath, preprocessorVariables, tokenizerSettings, tokenizerProgressBar);
         Uri uri = new(filePath, UriKind.Absolute);
         ParserResult result = new Parser(tokens.Tokens, uri).ParseInternal();
         result.SetFile(uri);
@@ -130,6 +130,8 @@ public sealed class Parser
         while (CurrentToken != null)
         {
             ParseCodeBlock();
+
+            SkipCrapTokens();
 
             endlessSafe++;
             if (endlessSafe > 500) { throw new EndlessLoopException(); }
@@ -216,6 +218,8 @@ public sealed class Parser
         usingDefinition = null;
         if (!ExpectIdentifier(DeclarationKeywords.Using, out Token? keyword))
         { return false; }
+
+        SkipCrapTokens();
 
         if (CurrentToken == null) throw new SyntaxException($"Expected url after keyword \"{DeclarationKeywords.Using}\"", keyword.Position.After(), File);
 
@@ -895,6 +899,8 @@ public sealed class Parser
     {
         int savedToken = CurrentTokenIndex;
 
+        SkipCrapTokens();
+
         string v = CurrentToken?.Content ?? string.Empty;
 
         if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralFloat)
@@ -1202,6 +1208,7 @@ public sealed class Parser
         {
             if (!ExpectStatement(out Statement.Statement? statement))
             {
+                SkipCrapTokens();
                 if (CurrentToken is null)
                 { throw new SyntaxException($"Expected a statement, got nothing", bracketStart.Position.After(), File); }
                 else
@@ -1905,6 +1912,7 @@ public sealed class Parser
     bool ExpectIdentifier(string name, [NotNullWhen(true)] out Token? result)
     {
         result = null;
+        SkipCrapTokens();
         if (CurrentToken == null) return false;
         if (CurrentToken.TokenType != TokenType.Identifier) return false;
         if (name.Length > 0 && CurrentToken.Content != name) return false;
@@ -1929,6 +1937,7 @@ public sealed class Parser
     bool ExpectOperator(string[] name, [NotNullWhen(true)] out Token? result)
     {
         result = null;
+        SkipCrapTokens();
         if (CurrentToken == null) return false;
         if (CurrentToken.TokenType != TokenType.Operator) return false;
         if (!name.Contains(CurrentToken.Content)) return false;
@@ -1941,6 +1950,7 @@ public sealed class Parser
     bool ExpectOperator(string name, [NotNullWhen(true)] out Token? result)
     {
         result = null;
+        SkipCrapTokens();
         if (CurrentToken == null) return false;
         if (CurrentToken.TokenType != TokenType.Operator) return false;
         if (name.Length > 0 && CurrentToken.Content != name) return false;
@@ -1949,6 +1959,16 @@ public sealed class Parser
         CurrentTokenIndex++;
 
         return true;
+    }
+
+    void SkipCrapTokens()
+    {
+        while (CurrentToken is not null &&
+               CurrentToken.TokenType is
+               TokenType.PreprocessIdentifier or
+               TokenType.PreprocessArgument or
+               TokenType.PreprocessSkipped)
+        { CurrentTokenIndex++; }
     }
 
     [Flags]

@@ -70,7 +70,7 @@ struct ActiveInteractiveSession
 
 class InteractiveCompiler
 {
-    string? _text;
+    string _text;
     Token[]? _tokens;
     Statement? _parsed;
     CompilerResult _compiled;
@@ -98,7 +98,7 @@ class InteractiveCompiler
 
     public InteractiveCompiler(Action<Task> onCompiledAsync)
     {
-        _text = null;
+        _text = string.Empty;
         _tokens = null;
         _parsed = null;
         _compiled = CompilerResult.Empty;
@@ -114,7 +114,7 @@ class InteractiveCompiler
         { return; }
 
         _text = text;
-        _tokens = StringTokenizer.Tokenize(_text, null);
+        _tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive);
         _parsed = default;
         _compiled = default;
         _generated = default;
@@ -133,7 +133,8 @@ class InteractiveCompiler
                 parsed2,
                 externalFunctions,
                 new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
-                [UsingDefinition.CreateAnonymous("System")]);
+                [UsingDefinition.CreateAnonymous("System")],
+                PreprocessorVariables.Interactive);
 
             _generated = CodeGeneratorForMain.Generate(_compiled, GeneratorSettings.Default);
         }
@@ -159,7 +160,7 @@ class InteractiveCompiler
 
     void CompileTask()
     {
-        _tokens = StringTokenizer.Tokenize(_text, null);
+        _tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive);
         _parsed = default;
         _compiled = default;
         _generated = default;
@@ -178,7 +179,8 @@ class InteractiveCompiler
                 parsed2,
                 externalFunctions,
                 new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
-                [UsingDefinition.CreateAnonymous("System")]);
+                [UsingDefinition.CreateAnonymous("System")],
+                PreprocessorVariables.Interactive);
 
             _generated = CodeGeneratorForMain.Generate(_compiled, GeneratorSettings.Default);
         }
@@ -720,8 +722,7 @@ public class Interactive
 
             BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, GeneratorSettings.Default);
 
-            interpreter = new(true, BytecodeInterpreterSettings.Default, generated.Code)
-            { CompilerResult = generated };
+            interpreter = new(true, BytecodeInterpreterSettings.Default, generated.Code, generated.DebugInfo);
 
             interpreter.OnStdOut += OnInterpreterStandardOut;
             interpreter.OnStdError += OnInterpreterStandardError;

@@ -119,7 +119,9 @@ public class BytecodeProcessor
 
     public ImmutableArray<Instruction> Code;
 
-    const int StackSize = 256;
+    public const int StackSize = 256;
+    public int HeapSize => Settings.HeapSize;
+
     public int StackStart => Settings.HeapSize;
 
     readonly FrozenDictionary<int, ExternalFunctionBase> ExternalFunctions;
@@ -133,7 +135,7 @@ public class BytecodeProcessor
         Code = code;
 
         Memory = new DataItem[settings.HeapSize + StackSize];
-        HeapUtils.Init(Memory);
+        // HeapUtils.Init(Memory);
 
         Registers.StackPointer = Settings.HeapSize;
 
@@ -384,22 +386,14 @@ public class BytecodeProcessor
     #region Memory Manipulation
 
     /// <exception cref="InternalException"/>
-    int FetchStackAddress() => CurrentInstruction.AddressingMode switch
+    int FetchAddress() => CurrentInstruction.AddressingMode switch
     {
+        AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
         AddressingMode.Runtime => (int)Pop(),
         AddressingMode.BasePointerRelative => Registers.BasePointer + (int)CurrentInstruction.Parameter,
         AddressingMode.StackPointerRelative => Registers.StackPointer + (int)CurrentInstruction.Parameter,
 
-        _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
-    };
-
-    /// <exception cref="InternalException"/>
-    int FetchHeapAddress() => CurrentInstruction.AddressingMode switch
-    {
-        AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-        AddressingMode.Runtime => (int)Pop(),
-
-        _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
+        _ => throw new UnreachableException(),
     };
 
     /// <exception cref="InternalException"/>
@@ -413,12 +407,18 @@ public class BytecodeProcessor
 
     void Push(DataItem data)
     {
+        if (Registers.StackPointer >= Memory.Length)
+        { throw new RuntimeException("Stack overflow", GetContext()); }
+
         Memory[Registers.StackPointer] = data;
         Registers.StackPointer++;
     }
 
     DataItem Pop()
     {
+        if (Registers.StackPointer < 0)
+        { throw new RuntimeException("Stack underflow", GetContext()); }
+
         Registers.StackPointer--;
         return Memory[Registers.StackPointer];
     }
@@ -453,7 +453,7 @@ public class BytecodeProcessor
 
     void HEAP_GET()
     {
-        int address = FetchHeapAddress();
+        int address = FetchAddress();
         DataItem value = Memory[address];
         Push(value);
         Step();
@@ -461,7 +461,7 @@ public class BytecodeProcessor
 
     void HEAP_SET()
     {
-        int address = FetchHeapAddress();
+        int address = FetchAddress();
         DataItem value = Pop();
         Memory[address] = value;
         Step();
@@ -744,7 +744,7 @@ public class BytecodeProcessor
 
     void STORE_VALUE()
     {
-        int address = FetchStackAddress();
+        int address = FetchAddress();
         DataItem value = Pop();
         Memory[address] = value;
 
@@ -753,7 +753,7 @@ public class BytecodeProcessor
 
     void LOAD_VALUE()
     {
-        int address = FetchStackAddress();
+        int address = FetchAddress();
         DataItem value = Memory[address];
         Push(value);
 

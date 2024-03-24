@@ -12,7 +12,7 @@ public static class HeapUtils
         int endlessSafe = heap.Count;
         int i = 0;
         int blockIndex = 0;
-        while (i + 1 < heap.Count)
+        while (i + 1 < 127)
         {
             (int blockSize, bool blockIsUsed) = GetHeader(heap[i]);
 
@@ -58,7 +58,7 @@ public static class HeapUtils
         int endlessSafe = heap.Count;
         int i = 0;
         int blockIndex = 0;
-        while (i + 1 < heap.Count)
+        while (i + 1 < 127)
         {
             (int blockSize, bool blockIsUsed) = GetHeader(heap[i]);
 
@@ -81,7 +81,7 @@ public static class HeapUtils
         int endlessSafe = heap.Count;
         int i = 0;
         int blockIndex = 0;
-        while (i + 1 < heap.Count)
+        while (i + 1 < 127)
         {
             (int blockSize, bool blockIsUsed) = GetHeader(heap[i]);
 
@@ -123,8 +123,22 @@ public static class HeapUtils
 
     public static DataItem GetHeader(int size, bool used)
         => new((size & BlockSizeMask) | (used ? BlockStatusMask : 0));
+
     public static (ushort, bool) GetHeader(DataItem header)
-        => ((ushort)(header.VInt & BlockSizeMask), (header.VInt & BlockStatusMask) != 0);
+    {
+        if (header.IsNull) header = 0;
+        if (header >= 127)
+        {
+            header -= 127;
+            return ((ushort)header, true);
+        }
+        else
+        {
+            return ((ushort)header, false);
+        }
+
+        // ((ushort)(header.VInt & BlockSizeMask), (header.VInt & BlockStatusMask) != 0);
+    }
 
     public static void Init(ArraySegment<DataItem> heap)
     {

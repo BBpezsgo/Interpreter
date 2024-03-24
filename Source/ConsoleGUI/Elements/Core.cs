@@ -183,6 +183,8 @@ public class DrawBuffer
     public int Step() => Step(1);
 
     public int CurrentIndex => currentIndex;
+    public int CurrentLine => Width == 0 ? 0 : currentIndex / Width;
+    public int CurrentColumn => Width == 0 ? 0 : currentIndex % Width;
 
     public byte ForegroundColor { get; set; }
     public byte BackgroundColor { get; set; }
@@ -249,16 +251,16 @@ public class DrawBuffer
 
     public void AddText(char v) => this.AddChar(v);
 
-    public void AddSpace(int to, int totalWidth)
+    public void AddSpace(int to)
     {
-        if (totalWidth == 0) return;
-        while (this.currentIndex % totalWidth < to)
+        if (Width == 0) return;
+        while (this.currentIndex % Width < to)
         { if (!this.AddChar(' ')) break; }
     }
-    public void FinishLine(int totalWidth)
+    public void FinishLine()
     {
-        if (totalWidth == 0) return;
-        this.AddSpace(totalWidth - 1, totalWidth);
+        if (Width == 0) return;
+        this.AddSpace(Width - 1);
         this.AddChar(' ');
     }
 

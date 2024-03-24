@@ -21,6 +21,7 @@ public readonly struct CompilerResult
     public readonly CompiledGeneralFunction[] GeneralFunctions;
     public readonly CompiledOperator[] Operators;
     public readonly CompiledConstructor[] Constructors;
+
     public readonly ImmutableDictionary<Uri, ImmutableArray<Token>> Tokens;
 
     public readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
@@ -29,7 +30,7 @@ public readonly struct CompilerResult
     public readonly CompileTag[] Hashes;
     public readonly CompiledEnum[] Enums;
 
-    public readonly Statement[] TopLevelStatements;
+    public readonly (Statement[] Statements, Uri? File)[] TopLevelStatements;
 
     public readonly Uri? File;
 
@@ -105,8 +106,11 @@ public readonly struct CompilerResult
     {
         get
         {
-            for (int i = 0; i < TopLevelStatements.Length; i++)
-            { yield return TopLevelStatements[i]; }
+            foreach ((Statement[] topLevelStatements, _) in TopLevelStatements)
+            {
+                for (int i = 0; i < topLevelStatements.Length; i++)
+                { yield return topLevelStatements[i]; }
+            }
 
             foreach (CompiledFunction function in Functions)
             {
@@ -130,18 +134,6 @@ public readonly struct CompilerResult
         }
     }
 
-    public readonly ParserResult AST => new(
-        Enumerable.Empty<Error>(),
-        Functions,
-        Operators,
-        Macros,
-        Structs,
-        Enumerable.Empty<UsingDefinition>(),
-        Enumerable.Empty<CompileTag>(),
-        TopLevelStatements,
-        Enums,
-        Enumerable.Empty<Token>());
-
     public static CompilerResult Empty => new(
         Enumerable.Empty<KeyValuePair<Uri, ImmutableArray<Token>>>(),
         Enumerable.Empty<CompiledFunction>(),
@@ -153,7 +145,7 @@ public readonly struct CompilerResult
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<CompileTag>(),
         Enumerable.Empty<CompiledEnum>(),
-        Enumerable.Empty<Statement>(),
+        Enumerable.Empty<(Statement[] Statements, Uri? File)>(),
         null);
 
     public CompilerResult(
@@ -167,7 +159,7 @@ public readonly struct CompilerResult
         IEnumerable<CompiledStruct> structs,
         IEnumerable<CompileTag> hashes,
         IEnumerable<CompiledEnum> enums,
-        IEnumerable<Statement> topLevelStatements,
+        IEnumerable<(Statement[] Statements, Uri? File)> topLevelStatements,
         Uri? file)
     {
         Tokens = tokens.ToImmutableDictionary();
@@ -284,50 +276,39 @@ public enum CompileLevel
 
 public sealed class Compiler
 {
-    readonly List<CompiledStruct> CompiledStructs;
-    readonly List<CompiledOperator> CompiledOperators;
-    readonly List<CompiledConstructor> CompiledConstructors;
-    readonly List<CompiledFunction> CompiledFunctions;
-    readonly List<CompiledGeneralFunction> CompiledGeneralFunctions;
-    readonly List<CompiledEnum> CompiledEnums;
+    readonly List<CompiledStruct> CompiledStructs = new();
+    readonly List<CompiledOperator> CompiledOperators = new();
+    readonly List<CompiledConstructor> CompiledConstructors = new();
+    readonly List<CompiledFunction> CompiledFunctions = new();
+    readonly List<CompiledGeneralFunction> CompiledGeneralFunctions = new();
+    readonly List<CompiledEnum> CompiledEnums = new();
 
-    readonly List<FunctionDefinition> Operators;
-    readonly List<FunctionDefinition> Functions;
-    readonly List<MacroDefinition> Macros;
-    readonly List<StructDefinition> Structs;
-    readonly List<EnumDefinition> Enums;
+    readonly List<FunctionDefinition> Operators = new();
+    readonly List<FunctionDefinition> Functions = new();
+    readonly List<MacroDefinition> Macros = new();
+    readonly List<StructDefinition> Structs = new();
+    readonly List<EnumDefinition> Enums = new();
 
-    readonly Stack<ImmutableArray<Token>> GenericParameters;
+    readonly List<(Statement[] Statements, Uri? File)> TopLevelStatements = new();
 
-    readonly List<CompileTag> Tags;
+    readonly Stack<ImmutableArray<Token>> GenericParameters = new();
+
+    readonly List<CompileTag> Tags = new();
 
     readonly CompilerSettings Settings;
     readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
     readonly PrintCallback? PrintCallback;
 
     readonly AnalysisCollection? AnalysisCollection;
+    readonly IEnumerable<string> PreprocessorVariables;
 
-    Compiler(Dictionary<int, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection)
+    Compiler(Dictionary<int, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection, IEnumerable<string> preprocessorVariables)
     {
-        Functions = new List<FunctionDefinition>();
-        Macros = new List<MacroDefinition>();
-        Operators = new List<FunctionDefinition>();
-        Structs = new List<StructDefinition>();
-        Enums = new List<EnumDefinition>();
-        Tags = new List<CompileTag>();
-        GenericParameters = new Stack<ImmutableArray<Token>>();
-
-        CompiledStructs = new List<CompiledStruct>();
-        CompiledOperators = new List<CompiledOperator>();
-        CompiledConstructors = new List<CompiledConstructor>();
-        CompiledFunctions = new List<CompiledFunction>();
-        CompiledGeneralFunctions = new List<CompiledGeneralFunction>();
-        CompiledEnums = new List<CompiledEnum>();
-
         ExternalFunctions = externalFunctions ?? new Dictionary<int, ExternalFunctionBase>();
         Settings = settings;
         PrintCallback = printCallback;
         AnalysisCollection = analysisCollection;
+        PreprocessorVariables = preprocessorVariables;
     }
 
     bool FindType(Token name, [NotNullWhen(true)] out GeneralType? result)
@@ -414,7 +395,9 @@ public sealed class Compiler
         if (function.Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out string? externalName, out AttributeUsage? attribute))
         {
             if (!ExternalFunctions.TryGet(externalName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
-            { AnalysisCollection?.Errors.Add(exception.InstantiateError(attribute, function.FilePath)); }
+            {
+                // AnalysisCollection?.Warnings.Add(exception.InstantiateWarning(attribute, function.FilePath));
+            }
             else
             {
                 if (externalFunction.Parameters.Length != function.Parameters.Count)
@@ -448,7 +431,9 @@ public sealed class Compiler
         if (function.Attributes.TryGetAttribute<string>(AttributeConstants.BuiltinIdentifier, out string? builtinName, out attribute))
         {
             if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out (GeneralType ReturnValue, GeneralType[] Parameters) builtinFunction))
-            { AnalysisCollection?.Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", attribute, function.FilePath)); }
+            {
+                // AnalysisCollection?.Warnings.Add(new Warning($"Builtin function \"{builtinName}\" not found", attribute, function.FilePath));
+            }
             else
             {
                 if (builtinFunction.Parameters.Length != function.Parameters.Count)
@@ -624,6 +609,9 @@ public sealed class Compiler
 
     void CompileFile(CollectedAST collectedAST)
     {
+        if (collectedAST.ParserResult.TopLevelStatements.Length > 0)
+        { TopLevelStatements.Add((collectedAST.ParserResult.TopLevelStatements, collectedAST.Uri)); }
+
         foreach (FunctionDefinition function in collectedAST.ParserResult.Functions)
         {
             if (Functions.Any(function.IsSame))
@@ -691,7 +679,7 @@ public sealed class Compiler
         {
             tokens[file] = parserResult.Tokens;
 
-            CollectorResult collectorResult = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, Settings.BasePath, AnalysisCollection);
+            CollectorResult collectorResult = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables);
 
             for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
             {
@@ -699,6 +687,8 @@ public sealed class Compiler
                 CompileFile(collectorResult.CollectedASTs[i]);
             }
         }
+
+        TopLevelStatements.Add((parserResult.TopLevelStatements, file));
 
         CompileInternal();
 
@@ -713,13 +703,13 @@ public sealed class Compiler
             CompiledStructs,
             Tags.ToArray(),
             CompiledEnums,
-            parserResult.TopLevelStatements,
+            TopLevelStatements,
             file);
     }
 
     CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings)
     {
-        CollectorResult collectorResult = SourceCodeManager.Collect(usings, (Uri?)null, PrintCallback, Settings.BasePath, AnalysisCollection);
+        CollectorResult collectorResult = SourceCodeManager.Collect(usings, (Uri?)null, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables);
 
         Dictionary<Uri, ImmutableArray<Token>> tokens = new();
 
@@ -729,6 +719,8 @@ public sealed class Compiler
             CompileFile(collectorResult.CollectedASTs[i]);
         }
 
+        TopLevelStatements.Add(([statement], null));
+
         CompileInternal();
 
         return new CompilerResult(
@@ -742,7 +734,7 @@ public sealed class Compiler
             CompiledStructs,
             Tags.ToArray(),
             CompiledEnums,
-            [statement],
+            TopLevelStatements,
             null);
     }
 
@@ -1116,10 +1108,11 @@ ExitBreak:
         Dictionary<int, ExternalFunctionBase>? externalFunctions,
         Uri? file,
         CompilerSettings settings,
+        IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null)
     {
-        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection);
+        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables);
         return compiler.CompileMainFile(parserResult, file);
     }
 
@@ -1134,11 +1127,12 @@ ExitBreak:
         FileInfo file,
         Dictionary<int, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
+        IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null)
     {
-        ParserResult ast = Parser.ParseFile(file.FullName);
-        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection);
+        ParserResult ast = Parser.ParseFile(file.FullName, preprocessorVariables);
+        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables);
         return compiler.CompileMainFile(ast, new Uri(file.FullName, UriKind.Absolute));
     }
 
@@ -1147,7 +1141,8 @@ ExitBreak:
         Dictionary<int, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
         UsingDefinition[] usings,
+        IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null)
-        => new Compiler(externalFunctions, printCallback, settings, analysisCollection).CompileInteractiveInternal(statement, usings);
+        => new Compiler(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables).CompileInteractiveInternal(statement, usings);
 }

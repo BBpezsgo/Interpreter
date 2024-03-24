@@ -1,0 +1,17 @@
+using System;
+
+temp char* builder = "";
+
+PrintLine(builder);
+
+builder = (temp builder) + "a";
+PrintLine(builder);
+
+builder = (temp builder) + "b";
+PrintLine(builder);
+
+builder = (temp builder) + "c";
+PrintLine(builder);
+
+builder = (temp builder) + "d";
+PrintLine(builder);

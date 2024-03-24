@@ -7,6 +7,7 @@ public class RuntimeException : LanguageException
     public Uri? SourceFile;
     public ImmutableArray<FunctionInformations> CallStack;
     public FunctionInformations? CurrentFrame;
+    string? Arrows;
 
     public void FeedDebugInfo(DebugInformation debugInfo)
     {
@@ -18,11 +19,16 @@ public class RuntimeException : LanguageException
         else
         { SourcePosition = sourcePosition.SourcePosition; }
 
+        if (sourcePosition.Uri is not null &&
+            debugInfo.OriginalFiles.TryGetValue(sourcePosition.Uri, out ImmutableArray<Tokenizing.Token> tokens))
+        { Arrows = GetArrows(sourcePosition.SourcePosition, tokens); }
+
         CurrentFrame = debugInfo.GetFunctionInformations(context.CodePointer);
 
         CallStack = debugInfo.GetFunctionInformations(context.CallTrace).ToImmutableArray();
 
-        SourceFile = CallStack.Length > 0 ? CallStack[^1].File : null;
+        SourceFile = sourcePosition.Uri;
+        SourceFile ??= CallStack.Length > 0 ? CallStack[^1].File : null;
     }
 
     public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
@@ -49,6 +55,14 @@ public class RuntimeException : LanguageException
         { result.Append($" (in {SourceFile})"); }
 
         result.Append(Environment.NewLine);
+
+        if (Arrows is not null)
+        {
+            result.Append(Arrows);
+            result.Append(Environment.NewLine);
+            result.Append(Environment.NewLine);
+        }
+
         result.Append($"Code Pointer: ");
         result.Append(context.CodePointer);
 

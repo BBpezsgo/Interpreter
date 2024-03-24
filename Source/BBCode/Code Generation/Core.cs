@@ -160,14 +160,35 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
         }
 
-        AddInstruction(Opcode.Push, new DataItem(0));
+        foreach ((Parser.Statement.Statement[] statements, _) in compilerResult.TopLevelStatements)
+        {
+            CompileGlobalConstants(statements);
+        }
+
+        for (int i = 0; i < compilerResult.TopLevelStatements.Length - 1; i++)
+        {
+            (Parser.Statement.Statement[] statements, Uri? file) = compilerResult.TopLevelStatements[i];
+            CurrentFile = compilerResult.File;
+#if DEBUG
+            if (CurrentFile == null)
+            { Debugger.Break(); }
+#endif
+            Print?.Invoke($"Generating top level statements for file {file?.ToString() ?? "null"} ...", LogType.Debug);
+            GenerateCodeForTopLevelStatements(statements, false);
+
+            CurrentFile = null;
+        }
 
         CurrentFile = compilerResult.File;
+
+        AddInstruction(Opcode.Push, new DataItem(0));
+
 #if DEBUG
         if (CurrentFile == null)
         { Debugger.Break(); }
 #endif
-        GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
+        Print?.Invoke($"Generating top level statements for file {compilerResult.TopLevelStatements[^1].File?.ToString() ?? "null"} ...", LogType.Debug);
+        GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements[^1].Statements, true);
 
         AddInstruction(Opcode.Exit);
 

@@ -130,14 +130,13 @@ public class Interpreter
     /// </summary>
     public event OnInputEventHandler? OnNeedInput;
 
-    public BBCodeGeneratorResult CompilerResult;
+    public readonly DebugInformation? DebugInformation;
     public Instruction? NextInstruction
     {
         get
         {
-            if (this.BytecodeInterpreter == null) return null;
-            if (this.BytecodeInterpreter.Registers.CodePointer < 0 || this.BytecodeInterpreter.Registers.CodePointer >= this.CompilerResult.Code.Length) return null;
-            return this.CompilerResult.Code[this.BytecodeInterpreter.Registers.CodePointer];
+            if (BytecodeInterpreter.Registers.CodePointer < 0 || BytecodeInterpreter.Registers.CodePointer >= BytecodeInterpreter.Code.Length) return null;
+            return BytecodeInterpreter.Code[BytecodeInterpreter.Registers.CodePointer];
         }
     }
 
@@ -150,10 +149,11 @@ public class Interpreter
 
     readonly bool ThrowExceptions;
 
-    public Interpreter(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program)
+    public Interpreter(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation)
     {
         Streams = new List<Stream>();
-        ThrowExceptions = handleErrors!;
+        ThrowExceptions = !handleErrors;
+        DebugInformation = debugInformation;
 
         BytecodeInterpreter = new BytecodeProcessor(program, GenerateExternalFunctions().ToFrozenDictionary(), settings);
     }
@@ -386,6 +386,9 @@ public class Interpreter
         #endregion
     }
 
+    /// <exception cref="UserException"/>
+    /// <exception cref="RuntimeException"/>
+    /// <exception cref="Exception"/>
     public void Update()
     {
         for (int i = 0; i < Streams.Count; i++)
@@ -404,31 +407,28 @@ public class Interpreter
         }
         catch (UserException error)
         {
-            if (CompilerResult.DebugInfo is not null) error.FeedDebugInfo(CompilerResult.DebugInfo);
+            if (DebugInformation is not null) error.FeedDebugInfo(DebugInformation);
 
             OnOutput?.Invoke(this, $"User Exception: {error}", LogType.Error);
 
-            BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;
-
             if (ThrowExceptions) throw;
+            else BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;
         }
         catch (RuntimeException error)
         {
-            if (CompilerResult.DebugInfo is not null) error.FeedDebugInfo(CompilerResult.DebugInfo);
+            if (DebugInformation is not null) error.FeedDebugInfo(DebugInformation);
 
             OnOutput?.Invoke(this, $"Runtime Exception: {error}", LogType.Error);
 
-            BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;
-
             if (ThrowExceptions) throw;
+            else BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;
         }
         catch (Exception error)
         {
             OnOutput?.Invoke(this, $"Internal Exception: {error.Message}", LogType.Error);
 
-            BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;
-
             if (ThrowExceptions) throw;
+            else BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;
         }
     }
 }

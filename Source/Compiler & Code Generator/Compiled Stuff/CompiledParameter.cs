@@ -9,6 +9,7 @@ public class CompiledParameter : ParameterDefinition,
     public new GeneralType Type { get; }
     public int Index { get; }
     public int MemoryAddress { get; }
+
     public bool IsAnonymous => Index == -1;
 
     public CompiledParameter(int index, int memoryAddress, GeneralType type, ParameterDefinition definition) : base(definition)

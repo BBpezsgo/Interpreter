@@ -280,8 +280,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
         newFrame.savedFilePath = CurrentFile;
 
-        newFrame.savedConstants = CompiledConstants.ToArray();
-        CompiledConstants.Clear();
+        newFrame.savedConstants = CompiledLocalConstants.ToArray();
+        CompiledLocalConstants.Clear();
 
         return newFrame;
     }
@@ -291,7 +291,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
         CompiledVariables.Set(frame.savedVariables);
 
-        CompiledConstants.Set(frame.savedConstants);
+        CompiledLocalConstants.Set(frame.savedConstants);
 
         if (Breaks.Count > 0)
         { throw new InternalException(); }
@@ -510,7 +510,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
                 if (variable.DeallocateOnClean &&
                     variable.Type is PointerType)
                 {
-                    GenerateDeallocator(
+                    GenerateDestructor(
                         new TypeCast(
                             new Identifier(
                                 Tokenizing.Token.CreateAnonymous(variable.Name, Tokenizing.TokenType.Identifier)
@@ -665,40 +665,35 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     #endregion
 
-    BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
+    void GenerateTopLevelStatements(Statement[] statements, Uri? file, bool isImported)
     {
-        Print?.Invoke("Generating code ...", LogType.Debug);
-        Print?.Invoke("  Precompiling ...", LogType.Debug);
+        Print?.Invoke($"  Generating top level statements for file {file?.ToString() ?? "null"} ...", LogType.Debug);
 
-        CurrentFile = compilerResult.File;
+        CurrentFile = file;
 
-        int constantCount = CompileConstants(compilerResult.TopLevelStatements);
-
-        Variable returnVariable = new(ReturnVariableName, Stack.PushVirtual(1), false, false, new BuiltinType(BasicType.Integer));
-        CompiledVariables.Add(returnVariable);
+        if (!isImported)
+        { CompiledVariables.Add(new Variable(ReturnVariableName, Stack.PushVirtual(1), false, false, new BuiltinType(BasicType.Integer))); }
 
         if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
-        { VariableCleanupStack.Push(PrecompileVariables(compilerResult.TopLevelStatements)); }
+        { VariableCleanupStack.Push(PrecompileVariables(statements)); }
         else
-        { PrecompileVariables(compilerResult.TopLevelStatements); }
+        { PrecompileVariables(statements); }
 
-        ControlFlowBlock? returnBlock = BeginReturnBlock(null, FindControlFlowUsage(compilerResult.TopLevelStatements));
+        ControlFlowBlock? returnBlock = BeginReturnBlock(null, FindControlFlowUsage(statements));
 
         {
             InMacro.Push(false);
-            Print?.Invoke("  Generating top level statements ...", LogType.Debug);
 
             using ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress);
 
-            for (int i = 0; i < compilerResult.TopLevelStatements.Length; i++)
+            for (int i = 0; i < statements.Length; i++)
             {
-                progressBar.Print(i, compilerResult.TopLevelStatements.Length);
-                GenerateCodeForStatement(compilerResult.TopLevelStatements[i]);
+                progressBar.Print(i, statements.Length);
+                GenerateCodeForStatement(statements[i]);
             }
+
             InMacro.Pop();
         }
-
-        Print?.Invoke("  Finishing up ...", LogType.Debug);
 
         if (returnBlock is not null)
         { FinishControlFlowStatements(Returns.Pop(), true, "return"); }
@@ -710,11 +705,28 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
         { CleanupVariables(VariableCleanupStack.Pop()); }
 
-        CompiledConstants.Pop(constantCount);
+        Code.SetPointer(0);
+
+        CurrentFile = null;
+    }
+
+    BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
+    {
+        Print?.Invoke("Generating code ...", LogType.Debug);
+        Print?.Invoke("  Precompiling ...", LogType.Debug);
+
+        foreach ((Statement[] statements, _) in compilerResult.TopLevelStatements)
+        {
+            CompileGlobalConstants(statements);
+        }
+
+        for (int i = 0; i < compilerResult.TopLevelStatements.Length; i++)
+        {
+            (Statement[] statements, Uri? file) = compilerResult.TopLevelStatements[i];
+            GenerateTopLevelStatements(statements, file, i < compilerResult.TopLevelStatements.Length - 1);
+        }
 
         // Heap.Destroy();
-
-        Code.SetPointer(0);
 
         if (Heap.IsUsed)
         {
@@ -723,9 +735,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         }
 
         if (Code.BranchDepth != 0)
-        { throw new InternalException($"Unbalanced branches", CurrentFile); }
-
-        CurrentFile = null;
+        { throw new InternalException($"Unbalanced branches", compilerResult.File); }
 
         Print?.Invoke($"Used stack size: {Stack.MaxUsedSize} bytes", LogType.Debug);
 

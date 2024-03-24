@@ -349,6 +349,8 @@ internal sealed class ConsoleGUI
     void WindowBufferSizeEvent(WindowBufferSizeEvent e) => ResizeElements = true;
     void KeyEvent(KeyEvent e)
     {
+        ConsoleKeyboard.Feed(e);
+
         if (e.IsDown == 0)
         {
             if (e.AsciiChar == 27)

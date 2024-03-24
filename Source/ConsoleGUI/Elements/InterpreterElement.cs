@@ -6,6 +6,71 @@ using Win32.Console;
 
 namespace ConsoleGUI;
 
+interface IJump
+{
+    public bool IsPaused { get; set; }
+    public bool ShouldDelete { get; }
+    public bool ShouldJump(Interpreter interpreter);
+    public void Tick();
+}
+
+class InstructionCountJump : IJump
+{
+    public bool IsPaused { get; set; }
+    public int Count { get; private set; }
+    public int Current { get; private set; }
+    public bool ShouldDelete => false;
+
+    public InstructionCountJump(int count)
+    {
+        Count = count;
+        Current = 0;
+    }
+
+    public void Reset(int newCount)
+    {
+        Count = newCount;
+        Current = 0;
+    }
+
+    public bool ShouldJump(Interpreter interpreter)
+    {
+        return Current < Count;
+    }
+
+    public void Tick()
+    {
+        Current++;
+    }
+
+    public override string ToString() => (Count - Current).ToString();
+}
+
+class BreakPointJump : IJump
+{
+    public bool IsPaused { get; set; }
+    public int Instruction { get; }
+    public bool ShouldDelete { get; private set; }
+
+    public BreakPointJump(int instruction) => Instruction = instruction;
+
+    public bool ShouldJump(Interpreter interpreter)
+    {
+        if (interpreter.BytecodeInterpreter.Registers.CodePointer == Instruction)
+        {
+            ShouldDelete = true;
+            return false;
+        }
+
+        return true;
+    }
+
+    public void Tick()
+    {
+
+    }
+}
+
 [SupportedOSPlatform("windows")]
 public sealed class InterpreterElement : WindowElement
 {
@@ -14,8 +79,8 @@ public sealed class InterpreterElement : WindowElement
     readonly ScrollBar HeapScrollBar;
     readonly ScrollBar StackScrollBar;
 
-    int NextCodeJumpCount;
-    int CurrentlyJumping;
+    IJump? CurrentJump;
+
     readonly MainThreadTimer InterpreterTimer;
     readonly StandardIOElement ConsolePanel;
 
@@ -39,6 +104,7 @@ public sealed class InterpreterElement : WindowElement
             Title = "Code",
         };
         codePanel.OnBeforeDraw += SourceCodeElement_OnBeforeDraw;
+        codePanel.OnMouseEventInvoked += SourceCodeElement_OnMouse;
 
         ConsolePanel = new StandardIOElement
         {
@@ -109,10 +175,6 @@ public sealed class InterpreterElement : WindowElement
 
         HasBorder = false;
 
-        NextCodeJumpCount = 1;
-        CurrentlyJumping = 0;
-        // StackAutoScroll = true;
-
         InterpreterTimer = new MainThreadTimer(200);
         InterpreterTimer.Elapsed += OnInterpreterTimer;
         InterpreterTimer.Enabled = true;
@@ -129,9 +191,12 @@ public sealed class InterpreterElement : WindowElement
 
     void OnInterpreterTimer()
     {
-        if (CurrentlyJumping <= 0) return;
+        if (CurrentJump is null) return;
+        if (CurrentJump.IsPaused) return;
+        if (CurrentJump.ShouldDelete) { CurrentJump = null; return; }
+        if (!CurrentJump.ShouldJump(Interpreter)) return;
 
-        CurrentlyJumping--;
+        CurrentJump?.Tick();
         Interpreter.DoUpdate();
         if (Interpreter.BytecodeInterpreter.IsDone)
         {
@@ -166,8 +231,8 @@ public sealed class InterpreterElement : WindowElement
         ImmutableArray<int> calltraceRaw = BytecodeProcessor.TraceCalls(Interpreter.BytecodeInterpreter.Memory, Interpreter.BytecodeInterpreter.Registers.BasePointer);
 
         FunctionInformations[] callstack;
-        if (Interpreter.CompilerResult.DebugInfo is not null)
-        { callstack = Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(calltraceRaw).ToArray(); }
+        if (Interpreter.DebugInformation is not null)
+        { callstack = Interpreter.DebugInformation.GetFunctionInformations(calltraceRaw).ToArray(); }
         else
         { callstack = new FunctionInformations[calltraceRaw.Length]; }
 
@@ -182,7 +247,7 @@ public sealed class InterpreterElement : WindowElement
             sender.DrawBuffer.AddText(' ', 3 - i.ToString(CultureInfo.InvariantCulture).Length);
 
             sender.DrawBuffer.AddText(i.ToString(CultureInfo.InvariantCulture));
-            sender.DrawBuffer.AddSpace(5, sender.Rect.Width);
+            sender.DrawBuffer.AddSpace(5);
 
             sender.DrawBuffer.ForegroundColor = CharColor.Silver;
             sender.DrawBuffer.BackgroundColor = CharColor.Black;
@@ -259,13 +324,13 @@ public sealed class InterpreterElement : WindowElement
             }
 
             sender.DrawBuffer.BackgroundColor = CharColor.Black;
-            sender.DrawBuffer.FinishLine(sender.Rect.Width);
+            sender.DrawBuffer.FinishLine();
             sender.DrawBuffer.ForegroundColor = CharColor.Silver;
         }
 
-        if (Interpreter.CompilerResult.DebugInfo is not null)
+        if (Interpreter.DebugInformation is not null)
         {
-            FunctionInformations callframe = Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(this.Interpreter.BytecodeInterpreter.Registers.CodePointer);
+            FunctionInformations callframe = Interpreter.DebugInformation.GetFunctionInformations(this.Interpreter.BytecodeInterpreter.Registers.CodePointer);
 
             if (callframe.IsValid)
             {
@@ -275,7 +340,7 @@ public sealed class InterpreterElement : WindowElement
                 sender.DrawBuffer.AddText(' ', 3 - (i + 1).ToString(CultureInfo.InvariantCulture).Length);
 
                 sender.DrawBuffer.AddText((i + 1).ToString(CultureInfo.InvariantCulture));
-                sender.DrawBuffer.AddSpace(5, sender.Rect.Width);
+                sender.DrawBuffer.AddSpace(5);
 
                 sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                 sender.DrawBuffer.BackgroundColor = CharColor.Black;
@@ -347,7 +412,7 @@ public sealed class InterpreterElement : WindowElement
                 sender.DrawBuffer.AddText(" (current)");
 
                 sender.DrawBuffer.BackgroundColor = CharColor.Black;
-                sender.DrawBuffer.FinishLine(sender.Rect.Width);
+                sender.DrawBuffer.FinishLine();
                 sender.DrawBuffer.ForegroundColor = CharColor.Silver;
             }
         }
@@ -368,7 +433,7 @@ public sealed class InterpreterElement : WindowElement
         b.AddText("IsRunning: ");
         b.AddText((!this.Interpreter.BytecodeInterpreter.IsDone).ToString());
         b.BackgroundColor = CharColor.Black;
-        b.FinishLine(sender.Rect.Width);
+        b.FinishLine();
         b.ForegroundColor = CharColor.Silver;
 
         b.AddText(' ', 2);
@@ -434,7 +499,7 @@ public sealed class InterpreterElement : WindowElement
         b.AddText(' ', 2);
 
         b.BackgroundColor = CharColor.Black;
-        b.FinishLine(sender.Rect.Width);
+        b.FinishLine();
         b.ForegroundColor = CharColor.Silver;
     }
 
@@ -518,12 +583,13 @@ public sealed class InterpreterElement : WindowElement
                 break;
             }
 
-            if (((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString(CultureInfo.InvariantCulture).Length > 0) b.AddText(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString(CultureInfo.InvariantCulture).Length);
+            int space = ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString(CultureInfo.InvariantCulture).Length;
+            b.AddText(' ', space);
 
             b.ForegroundColor = CharColor.Silver;
             b.AddText(i.ToString(CultureInfo.InvariantCulture));
             b.ForegroundColor = CharColor.White;
-            b.AddSpace(5, sender.Rect.Width);
+            b.AddSpace(5);
 
             if (isHeader)
             {
@@ -582,7 +648,7 @@ public sealed class InterpreterElement : WindowElement
             }
 
             b.BackgroundColor = CharColor.Black;
-            b.FinishLine(sender.Rect.Width);
+            b.FinishLine();
             b.ForegroundColor = CharColor.Silver;
         }
 
@@ -600,8 +666,8 @@ public sealed class InterpreterElement : WindowElement
         b.ResetColor();
 
         CollectedScopeInfo stackDebugInfo;
-        if (Interpreter.CompilerResult.DebugInfo is not null)
-        { stackDebugInfo = Interpreter.CompilerResult.DebugInfo.GetScopeInformations(Interpreter.BytecodeInterpreter.Registers.CodePointer); }
+        if (Interpreter.DebugInformation is not null)
+        { stackDebugInfo = Interpreter.DebugInformation.GetScopeInformations(Interpreter.BytecodeInterpreter.Registers.CodePointer); }
         else
         { stackDebugInfo = CollectedScopeInfo.Empty; }
 
@@ -722,7 +788,7 @@ public sealed class InterpreterElement : WindowElement
             { b.AddText(' '); }
 
             b.AddText(address.ToString(CultureInfo.InvariantCulture));
-            b.AddSpace(7, sender.Rect.Width);
+            b.AddSpace(7);
 
             b.ForegroundColor = CharColor.Silver;
             b.BackgroundColor = CharColor.Black;
@@ -789,7 +855,7 @@ public sealed class InterpreterElement : WindowElement
                         b.AddText($" ({itemDebugInfo.Kind}) {itemDebugInfo.Tag} {{");
 
                         b.BackgroundColor = CharColor.Black;
-                        b.FinishLine(sender.Rect.Width);
+                        b.FinishLine();
                         b.ForegroundColor = CharColor.Silver;
 
                         DrawElement(i, item);
@@ -799,7 +865,7 @@ public sealed class InterpreterElement : WindowElement
                         DrawElement(i, item);
 
                         b.BackgroundColor = CharColor.Black;
-                        b.FinishLine(sender.Rect.Width);
+                        b.FinishLine();
                         b.ForegroundColor = CharColor.Gray;
                         b.AddText(' ');
                         b.AddText('}');
@@ -828,7 +894,7 @@ public sealed class InterpreterElement : WindowElement
             }
 
             b.BackgroundColor = CharColor.Black;
-            b.FinishLine(sender.Rect.Width);
+            b.FinishLine();
             b.ForegroundColor = CharColor.Silver;
         }
 
@@ -881,10 +947,10 @@ public sealed class InterpreterElement : WindowElement
             b.AddText(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString(CultureInfo.InvariantCulture).Length);
 
             b.AddText(i.ToString(CultureInfo.InvariantCulture));
-            b.AddSpace(5, sender.Rect.Width);
+            b.AddSpace(5);
 
             b.BackgroundColor = CharColor.Black;
-            b.FinishLine(sender.Rect.Width);
+            b.FinishLine();
             b.ForegroundColor = CharColor.Silver;
 
             // i++;
@@ -894,6 +960,12 @@ public sealed class InterpreterElement : WindowElement
 
         StackScrollBar.Draw(b);
     }
+
+    void SourceCodeElement_OnMouse(InlineElement sender, MouseEvent e)
+    {
+
+    }
+
     void SourceCodeElement_OnBeforeDraw(InlineElement sender)
     {
         // sender.ClearBuffer();
@@ -911,15 +983,15 @@ public sealed class InterpreterElement : WindowElement
             b.ForegroundColor = CharColor.Silver;
             b.AddText(lineNumber);
             b.ForegroundColor = CharColor.Silver;
-            b.AddSpace(5, sender.Rect.Width);
+            b.AddSpace(5);
         }
 
         int indent = 0;
-        if (Interpreter.CompilerResult.DebugInfo is not null)
+        if (Interpreter.DebugInformation is not null)
         {
             for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Registers.CodePointer - 5; i++)
             {
-                if (Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out List<string>? comments))
+                if (Interpreter.DebugInformation.CodeComments.TryGetValue(i, out List<string>? comments))
                 {
                     for (int j = 0; j < comments.Count; j++)
                     {
@@ -933,15 +1005,15 @@ public sealed class InterpreterElement : WindowElement
         }
 
         bool IsNextInstruction = false;
-        for (int i = Math.Max(0, this.Interpreter.BytecodeInterpreter.Registers.CodePointer - 5); i < this.Interpreter.CompilerResult.Code.Length; i++)
+        for (int i = Math.Max(0, this.Interpreter.BytecodeInterpreter.Registers.CodePointer - 5); i < this.Interpreter.BytecodeInterpreter.Code.Length; i++)
         {
             if (Interpreter.BytecodeInterpreter.Registers.CodePointer == i) IsNextInstruction = true;
 
-            Instruction instruction = Interpreter.CompilerResult.Code[i];
+            Instruction instruction = Interpreter.BytecodeInterpreter.Code[i];
 
-            if (this.Interpreter.CompilerResult.DebugInfo is not null)
+            if (this.Interpreter.DebugInformation is not null)
             {
-                if (this.Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out List<string>? comments))
+                if (this.Interpreter.DebugInformation.CodeComments.TryGetValue(i, out List<string>? comments))
                 {
                     for (int j = 0; j < comments.Count; j++)
                     {
@@ -958,7 +1030,7 @@ public sealed class InterpreterElement : WindowElement
                         b.AddText(comment);
                         b.ForegroundColor = CharColor.Silver;
                         b.BackgroundColor = CharColor.Black;
-                        b.FinishLine(sender.Rect.Width);
+                        b.FinishLine();
 
                         if (!comment.EndsWith("{ }", StringComparison.Ordinal) && comment.EndsWith('{'))
                         {
@@ -968,7 +1040,44 @@ public sealed class InterpreterElement : WindowElement
                 }
             }
 
+            if (CurrentJump is BreakPointJump breakPointJump &&
+                breakPointJump.Instruction == i)
+            { b.BackgroundColor = CharColor.Red; }
+
+            if (sender.Rect.Contains(ConsoleMouse.RecordedConsolePosition) &&
+                ConsoleMouse.RecordedConsolePosition.Y - sender.Rect.Top - 1 == b.CurrentLine &&
+                ConsoleMouse.RecordedConsolePosition.X > sender.Rect.Left &&
+                ConsoleMouse.RecordedConsolePosition.X <= sender.Rect.Left + 5)
+            {
+                if (ConsoleMouse.IsPressed(MouseButton.Left) &&
+                    ConsoleMouse.LeftPressedAt.Y - sender.Rect.Top - 1 == b.CurrentLine)
+                {
+                    b.BackgroundColor = CharColor.BrightRed;
+                }
+                else
+                {
+                    b.BackgroundColor = CharColor.Red;
+                }
+
+                if (ConsoleMouse.IsUp(MouseButton.Left) &&
+                    ConsoleMouse.LeftPressedAt.Y - sender.Rect.Top - 1 == b.CurrentLine)
+                {
+                    if (CurrentJump is BreakPointJump breakPointJump2 &&
+                        breakPointJump2.Instruction == i)
+                    {
+                        CurrentJump = null;
+                    }
+                    else
+                    {
+                        CurrentJump = new BreakPointJump(i)
+                        { IsPaused = !ConsoleKeyboard.IsActive(Win32.VirtualKeyCode.Control) };
+                    }
+                }
+            }
+
             LinePrefix((i + 1).ToString(CultureInfo.InvariantCulture));
+            b.BackgroundColor = CharColor.Black;
+
             b.ForegroundColor = CharColor.BrightYellow;
             b.AddText(' ', Math.Max(0, indent * 2));
             b.AddText(' ');
@@ -1025,12 +1134,13 @@ public sealed class InterpreterElement : WindowElement
             }
             b.BackgroundColor = CharColor.Black;
 
-            b.FinishLine(sender.Rect.Width);
+            b.FinishLine();
             b.ForegroundColor = CharColor.Silver;
         }
 
+        if (CurrentJump is not null)
         {
-            string t = CurrentlyJumping == 0 ? $" Jump Count: {NextCodeJumpCount} " : $" Jumping: {CurrentlyJumping} ";
+            string t = CurrentJump.IsPaused ? $" Jump: {CurrentJump} " : $" Jumping: {CurrentJump} ";
             b.ForegroundColor = CharColor.Black;
             b.BackgroundColor = CharColor.White;
             b.SetText(t, sender.Rect.Right - (2 + t.Length));
@@ -1047,65 +1157,77 @@ public sealed class InterpreterElement : WindowElement
 
     public override void OnKeyEvent(KeyEvent e)
     {
-        System.Diagnostics.Debug.WriteLine(e.ToString());
+        Debug.WriteLine(e.ToString());
 
         base.OnKeyEvent(e);
         Elements.OnKeyEvent(e);
 
-        if (e.IsDown == 1 && (e.AsciiChar == 9 || e.AsciiChar == 32))
+        if (e.IsDown == 1 && (e.VirtualKeyCode == Win32.VirtualKeyCode.Tab || e.VirtualKeyCode == Win32.VirtualKeyCode.Space))
         {
-            if (this.CurrentlyJumping <= 0)
+            if (CurrentJump is null)
             {
-                this.CurrentlyJumping = this.NextCodeJumpCount;
-                this.NextCodeJumpCount = 1;
+                CurrentJump = new InstructionCountJump(1);
+                return;
             }
-            else
+
+            if (CurrentJump is InstructionCountJump instructionCountJump &&
+                instructionCountJump.Current == instructionCountJump.Count)
             {
-                this.NextCodeJumpCount = Math.Max(1, this.CurrentlyJumping);
-                this.CurrentlyJumping = 0;
+                instructionCountJump.Reset(1);
+                return;
             }
+
+            CurrentJump.IsPaused = !CurrentJump.IsPaused;
+
             return;
         }
 
-        if (e.IsDown != 0 && e.AsciiChar == 43)
+        if (e.IsDown != 0 && e.VirtualKeyCode == Win32.VirtualKeyCode.Add)
         {
-            if (this.CurrentlyJumping > 0)
-            { this.CurrentlyJumping++; }
-            else
-            { this.NextCodeJumpCount++; }
-            return;
-        }
-
-        if (e.IsDown != 0 && e.AsciiChar == 45)
-        {
-            if (this.CurrentlyJumping > 0)
+            if (CurrentJump is null)
             {
-                this.CurrentlyJumping--;
-                this.CurrentlyJumping = Math.Max(this.CurrentlyJumping, 0);
+                CurrentJump = new InstructionCountJump(1)
+                { IsPaused = true };
+                return;
             }
-            else
+
+            if (CurrentJump is InstructionCountJump instructionCountJump)
             {
-                this.NextCodeJumpCount--;
-                this.NextCodeJumpCount = Math.Max(this.NextCodeJumpCount, 1);
+                instructionCountJump.Reset(instructionCountJump.Count + 1);
             }
+
             return;
         }
 
-        if (e.IsDown != 0 && e.AsciiChar == 42)
+        if (e.IsDown != 0 && e.VirtualKeyCode == Win32.VirtualKeyCode.Subtract)
         {
-            if (this.CurrentlyJumping > 0)
-            { this.CurrentlyJumping = int.MaxValue; }
-            else
-            { this.NextCodeJumpCount = int.MaxValue; }
+            if (CurrentJump is InstructionCountJump instructionCountJump)
+            {
+                if (instructionCountJump.Count <= 1)
+                {
+                    CurrentJump = null;
+                }
+                else
+                {
+                    instructionCountJump.Reset(instructionCountJump.Count - 1);
+                }
+            }
+
             return;
         }
 
-        if (e.IsDown != 0 && e.AsciiChar == 47)
+        if (e.IsDown != 0 && e.VirtualKeyCode == Win32.VirtualKeyCode.Multiply)
         {
-            if (this.CurrentlyJumping > 0)
-            { this.CurrentlyJumping = 0; }
-            else
-            { this.NextCodeJumpCount = 1; }
+            CurrentJump = new InstructionCountJump(int.MaxValue)
+            { IsPaused = true };
+
+            return;
+        }
+
+        if (e.IsDown != 0 && e.VirtualKeyCode == Win32.VirtualKeyCode.Divide)
+        {
+            CurrentJump = null;
+
             return;
         }
     }

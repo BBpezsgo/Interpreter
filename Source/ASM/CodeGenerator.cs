@@ -1091,7 +1091,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             return;
         }
 
-        if (GetParameter(functionCall.Identifier.Content, out CompiledParameter? compiledParameter))
+        if (GetParameter(functionCall.Identifier.Content, out _))
         {
             throw new NotImplementedException();
         }
@@ -1578,7 +1578,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     void GenerateCodeForTopLevelStatements(Statement[] statements)
     {
-        CompileConstants(statements);
+        CompileLocalConstants(statements);
 
         Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.BP, Registers.SP);
 
@@ -1626,7 +1626,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Halt);
 
-        CleanupConstants();
+        CleanupLocalConstants();
     }
 
     void CompileParameters(ParameterDefinition[] parameters)
@@ -1721,7 +1721,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     AsmGeneratorResult GenerateCode(CompilerResult compilerResult)
     {
-        GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
+        GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements[^1].Statements);
 
         while (true)
         {

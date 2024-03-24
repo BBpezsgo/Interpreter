@@ -31,7 +31,7 @@ public class TokenizerTests
     {
         string text = "a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -49,7 +49,7 @@ public class TokenizerTests
     {
         string text = "ab";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -67,7 +67,7 @@ public class TokenizerTests
     {
         string text = "";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -77,9 +77,9 @@ public class TokenizerTests
     [TestMethod]
     public void Test4()
     {
-        string? text = null;
+        string text = string.Empty;
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -91,7 +91,7 @@ public class TokenizerTests
     {
         string text = " a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -109,7 +109,7 @@ public class TokenizerTests
     {
         string text = "a\r\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -127,7 +127,7 @@ public class TokenizerTests
     {
         string text = " \r\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -139,7 +139,7 @@ public class TokenizerTests
     {
         string text = " a\r\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -157,7 +157,7 @@ public class TokenizerTests
     {
         string text = "\r\na";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -175,7 +175,7 @@ public class TokenizerTests
     {
         string text = "\r\n a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -193,7 +193,7 @@ public class TokenizerTests
     {
         string text = "\r";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -205,7 +205,7 @@ public class TokenizerTests
     {
         string text = "\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -217,7 +217,7 @@ public class TokenizerTests
     {
         string text = " ";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -229,7 +229,7 @@ public class TokenizerTests
     {
         string text = "\ra";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -247,7 +247,7 @@ public class TokenizerTests
     {
         string text = "\r a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -265,7 +265,7 @@ public class TokenizerTests
     {
         string text = "\na";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -283,7 +283,7 @@ public class TokenizerTests
     {
         string text = "\n a";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -301,7 +301,7 @@ public class TokenizerTests
     {
         string text = @"""""";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -319,7 +319,7 @@ public class TokenizerTests
     {
         string text = @"""a""";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -337,7 +337,7 @@ public class TokenizerTests
     {
         string text = "'a'";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -355,7 +355,7 @@ public class TokenizerTests
     {
         string text = "563";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -373,7 +373,7 @@ public class TokenizerTests
     {
         string text = ".563";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -391,7 +391,7 @@ public class TokenizerTests
     {
         string text = ".563f";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -409,7 +409,7 @@ public class TokenizerTests
     {
         string text = @"""\n""";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -428,7 +428,7 @@ public class TokenizerTests
     {
         string text = @"""\u4685""";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -447,7 +447,7 @@ public class TokenizerTests
     {
         string text = @"'\n'";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -466,7 +466,7 @@ public class TokenizerTests
     {
         string text = @"'\u4685'";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -486,7 +486,7 @@ public class TokenizerTests
     {
         string text = @"'\7'";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -505,7 +505,7 @@ public class TokenizerTests
     {
         string text = "''";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -523,7 +523,7 @@ public class TokenizerTests
     {
         string text = "// hello";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -542,7 +542,7 @@ public class TokenizerTests
     {
         string text = "// hello\n";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -561,7 +561,7 @@ public class TokenizerTests
     {
         string text = "/* hello */";
 
-        Token[] tokens = StringTokenizer.Tokenize(text, null, Settings).Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
         Position[] positions = new Position[]
         {
             new(
@@ -578,7 +578,7 @@ public class TokenizerTests
     [TestMethod]
     public void Test33()
     {
-        Token[] tokens = StringTokenizer.Tokenize(";;").Tokens;
+        Token[] tokens = StringTokenizer.Tokenize(";;", Enumerable.Empty<string>(), settings: Settings).Tokens;
 
         Position[] positions = new Position[]
         {
@@ -604,7 +604,7 @@ public class TokenTests
     [TestMethod]
     public void Test1()
     {
-        Token token = StringTokenizer.Tokenize("ab").Tokens[0];
+        Token token = StringTokenizer.Tokenize("ab", Enumerable.Empty<string>()).Tokens[0];
 
         (Token? a, Token? b) = token.Slice(1);
 
@@ -624,7 +624,7 @@ public class TokenTests
     [TestMethod]
     public void Test2()
     {
-        Token token = StringTokenizer.Tokenize("a").Tokens[0];
+        Token token = StringTokenizer.Tokenize("a", Enumerable.Empty<string>()).Tokens[0];
 
         (Token? a, Token? b) = token.Slice(1);
 
@@ -652,7 +652,7 @@ public class TokenTests
     [TestMethod]
     public void Test4()
     {
-        Token token = StringTokenizer.Tokenize("abcd").Tokens[0];
+        Token token = StringTokenizer.Tokenize("abcd", Enumerable.Empty<string>()).Tokens[0];
 
         (Token? a, Token? b) = token.Slice(2);
 
@@ -672,7 +672,7 @@ public class TokenTests
     [TestMethod]
     public void Test5()
     {
-        Token token = StringTokenizer.Tokenize("abc").Tokens[0];
+        Token token = StringTokenizer.Tokenize("abc", Enumerable.Empty<string>()).Tokens[0];
 
         (Token? a, Token? b) = token.Slice(1);
 
@@ -692,13 +692,13 @@ public class TokenTests
     [TestMethod]
     public void Test6()
     {
-        Token token = StringTokenizer.Tokenize("0x545fadf3").Tokens[0];
+        Token token = StringTokenizer.Tokenize("0x545fadf3", Enumerable.Empty<string>()).Tokens[0];
     }
 
     [TestMethod]
     public void Test7()
     {
-        Token token = StringTokenizer.Tokenize("abc").Tokens[0];
+        Token token = StringTokenizer.Tokenize("abc", Enumerable.Empty<string>()).Tokens[0];
 
         (Token? a, Token? b) = token.Slice(3);
 

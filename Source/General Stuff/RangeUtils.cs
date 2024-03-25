@@ -104,4 +104,12 @@ public static class RangeExtensions
     public static T Middle<T>(this Range<T> a)
         where T : IEquatable<T>, IAdditionOperators<T, T, T>, IDivisionOperators<T, int, T>
         => (a.Start + a.End) / 2;
+
+    public static IEnumerable<int> ForEach(this Range<int> a)
+    {
+        if (a.End < a.Start) // Reversed
+        { return Enumerable.Range(a.End + 1, a.Start - a.End); }
+        else
+        { return Enumerable.Range(a.Start, a.End - a.Start); }
+    }
 }

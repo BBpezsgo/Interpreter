@@ -96,8 +96,7 @@ public class InterpreterDebuggabble : Interpreter
         {
             DoUpdate();
 
-            // TODO: Remove ! operator
-            if (BytecodeInterpreter!.Registers.CodePointer == AbsoluteBreakpoint) break;
+            if (BytecodeInterpreter.Registers.CodePointer == AbsoluteBreakpoint) break;
 
             if (endlessSafe-- < 0) throw new EndlessLoopException();
         }

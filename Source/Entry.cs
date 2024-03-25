@@ -122,15 +122,18 @@ public static class Entry
                     Console.WriteLine($" ===== HEAP ===== ");
                     Console.WriteLine();
 
-                    HeapUtils.DebugPrint(interpreter.BytecodeInterpreter.Memory);
+                    if (interpreter.BytecodeInterpreter.Memory[0] != 0)
+                    { HeapUtils.DebugPrint(interpreter.BytecodeInterpreter.Memory); }
+                    else
+                    { Console.WriteLine("Empty"); }
 
                     Console.WriteLine();
                     Console.WriteLine($" ===== STACK ===== ");
                     Console.WriteLine();
 
-                    for (int i = interpreter.BytecodeInterpreter.StackStart; i < interpreter.BytecodeInterpreter.Registers.StackPointer; i++)
+                    foreach (DataItem item in interpreter.BytecodeInterpreter.EnumerateStack())
                     {
-                        interpreter.BytecodeInterpreter.Memory[i].DebugPrint();
+                        item.DebugPrint();
                         Console.WriteLine();
                     }
 #endif
@@ -157,6 +160,8 @@ public static class Entry
                     { gui.Tick(); }
 
                     Console.Clear();
+                    Console.ResetColor();
+                    PrintStuff(interpreter);
                 }
                 else
                 {

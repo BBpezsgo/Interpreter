@@ -360,7 +360,7 @@ public sealed class Parser
 
         Token[] modifiers = ParseModifiers();
 
-        if (!ExpectType(AllowedType.None, out TypeInstance? possibleType))
+        if (!ExpectType(AllowedType.None, out TypeInstance? possibleType, out _))
         { CurrentTokenIndex = parseStart; return false; }
 
         if (!ExpectOperator(OverloadableOperators, out Token? possibleName))
@@ -521,7 +521,7 @@ public sealed class Parser
 
         Token[] modifiers = ParseModifiers();
 
-        if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? possibleType))
+        if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? possibleType, out _))
         { CurrentTokenIndex = parseStart; return false; }
 
         if (!ExpectIdentifier(out Token? possibleNameT))
@@ -1986,7 +1986,17 @@ public sealed class Parser
 
     bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type)
     {
+        if (ExpectType(flags, out type, out Error? error))
+        { return true; }
+        if (error is not null)
+        { Errors.Add(error.Break()); }
+        return false;
+    }
+
+    bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type, [MaybeNullWhen(true)] out Error? error)
+    {
         type = default;
+        error = null;
 
         if (!ExpectIdentifier(out Token? possibleType)) return false;
 
@@ -2004,7 +2014,7 @@ public sealed class Parser
 
             if ((flags & AllowedType.ExplicitAny) == 0)
             {
-                Errors.Add(new Error($"Type \"{possibleType.Content}\" is not valid in the current context", possibleType, File));
+                error = new Error($"Type \"{possibleType.Content}\" is not valid in the current context", possibleType, File, false);
                 return false;
             }
 
@@ -2023,7 +2033,7 @@ public sealed class Parser
 
             if ((flags & AllowedType.Implicit) == 0)
             {
-                Errors.Add(new Error($"implicit type not allowed in the current context", possibleType, File));
+                error = new Error($"Implicit type not allowed in the current context", possibleType, File, false);
                 return false;
             }
 

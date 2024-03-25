@@ -70,6 +70,8 @@ public readonly struct ValueAddress
         return result.ToString();
     }
     string GetDebuggerDisplay() => ToString();
+
+    public ValueAddress ToUnreferenced() => new(Address, AddressingMode, false, InHeap);
 }
 
 readonly struct UndefinedOffset<TFunction>
@@ -156,6 +158,7 @@ public interface ICompiledFunction
 
 public interface ITemplateable<TSelf> where TSelf : notnull
 {
+    public bool IsTemplate { get; }
     public TSelf InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters);
 }
 

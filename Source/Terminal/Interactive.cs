@@ -779,8 +779,7 @@ public class Interactive
             return;
         }
 
-        // TODO: Remove ! operator
-        if (interpreter.BytecodeInterpreter!.Memory.Length > 0)
+        if (interpreter.BytecodeInterpreter.Memory.Length > 0)
         {
             DataItem exitCode = interpreter.BytecodeInterpreter.Memory[interpreter.BytecodeInterpreter.Registers.StackPointer - 1];
 

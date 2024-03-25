@@ -678,7 +678,7 @@ public readonly struct MainResult : IResult
     {
         StdOutput = stdOut;
         StdError = stdErr;
-        ExitCode = (int)interpreter.Memory[interpreter.Registers.StackPointer - 1];
+        ExitCode = (int)interpreter.Memory[interpreter.Registers.StackPointer - BytecodeProcessor.StackDirection];
         Heap = interpreter.Memory;
     }
 }

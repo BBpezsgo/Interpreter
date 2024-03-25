@@ -57,16 +57,21 @@ public abstract class CodeGenerator
             OriginalFunction = function;
             TypeArguments = typeArguments;
 
-            foreach (KeyValuePair<string, GeneralType> pair in TypeArguments)
-            {
-                if (pair.Value is GenericType)
-                { throw new InternalException($"{pair.Value} is generic"); }
-            }
-
+            CodeGenerator.ValidateGenericArguments(TypeArguments);
             Function = OriginalFunction.InstantiateTemplate(typeArguments);
         }
 
         public override string ToString() => Function?.ToString() ?? "null";
+    }
+
+    /// <exception cref="InternalException"/>
+    public static void ValidateGenericArguments(IEnumerable<KeyValuePair<string, GeneralType>> typeArguments)
+    {
+        foreach (KeyValuePair<string, GeneralType> pair in typeArguments)
+        {
+            if (pair.Value is GenericType)
+            { throw new InternalException($"{pair.Value} is generic"); }
+        }
     }
 
     protected class ControlFlowBlock : IDuplicatable<ControlFlowBlock>
@@ -325,6 +330,21 @@ public abstract class CodeGenerator
 
     #region AddCompilable()
 
+    protected CompliableTemplate<TFunction> AddCompilable<TFunction>(CompliableTemplate<TFunction> compilable)
+        where TFunction : ITemplateable<TFunction>
+    {
+        switch (compilable)
+        {
+            case CompliableTemplate<CompiledFunction> template: AddCompilable(template); break;
+            case CompliableTemplate<CompiledOperator> template: AddCompilable(template); break;
+            case CompliableTemplate<CompiledGeneralFunction> template: AddCompilable(template); break;
+            case CompliableTemplate<CompiledConstructor> template: AddCompilable(template); break;
+            default:
+                throw new NotImplementedException();
+        }
+        return compilable;
+    }
+
     protected CompliableTemplate<CompiledFunction> AddCompilable(CompliableTemplate<CompiledFunction> compilable)
     {
         for (int i = 0; i < compilableFunctions.Count; i++)
@@ -443,10 +463,11 @@ public abstract class CodeGenerator
         return false;
     }
 
-    protected bool GetConstructor(GeneralType type, GeneralType[] parameters, [NotNullWhen(true)] out CompiledConstructor? compiledFunction, [NotNullWhen(false)] out WillBeCompilerException? error)
+    protected bool GetConstructor(GeneralType type, GeneralType[] parameters, [NotNullWhen(true)] out CompiledConstructor? result, [MaybeNullWhen(false)] out Dictionary<string, GeneralType>? typeArguments, bool addCompilable, [NotNullWhen(false)] out WillBeCompilerException? error)
     {
-        compiledFunction = null;
+        result = null;
         error = null;
+        typeArguments = null;
 
         {
             List<GeneralType> _parameters = new();
@@ -466,13 +487,13 @@ public abstract class CodeGenerator
                 continue;
             }
 
-            if (compiledFunction is not null)
+            if (result is not null)
             {
                 error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found: multiple constructors matched");
                 return false;
             }
 
-            compiledFunction = function;
+            result = function;
         }
 
         foreach (CompliableTemplate<CompiledConstructor> function in compilableConstructors)
@@ -485,33 +506,13 @@ public abstract class CodeGenerator
                 continue;
             }
 
-            if (compiledFunction is not null)
+            if (result is not null)
             {
                 error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found: multiple constructors matched");
                 return false;
             }
 
-            compiledFunction = function.Function;
-        }
-
-        if (compiledFunction is not null)
-        { return true; }
-
-        error ??= new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found");
-        return false;
-    }
-
-    protected bool GetConstructorTemplate(GeneralType type, GeneralType[] parameters, out CompliableTemplate<CompiledConstructor> compiledConstructor, [NotNullWhen(false)] out WillBeCompilerException? error)
-    {
-        bool found = false;
-        compiledConstructor = default;
-        error = null;
-
-        {
-            List<GeneralType> _parameters = new();
-            _parameters.Add(type);
-            _parameters.AddRange(parameters);
-            parameters = _parameters.ToArray();
+            result = function.Function;
         }
 
         foreach (CompiledConstructor constructor in CompiledConstructors)
@@ -524,25 +525,34 @@ public abstract class CodeGenerator
                 continue;
             }
 
-            Dictionary<string, GeneralType> typeArguments = new(TypeArguments);
+            Dictionary<string, GeneralType> _typeArguments = new(TypeArguments);
 
-            if (!GeneralType.TryGetTypeParameters(constructor.ParameterTypes, parameters, typeArguments)) continue;
+            if (!GeneralType.TryGetTypeParameters(constructor.ParameterTypes, parameters, _typeArguments)) continue;
 
-            compiledConstructor = new CompliableTemplate<CompiledConstructor>(constructor, typeArguments);
-
-            if (found)
+            if (result is not null)
             {
                 error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found: multiple constructors matched");
                 return false;
             }
 
-            found = true;
+            result = constructor;
+            typeArguments = _typeArguments;
         }
 
-        if (found)
-        { return true; }
+        if (result is not null)
+        {
+            if (typeArguments is not null)
+            {
+                CompliableTemplate<CompiledConstructor> template = new(result, typeArguments);
+                if (addCompilable)
+                { AddCompilable(template); }
+                result = template.Function;
+            }
 
-        error = new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found");
+            return true;
+        }
+
+        error ??= new WillBeCompilerException($"Constructor {CompiledConstructor.ToReadable(type, parameters)} not found");
         return false;
     }
 
@@ -614,9 +624,10 @@ public abstract class CodeGenerator
         return false;
     }
 
-    protected bool TryGetBuiltinFunction(string builtinName, GeneralType[] parameters, [NotNullWhen(true)] out CompiledFunction? compiledFunction, bool addCompilable)
+    protected bool TryGetBuiltinFunction(string builtinName, GeneralType[] parameters, [NotNullWhen(true)] out CompiledFunction? compiledFunction, [MaybeNullWhen(false)] out Dictionary<string, GeneralType>? typeArguments, bool addCompilable)
     {
         compiledFunction = null;
+        typeArguments = null;
 
         foreach (CompiledFunction function in this.CompiledFunctions)
         {
@@ -651,18 +662,28 @@ public abstract class CodeGenerator
             if (compiledFunction is not null)
             { return false; }
 
-            Dictionary<string, GeneralType> typeArguments = new();
+            Dictionary<string, GeneralType> _typeArguments = new();
 
-            if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, parameters, typeArguments))
+            if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, parameters, _typeArguments))
             { continue; }
 
-            CompliableTemplate<CompiledFunction> template = new(function, typeArguments);
-            if (addCompilable)
-            { AddCompilable(template); }
-            compiledFunction = template.Function;
+            compiledFunction = function;
+            typeArguments = _typeArguments;
         }
 
-        return compiledFunction is not null;
+        if (compiledFunction is not null)
+        {
+            if (typeArguments is not null)
+            {
+                CompliableTemplate<CompiledFunction> template = new(compiledFunction, typeArguments);
+                if (addCompilable)
+                { AddCompilable(template); }
+                compiledFunction = template.Function;
+            }
+            return true;
+        }
+
+        return false;
     }
 
     #region TryGetMacro()
@@ -1730,7 +1751,6 @@ public abstract class CodeGenerator
             StatementKeywords.Return => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
             StatementKeywords.Throw => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
             StatementKeywords.Break => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-            "sizeof" => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Integer)),
             StatementKeywords.Delete => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
             _ => throw new CompilerException($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile)
         };
@@ -2004,16 +2024,10 @@ public abstract class CodeGenerator
         GeneralType type = GeneralType.From(constructorCall.Type, FindType);
         GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
 
-        if (GetConstructor(type, parameters, out CompiledConstructor? constructor, out WillBeCompilerException? notFound))
+        if (GetConstructor(type, parameters, out CompiledConstructor? constructor, out _, false, out WillBeCompilerException? notFound))
         {
             constructorCall.Type.SetAnalyzedType(constructor.Type);
             return OnGotStatementType(constructorCall, constructor.Type);
-        }
-
-        if (GetConstructorTemplate(type, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction, out notFound))
-        {
-            constructorCall.Type.SetAnalyzedType(compilableGeneralFunction.Function.Type);
-            return OnGotStatementType(constructorCall, compilableGeneralFunction.Function.Type);
         }
 
         throw notFound.Instantiate(constructorCall.Keyword, CurrentFile);

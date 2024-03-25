@@ -1,0 +1,9 @@
+using System;
+
+void Callback(int item)
+{
+	PrintLine(item);
+}
+
+var callback = Callback;
+callback(5);

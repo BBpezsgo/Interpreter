@@ -39,12 +39,12 @@ public struct StackElementInformations
     public bool BasepointerRelative;
     public int Size;
 
-    public readonly MutableRange<int> GetRange(int basePointer, int stackStart)
+    public readonly MutableRange<int> GetRange(int basePointer, int absoluteOffset)
     {
         int itemStart = Address;
 
         if (BasepointerRelative) itemStart += basePointer;
-        else itemStart += stackStart;
+        else itemStart += absoluteOffset;
 
         int itemEnd = itemStart + Size - 1;
 
@@ -69,14 +69,14 @@ public readonly struct CollectedScopeInfo
         Stack = stack.ToImmutableArray();
     }
 
-    public bool TryGet(int basePointer, int stackStart, int stackAddress, out StackElementInformations result)
+    public bool TryGet(int basePointer, int absoluteOffset, int address, out StackElementInformations result)
     {
         for (int i = 0; i < Stack.Length; i++)
         {
             StackElementInformations item = Stack[i];
-            MutableRange<int> range = item.GetRange(basePointer, stackStart);
+            MutableRange<int> range = item.GetRange(basePointer, absoluteOffset);
 
-            if (range.Contains(stackAddress))
+            if (range.Contains(address))
             {
                 result = item;
                 return true;

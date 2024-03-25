@@ -14,7 +14,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         StatementWithValue[] parameters = new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) };
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator, true))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator, out _, true))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, CurrentFile); }
         if (!allocator.ReturnSomething)
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", position, CurrentFile); }
@@ -84,7 +84,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         StatementWithValue[] parameters = new StatementWithValue[] { value };
         GeneralType[] parameterTypes = FindStatementTypes(parameters);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, false))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, false))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
 
         GenerateCodeForFunction(deallocator, parameters, null, value);
@@ -1459,16 +1459,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (instanceType is StructType structType)
         { structType.Struct?.References.Add((constructorCall.Type, CurrentFile, CurrentMacro.Last)); }
 
-        Dictionary<string, GeneralType> typeArguments = new();
+        if (!GetConstructor(instanceType, parameters, out CompiledConstructor? constructor, out Dictionary<string, GeneralType>? typeArguments, false, out WillBeCompilerException? notFound))
+        { throw notFound.Instantiate(constructorCall.Keyword, CurrentFile); }
 
-        if (!GetConstructor(instanceType, parameters, out CompiledConstructor? constructor, out WillBeCompilerException? notFound))
-        {
-            if (!GetConstructorTemplate(instanceType, parameters, out CompliableTemplate<CompiledConstructor> compilableGeneralFunction, out notFound))
-            { throw notFound.Instantiate(constructorCall.Keyword, CurrentFile); }
-
-            constructor = compilableGeneralFunction.Function;
-            typeArguments = compilableGeneralFunction.TypeArguments;
-        }
+        typeArguments ??= new Dictionary<string, GeneralType>();
 
         constructor.References.Add((constructorCall, CurrentFile, CurrentMacro.Last));
         OnGotStatementType(constructorCall, constructor.Type);

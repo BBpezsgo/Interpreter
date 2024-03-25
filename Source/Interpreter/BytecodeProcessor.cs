@@ -7,7 +7,7 @@ public readonly struct RuntimeContext
     public ImmutableArray<int> CallTrace { get; init; }
     public int CodePointer { get; init; }
     public ImmutableArray<Instruction> Code { get; init; }
-    public IReadOnlyList<DataItem> Stack { get; init; }
+    public IReadOnlyList<DataItem> Memory { get; init; }
     public int CodeSampleStart { get; init; }
 }
 
@@ -103,6 +103,8 @@ public class TimeSleep : ISleep
 public class BytecodeProcessor
 {
     const int CodeSampleRange = 20;
+    public static readonly int StackDirection = -1;
+    public const int StackSize = 256;
 
     Instruction CurrentInstruction => Code[Registers.CodePointer];
     public bool IsDone => Registers.CodePointer >= Code.Length;
@@ -119,10 +121,44 @@ public class BytecodeProcessor
 
     public ImmutableArray<Instruction> Code;
 
-    public const int StackSize = 256;
-    public int HeapSize => Settings.HeapSize;
-
     public int StackStart => Settings.HeapSize;
+
+    public IEnumerable<DataItem> EnumerateStack()
+    {
+        ArraySegment<DataItem> stack = GetStack(out bool shouldReverse);
+        if (shouldReverse)
+        { return stack.Reverse(); }
+        else
+        { return stack; }
+    }
+
+    public ArraySegment<DataItem> GetStack(out bool shouldReverse)
+    {
+        if (StackDirection > 0)
+        {
+            shouldReverse = false;
+            return new ArraySegment<DataItem>(Memory)[StackStart..Registers.StackPointer];
+        }
+        else
+        {
+            shouldReverse = true;
+            return new ArraySegment<DataItem>(Memory)[(Registers.StackPointer + 1)..];
+        }
+    }
+
+    public Range<int> GetStackInterval(out bool isReversed)
+    {
+        if (StackDirection > 0)
+        {
+            isReversed = false;
+            return new Range<int>(StackStart, Registers.StackPointer);
+        }
+        else
+        {
+            isReversed = true;
+            return new Range<int>(Memory.Length - 1, Registers.StackPointer);
+        }
+    }
 
     readonly FrozenDictionary<int, ExternalFunctionBase> ExternalFunctions;
 
@@ -137,7 +173,10 @@ public class BytecodeProcessor
         Memory = new DataItem[settings.HeapSize + StackSize];
         // HeapUtils.Init(Memory);
 
-        Registers.StackPointer = Settings.HeapSize;
+        if (StackDirection > 0)
+        { Registers.StackPointer = Settings.HeapSize; }
+        else
+        { Registers.StackPointer = Memory.Length - 1; }
 
         externalFunctions.SetInterpreter(this);
     }
@@ -154,23 +193,29 @@ public class BytecodeProcessor
         CallTrace = TraceCalls(Memory, Registers.BasePointer),
         CodePointer = Registers.CodePointer,
         Code = Code[Math.Max(Registers.CodePointer - CodeSampleRange, 0)..Math.Clamp(Registers.CodePointer + CodeSampleRange, 0, Code.Length - 1)],
-        Stack = Memory,
+        Memory = Memory,
         CodeSampleStart = Math.Max(Registers.CodePointer - CodeSampleRange, 0),
     };
 
     public static ImmutableArray<int> TraceCalls(IReadOnlyList<DataItem> stack, int basePointer)
     {
-        static bool CanTraceCallsWith(IReadOnlyList<DataItem> stack, int basePointer) =>
-            basePointer >= 2 &&
-            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset < stack.Count &&
-            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset < stack.Count;
+        static bool CanTraceCallsWith(IReadOnlyList<DataItem> stack, int basePointer)
+        {
+            int savedCodePointerAddress = basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection);
+            int savedBasePointerAddress = basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
+
+            if (savedCodePointerAddress < 0 || savedCodePointerAddress >= stack.Count) return false;
+            if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Count) return false;
+
+            return true;
+        }
 
         static void TraceCalls(IReadOnlyList<DataItem> stack, List<int> callTrace, int basePointer)
         {
             if (!CanTraceCallsWith(stack, basePointer)) return;
 
-            DataItem savedCodePointerD = stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset];
-            DataItem savedBasePointerD = stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset];
+            DataItem savedCodePointerD = stack[basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection)];
+            DataItem savedBasePointerD = stack[basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
 
             if (!savedCodePointerD.Integer.HasValue) return;
             if (!savedBasePointerD.Integer.HasValue) return;
@@ -198,15 +243,20 @@ public class BytecodeProcessor
 
     public static ImmutableArray<int> TraceBasePointers(IReadOnlyList<DataItem> stack, int basePointer)
     {
-        static bool CanTraceBPsWith(IReadOnlyList<DataItem> stack, int basePointer) =>
-            basePointer >= 1 &&
-            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset < stack.Count;
+        static bool CanTraceBPsWith(IReadOnlyList<DataItem> stack, int basePointer)
+        {
+            int savedBasePointerAddress = basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
+
+            if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Count) return false;
+
+            return true;
+        }
 
         static void TraceBasePointers(List<int> result, IReadOnlyList<DataItem> stack, int basePointer)
         {
             if (!CanTraceBPsWith(stack, basePointer)) return;
 
-            DataItem savedBasePointerD = stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset];
+            DataItem savedBasePointerD = stack[basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
             if (savedBasePointerD.Type != RuntimeType.Integer) return;
             int newBasePointer = savedBasePointerD.VInt;
             result.Add(newBasePointer);
@@ -221,15 +271,6 @@ public class BytecodeProcessor
         TraceBasePointers(result, stack, basePointer);
         return result.ToImmutableArray();
     }
-
-    public int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
-    {
-        AddressingMode.Absolute => offset,
-        AddressingMode.BasePointerRelative => Registers.BasePointer + offset,
-        AddressingMode.StackPointerRelative => Registers.StackPointer + offset,
-        AddressingMode.Runtime => Memory[Registers.StackPointer - 1].VInt,
-        _ => offset,
-    };
 
     void Step() => Registers.CodePointer++;
     void Step(int num) => Registers.CodePointer += num;
@@ -385,6 +426,19 @@ public class BytecodeProcessor
 
     #region Memory Manipulation
 
+    public int GetAddress(Instruction instruction)
+        => GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode);
+
+    public int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
+    {
+        AddressingMode.Absolute => offset,
+        AddressingMode.Runtime => Memory[Registers.StackPointer - StackDirection].VInt,
+        AddressingMode.BasePointerRelative => Registers.BasePointer + offset,
+        AddressingMode.StackPointerRelative => Registers.StackPointer + offset,
+
+        _ => throw new UnreachableException(),
+    };
+
     /// <exception cref="InternalException"/>
     int FetchAddress() => CurrentInstruction.AddressingMode switch
     {
@@ -407,19 +461,19 @@ public class BytecodeProcessor
 
     void Push(DataItem data)
     {
-        if (Registers.StackPointer >= Memory.Length)
-        { throw new RuntimeException("Stack overflow", GetContext()); }
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
+        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
 
         Memory[Registers.StackPointer] = data;
-        Registers.StackPointer++;
+        Registers.StackPointer += StackDirection;
     }
 
     DataItem Pop()
     {
-        if (Registers.StackPointer < 0)
-        { throw new RuntimeException("Stack underflow", GetContext()); }
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
+        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
 
-        Registers.StackPointer--;
+        Registers.StackPointer -= StackDirection;
         return Memory[Registers.StackPointer];
     }
 
@@ -842,7 +896,7 @@ public class BytecodeProcessor
 
         List<DataItem> parameters = new();
         for (int i = 0; i < (int)CurrentInstruction.Parameter; i++)
-        { parameters.Add(Memory[Registers.StackPointer - 1 - i]); }
+        { parameters.Add(Memory[Registers.StackPointer - ((1 + i) * StackDirection)]); }
         parameters.Reverse();
 
         if (function is ExternalFunctionManaged managedFunction)

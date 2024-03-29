@@ -133,7 +133,7 @@ public static class Minifier
                 int redundantModification = BrainfuckCode.Modifications(slice, '+', '-', out int redundantModificationLength);
 
                 if (redundantModification != 0 &&
-                    slice.Length - redundantModificationLength > 0)
+                    slice.Length > redundantModificationLength)
                 {
                     slice = slice[redundantModificationLength..];
 

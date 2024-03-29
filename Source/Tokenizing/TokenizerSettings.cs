@@ -24,6 +24,5 @@ public struct TokenizerSettings
         DistinguishBetweenSpacesAndNewlines = other.DistinguishBetweenSpacesAndNewlines;
         JoinLinebreaks = other.JoinLinebreaks;
         TokenizeComments = other.TokenizeComments;
-
     }
 }

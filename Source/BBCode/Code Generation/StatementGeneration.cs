@@ -1873,25 +1873,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         });
     }
 
-    CleanupItem[] CompileVariables(IEnumerable<Statement> statements, bool addComments = true)
-    {
-        if (addComments) AddComment("Variables {");
-
-        List<CleanupItem> result = new();
-
-        foreach (Statement statement in statements)
-        {
-            CleanupItem item = GenerateCodeForVariable(statement);
-            if (item.SizeOnStack == 0) continue;
-
-            result.Add(item);
-        }
-
-        if (addComments) AddComment("}");
-
-        return result.ToArray();
-    }
-
     CleanupItem[] CompileVariables(IEnumerable<VariableDeclaration> statements, bool addComments = true)
     {
         if (addComments) AddComment("Variables {");
@@ -2033,7 +2014,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (prevType is not StructType structType1)
+        if (prevType is not StructType)
         { throw new NotImplementedException(); }
 
         GeneralType type = FindStatementType(statementToSet);
@@ -2146,8 +2127,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
     }
-    void GenerateCodeForValueSetter(VariableDeclaration statementToSet, StatementWithValue value)
-    { }
 
     void GenerateCodeForInlinedMacro(Statement inlinedMacro)
     {

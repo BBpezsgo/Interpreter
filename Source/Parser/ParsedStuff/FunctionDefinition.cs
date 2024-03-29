@@ -9,8 +9,9 @@ public class FunctionDefinition : FunctionThingDefinition,
 {
     public ImmutableArray<AttributeUsage> Attributes { get; }
     public TypeInstance Type { get; }
-    public override Position Position => base.Position.Union(Type);
     public StructDefinition? Context { get; set; }
+
+    public override Position Position => base.Position.Union(Type);
 
     [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
     public bool IsExternal => Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out _);
@@ -24,8 +25,8 @@ public class FunctionDefinition : FunctionThingDefinition,
     {
         get
         {
-            if (TemplateInfo != null) return true;
-            if (Context != null && Context.TemplateInfo != null) return true;
+            if (Template is not null) return true;
+            if (Context?.Template is not null) return true;
             return false;
         }
     }
@@ -84,7 +85,7 @@ public class FunctionDefinition : FunctionThingDefinition,
         return true;
     }
 
-    public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), TemplateInfo)
+    public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), Template)
     {
         Block = Block,
         FilePath = FilePath,

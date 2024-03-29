@@ -7,6 +7,32 @@ using Tokenizing;
 
 public static class Extensions
 {
+    public static bool ContainsNull<T>([NotNullWhen(false)] this T?[] values, [NotNullWhen(false)] out T[]? nonnullValues) where T : class
+    {
+        nonnullValues = null;
+        for (int i = 0; i < values.Length; i++)
+        {
+            if (values[i] is null) return true;
+        }
+#pragma warning disable CS8619
+        nonnullValues = values;
+#pragma warning restore CS8619
+        return false;
+    }
+
+    public static bool ContainsNull<T>([NotNullWhen(false)] this IEnumerable<T?> values, [NotNullWhen(false)] out IEnumerable<T>? nonnullValues) where T : class
+    {
+        nonnullValues = null;
+        foreach (T? item in values)
+        {
+            if (item is null) return true;
+        }
+#pragma warning disable CS8619
+        nonnullValues = values;
+#pragma warning restore CS8619
+        return false;
+    }
+
     public static IEnumerable<T> Duplicate<T>(this IEnumerable<T> values)
         where T : IDuplicatable<T>
         => values.Select(item => item.Duplicate());

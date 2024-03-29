@@ -421,14 +421,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         function.ToReadable(typeArguments),
         function.Position);
 
-    DebugFunctionBlock<CompiledOperator> FunctionBlock(MacroDefinition function) => new(
-        Code,
-        DebugInfo,
-        function.FilePath,
-        function.Identifier.ToString(),
-        function.ToReadable(),
-        function.Position);
-
     protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
         if (CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, symbolName, out Variable variable))
@@ -627,9 +619,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
                 return false;
             }
 
+            if (!structType.GetField(field.Identifier.Content, out _, out int fieldOffset))
+            { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
+
             GeneralType fieldType = FindStatementType(field);
 
-            address = structType.Struct.FieldOffsets[field.Identifier.Content] + prevAddress;
+            address = fieldOffset + prevAddress;
             size = fieldType.Size;
             return true;
         }
@@ -665,7 +660,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     #endregion
 
-    void GenerateTopLevelStatements(Statement[] statements, Uri? file, bool isImported)
+    void GenerateTopLevelStatements(ImmutableArray<Statement> statements, Uri? file, bool isImported)
     {
         Print?.Invoke($"  Generating top level statements for file {file?.ToString() ?? "null"} ...", LogType.Debug);
 
@@ -715,14 +710,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         Print?.Invoke("Generating code ...", LogType.Debug);
         Print?.Invoke("  Precompiling ...", LogType.Debug);
 
-        foreach ((Statement[] statements, _) in compilerResult.TopLevelStatements)
+        foreach ((ImmutableArray<Statement> statements, _) in compilerResult.TopLevelStatements)
         {
             CompileGlobalConstants(statements);
         }
 
         for (int i = 0; i < compilerResult.TopLevelStatements.Length; i++)
         {
-            (Statement[] statements, Uri? file) = compilerResult.TopLevelStatements[i];
+            (ImmutableArray<Statement> statements, Uri? file) = compilerResult.TopLevelStatements[i];
             GenerateTopLevelStatements(statements, file, i < compilerResult.TopLevelStatements.Length - 1);
         }
 

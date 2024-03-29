@@ -6,13 +6,14 @@ using Tokenizing;
 public abstract class FunctionThingDefinition :
     IExportable,
     IPositioned,
-    ISimpleReadable
+    ISimpleReadable,
+    IIdentifiable<Token>
 {
     public ImmutableArray<Token> Modifiers { get; }
     public Token Identifier { get; }
     public ParameterDefinitionCollection Parameters { get; }
     public Statement.Block? Block { get; init; }
-    public TemplateInfo? TemplateInfo { get; }
+    public TemplateInfo? Template { get; }
     public Uri? FilePath { get; set; }
 
     /// <summary>
@@ -23,7 +24,7 @@ public abstract class FunctionThingDefinition :
     public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
     public bool IsMacro => Modifiers.Contains("macro");
     public bool IsInlineable => Modifiers.Contains(ModifierKeywords.Inline);
-    public virtual bool IsTemplate => TemplateInfo is not null;
+    public virtual bool IsTemplate => Template is not null;
 
     public virtual Position Position =>
         new Position(Identifier)
@@ -37,7 +38,7 @@ public abstract class FunctionThingDefinition :
         Identifier = other.Identifier;
         Parameters = other.Parameters;
         Block = other.Block;
-        TemplateInfo = other.TemplateInfo;
+        Template = other.Template;
         FilePath = other.FilePath;
     }
 
@@ -45,7 +46,7 @@ public abstract class FunctionThingDefinition :
         IEnumerable<Token> modifiers,
         Token identifier,
         ParameterDefinitionCollection parameters,
-        TemplateInfo? templateInfo)
+        TemplateInfo? template)
     {
         parameters.Context = this;
         foreach (ParameterDefinition parameter in parameters) parameter.Context = this;
@@ -53,7 +54,7 @@ public abstract class FunctionThingDefinition :
         Modifiers = modifiers.ToImmutableArray();
         Identifier = identifier;
         Parameters = parameters;
-        TemplateInfo = templateInfo;
+        Template = template;
     }
 
     string ISimpleReadable.ToReadable() => ToReadable();

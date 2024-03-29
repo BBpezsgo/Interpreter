@@ -12,8 +12,8 @@ public class GeneralFunctionDefinition : FunctionThingDefinition,
     {
         get
         {
-            if (TemplateInfo is not null) return true;
-            if (Context != null && Context.TemplateInfo != null) return true;
+            if (Template is not null) return true;
+            if (Context.Template is not null) return true;
             return false;
         }
     }

@@ -1,20 +1,23 @@
 ﻿namespace LanguageCore.Parser;
 
+using Compiler;
 using Tokenizing;
 
 public class ParameterDefinition :
     IPositioned,
     IHaveType,
-    Compiler.IInContext<FunctionThingDefinition>
+    IInContext<FunctionThingDefinition>,
+    IIdentifiable<Token>
 {
     public Token Identifier { get; }
     public TypeInstance Type { get; }
     public ImmutableArray<Token> Modifiers { get; }
+    [NotNull] public FunctionThingDefinition? Context { get; set; }
+
     public bool IsRef => Modifiers.Contains(ModifierKeywords.Ref);
     public Position Position =>
         new Position(Identifier, Type)
         .Union(Modifiers);
-    [NotNull] public FunctionThingDefinition? Context { get; set; }
 
     public ParameterDefinition(ParameterDefinition other)
     {

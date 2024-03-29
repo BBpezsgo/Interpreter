@@ -1,15 +1,18 @@
 ﻿namespace LanguageCore.Parser;
 
+using Compiler;
 using Statement;
 using Tokenizing;
 
 public class EnumMemberDefinition :
     IPositioned,
-    Compiler.IInContext<EnumDefinition>
+    IInContext<EnumDefinition>,
+    IIdentifiable<Token>
 {
     public Token Identifier { get; }
     public StatementWithValue? Value { get; }
     [NotNull] public EnumDefinition? Context { get; set; }
+
     public Position Position => new(Identifier, Value);
 
     public EnumMemberDefinition(EnumMemberDefinition other)

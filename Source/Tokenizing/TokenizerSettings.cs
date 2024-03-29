@@ -17,4 +17,13 @@ public struct TokenizerSettings
         JoinLinebreaks = true,
         TokenizeComments = false,
     };
+
+    public TokenizerSettings(TokenizerSettings other)
+    {
+        TokenizeWhitespaces = other.TokenizeWhitespaces;
+        DistinguishBetweenSpacesAndNewlines = other.DistinguishBetweenSpacesAndNewlines;
+        JoinLinebreaks = other.JoinLinebreaks;
+        TokenizeComments = other.TokenizeComments;
+
+    }
 }

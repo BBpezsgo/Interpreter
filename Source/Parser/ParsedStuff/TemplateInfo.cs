@@ -7,18 +7,18 @@ public class TemplateInfo : IPositioned
 {
     public Token Keyword { get; }
     public TokenPair Brackets { get; }
-    public ImmutableArray<Token> TypeParameters { get; }
+    public ImmutableArray<Token> Parameters { get; }
 
     public Position Position =>
-        new Position(TypeParameters)
+        new Position(Parameters)
         .Union(Keyword, Brackets);
 
     public TemplateInfo(Token keyword, TokenPair brackets, IEnumerable<Token> typeParameters)
     {
         Keyword = keyword;
         Brackets = brackets;
-        TypeParameters = typeParameters.ToImmutableArray();
+        Parameters = typeParameters.ToImmutableArray();
     }
 
-    public override string ToString() => $"{Keyword} {Brackets.Start}{string.Join(", ", TypeParameters)}{Brackets.End}";
+    public override string ToString() => $"{Keyword} {Brackets.Start}{string.Join(", ", Parameters)}{Brackets.End}";
 }

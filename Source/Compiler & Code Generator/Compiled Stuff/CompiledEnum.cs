@@ -58,5 +58,23 @@ public class CompiledEnum : EnumDefinition, IProbablyHaveCompiledType
         return false;
     }
 
+    public bool IsSameType(GeneralType type)
+    {
+        if (type is not BuiltinType builtinType) return false;
+        RuntimeType runtimeType;
+        try
+        { runtimeType = builtinType.RuntimeType; }
+        catch (NotImplementedException)
+        { return false; }
+
+        for (int i = 0; i < Members.Length; i++)
+        {
+            if (Members[i].ComputedValue.Type != runtimeType)
+            { return false; }
+        }
+
+        return true;
+    }
+
     public override string ToString() => $"enum {Identifier} : {Type}";
 }

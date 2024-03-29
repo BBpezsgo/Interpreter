@@ -87,13 +87,13 @@ class InteractiveCompiler
         Enumerable.Empty<Error>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<FunctionDefinition>(),
-        Enumerable.Empty<MacroDefinition>(),
         Enumerable.Empty<StructDefinition>(),
         Enumerable.Empty<UsingDefinition>(),
         Enumerable.Empty<CompileTag>(),
         _parsed != null ? [_parsed] :
         Enumerable.Empty<Statement>(),
         Enumerable.Empty<EnumDefinition>(),
+        Enumerable.Empty<Token>(),
         Enumerable.Empty<Token>());
 
     public InteractiveCompiler(Action<Task> onCompiledAsync)
@@ -134,7 +134,10 @@ class InteractiveCompiler
                 externalFunctions,
                 new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
                 [UsingDefinition.CreateAnonymous("System")],
-                PreprocessorVariables.Interactive);
+                PreprocessorVariables.Interactive,
+                null,
+                null,
+                null);
 
             _generated = CodeGeneratorForMain.Generate(_compiled, GeneratorSettings.Default);
         }
@@ -180,7 +183,10 @@ class InteractiveCompiler
                 externalFunctions,
                 new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
                 [UsingDefinition.CreateAnonymous("System")],
-                PreprocessorVariables.Interactive);
+                PreprocessorVariables.Interactive,
+                null,
+                null,
+                null);
 
             _generated = CodeGeneratorForMain.Generate(_compiled, GeneratorSettings.Default);
         }
@@ -668,7 +674,6 @@ public class Interactive
                         },
                         TokenAnalyzedType.Attribute or
                         TokenAnalyzedType.Type or
-                        TokenAnalyzedType.Class => InteractiveColors.Type,
                         TokenAnalyzedType.Struct => InteractiveColors.Struct,
                         TokenAnalyzedType.Keyword or
                         TokenAnalyzedType.BuiltinType => InteractiveColors.Keyword,
@@ -676,10 +681,8 @@ public class Interactive
                         TokenAnalyzedType.FieldName => InteractiveColors.FieldName,
                         TokenAnalyzedType.VariableName or
                         TokenAnalyzedType.ParameterName => InteractiveColors.LocalSymbol,
-                        TokenAnalyzedType.Namespace => Color.White,
                         TokenAnalyzedType.CompileTag => Color.White,
                         TokenAnalyzedType.CompileTagParameter => Color.White,
-                        TokenAnalyzedType.Library => Color.White,
                         TokenAnalyzedType.Statement => InteractiveColors.Statement,
                         TokenAnalyzedType.Enum => InteractiveColors.Enum,
                         TokenAnalyzedType.EnumMember => InteractiveColors.EnumMember,

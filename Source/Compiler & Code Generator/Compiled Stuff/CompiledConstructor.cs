@@ -11,7 +11,8 @@ public class CompiledConstructor : ConstructorDefinition,
     IInContext<CompiledStruct>,
     ITemplateable<CompiledConstructor>,
     IHaveInstructionOffset,
-    ICompiledFunction
+    ICompiledFunction,
+    IIdentifiable<GeneralType>
 {
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
@@ -21,6 +22,7 @@ public class CompiledConstructor : ConstructorDefinition,
 
     IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
     IReadOnlyList<GeneralType> ICompiledFunction.ParameterTypes => ParameterTypes;
+    GeneralType IIdentifiable<GeneralType>.Identifier => Type;
 
     public CompiledConstructor(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
     {

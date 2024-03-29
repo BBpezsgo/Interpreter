@@ -9,10 +9,9 @@ struct Stringify
     public const int CozyLength = 30;
 }
 
-public interface IReferenceableTo : IReferenceableTo<object>;
-public interface IReferenceableTo<T> where T : notnull
+public interface IReferenceableTo
 {
-    public T? Reference { get; set; }
+    public object? Reference { get; set; }
     public Uri? OriginalFile { get; set; }
 }
 
@@ -38,16 +37,22 @@ public readonly struct TokenPair :
 
 public static class StatementExtensions
 {
-    public static T? GetStatementAt<T>(this ParserResult parserResult, int absolutePosition)
+    public static bool GetStatementAt<T>(this ParserResult parserResult, SinglePosition position, [NotNullWhen(true)] out T? statement)
         where T : IPositioned
-        => StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.AbsoluteRange.Contains(absolutePosition));
+    {
+        statement = StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.Range.Contains(position));
+        return statement is not null;
+    }
+
+    public static bool GetStatementAt(this ParserResult parserResult, SinglePosition position, [NotNullWhen(true)] out Statement? statement)
+    {
+        statement = StatementExtensions.GetStatement(parserResult, statement => statement.Position.Range.Contains(position));
+        return statement is not null;
+    }
 
     public static T? GetStatementAt<T>(this ParserResult parserResult, SinglePosition position)
         where T : IPositioned
         => StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.Range.Contains(position));
-
-    public static Statement? GetStatementAt(this ParserResult parserResult, int absolutePosition)
-        => StatementExtensions.GetStatement(parserResult, statement => statement.Position.AbsoluteRange.Contains(absolutePosition));
 
     public static Statement? GetStatementAt(this ParserResult parserResult, SinglePosition position)
         => StatementExtensions.GetStatement(parserResult, statement => statement.Position.Range.Contains(position));
@@ -125,13 +130,13 @@ public static class StatementExtensions
         return default;
     }
 
-    public static bool TryGetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result)
+    public static bool GetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result)
         => (result = GetStatement<T>(parserResult)) != null;
 
-    public static bool TryGetStatement(this ParserResult parserResult, [NotNullWhen(true)] out Statement? result)
+    public static bool GetStatement(this ParserResult parserResult, [NotNullWhen(true)] out Statement? result)
         => (result = GetStatement(parserResult)) != null;
 
-    public static bool TryGetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
+    public static bool GetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
         => (result = GetStatement<T>(parserResult, condition)) != null;
 
     public static T? GetStatement<T>(this Statement statement)
@@ -154,10 +159,10 @@ public static class StatementExtensions
         return default;
     }
 
-    public static bool TryGetStatement<T>(this Statement statement, [NotNullWhen(true)] out T? result)
+    public static bool GetStatement<T>(this Statement statement, [NotNullWhen(true)] out T? result)
         => (result = GetStatement<T>(statement)) != null;
 
-    public static bool TryGetStatement<T>(this Statement statement, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
+    public static bool GetStatement<T>(this Statement statement, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
         => (result = GetStatement<T>(statement, condition)) != null;
 }
 
@@ -415,7 +420,7 @@ public class LiteralList : StatementWithValue
     }
 }
 
-public class VariableDeclaration : Statement, IHaveType, IExportable
+public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifiable<Token>
 {
     public TypeInstance Type { get; }
     public Token Identifier { get; }
@@ -784,14 +789,14 @@ public class KeywordCall : StatementWithValue, IReadable
     }
 }
 
-public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledOperator>
+public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 {
     public const int ParameterCount = 2;
 
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; set; }
-    public CompiledOperator? Reference { get; set; }
+    public object? Reference { get; set; }
     public Uri? OriginalFile { get; set; }
 
     public override Position Position => new(Operator, Left, Right);
@@ -856,13 +861,13 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
     }
 }
 
-public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo<CompiledOperator>
+public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 {
     public const int ParameterCount = 1;
 
     public Token Operator { get; }
     public StatementWithValue Left { get; }
-    public CompiledOperator? Reference { get; set; }
+    public object? Reference { get; set; }
     public Uri? OriginalFile { get; set; }
 
     public override Position Position => new(Operator, Left);
@@ -921,14 +926,14 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 /// <summary>
 /// Increment and decrement operator
 /// </summary>
-public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<CompiledOperator>
+public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
 {
     /// <summary>
     /// This should be "++" or "--"
     /// </summary>
     public Token Operator { get; }
     public StatementWithValue Left { get; }
-    public CompiledOperator? Reference { get; set; }
+    public object? Reference { get; set; }
     public Uri? OriginalFile { get; set; }
 
     public StatementWithValue[] Parameters => new StatementWithValue[] { Left };
@@ -1015,7 +1020,7 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
     }
 }
 
-public class Assignment : AnyAssignment, IReferenceableTo<CompiledOperator>
+public class Assignment : AnyAssignment, IReferenceableTo
 {
     /// <summary>
     /// This should always be <c>"="</c>
@@ -1023,7 +1028,7 @@ public class Assignment : AnyAssignment, IReferenceableTo<CompiledOperator>
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; }
-    public CompiledOperator? Reference { get; set; }
+    public object? Reference { get; set; }
     public Uri? OriginalFile { get; set; }
 
     public override Position Position => new(Operator, Left, Right);
@@ -1072,7 +1077,7 @@ public class Assignment : AnyAssignment, IReferenceableTo<CompiledOperator>
     }
 }
 
-public class CompoundAssignment : AnyAssignment, IReferenceableTo<CompiledOperator>
+public class CompoundAssignment : AnyAssignment, IReferenceableTo
 {
     /// <summary>
     /// This should always starts with <c>"="</c>
@@ -1083,7 +1088,7 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo<CompiledOperat
     public Uri? OriginalFile { get; set; }
 
     public override Position Position => new(Operator, Left, Right);
-    public CompiledOperator? Reference { get; set; }
+    public object? Reference { get; set; }
 
     public CompoundAssignment(Token @operator, StatementWithValue left, StatementWithValue right)
     {
@@ -1616,13 +1621,13 @@ public class NewInstance : StatementWithValue, IHaveType
     }
 }
 
-public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<ConstructorDefinition>, IHaveType
+public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo, IHaveType
 {
     public Token Keyword { get; }
     public TypeInstance Type { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
     public TokenPair Brackets { get; }
-    public ConstructorDefinition? Reference { get; set; }
+    public object? Reference { get; set; }
     public Uri? OriginalFile { get; set; }
 
     public override Position Position =>
@@ -1701,12 +1706,12 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
     };
 }
 
-public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<GeneralFunctionDefinition>
+public class IndexCall : StatementWithValue, IReadable, IReferenceableTo
 {
     public StatementWithValue PrevStatement { get; }
     public StatementWithValue Index { get; }
     public TokenPair Brackets { get; }
-    public GeneralFunctionDefinition? Reference { get; set; }
+    public object? Reference { get; set; }
     public Uri? OriginalFile { get; set; }
 
     public override Position Position => new(PrevStatement, Index);
@@ -1749,11 +1754,11 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<General
     }
 }
 
-public class Field : StatementWithValue, IReferenceableTo<FieldDefinition>
+public class Field : StatementWithValue, IReferenceableTo
 {
     public Token Identifier { get; }
     public StatementWithValue PrevStatement { get; }
-    public FieldDefinition? Reference { get; set; }
+    public object? Reference { get; set; }
     public Uri? OriginalFile { get; set; }
 
     public override Position Position => new(PrevStatement, Identifier);

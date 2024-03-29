@@ -1,4 +1,6 @@
-// https://stackoverflow.com/a/67122267
+/*
+ * Source: https://stackoverflow.com/a/67122267
+ */
 export inline float Sin(float x)
 {
     float value = x;
@@ -15,7 +17,9 @@ export inline float Sin(float x)
     return sum;
 }
 
-// https://stackoverflow.com/a/67122267
+/*
+ * Source: https://stackoverflow.com/a/67122267
+ */
 export inline float Cos(float x)
 {
     float value = 1f;
@@ -32,7 +36,9 @@ export inline float Cos(float x)
     return sum;
 }
 
-// https://stackoverflow.com/a/101613
+/*
+ * Source: https://stackoverflow.com/a/101613
+ */
 export int Pow(int base, int exp)
 {
     int result = 1;
@@ -160,7 +166,9 @@ int Sqrt(int number)
 }
 */
 
-// https://en.wikipedia.org/wiki/Integer_square_root
+/*
+ * Source: https://en.wikipedia.org/wiki/Integer_square_root
+ */
 export int Sqrt(int s)
 {
     // Zero yields zero

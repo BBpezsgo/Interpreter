@@ -7,6 +7,7 @@ public sealed class Parser
 {
     int CurrentTokenIndex;
     readonly Token[] Tokens;
+    readonly Token[] OriginalTokens;
     readonly Uri? File;
 
     Token? CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
@@ -85,7 +86,6 @@ public sealed class Parser
     readonly List<Error> Errors = new();
     readonly List<FunctionDefinition> Functions = new();
     readonly List<FunctionDefinition> Operators = new();
-    readonly List<MacroDefinition> Macros = new();
     readonly List<EnumDefinition> Enums = new();
     readonly Dictionary<string, StructDefinition> Structs = new();
     readonly List<UsingDefinition> Usings = new();
@@ -95,7 +95,17 @@ public sealed class Parser
 
     Parser(Token[] tokens, Uri? file)
     {
-        Tokens = tokens;
+        OriginalTokens = tokens;
+        Tokens = tokens
+            .Where(v => v.TokenType
+                is not TokenType.Comment
+                and not TokenType.CommentMultiline
+                and not TokenType.Whitespace
+                and not TokenType.LineBreak
+                and not TokenType.PreprocessArgument
+                and not TokenType.PreprocessIdentifier
+                and not TokenType.PreprocessSkipped)
+            .ToArray();
         File = file;
     }
 
@@ -141,12 +151,12 @@ public sealed class Parser
             Errors,
             Functions,
             Operators,
-            Macros,
             Structs.Values,
             Usings,
             Hashes,
             TopLevelStatements,
             Enums,
+            OriginalTokens,
             Tokens);
     }
 
@@ -284,8 +294,6 @@ public sealed class Parser
     {
         if (ExpectStructDefinition()) { }
         else if (ExpectClassDefinition()) { }
-        else if (ExpectMacroDefinition(out MacroDefinition? macroDefinition))
-        { Macros.Add(macroDefinition); }
         else if (ExpectFunctionDefinition(out FunctionDefinition? functionDefinition))
         { Functions.Add(functionDefinition); }
         else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
@@ -454,58 +462,6 @@ public sealed class Parser
         }
 
         templateInfo = new(keyword, new TokenPair(startBracket, endBracket), parameters);
-
-        return true;
-    }
-
-    bool ExpectMacroDefinition([NotNullWhen(true)] out MacroDefinition? macro)
-    {
-        int parseStart = CurrentTokenIndex;
-        macro = null;
-
-        _ = ExpectAttributes();
-
-        Token[] modifiers = ParseModifiers();
-
-        if (!ExpectIdentifier(DeclarationKeywords.Macro, out Token? macroKeyword))
-        { CurrentTokenIndex = parseStart; return false; }
-
-        if (!ExpectIdentifier(out Token? possibleNameT))
-        { CurrentTokenIndex = parseStart; return false; }
-
-        if (!ExpectOperator("("))
-        { CurrentTokenIndex = parseStart; return false; }
-
-        possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-        List<Token> parameters = new();
-
-        Token? bracketEnd;
-
-        bool expectParameter = false;
-        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
-        {
-            if (!ExpectIdentifier(out Token? parameterIdentifier))
-            { throw new SyntaxException("Expected a parameter name", PreviousToken?.Position.After(), File); }
-
-            parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
-            parameters.Add(parameterIdentifier);
-
-            if (ExpectOperator(")", out bracketEnd))
-            { break; }
-
-            if (!ExpectOperator(","))
-            { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken?.Position.After(), File); }
-            else
-            { expectParameter = true; }
-        }
-
-        CheckModifiers(modifiers, ProtectionKeywords.Export);
-
-        if (!ExpectBlock(out Block? block))
-        { throw new SyntaxException($"Expected block", bracketEnd?.Position.After(), File); }
-
-        macro = new MacroDefinition(modifiers, macroKeyword, possibleNameT, parameters, block);
 
         return true;
     }
@@ -722,7 +678,6 @@ public sealed class Parser
         if (!ExpectOperator("{", out _))
         { throw new SyntaxException("Expected \"{\" after class identifier", possibleClassName.Position.After(), File); }
 
-        possibleClassName.AnalyzedType = TokenAnalyzedType.Class;
         keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
         List<FieldDefinition> fields = new();
@@ -842,7 +797,7 @@ public sealed class Parser
             operators,
             constructors)
         {
-            TemplateInfo = templateInfo,
+            Template = templateInfo,
         };
 
         Structs.Add(structDefinition.Identifier.Content, structDefinition);
@@ -1999,9 +1954,6 @@ public sealed class Parser
         error = null;
 
         if (!ExpectIdentifier(out Token? possibleType)) return false;
-
-        if (possibleType.Equals(DeclarationKeywords.Macro))
-        { return false; }
 
         if (possibleType.Equals(StatementKeywords.Return))
         { return false; }

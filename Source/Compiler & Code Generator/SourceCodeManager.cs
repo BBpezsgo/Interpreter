@@ -24,20 +24,6 @@ public readonly struct CollectedAST
     }
 }
 
-public readonly struct CollectorResult
-{
-    public readonly CollectedAST[] CollectedASTs;
-
-    public CollectorResult(
-        IEnumerable<CollectedAST> collectedASTs)
-    {
-        CollectedASTs = collectedASTs.ToArray();
-    }
-
-    public static CollectorResult Empty => new(
-        Enumerable.Empty<CollectedAST>());
-}
-
 public class SourceCodeManager
 {
     readonly List<Uri> AlreadyLoadedCodes;
@@ -79,7 +65,7 @@ public class SourceCodeManager
         return JsonDocument.Parse(File.ReadAllText(configFiles[0]));
     }
 
-    bool FromWeb(Uri uri, out ParserResult ast)
+    bool FromWeb(Uri uri, TokenizerSettings? tokenizerSettings, out ParserResult ast)
     {
         Print?.Invoke($"  Download file \"{uri}\" ...", LogType.Debug);
 
@@ -111,11 +97,11 @@ public class SourceCodeManager
         if (res.Content.Headers.ContentLength.HasValue)
         {
             using ConsoleProgressBar progress = new(ConsoleColor.DarkGray, true);
-            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), PreprocessorVariables, uri, null, progress, (int)res.Content.Headers.ContentLength.Value);
+            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), PreprocessorVariables, uri, tokenizerSettings, progress, (int)res.Content.Headers.ContentLength.Value);
         }
         else
         {
-            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), PreprocessorVariables, uri, null);
+            tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), PreprocessorVariables, uri, tokenizerSettings);
         }
 
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
@@ -127,7 +113,7 @@ public class SourceCodeManager
         return true;
     }
 
-    bool FromFile(string path, out ParserResult ast)
+    bool FromFile(string path, TokenizerSettings? tokenizerSettings, out ParserResult ast)
     {
         ast = default;
 
@@ -136,7 +122,7 @@ public class SourceCodeManager
 
         Print?.Invoke($"  Load local file \"{path}\" ...", LogType.Debug);
 
-        TokenizerResult tokens = StreamTokenizer.Tokenize(path, PreprocessorVariables);
+        TokenizerResult tokens = StreamTokenizer.Tokenize(path, PreprocessorVariables, tokenizerSettings);
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
 
         ast = Parser.Parse(tokens, new Uri(path, UriKind.Absolute));
@@ -145,7 +131,7 @@ public class SourceCodeManager
         return true;
     }
 
-    bool FromAnywhere(UsingDefinition @using, Uri uri, out ParserResult? ast)
+    bool FromAnywhere(UsingDefinition @using, Uri uri, TokenizerSettings? tokenizerSettings, out ParserResult? ast)
     {
         if (uri.IsFile)
         { @using.CompiledUri = uri.LocalPath; }
@@ -161,7 +147,7 @@ public class SourceCodeManager
         if (uri.IsFile)
         {
             string filePath = uri.LocalPath;
-            success = FromFile(filePath, out ParserResult _ast);
+            success = FromFile(filePath, tokenizerSettings, out ParserResult _ast);
             if (success)
             {
                 _ast.SetFile(uri);
@@ -170,7 +156,7 @@ public class SourceCodeManager
         }
         else
         {
-            success = FromWeb(uri, out ParserResult _ast);
+            success = FromWeb(uri, tokenizerSettings, out ParserResult _ast);
             if (success)
             {
                 _ast.SetFile(uri);
@@ -237,11 +223,11 @@ public class SourceCodeManager
         }
     }
 
-    bool ProcessFiles(UsingDefinition @using, IEnumerable<Uri> searchForThese, out ParserResult? ast, [NotNullWhen(true)] out Uri? uri)
+    bool ProcessFiles(UsingDefinition @using, IEnumerable<Uri> searchForThese, TokenizerSettings? tokenizerSettings, out ParserResult? ast, [NotNullWhen(true)] out Uri? uri)
     {
         foreach (Uri item in searchForThese)
         {
-            if (FromAnywhere(@using, item, out ast))
+            if (FromAnywhere(@using, item, tokenizerSettings, out ast))
             {
                 uri = item;
                 return true;
@@ -253,12 +239,13 @@ public class SourceCodeManager
         return false;
     }
 
-    CollectedAST[] ProcessFile(
+    IReadOnlyList<CollectedAST> ProcessFile(
         UsingDefinition @using,
         Uri? parent,
-        string? basePath)
+        string? basePath,
+        TokenizerSettings? tokenizerSettings)
     {
-        if (!ProcessFiles(@using, GetSearches(@using, parent, basePath), out ParserResult? ast, out Uri? path))
+        if (!ProcessFiles(@using, GetSearches(@using, parent, basePath), tokenizerSettings, out ParserResult? ast, out Uri? path))
         {
             AnalysisCollection?.Errors.Add(new Error($"File \"{@using.PathString}\" not found", new Position(@using.Path), parent));
             return Array.Empty<CollectedAST>();
@@ -269,56 +256,59 @@ public class SourceCodeManager
 
         List<CollectedAST> collectedASTs = new();
 
-        collectedASTs.Add(new CollectedAST(ast.Value, path, @using, ast.Value.Tokens));
+        collectedASTs.Add(new CollectedAST(ast.Value, path, @using, ast.Value.OriginalTokens));
 
         foreach (UsingDefinition using_ in ast.Value.Usings)
-        { collectedASTs.AddRange(ProcessFile(using_, path, null)); }
+        { collectedASTs.AddRange(ProcessFile(using_, path, null, tokenizerSettings)); }
 
-        return collectedASTs.ToArray();
+        return collectedASTs;
     }
 
-    CollectorResult Entry(
-        UsingDefinition[] usings,
+    ImmutableArray<CollectedAST> Entry(
+        IEnumerable<UsingDefinition> usings,
         Uri? file,
-        string? basePath)
+        string? basePath,
+        TokenizerSettings? tokenizerSettings)
     {
-        if (usings.Length > 0)
+        if (usings.Any())
         { Print?.Invoke("Loading used files ...", LogType.Debug); }
 
         List<CollectedAST> collectedASTs = new();
 
         foreach (UsingDefinition usingItem in usings)
-        { collectedASTs.AddRange(ProcessFile(usingItem, file, basePath)); }
+        { collectedASTs.AddRange(ProcessFile(usingItem, file, basePath, tokenizerSettings)); }
 
         AnalysisCollection?.Throw();
 
-        return new CollectorResult(collectedASTs);
+        return collectedASTs.ToImmutableArray();
     }
 
-    public static CollectorResult Collect(
-        UsingDefinition[] usings,
+    public static ImmutableArray<CollectedAST> Collect(
+        IEnumerable<UsingDefinition> usings,
         Uri? file,
         PrintCallback? printCallback,
         string? basePath,
         AnalysisCollection? analysisCollection,
-        IEnumerable<string> preprocessorVariables)
+        IEnumerable<string> preprocessorVariables,
+        TokenizerSettings? tokenizerSettings)
     {
         SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables);
         if (file != null) sourceCodeManager.AlreadyLoadedCodes.Add(file);
-        return sourceCodeManager.Entry(usings, file, basePath);
+        return sourceCodeManager.Entry(usings, file, basePath, tokenizerSettings);
     }
 
-    public static CollectorResult Collect(
-        UsingDefinition[] usings,
+    public static ImmutableArray<CollectedAST> Collect(
+        IEnumerable<UsingDefinition> usings,
         FileInfo? file,
         IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback = null,
-        string? basePath = null,
-        AnalysisCollection? analysisCollection = null)
+        PrintCallback? printCallback,
+        string? basePath,
+        AnalysisCollection? analysisCollection,
+        TokenizerSettings? tokenizerSettings)
     {
         Uri? fileUri = file is null ? null : new Uri(file.FullName, UriKind.Absolute);
         SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables);
         if (fileUri != null) sourceCodeManager.AlreadyLoadedCodes.Add(fileUri);
-        return sourceCodeManager.Entry(usings, fileUri, basePath);
+        return sourceCodeManager.Entry(usings, fileUri, basePath, tokenizerSettings);
     }
 }

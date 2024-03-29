@@ -103,7 +103,6 @@ public class LanguageException : Exception
 
         StringBuilder result = new();
 
-
         int removedLeadingWhitespaces;
         {
             string trimmedLine = line.TrimStart();

@@ -207,3 +207,8 @@ public interface ISameCheck<TOther> : ISameCheck
 
     bool ISameCheck.IsSame(object? other) => other is TOther _other && IsSame(_other);
 }
+
+public interface IIdentifiable<TIdentifier>
+{
+    public TIdentifier Identifier { get; }
+}

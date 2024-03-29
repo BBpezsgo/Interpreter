@@ -1,13 +1,18 @@
 ﻿namespace LanguageCore.Parser;
 
+using Compiler;
 using Tokenizing;
 
-public class EnumDefinition : IInFile, IPositioned
+public class EnumDefinition :
+    IInFile,
+    IPositioned,
+    IIdentifiable<Token>
 {
     public Token Identifier { get; }
     public ImmutableArray<EnumMemberDefinition> Members { get; }
     public ImmutableArray<AttributeUsage> Attributes { get; }
     public Uri? FilePath { get; set; }
+
     public Position Position =>
         new Position(Identifier)
         .Union(Members);

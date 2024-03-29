@@ -5,13 +5,15 @@ using Tokenizing;
 
 public class FieldDefinition :
     IPositioned,
-    IInContext<StructDefinition>
+    IInContext<StructDefinition>,
+    IIdentifiable<Token>
 {
     public Token Identifier { get; }
     public TypeInstance Type { get; }
     public Token? ProtectionToken { get; }
     public Token? Semicolon { get; set; }
     [NotNull] public StructDefinition? Context { get; set; }
+
     public Position Position => new(Identifier, Type, ProtectionToken);
 
     public FieldDefinition(FieldDefinition other)

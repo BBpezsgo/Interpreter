@@ -1,8 +1,12 @@
 ﻿namespace LanguageCore.Parser;
 
+using Compiler;
 using Tokenizing;
 
-public class StructDefinition : IExportable, IPositioned
+public class StructDefinition :
+    IExportable,
+    IPositioned,
+    IIdentifiable<Token>
 {
     public ImmutableArray<AttributeUsage> Attributes { get; }
     public Token Identifier { get; }
@@ -11,9 +15,9 @@ public class StructDefinition : IExportable, IPositioned
     public Uri? FilePath { get; set; }
     public ImmutableArray<FieldDefinition> Fields { get; }
     public ImmutableArray<Token> Modifiers { get; }
-    public TemplateInfo? TemplateInfo { get; init; }
-    public ImmutableArray<FunctionDefinition> Methods { get; }
-    public ImmutableArray<GeneralFunctionDefinition> GeneralMethods { get; }
+    public TemplateInfo? Template { get; init; }
+    public ImmutableArray<FunctionDefinition> Functions { get; }
+    public ImmutableArray<GeneralFunctionDefinition> GeneralFunctions { get; }
     public ImmutableArray<FunctionDefinition> Operators { get; }
     public ImmutableArray<ConstructorDefinition> Constructors { get; }
 
@@ -29,9 +33,9 @@ public class StructDefinition : IExportable, IPositioned
         FilePath = other.FilePath;
         Fields = other.Fields;
         Modifiers = other.Modifiers;
-        TemplateInfo = other.TemplateInfo;
-        Methods = other.Methods;
-        GeneralMethods = other.GeneralMethods;
+        Template = other.Template;
+        Functions = other.Functions;
+        GeneralFunctions = other.GeneralFunctions;
         Operators = other.Operators;
         Constructors = other.Constructors;
     }
@@ -58,8 +62,8 @@ public class StructDefinition : IExportable, IPositioned
         BracketStart = bracketStart;
         BracketEnd = bracketEnd;
         Fields = fields.ToImmutableArray();
-        Methods = methods.ToImmutableArray();
-        GeneralMethods = generalMethods.ToImmutableArray();
+        Functions = methods.ToImmutableArray();
+        GeneralFunctions = generalMethods.ToImmutableArray();
         Attributes = attributes.ToImmutableArray();
         Operators = operators.ToImmutableArray();
         Constructors = constructors.ToImmutableArray();

@@ -1,6 +1,7 @@
 using System;
 
-macro PrintStackString(text)
+template<T>
+inline void PrintStackString(T text)
 {
 	for (int i; i < text.Length; i++)
 	{

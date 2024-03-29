@@ -14,7 +14,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         StatementWithValue[] parameters = new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) };
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator, out _, true))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator, out _, true, out _))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, CurrentFile); }
         if (!allocator.ReturnSomething)
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", position, CurrentFile); }
@@ -44,23 +44,23 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         StatementWithValue[] parameters = new StatementWithValue[] { value };
         GeneralType[] parameterTypes = FindStatementTypes(parameters);
 
-        if (deallocateableType is not PointerType)
+        if (deallocateableType is not PointerType deallocateablePointerType)
         {
             AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on pointers so I skip this", value, CurrentFile));
             return;
         }
 
-        Dictionary<string, GeneralType> typeArguments = new();
-
-        if (!GetGeneralFunction(deallocateableType, parameterTypes, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
+        if (!GetGeneralFunction(deallocateablePointerType.To, parameterTypes, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor, out Dictionary<string, GeneralType>? typeArguments, false, out WillBeCompilerException? error))
         {
-            if (!GetGeneralFunctionTemplate(deallocateableType, parameterTypes, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
+            GenerateDeallocator(value);
+
+            if (deallocateablePointerType.To is not BuiltinType)
             {
-                GenerateDeallocator(value);
-                return;
+                AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deallocateablePointerType}\" not found", value, CurrentFile));
+                AnalysisCollection?.Warnings.Add(error.InstantiateWarning(value, CurrentFile));
             }
-            typeArguments = destructorTemplate.TypeArguments;
-            destructor = destructorTemplate.Function;
+
+            return;
         }
 
         if (!destructor.CanUse(CurrentFile))
@@ -68,8 +68,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             AnalysisCollection?.Errors.Add(new Error($"Destructor for type {deallocateableType} cannot be called due to its protection level", value, CurrentFile));
             return;
         }
-
-        typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
 
         GenerateCodeForFunction(destructor, new StatementWithValue[] { value }, typeArguments, value);
 
@@ -84,7 +82,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         StatementWithValue[] parameters = new StatementWithValue[] { value };
         GeneralType[] parameterTypes = FindStatementTypes(parameters);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, false))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, false, out _))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
 
         GenerateCodeForFunction(deallocator, parameters, null, value);
@@ -149,11 +147,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (arrayType.Of == BasicType.Char)
                 {
                     if (initialValue is not Literal literal)
-                    { throw new InternalException(); }
+                    { throw new NotSupportedException($"Only string literals supported", initialValue, CurrentFile); }
                     if (literal.Type != LiteralType.String)
-                    { throw new InternalException(); }
+                    { throw new NotSupportedException($"Only string literals supported", literal, CurrentFile); }
                     if (literal.Value.Length != arrayType.Length)
-                    { throw new InternalException(); }
+                    { throw new CompilerException($"Literal length {literal.Value.Length} must be equal to the stack array length {arrayType.Length}", literal, CurrentFile); }
 
                     using (DebugBlock(initialValue))
                     {
@@ -241,8 +239,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (pointerType.To is not StructType structPointerType)
             { throw new CompilerException($"Could not get the field offsets of type {pointerType}", field.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.Struct.FieldOffsets.TryGetValue(field.Identifier.Content, out int fieldOffset))
+            if (!structPointerType.GetField(field.Identifier.Content, out CompiledField? fieldDefinition, out int fieldOffset))
             { throw new CompilerException($"Could not get the field offset of field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
+
+            field.Reference = fieldDefinition;
+            field.CompiledType = fieldDefinition.Type;
 
             if (type.Size != GetValueSize(value))
             { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
@@ -475,15 +476,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GeneralType prevType = FindStatementType(statement.PrevStatement);
         GeneralType valueType = FindStatementType(value);
 
-        Dictionary<string, GeneralType> typeArguments = new();
-        if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer, out _))
-        {
-            if (GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-            {
-                indexer = indexerTemplate.Function;
-                typeArguments = indexerTemplate.TypeArguments;
-            }
-        }
+        if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer, out Dictionary<string, GeneralType>? typeArguments, false, out _))
+        { }
 
         if (indexer is not null)
         {
@@ -492,8 +486,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 AnalysisCollection?.Errors.Add(new Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", statement, CurrentFile));
                 return;
             }
-
-            typeArguments = Utils.ConcatDictionary(typeArguments, indexer.Context?.CurrentTypeArguments);
 
             GenerateCodeForFunction(indexer, new StatementWithValue[]
             {
@@ -1168,7 +1160,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         {
             BinaryOperatorCall @operator = statement.GetOperatorCall();
-            if (GetOperator(@operator, out _) || GetOperatorTemplate(@operator, out _))
+            if (GetOperator(@operator, out _, out _, false, out _))
             {
                 GenerateCodeForStatement(statement.ToAssignment());
                 return;
@@ -1285,7 +1277,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         {
             BinaryOperatorCall @operator = statement.GetOperatorCall();
-            if (GetOperator(@operator, out _) || GetOperatorTemplate(@operator, out _))
+            if (GetOperator(@operator, out _, out _, false, out _))
             {
                 GenerateCodeForStatement(statement.ToAssignment());
                 return;
@@ -1381,39 +1373,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (TryGetMacro(functionCall, out MacroDefinition? macro))
-        {
-            functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-            // Uri? prevFile = CurrentFile;
-            // CurrentFile = macro.FilePath;
-
-            InMacro.Push(true);
-
-            if (!InlineMacro(macro, out Statement? inlinedMacro, functionCall.Parameters))
-            { throw new CompilerException($"Failed to inline the macro", functionCall, CurrentFile); }
-
-            if (inlinedMacro is Block inlinedMacroBlock)
-            { GenerateCodeForStatement(inlinedMacroBlock); }
-            else
-            { GenerateCodeForStatement(inlinedMacro); }
-
-            InMacro.Pop();
-
-            // CurrentFile = prevFile;
-            return;
-        }
-
-        Dictionary<string, GeneralType> typeArguments = new();
-
-        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out WillBeCompilerException? notFound))
-        {
-            if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-            { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
-
-            compiledFunction = compilableFunction.Function;
-            typeArguments = compilableFunction.TypeArguments;
-        }
+        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out Dictionary<string, GeneralType>? typeArguments, false, out WillBeCompilerException? notFound))
+        { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
 
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
@@ -1441,8 +1402,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 return;
             }
         }
-
-        typeArguments = Utils.ConcatDictionary(typeArguments, compiledFunction.Context?.CurrentTypeArguments);
 
         GenerateCodeForFunction(compiledFunction, functionCall.MethodParameters, typeArguments, functionCall);
 
@@ -1472,8 +1431,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             AnalysisCollection?.Errors.Add(new Error($"Constructor {constructor.ToReadable()} could not be called due to its protection level", constructorCall.Type, CurrentFile));
             return;
         }
-
-        typeArguments = Utils.ConcatDictionary(typeArguments, constructor.Context?.CurrentTypeArguments);
 
         GenerateCodeForFunction(constructor, constructorCall.Parameters.ToArray(), typeArguments, constructorCall);
     }
@@ -1569,18 +1526,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
         {
-            Dictionary<string, GeneralType> typeArguments = new();
-
-            if (!GetOperator(statement, out CompiledOperator? compiledOperator))
-            {
-                if (GetOperatorTemplate(statement, out CompliableTemplate<CompiledOperator> compilableFunction))
-                {
-                    compiledOperator = compilableFunction.Function;
-                    typeArguments = compilableFunction.TypeArguments;
-                }
-            }
-
-            if (compiledOperator is not null)
+            if (GetOperator(statement, out CompiledOperator? compiledOperator, out Dictionary<string, GeneralType>? typeArguments, false, out _))
             {
                 statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
 
@@ -1589,8 +1535,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
                     return;
                 }
-
-                typeArguments = Utils.ConcatDictionary(typeArguments, compiledOperator.Context?.CurrentTypeArguments);
 
                 GenerateCodeForFunction(compiledOperator, statement.Parameters.ToArray(), typeArguments, statement);
 
@@ -1998,18 +1942,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
         {
-            Dictionary<string, GeneralType> typeArguments = new();
-
-            if (!GetOperator(statement, out CompiledOperator? compiledOperator))
-            {
-                if (GetOperatorTemplate(statement, out CompliableTemplate<CompiledOperator> compilableFunction))
-                {
-                    compiledOperator = compilableFunction.Function;
-                    typeArguments = compilableFunction.TypeArguments;
-                }
-            }
-
-            if (compiledOperator is not null)
+            if (GetOperator(statement, out CompiledOperator? compiledOperator, out Dictionary<string, GeneralType>? typeArguments, false, out _))
             {
                 statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
 
@@ -2018,8 +1951,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
                     return;
                 }
-
-                typeArguments = Utils.ConcatDictionary(typeArguments, compiledOperator.Context?.CurrentTypeArguments);
 
                 GenerateCodeForFunction(compiledOperator, statement.Parameters.ToArray(), typeArguments, statement);
 
@@ -2190,13 +2121,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 structType.Struct.References.Add((newInstance.Type, CurrentFile, CurrentMacro.Last));
 
-                int address = Stack.PushVirtual(structType.Struct.Size);
+                int address = Stack.PushVirtual(structType.Size);
 
-                foreach (CompiledField field in structType.Struct.Fields)
+                foreach ((CompiledField field, int offset) in structType.Fields)
                 {
                     if (field.Type is not BuiltinType builtinType)
                     { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.FilePath); }
-                    int offset = structType.Struct.FieldOffsets[field.Identifier.Content];
 
                     int offsettedAddress = address + offset;
 
@@ -2249,20 +2179,20 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (pointerType.To is not StructType structPointerType)
             { throw new CompilerException($"Could not get the field offsets of type {prevType}", field.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.Struct.FieldOffsets.TryGetValue(field.Identifier.Content, out int fieldOffset))
-            { throw new CompilerException($"Could not get the field offset of field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
-
-            if (!structPointerType.Struct.GetField(field.Identifier.Content, out CompiledField? _field))
+            if (!structPointerType.GetField(field.Identifier.Content, out CompiledField? fieldDefinition, out int fieldOffset))
             { throw new CompilerException($"Could not get the field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
 
-            int resultAddress = Stack.Push(_field.Type.Size);
+            field.Reference = fieldDefinition;
+            field.CompiledType = fieldDefinition.Type;
+
+            int resultAddress = Stack.Push(fieldDefinition.Type.Size);
 
             int pointerAddress = Stack.NextAddress;
             GenerateCodeForStatement(field.PrevStatement);
 
             Code.AddValue(pointerAddress, fieldOffset);
 
-            Heap.Get(pointerAddress, resultAddress, _field.Type.Size);
+            Heap.Get(pointerAddress, resultAddress, fieldDefinition.Type.Size);
 
             Stack.Pop();
 

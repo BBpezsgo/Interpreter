@@ -7,7 +7,7 @@ using Parser.Statement;
 using Runtime;
 using Tokenizing;
 
-public readonly struct BuiltinFunctionNames
+public static class BuiltinFunctionNames
 {
     public const string Destructor = "destructor";
     public const string IndexerGet = "indexer_get";
@@ -16,21 +16,20 @@ public readonly struct BuiltinFunctionNames
 
 public readonly struct CompilerResult
 {
-    public readonly CompiledFunction[] Functions;
-    public readonly MacroDefinition[] Macros;
-    public readonly CompiledGeneralFunction[] GeneralFunctions;
-    public readonly CompiledOperator[] Operators;
-    public readonly CompiledConstructor[] Constructors;
+    public readonly ImmutableArray<CompiledFunction> Functions;
+    public readonly ImmutableArray<CompiledGeneralFunction> GeneralFunctions;
+    public readonly ImmutableArray<CompiledOperator> Operators;
+    public readonly ImmutableArray<CompiledConstructor> Constructors;
 
     public readonly ImmutableDictionary<Uri, ImmutableArray<Token>> Tokens;
 
     public readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
 
-    public readonly CompiledStruct[] Structs;
-    public readonly CompileTag[] Hashes;
-    public readonly CompiledEnum[] Enums;
+    public readonly ImmutableArray<CompiledStruct> Structs;
+    public readonly ImmutableArray<CompileTag> Hashes;
+    public readonly ImmutableArray<CompiledEnum> Enums;
 
-    public readonly (Statement[] Statements, Uri? File)[] TopLevelStatements;
+    public readonly ImmutableArray<(ImmutableArray<Statement> Statements, Uri? File)> TopLevelStatements;
 
     public readonly Uri? File;
 
@@ -43,16 +42,6 @@ public readonly struct CompilerResult
             foreach (CompiledFunction function in Functions)
             {
                 Uri? file = function.FilePath;
-                if (file is not null && !alreadyExists.Contains(file))
-                {
-                    alreadyExists.Add(file);
-                    yield return file;
-                }
-            }
-
-            foreach (MacroDefinition macro in Macros)
-            {
-                Uri? file = macro.FilePath;
                 if (file is not null && !alreadyExists.Contains(file))
                 {
                     alreadyExists.Add(file);
@@ -106,7 +95,7 @@ public readonly struct CompilerResult
     {
         get
         {
-            foreach ((Statement[] topLevelStatements, _) in TopLevelStatements)
+            foreach ((ImmutableArray<Statement> topLevelStatements, _) in TopLevelStatements)
             {
                 for (int i = 0; i < topLevelStatements.Length; i++)
                 { yield return topLevelStatements[i]; }
@@ -122,11 +111,6 @@ public readonly struct CompilerResult
                 if (function.Block != null) yield return function.Block;
             }
 
-            foreach (MacroDefinition macro in Macros)
-            {
-                yield return macro.Block;
-            }
-
             foreach (CompiledOperator @operator in Operators)
             {
                 if (@operator.Block != null) yield return @operator.Block;
@@ -137,7 +121,6 @@ public readonly struct CompilerResult
     public static CompilerResult Empty => new(
         Enumerable.Empty<KeyValuePair<Uri, ImmutableArray<Token>>>(),
         Enumerable.Empty<CompiledFunction>(),
-        Enumerable.Empty<MacroDefinition>(),
         Enumerable.Empty<CompiledGeneralFunction>(),
         Enumerable.Empty<CompiledOperator>(),
         Enumerable.Empty<CompiledConstructor>(),
@@ -145,13 +128,12 @@ public readonly struct CompilerResult
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<CompileTag>(),
         Enumerable.Empty<CompiledEnum>(),
-        Enumerable.Empty<(Statement[] Statements, Uri? File)>(),
+        Enumerable.Empty<(ImmutableArray<Statement>, Uri?)>(),
         null);
 
     public CompilerResult(
         IEnumerable<KeyValuePair<Uri, ImmutableArray<Token>>> tokens,
         IEnumerable<CompiledFunction> functions,
-        IEnumerable<MacroDefinition> macros,
         IEnumerable<CompiledGeneralFunction> generalFunctions,
         IEnumerable<CompiledOperator> operators,
         IEnumerable<CompiledConstructor> constructors,
@@ -159,96 +141,75 @@ public readonly struct CompilerResult
         IEnumerable<CompiledStruct> structs,
         IEnumerable<CompileTag> hashes,
         IEnumerable<CompiledEnum> enums,
-        IEnumerable<(Statement[] Statements, Uri? File)> topLevelStatements,
+        IEnumerable<(ImmutableArray<Statement> Statements, Uri? File)> topLevelStatements,
         Uri? file)
     {
         Tokens = tokens.ToImmutableDictionary();
-        Functions = functions.ToArray();
-        Macros = macros.ToArray();
-        GeneralFunctions = generalFunctions.ToArray();
-        Operators = operators.ToArray();
-        Constructors = constructors.ToArray();
+        Functions = functions.ToImmutableArray();
+        GeneralFunctions = generalFunctions.ToImmutableArray();
+        Operators = operators.ToImmutableArray();
+        Constructors = constructors.ToImmutableArray();
         ExternalFunctions = externalFunctions.ToDictionary();
-        Structs = structs.ToArray();
-        Hashes = hashes.ToArray();
-        Enums = enums.ToArray();
-        TopLevelStatements = topLevelStatements.ToArray();
+        Structs = structs.ToImmutableArray();
+        Hashes = hashes.ToImmutableArray();
+        Enums = enums.ToImmutableArray();
+        TopLevelStatements = topLevelStatements.ToImmutableArray();
         File = file;
     }
 
-    public CompiledFunction? GetFunctionAt(Uri file, SinglePosition position)
+    public static bool GetThingAt<TThing, TIdentifier>(IEnumerable<TThing> things, Uri file, SinglePosition position, [NotNullWhen(true)] out TThing? result)
+        where TThing : IInFile, IIdentifiable<TIdentifier>
+        where TIdentifier : IPositioned
     {
-        for (int i = 0; i < Functions.Length; i++)
+        foreach (TThing? thing in things)
         {
-            if (Functions[i].FilePath != file)
+            if (thing.FilePath != file)
             { continue; }
 
-            if (!Functions[i].Identifier.Position.Range.Contains(position))
+            if (!thing.Identifier.Position.Range.Contains(position))
             { continue; }
 
-            return Functions[i];
+            result = thing;
+            return true;
         }
-        return null;
+
+        result = default;
+        return false;
     }
 
-    public CompiledGeneralFunction? GetGeneralFunctionAt(Uri file, SinglePosition position)
+    public bool GetFunctionAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledFunction? result)
+        => GetThingAt<CompiledFunction, Token>(Functions, file, position, out result);
+
+    public bool GetGeneralFunctionAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledGeneralFunction? result)
+        => GetThingAt<CompiledGeneralFunction, Token>(GeneralFunctions, file, position, out result);
+
+    public bool GetOperatorAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledOperator? result)
+        => GetThingAt<CompiledOperator, Token>(Operators, file, position, out result);
+
+    public bool GetStructAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledStruct? result)
+        => GetThingAt<CompiledStruct, Token>(Structs, file, position, out result);
+
+    public bool GetEnumAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledEnum? result)
+        => GetThingAt<CompiledEnum, Token>(Enums, file, position, out result);
+
+    public bool GetFieldAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledField? result)
     {
-        for (int i = 0; i < GeneralFunctions.Length; i++)
+        foreach (CompiledStruct @struct in Structs)
         {
-            if (GeneralFunctions[i].FilePath != file)
-            { continue; }
+            if (@struct.FilePath != file) continue;
 
-            if (!GeneralFunctions[i].Identifier.Position.Range.Contains(position))
-            { continue; }
-
-            return GeneralFunctions[i];
+            foreach (CompiledField field in @struct.Fields)
+            {
+                if (field.Identifier.Position.Range.Contains(position))
+                {
+                    result = field;
+                    return true;
+                }
+            }
         }
-        return null;
-    }
 
-    public CompiledOperator? GetOperatorAt(Uri file, SinglePosition position)
-    {
-        for (int i = 0; i < Operators.Length; i++)
-        {
-            if (Operators[i].FilePath != file)
-            { continue; }
-
-            if (!Operators[i].Identifier.Position.Range.Contains(position))
-            { continue; }
-
-            return Operators[i];
-        }
-        return null;
-    }
-
-    public CompiledStruct? GetStructAt(Uri file, SinglePosition position)
-    {
-        for (int i = 0; i < Structs.Length; i++)
-        {
-            if (Structs[i].FilePath != file)
-            { continue; }
-
-            if (!Structs[i].Identifier.Position.Range.Contains(position))
-            { continue; }
-
-            return Structs[i];
-        }
-        return null;
-    }
-
-    public CompiledEnum? GetEnumAt(Uri file, SinglePosition position)
-    {
-        for (int i = 0; i < Enums.Length; i++)
-        {
-            if (Enums[i].FilePath != file)
-            { continue; }
-
-            if (!Enums[i].Identifier.Position.Range.Contains(position))
-            { continue; }
-
-            return Enums[i];
-        }
-        return null;
+        result = null;
+        return false;
     }
 }
 
@@ -285,35 +246,36 @@ public sealed class Compiler
 
     readonly List<FunctionDefinition> Operators = new();
     readonly List<FunctionDefinition> Functions = new();
-    readonly List<MacroDefinition> Macros = new();
     readonly List<StructDefinition> Structs = new();
     readonly List<EnumDefinition> Enums = new();
 
-    readonly List<(Statement[] Statements, Uri? File)> TopLevelStatements = new();
+    readonly List<(ImmutableArray<Statement> Statements, Uri? File)> TopLevelStatements = new();
 
     readonly Stack<ImmutableArray<Token>> GenericParameters = new();
 
     readonly List<CompileTag> Tags = new();
 
     readonly CompilerSettings Settings;
+    readonly TokenizerSettings? TokenizerSettings;
     readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
     readonly PrintCallback? PrintCallback;
 
     readonly AnalysisCollection? AnalysisCollection;
     readonly IEnumerable<string> PreprocessorVariables;
 
-    Compiler(Dictionary<int, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection, IEnumerable<string> preprocessorVariables)
+    Compiler(Dictionary<int, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings)
     {
         ExternalFunctions = externalFunctions ?? new Dictionary<int, ExternalFunctionBase>();
         Settings = settings;
         PrintCallback = printCallback;
         AnalysisCollection = analysisCollection;
         PreprocessorVariables = preprocessorVariables;
+        TokenizerSettings = tokenizerSettings;
     }
 
     bool FindType(Token name, [NotNullWhen(true)] out GeneralType? result)
     {
-        if (CodeGenerator.GetStruct(CompiledStructs, name.Content, out CompiledStruct? @struct))
+        if (CodeGenerator.GetStruct(CompiledStructs, name.Content, out CompiledStruct? @struct, out _))
         {
             result = new StructType(@struct);
             return true;
@@ -351,17 +313,17 @@ public sealed class Compiler
     CompiledStruct CompileStruct(StructDefinition @struct)
     {
         if (LanguageConstants.KeywordList.Contains(@struct.Identifier.Content))
-        { throw new CompilerException($"Illegal struct name '{@struct.Identifier.Content}'", @struct.Identifier, @struct.FilePath); }
+        { throw new CompilerException($"Illegal struct name \"{@struct.Identifier.Content}\"", @struct.Identifier, @struct.FilePath); }
 
         @struct.Identifier.AnalyzedType = TokenAnalyzedType.Struct;
 
-        if (CodeGenerator.GetStruct(CompiledStructs, @struct.Identifier.Content, out _))
-        { throw new CompilerException($"Struct with name '{@struct.Identifier.Content}' already exist", @struct.Identifier, @struct.FilePath); }
+        if (CodeGenerator.GetStruct(CompiledStructs, @struct.Identifier.Content, out _, out _))
+        { throw new CompilerException($"Struct \"{@struct.Identifier.Content}\" already exist", @struct.Identifier, @struct.FilePath); }
 
-        if (@struct.TemplateInfo != null)
+        if (@struct.Template is not null)
         {
-            GenericParameters.Push(@struct.TemplateInfo.TypeParameters);
-            foreach (Token typeParameter in @struct.TemplateInfo.TypeParameters)
+            GenericParameters.Push(@struct.Template.Parameters);
+            foreach (Token typeParameter in @struct.Template.Parameters)
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
@@ -374,7 +336,7 @@ public sealed class Compiler
             compiledFields[j] = newField;
         }
 
-        if (@struct.TemplateInfo != null)
+        if (@struct.Template is not null)
         { GenericParameters.Pop(); }
 
         return new CompiledStruct(compiledFields, @struct);
@@ -382,10 +344,10 @@ public sealed class Compiler
 
     CompiledFunction CompileFunction(FunctionDefinition function, CompiledStruct? context)
     {
-        if (function.TemplateInfo != null)
+        if (function.Template is not null)
         {
-            GenericParameters.Push(function.TemplateInfo.TypeParameters);
-            foreach (Token typeParameter in function.TemplateInfo.TypeParameters)
+            GenericParameters.Push(function.Template.Parameters);
+            foreach (Token typeParameter in function.Template.Parameters)
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
@@ -417,7 +379,7 @@ public sealed class Compiler
                     throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
                 }
 
-                if (function.TemplateInfo != null)
+                if (function.Template is not null)
                 { GenericParameters.Pop(); }
 
                 return new CompiledFunction(
@@ -465,7 +427,7 @@ public sealed class Compiler
             context,
             function);
 
-        if (function.TemplateInfo != null)
+        if (function.Template is not null)
         { GenericParameters.Pop(); }
 
         return result;
@@ -525,10 +487,10 @@ public sealed class Compiler
 
     CompiledConstructor CompileConstructor(ConstructorDefinition function, CompiledStruct context)
     {
-        if (function.TemplateInfo != null)
+        if (function.Template is not null)
         {
-            GenericParameters.Push(function.TemplateInfo.TypeParameters);
-            foreach (Token typeParameter in function.TemplateInfo.TypeParameters)
+            GenericParameters.Push(function.Template.Parameters);
+            foreach (Token typeParameter in function.Template.Parameters)
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
@@ -541,7 +503,7 @@ public sealed class Compiler
             context,
             function);
 
-        if (function.TemplateInfo != null)
+        if (function.Template is not null)
         { GenericParameters.Pop(); }
 
         return result;
@@ -594,15 +556,6 @@ public sealed class Compiler
             }
         }
 
-        foreach (MacroDefinition macro in Macros)
-        {
-            if (macro.Identifier.Content == symbol)
-            {
-                where = macro.Identifier;
-                return true;
-            }
-        }
-
         where = null;
         return false;
     }
@@ -628,24 +581,6 @@ public sealed class Compiler
             Operators.Add(@operator);
         }
 
-        foreach (MacroDefinition macro in collectedAST.ParserResult.Macros)
-        {
-            if (Macros.Any(macro.IsSame))
-            { AnalysisCollection?.Errors.Add(new Error($"Macro {macro.ToReadable()} already defined", macro.Identifier, macro.FilePath)); continue; }
-
-            Macros.Add(macro);
-        }
-
-        /*
-        foreach (var func in collectedAST.ParserResult.Operators)
-        {
-            if (Operators.ContainsSameDefinition(func))
-            { AnalysisCollection?.Errors.Add(new Error($"Operator '{func.ReadableID()}' already defined", func.Identifier)); continue; }
-
-            Operators.Add(func);
-        }
-        */
-
         foreach (StructDefinition @struct in collectedAST.ParserResult.Structs)
         {
             if (IsSymbolExists(@struct.Identifier.Content, out _))
@@ -670,21 +605,20 @@ public sealed class Compiler
         Structs.AddRange(parserResult.Structs);
         Functions.AddRange(parserResult.Functions);
         Operators.AddRange(parserResult.Operators);
-        Macros.AddRange(parserResult.Macros);
         Enums.AddRange(parserResult.Enums);
 
         Dictionary<Uri, ImmutableArray<Token>> tokens = new();
 
         if (file != null)
         {
-            tokens[file] = parserResult.Tokens;
+            tokens[file] = parserResult.OriginalTokens;
 
-            CollectorResult collectorResult = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables);
+            ImmutableArray<CollectedAST> files = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings);
 
-            for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
+            for (int i = 0; i < files.Length; i++)
             {
-                tokens[collectorResult.CollectedASTs[i].Uri] = collectorResult.CollectedASTs[i].Tokens;
-                CompileFile(collectorResult.CollectedASTs[i]);
+                tokens[files[i].Uri] = files[i].Tokens;
+                CompileFile(files[i]);
             }
         }
 
@@ -695,13 +629,12 @@ public sealed class Compiler
         return new CompilerResult(
             tokens,
             CompiledFunctions,
-            Macros.ToArray(),
             CompiledGeneralFunctions,
             CompiledOperators,
             CompiledConstructors,
             ExternalFunctions,
             CompiledStructs,
-            Tags.ToArray(),
+            Tags,
             CompiledEnums,
             TopLevelStatements,
             file);
@@ -709,14 +642,14 @@ public sealed class Compiler
 
     CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings)
     {
-        CollectorResult collectorResult = SourceCodeManager.Collect(usings, (Uri?)null, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables);
+        ImmutableArray<CollectedAST> files = SourceCodeManager.Collect(usings, null, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings);
 
         Dictionary<Uri, ImmutableArray<Token>> tokens = new();
 
-        for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
+        for (int i = 0; i < files.Length; i++)
         {
-            tokens[collectorResult.CollectedASTs[i].Uri] = collectorResult.CollectedASTs[i].Tokens;
-            CompileFile(collectorResult.CollectedASTs[i]);
+            tokens[files[i].Uri] = files[i].Tokens;
+            CompileFile(files[i]);
         }
 
         TopLevelStatements.Add(([statement], null));
@@ -726,13 +659,12 @@ public sealed class Compiler
         return new CompilerResult(
             tokens,
             CompiledFunctions,
-            Macros.ToArray(),
             CompiledGeneralFunctions,
             CompiledOperators,
             CompiledConstructors,
             ExternalFunctions,
             CompiledStructs,
-            Tags.ToArray(),
+            Tags,
             CompiledEnums,
             TopLevelStatements,
             null);
@@ -800,7 +732,7 @@ public sealed class Compiler
                     break;
             }
 
-ExitBreak:
+            ExitBreak:
             continue;
         }
     }
@@ -847,14 +779,14 @@ ExitBreak:
         {
             foreach (CompiledStruct compiledStruct in CompiledStructs)
             {
-                if (compiledStruct.TemplateInfo != null)
+                if (compiledStruct.Template is not null)
                 {
-                    GenericParameters.Push(compiledStruct.TemplateInfo.TypeParameters);
-                    foreach (Token typeParameter in compiledStruct.TemplateInfo.TypeParameters)
+                    GenericParameters.Push(compiledStruct.Template.Parameters);
+                    foreach (Token typeParameter in compiledStruct.Template.Parameters)
                     { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
                 }
 
-                foreach (GeneralFunctionDefinition method in compiledStruct.GeneralMethods)
+                foreach (GeneralFunctionDefinition method in compiledStruct.GeneralFunctions)
                 {
                     foreach (ParameterDefinition parameter in method.Parameters)
                     {
@@ -869,7 +801,7 @@ ExitBreak:
                         List<ParameterDefinition> parameters = method.Parameters.ToList();
                         parameters.Insert(0, new ParameterDefinition(
                             new Token[] { Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This) },
-                            TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters),
+                            TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.Template?.Parameters),
                             Token.CreateAnonymous(StatementKeywords.This),
                             method)
                         );
@@ -891,7 +823,7 @@ ExitBreak:
                         parameters = method.Parameters.ToList();
                         parameters.Insert(0, new ParameterDefinition(
                             new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
-                            TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters)),
+                            TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.Template?.Parameters)),
                             Token.CreateAnonymous(StatementKeywords.This),
                             method)
                         );
@@ -930,7 +862,7 @@ ExitBreak:
                     }
                 }
 
-                foreach (FunctionDefinition method in compiledStruct.Methods)
+                foreach (FunctionDefinition method in compiledStruct.Functions)
                 {
                     foreach (ParameterDefinition parameter in method.Parameters)
                     {
@@ -941,7 +873,7 @@ ExitBreak:
                     List<ParameterDefinition> parameters = method.Parameters.ToList();
                     parameters.Insert(0, new ParameterDefinition(
                         new Token[] { Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This) },
-                        TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters),
+                        TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.Template?.Parameters),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)
                     );
@@ -952,7 +884,7 @@ ExitBreak:
                         method.Type,
                         method.Identifier,
                         new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
-                        method.TemplateInfo)
+                        method.Template)
                     {
                         Context = method.Context,
                         Block = method.Block,
@@ -965,7 +897,7 @@ ExitBreak:
                     parameters.Insert(0,
                         new ParameterDefinition(
                             new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
-                            TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.TemplateInfo?.TypeParameters)),
+                            TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.Template?.Parameters)),
                             Token.CreateAnonymous(StatementKeywords.This),
                             method)
                         );
@@ -976,7 +908,7 @@ ExitBreak:
                         method.Type,
                         method.Identifier,
                         new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
-                        method.TemplateInfo)
+                        method.Template)
                     {
                         Context = method.Context,
                         Block = method.Block,
@@ -1090,7 +1022,7 @@ ExitBreak:
                     }
                 }
 
-                if (compiledStruct.TemplateInfo != null)
+                if (compiledStruct.Template is not null)
                 { GenericParameters.Pop(); }
             }
         }
@@ -1109,10 +1041,11 @@ ExitBreak:
         Uri? file,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback = null,
-        AnalysisCollection? analysisCollection = null)
+        PrintCallback? printCallback,
+        AnalysisCollection? analysisCollection,
+        TokenizerSettings? tokenizerSettings)
     {
-        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables);
+        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables, tokenizerSettings);
         return compiler.CompileMainFile(parserResult, file);
     }
 
@@ -1128,11 +1061,12 @@ ExitBreak:
         Dictionary<int, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback = null,
-        AnalysisCollection? analysisCollection = null)
+        PrintCallback? printCallback,
+        AnalysisCollection? analysisCollection,
+        TokenizerSettings? tokenizerSettings)
     {
-        ParserResult ast = Parser.ParseFile(file.FullName, preprocessorVariables);
-        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables);
+        ParserResult ast = Parser.ParseFile(file.FullName, preprocessorVariables, tokenizerSettings);
+        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables, tokenizerSettings);
         return compiler.CompileMainFile(ast, new Uri(file.FullName, UriKind.Absolute));
     }
 
@@ -1142,7 +1076,8 @@ ExitBreak:
         CompilerSettings settings,
         UsingDefinition[] usings,
         IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback = null,
-        AnalysisCollection? analysisCollection = null)
-        => new Compiler(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables).CompileInteractiveInternal(statement, usings);
+        PrintCallback? printCallback,
+        AnalysisCollection? analysisCollection,
+        TokenizerSettings? tokenizerSettings)
+        => new Compiler(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables, tokenizerSettings).CompileInteractiveInternal(statement, usings);
 }

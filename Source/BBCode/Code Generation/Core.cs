@@ -160,14 +160,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
         }
 
-        foreach ((Parser.Statement.Statement[] statements, _) in compilerResult.TopLevelStatements)
+        foreach ((ImmutableArray<Parser.Statement.Statement> statements, _) in compilerResult.TopLevelStatements)
         {
             CompileGlobalConstants(statements);
         }
 
         for (int i = 0; i < compilerResult.TopLevelStatements.Length - 1; i++)
         {
-            (Parser.Statement.Statement[] statements, Uri? file) = compilerResult.TopLevelStatements[i];
+            (ImmutableArray<Parser.Statement.Statement> statements, Uri? file) = compilerResult.TopLevelStatements[i];
             CurrentFile = compilerResult.File;
 #if DEBUG
             if (CurrentFile == null)

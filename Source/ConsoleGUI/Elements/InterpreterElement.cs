@@ -104,7 +104,6 @@ public sealed partial class InterpreterElement : WindowElement
             Title = "Code",
         };
         codePanel.OnBeforeDraw += SourceCodeElement_OnBeforeDraw;
-        codePanel.OnMouseEventInvoked += SourceCodeElement_OnMouse;
 
         ConsolePanel = new StandardIOElement
         {

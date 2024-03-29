@@ -108,6 +108,7 @@ public abstract partial class Tokenizer
 
     readonly List<PreprocessorTag> UnprocessedPreprocessorTags = new();
 
+    /// <exception cref="TokenizerException"/>
     void HandlePreprocess(bool finished)
     {
         PreprocessorTag? last = LastPreprocess;

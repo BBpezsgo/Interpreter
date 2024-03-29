@@ -7,7 +7,6 @@ public static class DeclarationKeywords
 {
     public const string Struct = "struct";
     public const string Enum = "enum";
-    public const string Macro = "macro";
     public const string Using = "using";
     public const string Template = "template";
 }
@@ -86,7 +85,6 @@ public static class LanguageConstants
     (
         DeclarationKeywords.Struct,
         DeclarationKeywords.Enum,
-        DeclarationKeywords.Macro,
         DeclarationKeywords.Using,
         DeclarationKeywords.Template,
 

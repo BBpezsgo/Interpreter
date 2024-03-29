@@ -11,8 +11,8 @@ using Parser.Statement;
 using Runtime;
 using Tokenizing;
 using LiteralStatement = Parser.Statement.Literal;
-using Registers = LanguageCore.ASM.Registers;
 using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.GeneralType Type);
+using Registers = LanguageCore.ASM.Registers;
 
 public class ImportedAsmFunction
 {
@@ -814,14 +814,6 @@ public class CodeGeneratorForAsm : CodeGenerator
             case ModifiedStatement v: GenerateCodeForStatement(v); break;
             default: throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);
         }
-
-        if (statement is FunctionCall statementWithValue &&
-            !statementWithValue.SaveValue &&
-            GetFunction(statementWithValue, out CompiledFunction? _f, out _) &&
-            _f.ReturnSomething)
-        {
-            throw new NotImplementedException();
-        }
     }
     void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
     {
@@ -1096,31 +1088,8 @@ public class CodeGeneratorForAsm : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (TryGetMacro(functionCall, out MacroDefinition? macro))
-        {
-            functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-            Uri? prevFile = CurrentFile;
-
-            CurrentFile = macro.FilePath;
-
-            if (!InlineMacro(macro, out Statement? inlinedMacro, functionCall.Parameters))
-            { throw new CompilerException($"Failed to inline the macro", functionCall, CurrentFile); }
-
-            GenerateCodeForInlinedMacro(inlinedMacro);
-
-            CurrentFile = prevFile;
-
-            return;
-        }
-
-        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out WillBeCompilerException? notFound))
-        {
-            if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-            { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
-
-            compiledFunction = compilableFunction.Function;
-        }
+        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out _, false, out WillBeCompilerException? notFound))
+        { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
 
         GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
     }
@@ -1220,7 +1189,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     }
     void GenerateCodeForStatement(BinaryOperatorCall statement)
     {
-        if (GetOperator(statement, out _))
+        if (GetOperator(statement, out _, out _, false, out _))
         {
             throw new NotImplementedException();
         }
@@ -1464,7 +1433,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     }
     void GenerateCodeForStatement(UnaryOperatorCall statement)
     {
-        if (GetOperator(statement, out _))
+        if (GetOperator(statement, out _, out _, false, out _))
         {
             throw new NotImplementedException();
         }
@@ -1576,7 +1545,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         }
     }
 
-    void GenerateCodeForTopLevelStatements(Statement[] statements)
+    void GenerateCodeForTopLevelStatements(IEnumerable<Statement> statements)
     {
         CompileLocalConstants(statements);
 
@@ -1588,9 +1557,9 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         Builder.CodeBuilder.AppendCommentLine("Code:");
 
-        for (int i = 0; i < statements.Length; i++)
+        foreach (Statement statement in statements)
         {
-            if (statements[i] is KeywordCall keywordCall &&
+            if (statement is KeywordCall keywordCall &&
                 keywordCall.Identifier.Equals(StatementKeywords.Return))
             {
                 if (keywordCall.Parameters.Length != 0 &&
@@ -1609,9 +1578,9 @@ public class CodeGeneratorForAsm : CodeGenerator
                 }
             }
 
-            Builder.CodeBuilder.AppendCommentLine(statements[i].ToString());
+            Builder.CodeBuilder.AppendCommentLine(statement.ToString());
 
-            GenerateCodeForStatement(statements[i]);
+            GenerateCodeForStatement(statement);
         }
 
         Builder.CodeBuilder.AppendCommentLine("Cleanup");

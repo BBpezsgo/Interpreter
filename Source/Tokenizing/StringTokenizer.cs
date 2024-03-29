@@ -22,6 +22,8 @@ public sealed class StringTokenizer : Tokenizer
         { return tokenizer.TokenizeInternal(); }
     }
 
+    /// <exception cref="InternalException"/>
+    /// <exception cref="TokenizerException"/>
     TokenizerResult TokenizeInternal()
     {
         for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)

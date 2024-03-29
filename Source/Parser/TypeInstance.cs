@@ -13,7 +13,7 @@ public abstract class TypeInstance : IEquatable<TypeInstance>, IPositioned
         if (a is null && b is null) return true;
         if (a is null || b is null) return false;
         if (a is not TypeInstanceSimple a2) return false;
-        if (a2.GenericTypes is not null) return false;
+        if (a2.TypeArguments is not null) return false;
         return a2.Identifier.Content == b;
     }
     public static bool operator !=(TypeInstance? a, string? b) => !(a == b);
@@ -166,15 +166,15 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
 public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
 {
     public Token Identifier { get; }
-    public ImmutableArray<TypeInstance>? GenericTypes { get; }
+    public ImmutableArray<TypeInstance>? TypeArguments { get; }
     public override Position Position =>
         new Position(Identifier)
-        .Union(GenericTypes);
+        .Union(TypeArguments);
 
-    public TypeInstanceSimple(Token identifier, IEnumerable<TypeInstance>? genericTypes = null) : base()
+    public TypeInstanceSimple(Token identifier, IEnumerable<TypeInstance>? typeArguments = null) : base()
     {
         this.Identifier = identifier;
-        this.GenericTypes = genericTypes?.ToImmutableArray();
+        this.TypeArguments = typeArguments?.ToImmutableArray();
     }
 
     public override bool Equals(object? obj) => obj is TypeInstanceSimple other && Equals(other);
@@ -184,19 +184,19 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
         if (other is null) return false;
         if (Identifier.Content != other.Identifier.Content) return false;
 
-        if (!GenericTypes.HasValue) return other.GenericTypes is null;
-        if (!other.GenericTypes.HasValue) return false;
+        if (!TypeArguments.HasValue) return other.TypeArguments is null;
+        if (!other.TypeArguments.HasValue) return false;
 
-        if (GenericTypes.Value.Length != other.GenericTypes.Value.Length) return false;
-        for (int i = 0; i < GenericTypes.Value.Length; i++)
+        if (TypeArguments.Value.Length != other.TypeArguments.Value.Length) return false;
+        for (int i = 0; i < TypeArguments.Value.Length; i++)
         {
-            if (!GenericTypes.Value[i].Equals(other.GenericTypes.Value[i]))
+            if (!TypeArguments.Value[i].Equals(other.TypeArguments.Value[i]))
             { return false; }
         }
         return true;
     }
 
-    public override int GetHashCode() => HashCode.Combine((byte)3, Identifier, GenericTypes);
+    public override int GetHashCode() => HashCode.Combine((byte)3, Identifier, TypeArguments);
 
     public override void SetAnalyzedType(GeneralType type)
     {
@@ -207,17 +207,17 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
     public static TypeInstanceSimple CreateAnonymous(string name)
         => new(Token.CreateAnonymous(name), null);
 
-    public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<TypeInstance>? genericTypes)
-        => new(Token.CreateAnonymous(name), genericTypes);
+    public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<TypeInstance>? typeArguments)
+        => new(Token.CreateAnonymous(name), typeArguments);
 
-    public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<Token>? genericTypes)
+    public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<Token>? typeArguments)
     {
         TypeInstance[]? genericTypesConverted;
-        if (genericTypes == null)
+        if (typeArguments == null)
         { genericTypesConverted = null; }
         else
         {
-            Token[] genericTypesA = genericTypes.ToArray();
+            Token[] genericTypesA = typeArguments.ToArray();
             genericTypesConverted = new TypeInstance[genericTypesA.Length];
             for (int i = 0; i < genericTypesA.Length; i++)
             {
@@ -230,8 +230,8 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
 
     public override string ToString()
     {
-        if (GenericTypes is null) return Identifier.Content;
-        return $"{Identifier.Content}<{string.Join<TypeInstance>(", ", GenericTypes)}>";
+        if (TypeArguments is null) return Identifier.Content;
+        return $"{Identifier.Content}<{string.Join<TypeInstance>(", ", TypeArguments)}>";
     }
     public override string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments)
     {
@@ -239,15 +239,15 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
         if (typeArguments.TryGetValue(Identifier.Content, out GeneralType? replaced))
         { identifier = replaced.ToString(); }
 
-        if (!GenericTypes.HasValue)
+        if (!TypeArguments.HasValue)
         { return identifier; }
 
         StringBuilder result = new(identifier);
         result.Append('<');
-        for (int i = 0; i < GenericTypes.Value.Length; i++)
+        for (int i = 0; i < TypeArguments.Value.Length; i++)
         {
             if (i > 0) result.Append(", ");
-            result.Append(GenericTypes.Value[i].ToString(typeArguments));
+            result.Append(TypeArguments.Value[i].ToString(typeArguments));
         }
         result.Append('>');
         return result.ToString();

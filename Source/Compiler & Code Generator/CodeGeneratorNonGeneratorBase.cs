@@ -1,12 +1,7 @@
 ﻿namespace LanguageCore.Compiler;
 
-using BBCode.Generator;
-
 public class CodeGeneratorNonGeneratorBase : CodeGenerator
 {
-    public CodeGeneratorNonGeneratorBase() : base()
-    { }
-
     public CodeGeneratorNonGeneratorBase(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, settings, analysisCollection, print)
     { }
 

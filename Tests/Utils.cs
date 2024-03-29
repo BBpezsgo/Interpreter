@@ -304,7 +304,7 @@ public static class Utils
 
         AnalysisCollection analysisCollection = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null);
         BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
 
         analysisCollection.Throw();
@@ -343,7 +343,7 @@ public static class Utils
 
         AnalysisCollection analysisCollection = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection, null);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, analysisCollection);
 
         analysisCollection.Throw();
@@ -366,7 +366,7 @@ public static class Utils
 
         AnalysisCollection analysisCollection = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings() { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection, null);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, analysisCollection);
 
         analysisCollection.Throw();
@@ -391,7 +391,7 @@ public static class Utils
         byte InputCallback() => LanguageCore.Brainfuck.CharCode.GetByte(inputBuffer.Read());
 
         AnalysisCollection analysisCollection = new();
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection, null);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, analysisCollection);
         analysisCollection.Throw();
 
@@ -426,7 +426,7 @@ public static class Utils
     {
         AnalysisCollection analysisCollection = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, Enumerable.Empty<string>(), null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, Enumerable.Empty<string>(), null, analysisCollection, null);
 
         LanguageCore.ASM.Generator.AsmGeneratorResult code = LanguageCore.ASM.Generator.CodeGeneratorForAsm.Generate(compiled, new LanguageCore.ASM.Generator.AsmGeneratorSettings()
         {

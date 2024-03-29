@@ -5,23 +5,27 @@ using Tokenizing;
 
 public class ConstructorDefinition : FunctionThingDefinition,
     ISimpleReadable,
-    IInContext<StructDefinition?>
+    IInContext<StructDefinition?>,
+    IIdentifiable<TypeInstance>
 {
     public TypeInstance Type { get; }
-    public StructDefinition? Context { get; set; }
+    [NotNull] public StructDefinition? Context { get; set; }
+
     public override bool IsTemplate
     {
         get
         {
-            if (TemplateInfo is not null) return true;
-            if (Context != null && Context.TemplateInfo != null) return true;
+            if (Template is not null) return true;
+            if (Context.Template is not null) return true;
             return false;
         }
     }
+    TypeInstance IIdentifiable<TypeInstance>.Identifier => Type;
 
     public ConstructorDefinition(ConstructorDefinition other) : base(other)
     {
         Type = other.Type;
+        Context = other.Context;
     }
 
     public ConstructorDefinition(

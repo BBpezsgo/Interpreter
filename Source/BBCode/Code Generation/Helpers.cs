@@ -8,80 +8,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
 {
     #region Helper Functions
 
-    int CallRuntime(CompiledVariable address)
-    {
-        if (address.Type != BasicType.Integer && address.Type is not FunctionType)
-        { throw new CompilerException($"This should be an \"{new BuiltinType(BasicType.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
-
-        int returnToValueInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Push, 0);
-
-        StackLoad(AbsoluteGlobalAddress);
-        AddInstruction(Opcode.GetBasePointer);
-
-        StackLoad(new ValueAddress(address), address.Type.Size);
-
-        AddInstruction(Opcode.Push, GeneratedCode.Count + 3);
-
-        AddInstruction(Opcode.MathSub);
-
-        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackPointerRelative, -BytecodeProcessor.StackDirection);
-
-        int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Jump, AddressingMode.Runtime);
-
-        GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
-
-        return jumpInstruction;
-    }
-
-    int CallRuntime(CompiledParameter address)
-    {
-        if (address.Type != BasicType.Integer && address.Type is not FunctionType)
-        { throw new CompilerException($"This should be an \"{new BuiltinType(BasicType.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
-
-        int returnToValueInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Push, 0);
-
-        StackLoad(AbsoluteGlobalAddress);
-        AddInstruction(Opcode.GetBasePointer);
-
-        ValueAddress offset = GetBaseAddress(address);
-        StackLoad(offset);
-
-        AddInstruction(Opcode.Push, GeneratedCode.Count + 3);
-
-        AddInstruction(Opcode.MathSub);
-
-        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackPointerRelative, -1);
-
-        int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Jump, AddressingMode.Runtime);
-
-        GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
-
-        return jumpInstruction;
-    }
-
     int CallRuntime(StatementWithValue address)
     {
         GeneralType addressType = FindStatementType(address);
 
-        if (addressType != BasicType.Integer && addressType is not FunctionType)
-        { throw new CompilerException($"This should be an \"{new BuiltinType(BasicType.Integer)}\" or function pointer and not \"{addressType}\"", address, CurrentFile); }
+        if (addressType is not FunctionType)
+        { throw new CompilerException($"This should be a function pointer and not {addressType}", address, CurrentFile); }
 
         int returnToValueInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Push, 0); // Saved code pointer
+        AddInstruction(Opcode.Push, 0);
 
         StackLoad(AbsoluteGlobalAddress);
-        AddInstruction(Opcode.GetBasePointer); // Saved base pointer
+        AddInstruction(Opcode.GetBasePointer);
 
         GenerateCodeForStatement(address);
 
         AddInstruction(Opcode.Push, GeneratedCode.Count + 3);
         AddInstruction(Opcode.MathSub);
 
-        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackPointerRelative, -1);
+        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackPointerRelative, -1 * BytecodeProcessor.StackDirection);
 
         int jumpInstruction = GeneratedCode.Count;
         AddInstruction(Opcode.Jump, AddressingMode.Runtime);
@@ -123,7 +68,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (type is StructType structType)
         {
-            ImmutableDictionary<string, GeneralType>? typeParameters = structType.TypeParameters;
+            ImmutableDictionary<string, GeneralType>? typeParameters = structType.TypeArguments;
             int size = 0;
             foreach (CompiledField field in structType.Struct.Fields)
             {

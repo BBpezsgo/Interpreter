@@ -596,6 +596,24 @@ public class TokenizerTests
         AssertUtils.ContentEquals(tokens, ";", ";");
         TokenSpecificAssert(tokens);
     }
+
+    [TestMethod]
+    [ExpectedException(typeof(TokenizerException))]
+    public void Test34()
+    {
+        Token[] tokens = StringTokenizer.Tokenize("0x64_4g", Enumerable.Empty<string>(), settings: Settings).Tokens;
+
+        Position[] positions = new Position[]
+        {
+            new(
+                ((0, 0), (0, 7)),
+                (0, 7)
+            ),
+        };
+
+        AssertUtils.PositionEquals(tokens, positions);
+        TokenSpecificAssert(tokens);
+    }
 }
 
 [TestClass, TestCategory("Token Utils")]

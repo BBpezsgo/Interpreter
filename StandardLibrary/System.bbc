@@ -57,18 +57,6 @@ export char* ToString(this int number)
         i--;
 	}
 
-    // if (isNegative)
-    // {
-    //     char* newResult = Alloc((result.Length() + 1) * sizeof(char)) as char*;
-	// 	   CopyString(result, newResult);
-    //     newResult[result.Length()] = '-';
-    //     delete result;
-    //     result = newResult;
-    // }
-
-	// char* reversed = result.Reverse();
-	// delete result;
-
 	return result;
 }
 
@@ -80,29 +68,21 @@ export inline int ParseInt(temp char* v)
     if (v.IsNullOrEmpty())
     { return 0; }
 
-    int IsNegative = (v[0] == '-');
-    temp char* parsing = v;
+    int isNegative = (v[0] == '-');
+    int start;
+    int result;
+    
+    if (isNegative)
+    { start = 1; }
 
-    if (IsNegative)
+    for (int i = start; v[i]; i++)
     {
-        parsing = parsing.Substring(1);
-        char* reversed = parsing.Reverse();
-        delete parsing;
-        parsing = reversed;
+        char digit = v[i];
+        result *= 10;
+        result += (digit - '0');
     }
-    else
-    {
-        parsing = parsing.Reverse();
-    }
-
-    int result = 0;
-    for (int i = 0; parsing[i]; i++)
-    {
-        char digit = parsing[i];
-        result += (Pow(10, i) * (digit - '0'));
-    }
-
-    if (IsNegative)
+    
+    if (isNegative)
     { result *= -1; }
 
     return result;
@@ -113,31 +93,15 @@ export inline byte ParseByte(temp char* v)
     if (v.IsNullOrEmpty())
     { return 0; }
 
-    int IsNegative = (v[0] == '-');
-    temp char* parsing = v;
-
-    if (IsNegative)
+    byte result;
+    
+    for (int i = 0; v[i]; i++)
     {
-        parsing = parsing.Substring(1);
-        char* reversed = parsing.Reverse();
-        delete parsing;
-        parsing = reversed;
+        char digit = v[i];
+        result *= 10 as byte;
+        result += (digit - '0') as byte;
     }
-    else
-    {
-        parsing = parsing.Reverse();
-    }
-
-    int result = 0;
-    for (int i = 0; parsing[i]; i++)
-    {
-        char digit = parsing[i];
-        result += (Pow(10, i) * (digit - '0'));
-    }
-
-    if (IsNegative)
-    { result *= -1; }
-
+    
     return result;
 }
 
@@ -147,6 +111,9 @@ export float ToFloat(this int v);
 [External("float-to-int")]
 export int ToInt(this float v);
 
+/*
+ * Source: https://en.wikipedia.org/wiki/Lehmer_random_number_generator
+ */
 export inline int Random(int state)
 {
 	// Precomputed parameters for Schrage's method
@@ -166,12 +133,4 @@ export inline int Random(int state)
     { result += M; };
     
 	return result;
-}
-
-void memcp(int source, int destination, int size)
-{
-    for (int offset; offset < size; offset++)
-    {
-        (*(destination + offset)) = *(source + offset);
-    }
 }

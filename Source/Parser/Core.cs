@@ -48,66 +48,78 @@ public readonly struct ParserResult
 {
     public readonly Error[] Errors;
 
-    public readonly FunctionDefinition[] Functions;
-    public readonly FunctionDefinition[] Operators;
-    public readonly MacroDefinition[] Macros;
-    public readonly StructDefinition[] Structs;
-    public readonly UsingDefinition[] Usings;
-    public readonly Statement.CompileTag[] Hashes;
+    public readonly ImmutableArray<FunctionDefinition> Functions;
+    public readonly ImmutableArray<FunctionDefinition> Operators;
+    public readonly ImmutableArray<StructDefinition> Structs;
+    public readonly ImmutableArray<EnumDefinition> Enums;
+
+    public readonly ImmutableArray<UsingDefinition> Usings;
     public readonly List<UsingAnalysis> UsingsAnalytics;
-    public readonly Statement.Statement[] TopLevelStatements;
-    public readonly EnumDefinition[] Enums;
+    public readonly ImmutableArray<CompileTag> Hashes;
+
+    public readonly ImmutableArray<Statement.Statement> TopLevelStatements;
+
+    public readonly ImmutableArray<Token> OriginalTokens;
     public readonly ImmutableArray<Token> Tokens;
 
     public static ParserResult Empty => new(
         Enumerable.Empty<Error>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<FunctionDefinition>(),
-        Enumerable.Empty<MacroDefinition>(),
         Enumerable.Empty<StructDefinition>(),
         Enumerable.Empty<UsingDefinition>(),
-        Enumerable.Empty<Statement.CompileTag>(),
+        Enumerable.Empty<CompileTag>(),
         Enumerable.Empty<Statement.Statement>(),
         Enumerable.Empty<EnumDefinition>(),
+        Enumerable.Empty<Token>(),
         Enumerable.Empty<Token>());
 
-    public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<FunctionDefinition> operators, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, IEnumerable<Token> tokens)
+    public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<FunctionDefinition> operators, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, IEnumerable<Token> originalTokens, IEnumerable<Token> tokens)
     {
         Errors = errors.ToArray();
 
-        Functions = functions.ToArray();
-        Operators = operators.ToArray();
-        Macros = macros.ToArray();
-        Structs = structs.ToArray();
-        Usings = usings.ToArray();
+        Functions = functions.ToImmutableArray();
+        Operators = operators.ToImmutableArray();
+        Structs = structs.ToImmutableArray();
+        Usings = usings.ToImmutableArray();
         UsingsAnalytics = new();
-        Hashes = hashes.ToArray();
-        TopLevelStatements = topLevelStatements.ToArray();
-        Enums = enums.ToArray();
+        Hashes = hashes.ToImmutableArray();
+        TopLevelStatements = topLevelStatements.ToImmutableArray();
+        Enums = enums.ToImmutableArray();
+        OriginalTokens = originalTokens.ToImmutableArray();
         Tokens = tokens.ToImmutableArray();
     }
 
     public void SetFile(Uri path)
     {
-        for (int i = 0; i < Functions.Length; i++)
-        { Functions[i].FilePath = path; }
+        foreach (FunctionDefinition function in Functions)
+        { function.FilePath = path; }
 
-        for (int i = 0; i < Enums.Length; i++)
-        { Enums[i].FilePath = path; }
+        foreach (FunctionDefinition function in Operators)
+        { function.FilePath = path; }
 
-        for (int i = 0; i < Macros.Length; i++)
-        { Macros[i].FilePath = path; }
+        foreach (EnumDefinition @enum in Enums)
+        { @enum.FilePath = path; }
 
-        for (int i = 0; i < Structs.Length; i++)
+        foreach (StructDefinition @struct in Structs)
         {
-            Structs[i].FilePath = path;
+            @struct.FilePath = path;
 
-            foreach (FunctionDefinition method in Structs[i].Methods)
+            foreach (FunctionDefinition method in @struct.Functions)
+            { method.FilePath = path; }
+
+            foreach (FunctionDefinition method in @struct.Operators)
+            { method.FilePath = path; }
+
+            foreach (GeneralFunctionDefinition method in @struct.GeneralFunctions)
+            { method.FilePath = path; }
+
+            foreach (ConstructorDefinition method in @struct.Constructors)
             { method.FilePath = path; }
         }
 
-        for (int i = 0; i < Hashes.Length; i++)
-        { Hashes[i].FilePath = path; }
+        foreach (CompileTag hash in Hashes)
+        { hash.FilePath = path; }
 
         foreach (IInFile item in StatementExtensions.GetStatements<IInFile>(this))
         {
@@ -150,22 +162,11 @@ public readonly struct ParserResult
             { yield return statement; }
         }
 
-        for (int i = 0; i < Macros.Length; i++)
-        {
-            MacroDefinition macro = Macros[i];
-
-            if (macro.Block == null)
-            { continue; }
-
-            foreach (Statement.Statement statement in macro.Block.GetStatementsRecursively(true))
-            { yield return statement; }
-        }
-
         for (int i = 0; i < Structs.Length; i++)
         {
             StructDefinition structs = Structs[i];
 
-            foreach (GeneralFunctionDefinition method in structs.GeneralMethods)
+            foreach (GeneralFunctionDefinition method in structs.GeneralFunctions)
             {
                 if (method.Block == null)
                 { continue; }
@@ -174,7 +175,7 @@ public readonly struct ParserResult
                 { yield return statement; }
             }
 
-            foreach (FunctionDefinition method in structs.Methods)
+            foreach (FunctionDefinition method in structs.Functions)
             {
                 if (method.Block == null)
                 { continue; }

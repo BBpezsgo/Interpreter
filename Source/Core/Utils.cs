@@ -12,6 +12,7 @@ public interface IReadable
 public interface ISimpleReadable : IReadable
 {
     public string ToReadable();
+
     string IReadable.ToReadable(Func<StatementWithValue, GeneralType> typeSearch) => ToReadable();
 }
 

@@ -1,9 +1,12 @@
 ﻿namespace LanguageCore.Parser;
 
+using Compiler;
 using Statement;
 using Tokenizing;
 
-public class AttributeUsage : IPositioned
+public class AttributeUsage :
+    IPositioned,
+    IIdentifiable<Token>
 {
     public Token Identifier { get; }
     public ImmutableArray<Literal> Parameters { get; }

@@ -28,16 +28,6 @@ export void Split(this char* string, char separator, List<char*>* result)
 	}
 }
 
-macro UnsafeGet(list, index)
-{
-    return *(&list + 1 + index);
-}
-
-macro UnsafeSet(list, index, value)
-{
-    *(&list + 1 + index) = value;
-}
-
 export int IsNullOrEmpty(this char* text)
 {
     if (text)

@@ -6,11 +6,6 @@ namespace ConsoleGUI;
 
 public partial class InterpreterElement
 {
-    void SourceCodeElement_OnMouse(InlineElement sender, MouseEvent e)
-    {
-
-    }
-
     void SourceCodeElement_OnBeforeDraw(InlineElement sender)
     {
         // sender.ClearBuffer();

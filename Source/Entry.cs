@@ -64,7 +64,7 @@ public static class Entry
                 {
                     try
                     {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection);
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null);
                         generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
@@ -84,7 +84,7 @@ public static class Entry
                 }
                 else
                 {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection);
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
@@ -204,7 +204,7 @@ public static class Entry
                 if (arguments.ThrowErrors)
                 {
                     tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck);
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection);
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
@@ -215,7 +215,7 @@ public static class Entry
                     try
                     {
                         tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck);
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection);
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
@@ -459,7 +459,7 @@ public static class Entry
 
                 AnalysisCollection analysisCollection = new();
 
-                CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Enumerable.Empty<string>(), Output.Log, analysisCollection);
+                CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Enumerable.Empty<string>(), Output.Log, analysisCollection, null);
 
                 AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, new AsmGeneratorSettings()
                 {

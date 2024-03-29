@@ -68,7 +68,7 @@ export inline void PrintLine()
     Print('\n');
 }
 
-export macro PrintLine(message)
+export inline void PrintLine(temp char* message)
 {
     Print(message);
     PrintLine();

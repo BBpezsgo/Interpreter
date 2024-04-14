@@ -281,8 +281,6 @@ public sealed partial class InterpreterElement : WindowElement
                 return;
             }
 
-            CurrentJump.IsPaused = !CurrentJump.IsPaused;
-
             return;
         }
 

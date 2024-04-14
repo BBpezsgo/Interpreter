@@ -165,6 +165,9 @@ public partial class InterpreterElement
         }
 
         Range<int> interval = Interpreter.BytecodeInterpreter.GetStackInterval(out bool isReversed);
+
+        interval = LanguageCore.Range.Intersect(interval, interval.Offset(isReversed ? -StackScrollBar.Offset : StackScrollBar.Offset));
+
         IEnumerable<int> enumerator = interval.ForEach();
         if (isReversed)
         { enumerator = enumerator.Reverse(); }
@@ -174,10 +177,11 @@ public partial class InterpreterElement
 
             if (stackDebugInfo.TryGet(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart, i, out StackElementInformations itemDebugInfo))
             {
-                MutableRange<int> range = itemDebugInfo.GetRange(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart);
+                Range<int> range = itemDebugInfo.GetRange(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart);
 
                 if (itemDebugInfo.Kind == StackElementKind.Variable ||
-                    itemDebugInfo.Kind == StackElementKind.Parameter)
+                    itemDebugInfo.Kind == StackElementKind.Parameter ||
+                    itemDebugInfo.Kind == StackElementKind.Internal)
                 {
                     if (range.Start == range.End)
                     {

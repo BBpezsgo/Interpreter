@@ -81,6 +81,7 @@ public partial class InterpreterElement
             }
 
             if (CurrentJump is BreakPointJump breakPointJump &&
+                !breakPointJump.Invisible &&
                 breakPointJump.Instruction == i)
             { b.BackgroundColor = CharColor.Red; }
 

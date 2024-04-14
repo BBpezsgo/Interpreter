@@ -1,0 +1,29 @@
+using System.Math;
+using System;
+
+struct Vector2
+{
+	int x;
+	int y;
+}
+
+Vector2 Normalize(this Vector2 vec)
+{
+	int a = vec.x * vec.x;
+	int b = vec.y * vec.y;
+	int l = Sqrt(a + b);
+
+	Vector2 res;
+	res.x = vec.x / l;
+	res.y = vec.y / l;
+	return res;
+}
+
+Vector2 vec;
+vec.x = 0;
+vec.y = 6;
+
+vec = vec.Normalize();
+
+PrintLine(vec.x);
+PrintLine(vec.y);

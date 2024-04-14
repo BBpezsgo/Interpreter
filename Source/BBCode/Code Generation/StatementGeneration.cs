@@ -299,6 +299,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (newVariable.InitialValue is LiteralList)
         { throw new NotImplementedException(); }
 
+        GenerateCodeForValueSetter(new Identifier(newVariable.Identifier), newVariable.InitialValue);
+        AddComment("}");
+        return;
+
         GeneralType valueType = FindStatementType(newVariable.InitialValue);
 
         AssignTypeCheck(compiledVariable.Type, valueType, newVariable.InitialValue);
@@ -357,7 +361,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 if (InFunction || InMacro.Last)
                 {
-                    StackStore(ReturnValueAddress, returnValueType.Size);
+                    StackStore(GetReturnValueAddress(returnValueType), returnValueType.Size);
                 }
                 else
                 {
@@ -1144,7 +1148,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             ValueAddress address = GetBaseAddress(param);
 
-            StackLoad(address);
+            StackLoad(address, param.Type.Size);
 
             return;
         }
@@ -1964,7 +1968,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(value);
 
-            StackStore(new ValueAddress(variable));
+            StackStore(new ValueAddress(variable), variable.Type.Size);
         }
         else if (GetGlobalVariable(statementToSet.Content, out CompiledVariable? globalVariable))
         {
@@ -2381,6 +2385,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath));
 
+        if (function is IHaveCompiledType returnType)
+        {
+            CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+            {
+                Address = GetReturnValueAddress(returnType.Type).Address * BytecodeProcessor.StackDirection,
+                BasepointerRelative = true,
+                Kind = StackElementKind.Internal,
+                Size = returnType.Type.Size,
+                Tag = "Return Value",
+                Type = StackElementType.Value,
+            });
+        }
+
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
         {
             Address = ReturnFlagOffset * BytecodeProcessor.StackDirection,
@@ -2424,7 +2441,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             StackElementInformations debugInfo = new()
             {
-                Address = GetBaseAddress(p).Address,
+                Address = GetBaseAddress(p).Address * BytecodeProcessor.StackDirection,
                 Kind = StackElementKind.Parameter,
                 BasepointerRelative = true,
                 Size = p.Type.Size,

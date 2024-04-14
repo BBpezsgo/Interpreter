@@ -51,8 +51,13 @@ class BreakPointJump : IJump
     public bool IsPaused { get; set; }
     public int Instruction { get; }
     public bool ShouldDelete { get; private set; }
+    public bool Invisible { get; }
 
-    public BreakPointJump(int instruction) => Instruction = instruction;
+    public BreakPointJump(int instruction, bool invisible = false)
+    {
+        Instruction = instruction;
+        Invisible = invisible;
+    }
 
     public bool ShouldJump(Interpreter interpreter)
     {
@@ -174,7 +179,7 @@ public sealed partial class InterpreterElement : WindowElement
 
         HasBorder = false;
 
-        InterpreterTimer = new MainThreadTimer(200);
+        InterpreterTimer = new MainThreadTimer(0);
         InterpreterTimer.Elapsed += OnInterpreterTimer;
         InterpreterTimer.Enabled = true;
 
@@ -190,17 +195,21 @@ public sealed partial class InterpreterElement : WindowElement
 
     void OnInterpreterTimer()
     {
-        if (CurrentJump is null) return;
-        if (CurrentJump.IsPaused) return;
-        if (CurrentJump.ShouldDelete) { CurrentJump = null; return; }
-        if (!CurrentJump.ShouldJump(Interpreter)) return;
-
-        CurrentJump?.Tick();
-        Interpreter.DoUpdate();
-        if (Interpreter.BytecodeInterpreter.IsDone)
+        int maxIterations = 32;
+        while (maxIterations-- > 0)
         {
-            ConsoleGUI.Instance?.Destroy();
-            return;
+            if (CurrentJump is null) return;
+            if (CurrentJump.IsPaused) return;
+            if (CurrentJump.ShouldDelete) { CurrentJump = null; return; }
+            if (!CurrentJump.ShouldJump(Interpreter)) return;
+
+            CurrentJump?.Tick();
+            Interpreter.DoUpdate();
+            if (Interpreter.BytecodeInterpreter.IsDone)
+            {
+                ConsoleGUI.Instance?.Destroy();
+                return;
+            }
         }
         if (ConsoleGUI.Instance != null) ConsoleGUI.Instance.NextRefreshConsole = true;
     }
@@ -218,7 +227,10 @@ public sealed partial class InterpreterElement : WindowElement
         ConsolePanel.Write("\n");
     }
 
-    public override void Tick(double deltaTime) => InterpreterTimer.Tick(deltaTime);
+    public override void Tick(double deltaTime)
+    {
+        OnInterpreterTimer();
+    }
 
     public override void OnMouseEvent(MouseEvent e)
     {
@@ -234,6 +246,27 @@ public sealed partial class InterpreterElement : WindowElement
         Elements.OnKeyEvent(e);
 
         if (e.IsDown == 1 && (e.VirtualKeyCode == Win32.VirtualKeyCode.Tab || e.VirtualKeyCode == Win32.VirtualKeyCode.Space))
+        {
+            if (CurrentJump is null ||
+                (CurrentJump is InstructionCountJump instructionCountJump1 && instructionCountJump1.Current == instructionCountJump1.Count))
+            {
+                CurrentJump = new BreakPointJump(Interpreter.BytecodeInterpreter.Registers.CodePointer + 1, true);
+                return;
+            }
+
+            if (CurrentJump is InstructionCountJump instructionCountJump &&
+                instructionCountJump.Current == instructionCountJump.Count)
+            {
+                instructionCountJump.Reset(1);
+                return;
+            }
+
+            CurrentJump.IsPaused = !CurrentJump.IsPaused;
+
+            return;
+        }
+
+        if (e.IsDown == 1 && (e.VirtualKeyCode == Win32.VirtualKeyCode.Return))
         {
             if (CurrentJump is null)
             {

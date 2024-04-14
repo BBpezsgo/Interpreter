@@ -227,7 +227,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     /// <summary>Stuff after BasePointer but before any variables</summary>
     readonly Stack<int> TagCount;
 
-    public ValueAddress ReturnValueAddress => new(-(ParametersSize + 1 + TagsBeforeBasePointer), AddressingMode.BasePointerRelative);
+    public ValueAddress GetReturnValueAddress(GeneralType returnType)
+    {
+        return new ValueAddress(-(ParametersSize + TagsBeforeBasePointer + returnType.Size), AddressingMode.BasePointerRelative);
+    }
 
     public static ValueAddress SavedBasePointerAddress => new(SavedBasePointerOffset, AddressingMode.BasePointerRelative);
     public static ValueAddress SavedCodePointerAddress => new(SavedCodePointerOffset, AddressingMode.BasePointerRelative);

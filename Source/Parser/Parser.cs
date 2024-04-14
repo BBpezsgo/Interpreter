@@ -2017,7 +2017,10 @@ public sealed class Parser
                 while (true)
                 {
                     if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? typeParameter))
-                    { return false; }
+                    {
+                        CurrentTokenIndex = afterIdentifier;
+                        goto End;
+                    }
 
                     genericTypes.Add(typeParameter);
 
@@ -2046,7 +2049,7 @@ public sealed class Parser
                 if (!flags.HasFlag(AllowedType.FunctionPointer))
                 {
                     CurrentTokenIndex = afterIdentifier;
-                    return true;
+                    goto End;
                 }
 
                 List<TypeInstance> parameterTypes = new();
@@ -2055,7 +2058,7 @@ public sealed class Parser
                     if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? subtype))
                     {
                         CurrentTokenIndex = afterIdentifier;
-                        return true;
+                        goto End;
                     }
 
                     parameterTypes.Add(subtype);
@@ -2092,6 +2095,7 @@ public sealed class Parser
             { break; }
         }
 
+        End:
         return true;
     }
 

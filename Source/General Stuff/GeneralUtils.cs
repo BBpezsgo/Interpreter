@@ -12,6 +12,14 @@ public interface IDuplicatable<T> : ICloneable
 
 public static partial class Utils
 {
+    public static T Max<T>(T a, T b)
+        where T : IComparisonOperators<T, T, bool>
+        => a > b ? a : b;
+
+    public static T Min<T>(T a, T b)
+        where T : IComparisonOperators<T, T, bool>
+        => a < b ? a : b;
+
     public static bool SequenceEquals<T1, T2>(IEnumerable<T1> collectionA, IEnumerable<T2> collectionB)
         where T1 : IEquatable<T2>
     {

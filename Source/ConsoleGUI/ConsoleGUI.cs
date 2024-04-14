@@ -32,25 +32,25 @@ internal sealed class MainThreadTimer : IMainThreadThing
 
     public MainThreadTimer(double interval)
     {
-        this.Interval = interval;
-        this.Enabled = false;
+        Interval = interval;
+        Enabled = false;
     }
 
     public void Tick(double deltaTime)
     {
-        if (!this.Enabled) return;
+        if (!Enabled) return;
 
-        this.Timer += deltaTime;
-        if (this.Timer >= this.Interval)
+        Timer += deltaTime;
+        if (Timer >= Interval)
         {
-            this.Elapsed?.Invoke();
+            Elapsed?.Invoke();
         }
     }
 
     public void Stop()
     {
-        this.Timer = 0d;
-        this.Enabled = false;
+        Timer = 0d;
+        Enabled = false;
     }
 }
 

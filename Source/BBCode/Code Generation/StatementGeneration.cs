@@ -174,8 +174,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         GeneralType[] parameterTypes = new GeneralType[] { deallocateableType };
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, true, out _))
-        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", position, CurrentFile); }
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, true, out WillBeCompilerException? notFoundError))
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found ({notFoundError.Message})", position, CurrentFile); }
 
         if (!deallocator.CanUse(CurrentFile))
         {
@@ -2229,6 +2229,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { debugInfo.Type = StackElementType.HeapPointer; }
         else
         { debugInfo.Type = StackElementType.Value; }
+        newVariable.CompiledType = compiledVariable.Type;
 
         CurrentScopeDebug.Last.Stack.Add(debugInfo);
 

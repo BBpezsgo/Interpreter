@@ -7,7 +7,7 @@ public sealed class Parser
 {
     int CurrentTokenIndex;
     readonly Token[] Tokens;
-    readonly Token[] OriginalTokens;
+    readonly ImmutableArray<Token> OriginalTokens;
     readonly Uri? File;
 
     Token? CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
@@ -93,7 +93,7 @@ public sealed class Parser
     readonly List<Statement.Statement> TopLevelStatements = new();
     // === ===
 
-    Parser(Token[] tokens, Uri? file)
+    Parser(ImmutableArray<Token> tokens, Uri? file)
     {
         OriginalTokens = tokens;
         Tokens = tokens
@@ -124,10 +124,10 @@ public sealed class Parser
 
     /// <exception cref="EndlessLoopException"/>
     /// <exception cref="SyntaxException"/>
-    public static ParserResult Parse(Token[] tokens, Uri? file)
+    public static ParserResult Parse(ImmutableArray<Token> tokens, Uri? file)
         => new Parser(tokens, file).ParseInternal();
 
-    public static Statement.Statement ParseStatement(Token[] tokens, Uri? file)
+    public static Statement.Statement ParseStatement(ImmutableArray<Token> tokens, Uri? file)
         => new Parser(tokens, file).ParseStatementInternal();
 
     ParserResult ParseInternal()

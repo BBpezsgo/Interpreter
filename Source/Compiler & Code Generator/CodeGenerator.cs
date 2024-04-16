@@ -707,7 +707,7 @@ public abstract class CodeGenerator
             if (arguments.ContainsNull(out IEnumerable<GeneralType>? _parameters))
             { continue; }
 
-            Dictionary<string, GeneralType> _typeArguments = new(TypeArguments);
+            Dictionary<string, GeneralType> _typeArguments = new();
 
             if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, _parameters, _typeArguments))
             { continue; }

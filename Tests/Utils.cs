@@ -766,11 +766,11 @@ public static class AssertUtils
     }
 
     /// <exception cref="AssertFailedException"/>
-    public static void PositionEquals(IPositioned[] positions, params Position[] expected)
+    public static void PositionEquals(IReadOnlyList<IPositioned> positions, params Position[] expected)
     {
-        Assert.AreEqual(positions.Length, expected.Length);
+        Assert.AreEqual(positions.Count, expected.Length);
 
-        for (int i = 0; i < positions.Length; i++)
+        for (int i = 0; i < positions.Count; i++)
         {
             if (!positions[i].Position.Equals(expected[i]))
             {
@@ -784,11 +784,11 @@ public static class AssertUtils
     }
 
     /// <exception cref="AssertFailedException"/>
-    public static void ContentEquals(LanguageCore.Tokenizing.Token[] tokens, params string[] expected)
+    public static void ContentEquals(IReadOnlyList<LanguageCore.Tokenizing.Token> tokens, params string[] expected)
     {
-        Assert.AreEqual(tokens.Length, expected.Length);
+        Assert.AreEqual(tokens.Count, expected.Length);
 
-        for (int i = 0; i < tokens.Length; i++)
+        for (int i = 0; i < tokens.Count; i++)
         { Assert.AreEqual(tokens[i].Content, expected[i], $"\"{tokens[i].Content}\" != \"{expected[i]}\" (i: {i})"); }
     }
 }

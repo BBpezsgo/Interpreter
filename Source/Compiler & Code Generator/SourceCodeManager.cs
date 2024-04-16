@@ -106,7 +106,7 @@ public class SourceCodeManager
 
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
 
-        ast = Parser.Parse(tokens, uri);
+        ast = Parser.Parse(tokens.Tokens, uri);
 
         AnalysisCollection?.Errors.AddRange(ast.Errors);
 
@@ -125,7 +125,7 @@ public class SourceCodeManager
         TokenizerResult tokens = StreamTokenizer.Tokenize(path, PreprocessorVariables, tokenizerSettings);
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
 
-        ast = Parser.Parse(tokens, new Uri(path, UriKind.Absolute));
+        ast = Parser.Parse(tokens.Tokens, new Uri(path, UriKind.Absolute));
         AnalysisCollection?.Errors.AddRange(ast.Errors);
 
         return true;

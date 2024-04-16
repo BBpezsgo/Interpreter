@@ -71,7 +71,7 @@ struct ActiveInteractiveSession
 class InteractiveCompiler
 {
     string _text;
-    Token[]? _tokens;
+    ImmutableArray<Token> _tokens;
     Statement? _parsed;
     CompilerResult _compiled;
     BBCodeGeneratorResult _generated;
@@ -79,7 +79,7 @@ class InteractiveCompiler
     readonly Action<Task> _onCompiledAsync;
     readonly Queue<Task> _completedTasks;
 
-    public IReadOnlyList<Token>? Tokens => _tokens;
+    public ImmutableArray<Token> Tokens => _tokens;
     public Statement? Statement => _parsed;
     public CompilerResult Compiled => _compiled;
     public BBCodeGeneratorResult Generated => _generated;
@@ -99,7 +99,7 @@ class InteractiveCompiler
     public InteractiveCompiler(Action<Task> onCompiledAsync)
     {
         _text = string.Empty;
-        _tokens = null;
+        _tokens = ImmutableArray<Token>.Empty;
         _parsed = null;
         _compiled = CompilerResult.Empty;
         _generated = default;
@@ -110,11 +110,11 @@ class InteractiveCompiler
 
     public void Compile(string text)
     {
-        if (_tokens != null && _parsed != null && string.Equals(text, _text))
+        if (_parsed != null && string.Equals(text, _text))
         { return; }
 
         _text = text;
-        _tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive);
+        _tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive).Tokens;
         _parsed = default;
         _compiled = default;
         _generated = default;
@@ -145,7 +145,7 @@ class InteractiveCompiler
 
     public void CompileAsync(string text)
     {
-        if (_tokens != null && _parsed != null && string.Equals(text, _text))
+        if (_parsed != null && string.Equals(text, _text))
         { return; }
 
         if (_task != null && !_task.IsCompleted)
@@ -163,7 +163,7 @@ class InteractiveCompiler
 
     void CompileTask()
     {
-        _tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive);
+        _tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive).Tokens;
         _parsed = default;
         _compiled = default;
         _generated = default;
@@ -719,7 +719,7 @@ public class Interactive
         {
             CompilerCache.Compile(Input.ToString());
 
-            if (CompilerCache.Tokens == null || CompilerCache.Tokens.Count == 0) return;
+            if (CompilerCache.Tokens.IsEmpty) return;
 
             Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 

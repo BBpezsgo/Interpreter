@@ -197,13 +197,13 @@ public static class Entry
                 Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
 
                 BrainfuckGeneratorResult generated;
-                Token[] tokens;
+                ImmutableArray<Token> tokens;
                 BrainfuckGeneratorSettings generatorSettings = arguments.BrainfuckGeneratorSettings;
 
                 AnalysisCollection analysisCollection = new();
                 if (arguments.ThrowErrors)
                 {
-                    tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck);
+                    tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck).Tokens;
                     CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
@@ -214,7 +214,7 @@ public static class Entry
                 {
                     try
                     {
-                        tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck);
+                        tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck).Tokens;
                         CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();

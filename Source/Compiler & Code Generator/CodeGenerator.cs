@@ -1357,23 +1357,57 @@ public abstract class CodeGenerator
         _ => throw new NotImplementedException($"Initial value for type \"{type}\" isn't implemented"),
     };
 
-    /// <exception cref="NotImplementedException"></exception>
-    /// <exception cref="CompilerException"></exception>
-    /// <exception cref="InternalException"></exception>
-    protected static DataItem GetInitialValue(TypeInstance type)
-        => type.ToString() switch
-        {
-            TypeKeywords.Int => new DataItem((int)0),
-            TypeKeywords.Byte => new DataItem((byte)0),
-            TypeKeywords.Float => new DataItem((float)0f),
-            TypeKeywords.Char => new DataItem((char)'\0'),
-            StatementKeywords.Var => throw new InternalException("Undefined type"),
-            TypeKeywords.Void => throw new InternalException("Invalid type"),
-            _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
-        };
+    /// <exception cref="NotImplementedException"/>
+    /// <exception cref="CompilerException"/>
+    /// <exception cref="InternalException"/>
+    protected static DataItem GetInitialValue(TypeInstance type) => type.ToString() switch
+    {
+        TypeKeywords.Int => new DataItem((int)0),
+        TypeKeywords.Byte => new DataItem((byte)0),
+        TypeKeywords.Float => new DataItem((float)0f),
+        TypeKeywords.Char => new DataItem((char)'\0'),
+        StatementKeywords.Var => throw new InternalException("Undefined type"),
+        TypeKeywords.Void => throw new InternalException("Invalid type"),
+        _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
+    };
 
-    /// <exception cref="NotImplementedException"></exception>
-    /// <exception cref="InternalException"></exception>
+    /// <exception cref="NotImplementedException"/>
+    /// <exception cref="CompilerException"/>
+    /// <exception cref="InternalException"/>
+    protected static bool GetInitialValue(TypeInstance type, out DataItem value)
+    {
+        switch (type.ToString())
+        {
+            case TypeKeywords.Int:
+            {
+                value = new DataItem((int)0);
+                return true;
+            }
+            case TypeKeywords.Byte:
+            {
+                value = new DataItem((byte)0);
+                return true;
+            }
+            case TypeKeywords.Float:
+            {
+                value = new DataItem((float)0f);
+                return true;
+            }
+            case TypeKeywords.Char:
+            {
+                value = new DataItem((char)'\0');
+                return true;
+            }
+            default:
+            {
+                value = default;
+                return false;
+            }
+        };
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    /// <exception cref="InternalException"/>
     protected static DataItem GetInitialValue(GeneralType type)
     {
         switch (type)
@@ -3102,7 +3136,8 @@ public abstract class CodeGenerator
         if (variableDeclaration.InitialValue is null &&
             variableDeclaration.Type.ToString() != StatementKeywords.Var)
         {
-            value = GetInitialValue(variableDeclaration.Type);
+            if (!GetInitialValue(variableDeclaration.Type, out value))
+            { return false; }
         }
         else
         {

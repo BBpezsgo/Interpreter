@@ -323,7 +323,7 @@ internal sealed class ConsoleGUI
             }
         }
     }
-    void WriteConsole(ref SmallRect rect)
+    unsafe void WriteConsole(ref SmallRect rect)
     {
         if (ConsoleHandle.IsInvalid)
         {
@@ -336,11 +336,14 @@ internal sealed class ConsoleGUI
             return;
         }
 
-        if (Kernel32.WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
-            new SmallSize((short)Console.WindowWidth, (short)Console.WindowHeight),
-            new Coord(0, 0),
-            ref rect) == 0)
-        { throw WindowsException.Get(); }
+        fixed (ConsoleChar* consoleBufferPtr = ConsoleBuffer)
+        {
+            if (Kernel32.WriteConsoleOutputW(ConsoleHandle, consoleBufferPtr,
+                new SmallSize((short)Console.WindowWidth, (short)Console.WindowHeight),
+                new Coord(0, 0),
+                ref rect) == 0)
+            { throw WindowsException.Get(); }
+        }
     }
 
     void KeyEventThread(KeyEvent e) => KeyEvents.Add(e);

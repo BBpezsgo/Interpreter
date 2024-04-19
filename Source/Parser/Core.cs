@@ -62,6 +62,8 @@ public readonly struct ParserResult
     public readonly ImmutableArray<Token> OriginalTokens;
     public readonly ImmutableArray<Token> Tokens;
 
+    public bool IsEmpty { get; private init; }
+
     public static ParserResult Empty => new(
         Enumerable.Empty<Error>(),
         Enumerable.Empty<FunctionDefinition>(),
@@ -72,7 +74,8 @@ public readonly struct ParserResult
         Enumerable.Empty<Statement.Statement>(),
         Enumerable.Empty<EnumDefinition>(),
         Enumerable.Empty<Token>(),
-        Enumerable.Empty<Token>());
+        Enumerable.Empty<Token>())
+    { IsEmpty = true };
 
     public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<FunctionDefinition> operators, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, IEnumerable<Token> originalTokens, IEnumerable<Token> tokens)
     {
@@ -88,6 +91,8 @@ public readonly struct ParserResult
         Enums = enums.ToImmutableArray();
         OriginalTokens = originalTokens.ToImmutableArray();
         Tokens = tokens.ToImmutableArray();
+
+        IsEmpty = false;
     }
 
     public void SetFile(Uri path)

@@ -1,10 +1,14 @@
-﻿namespace LanguageCore;
+﻿using LanguageCore.Parser;
 
-public abstract class NotExceptionBut
+namespace LanguageCore;
+
+public abstract class NotExceptionBut : IInFile
 {
     public string Message { get; }
     public Position Position { get; }
     public Uri? Uri { get; }
+
+    Uri? IInFile.FilePath { get => Uri; set => throw new InvalidOperationException(); }
 
     protected NotExceptionBut(string message, Position position, Uri? file)
     {

@@ -91,7 +91,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         this.ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
         this.GeneratedCode = new List<PreparationInstruction>();
-        this.DebugInfo = new DebugInformation(compilerResult.Tokens);
+        this.DebugInfo = new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Key, v.Value.Tokens)));
         this.CleanupStack = new Stack<CleanupItem[]>();
         this.ReturnInstructions = new Stack<List<int>>();
         this.BreakInstructions = new Stack<List<int>>();
@@ -187,10 +187,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (CurrentFile == null)
         { Debugger.Break(); }
 #endif
-        Print?.Invoke($"Generating top level statements for file {compilerResult.TopLevelStatements[^1].File?.ToString() ?? "null"} ...", LogType.Debug);
-        GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements[^1].Statements, true);
-
-        AddInstruction(Opcode.Exit);
+        if (compilerResult.TopLevelStatements.Length > 0)
+        {
+            Print?.Invoke($"Generating top level statements for file {compilerResult.TopLevelStatements[^1].File?.ToString() ?? "null"} ...", LogType.Debug);
+            GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements[^1].Statements, true);
+            AddInstruction(Opcode.Exit);
+        }
 
         while (true)
         {

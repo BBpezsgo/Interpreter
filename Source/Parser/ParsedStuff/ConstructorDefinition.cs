@@ -32,7 +32,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
         TypeInstance type,
         IEnumerable<Token> modifiers,
         ParameterDefinitionCollection parameters)
-        : base(modifiers, new Token(TokenType.Identifier, type.ToString(), true, type.Position), parameters, null)
+        : base(modifiers, Token.CreateAnonymous(type.ToString(), TokenType.Identifier, type.Position), parameters, null)
     {
         Type = type;
     }

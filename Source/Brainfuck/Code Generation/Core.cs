@@ -342,7 +342,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         GeneratorSettings = settings;
         Returns = new Stack<ControlFlowBlock>();
         Breaks = new Stack<ControlFlowBlock>();
-        DebugInfo = settings.GenerateDebugInformation ? new DebugInformation(compilerResult.Tokens) : null;
+        DebugInfo = settings.GenerateDebugInformation ? new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Key, v.Value.Tokens))) : null;
         ShowProgress = settings.ShowProgress;
         MaxRecursiveDepth = 4;
     }

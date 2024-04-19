@@ -999,7 +999,7 @@ public sealed class Parser
                     { break; }
 
                     if (!ExpectOperator(","))
-                    { throw new SyntaxException("Expected \",\" to separate parameters", parameter, File); }
+                    { throw new SyntaxException("Expected \",\" to separate parameters", parameter.Position.After(), File); }
                     else
                     { expectParameter = true; }
 
@@ -1667,7 +1667,7 @@ public sealed class Parser
             { break; }
 
             if (!ExpectOperator(","))
-            { throw new SyntaxException("Expected \",\" to separate parameters", parameter, File); }
+            { throw new SyntaxException("Expected \",\" to separate parameters", parameter.Position.After(), File); }
             else
             { expectParameter = true; }
 

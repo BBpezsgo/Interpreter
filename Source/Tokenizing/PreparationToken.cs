@@ -25,25 +25,7 @@ sealed class PreparationToken :
     public override string ToString() => Content.ToString();
 
     /// <exception cref="InternalException"/>
-    public Token Instantiate() => new(TokenType switch
-    {
-        PreparationTokenType.Whitespace => Tokenizing.TokenType.Whitespace,
-        PreparationTokenType.LineBreak => Tokenizing.TokenType.LineBreak,
-        PreparationTokenType.Identifier => Tokenizing.TokenType.Identifier,
-        PreparationTokenType.LiteralNumber => Tokenizing.TokenType.LiteralNumber,
-        PreparationTokenType.LiteralHex => Tokenizing.TokenType.LiteralHex,
-        PreparationTokenType.LiteralBinary => Tokenizing.TokenType.LiteralBinary,
-        PreparationTokenType.LiteralString => Tokenizing.TokenType.LiteralString,
-        PreparationTokenType.LiteralCharacter => Tokenizing.TokenType.LiteralCharacter,
-        PreparationTokenType.LiteralFloat => Tokenizing.TokenType.LiteralFloat,
-        PreparationTokenType.Operator => Tokenizing.TokenType.Operator,
-        PreparationTokenType.Comment => Tokenizing.TokenType.Comment,
-        PreparationTokenType.CommentMultiline => Tokenizing.TokenType.CommentMultiline,
-        PreparationTokenType.PREPROCESS_Identifier => Tokenizing.TokenType.PreprocessIdentifier,
-        PreparationTokenType.PREPROCESS_Argument => Tokenizing.TokenType.PreprocessArgument,
-        PreparationTokenType.PREPROCESS_Skipped => Tokenizing.TokenType.PreprocessSkipped,
-        _ => throw new InternalException($"Token {this} isn't finished (type is {TokenType})"),
-    }, Content.ToString(), false, Position);
+    public Token Instantiate() => new(this);
 
     /// <exception cref="NotImplementedException"/>
     /// <exception cref="ArgumentOutOfRangeException"/>

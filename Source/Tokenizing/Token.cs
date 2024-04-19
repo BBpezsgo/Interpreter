@@ -17,13 +17,40 @@ public class Token :
     public Position Position { get; }
     public TokenAnalyzedType AnalyzedType { get; set; }
 
-    public Token(TokenType type, string content, bool isAnonymous, Position position)
+    Token(TokenType type, string content, bool isAnonymous, Position position)
     {
         TokenType = type;
         Content = content;
         IsAnonymous = isAnonymous;
         Position = position;
         AnalyzedType = TokenAnalyzedType.None;
+    }
+
+    /// <exception cref="InternalException"/>
+    internal Token(PreparationToken preparationToken)
+    {
+        TokenType = preparationToken.TokenType switch
+        {
+            PreparationTokenType.Whitespace => TokenType.Whitespace,
+            PreparationTokenType.LineBreak => TokenType.LineBreak,
+            PreparationTokenType.Identifier => TokenType.Identifier,
+            PreparationTokenType.LiteralNumber => TokenType.LiteralNumber,
+            PreparationTokenType.LiteralHex => TokenType.LiteralHex,
+            PreparationTokenType.LiteralBinary => TokenType.LiteralBinary,
+            PreparationTokenType.LiteralString => TokenType.LiteralString,
+            PreparationTokenType.LiteralCharacter => TokenType.LiteralCharacter,
+            PreparationTokenType.LiteralFloat => TokenType.LiteralFloat,
+            PreparationTokenType.Operator => TokenType.Operator,
+            PreparationTokenType.Comment => TokenType.Comment,
+            PreparationTokenType.CommentMultiline => TokenType.CommentMultiline,
+            PreparationTokenType.PREPROCESS_Identifier => TokenType.PreprocessIdentifier,
+            PreparationTokenType.PREPROCESS_Argument => TokenType.PreprocessArgument,
+            PreparationTokenType.PREPROCESS_Skipped => TokenType.PreprocessSkipped,
+            _ => throw new InternalException($"Token {this} isn't finished (type is {TokenType})"),
+        };
+        Content = preparationToken.Content.ToString();
+        IsAnonymous = false;
+        Position = preparationToken.Position;
     }
 
     public override string ToString() => Content;
@@ -93,8 +120,8 @@ public class Token :
 
         (Position leftPosition, Position rightPosition) = Position.Slice(at);
 
-        Token left = new(TokenType, Content[..at], IsAnonymous, leftPosition);
-        Token right = new(TokenType, Content[at..], IsAnonymous, rightPosition);
+        Token left = new(TokenType, Content[..at], IsAnonymous, leftPosition) { AnalyzedType = AnalyzedType };
+        Token right = new(TokenType, Content[at..], IsAnonymous, rightPosition) { AnalyzedType = AnalyzedType };
 
         return (left, right);
     }

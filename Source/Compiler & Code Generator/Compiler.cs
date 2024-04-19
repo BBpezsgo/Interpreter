@@ -21,7 +21,7 @@ public readonly struct CompilerResult
     public readonly ImmutableArray<CompiledOperator> Operators;
     public readonly ImmutableArray<CompiledConstructor> Constructors;
 
-    public readonly ImmutableDictionary<Uri, ImmutableArray<Token>> Tokens;
+    public readonly ImmutableDictionary<Uri, CollectedAST> Raw;
 
     public readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
 
@@ -119,7 +119,7 @@ public readonly struct CompilerResult
     }
 
     public static CompilerResult Empty => new(
-        Enumerable.Empty<KeyValuePair<Uri, ImmutableArray<Token>>>(),
+        Enumerable.Empty<KeyValuePair<Uri, CollectedAST>>(),
         Enumerable.Empty<CompiledFunction>(),
         Enumerable.Empty<CompiledGeneralFunction>(),
         Enumerable.Empty<CompiledOperator>(),
@@ -132,7 +132,7 @@ public readonly struct CompilerResult
         null);
 
     public CompilerResult(
-        IEnumerable<KeyValuePair<Uri, ImmutableArray<Token>>> tokens,
+        IEnumerable<KeyValuePair<Uri, CollectedAST>> tokens,
         IEnumerable<CompiledFunction> functions,
         IEnumerable<CompiledGeneralFunction> generalFunctions,
         IEnumerable<CompiledOperator> operators,
@@ -144,7 +144,7 @@ public readonly struct CompilerResult
         IEnumerable<(ImmutableArray<Statement> Statements, Uri? File)> topLevelStatements,
         Uri? file)
     {
-        Tokens = tokens.ToImmutableDictionary();
+        Raw = tokens.ToImmutableDictionary();
         Functions = functions.ToImmutableArray();
         GeneralFunctions = generalFunctions.ToImmutableArray();
         Operators = operators.ToImmutableArray();
@@ -560,9 +560,9 @@ public sealed class Compiler
         return false;
     }
 
-    void CompileFile(CollectedAST collectedAST)
+    void CompileFile(CollectedAST collectedAST, bool addTopLevelStatements = true)
     {
-        if (collectedAST.ParserResult.TopLevelStatements.Length > 0)
+        if (addTopLevelStatements)
         { TopLevelStatements.Add((collectedAST.ParserResult.TopLevelStatements, collectedAST.Uri)); }
 
         foreach (FunctionDefinition function in collectedAST.ParserResult.Functions)
@@ -600,34 +600,23 @@ public sealed class Compiler
         Tags.AddRange(collectedAST.ParserResult.Hashes);
     }
 
-    CompilerResult CompileMainFile(ParserResult parserResult, Uri? file)
+    CompilerResult CompileMainFile(Uri file, FileParser? fileParser)
     {
-        Structs.AddRange(parserResult.Structs);
-        Functions.AddRange(parserResult.Functions);
-        Operators.AddRange(parserResult.Operators);
-        Enums.AddRange(parserResult.Enums);
+        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, fileParser);
 
-        Dictionary<Uri, ImmutableArray<Token>> tokens = new();
+        foreach ((Uri file_, CollectedAST ast) in files)
+        { CompileFile(ast, file_ != file); }
 
-        if (file != null)
+        foreach ((Uri file_, CollectedAST ast) in files)
         {
-            tokens[file] = parserResult.OriginalTokens;
-
-            ImmutableArray<CollectedAST> files = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings);
-
-            for (int i = 0; i < files.Length; i++)
-            {
-                tokens[files[i].Uri] = files[i].Tokens;
-                CompileFile(files[i]);
-            }
+            if (file_ == file)
+            { TopLevelStatements.Add((ast.ParserResult.TopLevelStatements, file_)); }
         }
-
-        TopLevelStatements.Add((parserResult.TopLevelStatements, file));
 
         CompileInternal();
 
         return new CompilerResult(
-            tokens,
+            files,
             CompiledFunctions,
             CompiledGeneralFunctions,
             CompiledOperators,
@@ -642,22 +631,17 @@ public sealed class Compiler
 
     CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings)
     {
-        ImmutableArray<CollectedAST> files = SourceCodeManager.Collect(usings, null, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings);
+        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(usings, null, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, null);
 
-        Dictionary<Uri, ImmutableArray<Token>> tokens = new();
-
-        for (int i = 0; i < files.Length; i++)
-        {
-            tokens[files[i].Uri] = files[i].Tokens;
-            CompileFile(files[i]);
-        }
+        foreach (CollectedAST file in files.Values)
+        { CompileFile(file); }
 
         TopLevelStatements.Add(([statement], null));
 
         CompileInternal();
 
         return new CompilerResult(
-            tokens,
+            files,
             CompiledFunctions,
             CompiledGeneralFunctions,
             CompiledOperators,
@@ -712,10 +696,12 @@ public sealed class Compiler
 
                     if (returnType == BasicType.Void)
                     {
+#pragma warning disable RCS1021
                         ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                         {
                             Output.LogDebug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                         });
+#pragma warning restore RCS1021
                     }
                     else
                     {
@@ -1035,18 +1021,24 @@ public sealed class Compiler
     /// <exception cref="InternalException"/>
     /// <exception cref="NotImplementedException"/>
     /// <exception cref="Exception"/>
-    public static CompilerResult Compile(
-        ParserResult parserResult,
+    public static CompilerResult CompileFile(
+        Uri file,
         Dictionary<int, ExternalFunctionBase>? externalFunctions,
-        Uri? file,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,
         AnalysisCollection? analysisCollection,
-        TokenizerSettings? tokenizerSettings)
+        TokenizerSettings? tokenizerSettings,
+        FileParser? fileParser)
     {
-        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables, tokenizerSettings);
-        return compiler.CompileMainFile(parserResult, file);
+        Compiler compiler = new(
+            externalFunctions,
+            printCallback,
+            settings,
+            analysisCollection,
+            preprocessorVariables,
+            tokenizerSettings);
+        return compiler.CompileMainFile(file, fileParser);
     }
 
     /// <exception cref="EndlessLoopException"/>
@@ -1063,11 +1055,18 @@ public sealed class Compiler
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,
         AnalysisCollection? analysisCollection,
-        TokenizerSettings? tokenizerSettings)
+        TokenizerSettings? tokenizerSettings,
+        FileParser? fileParser)
     {
-        ParserResult ast = Parser.ParseFile(file.FullName, preprocessorVariables, tokenizerSettings);
-        Compiler compiler = new(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables, tokenizerSettings);
-        return compiler.CompileMainFile(ast, new Uri(file.FullName, UriKind.Absolute));
+        Compiler compiler = new(
+            externalFunctions,
+            printCallback,
+            settings,
+            analysisCollection,
+            preprocessorVariables,
+            tokenizerSettings);
+        Uri uri = new(file.FullName, UriKind.Absolute);
+        return compiler.CompileMainFile(uri, fileParser);
     }
 
     public static CompilerResult CompileInteractive(
@@ -1079,5 +1078,14 @@ public sealed class Compiler
         PrintCallback? printCallback,
         AnalysisCollection? analysisCollection,
         TokenizerSettings? tokenizerSettings)
-        => new Compiler(externalFunctions, printCallback, settings, analysisCollection, preprocessorVariables, tokenizerSettings).CompileInteractiveInternal(statement, usings);
+    {
+        Compiler compiler = new(
+            externalFunctions,
+            printCallback,
+            settings,
+            analysisCollection,
+            preprocessorVariables,
+            tokenizerSettings);
+        return compiler.CompileInteractiveInternal(statement, usings);
+    }
 }

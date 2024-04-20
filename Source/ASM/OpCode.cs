@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.ASM;
 
-public enum Instruction
+public enum OpCode
 {
     #region General Purpose Data Transfers
 

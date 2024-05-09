@@ -44,8 +44,9 @@ public class FunctionDefinition : FunctionThingDefinition,
         TypeInstance type,
         Token identifier,
         ParameterDefinitionCollection parameters,
-        TemplateInfo? templateInfo)
-        : base(modifiers, identifier, parameters, templateInfo)
+        TemplateInfo? templateInfo,
+        Uri? file)
+        : base(modifiers, identifier, parameters, templateInfo, file)
     {
         Attributes = attributes.ToImmutableArray();
         Type = type;
@@ -85,10 +86,9 @@ public class FunctionDefinition : FunctionThingDefinition,
         return true;
     }
 
-    public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), Template)
+    public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), Template, FilePath)
     {
         Block = Block,
-        FilePath = FilePath,
         Context = Context,
     };
 }

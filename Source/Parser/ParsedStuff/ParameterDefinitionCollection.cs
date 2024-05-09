@@ -14,6 +14,7 @@ public class ParameterDefinitionCollection :
     public TokenPair Brackets { get; }
     public int Count => _parameters.Length;
     [NotNull] public FunctionThingDefinition? Context { get; set; }
+
     public Position Position =>
         new Position(Brackets)
         .Union(_parameters);

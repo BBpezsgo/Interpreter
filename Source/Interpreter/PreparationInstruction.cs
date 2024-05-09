@@ -3,8 +3,8 @@
 [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
 public class PreparationInstruction
 {
-    public AddressingMode AddressingMode;
     public Opcode Opcode;
+    public AddressingMode AddressingMode;
     public DataItem Parameter;
 
     public PreparationInstruction(Opcode opcode, DataItem parameter)

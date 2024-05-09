@@ -12,7 +12,7 @@ struct Stringify
 public interface IReferenceableTo
 {
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 }
 
 public readonly struct TokenPair :
@@ -338,16 +338,21 @@ public class CompileTag : Statement, IInFile
     public Token Operator { get; }
     public Token Identifier { get; }
     public ImmutableArray<Literal> Parameters { get; }
-    public Uri? FilePath { get; set; }
+    public Uri? FilePath { get; }
     public override Position Position =>
         new Position(Operator, Identifier)
         .Union(Parameters);
 
-    public CompileTag(Token hashToken, Token hashName, IEnumerable<Literal> parameters)
+    public CompileTag(
+        Token hashToken,
+        Token hashName,
+        IEnumerable<Literal> parameters,
+        Uri? file)
     {
         Operator = hashToken;
         Identifier = hashName;
         Parameters = parameters.ToImmutableArray();
+        FilePath = file;
     }
 
     public override string ToString()
@@ -427,7 +432,7 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
     public StatementWithValue? InitialValue { get; }
     public ImmutableArray<Token> Modifiers { get; }
     public GeneralType? CompiledType { get; set; }
-    public Uri? FilePath { get; set; }
+    public Uri? FilePath { get; }
     public override Position Position =>
         new Position(Type, Identifier, InitialValue)
         .Union(Modifiers);
@@ -443,12 +448,18 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
         CompiledType = other.CompiledType;
     }
 
-    public VariableDeclaration(IEnumerable<Token> modifiers, TypeInstance type, Token variableName, StatementWithValue? initialValue)
+    public VariableDeclaration(
+        IEnumerable<Token> modifiers,
+        TypeInstance type,
+        Token variableName,
+        StatementWithValue? initialValue,
+        Uri? file)
     {
         Type = type;
         Identifier = variableName;
         InitialValue = initialValue;
         Modifiers = modifiers.ToImmutableArray();
+        FilePath = file;
     }
 
     public override string ToString()
@@ -465,14 +476,15 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
         }
     }
 
-    public static VariableDeclaration CreateAnonymous(GeneralType type, string name, StatementWithValue? initialValue = null)
-        => CreateAnonymous(type.ToTypeInstance(), name, initialValue);
+    public static VariableDeclaration CreateAnonymous(GeneralType type, string name, StatementWithValue? initialValue = null, Uri? file = null)
+        => CreateAnonymous(type.ToTypeInstance(), name, initialValue, file);
 
-    public static VariableDeclaration CreateAnonymous(TypeInstance type, string name, StatementWithValue? initialValue = null) => new(
+    public static VariableDeclaration CreateAnonymous(TypeInstance type, string name, StatementWithValue? initialValue = null, Uri? file = null) => new(
         Enumerable.Empty<Token>(),
         type,
         Token.CreateAnonymous(name),
-        initialValue);
+        initialValue,
+        file);
 }
 
 public class TypeStatement : StatementWithValue
@@ -512,15 +524,20 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
     public TokenPair Brackets { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public override Position Position => new(PrevStatement, Brackets);
 
-    public AnyCall(StatementWithValue prevStatement, IEnumerable<StatementWithValue> parameters, TokenPair brackets)
+    public AnyCall(
+        StatementWithValue prevStatement,
+        IEnumerable<StatementWithValue> parameters,
+        TokenPair brackets,
+        Uri? file)
     {
         PrevStatement = prevStatement;
         Parameters = parameters.ToImmutableArray();
         Brackets = brackets;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -572,7 +589,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
 
         if (PrevStatement is Identifier functionIdentifier)
         {
-            functionCall = new FunctionCall(null, functionIdentifier.Token, Parameters, Brackets)
+            functionCall = new FunctionCall(null, functionIdentifier.Token, Parameters, Brackets, OriginalFile)
             {
                 Semicolon = Semicolon,
                 SaveValue = SaveValue,
@@ -580,14 +597,13 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
                 CompiledType = CompiledType,
                 PredictedValue = PredictedValue,
                 Reference = Reference,
-                OriginalFile = OriginalFile,
             };
             return true;
         }
 
         if (PrevStatement is Field field)
         {
-            functionCall = new FunctionCall(field.PrevStatement, field.Identifier, Parameters, Brackets)
+            functionCall = new FunctionCall(field.PrevStatement, field.Identifier, Parameters, Brackets, OriginalFile)
             {
                 Semicolon = Semicolon,
                 SaveValue = SaveValue,
@@ -595,7 +611,6 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
                 CompiledType = CompiledType,
                 PredictedValue = PredictedValue,
                 Reference = Reference,
-                OriginalFile = OriginalFile,
             };
             return true;
         }
@@ -625,7 +640,7 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
     public StatementWithValue? PrevStatement { get; }
     public TokenPair Brackets { get; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public bool IsMethodCall => PrevStatement != null;
     public StatementWithValue[] MethodParameters
@@ -643,12 +658,18 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
         new Position(Brackets, Identifier)
         .Union(MethodParameters);
 
-    public FunctionCall(StatementWithValue? prevStatement, Token identifier, IEnumerable<StatementWithValue> parameters, TokenPair brackets)
+    public FunctionCall(
+        StatementWithValue? prevStatement,
+        Token identifier,
+        IEnumerable<StatementWithValue> parameters,
+        TokenPair brackets,
+        Uri? file)
     {
         PrevStatement = prevStatement;
         Identifier = identifier;
         Parameters = parameters.ToImmutableArray();
         Brackets = brackets;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -797,16 +818,21 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; set; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public override Position Position => new(Operator, Left, Right);
     public StatementWithValue[] Parameters => new StatementWithValue[] { Left, Right };
 
-    public BinaryOperatorCall(Token op, StatementWithValue left, StatementWithValue right)
+    public BinaryOperatorCall(
+        Token op,
+        StatementWithValue left,
+        StatementWithValue right,
+        Uri? file)
     {
         Operator = op;
         Left = left;
         Right = right;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -868,15 +894,19 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public override Position Position => new(Operator, Left);
     public StatementWithValue[] Parameters => new StatementWithValue[] { Left };
 
-    public UnaryOperatorCall(Token op, StatementWithValue left)
+    public UnaryOperatorCall(
+        Token op,
+        StatementWithValue left,
+        Uri? file)
     {
         Operator = op;
         Left = left;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -934,15 +964,19 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public StatementWithValue[] Parameters => new StatementWithValue[] { Left };
     public override Position Position => new(Operator, Left);
 
-    public ShortOperatorCall(Token op, StatementWithValue left)
+    public ShortOperatorCall(
+        Token op,
+        StatementWithValue left,
+        Uri? file)
     {
         Operator = op;
         Left = left;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -987,7 +1021,7 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
     {
         BinaryOperatorCall operatorCall = GetOperatorCall();
         Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
-        return new Assignment(assignmentToken, Left, operatorCall);
+        return new Assignment(assignmentToken, Left, operatorCall, OriginalFile);
     }
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
@@ -1006,13 +1040,13 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
             case "++":
             {
                 Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
-                return new BinaryOperatorCall(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one);
+                return new BinaryOperatorCall(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one, OriginalFile);
             }
 
             case "--":
             {
                 Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
-                return new BinaryOperatorCall(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one);
+                return new BinaryOperatorCall(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one, OriginalFile);
             }
 
             default: throw new NotImplementedException();
@@ -1029,15 +1063,20 @@ public class Assignment : AnyAssignment, IReferenceableTo
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public override Position Position => new(Operator, Left, Right);
 
-    public Assignment(Token @operator, StatementWithValue left, StatementWithValue right)
+    public Assignment(
+        Token @operator,
+        StatementWithValue left,
+        StatementWithValue right,
+        Uri? file)
     {
         Operator = @operator;
         Left = left;
         Right = right;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -1085,16 +1124,21 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; }
-    public Uri? OriginalFile { get; set; }
-
-    public override Position Position => new(Operator, Left, Right);
+    public Uri? OriginalFile { get; }
     public object? Reference { get; set; }
 
-    public CompoundAssignment(Token @operator, StatementWithValue left, StatementWithValue right)
+    public override Position Position => new(Operator, Left, Right);
+
+    public CompoundAssignment(
+        Token @operator,
+        StatementWithValue left,
+        StatementWithValue right,
+        Uri? file)
     {
         Operator = @operator;
         Left = left;
         Right = right;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -1124,13 +1168,14 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo
     public override Assignment ToAssignment()
     {
         BinaryOperatorCall statementToAssign = GetOperatorCall();
-        return new Assignment(Token.CreateAnonymous("=", TokenType.Operator, Operator.Position), Left, statementToAssign);
+        return new Assignment(Token.CreateAnonymous("=", TokenType.Operator, Operator.Position), Left, statementToAssign, OriginalFile);
     }
 
     public BinaryOperatorCall GetOperatorCall() => new(
         Token.CreateAnonymous(Operator.Content.Replace("=", string.Empty, StringComparison.Ordinal), TokenType.Operator, Operator.Position),
         Left,
-        Right);
+        Right,
+        OriginalFile);
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -1326,12 +1371,18 @@ public class Identifier : StatementWithValue, IReferenceableTo
 {
     public Token Token { get; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public string Content => Token.Content;
     public override Position Position => Token.Position;
 
-    public Identifier(Token token) => Token = token;
+    public Identifier(
+        Token token,
+        Uri? file)
+    {
+        Token = token;
+        OriginalFile = file;
+    }
 
     public override string ToString() => Token.Content;
 
@@ -1628,18 +1679,24 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo, 
     public ImmutableArray<StatementWithValue> Parameters { get; }
     public TokenPair Brackets { get; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public override Position Position =>
         new Position(Keyword, Type, Brackets)
         .Union(Parameters);
 
-    public ConstructorCall(Token keyword, TypeInstance typeName, IEnumerable<StatementWithValue> parameters, TokenPair brackets)
+    public ConstructorCall(
+        Token keyword,
+        TypeInstance typeName,
+        IEnumerable<StatementWithValue> parameters,
+        TokenPair brackets,
+        Uri? file)
     {
         Keyword = keyword;
         Type = typeName;
         Parameters = parameters.ToImmutableArray();
         Brackets = brackets;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -1712,15 +1769,20 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo
     public StatementWithValue Index { get; }
     public TokenPair Brackets { get; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public override Position Position => new(PrevStatement, Index);
 
-    public IndexCall(StatementWithValue prevStatement, StatementWithValue indexStatement, TokenPair brackets)
+    public IndexCall(
+        StatementWithValue prevStatement,
+        StatementWithValue indexStatement,
+        TokenPair brackets,
+        Uri? file)
     {
         PrevStatement = prevStatement;
         Index = indexStatement;
         Brackets = brackets;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -1759,14 +1821,18 @@ public class Field : StatementWithValue, IReferenceableTo
     public Token Identifier { get; }
     public StatementWithValue PrevStatement { get; }
     public object? Reference { get; set; }
-    public Uri? OriginalFile { get; set; }
+    public Uri? OriginalFile { get; }
 
     public override Position Position => new(PrevStatement, Identifier);
 
-    public Field(StatementWithValue prevStatement, Token fieldName)
+    public Field(
+        StatementWithValue prevStatement,
+        Token fieldName,
+        Uri? file)
     {
         PrevStatement = prevStatement;
         Identifier = fieldName;
+        OriginalFile = file;
     }
 
     public override string ToString()
@@ -1786,6 +1852,7 @@ public class TypeCast : StatementWithValue, IHaveType
     public StatementWithValue PrevStatement { get; }
     public Token Keyword { get; }
     public TypeInstance Type { get; }
+
     public override Position Position => new(PrevStatement, Keyword, Type);
 
     public TypeCast(StatementWithValue prevStatement, Token keyword, TypeInstance type)

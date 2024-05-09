@@ -292,7 +292,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             UndiscardVariable(CompiledVariables, variable.Name);
 
-            int tempAddress = Stack.NextAddress;
+            using StackAddress tempAddress = Stack.GetTemporaryAddress();
 
             int size = valueVariable.Size;
             for (int offset = 0; offset < size; offset++)
@@ -300,7 +300,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 int offsettedSource = valueVariable.Address + offset;
                 int offsettedTarget = variable.Address + offset;
 
-                Code.CopyValueWithTemp(offsettedSource, tempAddress, offsettedTarget);
+                Code.CopyValue(offsettedSource, offsettedTarget, tempAddress);
             }
 
             Optimizations++;
@@ -318,17 +318,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 AssignTypeCheck(variable.Type, constantValue, value);
 
                 Code.SetValue(variable.Address, constantValue);
-
-                /*
-                if (constantValue.Type == RuntimeType.String)
-                {
-                    string v = (string)constantValue;
-                    for (int i = 0; i < v.Length; i++)
-                    {
-                        Code.SetValue(variable.Address + i, v[i]);
-                    }
-                }
-                */
 
                 Optimizations++;
 
@@ -353,18 +342,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
-                    int tempAddress2 = Stack.Push(0);
-                    int tempAddress3 = Stack.Push(0);
-
-                    for (int i = 0; i < literal.Value.Length; i++)
+                    using StackAddress indexAddress = Stack.GetTemporaryAddress();
+                    using StackAddress valueAddress = Stack.GetTemporaryAddress();
                     {
-                        Code.SetValue(tempAddress2, i);
-                        Code.SetValue(tempAddress3, literal.Value[i]);
-                        Code.ARRAY_SET(variable.Address, tempAddress2, tempAddress3, tempAddress3 + 1);
+                        for (int i = 0; i < literal.Value.Length; i++)
+                        {
+                            Code.SetValue(indexAddress, i);
+                            Code.SetValue(valueAddress, literal.Value[i]);
+                            Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, Stack.GetTemporaryAddress);
+                        }
                     }
-
-                    Stack.Pop();
-                    Stack.Pop();
 
                     UndiscardVariable(CompiledVariables, variable.Name);
 
@@ -402,22 +389,23 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         int pointerAddress = Stack.NextAddress;
         GenerateCodeForStatement(statement.PrevStatement);
 
+        /*
         {
-            int checkResultAddress = Stack.PushVirtual(1);
+            using StackAddress checkResultAddress = Stack.PushVirtual(1);
+            {
+                using StackAddress maxSizeAddress = Stack.Push(GeneratorSettings.HeapSize);
+                using StackAddress pointerAddressCopy = Stack.PushVirtual(1);
+                {
+                    Code.CopyValue(pointerAddress, pointerAddressCopy);
 
-            int maxSizeAddress = Stack.Push(GeneratorSettings.HeapSize);
-            int pointerAddressCopy = Stack.PushVirtual(1);
-            Code.CopyValue(pointerAddress, pointerAddressCopy);
+                    Code.LOGIC_MT(pointerAddressCopy, maxSizeAddress, checkResultAddress, checkResultAddress + 1, checkResultAddress + 2);
+                }
 
-            Code.LOGIC_MT(pointerAddressCopy, maxSizeAddress, checkResultAddress, checkResultAddress + 1, checkResultAddress + 2);
-            Stack.PopVirtual();
-            Stack.PopVirtual();
-
-            using (Code.ConditionalBlock(this, checkResultAddress))
-            { Code.OUT_STRING(checkResultAddress, "\nOut of memory range\n"); }
-
-            Stack.Pop();
+                using (Code.ConditionalBlock(this, checkResultAddress))
+                { Code.OUT_STRING(checkResultAddress, "\nOut of memory range\n"); }
+            }
         }
+        */
 
         if (GetValueSize(value) != 1)
         { throw new CompilerException($"size 1 bruh allowed on heap thingy", value, CurrentFile); }
@@ -429,16 +417,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         Stack.PopVirtual();
         Stack.PopVirtual();
-
-        /*
-        if (!TryCompute(statement.Statement, out var addressToSet))
-        { throw new NotSupportedException($"Runtime pointer address in not supported", statement.Statement); }
-
-        if (addressToSet.Type != ValueType.Byte)
-        { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", statement.Statement); }
-
-        CompileSetter((byte)addressToSet, value);
-        */
     }
 
     void CompileSetter(int address, StatementWithValue value)
@@ -519,9 +497,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             if (pointerType.To.Size != 1)
             {
-                int multiplierAddress = Stack.Push(pointerType.To.Size);
-                Code.MULTIPLY(indexAddress, multiplierAddress, multiplierAddress + 1, multiplierAddress + 2);
-                Stack.Pop(); // multiplierAddress
+                using StackAddress multiplierAddress = Stack.Push(pointerType.To.Size);
+                Code.MULTIPLY(indexAddress, multiplierAddress, Stack.GetTemporaryAddress);
             }
 
             Stack.PopAndAdd(pointerAddress); // indexAddress
@@ -566,11 +543,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             using (Code.Block(this, $"Compute value"))
             { GenerateCodeForStatement(value); }
 
-            int temp0 = Stack.PushVirtual(1);
+            Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, Stack.GetTemporaryAddress);
 
-            Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, temp0);
-
-            Stack.Pop();
             Stack.Pop();
             Stack.Pop();
         }
@@ -682,11 +656,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             GenerateCodeForStatement(indexCall.Index);
 
             {
-                int multiplierAddress = Stack.Push(pointerType.To.Size);
-
-                Code.MULTIPLY(indexAddress, multiplierAddress, multiplierAddress + 1, multiplierAddress + 2);
-
-                Stack.Pop(); // multiplierAddress
+                using StackAddress multiplierAddress = Stack.Push(pointerType.To.Size);
+                Code.MULTIPLY(indexAddress, multiplierAddress, Stack.GetTemporaryAddress);
             }
 
             Stack.PopAndAdd(pointerAddress); // indexAddress
@@ -705,7 +676,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 indexCall.Index,
             },
-            indexCall.Brackets));
+            indexCall.Brackets,
+            indexCall.OriginalFile));
     }
     void GenerateCodeForStatement(LinkedIf @if, bool linked = false)
     {
@@ -745,7 +717,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             { GenerateCodeForStatement(@if.Condition); }
 
             using (DebugBlock(@if.Condition))
-            { Code.LOGIC_MAKE_BOOL(conditionAddress, conditionAddress + 1); }
+            { Code.NORMALIZE_BOOL(conditionAddress, Stack.GetTemporaryAddress); }
 
             Code.CommentLine($"Condition result at {conditionAddress}");
 
@@ -879,13 +851,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     Stack.PopAndStore(conditionAddress);
                 }
 
+                using StackAddress tempAddress = Stack.GetTemporaryAddress();
                 {
-                    int tempAddress = Stack.PushVirtual(1);
-
                     if (Returns.Count > 0)
                     {
                         Code.CopyValue(Returns.Last.FlagAddress, tempAddress);
-                        Code.LOGIC_NOT(tempAddress, tempAddress + 1);
+                        Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
                         using (Code.ConditionalBlock(this, tempAddress))
                         { Code.SetValue(conditionAddress, 0); }
                     }
@@ -893,12 +864,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     if (Breaks.Count > 0)
                     {
                         Code.CopyValue(Breaks.Last.FlagAddress, tempAddress);
-                        Code.LOGIC_NOT(tempAddress, tempAddress + 1);
+                        Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
                         using (Code.ConditionalBlock(this, tempAddress))
                         { Code.SetValue(conditionAddress, 0); }
                     }
-
-                    Stack.PopVirtual();
                 }
             }
 
@@ -1021,13 +990,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     Stack.PopAndStore(conditionAddress);
                 }
 
+                using StackAddress tempAddress = Stack.GetTemporaryAddress();
                 {
-                    int tempAddress = Stack.PushVirtual(1);
-
                     if (Returns.Count > 0)
                     {
                         Code.CopyValue(Returns.Last.FlagAddress, tempAddress);
-                        Code.LOGIC_NOT(tempAddress, tempAddress + 1);
+                        Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
                         using (Code.ConditionalBlock(this, tempAddress))
                         { Code.SetValue(conditionAddress, 0); }
                     }
@@ -1035,12 +1003,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     if (Breaks.Count > 0)
                     {
                         Code.CopyValue(Breaks.Last.FlagAddress, tempAddress);
-                        Code.LOGIC_NOT(tempAddress, tempAddress + 1);
+                        Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
                         using (Code.ConditionalBlock(this, tempAddress))
                         { Code.SetValue(conditionAddress, 0); }
                     }
-
-                    Stack.PopVirtual();
                 }
             }
 
@@ -1566,9 +1532,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     { GenerateCodeForStatement(statement.Right); }
 
                     using (Code.Block(this, "Compute equality"))
-                    {
-                        Code.LOGIC_EQ(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
-                    }
+                    { Code.LOGIC_EQ(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                     Stack.Pop();
 
@@ -1602,7 +1566,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         {
                             int resultAddress = Stack.PushVirtual(1);
 
-                            Code.CopyValueWithTemp(left.Address, Stack.NextAddress, resultAddress);
+                            Code.CopyValue(left.Address, resultAddress, Stack.NextAddress);
 
                             Code.AddValue(resultAddress, -right.VByte);
 
@@ -1640,7 +1604,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                             using (Code.Block(this, $"Snippet MATH_MUL_SELF({leftAddress_})"))
                             {
-                                Code.MATH_MUL_SELF(leftAddress_, leftAddress_ + 1, leftAddress_ + 2);
+                                Code.MATH_MUL_SELF(leftAddress_, Stack.GetTemporaryAddress);
                                 Optimizations++;
                                 break;
                             }
@@ -1656,9 +1620,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     { GenerateCodeForStatement(statement.Right); }
 
                     using (Code.Block(this, $"Snippet MULTIPLY({leftAddress} {rightAddress})"))
-                    {
-                        Code.MULTIPLY(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
-                    }
+                    { Code.MULTIPLY(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                     Stack.Pop();
 
@@ -1675,9 +1637,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     { GenerateCodeForStatement(statement.Right); }
 
                     using (Code.Block(this, $"Snippet DIVIDE({leftAddress} {rightAddress})"))
-                    {
-                        Code.MATH_DIV(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3, rightAddress + 4);
-                    }
+                    { Code.MATH_DIV(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                     Stack.Pop();
 
@@ -1694,9 +1654,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     { GenerateCodeForStatement(statement.Right); }
 
                     using (Code.Block(this, $"Snippet MOD({leftAddress} {rightAddress})"))
-                    {
-                        Code.MATH_MOD(leftAddress, rightAddress, rightAddress + 1);
-                    }
+                    { Code.MATH_MOD(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                     Stack.Pop();
 
@@ -1713,9 +1671,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     { GenerateCodeForStatement(statement.Right); }
 
                     using (Code.Block(this, $"Snippet LT({leftAddress} {rightAddress})"))
-                    {
-                        Code.LOGIC_LT(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
-                    }
+                    { Code.LOGIC_LT(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                     Stack.Pop();
 
@@ -1731,14 +1687,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     using (Code.Block(this, "Compute right-side value"))
                     { GenerateCodeForStatement(statement.Right); }
 
-                    using (Code.Block(this, $"Snippet MT({leftAddress} {rightAddress})"))
+                    using (StackAddress resultAddress = Stack.PushVirtual(1))
                     {
-                        Code.LOGIC_MT(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3);
+                        using (Code.Block(this, $"Snippet MT({leftAddress} {rightAddress})"))
+                        { Code.LOGIC_MT(leftAddress, rightAddress, resultAddress, Stack.GetTemporaryAddress); }
+
+                        Code.MoveValue(resultAddress, leftAddress);
                     }
 
                     Stack.Pop();
-
-                    Code.MoveValue(rightAddress + 1, leftAddress);
 
                     break;
                 }
@@ -1754,10 +1711,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     using (Code.Block(this, $"Snippet LTEQ({leftAddress} {rightAddress})"))
                     {
-                        Code.LOGIC_LT(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
+                        Code.LOGIC_LT(leftAddress, rightAddress, Stack.GetTemporaryAddress);
                         Stack.Pop();
-                        Code.SetPointer(leftAddress);
-                        Code.LOGIC_NOT(leftAddress, rightAddress);
+                        Code.LOGIC_NOT(leftAddress, Stack.GetTemporaryAddress);
                     }
 
                     break;
@@ -1773,9 +1729,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     { GenerateCodeForStatement(statement.Right); }
 
                     using (Code.Block(this, $"Snippet LTEQ({leftAddress} {rightAddress})"))
-                    {
-                        Code.LOGIC_LTEQ(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
-                    }
+                    { Code.LOGIC_LTEQ(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                     Stack.Pop();
 
@@ -1792,9 +1746,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     { GenerateCodeForStatement(statement.Right); }
 
                     using (Code.Block(this, $"Snippet NEQ({leftAddress} {rightAddress})"))
-                    {
-                        Code.LOGIC_NEQ(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
-                    }
+                    { Code.LOGIC_NEQ(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                     Stack.Pop();
 
@@ -1816,7 +1768,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         { GenerateCodeForStatement(statement.Right); }
 
                         using (Code.Block(this, $"Snippet AND({leftAddress} {rightAddress})"))
-                        { Code.LOGIC_AND(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2); }
+                        { Code.LOGIC_AND(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                         Stack.Pop(); // Pop rightAddress
                     }
@@ -1832,7 +1784,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     int invertedLeftAddress = Stack.PushVirtual(1);
                     Code.CopyValue(leftAddress, invertedLeftAddress);
-                    Code.LOGIC_NOT(invertedLeftAddress, invertedLeftAddress + 1);
+                    Code.LOGIC_NOT(invertedLeftAddress, Stack.GetTemporaryAddress);
 
                     using (Code.ConditionalBlock(this, invertedLeftAddress))
                     {
@@ -1841,7 +1793,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         { GenerateCodeForStatement(statement.Right); }
 
                         using (Code.Block(this, $"Snippet AND({leftAddress} {rightAddress})"))
-                        { Code.LOGIC_OR(leftAddress, rightAddress, rightAddress + 1); }
+                        { Code.LOGIC_OR(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                         Stack.Pop(); // Pop rightAddress
                     }
@@ -1864,14 +1816,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         if (!Utils.PowerOf2((int)offsetConst))
                         { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
-                        int offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
+                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
 
                         using (Code.Block(this, $"Snippet MULTIPLY({valueAddress} {offsetAddress})"))
-                        {
-                            Code.MULTIPLY(valueAddress, offsetAddress, offsetAddress + 1, offsetAddress + 2);
-                        }
-
-                        Stack.Pop();
+                        { Code.MULTIPLY(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
                     }
 
                     break;
@@ -1890,14 +1838,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         if (!Utils.PowerOf2((int)offsetConst))
                         { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
-                        int offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
+                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
 
                         using (Code.Block(this, $"Snippet MATH_DIV({valueAddress} {offsetAddress})"))
-                        {
-                            Code.MATH_DIV(valueAddress, offsetAddress, offsetAddress + 1, offsetAddress + 2, offsetAddress + 3, offsetAddress + 4);
-                        }
-
-                        Stack.Pop();
+                        { Code.MATH_DIV(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
                     }
 
                     break;
@@ -1908,7 +1852,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     using (Code.Block(this, "Compute left-side value"))
                     { GenerateCodeForStatement(statement.Left); }
 
-                    Code.LOGIC_NOT(leftAddress, leftAddress + 1);
+                    Code.LOGIC_NOT(leftAddress, Stack.GetTemporaryAddress);
 
                     break;
                 }
@@ -1920,14 +1864,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         using (Code.Block(this, "Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
 
-                        int rightAddress = Stack.Push(2);
+                        using StackAddress rightAddress = Stack.Push(2);
 
                         using (Code.Block(this, $"Snippet MOD({leftAddress} {rightAddress})"))
-                        {
-                            Code.MATH_MOD(leftAddress, rightAddress, rightAddress + 1);
-                        }
-
-                        Stack.Pop();
+                        { Code.MATH_MOD(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
                         break;
                     }
@@ -1977,7 +1917,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     using (Code.Block(this, "Compute left-side value"))
                     { GenerateCodeForStatement(statement.Left); }
 
-                    Code.LOGIC_NOT(leftAddress, leftAddress + 1);
+                    Code.LOGIC_NOT(leftAddress, Stack.GetTemporaryAddress);
 
                     break;
                 }
@@ -2102,7 +2042,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 GenerateAllocator(pointerType.To.Size, newInstance);
 
                 int temp = Stack.PushVirtual(1);
-                Code.CopyValueWithTemp(pointerAddress, temp + 1, temp);
+                Code.CopyValue(pointerAddress, temp, temp + 1);
 
                 for (int i = 0; i < pointerType.To.Size; i++)
                 {
@@ -2846,7 +2786,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     {
                         GenerateDestructor(
                             new TypeCast(
-                                new Identifier(Token.CreateAnonymous(variable.Name)),
+                                new Identifier(Token.CreateAnonymous(variable.Name), null),
                                 Token.CreateAnonymous(StatementKeywords.As),
                                 new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
@@ -2982,7 +2922,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     {
                         GenerateDestructor(
                             new TypeCast(
-                                new Identifier(Token.CreateAnonymous(variable.Name)),
+                                new Identifier(Token.CreateAnonymous(variable.Name), null),
                                 Token.CreateAnonymous(StatementKeywords.As),
                                 new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
@@ -3071,7 +3011,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     {
                         GenerateDestructor(
                             new TypeCast(
-                                new Identifier(Token.CreateAnonymous(variable.Name)),
+                                new Identifier(Token.CreateAnonymous(variable.Name), null),
                                 Token.CreateAnonymous(StatementKeywords.As),
                                 new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
@@ -3271,7 +3211,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     {
                         GenerateDestructor(
                             new TypeCast(
-                                new Identifier(Token.CreateAnonymous(variable.Name)),
+                                new Identifier(Token.CreateAnonymous(variable.Name), null),
                                 Token.CreateAnonymous(StatementKeywords.As),
                                 new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
                                 )

@@ -151,7 +151,6 @@ public class SourceCodeManager
 
         if (FileParser is not null && FileParser.Invoke(uri, tokenizerSettings, out ParserResult ast1))
         {
-            ast1.SetFile(uri);
             ast = ast1;
             AlreadyLoadedCodes.Add(uri, new CollectedAST(ast1, uri, @using));
             return true;
@@ -161,7 +160,6 @@ public class SourceCodeManager
         {
             if (FromFile(uri.LocalPath, tokenizerSettings, out ParserResult ast2))
             {
-                ast2.SetFile(uri);
                 ast = ast2;
                 AlreadyLoadedCodes.Add(uri, new CollectedAST(ast2, uri, @using));
                 return true;
@@ -171,7 +169,6 @@ public class SourceCodeManager
         {
             if (FromWeb(uri, tokenizerSettings, out ParserResult ast2))
             {
-                ast2.SetFile(uri);
                 ast = ast2;
                 AlreadyLoadedCodes.Add(uri, new CollectedAST(ast2, uri, @using));
                 return true;

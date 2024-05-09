@@ -23,12 +23,18 @@ public partial class Interpreter : InterpreterBase<OpCodes>
                 Memory[_memoryPointer]--;
                 break;
             case OpCodes.PointerRight:
-                if (_memoryPointer++ >= Memory.Length)
-                { throw new BrainfuckRuntimeException($"Memory overflow", CurrentContext); }
+                _memoryPointer++;
+                _memoryPointer = (_memoryPointer + Memory.Length) % Memory.Length;
+
+                // if (_memoryPointer > Memory.Length)
+                // { throw new BrainfuckRuntimeException($"Memory overflow", CurrentContext); }
                 break;
             case OpCodes.PointerLeft:
-                if (_memoryPointer-- <= 0)
-                { throw new BrainfuckRuntimeException($"Memory underflow", CurrentContext); }
+                _memoryPointer--;
+                _memoryPointer = (_memoryPointer + Memory.Length) % Memory.Length;
+
+                // if (_memoryPointer < 0)
+                // { throw new BrainfuckRuntimeException($"Memory underflow", CurrentContext); }
                 break;
             case OpCodes.BranchStart:
                 if (Memory[_memoryPointer] == 0)

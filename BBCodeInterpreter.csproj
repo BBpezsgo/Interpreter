@@ -31,7 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\Wiki\**\*.md">
+    <None Include="..\Core.wiki\**\*.md">
       <Link>Wiki\%(RecursiveDir)%(FileName)%(Extension)</Link>
     </None>
   </ItemGroup>
@@ -48,7 +48,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="C:\Users\bazsi\source\repos\Win32-Stuff\Win32.csproj" />
+    <ProjectReference Include="..\..\Win32-Stuff\Win32.csproj" />
   </ItemGroup>
 
   <ItemGroup>

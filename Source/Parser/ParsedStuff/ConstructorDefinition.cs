@@ -31,8 +31,9 @@ public class ConstructorDefinition : FunctionThingDefinition,
     public ConstructorDefinition(
         TypeInstance type,
         IEnumerable<Token> modifiers,
-        ParameterDefinitionCollection parameters)
-        : base(modifiers, Token.CreateAnonymous(type.ToString(), TokenType.Identifier, type.Position), parameters, null)
+        ParameterDefinitionCollection parameters,
+        Uri? file)
+        : base(modifiers, Token.CreateAnonymous(type.ToString(), TokenType.Identifier, type.Position), parameters, null, file)
     {
         Type = type;
     }

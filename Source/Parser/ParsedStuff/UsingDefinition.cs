@@ -8,8 +8,6 @@ public class UsingDefinition : IPositioned
     public Token Keyword { get; }
     /// <summary> Set by the Compiler </summary>
     public string? CompiledUri { get; set; }
-    /// <summary> Set by the Compiler </summary>
-    public double? DownloadTime { get; set; }
 
     public string PathString
     {

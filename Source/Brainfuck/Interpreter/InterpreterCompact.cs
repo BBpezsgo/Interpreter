@@ -38,8 +38,10 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             {
                 _memoryPointer += instruction.Count;
                 _memoryPointerRange = Range.Union(_memoryPointerRange, _memoryPointer);
-                if (_memoryPointer >= Memory.Length)
-                { throw new BrainfuckRuntimeException("Memory overflow", CurrentContext); }
+                _memoryPointer = (_memoryPointer + Memory.Length) % Memory.Length;
+
+                // if (_memoryPointer >= Memory.Length)
+                // { throw new BrainfuckRuntimeException("Memory overflow", CurrentContext); }
                 break;
             }
 
@@ -47,8 +49,10 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             {
                 _memoryPointer -= instruction.Count;
                 _memoryPointerRange = Range.Union(_memoryPointerRange, _memoryPointer);
-                if (_memoryPointer < 0)
-                { throw new BrainfuckRuntimeException("Memory underflow", CurrentContext); }
+                _memoryPointer = (_memoryPointer + Memory.Length) % Memory.Length;
+
+                // if (_memoryPointer < 0)
+                // { throw new BrainfuckRuntimeException("Memory underflow", CurrentContext); }
                 break;
             }
 
@@ -132,10 +136,10 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             {
                 byte data = Memory[_memoryPointer];
                 Memory[_memoryPointer] = 0;
-                if (instruction.Arg1 != 0) Memory[_memoryPointer + instruction.Arg1] += data;
-                if (instruction.Arg2 != 0) Memory[_memoryPointer + instruction.Arg2] += data;
-                if (instruction.Arg3 != 0) Memory[_memoryPointer + instruction.Arg3] += data;
-                if (instruction.Arg4 != 0) Memory[_memoryPointer + instruction.Arg4] += data;
+                if (instruction.Arg1 != 0) Memory[(_memoryPointer + instruction.Arg1 + Memory.Length) % Memory.Length] += data;
+                if (instruction.Arg2 != 0) Memory[(_memoryPointer + instruction.Arg2 + Memory.Length) % Memory.Length] += data;
+                if (instruction.Arg3 != 0) Memory[(_memoryPointer + instruction.Arg3 + Memory.Length) % Memory.Length] += data;
+                if (instruction.Arg4 != 0) Memory[(_memoryPointer + instruction.Arg4 + Memory.Length) % Memory.Length] += data;
                 break;
             }
 

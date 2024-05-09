@@ -16,7 +16,7 @@ public static class ExportableExtensions
 
 public interface IInFile
 {
-    public Uri? FilePath { get; set; }
+    public Uri? FilePath { get; }
 }
 
 public interface IExportable : IInFile
@@ -77,7 +77,17 @@ public readonly struct ParserResult
         Enumerable.Empty<Token>())
     { IsEmpty = true };
 
-    public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<FunctionDefinition> operators, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, IEnumerable<Token> originalTokens, IEnumerable<Token> tokens)
+    public ParserResult(
+        IEnumerable<Error> errors,
+        IEnumerable<FunctionDefinition> functions,
+        IEnumerable<FunctionDefinition> operators,
+        IEnumerable<StructDefinition> structs,
+        IEnumerable<UsingDefinition> usings,
+        IEnumerable<Statement.CompileTag> hashes,
+        IEnumerable<Statement.Statement> topLevelStatements,
+        IEnumerable<EnumDefinition> enums,
+        IEnumerable<Token> originalTokens,
+        IEnumerable<Token> tokens)
     {
         Errors = errors.ToArray();
 
@@ -93,48 +103,6 @@ public readonly struct ParserResult
         Tokens = tokens.ToImmutableArray();
 
         IsEmpty = false;
-    }
-
-    public void SetFile(Uri path)
-    {
-        foreach (FunctionDefinition function in Functions)
-        { function.FilePath = path; }
-
-        foreach (FunctionDefinition function in Operators)
-        { function.FilePath = path; }
-
-        foreach (EnumDefinition @enum in Enums)
-        { @enum.FilePath = path; }
-
-        foreach (StructDefinition @struct in Structs)
-        {
-            @struct.FilePath = path;
-
-            foreach (FunctionDefinition method in @struct.Functions)
-            { method.FilePath = path; }
-
-            foreach (FunctionDefinition method in @struct.Operators)
-            { method.FilePath = path; }
-
-            foreach (GeneralFunctionDefinition method in @struct.GeneralFunctions)
-            { method.FilePath = path; }
-
-            foreach (ConstructorDefinition method in @struct.Constructors)
-            { method.FilePath = path; }
-        }
-
-        foreach (CompileTag hash in Hashes)
-        { hash.FilePath = path; }
-
-        foreach (IInFile item in StatementExtensions.GetStatements<IInFile>(this))
-        {
-            item.FilePath = path;
-        }
-
-        foreach (IReferenceableTo item in StatementExtensions.GetStatements<IReferenceableTo>(this))
-        {
-            item.OriginalFile = path;
-        }
     }
 
     public IEnumerable<Statement.Statement> GetStatementsRecursively()

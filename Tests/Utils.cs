@@ -1,10 +1,10 @@
-﻿using System.Diagnostics;
-using System.Text;
-using System.Xml;
-using LanguageCore;
+﻿using LanguageCore;
 using LanguageCore.BBCode.Generator;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
+using System.Diagnostics;
+using System.Text;
+using System.Xml;
 
 namespace Tests;
 
@@ -306,31 +306,56 @@ public static class Utils
 
         CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null);
         BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
+        compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null);
+        BBCodeGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new GeneratorSettings(MainGeneratorSettings) { DontOptimize = true }, null, analysisCollection);
 
         analysisCollection.Throw();
 
-        Interpreter interpreter = new(false, new BytecodeInterpreterSettings()
+        static (Interpreter, MainResult) Execute(BBCodeGeneratorResult code, string input)
         {
-            HeapSize = HeapSize,
-            StackMaxSize = BytecodeInterpreterSettings.Default.StackMaxSize,
-        }, generatedCode.Code, generatedCode.DebugInfo);
+            Interpreter interpreter = new(false, new BytecodeInterpreterSettings()
+            {
+                HeapSize = HeapSize,
+                StackMaxSize = BytecodeInterpreterSettings.Default.StackMaxSize,
+            }, code.Code, code.DebugInfo);
 
-        InputBuffer inputBuffer = new(input);
-        StringBuilder stdOutput = new();
-        StringBuilder stdError = new();
+            InputBuffer inputBuffer = new(input);
+            StringBuilder stdOutput = new();
+            StringBuilder stdError = new();
 
-        interpreter.OnStdOut += (sender, data) => stdOutput.Append(data);
-        interpreter.OnStdError += (sender, data) => stdError.Append(data);
+            interpreter.OnStdOut += (sender, data) => stdOutput.Append(data);
+            interpreter.OnStdError += (sender, data) => stdError.Append(data);
 
-        interpreter.OnNeedInput += (sender) => sender.OnInput(inputBuffer.Read());
+            interpreter.OnNeedInput += (sender) => sender.OnInput(inputBuffer.Read());
 
-        while (!interpreter.BytecodeInterpreter.IsDone)
-        { interpreter.Update(); }
+            while (!interpreter.BytecodeInterpreter.IsDone)
+            { interpreter.Update(); }
 
-        if (interpreter.BytecodeInterpreter == null)
-        { throw new UnreachableException($"{nameof(interpreter.BytecodeInterpreter)} is null"); }
+            return (interpreter, new MainResult(stdOutput.ToString(), stdError.ToString(), interpreter.BytecodeInterpreter));
+        }
 
-        return new MainResult(stdOutput.ToString(), stdError.ToString(), interpreter.BytecodeInterpreter);
+        (Interpreter interpreterUnoptimized, MainResult unoptimizedResult) = Execute(generatedCodeUnoptimized, input);
+        (Interpreter interpreter, MainResult result) = Execute(generatedCode, input);
+
+        if (interpreter.BytecodeInterpreter.Registers.BasePointer != interpreterUnoptimized.BytecodeInterpreter.Registers.BasePointer)
+        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.BytecodeInterpreter.Registers.BasePointer} != {interpreterUnoptimized.BytecodeInterpreter.Registers.BasePointer})"); }
+        
+        if (interpreter.BytecodeInterpreter.Registers.StackPointer != interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer)
+        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.BytecodeInterpreter.Registers.StackPointer} != {interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer})"); }
+        
+        if (interpreter.BytecodeInterpreter.Registers.StackPointer != interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer)
+        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.BytecodeInterpreter.Registers.StackPointer} != {interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer})"); }
+
+        if (result.StdOutput != unoptimizedResult.StdOutput)
+        { throw new AssertFailedException($"StdOutput are different on optimized and unoptimized version (\"{result.StdOutput.Escape()}\" != \"{unoptimizedResult.StdOutput.Escape()}\")"); }
+
+        if (result.StdError != unoptimizedResult.StdError)
+        { throw new AssertFailedException($"StdError are different on optimized and unoptimized version (\"{result.StdError.Escape()}\" != \"{unoptimizedResult.StdError.Escape()}\")"); }
+
+        if (result.ExitCode != unoptimizedResult.ExitCode)
+        { throw new AssertFailedException($"ExitCode are different on optimized and unoptimized version ({result.ExitCode} != {unoptimizedResult.ExitCode})"); }
+
+        return result;
     }
 
     public static BrainfuckResult RunBrainfuck(FileInfo file, string input)

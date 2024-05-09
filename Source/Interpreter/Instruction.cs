@@ -30,30 +30,9 @@ public enum AddressingMode : byte
 [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
 public readonly struct Instruction
 {
-    public readonly AddressingMode AddressingMode;
     public readonly Opcode Opcode;
+    public readonly AddressingMode AddressingMode;
     public readonly DataItem Parameter;
-
-    public Instruction(Opcode opcode, DataItem parameter)
-    {
-        Opcode = opcode;
-        AddressingMode = AddressingMode.Absolute;
-        Parameter = parameter;
-    }
-
-    public Instruction(Opcode opcode, AddressingMode addressingMode = AddressingMode.Absolute)
-    {
-        Opcode = opcode;
-        AddressingMode = addressingMode;
-        Parameter = DataItem.Null;
-    }
-
-    public Instruction(Opcode opcode, AddressingMode addressingMode, DataItem parameter)
-    {
-        Opcode = opcode;
-        AddressingMode = addressingMode;
-        Parameter = parameter;
-    }
 
     public Instruction(PreparationInstruction other)
     {

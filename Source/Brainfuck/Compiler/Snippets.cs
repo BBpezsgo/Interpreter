@@ -1,5 +1,7 @@
 ﻿#pragma warning disable IDE0059 // Unnecessary assignment of a value
 
+using Win32.Console;
+
 namespace LanguageCore.Brainfuck;
 
 public static class Snippets
@@ -14,7 +16,21 @@ public static class Snippets
     /// <br/>
     /// Made by: me
     /// </summary>
-    public static void LOGIC_MAKE_BOOL(this CompiledCode code, int addressX, int tempAddress1)
+    public static void NORMALIZE_BOOL(this CodeHelper code, int addressX, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        code.NORMALIZE_BOOL(addressX, tempAddress1);
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/> (0 or 1)
+    /// <br/>
+    /// Pointer: <paramref name="addressX"/>
+    /// <br/>
+    /// <br/>
+    /// Made by: me
+    /// </summary>
+    public static void NORMALIZE_BOOL(this CodeHelper code, int addressX, int tempAddress1)
     {
         code.ClearValue(tempAddress1);
         code.JumpStart(addressX);
@@ -34,7 +50,23 @@ public static class Snippets
     /// <br/>
     /// Attribution: Jeffry Johnston
     /// </summary>
-    public static void LOGIC_NOT(this CompiledCode code, int addressX, int tempAddress1)
+    public static void LOGIC_NOT(this CodeHelper code, int addressX, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        code.LOGIC_NOT(addressX, tempAddress1);
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/> (0 or 1)
+    /// <br/>
+    /// Pointer: <paramref name="addressX"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x%C2%B4_=_not_x_(boolean,_logical)"/>
+    /// <br/>
+    /// Attribution: Jeffry Johnston
+    /// </summary>
+    public static void LOGIC_NOT(this CodeHelper code, int addressX, int tempAddress1)
     {
         code.ClearValue(tempAddress1);
         code.JumpStart(addressX);
@@ -60,7 +92,26 @@ public static class Snippets
     /// <br/>
     /// Attribution: Jeffry Johnston
     /// </summary>
-    public static void LOGIC_EQ(this CompiledCode code, int addressX, int addressY, int tempAddress1, int tempAddress2)
+    public static void LOGIC_EQ(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(1);
+        code.LOGIC_EQ(addressX, addressY, tempAddress1, tempAddress2);
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/> (0 or 1)
+    /// <br/>
+    /// Pointer: <paramref name="tempAddress2"/>
+    /// <br/>
+    /// Preserves <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x%C2%B4_=_x_==_y"/>
+    /// <br/>
+    /// Attribution: Jeffry Johnston
+    /// </summary>
+    public static void LOGIC_EQ(this CodeHelper code, int addressX, int addressY, int tempAddress1, int tempAddress2)
     {
         code.ClearValue(tempAddress1);
         code.ClearValue(tempAddress2);
@@ -98,7 +149,7 @@ public static class Snippets
     /// <br/>
     /// Attribution: Jeffry Johnston
     /// </summary>
-    public static void LOGIC_EQ(this CompiledCode code, int addressX, int addressY)
+    public static void LOGIC_EQ(this CodeHelper code, int addressX, int addressY)
     {
         // x[-y-x]
         code.SetPointer(addressX);
@@ -134,7 +185,26 @@ public static class Snippets
     /// <br/>
     /// Attribution: Jeffry Johnston
     /// </summary>
-    public static void LOGIC_NEQ(this CompiledCode code, int addressX, int addressY, int tempAddress1, int tempAddress2)
+    public static void LOGIC_NEQ(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(1);
+        code.LOGIC_NEQ(addressX, addressY, tempAddress1, tempAddress2);
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/>
+    /// <br/>
+    /// Pointer: <paramref name="tempAddress2"/>
+    /// <br/>
+    /// Preserves <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.21.3D_y"/>
+    /// <br/>
+    /// Attribution: Jeffry Johnston
+    /// </summary>
+    public static void LOGIC_NEQ(this CodeHelper code, int addressX, int addressY, int tempAddress1, int tempAddress2)
     {
         /*
             temp0[-]
@@ -172,6 +242,28 @@ public static class Snippets
     /// <br/>
     /// <b>x and y are unsigned.</b>
     /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.3C_y"/>
+    /// <br/>
+    /// Attribution: Ian Kelly
+    /// </summary>
+    public static void LOGIC_LT(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(3);
+        if (StackCodeHelper.Direction < 0)
+        { code.LOGIC_LT(addressX, addressY, tempAddress1, tempAddress2 - 2); }
+        else
+        { code.LOGIC_LT(addressX, addressY, tempAddress1, tempAddress2); }
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/> (0 or 1)
+    /// <br/>
+    /// Preserves <paramref name="addressY"/>
+    /// <br/>
+    /// <b>x and y are unsigned.</b>
+    /// <br/>
     /// <b><paramref name="addressTemp2"/> is the first of three consecutive temporary cells.</b>
     /// <br/>
     /// <br/>
@@ -179,7 +271,7 @@ public static class Snippets
     /// <br/>
     /// Attribution: Ian Kelly
     /// </summary>
-    public static void LOGIC_LT(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2)
+    public static void LOGIC_LT(this CodeHelper code, int addressX, int addressY, int addressTemp1, int addressTemp2)
     {
         code.ClearValue(addressTemp1);
         code.ClearValue(addressTemp2);
@@ -187,7 +279,7 @@ public static class Snippets
         code.SetValue(addressTemp2 + 1, 1);
         code.ClearValue(addressTemp2 + 2);
 
-        code.CopyValueWithTemp(addressY, addressTemp1, addressTemp2);
+        code.CopyValue(addressY, addressTemp2, addressTemp1);
 
         code.MoveValue(addressX, addressTemp1);
         code.AddValue(1);
@@ -246,6 +338,30 @@ public static class Snippets
     /// <br/>
     /// <b>x and y are unsigned.</b>
     /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.3C.3D_y"/>
+    /// <br/>
+    /// Attribution: Ian Kelly
+    /// </summary>
+    public static void LOGIC_LTEQ(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(3);
+        if (StackCodeHelper.Direction < 0)
+        { code.LOGIC_LTEQ(addressX, addressY, tempAddress1, tempAddress2 - 2); }
+        else
+        { code.LOGIC_LTEQ(addressX, addressY, tempAddress1, tempAddress2); }
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/> (0 or 1)
+    /// <br/>
+    /// Pointer: <paramref name="addressX"/>
+    /// <br/>
+    /// Preserves <paramref name="addressY"/>
+    /// <br/>
+    /// <b>x and y are unsigned.</b>
+    /// <br/>
     /// <b><paramref name="tempAddress2"/> is the first of three consecutive temporary cells.</b>
     /// <br/>
     /// <br/>
@@ -253,7 +369,7 @@ public static class Snippets
     /// <br/>
     /// Attribution: Ian Kelly
     /// </summary>
-    public static void LOGIC_LTEQ(this CompiledCode code, int addressX, int addressY, int tempAddress1, int tempAddress2)
+    public static void LOGIC_LTEQ(this CodeHelper code, int addressX, int addressY, int tempAddress1, int tempAddress2)
     {
         code.ClearValue(tempAddress1, tempAddress2);
         code.SetValue(tempAddress2 + 1, 1);
@@ -307,6 +423,11 @@ public static class Snippets
     /// Does not preserves <paramref name="addressX"/> and <paramref name="addressY"/>
     /// <br/>
     /// <br/>
+    /// 0 → <paramref name="addressX"/>
+    /// <br/>
+    /// (<paramref name="addressY"/> - <paramref name="addressX"/>) → <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
     /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#z_.3D_x_.3E_y"/>
     /// <br/>
     /// Attribution: User:ais523
@@ -320,47 +441,79 @@ public static class Snippets
     /// that's incremented during the loop.)
     /// </para>
     /// </summary>
-    public static void LOGIC_MT(this CompiledCode c, int addressX, int addressY, int addressResult, int tempAddress1, int tempAddress2)
+    public static void LOGIC_MT(this CodeHelper code, int addressX, int addressY, int addressResult, Func<int, StackAddress> allocator)
     {
-        c.ClearValue(tempAddress1);
-        c.ClearValue(tempAddress2);
-        c.ClearValue(addressResult);
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(1);
+        code.LOGIC_MT(addressX, addressY, addressResult, tempAddress1, tempAddress2);
+    }
 
-        c.SetPointer(addressX);
-        c += '[';
+    /// <summary>
+    /// Result → <paramref name="addressResult"/> (0 or 1)
+    /// <br/>
+    /// Pointer: <paramref name="addressResult"/>
+    /// <br/>
+    /// Does not preserves <paramref name="addressX"/> and <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
+    /// 0 → <paramref name="addressX"/>
+    /// <br/>
+    /// (<paramref name="addressY"/> - <paramref name="addressX"/>) → <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#z_.3D_x_.3E_y"/>
+    /// <br/>
+    /// Attribution: User:ais523
+    /// <para>
+    /// This uses balanced loops only,
+    /// and <b>requires a wrapping implementation</b>
+    /// (and will be very slow with large numbers of bits,
+    /// although the number of bits otherwise doesn't matter.)
+    /// The temporaries and x are left at 0; y is set to y-x.
+    /// (You could make a temporary copy of x via using another temporary
+    /// that's incremented during the loop.)
+    /// </para>
+    /// </summary>
+    public static void LOGIC_MT(this CodeHelper code, int addressX, int addressY, int addressResult, int tempAddress1, int tempAddress2)
+    {
+        code.ClearValue(tempAddress1);
+        code.ClearValue(tempAddress2);
+        code.ClearValue(addressResult);
 
-        c.AddValue(tempAddress1, 1);
+        code.SetPointer(addressX);
+        code += '[';
 
-        c.SetPointer(addressY);
+        code.AddValue(tempAddress1, 1);
 
-        c += "[-";
+        code.SetPointer(addressY);
 
-        c.ClearValue(tempAddress1);
+        code += "[-";
 
-        c.AddValue(tempAddress2, 1);
+        code.ClearValue(tempAddress1);
 
-        c.SetPointer(addressY);
-        c += ']';
+        code.AddValue(tempAddress2, 1);
 
-        c.SetPointer(tempAddress1);
-        c += "[-";
-        c.AddValue(addressResult, 1);
-        c.SetPointer(tempAddress1);
-        c += ']';
+        code.SetPointer(addressY);
+        code += ']';
 
-        c.SetPointer(tempAddress2);
-        c += "[-";
-        c.AddValue(addressY, 1);
-        c.SetPointer(tempAddress2);
-        c += ']';
+        code.SetPointer(tempAddress1);
+        code += "[-";
+        code.AddValue(addressResult, 1);
+        code.SetPointer(tempAddress1);
+        code += ']';
 
-        c.AddValue(addressY, -1);
-        c.AddValue(addressX, -1);
+        code.SetPointer(tempAddress2);
+        code += "[-";
+        code.AddValue(addressY, 1);
+        code.SetPointer(tempAddress2);
+        code += ']';
 
-        c += ']';
+        code.AddValue(addressY, -1);
+        code.AddValue(addressX, -1);
 
-        c.ClearValue(addressY);
-        c.SetPointer(addressResult);
+        code += ']';
+
+        code.SetPointer(addressResult);
     }
 
     /// <summary>
@@ -373,7 +526,24 @@ public static class Snippets
     /// <br/>
     /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#z_.3D_x_.3E_y"/>
     /// </summary>
-    public static void LOGIC_AND(this CompiledCode code, int addressX, int addressY, int tempAddress1, int tempAddress2)
+    public static void LOGIC_AND(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(1);
+        code.LOGIC_AND(addressX, addressY, tempAddress1, tempAddress2);
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/> (0 or 1)
+    /// <br/>
+    /// Pointer: <paramref name="tempAddress2"/>
+    /// <br/>
+    /// Preserves <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#z_.3D_x_.3E_y"/>
+    /// </summary>
+    public static void LOGIC_AND(this CodeHelper code, int addressX, int addressY, int tempAddress1, int tempAddress2)
     {
         /*
             temp1[
@@ -412,7 +582,23 @@ public static class Snippets
     /// <br/>
     /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#z_.3D_x_or_y_.28boolean.2C_logical.29_.28wrapping.29"/>
     /// </summary>
-    public static void LOGIC_OR(this CompiledCode code, int addressX, int addressY, int tempStart)
+    public static void LOGIC_OR(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        code.LOGIC_OR(addressX, addressY, tempAddress1);
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/> (0 or 1)
+    /// <br/>
+    /// Pointer: <paramref name="addressX"/>
+    /// <br/>
+    /// Does not preserves <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#z_.3D_x_or_y_.28boolean.2C_logical.29_.28wrapping.29"/>
+    /// </summary>
+    public static void LOGIC_OR(this CodeHelper code, int addressX, int addressY, int tempStart)
     {
         code.ClearValue(tempStart + 0);
         code.ClearValue(tempStart + 1);
@@ -446,7 +632,24 @@ public static class Snippets
     /// <br/>
     /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.2A_y"/>
     /// </summary>
-    public static void MULTIPLY(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2)
+    public static void MULTIPLY(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(1);
+        code.MULTIPLY(addressX, addressY, tempAddress1, tempAddress2);
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/>
+    /// <br/>
+    /// Pointer: <paramref name="addressTemp2"/>
+    /// <br/>
+    /// Preserves <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.2A_y"/>
+    /// </summary>
+    public static void MULTIPLY(this CodeHelper code, int addressX, int addressY, int addressTemp1, int addressTemp2)
     {
         code.ClearValue(addressTemp1, addressTemp2);
 
@@ -495,7 +698,28 @@ public static class Snippets
     /// <br/>
     /// Attribution: Jeffry Johnston
     /// </summary>
-    public static void MATH_DIV(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3, int addressTemp4)
+    public static void MATH_DIV(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(1);
+        using StackAddress tempAddress3 = allocator.Invoke(1);
+        using StackAddress tempAddress4 = allocator.Invoke(1);
+        code.MATH_DIV(addressX, addressY, tempAddress1, tempAddress2, tempAddress3, tempAddress4);
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/>
+    /// <br/>
+    /// Pointer: <paramref name="addressTemp1"/>
+    /// <br/>
+    /// Preserves <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x%C2%B4_=_x_/_y"/>
+    /// <br/>
+    /// Attribution: Jeffry Johnston
+    /// </summary>
+    public static void MATH_DIV(this CodeHelper code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3, int addressTemp4)
     {
         code.ClearValue(addressTemp1, addressTemp2, addressTemp3, addressTemp4);
 
@@ -565,7 +789,27 @@ public static class Snippets
     /// <br/>
     /// Attribution: chad3814
     /// </summary>
-    public static void MATH_POW(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3)
+    public static void MATH_POW(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(1);
+        using StackAddress tempAddress3 = allocator.Invoke(1);
+        code.MATH_POW(addressX, addressY, tempAddress1, tempAddress2, tempAddress3);
+    }
+
+    /// <summary>
+    /// Result → <paramref name="addressX"/>
+    /// <br/>
+    /// Pointer: <paramref name="addressTemp1"/>
+    /// <br/>
+    /// It does not preserve <paramref name="addressY"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x%C2%B4_=_x_%5E_y"/>
+    /// <br/>
+    /// Attribution: chad3814
+    /// </summary>
+    public static void MATH_POW(this CodeHelper code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3)
     {
         code.ClearValue(addressTemp1);
 
@@ -610,7 +854,16 @@ public static class Snippets
     /// <summary>
     /// Pointer: <paramref name="addressX"/>
     /// </summary>
-    public static void MATH_MOD(this CompiledCode code, int addressX, int addressY, int free6CellStart)
+    public static void MATH_MOD(this CodeHelper code, int addressX, int addressY, Func<int, StackAddress> allocator)
+    {
+        using StackAddress free6CellStart = allocator.Invoke(6);
+        code.MATH_MOD(addressX, addressY, free6CellStart);
+    }
+
+    /// <summary>
+    /// Pointer: <paramref name="addressX"/>
+    /// </summary>
+    public static void MATH_MOD(this CodeHelper code, int addressX, int addressY, int free6CellStart)
     {
         /*
             # 0 >n d 0 0 0
@@ -635,7 +888,22 @@ public static class Snippets
     /// <br/>
     /// Attribution: Softengy (talk) 15:44, 7 April 2020 (UTC)
     /// </summary>
-    public static void MATH_MUL_SELF(this CompiledCode code, int addressX, int tempAddress1, int tempAddress2)
+    public static void MATH_MUL_SELF(this CodeHelper code, int addressX, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        using StackAddress tempAddress2 = allocator.Invoke(1);
+        code.MATH_MUL_SELF(addressX, tempAddress1, tempAddress2);
+    }
+
+    /// <summary>
+    /// Pointer: <paramref name="tempAddress1"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.2A_x"/>
+    /// <br/>
+    /// Attribution: Softengy (talk) 15:44, 7 April 2020 (UTC)
+    /// </summary>
+    public static void MATH_MUL_SELF(this CodeHelper code, int addressX, int tempAddress1, int tempAddress2)
     {
         // x[temp0+x-]
 
@@ -676,7 +944,19 @@ public static class Snippets
     /// <br/>
     /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x_.3D_-x"/>
     /// </summary>
-    public static void SWAP_SIGN(this CompiledCode code, int addressX, int tempAddress)
+    public static void SWAP_SIGN(this CodeHelper code, int addressX, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        code.SWAP_SIGN(addressX, tempAddress1);
+    }
+
+    /// <summary>
+    /// Pointer: <paramref name="tempAddress"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x_.3D_-x"/>
+    /// </summary>
+    public static void SWAP_SIGN(this CodeHelper code, int addressX, int tempAddress)
     {
         code.ClearValue(tempAddress);
 
@@ -709,7 +989,7 @@ public static class Snippets
     /// <br/>
     /// Originally posted at <see href="https://codegolf.stackexchange.com/a/118441/60043">Code Golf Stack Exchange</see>
     /// </summary>
-    public static void UTIL_CLEAR_NW(this CompiledCode code, int x)
+    public static void UTIL_CLEAR_NW(this CodeHelper code, int x)
     {
         code.SetPointer(x);
         code += "> [-]";
@@ -731,7 +1011,7 @@ public static class Snippets
     /// <summary>
     /// Pointer: <paramref name="tempAddress"/>
     /// </summary>
-    public static void SWAP(this CompiledCode code, int addressX, int addressY, int tempAddress)
+    public static void SWAP(this CodeHelper code, int addressX, int addressY, int tempAddress)
     {
         code.MoveValue(addressX, tempAddress);
         code.MoveValue(addressY, addressX);
@@ -758,7 +1038,7 @@ public static class Snippets
     /// OUT: <paramref name="valueAddressA"/> = <c>0</c>, <paramref name="valueAddressB"/> = <c>0</c>, <paramref name="switchAddress"/> = <c>0</c>, <paramref name="resultAddress"/> = <c>1</c>
     /// </para>
     /// </summary>
-    public static void MUX(this CompiledCode code, int switchAddress, int valueAddressA, int valueAddressB, int resultAddress)
+    public static void MUX(this CodeHelper code, int switchAddress, int valueAddressA, int valueAddressB, int resultAddress)
     {
         // code.ClearValue(resultAddress);
 
@@ -794,7 +1074,7 @@ public static class Snippets
     /// <br/>
     /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_not_x_.28bitwise.29"/>
     /// </summary>
-    public static void BITS_NOT(this CompiledCode code, int addressX, int tempAddress)
+    public static void BITS_NOT(this CodeHelper code, int addressX, int tempAddress)
     {
         code.ClearValue(tempAddress);
 
@@ -895,6 +1175,7 @@ public static class Snippets
     #region ARRAY
 
     public static int ARRAY_SIZE(int elementCount) => (2 * elementCount) + 3;
+
     /// <summary>
     /// <b>Pointer:</b> <paramref name="arrayAddress"/>
     /// <br/>
@@ -906,15 +1187,32 @@ public static class Snippets
     /// Each array element requires 2 memory cells.
     /// </para>
     /// </summary>
-    public static void ARRAY_SET(this CompiledCode code, int arrayAddress, int indexAddress, int valueAddress, int temp0)
+    public static void ARRAY_SET(this CodeHelper code, int arrayAddress, int indexAddress, int valueAddress, Func<int, StackAddress> allocator)
+    {
+        using StackAddress tempAddress1 = allocator.Invoke(1);
+        code.ARRAY_SET(arrayAddress, indexAddress, valueAddress, tempAddress1);
+    }
+
+    /// <summary>
+    /// <b>Pointer:</b> <paramref name="arrayAddress"/>
+    /// <br/>
+    /// <br/>
+    /// <see href="https://code.google.com/archive/p/brainfuck-compiler/"/>
+    /// <br/>
+    /// Attribution: Jeffry Johnston
+    /// <para>
+    /// Each array element requires 2 memory cells.
+    /// </para>
+    /// </summary>
+    public static void ARRAY_SET(this CodeHelper code, int arrayAddress, int indexAddress, int valueAddress, int tempAddress1)
     {
         int temp1 = arrayAddress + 1;
         int temp2 = arrayAddress + 2;
 
-        code.ClearValue(arrayAddress + 1, temp2, temp0);
+        code.ClearValue(arrayAddress + 1, temp2, tempAddress1);
 
-        code.CopyValueWithTemp(indexAddress, temp0, temp2);
-        code.CopyValueWithTemp(valueAddress, temp0, temp1);
+        code.CopyValue(indexAddress, temp2, tempAddress1);
+        code.CopyValue(valueAddress, temp1, tempAddress1);
 
         code.SetPointer(arrayAddress);
 
@@ -926,7 +1224,7 @@ public static class Snippets
         code += "> [>>] << [-<<]";
     }
 
-    public static void ARRAY_SET_CONST(this CompiledCode code, int arrayAddress, int index, Runtime.DataItem value)
+    public static void ARRAY_SET_CONST(this CodeHelper code, int arrayAddress, int index, Runtime.DataItem value)
     {
         index *= 2;
         index += 3;
@@ -945,10 +1243,10 @@ public static class Snippets
     /// Each array element requires 2 memory cells.
     /// </para>
     /// </summary>
-    public static void ARRAY_GET(this CompiledCode code, int arrayAddress, int indexAddress, int resultAddress)
+    public static void ARRAY_GET(this CodeHelper code, int arrayAddress, int indexAddress, int resultAddress)
     {
         code.ClearValue(resultAddress, arrayAddress + 1, arrayAddress + 2);
-        code.CopyValueWithTemp(indexAddress, arrayAddress + 1, arrayAddress + 2);
+        code.CopyValue(indexAddress, arrayAddress + 2, arrayAddress + 1);
 
         code.SetPointer(arrayAddress);
         code += ">> [[>>] + [<<] >> -] + [>>] < [< [<<] > +<"; // pointer is at y
@@ -1000,13 +1298,25 @@ public static class Snippets
         "<+>]>+>>]<<<<<]>[-]>>[>++++++[-<++++++++>]<.<<+>+>[-]]<[<[->-<]++++++[->++++++++" +
         "<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<";
 
+    public static void CRASH(this CodeHelper code, string message)
+    {
+        code.OUT_STRING_UNSAFE(0, $"\n{Ansi.StyleText(Ansi.BrightForegroundRed, message)}\n");
+        code.Append("[-]+[]");
+    }
+
+    public static void CRASH(this CodeHelper code, int address, string message)
+    {
+        code.OUT_STRING(address, $"\n{Ansi.StyleText(Ansi.BrightForegroundRed, message)}\n");
+        code.Append("[-]+[]");
+    }
+
     /// <summary>
     /// <b>Pointer:</b> <paramref name="tempAddress"/>
     /// </summary>
     /// <param name="code"></param>
     /// <param name="tempAddress"></param>
     /// <param name="message"></param>
-    public static void OUT_STRING(this CompiledCode code, int tempAddress, string message)
+    public static void OUT_STRING(this CodeHelper code, int tempAddress, string message)
     {
         code.ClearValue(tempAddress);
 
@@ -1039,7 +1349,7 @@ public static class Snippets
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public static void OUT_STRING_UNSAFE(this CompiledCode code, int tempOffset, string message)
+    public static void OUT_STRING_UNSAFE(this CodeHelper code, int tempOffset, string message)
     {
         code.MovePointerUnsafe(tempOffset);
         code.ClearCurrent();
@@ -1085,9 +1395,9 @@ public static class Snippets
     /// <see href="https://esolangs.org/wiki/Brainfuck_bitwidth_conversions"/>
     /// </para>
     /// </summary>
-    public static void Add16bit(this CompiledCode code)
+    public static void Add16bit(this CodeHelper code)
         => code.Append("+[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[->>+<<]>");
-        // => code.Append(">+<+[>-]>[->>+<]<<");
+    // => code.Append(">+<+[>-]>[->>+<]<<");
 
     /// <summary>
     /// <para>
@@ -1100,7 +1410,7 @@ public static class Snippets
     /// <see href="https://esolangs.org/wiki/Brainfuck_bitwidth_conversions"/>
     /// </para>
     /// </summary>
-    public static void Sub16bit(this CompiledCode code)
+    public static void Sub16bit(this CodeHelper code)
         => code.Append("[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[->>-<<]>-");
     // => code.Append(">+<[>-]>[->>-<]<<-");
 
@@ -1112,7 +1422,7 @@ public static class Snippets
     /// <see href="https://esolangs.org/wiki/Brainfuck_bitwidth_conversions"/>
     /// </para>
     /// </summary>
-    public static void JumpStart16bit(this CompiledCode code)
+    public static void JumpStart16bit(this CodeHelper code)
         => code.Append("[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<[[-]<<<+>>>]<[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<[[-]<<<+>>>]<<<[[-]>");
 
     /// <summary>
@@ -1123,7 +1433,7 @@ public static class Snippets
     /// <see href="https://esolangs.org/wiki/Brainfuck_bitwidth_conversions"/>
     /// </para>
     /// </summary>
-    public static void JumpEnd16bit(this CompiledCode code)
+    public static void JumpEnd16bit(this CodeHelper code)
         => code.Append("[>>+>>>+<<<<<-]>>>>>[<<<<<+>>>>>-]<<<[[-]<<<+>>>]<[>+>>>+<<<<-]>>>>[<<<<+>>>>-]<<<[[-]<<<+>>>]<<<]>");
 
     /// <summary>
@@ -1131,7 +1441,7 @@ public static class Snippets
     /// <b>Cells used:</b> <c>_ a b</c>
     /// </para>
     /// </summary>
-    public static void ClearCurrent16bit(this CompiledCode code)
+    public static void ClearCurrent16bit(this CodeHelper code)
         => code.Append("[-]>[-]<");
 
     #endregion

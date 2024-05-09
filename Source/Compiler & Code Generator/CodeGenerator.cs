@@ -1027,7 +1027,7 @@ public abstract class CodeGenerator
         if (GetFunction(name.Content, out CompiledFunction? function, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.FunctionName;
-            function.References.Add(new Reference<StatementWithValue>(new Identifier(name), CurrentFile));
+            function.References.Add(new Reference<StatementWithValue>(new Identifier(name, null), CurrentFile));
             result = new FunctionType(function);
             return true;
         }
@@ -1921,7 +1921,8 @@ public abstract class CodeGenerator
         => new(
             op: operatorCall.Operator,
             left: InlineMacro(operatorCall.Left, parameters),
-            right: InlineMacro(operatorCall.Right, parameters))
+            right: InlineMacro(operatorCall.Right, parameters),
+            file: operatorCall.OriginalFile)
         {
             SurroundingBracelet = operatorCall.SurroundingBracelet,
             SaveValue = operatorCall.SaveValue,
@@ -1931,7 +1932,8 @@ public abstract class CodeGenerator
     static UnaryOperatorCall InlineMacro(UnaryOperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             op: operatorCall.Operator,
-            left: InlineMacro(operatorCall.Left, parameters))
+            left: InlineMacro(operatorCall.Left, parameters),
+            file: operatorCall.OriginalFile)
         {
             SurroundingBracelet = operatorCall.SurroundingBracelet,
             SaveValue = operatorCall.SaveValue,
@@ -1953,14 +1955,15 @@ public abstract class CodeGenerator
         StatementWithValue? prevStatement = functionCall.PrevStatement;
         if (prevStatement != null)
         { prevStatement = InlineMacro(prevStatement, parameters); }
-        return new FunctionCall(prevStatement, functionCall.Identifier, _parameters, functionCall.Brackets);
+        return new FunctionCall(prevStatement, functionCall.Identifier, _parameters, functionCall.Brackets, functionCall.OriginalFile);
     }
 
     static AnyCall InlineMacro(AnyCall anyCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(anyCall.PrevStatement, parameters),
             parameters: InlineMacro(anyCall.Parameters, parameters),
-            brackets: anyCall.Brackets)
+            brackets: anyCall.Brackets,
+            file: anyCall.OriginalFile)
         {
             SaveValue = anyCall.SaveValue,
             Semicolon = anyCall.Semicolon,
@@ -1971,7 +1974,8 @@ public abstract class CodeGenerator
             keyword: constructorCall.Keyword,
             typeName: constructorCall.Type,
             parameters: InlineMacro(constructorCall.Parameters, parameters),
-            brackets: constructorCall.Brackets)
+            brackets: constructorCall.Brackets,
+            file: constructorCall.OriginalFile)
         {
             SaveValue = constructorCall.SaveValue,
             Semicolon = constructorCall.Semicolon,
@@ -2230,7 +2234,8 @@ public abstract class CodeGenerator
         inlined = new Assignment(
             @operator: statement.Operator,
             left: statement.Left,
-            right: InlineMacro(statement.Right, parameters))
+            right: InlineMacro(statement.Right, parameters),
+            file: statement.OriginalFile)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2246,7 +2251,8 @@ public abstract class CodeGenerator
 
         inlined = new ShortOperatorCall(
              op: statement.Operator,
-             left: statement.Left)
+             left: statement.Left,
+             file: statement.OriginalFile)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2263,7 +2269,8 @@ public abstract class CodeGenerator
         inlined = new CompoundAssignment(
             @operator: statement.Operator,
             left: statement.Left,
-            right: InlineMacro(statement.Right, parameters))
+            right: InlineMacro(statement.Right, parameters),
+            file: statement.OriginalFile)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2281,9 +2288,9 @@ public abstract class CodeGenerator
             modifiers: statement.Modifiers,
             type: statement.Type,
             variableName: statement.Identifier,
-            initialValue: InlineMacro(statement.InitialValue, parameters))
+            initialValue: InlineMacro(statement.InitialValue, parameters),
+            file: statement.FilePath)
         {
-            FilePath = statement.FilePath,
             Semicolon = statement.Semicolon,
         };
         return true;
@@ -2328,7 +2335,8 @@ public abstract class CodeGenerator
     static Field InlineMacro(Field statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
-            fieldName: statement.Identifier)
+            fieldName: statement.Identifier,
+            file: statement.OriginalFile)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
@@ -2338,7 +2346,8 @@ public abstract class CodeGenerator
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
             indexStatement: InlineMacro(statement.Index, parameters),
-            brackets: statement.Brackets)
+            brackets: statement.Brackets,
+            file: statement.OriginalFile)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
@@ -2793,7 +2802,8 @@ public abstract class CodeGenerator
                     null,
                     functionCall.Identifier,
                     Literal.CreateAnonymous(parameters, functionCall.MethodParameters),
-                    functionCall.Brackets)
+                    functionCall.Brackets,
+                    functionCall.OriginalFile)
                 {
                     SaveValue = functionCall.SaveValue,
                     Semicolon = functionCall.Semicolon,
@@ -2843,7 +2853,15 @@ public abstract class CodeGenerator
         if (context.TryGetValue(identifier, out value))
         { return true; }
 
+        if (TryGetVariableValue(identifier, out value))
+        { return true; }
+
         value = DataItem.Null;
+        return false;
+    }
+    protected virtual bool TryGetVariableValue(Identifier identifier, out DataItem value)
+    {
+        value = default;
         return false;
     }
     bool TryCompute(Field field, EvaluationContext context, out DataItem value)

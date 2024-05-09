@@ -26,14 +26,14 @@ public class GeneralFunctionDefinition : FunctionThingDefinition,
     public GeneralFunctionDefinition(
         Token identifier,
         IEnumerable<Token> modifiers,
-        ParameterDefinitionCollection parameters)
-        : base(modifiers, identifier, parameters, null)
+        ParameterDefinitionCollection parameters,
+        Uri? file)
+        : base(modifiers, identifier, parameters, null, file)
     { }
 
-    public GeneralFunctionDefinition Duplicate() => new(Identifier, Modifiers, Parameters.Duplicate())
+    public GeneralFunctionDefinition Duplicate() => new(Identifier, Modifiers, Parameters.Duplicate(), FilePath)
     {
         Block = Block,
-        FilePath = FilePath,
         Context = Context,
     };
 

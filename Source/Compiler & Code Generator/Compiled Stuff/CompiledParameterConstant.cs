@@ -7,7 +7,7 @@ public class CompiledParameterConstant : ParameterDefinition,
     IConstant
 {
     public DataItem Value { get; }
-    public Uri? FilePath { get; set; }
+    public Uri? FilePath { get; }
 
     public new string Identifier => base.Identifier.Content;
     public bool IsExport => false;

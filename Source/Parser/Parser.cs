@@ -118,7 +118,6 @@ public sealed class Parser
         TokenizerResult tokens = StreamTokenizer.Tokenize(filePath, preprocessorVariables, tokenizerSettings, tokenizerProgressBar);
         Uri uri = new(filePath, UriKind.Absolute);
         ParserResult result = new Parser(tokens.Tokens, uri).ParseInternal();
-        result.SetFile(uri);
         return result;
     }
 
@@ -215,7 +214,7 @@ public sealed class Parser
             { throw new EndlessLoopException(); }
         }
 
-        hashStatement = new CompileTag(hashT, hashName, parameters.ToArray())
+        hashStatement = new CompileTag(hashT, hashName, parameters.ToArray(), File)
         {
             Semicolon = semicolon,
         };
@@ -354,7 +353,7 @@ public sealed class Parser
             throw new SyntaxException($"Expected \",\" or \"}}\" (not \"{CurrentToken}\")", PreviousToken?.Position.After(), File);
         }
 
-        enumDefinition = new(identifier, attributes, members);
+        enumDefinition = new(identifier, attributes, members, File);
 
         return true;
     }
@@ -421,7 +420,8 @@ public sealed class Parser
             possibleType,
             possibleName,
             new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
-            null)
+            null,
+            File)
         {
             Block = block
         };
@@ -531,7 +531,8 @@ public sealed class Parser
             possibleType,
             possibleNameT,
             new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
-            templateInfo)
+            templateInfo,
+            File)
         {
             Block = block
         };
@@ -592,7 +593,8 @@ public sealed class Parser
         function = new GeneralFunctionDefinition(
             possibleNameT,
             modifiers,
-            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)))
+            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
+            File)
         {
             Block = block
         };
@@ -651,7 +653,8 @@ public sealed class Parser
         function = new ConstructorDefinition(
             type,
             modifiers,
-            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)))
+            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
+            File)
         {
             Block = block
         };
@@ -795,7 +798,8 @@ public sealed class Parser
             methods,
             generalMethods,
             operators,
-            constructors)
+            constructors,
+            File)
         {
             Template = templateInfo,
         };
@@ -946,7 +950,7 @@ public sealed class Parser
         if (!ExpectOperator("]", out Token? bracketEnd))
         { throw new SyntaxException("Unbalanced [", bracketStart, File); }
 
-        statement = new IndexCall(prevStatement, expression, new TokenPair(bracketStart, bracketEnd));
+        statement = new IndexCall(prevStatement, expression, new TokenPair(bracketStart, bracketEnd), File);
         return true;
     }
 
@@ -1008,7 +1012,7 @@ public sealed class Parser
                     { throw new EndlessLoopException(); }
                 }
 
-                ConstructorCall newStructStatement = new(keywordNew, instanceTypeName, parameters, new TokenPair(bracketStart2, bracketEnd2));
+                ConstructorCall newStructStatement = new(keywordNew, instanceTypeName, parameters, new TokenPair(bracketStart2, bracketEnd2), File);
 
                 statementWithValue = newStructStatement;
             }
@@ -1035,7 +1039,7 @@ public sealed class Parser
             }
             else
             {
-                Identifier identifierStatement = new(simpleIdentifier);
+                Identifier identifierStatement = new(simpleIdentifier, File);
 
                 if (simpleIdentifier.Content == StatementKeywords.This)
                 { simpleIdentifier.AnalyzedType = TokenAnalyzedType.Keyword; }
@@ -1054,7 +1058,7 @@ public sealed class Parser
                 if (!ExpectIdentifier(out Token? fieldName))
                 { throw new SyntaxException("Expected a symbol after \".\"", tokenDot.Position.After(), File); }
 
-                statementWithValue = new Field(statementWithValue, fieldName);
+                statementWithValue = new Field(statementWithValue, fieldName, File);
 
                 continue;
             }
@@ -1214,7 +1218,7 @@ public sealed class Parser
             { throw new SyntaxException("Initial value for variable declaration with implicit type is required", possibleType, File); }
         }
 
-        variableDeclaration = new VariableDeclaration(modifiers.ToArray(), possibleType, possibleVariableName, initialValue);
+        variableDeclaration = new VariableDeclaration(modifiers, possibleType, possibleVariableName, initialValue, File);
         return true;
     }
 
@@ -1452,7 +1456,7 @@ public sealed class Parser
             if (!ExpectOneValue(out StatementWithValue? statement))
             { throw new SyntaxException($"Expected value after operator \"{unaryPrefixOperator}\" (not \"{CurrentToken}\")", unaryPrefixOperator.Position.After(), File); }
 
-            result = new UnaryOperatorCall(unaryPrefixOperator, statement);
+            result = new UnaryOperatorCall(unaryPrefixOperator, statement, File);
             return true;
         }
 
@@ -1470,12 +1474,12 @@ public sealed class Parser
             BinaryOperatorCall? rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
             if (rightmostStatement != null)
             {
-                BinaryOperatorCall operatorCall = new(binaryOperator, rightmostStatement.Right, rightStatement);
+                BinaryOperatorCall operatorCall = new(binaryOperator, rightmostStatement.Right, rightStatement, File);
                 rightmostStatement.Right = operatorCall;
             }
             else
             {
-                BinaryOperatorCall operatorCall = new(binaryOperator, leftStatement, rightStatement);
+                BinaryOperatorCall operatorCall = new(binaryOperator, leftStatement, rightStatement, File);
                 leftStatement = operatorCall;
             }
         }
@@ -1525,7 +1529,7 @@ public sealed class Parser
         if (!ExpectExpression(out StatementWithValue? valueToAssign))
         { throw new SyntaxException("Expected expression after assignment operator", @operator, File); }
 
-        assignment = new Assignment(@operator, leftStatement, valueToAssign);
+        assignment = new Assignment(@operator, leftStatement, valueToAssign, File);
         return true;
     }
 
@@ -1549,7 +1553,7 @@ public sealed class Parser
         if (!ExpectExpression(out StatementWithValue? valueToAssign))
         { throw new SyntaxException("Expected expression after compound assignment operator", @operator, File); }
 
-        compoundAssignment = new CompoundAssignment(@operator, leftStatement, valueToAssign);
+        compoundAssignment = new CompoundAssignment(@operator, leftStatement, valueToAssign, File);
         return true;
     }
 
@@ -1566,13 +1570,13 @@ public sealed class Parser
 
         if (ExpectOperator("++", out Token? t0))
         {
-            shortOperatorCall = new ShortOperatorCall(t0, leftStatement);
+            shortOperatorCall = new ShortOperatorCall(t0, leftStatement, File);
             return true;
         }
 
         if (ExpectOperator("--", out Token? t1))
         {
-            shortOperatorCall = new ShortOperatorCall(t1, leftStatement);
+            shortOperatorCall = new ShortOperatorCall(t1, leftStatement, File);
             return true;
         }
 
@@ -1676,7 +1680,7 @@ public sealed class Parser
             { throw new EndlessLoopException(); }
         }
 
-        anyCall = new AnyCall(prevStatement, parameters, new TokenPair(bracketStart, bracketEnd));
+        anyCall = new AnyCall(prevStatement, parameters, new TokenPair(bracketStart, bracketEnd), File);
         return true;
     }
 

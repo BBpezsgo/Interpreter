@@ -94,7 +94,7 @@ public partial struct DataItem :
         if (Type != other.Type) return false;
         return Type switch
         {
-            RuntimeType.Null => false,
+            RuntimeType.Null => true,
             RuntimeType.Byte => _byte == other._byte,
             RuntimeType.Integer => _integer == other._integer,
             RuntimeType.Single => _single == other._single,
@@ -114,8 +114,10 @@ public partial struct DataItem :
         DataItem.TryCast(ref x, y.Type);
         DataItem.TryCast(ref y, x.Type);
 
-        if (!xBefore.Equals(x) &&
-            !yBefore.Equals(y))
+        if (x.IsNull || y.IsNull)
+        { throw new InternalException(); }
+
+        if (!xBefore.Equals(x) && !yBefore.Equals(y))
         { throw new InternalException(); }
 
         if (x.Type != y.Type)

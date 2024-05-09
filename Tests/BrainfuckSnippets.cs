@@ -13,7 +13,7 @@ public class BrainfuckSnippets
         return result;
     }
 
-    static void InitializeValues(CompiledCode code, params int[] values)
+    static void InitializeValues(CodeHelper code, params int[] values)
     {
         for (int offset = 0; offset < values.Length; offset++)
         { code.SetValue(offset, values[offset]); }
@@ -41,7 +41,7 @@ public class BrainfuckSnippets
     [DataRow(255, 1, 0)]
     public void LOGIC_LT(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.LOGIC_LT(0, 1, 2, 3);
 
@@ -62,7 +62,7 @@ public class BrainfuckSnippets
     [DataRow(255, 1, 1)]
     public void LOGIC_MT(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.LOGIC_MT(0, 1, 2, 3, 4);
 
@@ -84,7 +84,7 @@ public class BrainfuckSnippets
     [DataRow(255, 255, 1)]
     public void LOGIC_LTEQ(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.LOGIC_LTEQ(0, 1, 2, 3);
 
@@ -105,7 +105,7 @@ public class BrainfuckSnippets
     [DataRow(0, 255, 0)]
     public void LOGIC_EQ(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.LOGIC_EQ(0, 1, 2, 3);
 
@@ -126,7 +126,7 @@ public class BrainfuckSnippets
     [DataRow(0, 255, 1)]
     public void LOGIC_NEQ(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.LOGIC_NEQ(0, 1, 2, 3);
 
@@ -142,7 +142,7 @@ public class BrainfuckSnippets
     [DataRow(1, 0)]
     public void LOGIC_NOT(int x, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x);
         code.LOGIC_NOT(0, 1);
 
@@ -160,7 +160,7 @@ public class BrainfuckSnippets
     [DataRow(1, 1, 1)]
     public void LOGIC_OR(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.LOGIC_OR(0, 1, 2);
 
@@ -178,7 +178,7 @@ public class BrainfuckSnippets
     [DataRow(1, 1, 1)]
     public void LOGIC_AND(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.LOGIC_AND(0, 1, 2, 3);
 
@@ -200,7 +200,7 @@ public class BrainfuckSnippets
     [DataRow(255, ~255)]
     public void BITS_NOT(int x, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x);
         code.BITS_NOT(0, 1);
 
@@ -226,7 +226,7 @@ public class BrainfuckSnippets
     [DataRow(77, 76, 1)]
     public void MATH_DIV(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.MATH_DIV(0, 1, 2, 3, 4, 5);
 
@@ -245,7 +245,7 @@ public class BrainfuckSnippets
     [DataRow(3, 2, 1)]
     public void MATH_MOD(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.MATH_MOD(0, 1, 2);
 
@@ -264,7 +264,7 @@ public class BrainfuckSnippets
     [DataRow(16, 16)]
     public void MATH_MUL_SELF(int x, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x);
         code.MATH_MUL_SELF(0, 1, 2);
 
@@ -284,7 +284,7 @@ public class BrainfuckSnippets
     [DataRow(2, 7, 128)]
     public void MATH_POW(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.MATH_POW(0, 1, 2, 3, 4);
 
@@ -305,7 +305,7 @@ public class BrainfuckSnippets
     [DataRow(16, 1, 16)]
     public void MULTIPLY(int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.MULTIPLY(0, 1, 2, 3);
 
@@ -331,7 +331,7 @@ public class BrainfuckSnippets
     [DataRow(1, 255)]
     public void SWAP(int x, int y)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, x, y);
         code.SWAP(0, 1, 2);
 
@@ -359,7 +359,7 @@ public class BrainfuckSnippets
     [DataRow(1, 255, 16, 16)]
     public void MUX(int a, int x, int y, int expected)
     {
-        CompiledCode code = new();
+        CodeHelper code = new();
         InitializeValues(code, a, x, y);
         code.MUX(0, 1, 2, 3);
 

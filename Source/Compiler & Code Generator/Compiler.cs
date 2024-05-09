@@ -795,11 +795,11 @@ public sealed class Compiler
                         GeneralFunctionDefinition copy = new(
                             method.Identifier,
                             method.Modifiers,
-                            new ParameterDefinitionCollection(parameters, method.Parameters.Brackets))
+                            new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
+                            method.FilePath)
                         {
                             Context = method.Context,
                             Block = method.Block,
-                            FilePath = method.FilePath,
                         };
 
                         returnType = new BuiltinType(BasicType.Void);
@@ -817,11 +817,11 @@ public sealed class Compiler
                         copy = new GeneralFunctionDefinition(
                             method.Identifier,
                             method.Modifiers,
-                            new ParameterDefinitionCollection(parameters, method.Parameters.Brackets))
+                            new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
+                            method.FilePath)
                         {
                             Context = method.Context,
                             Block = method.Block,
-                            FilePath = method.FilePath,
                         };
 
                         CompiledGeneralFunction methodWithPointer = CompileGeneralFunction(copy, returnType, compiledStruct);
@@ -870,11 +870,11 @@ public sealed class Compiler
                         method.Type,
                         method.Identifier,
                         new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
-                        method.Template)
+                        method.Template,
+                        method.FilePath)
                     {
                         Context = method.Context,
                         Block = method.Block,
-                        FilePath = method.FilePath,
                     };
 
                     CompiledFunction methodWithRef = CompileFunction(copy, compiledStruct);
@@ -894,11 +894,11 @@ public sealed class Compiler
                         method.Type,
                         method.Identifier,
                         new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
-                        method.Template)
+                        method.Template,
+                        method.FilePath)
                     {
                         Context = method.Context,
                         Block = method.Block,
-                        FilePath = method.FilePath,
                     };
 
                     CompiledFunction methodWithPointer = CompileFunction(copy, compiledStruct);
@@ -935,12 +935,11 @@ public sealed class Compiler
                         ConstructorDefinition constructorDefWithNothing = new(
                             constructor.Type,
                             constructor.Modifiers,
-                            new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets)
-                            )
+                            new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
+                            constructor.FilePath)
                         {
                             Block = constructor.Block,
                             Context = constructor.Context,
-                            FilePath = constructor.FilePath,
                         };
 
                         CompiledConstructor constructorWithNothing = CompileConstructor(constructorDefWithNothing, compiledStruct);
@@ -964,12 +963,11 @@ public sealed class Compiler
                         ConstructorDefinition constructorDefWithRef = new(
                             constructor.Type,
                             constructor.Modifiers,
-                            new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets)
-                            )
+                            new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
+                            constructor.FilePath)
                         {
                             Block = constructor.Block,
                             Context = constructor.Context,
-                            FilePath = constructor.FilePath,
                         };
 
                         CompiledConstructor constructorWithRef = CompileConstructor(constructorDefWithRef, compiledStruct);
@@ -991,12 +989,11 @@ public sealed class Compiler
                         ConstructorDefinition constructorDefWithPointer = new(
                             constructor.Type,
                             constructor.Modifiers,
-                            new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets)
-                            )
+                            new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
+                            constructor.FilePath)
                         {
                             Block = constructor.Block,
                             Context = constructor.Context,
-                            FilePath = constructor.FilePath,
                         };
 
                         CompiledConstructor constructorWithPointer = CompileConstructor(constructorDefWithPointer, compiledStruct);

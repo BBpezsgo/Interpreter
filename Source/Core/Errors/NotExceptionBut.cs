@@ -8,7 +8,7 @@ public abstract class NotExceptionBut : IInFile
     public Position Position { get; }
     public Uri? Uri { get; }
 
-    Uri? IInFile.FilePath { get => Uri; set => throw new InvalidOperationException(); }
+    Uri? IInFile.FilePath => Uri;
 
     protected NotExceptionBut(string message, Position position, Uri? file)
     {

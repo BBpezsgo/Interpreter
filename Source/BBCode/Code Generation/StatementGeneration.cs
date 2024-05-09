@@ -299,7 +299,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (newVariable.InitialValue is LiteralList)
         { throw new NotImplementedException(); }
 
-        GenerateCodeForValueSetter(new Identifier(newVariable.Identifier), newVariable.InitialValue);
+        GenerateCodeForValueSetter(new Identifier(newVariable.Identifier, newVariable.FilePath), newVariable.InitialValue);
         AddComment("}");
         return;
 
@@ -1719,7 +1719,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     index.Index,
                 },
-                index.Brackets
+                index.Brackets,
+                index.OriginalFile
             ), indexer);
     }
     void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
@@ -2110,10 +2111,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     Token.CreateAnonymous(BuiltinFunctionNames.IndexerSet),
                     new StatementWithValue[]
                     {
-                    statementToSet.Index,
-                    value,
+                        statementToSet.Index,
+                        value,
                     },
-                    statementToSet.Brackets
+                    statementToSet.Brackets,
+                    statementToSet.OriginalFile
                 ), indexer);
             return;
         }

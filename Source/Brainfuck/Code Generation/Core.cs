@@ -116,12 +116,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     readonly struct DebugInfoBlock : IDisposable
     {
         readonly int InstructionStart;
-        readonly CompiledCode Code;
+        readonly CodeHelper Code;
         readonly DebugInformation? DebugInfo;
         readonly Position Position;
         readonly Uri? CurrentFile;
 
-        public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, Position position, Uri? currentFile)
+        public DebugInfoBlock(CodeHelper code, DebugInformation? debugInfo, Position position, Uri? currentFile)
         {
             Code = code;
             DebugInfo = debugInfo;
@@ -134,7 +134,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             CurrentFile = currentFile;
         }
 
-        public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, IPositioned? position, Uri? currentFile)
+        public DebugInfoBlock(CodeHelper code, DebugInformation? debugInfo, IPositioned? position, Uri? currentFile)
             : this(code, debugInfo, position?.Position ?? Position.UnknownPosition, currentFile)
         { }
 
@@ -158,14 +158,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         where TFunction : FunctionThingDefinition
     {
         readonly int InstructionStart;
-        readonly CompiledCode Code;
+        readonly CodeHelper Code;
         readonly DebugInformation? DebugInfo;
         readonly Uri? Uri;
         readonly string Identifier;
         readonly string ReadableIdentifier;
         readonly Position Position;
 
-        public DebugFunctionBlock(CompiledCode code, DebugInformation? debugInfo, Uri? uri, string identifier, string readableIdentifier, Position position)
+        public DebugFunctionBlock(CodeHelper code, DebugInformation? debugInfo, Uri? uri, string identifier, string readableIdentifier, Position position)
         {
             Code = code;
             DebugInfo = debugInfo;
@@ -235,7 +235,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     readonly struct CodeSnapshot
     {
-        public readonly CompiledCode Code;
+        public readonly CodeHelper Code;
         public readonly HeapCodeHelper Heap;
         public readonly StackCodeHelper Stack;
 
@@ -304,10 +304,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     #region Fields
 
-    CompiledCode Code;
+    CodeHelper Code;
     StackCodeHelper Stack;
     HeapCodeHelper Heap;
-    CompiledCode IBrainfuckGenerator.Code => Code;
+    CodeHelper IBrainfuckGenerator.Code => Code;
 
     new readonly Stack<Variable> CompiledVariables;
 
@@ -334,7 +334,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection, print)
     {
         CompiledVariables = new Stack<Variable>();
-        Code = new CompiledCode();
+        Code = new CodeHelper();
         Stack = new StackCodeHelper(Code, 0, settings.StackSize);
         Heap = new HeapCodeHelper(Code, settings.HeapStart, settings.HeapSize);
         CurrentMacro = new Stack<ISameCheck>();
@@ -505,7 +505,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
                     GenerateDestructor(
                         new TypeCast(
                             new Identifier(
-                                Tokenizing.Token.CreateAnonymous(variable.Name, Tokenizing.TokenType.Identifier)
+                                Tokenizing.Token.CreateAnonymous(variable.Name, Tokenizing.TokenType.Identifier),
+                                null
                                 ),
                             Tokenizing.Token.CreateAnonymous("as"),
                             new TypeInstancePointer(

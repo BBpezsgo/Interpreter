@@ -113,15 +113,13 @@ Now the folder structure should look like this:
 ```
 
 5. Open `./Interpreter/BBCodeInterpreter.csproj` in a **text editor**
-6. In the `ProjectReference` tags, replace `C:\Users\bazsi\source\repos` with `..` (so it will point to the existing projects you downloaded)
+6. In the `ProjectReference` tags, replace `..\..` with `..` (so it will point to the existing projects you downloaded)
 
 ### Method 1: Building with Visual Studio:
 
 7. Open `./Interpreter/BBCodeInterpreter.csproj` in Visual Studio
 8. Add the `./Win32-Stuff/Win32.csproj` project to the solution
 9. Now you can build it with the "Build" button
-
-Done
 
 ### Method 2: Building with .NET CLI:
 

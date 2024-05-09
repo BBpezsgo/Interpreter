@@ -173,16 +173,27 @@ struct Registers
     [FieldOffset(26)] public Flags Flags;
 }
 
-enum Register : byte
+/// <summary>
+/// <c>0b_W_REG</c>
+/// </summary>
+public enum Register : byte
 {
-    AL = 0b_000,
-    CL = 0b_001,
-    DL = 0b_010,
-    BL = 0b_011,
-    AH = 0b_100,
-    CH = 0b_101,
-    DH = 0b_110,
-    BH = 0b_111,
+    AL = 0b_0_000,
+    CL = 0b_0_001,
+    DL = 0b_0_010,
+    BL = 0b_0_011,
+    AH = 0b_0_100,
+    CH = 0b_0_101,
+    DH = 0b_0_110,
+    BH = 0b_0_111,
+    AX = 0b_1_000,
+    CX = 0b_1_001,
+    DX = 0b_1_010,
+    BX = 0b_1_011,
+    SP = 0b_1_100,
+    BP = 0b_1_101,
+    SI = 0b_1_110,
+    DI = 0b_1_111,
 }
 
 [StructLayout(LayoutKind.Explicit)]

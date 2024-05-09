@@ -43,14 +43,14 @@ public static class Assembler
         {
             // if (File.Exists(fileAsmTemp))
             // { File.Delete(fileAsmTemp); }
-            if (File.Exists(fileObjTemp))
-            { File.Delete(fileObjTemp); }
-            if (File.Exists(fileExeTemp))
-            { File.Delete(fileExeTemp); }
+            // if (File.Exists(fileObjTemp))
+            // { File.Delete(fileObjTemp); }
+            // if (File.Exists(fileExeTemp))
+            // { File.Delete(fileExeTemp); }
         }
     }
 
-    public static void AssembleRaw(string asmSourceCode, string outputFile, bool saveAsmFile = false)
+    public static void AssembleRaw(string asmSourceCode, string outputFile, bool saveAsmFile = false, IEnumerable<emu8086.Symbols.Symbol>? symbols = null)
     {
         string outputFilename = Path.GetFileName(outputFile);
 
@@ -70,14 +70,21 @@ public static class Assembler
 
             if (saveAsmFile && File.Exists(fileAsmTemp))
             {
-                Output.LogWarning($"File \"{outputFile + ".asm"}\" will be overridden");
-                File.Copy(fileAsmTemp, outputFile + ".asm", true);
+                Output.LogWarning($"File \"{fileBinFinal + ".~asm"}\" will be overridden");
+                File.Copy(fileAsmTemp, fileBinFinal + ".~asm", true);
             }
 
             Nasm.AssembleRaw(fileAsmTemp, fileBinTemp);
 
             if (File.Exists(fileBinTemp))
             { File.Copy(fileBinTemp, fileBinFinal, true); }
+
+            if (symbols is not null)
+            {
+                emu8086.Symbols _symbols = new(fileBinFinal, "4.08");
+                _symbols.Entries.AddRange(symbols);
+                File.WriteAllText(fileBinFinal + ".symbol", _symbols.Compile());
+            }
         }
         finally
         {

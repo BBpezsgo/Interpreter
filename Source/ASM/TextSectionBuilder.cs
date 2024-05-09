@@ -36,59 +36,59 @@ public class TextSectionBuilder : SectionBuilder
         AppendTextLine($"{label}:");
     }
 
-    public static string StringifyInstruction(Instruction instruction) => (instruction switch
+    public static string StringifyInstruction(OpCode instruction) => (instruction switch
     {
-        Instruction.Move => "mov",
-        Instruction.Push => "push",
-        Instruction.Pop => "pop",
-        Instruction.LoadEA => "lea",
+        OpCode.Move => "mov",
+        OpCode.Push => "push",
+        OpCode.Pop => "pop",
+        OpCode.LoadEA => "lea",
 
-        Instruction.MathAdd => "add",
-        Instruction.MathSub => "sub",
-        Instruction.Compare => "cmp",
-        Instruction.MathMult => "mul",
-        Instruction.MathDiv => "div",
-        Instruction.IMathMult => "imul",
-        Instruction.IMathDiv => "idiv",
-        Instruction.Test => "test",
-        Instruction.BitsAND => "and",
-        Instruction.BitsXOR => "xor",
-        Instruction.BitsOR => "or",
-        Instruction.BitsShiftRight => "shr",
-        Instruction.BitsShiftLeft => "shl",
+        OpCode.MathAdd => "add",
+        OpCode.MathSub => "sub",
+        OpCode.Compare => "cmp",
+        OpCode.MathMult => "mul",
+        OpCode.MathDiv => "div",
+        OpCode.IMathMult => "imul",
+        OpCode.IMathDiv => "idiv",
+        OpCode.Test => "test",
+        OpCode.BitsAND => "and",
+        OpCode.BitsXOR => "xor",
+        OpCode.BitsOR => "or",
+        OpCode.BitsShiftRight => "shr",
+        OpCode.BitsShiftLeft => "shl",
 
-        Instruction.Call => "call",
-        Instruction.Return => "ret",
+        OpCode.Call => "call",
+        OpCode.Return => "ret",
 
-        Instruction.Jump => "jmp",
-        Instruction.JumpIfZero => "jz",
-        Instruction.JumpIfNotEQ => "jne",
-        Instruction.JumpIfGEQ => "jge",
-        Instruction.JumpIfG => "jg",
-        Instruction.JumpIfLEQ => "jle",
-        Instruction.JumpIfL => "jl",
-        Instruction.JumpIfEQ => "je",
+        OpCode.Jump => "jmp",
+        OpCode.JumpIfZero => "jz",
+        OpCode.JumpIfNotEQ => "jne",
+        OpCode.JumpIfGEQ => "jge",
+        OpCode.JumpIfG => "jg",
+        OpCode.JumpIfLEQ => "jle",
+        OpCode.JumpIfL => "jl",
+        OpCode.JumpIfEQ => "je",
 
-        Instruction.ConvertByteToWord => "cbw",
-        Instruction.ConvertWordToDoubleword => "cwd",
-        Instruction.Halt => "hlt",
+        OpCode.ConvertByteToWord => "cbw",
+        OpCode.ConvertWordToDoubleword => "cwd",
+        OpCode.Halt => "hlt",
 
         _ => throw new UnreachableException(),
     }).ToUpperInvariant();
 
-    void AppendInstructionNoEOL(Instruction keyword)
+    void AppendInstructionNoEOL(OpCode keyword)
     {
         AppendText(' ', Indent);
         AppendText(StringifyInstruction(keyword));
     }
 
-    public void AppendInstruction(Instruction keyword)
+    public void AppendInstruction(OpCode keyword)
     {
         AppendInstructionNoEOL(keyword);
         AppendText(EOL);
     }
 
-    public void AppendInstructionNoEOL(Instruction keyword, params string[] operands)
+    void AppendInstructionNoEOL(OpCode keyword, params string[] operands)
     {
         AppendInstructionNoEOL(keyword);
         if (operands.Length > 0)
@@ -104,32 +104,33 @@ public class TextSectionBuilder : SectionBuilder
         }
     }
 
-    public void AppendInstruction(Instruction keyword, params string[] operands)
+    void AppendInstruction(OpCode keyword, params string[] operands)
     {
         AppendInstructionNoEOL(keyword, operands);
         AppendText(EOL);
     }
 
-    public void AppendInstructionNoEOL(Instruction keyword, params InstructionOperand[] operands)
+    public void AppendInstructionNoEOL(OpCode keyword, InstructionOperand parameterA = default, InstructionOperand parameterB = default)
     {
-        AppendInstructionNoEOL(keyword);
-        if (operands.Length > 0)
-        {
-            AppendText(' ');
-            for (int i = 0; i < operands.Length; i++)
-            {
-                InstructionOperand operand = operands[i];
-                if (i > 0)
-                { AppendText(", "); }
-                AppendText(operand.ToString());
-            }
-        }
+        AppendInstructionNoEOL(new Instruction(keyword, parameterA, parameterB));
     }
 
-    public void AppendInstruction(Instruction keyword, params InstructionOperand[] operands)
+    public void AppendInstruction(OpCode keyword, InstructionOperand parameterA = default, InstructionOperand parameterB = default)
     {
-        AppendInstructionNoEOL(keyword, operands);
+        AppendInstruction(new Instruction(keyword, parameterA, parameterB));
+    }
+
+    public void AppendInstruction(Instruction instruction)
+    {
+        AppendText(' ', Indent);
+        AppendText(instruction.ToString());
         AppendText(EOL);
+    }
+
+    public void AppendInstructionNoEOL(Instruction instruction)
+    {
+        AppendText(' ', Indent);
+        AppendText(instruction.ToString());
     }
 
     public void Import(string label)
@@ -151,7 +152,7 @@ public class TextSectionBuilder : SectionBuilder
     /// <summary>
     /// Return value: <see cref="Registers.AX"/>
     /// </summary>
-    public void Call_cdecl(string label, int parametersSize, params string?[] parameters)
+    void Call_cdecl(string label, int parametersSize, params string?[] parameters)
     {
         if (label.StartsWith('_') && label.Contains('@'))
         { Import(label); }
@@ -162,15 +163,15 @@ public class TextSectionBuilder : SectionBuilder
 
             for (int i = parameters.Length - 1; i >= 0; i--)
             {
-                AppendInstruction(Instruction.Push, parameters[i] ?? throw new ArgumentNullException(nameof(parameters), $"The {i}th parameter is null"));
+                AppendInstruction(OpCode.Push, parameters[i] ?? throw new ArgumentNullException(nameof(parameters), $"The {i}th parameter is null"));
             }
         }
 
-        AppendInstruction(Instruction.Call, label);
+        AppendInstruction(OpCode.Call, label);
 
         AppendCommentLine("Clear arguments");
 
-        AppendInstructionNoEOL(Instruction.MathAdd, Registers.SP, parametersSize);
+        AppendInstructionNoEOL(OpCode.MathAdd, Intel.Register.SP, parametersSize);
         AppendComment("Remove call arguments from frame");
         AppendText(EOL);
     }
@@ -181,11 +182,11 @@ public class TextSectionBuilder : SectionBuilder
         if (label.StartsWith('_') && label.Contains('@'))
         { Import(label); }
 
-        AppendInstruction(Instruction.Call, label);
+        AppendInstruction(OpCode.Call, label);
 
         AppendCommentLine("Clear arguments");
 
-        AppendInstructionNoEOL(Instruction.MathAdd, Registers.SP, parametersSize);
+        AppendInstructionNoEOL(OpCode.MathAdd, Intel.Register.SP, parametersSize);
         AppendComment("Remove call arguments from frame");
         AppendText(EOL);
     }
@@ -208,7 +209,7 @@ public class TextSectionBuilder : SectionBuilder
     /// Return value: <see cref="Registers.AX"/>
     /// </para>
     /// </summary>
-    public void Call_stdcall(string label, params string?[] parameters)
+    void Call_stdcall(string label, params string?[] parameters)
     {
         if (label.StartsWith('_') && label.Contains('@'))
         { Import(label); }
@@ -217,10 +218,10 @@ public class TextSectionBuilder : SectionBuilder
 
         for (int i = parameters.Length - 1; i >= 0; i--)
         {
-            AppendInstruction(Instruction.Push, parameters[i] ?? throw new ArgumentNullException(nameof(parameters), $"The {i}th parameter is null"));
+            AppendInstruction(OpCode.Push, parameters[i] ?? throw new ArgumentNullException(nameof(parameters), $"The {i}th parameter is null"));
         }
 
-        AppendInstruction(Instruction.Call, label);
+        AppendInstruction(OpCode.Call, label);
     }
 
     /// <inheritdoc cref="Call_stdcall(string, string?[])"/>
@@ -229,7 +230,7 @@ public class TextSectionBuilder : SectionBuilder
         if (label.StartsWith('_') && label.Contains('@'))
         { Import(label); }
 
-        AppendInstruction(Instruction.Call, label);
+        AppendInstruction(OpCode.Call, label);
     }
 
     #endregion

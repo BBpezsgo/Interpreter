@@ -1,82 +1,91 @@
-﻿namespace LanguageCore.ASM;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-using Compiler;
-using Runtime;
+namespace LanguageCore.ASM;
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-public readonly struct InstructionOperand
+public enum InstructionOperandType
 {
-    readonly string value;
+    None,
+    Immediate,
+    Register,
+    DirectAddress,
+    IndirectAddress,
+    IndexedAddress,
+    BasedAddress,
+    BasedIndexedAddress,
+    Label,
+}
 
-    InstructionOperand(string value) => this.value = value;
+[SuppressMessage("Usage", "CA2231")]
+public readonly struct InstructionOperand : IEquatable<InstructionOperand>
+{
+    public readonly InstructionOperandType Type;
+    readonly ushort _1;
+    readonly ushort _2;
+    readonly string? _raw;
 
-    string GetDebuggerDisplay() => value;
-    public override string ToString() => value;
-
-    public static implicit operator InstructionOperand(string v) => new(v);
-    public static implicit operator InstructionOperand(int v) => new(v.ToString(CultureInfo.InvariantCulture));
-    public static explicit operator InstructionOperand(ValueAddress v)
+    InstructionOperand(InstructionOperandType type, ushort _1 = default, ushort _2 = default)
     {
-        StringBuilder result = new();
-
-        if (v.IsReference)
-        { throw new NotImplementedException(); }
-
-        switch (v.AddressingMode)
-        {
-            case AddressingMode.Absolute:
-            {
-                throw new NotImplementedException();
-                // result.Append('[');
-                // result.Append((v.Address + 1) * 4);
-                // result.Append(']');
-                // return new InstructionOperand(result.ToString());
-            }
-            case AddressingMode.Runtime:
-                throw new NotImplementedException();
-            case AddressingMode.BasePointerRelative:
-            {
-                result.Append('[');
-                result.Append(Registers.BP);
-                result.Append((v.Address < 0) ? '+' : '-');
-                result.Append(Math.Abs(v.Address) * 4);
-                result.Append(']');
-                return new InstructionOperand(result.ToString());
-            }
-            case AddressingMode.StackPointerRelative:
-            {
-                result.Append('[');
-                result.Append(Registers.SP);
-                result.Append((v.Address < 0) ? '+' : '-');
-                result.Append(Math.Abs(v.Address) * 4);
-                result.Append(']');
-                return new InstructionOperand(result.ToString());
-            }
-            default:
-                throw new UnreachableException();
-        }
+        Type = type;
+        this._1 = _1;
+        this._2 = _2;
+        _raw = null;
     }
-    public static explicit operator InstructionOperand(DataItem v) => v.Type switch
+
+    InstructionOperand(InstructionOperandType type, string _raw)
     {
-        RuntimeType.Byte => new InstructionOperand(v.VByte.ToString()),
-        RuntimeType.Integer => new InstructionOperand(v.VInt.ToString()),
-        RuntimeType.Char => new InstructionOperand(((ushort)v.VChar).ToString()),
-        RuntimeType.Null => throw new InternalException($"Operand value is null"),
-        RuntimeType.Single => throw new NotImplementedException(),
-        _ => throw new UnreachableException(),
+        Type = type;
+        _1 = default;
+        _2 = default;
+        this._raw = _raw;
+    }
+
+    public override string ToString() => Type switch
+    {
+        InstructionOperandType.Immediate => $"DWORD {_1}",
+        InstructionOperandType.Register => $"{(Intel.Register)_1}",
+        InstructionOperandType.DirectAddress => $"DWORD [{_1}]",
+        InstructionOperandType.IndirectAddress => $"DWORD [{(Intel.Register)_1}]",
+        InstructionOperandType.IndexedAddress => $"DWORD [{(Intel.Register)_1}+{(Intel.Register)_2}]",
+        InstructionOperandType.BasedAddress => throw new NotImplementedException(),
+        InstructionOperandType.BasedIndexedAddress => throw new NotImplementedException(),
+        InstructionOperandType.None => throw new NotImplementedException(),
+        InstructionOperandType.Label => _raw ?? throw new NullReferenceException(),
+        _ => throw new NotImplementedException(),
     };
 
-    public static InstructionOperand Pointer(string register, int offset, string? size = null)
-    {
-        size = null;
-        if (offset < 0) return new InstructionOperand($"{size}[{register}-{-offset}]");
-        else if (offset > 0) return new InstructionOperand($"{size}[{register}+{offset}]");
-        else return new InstructionOperand($"{size}[{register}]");
-    }
+    public override bool Equals(object? obj) =>
+        obj is InstructionOperand operand &&
+        Equals(operand);
 
-    public static InstructionOperand Pointer(int address, string? size = null)
+    public bool Equals(InstructionOperand other) =>
+        Type == other.Type &&
+        _1 == other._1 &&
+        _2 == other._2;
+
+    public override int GetHashCode() => HashCode.Combine(Type, _1, _2);
+
+    public static implicit operator InstructionOperand(int immediate) => new(InstructionOperandType.Immediate, checked((ushort)immediate));
+    public static implicit operator InstructionOperand(Intel.Register register) => new(InstructionOperandType.Register, (ushort)register);
+    public static InstructionOperand Pointer(int directAddress) => new(InstructionOperandType.DirectAddress, checked((ushort)directAddress));
+    public static InstructionOperand Pointer(Intel.Register indirectAddress) => new(InstructionOperandType.IndirectAddress, (ushort)indirectAddress);
+    public static InstructionOperand Pointer(Intel.Register baseAddress, int offset) => new(InstructionOperandType.IndexedAddress, (ushort)baseAddress, checked((ushort)offset));
+    public static InstructionOperand Label(string label) => new(InstructionOperandType.Label, label);
+
+    public static explicit operator InstructionOperand(Compiler.ValueAddress v)
     {
-        size = null;
-        return new InstructionOperand($"{size}[{address}]");
+        if (v.IsReference || v.InHeap)
+        { throw new NotImplementedException(); }
+
+        return v.AddressingMode switch
+        {
+            Runtime.AddressingMode.BasePointerRelative => new InstructionOperand(InstructionOperandType.IndexedAddress, (ushort)Intel.Register.BP, (ushort)(v.Address * 4)),
+            Runtime.AddressingMode.StackPointerRelative => new InstructionOperand(InstructionOperandType.IndexedAddress, (ushort)Intel.Register.SP, (ushort)(v.Address * 4)),
+            _ => throw new UnreachableException(),
+        };
     }
+    public static explicit operator InstructionOperand(Runtime.DataItem v) => new(InstructionOperandType.Immediate, checked((ushort)v));
 }

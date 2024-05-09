@@ -1,5 +1,4 @@
 ﻿#pragma warning disable IDE0051 // Remove unused private members
-#pragma warning disable IDE0052 // Remove unread private members
 #pragma warning disable IDE0060 // Remove unused parameter
 
 namespace LanguageCore.ASM.Generator;
@@ -79,9 +78,9 @@ public class CodeGeneratorForAsm : CodeGenerator
         return false;
     }
 
-    public static bool TryGetRegister(string identifier, [NotNullWhen(true)] out string? register, [NotNullWhen(true)] out BuiltinType? type)
+    public static bool TryGetRegister(string identifier, [NotNullWhen(true)] out Intel.Register register, [NotNullWhen(true)] out BuiltinType? type)
     {
-        register = null;
+        register = default;
         type = null;
 
         if (!identifier.StartsWith('@')) return false;
@@ -91,7 +90,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             "AX" or "BX" or "CX" or "DX" or
             "DS")
         {
-            register = identifier;
+            register = Enum.Parse<Intel.Register>(identifier);
             type = new BuiltinType(BasicType.Char);
             return true;
         }
@@ -100,7 +99,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             "AH" or "BH" or "CH" or "DH" or
             "AL" or "BL" or "CL" or "DL")
         {
-            register = identifier;
+            register = Enum.Parse<Intel.Register>(identifier);
             type = new BuiltinType(BasicType.Byte);
             return true;
         }
@@ -134,14 +133,14 @@ public class CodeGeneratorForAsm : CodeGenerator
             switch (address.AddressingMode)
             {
                 case AddressingMode.Absolute:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.AX, InstructionOperand.Pointer((address.Address + 1) * IntSize, "DWORD"));
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, InstructionOperand.Pointer((address.Address + 1) * IntSize));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     return;
                 case AddressingMode.Runtime:
                     throw new NotImplementedException();
                 case AddressingMode.BasePointerRelative:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.AX, InstructionOperand.Pointer(Registers.BP, (Math.Abs(address.Address) + 1) * IntSize * Math.Sign(address.Address), "DWORD"));
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, InstructionOperand.Pointer(Intel.Register.BP, (Math.Abs(address.Address) + 1) * IntSize * Math.Sign(address.Address)));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     return;
                 case AddressingMode.StackPointerRelative:
                     throw new NotImplementedException();
@@ -156,13 +155,13 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             case AddressingMode.Absolute:
             case AddressingMode.BasePointerRelative:
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.AX, InstructionOperand.Pointer(Registers.BP, (address.Address + 1) * IntSize * -1, "DWORD"));
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, InstructionOperand.Pointer(Intel.Register.BP, (address.Address + 1) * IntSize * -1));
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                 break;
 
             case AddressingMode.StackPointerRelative:
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.AX, InstructionOperand.Pointer(Registers.SP, (address.Address + 1) * IntSize, "DWORD"));
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, InstructionOperand.Pointer(Intel.Register.SP, (address.Address + 1) * IntSize));
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                 throw new NotImplementedException();
 
             case AddressingMode.Runtime:
@@ -177,14 +176,14 @@ public class CodeGeneratorForAsm : CodeGenerator
             switch (address.AddressingMode)
             {
                 case AddressingMode.Absolute:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, InstructionOperand.Pointer((address.Address + 1) * IntSize, "DWORD"), Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, InstructionOperand.Pointer((address.Address + 1) * IntSize), Intel.Register.AX);
                     return;
                 case AddressingMode.Runtime:
                     throw new NotImplementedException();
                 case AddressingMode.BasePointerRelative:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, InstructionOperand.Pointer(Registers.BP, (Math.Abs(address.Address) + 1) * IntSize * Math.Sign(address.Address), "DWORD"), Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, InstructionOperand.Pointer(Intel.Register.BP, (Math.Abs(address.Address) + 1) * IntSize * Math.Sign(address.Address)), Intel.Register.AX);
                     return;
                 case AddressingMode.StackPointerRelative:
                     throw new NotImplementedException();
@@ -199,8 +198,8 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             case AddressingMode.Absolute:
             case AddressingMode.BasePointerRelative:
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, InstructionOperand.Pointer(Registers.BP, (address.Address + 1) * IntSize * -1, "DWORD"), Registers.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, InstructionOperand.Pointer(Intel.Register.BP, (address.Address + 1) * IntSize * -1), Intel.Register.AX);
                 break;
             case AddressingMode.StackPointerRelative:
             case AddressingMode.Runtime:
@@ -282,7 +281,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             return size;
         }
 
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, (InstructionOperand)GetInitialValue(type));
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, (InstructionOperand)GetInitialValue(type));
         return 1;
     }
 
@@ -331,7 +330,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             size = 1;
 
-            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, (InstructionOperand)computedInitialValue);
+            Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, (InstructionOperand)computedInitialValue);
             compiledVariable.IsInitialized = true;
 
             if (size <= 0)
@@ -415,7 +414,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             return;
         }
 
-        if (TryGetRegister(statement.Token.Content, out string? dstRegister, out BuiltinType? dstRegisterType))
+        if (TryGetRegister(statement.Token.Content, out Intel.Register dstRegister, out BuiltinType? dstRegisterType))
         {
             if (TryCompute(value, out DataItem _value))
             {
@@ -427,16 +426,16 @@ public class CodeGeneratorForAsm : CodeGenerator
                     !DataItem.TryShrinkTo16bit(ref _value))
                 { throw new CompilerException($"Can't set constant value {_value} to an 16bit register", value, CurrentFile); }
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, dstRegister, (InstructionOperand)_value);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, dstRegister, (InstructionOperand)_value);
             }
             else if (value is Identifier _identifier2 &&
-                     TryGetRegister(_identifier2.Content, out string? srcRegister, out BuiltinType? srcRegisterType))
+                     TryGetRegister(_identifier2.Content, out Intel.Register srcRegister, out BuiltinType? srcRegisterType))
             {
                 if (dstRegisterType == BasicType.Byte &&
                     srcRegisterType == BasicType.Char)
                 { throw new CompilerException($"Can't transfer 16bit data from register {srcRegister} to an 8bit register", value, CurrentFile); }
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, dstRegister, srcRegister);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, dstRegister, srcRegister);
             }
             else
             {
@@ -445,7 +444,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 if (dstRegisterType == BasicType.Byte)
                 { throw new CompilerException($"Can't pop to an 8bit register", value, CurrentFile); }
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, dstRegister);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, dstRegister);
             }
             return;
         }
@@ -463,30 +462,22 @@ public class CodeGeneratorForAsm : CodeGenerator
         if (statement.PrevStatement is Identifier _identifier &&
             _identifier.Content.StartsWith('@'))
         {
-            string destinationRegister = _identifier.Content[1..];
-            if (destinationRegister is
-                "AX" or "BX" or "CX" or "DX" or
-                "AH" or "BH" or "CH" or "DH" or
-                "AL" or "BL" or "CL" or "DL" or
-                "DS")
+            string destinationRegisterName = _identifier.Content[1..];
+            if (Enum.TryParse<Intel.Register>(destinationRegisterName, out Intel.Register destinationRegister))
             {
                 if (TryCompute(value, out DataItem _value))
                 {
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, InstructionOperand.Pointer(destinationRegister, 0), (InstructionOperand)_value);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, InstructionOperand.Pointer(destinationRegister, 0), (InstructionOperand)_value);
                     return;
                 }
 
                 if (value is Identifier _identifier2 &&
-                         _identifier2.Content.StartsWith('@'))
+                    _identifier2.Content.StartsWith('@'))
                 {
-                    string sourceRegister = _identifier2.Content[1..];
-                    if (sourceRegister is
-                        "AX" or "BX" or "CX" or "DX" or
-                        "AH" or "BH" or "CH" or "DH" or
-                        "AL" or "BL" or "CL" or "DL" or
-                        "DS")
+                    string sourceRegisterName = _identifier2.Content[1..];
+                    if (Enum.TryParse(sourceRegisterName, out Intel.Register sourceRegister))
                     {
-                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, InstructionOperand.Pointer(destinationRegister, 0), sourceRegister);
+                        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, InstructionOperand.Pointer(destinationRegister, 0), sourceRegister);
                         return;
                     }
                 }
@@ -509,12 +500,12 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     void Call(string label)
     {
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Call, label);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Call, InstructionOperand.Label(label));
     }
 
     void Return()
     {
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Return);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Return);
     }
 
     Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(FunctionCall functionCall, CompiledFunction compiledFunction)
@@ -596,41 +587,6 @@ public class CodeGeneratorForAsm : CodeGenerator
         return parameterCleanup;
     }
 
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(BinaryOperatorCall functionCall, CompiledOperator compiledFunction)
-    {
-        Stack<ParameterCleanupItem> parameterCleanup = new();
-
-        for (int i = 0; i < functionCall.Parameters.Length; i++)
-        {
-            StatementWithValue passedParameter = functionCall.Parameters[i];
-            GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsExtension ? (i + 1) : i];
-            // GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
-
-            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
-
-            canDeallocate = canDeallocate && passedParameterType is PointerType;
-
-            if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
-            {
-                if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
-            }
-            else
-            {
-                if (explicitDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
-                canDeallocate = false;
-            }
-
-            GenerateCodeForStatement(passedParameter); // TODO: expectedType = definedParameterType
-
-            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType));
-        }
-
-        return parameterCleanup;
-    }
-
     void GenerateCodeForParameterCleanup(Stack<ParameterCleanupItem> parameterCleanup)
     {
         while (parameterCleanup.Count > 0)
@@ -642,7 +598,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
             for (int i = 0; i < passedParameter.Size; i++)
             {
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
             }
         }
     }
@@ -676,13 +632,13 @@ public class CodeGeneratorForAsm : CodeGenerator
 
                 Builder.CodeBuilder.Call_stdcall("_GetStdHandle@4", 4, -11);
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LoadEA, Registers.BX, (InstructionOperand)new ValueAddress(0, AddressingMode.BasePointerRelative));
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.LoadEA, Intel.Register.BX, (InstructionOperand)new ValueAddress(0, AddressingMode.BasePointerRelative));
 
                 Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20,
-                    Registers.AX,
-                    dataLabel,
+                    Intel.Register.AX,
+                    InstructionOperand.Label(dataLabel),
                     charLiteral.Value.Length,
-                    Registers.BX,
+                    Intel.Register.BX,
                     0);
 
                 return;
@@ -697,17 +653,17 @@ public class CodeGeneratorForAsm : CodeGenerator
 
                 Builder.CodeBuilder.Call_stdcall("_GetStdHandle@4", 4, -11);
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LoadEA, Registers.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackPointerRelative));
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.LoadEA, Intel.Register.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackPointerRelative));
 
                 Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20,
-                    Registers.AX,
+                    Intel.Register.AX,
                     (InstructionOperand)new ValueAddress(-2, AddressingMode.StackPointerRelative),
                     1,
-                    Registers.BX,
+                    Intel.Register.BX,
                     0);
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop);
 
                 return;
             }
@@ -720,17 +676,17 @@ public class CodeGeneratorForAsm : CodeGenerator
 
                 Builder.CodeBuilder.Call_stdcall("_GetStdHandle@4", 4, -11);
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LoadEA, Registers.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackPointerRelative));
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.LoadEA, Intel.Register.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackPointerRelative));
 
                 Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20,
-                    Registers.AX,
-                    dataLabel,
+                    Intel.Register.AX,
+                    InstructionOperand.Label(dataLabel),
                     stringLiteral.Value.Length,
-                    Registers.BX,
+                    Intel.Register.BX,
                     0);
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop);
 
                 return;
             }
@@ -781,7 +737,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             for (int i = 0; i < returnValueSize; i++)
             {
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
             }
         }
     }
@@ -833,7 +789,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             }
             else
             {
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, $"[rbp+{address.Address}]".Replace("+-", "-", StringComparison.Ordinal));
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, InstructionOperand.Pointer(Intel.Register.BP, address.Address));
             }
             return;
         }
@@ -865,7 +821,8 @@ public class CodeGeneratorForAsm : CodeGenerator
             {
                 indexCall.Index,
             },
-            indexCall.Brackets));
+            indexCall.Brackets,
+            indexCall.OriginalFile));
     }
     void GenerateCodeForStatement(IfContainer @if)
     {
@@ -878,22 +835,22 @@ public class CodeGeneratorForAsm : CodeGenerator
             {
                 string nextLabel = Builder.CodeBuilder.NewLabel("if_next");
                 GenerateCodeForStatement(ifBranch.Condition);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Test, Registers.AX, Registers.AX);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfZero, nextLabel);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Test, Intel.Register.AX, Intel.Register.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfZero, InstructionOperand.Label(nextLabel));
                 GenerateCodeForStatement(ifBranch.Block);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, endLabel);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(endLabel));
                 Builder.CodeBuilder.AppendLabel(nextLabel);
             }
             else if (part is ElseIfBranch elseIfBranch)
             {
                 string nextLabel = Builder.CodeBuilder.NewLabel("if_next");
                 GenerateCodeForStatement(elseIfBranch.Condition);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Test, Registers.AX, Registers.AX);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfZero, nextLabel);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Test, Intel.Register.AX, Intel.Register.AX);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfZero, InstructionOperand.Label(nextLabel));
                 GenerateCodeForStatement(elseIfBranch.Block);
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, endLabel);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(endLabel));
                 Builder.CodeBuilder.AppendLabel(nextLabel);
             }
             else if (part is ElseBranch elseBranch)
@@ -922,16 +879,16 @@ public class CodeGeneratorForAsm : CodeGenerator
         { GenerateCodeForStatement(@while.Condition); }
         Builder.CodeBuilder.AppendCommentLine($"}}");
 
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Test, Registers.AX, Registers.AX);
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfZero, endLabel);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Test, Intel.Register.AX, Intel.Register.AX);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfZero, InstructionOperand.Label(endLabel));
 
         Builder.CodeBuilder.AppendCommentLine($"{{");
         using (Builder.CodeBuilder.Block())
         { GenerateCodeForStatement(@while.Block); }
         Builder.CodeBuilder.AppendCommentLine($"}}");
 
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, startLabel);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(startLabel));
 
         Builder.CodeBuilder.AppendLabel(endLabel);
 
@@ -959,9 +916,9 @@ public class CodeGeneratorForAsm : CodeGenerator
                 }
 
                 if (InFunction)
-                { Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MathAdd, Registers.SP, FunctionFrameSize.Last * IntSize); }
+                { Builder.CodeBuilder.AppendInstruction(ASM.OpCode.MathAdd, Intel.Register.SP, FunctionFrameSize.Last * IntSize); }
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BP);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BP);
                 Return();
                 break;
             }
@@ -1041,7 +998,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         if (variable.IsInitialized) return;
 
-        GenerateCodeForSetter(new Identifier(statement.Identifier), statement.InitialValue);
+        GenerateCodeForSetter(new Identifier(statement.Identifier, statement.FilePath), statement.InitialValue);
 
         variable.IsInitialized = true;
     }
@@ -1069,7 +1026,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
             parameterCleanup = GenerateCodeForParameterPassing(functionCall, function);
 
-            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Call, (InstructionOperand)new ValueAddress(compiledVariable));
+            Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Call, (InstructionOperand)new ValueAddress(compiledVariable));
 
             GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -1077,7 +1034,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             {
                 for (int i = 0; i < returnValueSize; i++)
                 {
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
                 }
             }
             return;
@@ -1102,14 +1059,14 @@ public class CodeGeneratorForAsm : CodeGenerator
         switch (statement.Type)
         {
             case LiteralType.Integer:
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, statement.Value);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, int.Parse(statement.Value));
                 break;
             case LiteralType.Float:
                 throw new NotImplementedException();
             case LiteralType.String:
                 throw new NotImplementedException();
             case LiteralType.Char:
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, statement.Value[0]);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, statement.Value[0]);
                 break;
             default:
                 throw new UnreachableException();
@@ -1121,7 +1078,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             statement.Token.AnalyzedType = TokenAnalyzedType.ConstantName;
             statement.Reference = constant;
-            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, (InstructionOperand)constant.Value);
+            Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, (InstructionOperand)constant.Value);
             return;
         }
 
@@ -1156,7 +1113,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 FunctionLabels.Add((compiledFunction, label));
             }
 
-            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, label);
+            Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, InstructionOperand.Label(label));
             return;
         }
 
@@ -1179,7 +1136,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 // case "CL":
                 // case "DL":
                 {
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, potentialRegister);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, InstructionOperand.Label(potentialRegister));
                     return;
                 }
             }
@@ -1208,16 +1165,16 @@ public class CodeGeneratorForAsm : CodeGenerator
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, Registers.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.AX, Intel.Register.BX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfGEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfGEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
@@ -1226,15 +1183,15 @@ public class CodeGeneratorForAsm : CodeGenerator
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfLEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfLEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
@@ -1243,15 +1200,15 @@ public class CodeGeneratorForAsm : CodeGenerator
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfG, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfG, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
@@ -1260,15 +1217,15 @@ public class CodeGeneratorForAsm : CodeGenerator
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfL, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfL, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
@@ -1277,17 +1234,17 @@ public class CodeGeneratorForAsm : CodeGenerator
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, 0);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfNotEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.BX, 0);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfNotEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.AX, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfNotEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.BX, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfNotEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 1);
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
@@ -1296,17 +1253,17 @@ public class CodeGeneratorForAsm : CodeGenerator
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, 0);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.BX, 0);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.AX, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.BX, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
                     Builder.CodeBuilder.AppendLabel(label2);
 
                     break;
@@ -1316,15 +1273,15 @@ public class CodeGeneratorForAsm : CodeGenerator
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfNotEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfNotEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
@@ -1333,95 +1290,95 @@ public class CodeGeneratorForAsm : CodeGenerator
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
 
                 case Opcode.BitsAND:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.BitsAND, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.BitsAND, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     break;
                 case Opcode.BitsOR:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.BitsOR, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.BitsOR, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     break;
                 case Opcode.BitsXOR:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.BitsXOR, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.BitsXOR, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     break;
 
                 case Opcode.BitsShiftLeft:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.BitsShiftLeft, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.BitsShiftLeft, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     break;
                 case Opcode.BitsShiftRight:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.BitsShiftRight, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.BitsShiftRight, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     break;
 
                 case Opcode.MathAdd:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MathAdd, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.MathAdd, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     break;
                 case Opcode.MathSub:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MathSub, Registers.BX, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.MathSub, Intel.Register.BX, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.BX);
                     break;
                 case Opcode.MathMult:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MathMult, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.MathMult, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     break;
                 case Opcode.MathDiv:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.IMathDiv, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.IMathDiv, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     break;
                 case Opcode.MathMod:
                 {
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.IMathDiv, Registers.AX, Registers.BX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.AX, Registers.DX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Test, Registers.AX, Registers.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.AX, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.IMathDiv, Intel.Register.AX, Intel.Register.BX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, Intel.Register.DX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Test, Intel.Register.AX, Intel.Register.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.AX, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, 0);
                     Builder.CodeBuilder.AppendLabel(label2);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     break;
                 }
                 default:
@@ -1451,14 +1408,14 @@ public class CodeGeneratorForAsm : CodeGenerator
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.AX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Compare, Registers.AX, 0);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JumpIfNotEQ, label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Jump, label2);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Compare, Intel.Register.AX, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.JumpIfNotEQ, InstructionOperand.Label(label1));
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 1);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Jump, InstructionOperand.Label(label2));
                     Builder.CodeBuilder.AppendLabel(label1);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
+                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
@@ -1505,34 +1462,6 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     #endregion
 
-    void GenerateCodeForInlinedMacro(Statement inlinedMacro)
-    {
-        Builder.CodeBuilder.AppendCommentLine("Macro {");
-        Builder.CodeBuilder.Indent += SectionBuilder.IndentIncrement;
-
-        InMacro.Push(true);
-        if (inlinedMacro is Block block)
-        {
-            GenerateCodeForStatement(block);
-        }
-        else if (inlinedMacro is KeywordCall keywordCall &&
-            keywordCall.Identifier.Equals(StatementKeywords.Return) &&
-            keywordCall.Parameters.Length == 1)
-        {
-            Builder.CodeBuilder.AppendCommentLine($"{keywordCall.Parameters[0]}  (returned)");
-            GenerateCodeForStatement(keywordCall.Parameters[0]);
-        }
-        else
-        {
-            Builder.CodeBuilder.AppendCommentLine(inlinedMacro.ToString());
-            GenerateCodeForStatement(inlinedMacro);
-        }
-        InMacro.Pop();
-
-        Builder.CodeBuilder.Indent -= SectionBuilder.IndentIncrement;
-        Builder.CodeBuilder.AppendCommentLine("}");
-    }
-
     void CleanupVariables(CleanupItem[] cleanup)
     {
         for (int i = 0; i < cleanup.Length; i++)
@@ -1540,7 +1469,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             CleanupItem item = cleanup[i];
             for (int j = 0; j < item.SizeOnStack; j++)
             {
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MathAdd, Registers.SP, IntSize);
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.MathAdd, Intel.Register.SP, IntSize);
             }
         }
     }
@@ -1549,7 +1478,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     {
         CompileLocalConstants(statements);
 
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.BP, Registers.SP);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.BP, Intel.Register.SP);
 
         Builder.CodeBuilder.AppendCommentLine("Variables:");
         CleanupItem[] cleanup = GenerateCodeForVariable(statements).ToArray();
@@ -1573,7 +1502,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
                     GenerateCodeForStatement(keywordCall.Parameters[0]);
                     hasExited = true;
-                    Builder.CodeBuilder.Call_stdcall("_ExitProcess@4", 4);
+                    Builder.CodeBuilder.Call_stdcall("_ExitProcess@4");
                     break;
                 }
             }
@@ -1589,11 +1518,10 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         if (!hasExited && !Is16Bits)
         {
-            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, 0);
-            Builder.CodeBuilder.Call_stdcall("_ExitProcess@4", 4);
+            Builder.CodeBuilder.Call_stdcall("_ExitProcess@4", 0);
         }
 
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Halt);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Halt);
 
         CleanupLocalConstants();
     }
@@ -1666,8 +1594,8 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         Builder.CodeBuilder.AppendCommentLine("Begin frame");
 
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Push, Registers.BP);
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Move, Registers.BP, Registers.SP);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.BP);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.BP, Intel.Register.SP);
 
         Builder.CodeBuilder.AppendCommentLine("Block");
 
@@ -1675,7 +1603,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         Builder.CodeBuilder.AppendCommentLine("End frame");
 
-        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.Pop, Registers.BP);
+        Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BP);
 
         CurrentFile = null;
 

@@ -6,41 +6,6 @@ using Runtime;
 using Tokenizing;
 using LiteralStatement = Parser.Statement.Literal;
 
-public struct GeneratorSettings
-{
-    public bool GenerateComments;
-    public bool PrintInstructions;
-    public bool DontOptimize;
-    public bool GenerateDebugInstructions;
-    public bool ExternalFunctionsCache;
-    public bool CheckNullPointers;
-    public CompileLevel CompileLevel;
-
-    public readonly bool OptimizeCode => !DontOptimize;
-
-    public GeneratorSettings(GeneratorSettings other)
-    {
-        GenerateComments = other.GenerateComments;
-        PrintInstructions = other.PrintInstructions;
-        DontOptimize = other.DontOptimize;
-        GenerateDebugInstructions = other.GenerateDebugInstructions;
-        ExternalFunctionsCache = other.ExternalFunctionsCache;
-        CheckNullPointers = other.CheckNullPointers;
-        CompileLevel = other.CompileLevel;
-    }
-
-    public static GeneratorSettings Default => new()
-    {
-        GenerateComments = true,
-        PrintInstructions = false,
-        DontOptimize = false,
-        GenerateDebugInstructions = true,
-        ExternalFunctionsCache = false,
-        CheckNullPointers = true,
-        CompileLevel = CompileLevel.Minimal,
-    };
-}
-
 public abstract class CodeGenerator
 {
     protected readonly struct CompliableTemplate<T> where T : ITemplateable<T>
@@ -117,7 +82,6 @@ public abstract class CodeGenerator
     protected readonly Dictionary<string, GeneralType> TypeArguments;
     protected DebugInformation? DebugInfo;
 
-    protected readonly GeneratorSettings Settings;
     protected readonly PrintCallback? Print;
     protected readonly AnalysisCollection? AnalysisCollection;
 
@@ -132,7 +96,7 @@ public abstract class CodeGenerator
 
     #endregion
 
-    protected CodeGenerator(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print)
+    protected CodeGenerator(CompilerResult compilerResult, AnalysisCollection? analysisCollection, PrintCallback? print)
     {
         CompiledGlobalConstants = ImmutableArray.Create<IConstant>();
 
@@ -160,7 +124,6 @@ public abstract class CodeGenerator
         CompiledEnums = compilerResult.Enums;
 
         AnalysisCollection = analysisCollection;
-        Settings = settings;
         Print = print;
     }
 
@@ -359,18 +322,13 @@ public abstract class CodeGenerator
 
     protected bool GetConstructor(
         GeneralType type,
-        GeneralType[] arguments,
+        ImmutableArray<GeneralType> arguments,
         [NotNullWhen(true)] out CompiledConstructor? result,
         [MaybeNullWhen(false)] out Dictionary<string, GeneralType>? typeArguments,
         bool addCompilable,
         [NotNullWhen(false)] out WillBeCompilerException? error)
     {
-        {
-            List<GeneralType> newArguments = new(arguments.Length + 1);
-            newArguments.Add(type);
-            newArguments.AddRange(arguments);
-            arguments = newArguments.ToArray();
-        }
+        arguments = [type, .. arguments];
 
         return GetFunction<CompiledConstructor, GeneralType, GeneralType>(
             CompiledConstructors,
@@ -398,7 +356,7 @@ public abstract class CodeGenerator
             "function",
             null,
 
-            BuiltinFunctionNames.IndexerGet,
+            BuiltinFunctionIdentifiers.IndexerGet,
             new GeneralType[] { prevType, new BuiltinType(BasicType.Integer) },
             out result,
             out typeArguments,
@@ -418,7 +376,7 @@ public abstract class CodeGenerator
             "function",
             null,
 
-            BuiltinFunctionNames.IndexerSet,
+            BuiltinFunctionIdentifiers.IndexerSet,
             new GeneralType[] { prevType, new BuiltinType(BasicType.Integer), elementType },
             out result,
             out typeArguments,
@@ -427,7 +385,7 @@ public abstract class CodeGenerator
 
     protected bool TryGetBuiltinFunction(
         string builtinName,
-        GeneralType[] arguments,
+        IEnumerable<GeneralType> arguments,
         [NotNullWhen(true)] out CompiledFunction? result,
         [MaybeNullWhen(false)] out Dictionary<string, GeneralType>? typeArguments,
         bool addCompilable,
@@ -445,7 +403,7 @@ public abstract class CodeGenerator
             builtinCompiledFunctions,
             builtinCompilableFunctions,
             "builtin function",
-            $"[Builtin(\"{builtinName}\")] ?({string.Join<GeneralType>(", ", arguments)})",
+            $"[Builtin(\"{builtinName}\")] ?({string.Join(", ", arguments)})",
 
             null,
             arguments,
@@ -510,13 +468,13 @@ public abstract class CodeGenerator
 
     protected bool GetFunction(
         string identifier,
-        StatementWithValue[] arguments,
+        ImmutableArray<StatementWithValue> arguments,
         [NotNullWhen(true)] out CompiledFunction? result,
         [MaybeNullWhen(false)] out Dictionary<string, GeneralType>? typeArguments,
         bool addCompilable,
         [NotNullWhen(false)] out WillBeCompilerException? error)
     {
-        GeneralType[] argumentTypes;
+        ImmutableArray<GeneralType> argumentTypes;
 
         if (GetFunction(identifier, Enumerable.Repeat<GeneralType?>(null, arguments.Length), out CompiledFunction? possibleFunction, out _, false, out _))
         { argumentTypes = FindStatementTypes(arguments, possibleFunction.ParameterTypes); }
@@ -823,7 +781,7 @@ public abstract class CodeGenerator
         bool addCompilable,
         [NotNullWhen(false)] out WillBeCompilerException? error)
     {
-        GeneralType[] arguments = FindStatementTypes(@operator.Parameters);
+        ImmutableArray<GeneralType> arguments = FindStatementTypes(@operator.Parameters);
         return GetOperator(
             @operator.Operator.Content,
             arguments,
@@ -841,7 +799,7 @@ public abstract class CodeGenerator
         bool addCompilable,
         [NotNullWhen(false)] out WillBeCompilerException? error)
     {
-        GeneralType[] arguments = FindStatementTypes(@operator.Parameters);
+        ImmutableArray<GeneralType> arguments = FindStatementTypes(@operator.Parameters);
         return GetOperator(
             @operator.Operator.Content,
             arguments,
@@ -860,7 +818,7 @@ public abstract class CodeGenerator
 
     protected bool GetGeneralFunction(
         GeneralType context,
-        GeneralType[] arguments,
+        IEnumerable<GeneralType> arguments,
         string identifier,
         [NotNullWhen(true)] out CompiledGeneralFunction? result,
         [MaybeNullWhen(false)] out Dictionary<string, GeneralType>? typeArguments,
@@ -1346,7 +1304,7 @@ public abstract class CodeGenerator
 
     #region GetInitialValue()
 
-    /// <exception cref="NotImplementedException"></exception>
+    /// <exception cref="NotImplementedException"/>
     protected static DataItem GetInitialValue(BasicType type) => type switch
     {
         BasicType.Byte => new DataItem((byte)0),
@@ -1360,50 +1318,26 @@ public abstract class CodeGenerator
     /// <exception cref="NotImplementedException"/>
     /// <exception cref="CompilerException"/>
     /// <exception cref="InternalException"/>
-    protected static DataItem GetInitialValue(TypeInstance type) => type.ToString() switch
-    {
-        TypeKeywords.Int => new DataItem((int)0),
-        TypeKeywords.Byte => new DataItem((byte)0),
-        TypeKeywords.Float => new DataItem((float)0f),
-        TypeKeywords.Char => new DataItem((char)'\0'),
-        StatementKeywords.Var => throw new InternalException("Undefined type"),
-        TypeKeywords.Void => throw new InternalException("Invalid type"),
-        _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
-    };
-
-    /// <exception cref="NotImplementedException"/>
-    /// <exception cref="CompilerException"/>
-    /// <exception cref="InternalException"/>
     protected static bool GetInitialValue(TypeInstance type, out DataItem value)
     {
         switch (type.ToString())
         {
             case TypeKeywords.Int:
-            {
                 value = new DataItem((int)0);
                 return true;
-            }
             case TypeKeywords.Byte:
-            {
                 value = new DataItem((byte)0);
                 return true;
-            }
             case TypeKeywords.Float:
-            {
                 value = new DataItem((float)0f);
                 return true;
-            }
             case TypeKeywords.Char:
-            {
                 value = new DataItem((char)'\0');
                 return true;
-            }
             default:
-            {
                 value = default;
                 return false;
-            }
-        };
+        }
     }
 
     /// <exception cref="NotImplementedException"/>
@@ -1714,7 +1648,7 @@ public abstract class CodeGenerator
     protected GeneralType FindStatementType(ConstructorCall constructorCall)
     {
         GeneralType type = GeneralType.From(constructorCall.Type, FindType);
-        GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
+        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Parameters);
 
         if (GetConstructor(type, parameters, out CompiledConstructor? constructor, out _, false, out WillBeCompilerException? notFound))
         {
@@ -1817,51 +1751,39 @@ public abstract class CodeGenerator
         };
     }
 
-    protected IEnumerable<GeneralType> FindStatementTypes(IEnumerable<StatementWithValue> statements)
+    protected ImmutableArray<GeneralType> FindStatementTypes(ImmutableArray<StatementWithValue> statements)
     {
-        return statements.Select<StatementWithValue, GeneralType>(FindStatementType);
-    }
-
-    protected GeneralType[] FindStatementTypes(ImmutableArray<StatementWithValue> statements)
-    {
-        GeneralType[] result = new GeneralType[statements.Length];
+        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(statements.Length);
         for (int i = 0; i < statements.Length; i++)
-        { result[i] = FindStatementType(statements[i]); }
-        return result;
+        { result.Add(FindStatementType(statements[i])); }
+        return result.ToImmutable();
     }
 
-    protected GeneralType[] FindStatementTypes(StatementWithValue[] statements)
+    protected ImmutableArray<GeneralType> FindStatementTypes(ImmutableArray<StatementWithValue> statements, ImmutableArray<GeneralType> expectedTypes)
     {
-        GeneralType[] result = new GeneralType[statements.Length];
-        for (int i = 0; i < statements.Length; i++)
-        { result[i] = FindStatementType(statements[i]); }
-        return result;
-    }
-
-    protected GeneralType[] FindStatementTypes(IEnumerable<StatementWithValue> statements, IEnumerable<GeneralType> expectedTypes)
-        => FindStatementTypes(statements.ToArray(), expectedTypes.ToArray());
-    protected GeneralType[] FindStatementTypes(StatementWithValue[] statements, GeneralType[] expectedTypes)
-    {
-        GeneralType[] result = new GeneralType[statements.Length];
+        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(statements.Length);
         for (int i = 0; i < statements.Length; i++)
         {
             GeneralType? expectedType = null;
             if (i < expectedTypes.Length) expectedType = expectedTypes[i];
-            result[i] = FindStatementType(statements[i], expectedType);
+            result.Add(FindStatementType(statements[i], expectedType));
         }
-        return result;
+        return result.ToImmutable();
     }
 
     #endregion
 
     #region InlineMacro()
 
-    protected static bool InlineMacro(FunctionThingDefinition function, [NotNullWhen(true)] out Statement? inlined, params StatementWithValue[] parameters)
+    static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
+        => statements.Select(statement => InlineMacro(statement, parameters));
+
+    protected static bool InlineMacro(FunctionThingDefinition function, ImmutableArray<StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
-        Dictionary<string, StatementWithValue> _parameters = Utils.Map(
-            function.Parameters.ToArray(),
-            parameters,
-            (key, value) => (key.Identifier.Content, value));
+        Dictionary<string, StatementWithValue> _parameters =
+            function.Parameters
+            .Select((value, index) => (value.Identifier.Content, parameters[index]))
+            .ToDictionary();
 
         return InlineMacro(function, _parameters, out inlined);
     }
@@ -1980,9 +1902,6 @@ public abstract class CodeGenerator
             SaveValue = constructorCall.SaveValue,
             Semicolon = constructorCall.Semicolon,
         };
-
-    static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
-    { return statements.Select(statement => InlineMacro(statement, parameters)); }
 
     static bool InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
@@ -2618,7 +2537,7 @@ public abstract class CodeGenerator
 
         if (GetOperator(@operator, out CompiledOperator? compiledOperator, out _, false, out _))
         {
-            if (TryCompute(@operator.Parameters, context, out DataItem[]? parameterValues) &&
+            if (TryCompute(@operator.Parameters, context, out ImmutableArray<DataItem> parameterValues) &&
                 TryEvaluate(compiledOperator, parameterValues, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
@@ -2684,7 +2603,7 @@ public abstract class CodeGenerator
 
         if (GetOperator(@operator, out CompiledOperator? compiledOperator, out _, false, out _))
         {
-            if (TryCompute(@operator.Parameters, context, out DataItem[]? parameterValues) &&
+            if (TryCompute(@operator.Parameters, context, out ImmutableArray<DataItem> parameterValues) &&
                 TryEvaluate(compiledOperator, parameterValues, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
@@ -2796,7 +2715,7 @@ public abstract class CodeGenerator
 
             if (function.IsExternal &&
                 !functionCall.SaveValue &&
-                TryCompute(functionCall.MethodParameters, context, out DataItem[]? parameters))
+                TryCompute(functionCall.MethodParameters, context, out ImmutableArray<DataItem> parameters))
             {
                 FunctionCall newFunctionCall = new(
                     null,
@@ -2826,7 +2745,7 @@ public abstract class CodeGenerator
                     defined.ToTypeInstance());
             }
 
-            if (TryEvaluate(function, convertedParameters, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+            if (TryEvaluate(function, convertedParameters.ToImmutableArray(), out DataItem? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -2910,44 +2829,163 @@ public abstract class CodeGenerator
         value = DataItem.Null;
         return false;
     }
-    bool TryCompute(StatementWithValue[]? statements, EvaluationContext context, [NotNullWhen(true)] out DataItem[]? values)
+    protected bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, out DataItem value)
+        => TryCompute(statement, EvaluationContext.Empty, out value);
+    bool TryCompute(IEnumerable<StatementWithValue>? statements, EvaluationContext context, [NotNullWhen(true)] out ImmutableArray<DataItem> values)
     {
         if (statements is null)
         {
-            values = null;
+            values = ImmutableArray<DataItem>.Empty;
             return false;
         }
 
-        values = new DataItem[statements.Length];
-
-        for (int i = 0; i < statements.Length; i++)
+        ImmutableArray<DataItem>.Builder result = ImmutableArray.CreateBuilder<DataItem>();
+        foreach (StatementWithValue statement in statements)
         {
-            StatementWithValue statement = statements[i];
-
             if (!TryCompute(statement, context, out DataItem value))
             {
-                values = null;
+                values = ImmutableArray<DataItem>.Empty;
                 return false;
             }
 
-            values[i] = value;
+            result.Add(value);
         }
 
+        values = result.ToImmutable();
         return true;
     }
-    protected bool TryCompute(StatementWithValue[]? statements, [NotNullWhen(true)] out DataItem[]? values)
-        => TryCompute(statements, EvaluationContext.Empty, out values);
+    bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, EvaluationContext context, out DataItem value)
+    {
+        value = DataItem.Null;
 
-    protected bool TryEvaluate(CompiledFunction function, StatementWithValue[] parameters, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+        if (statement is null)
+        { return false; }
+
+        if (context.TryGetValue(statement, out value))
+        { return true; }
+
+        return statement switch
+        {
+            LiteralStatement v => TryCompute(v, out value),
+            BinaryOperatorCall v => TryCompute(v, context, out value),
+            UnaryOperatorCall v => TryCompute(v, context, out value),
+            Pointer v => TryCompute(v, context, out value),
+            KeywordCall v => TryCompute(v, out value),
+            FunctionCall v => TryCompute(v, context, out value),
+            AnyCall v => TryCompute(v, context, out value),
+            Identifier v => TryCompute(v, context, out value),
+            TypeCast v => TryCompute(v, context, out value),
+            Field v => TryCompute(v, context, out value),
+            IndexCall v => TryCompute(v, context, out value),
+            ModifiedStatement => false,
+            NewInstance => false,
+            ConstructorCall => false,
+            _ => throw new NotImplementedException(statement.GetType().ToString()),
+        };
+    }
+
+    public static bool TryComputeSimple(BinaryOperatorCall @operator, out DataItem value)
+    {
+        if (!TryComputeSimple(@operator.Left, out DataItem leftValue))
+        {
+            value = DataItem.Null;
+            return false;
+        }
+
+        string op = @operator.Operator.Content;
+
+        if (TryComputeSimple(@operator.Right, out DataItem rightValue))
+        {
+            value = Compute(op, leftValue, rightValue);
+            return true;
+        }
+
+        switch (op)
+        {
+            case "&&":
+            {
+                if (!leftValue)
+                {
+                    value = new DataItem(false);
+                    return true;
+                }
+                break;
+            }
+            case "||":
+            {
+                if (leftValue)
+                {
+                    value = new DataItem(true);
+                    return true;
+                }
+                break;
+            }
+            default:
+                value = DataItem.Null;
+                return false;
+        }
+
+        value = leftValue;
+        return true;
+    }
+    public static bool TryComputeSimple(UnaryOperatorCall @operator, out DataItem value)
+    {
+        if (!TryComputeSimple(@operator.Left, out DataItem leftValue))
+        {
+            value = DataItem.Null;
+            return false;
+        }
+
+        string op = @operator.Operator.Content;
+
+        if (op == "!")
+        {
+            value = leftValue;
+            return true;
+        }
+
+        value = leftValue;
+        return true;
+    }
+    public static bool TryComputeSimple(IndexCall indexCall, out DataItem value)
+    {
+        if (indexCall.PrevStatement is LiteralStatement literal &&
+            literal.Type == LiteralType.String &&
+            TryComputeSimple(indexCall.Index, out DataItem index))
+        {
+            if (index == literal.Value.Length)
+            { value = new DataItem('\0'); }
+            else
+            { value = new DataItem(literal.Value[(int)index]); }
+            return true;
+        }
+
+        value = DataItem.Null;
+        return false;
+    }
+    public static bool TryComputeSimple(StatementWithValue? statement, out DataItem value)
+    {
+        value = DataItem.Null;
+        return statement switch
+        {
+            LiteralStatement v => TryCompute(v, out value),
+            BinaryOperatorCall v => TryComputeSimple(v, out value),
+            UnaryOperatorCall v => TryComputeSimple(v, out value),
+            IndexCall v => TryComputeSimple(v, out value),
+            _ => false,
+        };
+    }
+
+    protected bool TryEvaluate(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
 
-        if (TryCompute(parameters, EvaluationContext.Empty, out DataItem[]? parameterValues) &&
+        if (TryCompute(parameters, EvaluationContext.Empty, out ImmutableArray<DataItem> parameterValues) &&
             TryEvaluate(function, parameterValues, out value, out runtimeStatements))
         { return true; }
 
-        if (!InlineMacro(function, out Statement? inlined, parameters))
+        if (!InlineMacro(function, parameters, out Statement? inlined))
         { return false; }
 
         EvaluationContext context = EvaluationContext.EmptyWithVariables;
@@ -2963,7 +3001,7 @@ public abstract class CodeGenerator
 
         return false;
     }
-    bool TryEvaluate(ICompiledFunction function, DataItem[] parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunction function, ImmutableArray<DataItem> parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
     {
         value = null;
         runtimeStatements = null;
@@ -3230,146 +3268,21 @@ public abstract class CodeGenerator
         StatementWithValue v => TryCompute(v, context, out _),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
-    bool TryEvaluate(IEnumerable<Statement> statements, EvaluationContext context)
+    bool TryEvaluate(ImmutableArray<Statement> statements, EvaluationContext context)
     {
         foreach (Statement statement in statements)
         {
             if (!TryEvaluate(statement, context))
             { return false; }
-            if (context.IsReturning)
-            { break; }
-            if (context.IsBreaking)
+
+            if (context.IsReturning || context.IsBreaking)
             { break; }
         }
         return true;
     }
-
-    protected bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, out DataItem value)
-        => TryCompute(statement, EvaluationContext.Empty, out value);
 
     readonly Stack<EvaluationContext> CurrentEvaluationContext = new();
 
-    bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, EvaluationContext context, out DataItem value)
-    {
-        value = DataItem.Null;
-
-        if (statement is null)
-        { return false; }
-
-        if (context.TryGetValue(statement, out value))
-        { return true; }
-
-        return statement switch
-        {
-            LiteralStatement v => TryCompute(v, out value),
-            BinaryOperatorCall v => TryCompute(v, context, out value),
-            UnaryOperatorCall v => TryCompute(v, context, out value),
-            Pointer v => TryCompute(v, context, out value),
-            KeywordCall v => TryCompute(v, out value),
-            FunctionCall v => TryCompute(v, context, out value),
-            AnyCall v => TryCompute(v, context, out value),
-            Identifier v => TryCompute(v, context, out value),
-            TypeCast v => TryCompute(v, context, out value),
-            Field v => TryCompute(v, context, out value),
-            IndexCall v => TryCompute(v, context, out value),
-            ModifiedStatement => false,
-            NewInstance => false,
-            ConstructorCall => false,
-            _ => throw new NotImplementedException(statement.GetType().ToString()),
-        };
-    }
-
-    public static bool TryComputeSimple(BinaryOperatorCall @operator, out DataItem value)
-    {
-        if (!TryComputeSimple(@operator.Left, out DataItem leftValue))
-        {
-            value = DataItem.Null;
-            return false;
-        }
-
-        string op = @operator.Operator.Content;
-
-        if (TryComputeSimple(@operator.Right, out DataItem rightValue))
-        {
-            value = Compute(op, leftValue, rightValue);
-            return true;
-        }
-
-        switch (op)
-        {
-            case "&&":
-            {
-                if (!leftValue)
-                {
-                    value = new DataItem(false);
-                    return true;
-                }
-                break;
-            }
-            case "||":
-            {
-                if (leftValue)
-                {
-                    value = new DataItem(true);
-                    return true;
-                }
-                break;
-            }
-            default:
-                value = DataItem.Null;
-                return false;
-        }
-
-        value = leftValue;
-        return true;
-    }
-    public static bool TryComputeSimple(UnaryOperatorCall @operator, out DataItem value)
-    {
-        if (!TryComputeSimple(@operator.Left, out DataItem leftValue))
-        {
-            value = DataItem.Null;
-            return false;
-        }
-
-        string op = @operator.Operator.Content;
-
-        if (op == "!")
-        {
-            value = leftValue;
-            return true;
-        }
-
-        value = leftValue;
-        return true;
-    }
-    public static bool TryComputeSimple(IndexCall indexCall, out DataItem value)
-    {
-        if (indexCall.PrevStatement is LiteralStatement literal &&
-            literal.Type == LiteralType.String &&
-            TryComputeSimple(indexCall.Index, out DataItem index))
-        {
-            if (index == literal.Value.Length)
-            { value = new DataItem('\0'); }
-            else
-            { value = new DataItem(literal.Value[(int)index]); }
-            return true;
-        }
-
-        value = DataItem.Null;
-        return false;
-    }
-    public static bool TryComputeSimple(StatementWithValue? statement, out DataItem value)
-    {
-        value = DataItem.Null;
-        return statement switch
-        {
-            LiteralStatement v => TryCompute(v, out value),
-            BinaryOperatorCall v => TryComputeSimple(v, out value),
-            UnaryOperatorCall v => TryComputeSimple(v, out value),
-            IndexCall v => TryComputeSimple(v, out value),
-            _ => false,
-        };
-    }
     #endregion
 
     protected bool IsUnrollable(ForLoop loop)
@@ -3401,7 +3314,7 @@ public abstract class CodeGenerator
         return true;
     }
 
-    protected Block[] Unroll(ForLoop loop, Dictionary<StatementWithValue, DataItem> values)
+    protected ImmutableArray<Block> Unroll(ForLoop loop, Dictionary<StatementWithValue, DataItem> values)
     {
         VariableDeclaration iteratorVariable = loop.VariableDeclaration;
         StatementWithValue condition = loop.Condition;
@@ -3456,7 +3369,7 @@ public abstract class CodeGenerator
             return result;
         }
 
-        List<Block> statements = new();
+        ImmutableArray<Block>.Builder statements = ImmutableArray.CreateBuilder<Block>();
 
         while (ComputeIterator())
         {
@@ -3474,7 +3387,7 @@ public abstract class CodeGenerator
             iterator = ComputeExpression();
         }
 
-        return statements.ToArray();
+        return statements.ToImmutable();
     }
 
     protected static bool CanConvertImplicitly(GeneralType? from, GeneralType? to)
@@ -3483,19 +3396,6 @@ public abstract class CodeGenerator
 
         if (to is EnumType enumType && enumType.Enum.Type == from)
         { return true; }
-
-        return false;
-    }
-
-    protected static bool TryConvertType(ref GeneralType? type, GeneralType? targetType)
-    {
-        if (type is null || targetType is null) return false;
-
-        if (targetType is EnumType enumType && enumType.Enum.Type == type)
-        {
-            type = targetType;
-            return true;
-        }
 
         return false;
     }

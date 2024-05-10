@@ -54,7 +54,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     #endregion
 
-    public CodeGeneratorForAsm(CompilerResult compilerResult, AsmGeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection, print)
+    public CodeGeneratorForAsm(CompilerResult compilerResult, AsmGeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, analysisCollection, print)
     {
         GeneratorSettings = settings;
         Builder = new AssemblyCode();
@@ -816,7 +816,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     {
         GenerateCodeForStatement(new FunctionCall(
             indexCall.PrevStatement,
-            Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
+            Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet),
             new StatementWithValue[]
             {
                 indexCall.Index,

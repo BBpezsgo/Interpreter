@@ -8,18 +8,17 @@ public class ScrollBar
 {
     readonly Func<Element, LanguageCore.Range<int>> GetRange;
     readonly Element Parent;
-    int offset;
 
-    public int Offset => offset;
+    public int Offset { get; private set; }
 
     float ScrollPercent
     {
         get
         {
             LanguageCore.Range<int> range = GetRange.Invoke(Parent);
-            offset -= range.Start;
+            Offset -= range.Start;
             int max = range.End - range.Start;
-            return (float)offset / (float)max;
+            return (float)Offset / (float)max;
         }
     }
 
@@ -55,7 +54,7 @@ public class ScrollBar
         LanguageCore.Range<int> range = GetRange.Invoke(sender);
         if (e.EventFlags.HasFlag(MouseEventFlags.MouseWheeled))
         {
-            offset = Math.Clamp(offset - Math.Sign(e.Scroll), range.Start, range.End);
+            Offset = Math.Clamp(Offset - Math.Sign(e.Scroll), range.Start, range.End);
             return;
         }
 
@@ -83,7 +82,7 @@ public class ScrollBar
             v *= range.End - range.Start;
             v += range.Start;
 
-            offset = (int)MathF.Round(v);
+            Offset = (int)MathF.Round(v);
         }
     }
 

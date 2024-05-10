@@ -10,9 +10,14 @@ using Tokenizing;
 
 public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 {
+    bool AllowLoopUnrolling => !Settings.DontOptimize;
+    bool AllowFunctionInlining => !Settings.DontOptimize;
+    bool AllowPrecomputing => !Settings.DontOptimize;
+    bool AllowOtherOptimizations => !Settings.DontOptimize;
+
     void GenerateAllocator(int size, IPositioned position)
     {
-        StatementWithValue[] parameters = new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) };
+        ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create<StatementWithValue>(Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position));
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator, out _, true, out _))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, CurrentFile); }
@@ -41,8 +46,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         GeneralType deallocateableType = FindStatementType(value);
 
-        StatementWithValue[] parameters = new StatementWithValue[] { value };
-        GeneralType[] parameterTypes = FindStatementTypes(parameters);
+        ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
+        ImmutableArray<GeneralType> parameterTypes = FindStatementTypes(parameters);
 
         if (deallocateableType is not PointerType deallocateablePointerType)
         {
@@ -50,7 +55,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (!GetGeneralFunction(deallocateablePointerType.To, parameterTypes, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor, out Dictionary<string, GeneralType>? typeArguments, false, out WillBeCompilerException? error))
+        if (!GetGeneralFunction(deallocateablePointerType.To, parameterTypes, BuiltinFunctionIdentifiers.Destructor, out CompiledGeneralFunction? destructor, out Dictionary<string, GeneralType>? typeArguments, false, out WillBeCompilerException? error))
         {
             GenerateDeallocator(value);
 
@@ -69,7 +74,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        GenerateCodeForFunction(destructor, new StatementWithValue[] { value }, typeArguments, value);
+        GenerateCodeForFunction(destructor, ImmutableArray.Create(value), typeArguments, value);
 
         if (destructor.ReturnSomething)
         { Stack.Pop(); }
@@ -79,8 +84,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     void GenerateDeallocator(StatementWithValue value)
     {
-        StatementWithValue[] parameters = new StatementWithValue[] { value };
-        GeneralType[] parameterTypes = FindStatementTypes(parameters);
+        ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
+        ImmutableArray<GeneralType> parameterTypes = FindStatementTypes(parameters);
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, false, out _))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
@@ -275,7 +280,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     void CompileSetter(Variable variable, StatementWithValue value)
     {
-        if (value is Identifier _identifier &&
+        if (AllowOtherOptimizations &&
+            value is Identifier _identifier &&
             CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, _identifier.Content, out Variable valueVariable))
         {
             if (variable.Address == valueVariable.Address)
@@ -313,7 +319,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         using (Code.Block(this, $"Set variable \"{variable.Name}\" (at {variable.Address}) to {value}"))
         {
-            if (TryCompute(value, out DataItem constantValue))
+            if (AllowPrecomputing && TryCompute(value, out DataItem constantValue))
             {
                 AssignTypeCheck(variable.Type, constantValue, value);
 
@@ -423,7 +429,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         using (Code.Block(this, $"Set value {value} to address {address}"))
         {
-            if (TryCompute(value, out DataItem constantValue))
+            if (AllowPrecomputing && TryCompute(value, out DataItem constantValue))
             {
                 // if (constantValue.Size != 1)
                 // { throw new CompilerException($"Value size can be only 1", value, CurrentFile); }
@@ -465,12 +471,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 return;
             }
 
-            GenerateCodeForFunction(indexer, new StatementWithValue[]
-            {
+            GenerateCodeForFunction(indexer, ImmutableArray.Create(
                 statement.PrevStatement,
                 statement.Index,
-                value,
-            }, typeArguments, statement);
+                value
+            ), typeArguments, statement);
 
             if (!statement.SaveValue && indexer.ReturnSomething)
             { Stack.Pop(); }
@@ -671,7 +676,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         GenerateCodeForStatement(new FunctionCall(
             indexCall.PrevStatement,
-            Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
+            Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet),
             new StatementWithValue[]
             {
                 indexCall.Index,
@@ -881,54 +886,57 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(ForLoop @for)
     {
-        CodeSnapshot codeSnapshot = SnapshotCode();
-        GeneratorSnapshot genSnapshot = Snapshot();
-        int initialCodeLength = codeSnapshot.Code.Length;
-
-        if (IsUnrollable(@for))
+        if (AllowLoopUnrolling)
         {
-            if (GenerateCodeForStatement(@for, true))
+            CodeSnapshot codeSnapshot = SnapshotCode();
+            GeneratorSnapshot genSnapshot = Snapshot();
+            int initialCodeLength = codeSnapshot.Code.Length;
+
+            if (IsUnrollable(@for))
             {
-                CodeSnapshot unrolledCode = SnapshotCode();
-
-                int unrolledLength = unrolledCode.Code.Length - initialCodeLength;
-                GeneratorSnapshot unrolledSnapshot = Snapshot();
-
-                Restore(genSnapshot);
-                RestoreCode(codeSnapshot);
-
-                try
+                if (GenerateCodeForStatement(@for, true))
                 {
-                    GenerateCodeForStatement(@for, false);
+                    CodeSnapshot unrolledCode = SnapshotCode();
 
-                    CodeSnapshot notUnrolledCode = SnapshotCode();
-                    int notUnrolledLength = notUnrolledCode.Code.Length - initialCodeLength;
-                    GeneratorSnapshot notUnrolledSnapshot = Snapshot();
+                    int unrolledLength = unrolledCode.Code.Length - initialCodeLength;
+                    GeneratorSnapshot unrolledSnapshot = Snapshot();
 
-                    if (unrolledLength <= notUnrolledLength)
+                    Restore(genSnapshot);
+                    RestoreCode(codeSnapshot);
+
+                    try
                     {
-                        Restore(unrolledSnapshot);
-                        RestoreCode(unrolledCode);
+                        GenerateCodeForStatement(@for, false);
+
+                        CodeSnapshot notUnrolledCode = SnapshotCode();
+                        int notUnrolledLength = notUnrolledCode.Code.Length - initialCodeLength;
+                        GeneratorSnapshot notUnrolledSnapshot = Snapshot();
+
+                        if (unrolledLength <= notUnrolledLength)
+                        {
+                            Restore(unrolledSnapshot);
+                            RestoreCode(unrolledCode);
+                        }
+                        else
+                        {
+                            Restore(notUnrolledSnapshot);
+                            RestoreCode(notUnrolledCode);
+                        }
+                        return;
                     }
-                    else
-                    {
-                        Restore(notUnrolledSnapshot);
-                        RestoreCode(notUnrolledCode);
-                    }
+                    catch (Exception)
+                    { }
+
+                    Restore(unrolledSnapshot);
+                    RestoreCode(unrolledCode);
+
                     return;
                 }
-                catch (Exception)
-                { }
-
-                Restore(unrolledSnapshot);
-                RestoreCode(unrolledCode);
-
-                return;
             }
-        }
 
-        Restore(genSnapshot);
-        RestoreCode(codeSnapshot);
+            Restore(genSnapshot);
+            RestoreCode(codeSnapshot);
+        }
 
         GenerateCodeForStatement(@for, false);
     }
@@ -941,12 +949,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             try
             {
-                Block[] unrolled = Unroll(@for, new Dictionary<StatementWithValue, DataItem>());
+                ImmutableArray<Block> unrolled = Unroll(@for, new Dictionary<StatementWithValue, DataItem>());
 
                 for (int i = 0; i < unrolled.Length; i++)
-                {
-                    GenerateCodeForStatement(unrolled[i]);
-                }
+                { GenerateCodeForStatement(unrolled[i]); }
 
                 return true;
             }
@@ -1158,7 +1164,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (statement.Right == null)
                 { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                if (TryCompute(statement.Right, out DataItem constantValue))
+                if (AllowPrecomputing && TryCompute(statement.Right, out DataItem constantValue))
                 {
                     if (variable.Type is BuiltinType builtinType)
                     { DataItem.TryCast(ref constantValue, builtinType.RuntimeType); }
@@ -1204,7 +1210,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (statement.Right == null)
                 { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                if (TryCompute(statement.Right, out DataItem constantValue))
+                if (AllowPrecomputing && TryCompute(statement.Right, out DataItem constantValue))
                 {
                     if (variable.Type is BuiltinType builtinType)
                     { DataItem.TryCast(ref constantValue, builtinType.RuntimeType); }
@@ -1255,7 +1261,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         {
             case "++":
             {
-                if (statement.Left is Identifier variableIdentifier)
+                if (AllowOtherOptimizations && statement.Left is Identifier variableIdentifier)
                 {
                     if (!GetVariable(CompiledVariables, variableIdentifier.Content, out Variable variable))
                     { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
@@ -1280,7 +1286,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
             case "--":
             {
-                if (statement.Left is Identifier variableIdentifier)
+                if (AllowOtherOptimizations && statement.Left is Identifier variableIdentifier)
                 {
                     if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, variableIdentifier.Content, out Variable variable))
                     { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
@@ -1379,7 +1385,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         using DebugInfoBlock debugBlock = DebugBlock(constructorCall);
 
         GeneralType instanceType = FindType(constructorCall.Type);
-        GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
+        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Parameters);
 
         if (instanceType is StructType structType)
         { structType.Struct?.References.Add((constructorCall.Type, CurrentFile, CurrentMacro.Last)); }
@@ -1398,7 +1404,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        GenerateCodeForFunction(constructor, constructorCall.Parameters.ToArray(), typeArguments, constructorCall);
+        GenerateCodeForFunction(constructor, constructorCall.Parameters, typeArguments, constructorCall);
     }
     void GenerateCodeForStatement(Literal statement)
     {
@@ -1456,7 +1462,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     int offsettedSource = variable.Address + offset;
                     int offsettedTarget = loadTarget + offset;
 
-                    if (VariableCanBeDiscarded != null && VariableCanBeDiscarded == variable.Name)
+                    if (AllowOtherOptimizations &&
+                        VariableCanBeDiscarded != null &&
+                        VariableCanBeDiscarded == variable.Name)
                     {
                         Code.MoveValue(offsettedSource, offsettedTarget);
                         DiscardVariable(CompiledVariables, variable.Name);
@@ -1502,7 +1510,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     return;
                 }
 
-                GenerateCodeForFunction(compiledOperator, statement.Parameters.ToArray(), typeArguments, statement);
+                GenerateCodeForFunction(compiledOperator, statement.Parameters, typeArguments, statement);
 
                 if (!statement.SaveValue)
                 { Stack.Pop(); }
@@ -1510,7 +1518,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
 
-        if (TryCompute(statement, out DataItem computed))
+        if (AllowPrecomputing && TryCompute(statement, out DataItem computed))
         {
             Stack.Push(computed);
             Optimizations++;
@@ -1558,7 +1566,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 case "-":
                 {
                     {
-                        if (statement.Left is Identifier _left &&
+                        if (AllowOtherOptimizations &&
+                            statement.Left is Identifier _left &&
                             CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, _left.Content, out Variable left) &&
                             !left.IsDiscarded &&
                             TryCompute(statement.Right, out DataItem right) &&
@@ -1594,7 +1603,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 case "*":
                 {
                     {
-                        if (statement.Left is Identifier identifier1 &&
+                        if (AllowOtherOptimizations &&
+                            statement.Left is Identifier identifier1 &&
                             statement.Right is Identifier identifier2 &&
                             string.Equals(identifier1.Content, identifier2.Content))
                         {
@@ -1892,7 +1902,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     return;
                 }
 
-                GenerateCodeForFunction(compiledOperator, statement.Parameters.ToArray(), typeArguments, statement);
+                GenerateCodeForFunction(compiledOperator, statement.Parameters, typeArguments, statement);
 
                 if (!statement.SaveValue)
                 { Stack.Pop(); }
@@ -1900,7 +1910,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
 
-        if (TryCompute(statement, out DataItem computed))
+        if (AllowPrecomputing && TryCompute(statement, out DataItem computed))
         {
             Stack.Push(computed);
             Optimizations++;
@@ -2483,17 +2493,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
     }
 
-    bool IsFunctionInlineable(FunctionThingDefinition function, StatementWithValue[] parameters)
+    bool IsFunctionInlineable(FunctionThingDefinition function, IEnumerable<StatementWithValue> parameters)
     {
         if (function.Block is null ||
             !function.IsInlineable)
         { return false; }
 
-        for (int i = 0; i < parameters.Length; i++)
+        foreach (StatementWithValue parameter in parameters)
         {
-            if (TryCompute(parameters[i], out _))
+            if (TryCompute(parameter, out _))
             { continue; }
-            if (parameters[i] is Literal)
+            if (parameter is Literal)
             { continue; }
             return false;
         }
@@ -2501,9 +2511,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         return true;
     }
 
-    void GenerateCodeForFunction(CompiledFunction function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
+    void GenerateCodeForFunction(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
     {
-        if (!IsFunctionInlineable(function, parameters))
+        if (!AllowFunctionInlining ||
+            !IsFunctionInlineable(function, parameters) ||
+            !InlineMacro(function, parameters, out Statement? inlined))
         {
             GenerateCodeForFunction_(function, parameters, typeArguments, callerPosition);
             return;
@@ -2513,23 +2525,22 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GeneratorSnapshot originalSnapshot = Snapshot();
         int originalCodeLength = originalCode.Code.Length;
 
-        CodeSnapshot? inlinedCode = null;
-        int inlinedLength = default;
-        GeneratorSnapshot inlinedSnapshot = default;
-
         try
         {
-            if (InlineMacro(function, out Statement? inlined, parameters))
-            {
-                GenerateCodeForStatement(inlined);
-
-                inlinedCode = SnapshotCode();
-                inlinedLength = inlinedCode.Value.Code.Length - originalCodeLength;
-                inlinedSnapshot = Snapshot();
-            }
+            GenerateCodeForStatement(inlined);
         }
-        catch (Exception)
-        { }
+        catch
+        {
+            Restore(originalSnapshot);
+            RestoreCode(originalCode);
+
+            GenerateCodeForFunction_(function, parameters, typeArguments, callerPosition);
+            return;
+        }
+
+        CodeSnapshot inlinedCode = SnapshotCode();
+        int inlinedLength = inlinedCode.Code.Length - originalCodeLength;
+        GeneratorSnapshot inlinedSnapshot = Snapshot();
 
         Restore(originalSnapshot);
         RestoreCode(originalCode);
@@ -2540,11 +2551,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         int notInlinedLength = notInlinedCode.Code.Length - originalCodeLength;
         GeneratorSnapshot notInlinedSnapshot = Snapshot();
 
-        if (inlinedCode is not null &&
-            inlinedLength <= notInlinedLength)
+        if (inlinedLength <= notInlinedLength)
         {
             Restore(inlinedSnapshot);
-            RestoreCode(inlinedCode.Value);
+            RestoreCode(inlinedCode);
         }
         else
         {
@@ -2553,7 +2563,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
     }
 
-    void GenerateCodeForParameterPassing<TFunction>(TFunction function, StatementWithValue[] parameters, Stack<Variable> compiledParameters, List<IConstant> constantParameters)
+    void GenerateCodeForParameterPassing<TFunction>(TFunction function, ImmutableArray<StatementWithValue> parameters, Stack<Variable> compiledParameters, List<IConstant> constantParameters)
         where TFunction : ICompiledFunction, ISimpleReadable
     {
         for (int i = 0; i < parameters.Length; i++)
@@ -2677,7 +2687,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
     }
 
-    void GenerateCodeForFunction_(CompiledFunction function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
+    void GenerateCodeForFunction_(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
     {
         using DebugFunctionBlock<CompiledFunction> debugFunction = FunctionBlock(function, typeArguments);
 
@@ -2813,7 +2823,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CurrentMacro.Pop();
     }
 
-    void GenerateCodeForFunction(CompiledOperator function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
+    void GenerateCodeForFunction(CompiledOperator function, ImmutableArray<StatementWithValue> parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
     {
         using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
 
@@ -2952,7 +2962,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CurrentMacro.Pop();
     }
 
-    void GenerateCodeForFunction(CompiledGeneralFunction function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
+    void GenerateCodeForFunction(CompiledGeneralFunction function, ImmutableArray<StatementWithValue> parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
     {
         using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
 
@@ -3035,7 +3045,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CurrentMacro.Pop();
     }
 
-    void GenerateCodeForFunction(CompiledConstructor function, StatementWithValue[] parameters, Dictionary<string, GeneralType>? typeArguments, ConstructorCall callerPosition)
+    void GenerateCodeForFunction(CompiledConstructor function, ImmutableArray<StatementWithValue> parameters, Dictionary<string, GeneralType>? typeArguments, ConstructorCall callerPosition)
     {
         using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
 

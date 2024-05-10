@@ -6,40 +6,6 @@ namespace ConsoleGUI;
 
 public class DrawBuffer
 {
-    readonly ConsoleChar[] v;
-
-    int currentIndex;
-    public readonly int Width;
-    public readonly int Height;
-
-    public DrawBuffer()
-    {
-        this.v = Array.Empty<ConsoleChar>();
-        this.currentIndex = 0;
-    }
-
-    public DrawBuffer(int width, int height)
-    {
-        this.v = new ConsoleChar[Math.Max(width * height, 0)];
-        this.currentIndex = 0;
-        this.Width = width;
-        this.Height = height;
-    }
-
-    public int Length => v.Length;
-
-    public ConsoleChar this[int index]
-    {
-        get => v[index];
-        set => v[index] = value;
-    }
-
-    public ConsoleChar this[int x, int y]
-    {
-        get => this[x + (y * Width)];
-        set => this[x + (y * Width)] = value;
-    }
-
     static readonly (int x, int y, char character)[] LineSegments = new (int, int, char)[]
     {
         (-1, -1, '┐'),
@@ -54,6 +20,46 @@ public class DrawBuffer
         (1, 0, '─'),
         (1, 1, '└'),
     };
+
+    public int CurrentLine => Width == 0 ? 0 : CurrentIndex / Width;
+    public int CurrentColumn => Width == 0 ? 0 : CurrentIndex % Width;
+    public int CurrentIndex { get; private set; }
+
+    public int Length => ConsoleBuffer.Length;
+
+    public byte ForegroundColor { get; set; }
+    public byte BackgroundColor { get; set; }
+
+    public int Width { get; }
+    public int Height { get; }
+
+    readonly ConsoleChar[] ConsoleBuffer;
+
+    public ConsoleChar this[int index]
+    {
+        get => ConsoleBuffer[index];
+        set => ConsoleBuffer[index] = value;
+    }
+
+    public ConsoleChar this[int x, int y]
+    {
+        get => this[x + (y * Width)];
+        set => this[x + (y * Width)] = value;
+    }
+
+    public DrawBuffer()
+    {
+        this.ConsoleBuffer = Array.Empty<ConsoleChar>();
+        this.CurrentIndex = 0;
+    }
+
+    public DrawBuffer(int width, int height)
+    {
+        this.ConsoleBuffer = new ConsoleChar[Math.Max(width * height, 0)];
+        this.CurrentIndex = 0;
+        this.Width = width;
+        this.Height = height;
+    }
 
     /*
     static (int x, int y)[] SimplifyLine_((int x, int y)[] line)
@@ -174,20 +180,13 @@ public class DrawBuffer
         }
     }
 
-    public void StepTo(int index) => currentIndex = index;
+    public void StepTo(int index) => CurrentIndex = index;
     public int Step(int steps)
     {
-        currentIndex += steps;
-        return currentIndex;
+        CurrentIndex += steps;
+        return CurrentIndex;
     }
     public int Step() => Step(1);
-
-    public int CurrentIndex => currentIndex;
-    public int CurrentLine => Width == 0 ? 0 : currentIndex / Width;
-    public int CurrentColumn => Width == 0 ? 0 : currentIndex % Width;
-
-    public byte ForegroundColor { get; set; }
-    public byte BackgroundColor { get; set; }
 
     public void ResetColor()
     {
@@ -197,25 +196,25 @@ public class DrawBuffer
 
     public bool AddChar(char v)
     {
-        if (currentIndex >= this.v.Length) return false;
-        if (currentIndex < 0) return false;
+        if (CurrentIndex >= this.ConsoleBuffer.Length) return false;
+        if (CurrentIndex < 0) return false;
 
-        this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new ConsoleChar(v, ForegroundColor, BackgroundColor);
+        this.ConsoleBuffer[Math.Clamp(CurrentIndex, 0, this.ConsoleBuffer.Length - 1)] = new ConsoleChar(v, ForegroundColor, BackgroundColor);
 
-        currentIndex++;
-        if (currentIndex >= this.v.Length) return false;
+        CurrentIndex++;
+        if (CurrentIndex >= this.ConsoleBuffer.Length) return false;
 
         return true;
     }
 
     public bool SetChar(char v, int i)
     {
-        if (i >= this.v.Length) return false;
+        if (i >= this.ConsoleBuffer.Length) return false;
         if (i < 0) return false;
 
-        this.v[i].Foreground = ForegroundColor;
-        this.v[i].Background = BackgroundColor;
-        this.v[i].Char = v;
+        this.ConsoleBuffer[i].Foreground = ForegroundColor;
+        this.ConsoleBuffer[i].Background = BackgroundColor;
+        this.ConsoleBuffer[i].Char = v;
 
         return true;
     }
@@ -227,12 +226,12 @@ public class DrawBuffer
 
     public bool AddChar(char v, byte fg, byte bg)
     {
-        if (currentIndex >= this.v.Length) return false;
+        if (CurrentIndex >= this.ConsoleBuffer.Length) return false;
 
-        this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new ConsoleChar(v, fg, bg);
+        this.ConsoleBuffer[Math.Clamp(CurrentIndex, 0, this.ConsoleBuffer.Length - 1)] = new ConsoleChar(v, fg, bg);
 
-        currentIndex++;
-        if (currentIndex >= this.v.Length) return false;
+        CurrentIndex++;
+        if (CurrentIndex >= this.ConsoleBuffer.Length) return false;
 
         return true;
     }
@@ -254,7 +253,7 @@ public class DrawBuffer
     public void AddSpace(int to)
     {
         if (Width == 0) return;
-        while (this.currentIndex % Width < to)
+        while (this.CurrentIndex % Width < to)
         { if (!this.AddChar(' ')) break; }
     }
     public void FinishLine()
@@ -266,22 +265,22 @@ public class DrawBuffer
 
     public void Fill(byte color)
     {
-        for (int i = 0; i < this.v.Length; i++)
+        for (int i = 0; i < this.ConsoleBuffer.Length; i++)
         {
-            this.v[i].Char = ' ';
-            this.v[i].Foreground = color;
-            this.v[i].Background = color;
+            this.ConsoleBuffer[i].Char = ' ';
+            this.ConsoleBuffer[i].Foreground = color;
+            this.ConsoleBuffer[i].Background = color;
         }
-        this.currentIndex = this.v.Length;
+        this.CurrentIndex = this.ConsoleBuffer.Length;
     }
 
     public void FillRemaining()
     {
-        for (int i = this.currentIndex; i < this.v.Length; i++)
+        for (int i = this.CurrentIndex; i < this.ConsoleBuffer.Length; i++)
         {
-            this.v[i].Char = ' ';
+            this.ConsoleBuffer[i].Char = ' ';
         }
-        this.currentIndex = this.v.Length;
+        this.CurrentIndex = this.ConsoleBuffer.Length;
     }
 }
 

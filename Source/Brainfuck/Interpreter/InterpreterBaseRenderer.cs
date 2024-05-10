@@ -109,6 +109,7 @@ public partial class InterpreterBase<TCode>
         { throw new NullReferenceException($"{nameof(_rendererContext.Renderer)} is null"); }
         if (_rendererContext.OutputBuffer is null)
         { throw new NullReferenceException($"{nameof(_rendererContext.OutputBuffer)} is null"); }
+        _rendererContext.Renderer.RefreshBufferSize();
 
         int width = _rendererContext.Renderer.Width;
         int height = _rendererContext.Renderer.Height;
@@ -177,6 +178,10 @@ public partial class InterpreterBase<TCode>
     void DrawOriginalCode(Renderer<ConsoleChar> renderer, SmallRect rect)
     {
         renderer.Clear(rect);
+        rect.Top = Math.Max(rect.Top, (short)0);
+        rect.Left = Math.Max(rect.Left, (short)0);
+        rect.Bottom = Math.Min(rect.Bottom, (short)(renderer.Height - 1));
+        rect.Right = Math.Min(rect.Right, (short)(renderer.Width - 1));
 
         if (DebugInfo == null) return;
 
@@ -275,7 +280,7 @@ public partial class InterpreterBase<TCode>
             string text = token.ToOriginalString();
             for (int offset = 0; offset < text.Length; offset++)
             {
-                if (currentX + offset - 1 >= rect.Width) return;
+                if (currentX + offset >= rect.Right) return;
 
                 renderer[currentX + offset, currentY] = new ConsoleChar(text[offset], foregroundColor, backgroundColor);
             }

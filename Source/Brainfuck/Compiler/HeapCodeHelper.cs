@@ -2,17 +2,16 @@
 
 public class HeapCodeHelper
 {
-    public int Start { get; }
-    public int Size { get; }
-    public int OffsettedStart => GetOffsettedStart(Start);
-    public bool IsUsed => _isUsed;
-
     public const int BlockSize = 3;
     public const int AddressCarryOffset = 0;
     public const int ValueCarryOffset = 1;
     public const int DataOffset = 2;
 
-    bool _isUsed;
+    public int Start { get; }
+    public int Size { get; }
+    public int OffsettedStart => GetOffsettedStart(Start);
+    public bool IsUsed { get; private set; }
+
     CodeHelper _code;
 
     public HeapCodeHelper(CodeHelper code, int start, int size)
@@ -186,7 +185,7 @@ public class HeapCodeHelper
 
         GoBack();
 
-        _isUsed = true;
+        IsUsed = true;
     }
 
     /// <summary>
@@ -208,7 +207,7 @@ public class HeapCodeHelper
 
         GoBack();
 
-        _isUsed = true;
+        IsUsed = true;
     }
 
     /// <summary>
@@ -230,7 +229,7 @@ public class HeapCodeHelper
 
         GoBack();
 
-        _isUsed = true;
+        IsUsed = true;
     }
 
     /// <summary>
@@ -252,7 +251,7 @@ public class HeapCodeHelper
 
         GoBack();
 
-        _isUsed = true;
+        IsUsed = true;
     }
 
     /// <summary>
@@ -271,7 +270,7 @@ public class HeapCodeHelper
             _code.AddValue(pointerAddress, 1);
         }
 
-        _isUsed = true;
+        IsUsed = true;
     }
 
     /// <summary>
@@ -298,6 +297,6 @@ public class HeapCodeHelper
         _code.MoveValue(Start + ValueCarryOffset, resultAddress);
         _code.SetPointer(resultAddress);
 
-        _isUsed = true;
+        IsUsed = true;
     }
 }

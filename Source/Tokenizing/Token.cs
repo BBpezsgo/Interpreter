@@ -27,31 +27,26 @@ public class Token :
     }
 
     /// <exception cref="InternalException"/>
-    internal Token(PreparationToken preparationToken)
+    internal Token(PreparationToken preparationToken) : this(preparationToken.TokenType switch
     {
-        TokenType = preparationToken.TokenType switch
-        {
-            PreparationTokenType.Whitespace => TokenType.Whitespace,
-            PreparationTokenType.LineBreak => TokenType.LineBreak,
-            PreparationTokenType.Identifier => TokenType.Identifier,
-            PreparationTokenType.LiteralNumber => TokenType.LiteralNumber,
-            PreparationTokenType.LiteralHex => TokenType.LiteralHex,
-            PreparationTokenType.LiteralBinary => TokenType.LiteralBinary,
-            PreparationTokenType.LiteralString => TokenType.LiteralString,
-            PreparationTokenType.LiteralCharacter => TokenType.LiteralCharacter,
-            PreparationTokenType.LiteralFloat => TokenType.LiteralFloat,
-            PreparationTokenType.Operator => TokenType.Operator,
-            PreparationTokenType.Comment => TokenType.Comment,
-            PreparationTokenType.CommentMultiline => TokenType.CommentMultiline,
-            PreparationTokenType.PREPROCESS_Identifier => TokenType.PreprocessIdentifier,
-            PreparationTokenType.PREPROCESS_Argument => TokenType.PreprocessArgument,
-            PreparationTokenType.PREPROCESS_Skipped => TokenType.PreprocessSkipped,
-            _ => throw new InternalException($"Token {this} isn't finished (type is {TokenType})"),
-        };
-        Content = preparationToken.Content.ToString();
-        IsAnonymous = false;
-        Position = preparationToken.Position;
-    }
+        PreparationTokenType.Whitespace => TokenType.Whitespace,
+        PreparationTokenType.LineBreak => TokenType.LineBreak,
+        PreparationTokenType.Identifier => TokenType.Identifier,
+        PreparationTokenType.LiteralNumber => TokenType.LiteralNumber,
+        PreparationTokenType.LiteralHex => TokenType.LiteralHex,
+        PreparationTokenType.LiteralBinary => TokenType.LiteralBinary,
+        PreparationTokenType.LiteralString => TokenType.LiteralString,
+        PreparationTokenType.LiteralCharacter => TokenType.LiteralCharacter,
+        PreparationTokenType.LiteralFloat => TokenType.LiteralFloat,
+        PreparationTokenType.Operator => TokenType.Operator,
+        PreparationTokenType.Comment => TokenType.Comment,
+        PreparationTokenType.CommentMultiline => TokenType.CommentMultiline,
+        PreparationTokenType.PREPROCESS_Identifier => TokenType.PreprocessIdentifier,
+        PreparationTokenType.PREPROCESS_Argument => TokenType.PreprocessArgument,
+        PreparationTokenType.PREPROCESS_Skipped => TokenType.PreprocessSkipped,
+        _ => throw new InternalException($"Token {preparationToken} isn't finished (type is {preparationToken.TokenType})"),
+    }, preparationToken.Content.ToString(), false, preparationToken.Position)
+    { }
 
     public override string ToString() => Content;
     public string ToOriginalString() => TokenType switch

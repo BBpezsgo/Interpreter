@@ -10,7 +10,7 @@ public struct ProgramArguments
     public System.IO.FileInfo? File;
 
     public Compiler.CompilerSettings CompilerSettings;
-    public Compiler.GeneratorSettings GeneratorSettings;
+    public BBCode.Generator.MainGeneratorSettings MainGeneratorSettings;
     public Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckGeneratorSettings;
     public BytecodeInterpreterSettings BytecodeInterpreterSettings;
 
@@ -35,7 +35,7 @@ public struct ProgramArguments
         LogFlags = LogType.Debug | LogType.Normal | LogType.Warning | LogType.Error,
         RunType = ProgramRunType.Normal,
         CompilerSettings = Compiler.CompilerSettings.Default,
-        GeneratorSettings = Compiler.GeneratorSettings.Default,
+        MainGeneratorSettings = BBCode.Generator.MainGeneratorSettings.Default,
         BrainfuckGeneratorSettings = Brainfuck.Generator.BrainfuckGeneratorSettings.Default,
         BytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
         ConsoleGUI = false,
@@ -225,7 +225,7 @@ public static class ArgumentParser
 
                 if (_args.TryConsume(out _, "--no-nullcheck", "-nn"))
                 {
-                    result.GeneratorSettings.CheckNullPointers = false;
+                    result.MainGeneratorSettings.CheckNullPointers = false;
                     continue;
                 }
 
@@ -312,13 +312,14 @@ public static class ArgumentParser
 
                 if (_args.TryConsume(out _, "--dont-optimize", "-do"))
                 {
-                    result.GeneratorSettings.DontOptimize = true;
+                    result.MainGeneratorSettings.DontOptimize = true;
+                    result.BrainfuckGeneratorSettings.DontOptimize = true;
                     continue;
                 }
 
                 if (_args.TryConsume(out _, "--no-debug-info", "-ndi"))
                 {
-                    result.GeneratorSettings.GenerateDebugInstructions = false;
+                    result.MainGeneratorSettings.GenerateDebugInstructions = false;
                     result.BrainfuckGeneratorSettings.GenerateDebugInformation = false;
                     continue;
                 }
@@ -365,7 +366,7 @@ public static class ArgumentParser
 
                     if (result.PrintFlags == PrintFlags.None)
                     { result.PrintFlags = PrintFlags.Final; }
-                    result.GeneratorSettings.PrintInstructions = true;
+                    result.MainGeneratorSettings.PrintInstructions = true;
                     continue;
                 }
 

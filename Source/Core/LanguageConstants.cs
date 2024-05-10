@@ -212,6 +212,13 @@ public static class BuiltinFunctions
     public const string Free = "free";
 }
 
+public static class BuiltinFunctionIdentifiers
+{
+    public const string Destructor = "destructor";
+    public const string IndexerGet = "indexer_get";
+    public const string IndexerSet = "indexer_set";
+}
+
 public static class ExternalFunctionNames
 {
     public const string StdOut = "stdout";

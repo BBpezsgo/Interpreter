@@ -1,10 +1,10 @@
-﻿using LanguageCore;
+﻿using System.Diagnostics;
+using System.Text;
+using System.Xml;
+using LanguageCore;
 using LanguageCore.BBCode.Generator;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
-using System.Diagnostics;
-using System.Text;
-using System.Xml;
 
 namespace Tests;
 
@@ -227,7 +227,7 @@ public static class Utils
         ShowProgress = false,
     };
 
-    public static GeneratorSettings MainGeneratorSettings => new(GeneratorSettings.Default)
+    public static MainGeneratorSettings MainGeneratorSettings => new(MainGeneratorSettings.Default)
     {
         GenerateDebugInstructions = false,
     };
@@ -307,7 +307,7 @@ public static class Utils
         CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null);
         BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
         compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null);
-        BBCodeGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new GeneratorSettings(MainGeneratorSettings) { DontOptimize = true }, null, analysisCollection);
+        BBCodeGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings) { DontOptimize = true }, null, analysisCollection);
 
         analysisCollection.Throw();
 
@@ -339,10 +339,10 @@ public static class Utils
 
         if (interpreter.BytecodeInterpreter.Registers.BasePointer != interpreterUnoptimized.BytecodeInterpreter.Registers.BasePointer)
         { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.BytecodeInterpreter.Registers.BasePointer} != {interpreterUnoptimized.BytecodeInterpreter.Registers.BasePointer})"); }
-        
+
         if (interpreter.BytecodeInterpreter.Registers.StackPointer != interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer)
         { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.BytecodeInterpreter.Registers.StackPointer} != {interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer})"); }
-        
+
         if (interpreter.BytecodeInterpreter.Registers.StackPointer != interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer)
         { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.BytecodeInterpreter.Registers.StackPointer} != {interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer})"); }
 

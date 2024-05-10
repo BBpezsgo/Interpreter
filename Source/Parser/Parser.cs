@@ -19,10 +19,27 @@ public sealed class Parser
         ModifierKeywords.Inline,
     };
 
+    static readonly string[] AllModifiers = new string[]
+    {
+        ProtectionKeywords.Export,
+        ProtectionKeywords.Private,
+
+        ModifierKeywords.Inline,
+        ModifierKeywords.Const,
+        ModifierKeywords.Ref,
+        ModifierKeywords.Temp,
+        ModifierKeywords.This,
+    };
+
     static readonly string[] FunctionModifiers = new string[]
     {
         ProtectionKeywords.Export,
         ModifierKeywords.Inline,
+    };
+
+    static readonly string[] FieldModifiers = new string[]
+    {
+        ProtectionKeywords.Private,
     };
 
     static readonly string[] GeneralStatementModifiers = new string[]
@@ -30,21 +47,21 @@ public sealed class Parser
         ModifierKeywords.Temp,
     };
 
-    static readonly string[] VariableDefinitionModifiers = new string[]
+    static readonly string[] VariableModifiers = new string[]
     {
         ProtectionKeywords.Export,
         ModifierKeywords.Temp,
         ModifierKeywords.Const,
     };
 
-    static readonly string[] ParameterDefinitionModifiers = new string[]
+    static readonly string[] ParameterModifiers = new string[]
     {
         ModifierKeywords.This,
         ModifierKeywords.Ref,
         ModifierKeywords.Temp,
     };
 
-    static readonly string[] PassedParameterModifiers = new string[]
+    static readonly string[] ArgumentModifiers = new string[]
     {
         ModifierKeywords.Ref,
         ModifierKeywords.Temp,
@@ -365,7 +382,7 @@ public sealed class Parser
 
         AttributeUsage[] attributes = ExpectAttributes();
 
-        Token[] modifiers = ParseModifiers();
+        Token[] modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.None, out TypeInstance? possibleType, out _))
         { CurrentTokenIndex = parseStart; return false; }
@@ -384,8 +401,8 @@ public sealed class Parser
         Token? bracketEnd;
         while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
-            Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-            CheckModifiers(parameterModifiers, ModifierKeywords.This, ModifierKeywords.Temp);
+            Token[] parameterModifiers = ExpectModifiers();
+            CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.This, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected a type (the parameter's type)", PreviousToken?.Position.After(), File); }
@@ -475,7 +492,7 @@ public sealed class Parser
 
         ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
-        Token[] modifiers = ParseModifiers();
+        Token[] modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? possibleType, out _))
         { CurrentTokenIndex = parseStart; return false; }
@@ -495,8 +512,8 @@ public sealed class Parser
         bool expectParameter = false;
         while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
-            Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-            CheckModifiers(parameterModifiers, ModifierKeywords.This, ModifierKeywords.Ref, ModifierKeywords.Temp);
+            Token[] parameterModifiers = ExpectModifiers();
+            CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.This, ModifierKeywords.Ref, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
@@ -545,7 +562,7 @@ public sealed class Parser
         int parseStart = CurrentTokenIndex;
         function = null;
 
-        Token[] modifiers = ParseModifiers();
+        Token[] modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier(out Token? possibleNameT))
         { CurrentTokenIndex = parseStart; return false; }
@@ -561,8 +578,8 @@ public sealed class Parser
         Token? bracketEnd;
         while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
-            Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-            CheckModifiers(parameterModifiers, ModifierKeywords.Temp);
+            Token[] parameterModifiers = ExpectModifiers();
+            CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
@@ -607,7 +624,7 @@ public sealed class Parser
         int parseStart = CurrentTokenIndex;
         function = null;
 
-        Token[] modifiers = ParseModifiers();
+        Token[] modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.None, out TypeInstance? type))
         { CurrentTokenIndex = parseStart; return false; }
@@ -621,8 +638,8 @@ public sealed class Parser
         Token? bracketEnd;
         while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
-            Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-            CheckModifiers(parameterModifiers, ModifierKeywords.Temp);
+            Token[] parameterModifiers = ExpectModifiers();
+            CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
@@ -670,7 +687,7 @@ public sealed class Parser
 
         ExpectTemplateInfo(out _);
 
-        Token[] modifiers = ParseModifiers();
+        Token[] modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier("class", out Token? keyword))
         { CurrentTokenIndex = startTokenIndex; return false; }
@@ -728,7 +745,7 @@ public sealed class Parser
 
         ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
-        Token[] modifiers = ParseModifiers();
+        Token[] modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier(DeclarationKeywords.Struct, out Token? keyword))
         { CurrentTokenIndex = startTokenIndex; return false; }
@@ -983,7 +1000,7 @@ public sealed class Parser
             keywordNew.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (!ExpectType(AllowedType.None, out TypeInstance? instanceTypeName))
-            { throw new SyntaxException("Expected instance constructor after keyword \"new\"", keywordNew, File); }
+            { throw new SyntaxException($"Expected instance constructor after keyword \"{StatementKeywords.New}\"", keywordNew, File); }
 
             if (ExpectOperator("(", out Token? bracketStart2))
             {
@@ -1194,7 +1211,7 @@ public sealed class Parser
         int startTokenIndex = CurrentTokenIndex;
 
         List<Token> modifiers = new();
-        while (ExpectIdentifier(out Token? modifier, VariableDefinitionModifiers))
+        while (ExpectIdentifier(out Token? modifier, VariableModifiers))
         { modifiers.Add(modifier); }
 
         if (!ExpectType(AllowedType.Implicit | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength, out TypeInstance? possibleType))
@@ -1654,7 +1671,7 @@ public sealed class Parser
         {
             StatementWithValue? parameter;
 
-            if (ExpectModifiedValue(out ModifiedStatement? modifiedStatement, PassedParameterModifiers))
+            if (ExpectModifiedValue(out ModifiedStatement? modifiedStatement, ArgumentModifiers))
             {
                 parameter = modifiedStatement;
             }
@@ -1766,23 +1783,7 @@ public sealed class Parser
     {
         List<AttributeUsage> attributes = new();
         while (ExpectAttribute(out AttributeUsage? attr))
-        {
-            bool alreadyHave = false;
-            foreach (AttributeUsage attribute in attributes)
-            {
-                if (attribute.Identifier == attr.Identifier)
-                {
-                    alreadyHave = true;
-                    break;
-                }
-            }
-            if (!alreadyHave)
-            {
-                attributes.Add(attr);
-            }
-            else
-            { Errors.Add(new Error($"Attribute \"{attr}\" already defined", attr.Identifier, File)); }
-        }
+        { attributes.Add(attr); }
         return attributes.ToArray();
     }
 
@@ -1792,8 +1793,7 @@ public sealed class Parser
 
         int startTokenIndex = CurrentTokenIndex;
 
-        if (ExpectIdentifier(ProtectionKeywords.Private, out Token? protectionToken))
-        { }
+        Token[] modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.Implicit | AllowedType.StackArrayWithLength, out TypeInstance? possibleType))
         { CurrentTokenIndex = startTokenIndex; return false; }
@@ -1806,28 +1806,26 @@ public sealed class Parser
 
         possibleVariableName.AnalyzedType = TokenAnalyzedType.None;
 
-        field = new(possibleVariableName, possibleType, protectionToken);
+        CheckModifiers(modifiers, FieldModifiers);
+
+        field = new(possibleVariableName, possibleType, modifiers);
 
         return true;
     }
 
     #region Basic parsing
 
-    Token[] ParseParameterModifiers(int parameterIndex)
+    Token[] ExpectModifiers()
     {
-        List<Token> modifiers = new();
+        List<Token> result = new();
         int endlessSafe = 16;
+
         while (true)
         {
-            if (ExpectIdentifier(out Token? modifier, ParameterDefinitionModifiers))
+            if (ExpectIdentifier(out Token? modifier, AllModifiers))
             {
                 modifier.AnalyzedType = TokenAnalyzedType.Keyword;
-                modifiers.Add(modifier);
-
-                if (modifier.Equals(ModifierKeywords.This) && parameterIndex != 0)
-                {
-                    Errors.Add(new Error($"Modifier \"{ModifierKeywords.This}\" only valid on the first parameter", modifier, File));
-                }
+                result.Add(modifier);
             }
             else
             { break; }
@@ -1835,27 +1833,21 @@ public sealed class Parser
             if (endlessSafe-- <= 0)
             { throw new EndlessLoopException(); }
         }
-        return modifiers.ToArray();
+
+        return result.ToArray();
     }
 
-    Token[] ParseModifiers()
+    void CheckParameterModifiers(IEnumerable<Token> modifiers, int parameterIndex, params string[] validModifiers)
     {
-        List<Token> modifiers = new();
-        int endlessSafe = 16;
-        while (true)
+        foreach (Token modifier in modifiers)
         {
-            if (ExpectIdentifier(out Token? modifier, Modifiers))
-            {
-                modifier.AnalyzedType = TokenAnalyzedType.Keyword;
-                modifiers.Add(modifier);
-            }
-            else
-            { break; }
+            if (!validModifiers.Contains(modifier.Content))
+            { Errors.Add(new Error($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
 
-            if (endlessSafe-- <= 0)
-            { throw new EndlessLoopException(); }
+            if (modifier.Content == ModifierKeywords.This &&
+                parameterIndex != 0)
+            { Errors.Add(new Error($"Modifier \"{ModifierKeywords.This}\" only valid on the first parameter", modifier, File)); }
         }
-        return modifiers.ToArray();
     }
 
     void CheckModifiers(IEnumerable<Token> modifiers, params string[] validModifiers)

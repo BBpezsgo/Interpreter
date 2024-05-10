@@ -2,7 +2,7 @@
 
 public class CodeGeneratorNonGeneratorBase : CodeGenerator
 {
-    public CodeGeneratorNonGeneratorBase(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, settings, analysisCollection, print)
+    public CodeGeneratorNonGeneratorBase(CompilerResult compilerResult, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, analysisCollection, print)
     { }
 
     protected override ValueAddress GetBaseAddress(CompiledParameter parameter) => throw new NotImplementedException();

@@ -7,13 +7,6 @@ using Parser.Statement;
 using Runtime;
 using Tokenizing;
 
-public static class BuiltinFunctionNames
-{
-    public const string Destructor = "destructor";
-    public const string IndexerGet = "indexer_get";
-    public const string IndexerSet = "indexer_set";
-}
-
 public readonly struct CompilerResult
 {
     public readonly ImmutableArray<CompiledFunction> Functions;
@@ -654,72 +647,74 @@ public sealed class Compiler
             null);
     }
 
+    void CompileTag(CompileTag tag)
+    {
+        switch (tag.Identifier.Content)
+        {
+            case "bf":
+            {
+                if (tag.Parameters.Length < 2)
+                { AnalysisCollection?.Errors.Add(new Error($"Compile tag \"{tag.Identifier}\" requires minimum 2 parameter", tag.Identifier, tag.FilePath)); break; }
+                string name = tag.Parameters[0].Value;
+
+                if (ExternalFunctions.TryGet(name, out _, out _)) break;
+
+                string[] bfParams = new string[tag.Parameters.Length - 1];
+                for (int i = 1; i < tag.Parameters.Length; i++)
+                { bfParams[i - 1] = tag.Parameters[i].Value; }
+
+                BasicType[] parameterTypes = new BasicType[bfParams.Length];
+                for (int i = 0; i < bfParams.Length; i++)
+                {
+                    if (TypeKeywords.BasicTypes.TryGetValue(bfParams[i], out BasicType paramType))
+                    {
+                        parameterTypes[i] = paramType;
+
+                        if (paramType == BasicType.Void && i > 0)
+                        {
+                            AnalysisCollection?.Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.FilePath));
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        AnalysisCollection?.Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.FilePath));
+                        return;
+                    }
+                }
+
+                BasicType returnType = parameterTypes[0];
+                List<BasicType> x = parameterTypes.ToList();
+                x.RemoveAt(0);
+                RuntimeType[] pTypes = x.ToArray().Select(v => v.Convert()).ToArray();
+
+                if (returnType == BasicType.Void)
+                {
+                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                        Output.LogDebug($"{name}({string.Join(", ", p)})")
+                    );
+                }
+                else
+                {
+                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                    {
+                        Output.LogDebug($"{name}({string.Join(", ", p)})");
+                        return DataItem.GetDefaultValue(returnType);
+                    });
+                }
+            }
+            break;
+            default:
+                AnalysisCollection?.Warnings.Add(new Warning($"Hash \"{tag.Identifier}\" does not exists, so this is ignored", tag.Identifier, tag.FilePath));
+                break;
+        }
+    }
+
     void CompileTags()
     {
         foreach (CompileTag tag in Tags)
         {
-            switch (tag.Identifier.Content)
-            {
-                case "bf":
-                {
-                    if (tag.Parameters.Length < 2)
-                    { AnalysisCollection?.Errors.Add(new Error($"Compile tag \"{tag.Identifier}\" requires minimum 2 parameter", tag.Identifier, tag.FilePath)); break; }
-                    string name = tag.Parameters[0].Value;
-
-                    if (ExternalFunctions.TryGet(name, out _, out _)) break;
-
-                    string[] bfParams = new string[tag.Parameters.Length - 1];
-                    for (int i = 1; i < tag.Parameters.Length; i++)
-                    { bfParams[i - 1] = tag.Parameters[i].Value; }
-
-                    BasicType[] parameterTypes = new BasicType[bfParams.Length];
-                    for (int i = 0; i < bfParams.Length; i++)
-                    {
-                        if (TypeKeywords.BasicTypes.TryGetValue(bfParams[i], out BasicType paramType))
-                        {
-                            parameterTypes[i] = paramType;
-
-                            if (paramType == BasicType.Void && i > 0)
-                            { AnalysisCollection?.Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.FilePath)); goto ExitBreak; }
-                        }
-                        else
-                        {
-                            AnalysisCollection?.Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.FilePath));
-                            goto ExitBreak;
-                        }
-                    }
-
-                    BasicType returnType = parameterTypes[0];
-                    List<BasicType> x = parameterTypes.ToList();
-                    x.RemoveAt(0);
-                    RuntimeType[] pTypes = x.ToArray().Select(v => v.Convert()).ToArray();
-
-                    if (returnType == BasicType.Void)
-                    {
-#pragma warning disable RCS1021
-                        ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
-                        {
-                            Output.LogDebug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
-                        });
-#pragma warning restore RCS1021
-                    }
-                    else
-                    {
-                        ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
-                        {
-                            Output.LogDebug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
-                            return DataItem.GetDefaultValue(returnType);
-                        });
-                    }
-                }
-                break;
-                default:
-                    AnalysisCollection?.Warnings.Add(new Warning($"Hash \"{tag.Identifier}\" does not exists, so this is ignored", tag.Identifier, tag.FilePath));
-                    break;
-            }
-
-            ExitBreak:
-            continue;
+            CompileTag(tag);
         }
     }
 
@@ -782,7 +777,7 @@ public sealed class Compiler
 
                     GeneralType returnType = new StructType(compiledStruct);
 
-                    if (method.Identifier.Content == BuiltinFunctionNames.Destructor)
+                    if (method.Identifier.Content == BuiltinFunctionIdentifiers.Destructor)
                     {
                         List<ParameterDefinition> parameters = method.Parameters.ToList();
                         parameters.Insert(0, new ParameterDefinition(

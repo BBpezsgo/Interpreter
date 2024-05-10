@@ -166,19 +166,7 @@ public static partial class Utils
         return result.ToString("N1", CultureInfo.InvariantCulture) + " day";
     }
 
-    public static Dictionary<TKey, TValue> ConcatDictionary<TKey, TValue>(params IReadOnlyDictionary<TKey, TValue>?[] dictionaries) where TKey : notnull
-    {
-        Dictionary<TKey, TValue> result = new();
-        for (int i = 0; i < dictionaries.Length; i++)
-        {
-            IReadOnlyDictionary<TKey, TValue>? dict = dictionaries[i];
-            if (dict == null) continue;
-
-            foreach (KeyValuePair<TKey, TValue> pair in dict)
-            { result[pair.Key] = pair.Value; }
-        }
-        return result;
-    }
+    #region Map Array
 
     /// <exception cref="ArgumentException"/>
     public static void Map<TSourceKey, TSourceValue, TDestinationKey, TDestinationValue>(TSourceKey[] keys, TSourceValue[] values, Func<TSourceKey, TSourceValue, ValueTuple<TDestinationKey, TDestinationValue>> mapper, Dictionary<TDestinationKey, TDestinationValue> dictionary)
@@ -223,10 +211,154 @@ public static partial class Utils
         return result;
     }
 
-    public static T[] Duplicate<T>(T[] array)
+    #endregion
+
+    #region Map ImmutableArray
+
+    /// <exception cref="ArgumentException"/>
+    public static void Map<TSourceKey, TSourceValue, TDestinationKey, TDestinationValue>(ImmutableArray<TSourceKey> keys, ImmutableArray<TSourceValue> values, Func<TSourceKey, TSourceValue, ValueTuple<TDestinationKey, TDestinationValue>> mapper, Dictionary<TDestinationKey, TDestinationValue> dictionary)
+        where TDestinationKey : notnull
     {
-        T[] result = new T[array.Length];
-        Array.Copy(array, result, array.Length);
+        if (keys.Length != values.Length)
+        { throw new ArgumentException($"There should be the same number of keys as values"); }
+
+        for (int i = 0; i < keys.Length; i++)
+        {
+            ValueTuple<TDestinationKey, TDestinationValue> pair = mapper.Invoke(keys[i], values[i]);
+            dictionary[pair.Item1] = pair.Item2;
+        }
+    }
+
+    /// <exception cref="ArgumentException"/>
+    public static Dictionary<TDestinationKey, TDestinationValue> Map<TSourceKey, TSourceValue, TDestinationKey, TDestinationValue>(ImmutableArray<TSourceKey> keys, ImmutableArray<TSourceValue> values, Func<TSourceKey, TSourceValue, ValueTuple<TDestinationKey, TDestinationValue>> mapper)
+        where TDestinationKey : notnull
+    {
+        Dictionary<TDestinationKey, TDestinationValue> result = new();
+        Utils.Map(keys, values, mapper, result);
         return result;
     }
+
+    /// <exception cref="ArgumentException"/>
+    public static void Map<TKey, TValue>(ImmutableArray<TKey> keys, ImmutableArray<TValue> values, Dictionary<TKey, TValue> dictionary)
+        where TKey : notnull
+    {
+        if (keys.Length != values.Length)
+        { throw new ArgumentException($"There should be the same number of keys as values"); }
+
+        for (int i = 0; i < keys.Length; i++)
+        { dictionary[keys[i]] = values[i]; }
+    }
+
+    /// <exception cref="ArgumentException"/>
+    public static Dictionary<TKey, TValue> Map<TKey, TValue>(ImmutableArray<TKey> keys, ImmutableArray<TValue> values)
+        where TKey : notnull
+    {
+        Dictionary<TKey, TValue> result = new();
+        Utils.Map(keys, values, result);
+        return result;
+    }
+
+    #endregion
+
+    #region Zip
+
+    public readonly struct ZipEntry<T1, T2>
+    {
+        public int Index { get; }
+        public T1 Value1 { get; }
+        public T2 Value2 { get; }
+
+        public ZipEntry(int index, T1 value1, T2 value2)
+        {
+            Index = index;
+            Value1 = value1;
+            Value2 = value2;
+        }
+
+        public static implicit operator ValueTuple<int, T1, T2>(ZipEntry<T1, T2> entry) => (entry.Index, entry.Value1, entry.Value2);
+        public static implicit operator ValueTuple<T1, T2>(ZipEntry<T1, T2> entry) => (entry.Value1, entry.Value2);
+    }
+
+    /// <summary>
+    /// Source: <see href="https://stackoverflow.com/a/2722021"/>
+    /// </summary>
+    /// <exception cref="InvalidOperationException"/>
+    public static IEnumerable<ZipEntry<T1, T2>> Zip<T1, T2>(
+        IEnumerable<T1> collection1, IEnumerable<T2> collection2)
+    {
+        int index = 0;
+        using IEnumerator<T1> enumerator1 = collection1.GetEnumerator();
+        using IEnumerator<T2> enumerator2 = collection2.GetEnumerator();
+
+        while (true)
+        {
+            bool hasNext1 = enumerator1.MoveNext();
+            bool hasNext2 = enumerator2.MoveNext();
+
+            if (hasNext1 != hasNext2)
+            { throw new InvalidOperationException("One of the collections ran out of values before the other"); }
+
+            if (!hasNext1) break;
+
+            yield return new ZipEntry<T1, T2>(index, enumerator1.Current, enumerator2.Current);
+            index++;
+        }
+    }
+
+    /// <summary>
+    /// Source: <see href="https://stackoverflow.com/a/2722021"/>
+    /// </summary>
+    /// <exception cref="InvalidOperationException"/>
+    public static IEnumerable<ZipEntry<TResult1, TResult2>> Zip<T1, T2, TResult1, TResult2>(
+        IEnumerable<T1> collection1, IEnumerable<T2> collection2,
+        Func<T1, TResult1> mapper1, Func<T2, TResult2> mapper2)
+    {
+        int index = 0;
+        using IEnumerator<T1> enumerator1 = collection1.GetEnumerator();
+        using IEnumerator<T2> enumerator2 = collection2.GetEnumerator();
+
+        while (true)
+        {
+            bool hasNext1 = enumerator1.MoveNext();
+            bool hasNext2 = enumerator2.MoveNext();
+
+            if (hasNext1 != hasNext2)
+            { throw new InvalidOperationException("One of the collections ran out of values before the other"); }
+
+            if (!hasNext1) break;
+
+            yield return new ZipEntry<TResult1, TResult2>(index,
+                mapper1.Invoke(enumerator1.Current), mapper2.Invoke(enumerator2.Current));
+            index++;
+        }
+    }
+
+    /// <summary>
+    /// Source: <see href="https://stackoverflow.com/a/2722021"/>
+    /// </summary>
+    /// <exception cref="InvalidOperationException"/>
+    public static IEnumerable<TResult> Zip<T1, T2, TResult>(
+        IEnumerable<T1> collection1, IEnumerable<T2> collection2,
+        Func<T1, T2, TResult> mapper)
+    {
+        int index = 0;
+        using IEnumerator<T1> enumerator1 = collection1.GetEnumerator();
+        using IEnumerator<T2> enumerator2 = collection2.GetEnumerator();
+
+        while (true)
+        {
+            bool hasNext1 = enumerator1.MoveNext();
+            bool hasNext2 = enumerator2.MoveNext();
+
+            if (hasNext1 != hasNext2)
+            { throw new InvalidOperationException("One of the collections ran out of values before the other"); }
+
+            if (!hasNext1) break;
+
+            yield return mapper.Invoke(enumerator1.Current, enumerator2.Current);
+            index++;
+        }
+    }
+
+    #endregion
 }

@@ -71,17 +71,14 @@ struct ActiveInteractiveSession
 class InteractiveCompiler
 {
     string _text;
-    ImmutableArray<Token> _tokens;
-    Statement? _parsed;
-    CompilerResult _compiled;
     BBCodeGeneratorResult _generated;
     Task? _task;
     readonly Action<Task> _onCompiledAsync;
     readonly Queue<Task> _completedTasks;
 
-    public ImmutableArray<Token> Tokens => _tokens;
-    public Statement? Statement => _parsed;
-    public CompilerResult Compiled => _compiled;
+    public ImmutableArray<Token> Tokens { get; private set; }
+    public Statement? Statement { get; private set; }
+    public CompilerResult Compiled { get; private set; }
     public BBCodeGeneratorResult Generated => _generated;
     public ParserResult InteractiveAST => new(
         Enumerable.Empty<Error>(),
@@ -90,7 +87,7 @@ class InteractiveCompiler
         Enumerable.Empty<StructDefinition>(),
         Enumerable.Empty<UsingDefinition>(),
         Enumerable.Empty<CompileTag>(),
-        _parsed != null ? [_parsed] :
+        Statement != null ? [Statement] :
         Enumerable.Empty<Statement>(),
         Enumerable.Empty<EnumDefinition>(),
         Enumerable.Empty<Token>(),
@@ -99,9 +96,9 @@ class InteractiveCompiler
     public InteractiveCompiler(Action<Task> onCompiledAsync)
     {
         _text = string.Empty;
-        _tokens = ImmutableArray<Token>.Empty;
-        _parsed = null;
-        _compiled = CompilerResult.Empty;
+        Tokens = ImmutableArray<Token>.Empty;
+        Statement = null;
+        Compiled = CompilerResult.Empty;
         _generated = default;
         _task = null;
         _onCompiledAsync = onCompiledAsync;
@@ -110,26 +107,26 @@ class InteractiveCompiler
 
     public void Compile(string text)
     {
-        if (_parsed != null && string.Equals(text, _text))
+        if (Statement != null && string.Equals(text, _text))
         { return; }
 
         _text = text;
-        _tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive).Tokens;
-        _parsed = default;
-        _compiled = default;
+        Tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive).Tokens;
+        Statement = default;
+        Compiled = default;
         _generated = default;
 
-        if (_tokens.Length != 0)
+        if (Tokens.Length != 0)
         {
-            _parsed = Parser.ParseStatement(_tokens, null);
+            Statement = Parser.ParseStatement(Tokens, null);
 
             Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
-            Statement parsed2 = _parsed;
+            Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
             { parsed2 = new KeywordCall((Token)StatementKeywords.Return, new StatementWithValue[] { statementWithValue }); }
 
-            _compiled = Compiler.CompileInteractive(
+            Compiled = Compiler.CompileInteractive(
                 parsed2,
                 externalFunctions,
                 new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
@@ -139,13 +136,13 @@ class InteractiveCompiler
                 null,
                 null);
 
-            _generated = CodeGeneratorForMain.Generate(_compiled, GeneratorSettings.Default);
+            _generated = CodeGeneratorForMain.Generate(Compiled, MainGeneratorSettings.Default);
         }
     }
 
     public void CompileAsync(string text)
     {
-        if (_parsed != null && string.Equals(text, _text))
+        if (Statement != null && string.Equals(text, _text))
         { return; }
 
         if (_task != null && !_task.IsCompleted)
@@ -163,22 +160,22 @@ class InteractiveCompiler
 
     void CompileTask()
     {
-        _tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive).Tokens;
-        _parsed = default;
-        _compiled = default;
+        Tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive).Tokens;
+        Statement = default;
+        Compiled = default;
         _generated = default;
 
-        if (_tokens.Length != 0)
+        if (Tokens.Length != 0)
         {
-            _parsed = Parser.ParseStatement(_tokens, null);
+            Statement = Parser.ParseStatement(Tokens, null);
 
             Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
-            Statement parsed2 = _parsed;
+            Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
             { parsed2 = new KeywordCall((Token)StatementKeywords.Return, new StatementWithValue[] { statementWithValue }); }
 
-            _compiled = Compiler.CompileInteractive(
+            Compiled = Compiler.CompileInteractive(
                 parsed2,
                 externalFunctions,
                 new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
@@ -188,7 +185,7 @@ class InteractiveCompiler
                 null,
                 null);
 
-            _generated = CodeGeneratorForMain.Generate(_compiled, GeneratorSettings.Default);
+            _generated = CodeGeneratorForMain.Generate(Compiled, MainGeneratorSettings.Default);
         }
     }
 
@@ -723,7 +720,7 @@ public class Interactive
 
             Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
-            BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, GeneratorSettings.Default);
+            BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, MainGeneratorSettings.Default);
 
             interpreter = new(true, BytecodeInterpreterSettings.Default, generated.Code, generated.DebugInfo);
 

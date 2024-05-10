@@ -70,10 +70,7 @@ class BreakPointJump : IJump
         return true;
     }
 
-    public void Tick()
-    {
-
-    }
+    public void Tick() { }
 }
 
 [SupportedOSPlatform("windows")]

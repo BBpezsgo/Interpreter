@@ -32,7 +32,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateAllocator(StatementWithValue size)
     {
-        StatementWithValue[] parameters = new StatementWithValue[] { size };
+        ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(size);
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator, out _, true, out _))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", size, CurrentFile); }
@@ -99,8 +99,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateDeallocator(StatementWithValue value)
     {
-        StatementWithValue[] parameters = new StatementWithValue[] { value };
-        GeneralType[] parameterTypes = FindStatementTypes(parameters);
+        ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
+        ImmutableArray<GeneralType> parameterTypes = FindStatementTypes(parameters);
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, true, out _))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
@@ -233,7 +233,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (!GetGeneralFunction(deallocateablePointerType.To, new GeneralType[] { deallocateablePointerType }, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor, out _, true, out WillBeCompilerException? error))
+        if (!GetGeneralFunction(deallocateablePointerType.To, new GeneralType[] { deallocateablePointerType }, BuiltinFunctionIdentifiers.Destructor, out CompiledGeneralFunction? destructor, out _, true, out WillBeCompilerException? error))
         {
             AddComment($"Pointer value should be already there");
             GenerateDeallocator(deallocateableType, position);
@@ -769,10 +769,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { _identifier2.Token.AnalyzedType = TokenAnalyzedType.FunctionName; }
             anyCall.Reference = compiledFunction;
 
-            StatementWithValue[] convertedParameters = new StatementWithValue[functionCall.MethodParameters.Length];
+            ImmutableArray<StatementWithValue>.Builder convertedParameters = ImmutableArray.CreateBuilder<StatementWithValue>(functionCall.MethodParameters.Length);
             for (int i = 0; i < functionCall.MethodParameters.Length; i++)
             {
-                convertedParameters[i] = functionCall.MethodParameters[i];
+                convertedParameters.Add(functionCall.MethodParameters[i]);
                 GeneralType passed = FindStatementType(functionCall.MethodParameters[i]);
                 GeneralType defined = compiledFunction.ParameterTypes[i];
                 if (passed.Equals(defined)) continue;
@@ -782,8 +782,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     defined.ToTypeInstance());
             }
 
-            if (Settings.OptimizeCode &&
-                TryEvaluate(compiledFunction, convertedParameters, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+            if (!Settings.DontOptimize &&
+                TryEvaluate(compiledFunction, convertedParameters.ToImmutable(), out DataItem? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -864,7 +864,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(BinaryOperatorCall @operator)
     {
-        if (Settings.OptimizeCode && TryCompute(@operator, out DataItem predictedValue))
+        if (!Settings.DontOptimize && TryCompute(@operator, out DataItem predictedValue))
         {
             OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
             @operator.PredictedValue = predictedValue;
@@ -969,7 +969,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(UnaryOperatorCall @operator)
     {
-        if (Settings.OptimizeCode && TryCompute(@operator, out DataItem predictedValue))
+        if (!Settings.DontOptimize && TryCompute(@operator, out DataItem predictedValue))
         {
             OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
             @operator.PredictedValue = predictedValue;
@@ -1223,7 +1223,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(WhileLoop whileLoop)
     {
-        if (Settings.OptimizeCode &&
+        if (!Settings.DontOptimize &&
             TryCompute(whileLoop.Condition, out DataItem condition))
         {
             if (condition)
@@ -1293,7 +1293,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("For-loop variable");
         GenerateCodeForStatement(forLoop.VariableDeclaration);
 
-        if (Settings.OptimizeCode &&
+        if (!Settings.DontOptimize &&
             TryCompute(forLoop.Condition, out DataItem condition))
         {
             if (condition)
@@ -1357,7 +1357,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (ifSegment is IfBranch partIf)
             {
-                if (Settings.OptimizeCode &&
+                if (!Settings.DontOptimize &&
                     TryCompute(partIf.Condition, out DataItem condition))
                 {
                     if (!condition)
@@ -1394,7 +1394,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else if (ifSegment is ElseIfBranch partElseif)
             {
-                if (Settings.OptimizeCode &&
+                if (!Settings.DontOptimize &&
                     TryCompute(partElseif.Condition, out DataItem condition))
                 {
                     if (!condition)
@@ -1488,7 +1488,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForStatement(ConstructorCall constructorCall)
     {
         GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute);
-        GeneralType[] parameters = FindStatementTypes(constructorCall.Parameters);
+        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Parameters);
 
         if (!GetConstructor(instanceType, parameters, out CompiledConstructor? compiledFunction, out _, true, out WillBeCompilerException? notFound))
         { throw notFound.Instantiate(constructorCall.Type, CurrentFile); }
@@ -1714,7 +1714,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GenerateCodeForFunctionCall_Function(new FunctionCall(
                 index.PrevStatement,
-                Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
+                Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet),
                 new StatementWithValue[]
                 {
                     index.Index,
@@ -1781,7 +1781,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (statementType.Size != targetType.Size)
         { throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.Size}) to {targetType} (size of {targetType.Size})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
 
-        if (Settings.OptimizeCode &&
+        if (!Settings.DontOptimize &&
             targetType is BuiltinType targetBuiltinType &&
             TryComputeSimple(typeCast.PrevStatement, out DataItem prevValue) &&
             DataItem.TryCast(ref prevValue, targetBuiltinType.RuntimeType))
@@ -1813,7 +1813,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     /// </param>
     void GenerateCodeForStatement(Block block, bool silent = false)
     {
-        if (Settings.OptimizeCode &&
+        if (!Settings.DontOptimize &&
             block.Statements.Length == 0)
         {
             AddComment("Statements { }");
@@ -2108,7 +2108,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             GenerateCodeForFunctionCall_Function(new FunctionCall(
                     statementToSet.PrevStatement,
-                    Token.CreateAnonymous(BuiltinFunctionNames.IndexerSet),
+                    Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerSet),
                     new StatementWithValue[]
                     {
                         statementToSet.Index,
@@ -2241,7 +2241,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int size;
 
-        if (Settings.OptimizeCode &&
+        if (!Settings.DontOptimize &&
             TryCompute(newVariable.InitialValue, out DataItem computedInitialValue))
         {
             newVariable.InitialValue.PredictedValue = computedInitialValue;

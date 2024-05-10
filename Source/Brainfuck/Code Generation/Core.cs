@@ -54,6 +54,8 @@ public struct BrainfuckGeneratorSettings
     public int HeapSize;
     public bool GenerateDebugInformation;
     public bool ShowProgress;
+    public bool DontOptimize;
+
     public readonly int HeapStart => StackSize + 1;
 
     public static BrainfuckGeneratorSettings Default => new()
@@ -63,6 +65,7 @@ public struct BrainfuckGeneratorSettings
         HeapSize = 64,
         GenerateDebugInformation = true,
         ShowProgress = true,
+        DontOptimize = false,
     };
 
     public BrainfuckGeneratorSettings(BrainfuckGeneratorSettings other)
@@ -72,6 +75,7 @@ public struct BrainfuckGeneratorSettings
         HeapSize = other.HeapSize;
         GenerateDebugInformation = other.GenerateDebugInformation;
         ShowProgress = other.ShowProgress;
+        DontOptimize = other.DontOptimize;
     }
 }
 
@@ -321,30 +325,33 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     readonly Stack<ISameCheck> CurrentMacro;
 
-    readonly BrainfuckGeneratorSettings GeneratorSettings;
+    readonly BrainfuckGeneratorSettings Settings;
 
     string? VariableCanBeDiscarded;
 
-    readonly bool ShowProgress;
+    bool ShowProgress => Settings.ShowProgress;
 
     readonly int MaxRecursiveDepth;
 
     #endregion
 
-    public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection, print)
+    public CodeGeneratorForBrainfuck(
+        CompilerResult compilerResult,
+        BrainfuckGeneratorSettings brainfuckSettings,
+        AnalysisCollection? analysisCollection,
+        PrintCallback? print) : base(compilerResult, analysisCollection, print)
     {
         CompiledVariables = new Stack<Variable>();
         Code = new CodeHelper();
-        Stack = new StackCodeHelper(Code, 0, settings.StackSize);
-        Heap = new HeapCodeHelper(Code, settings.HeapStart, settings.HeapSize);
+        Stack = new StackCodeHelper(Code, 0, brainfuckSettings.StackSize);
+        Heap = new HeapCodeHelper(Code, brainfuckSettings.HeapStart, brainfuckSettings.HeapSize);
         CurrentMacro = new Stack<ISameCheck>();
         VariableCleanupStack = new Stack<int>();
-        GeneratorSettings = settings;
         Returns = new Stack<ControlFlowBlock>();
         Breaks = new Stack<ControlFlowBlock>();
-        DebugInfo = settings.GenerateDebugInformation ? new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Key, v.Value.Tokens))) : null;
-        ShowProgress = settings.ShowProgress;
+        DebugInfo = brainfuckSettings.GenerateDebugInformation ? new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Key, v.Value.Tokens))) : null;
         MaxRecursiveDepth = 4;
+        Settings = brainfuckSettings;
     }
 
     GeneratorSnapshot Snapshot() => new(this);
@@ -670,7 +677,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         if (!isImported)
         { CompiledVariables.Add(new Variable(ReturnVariableName, Stack.PushVirtual(1), false, false, new BuiltinType(BasicType.Integer))); }
 
-        if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
+        if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(statements)); }
         else
         { PrecompileVariables(statements); }
@@ -698,7 +705,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             Breaks.Count > 0)
         { throw new InternalException(); }
 
-        if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
+        if (Settings.ClearGlobalVariablesBeforeExit)
         { CleanupVariables(VariableCleanupStack.Pop()); }
 
         Code.SetPointer(0);
@@ -748,13 +755,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     public static BrainfuckGeneratorResult Generate(
         CompilerResult compilerResult,
-        BrainfuckGeneratorSettings generatorSettings,
+        BrainfuckGeneratorSettings brainfuckSettings,
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null)
     => new CodeGeneratorForBrainfuck(
         compilerResult,
-        generatorSettings,
-        printCallback,
+        brainfuckSettings,
         analysisCollection,
         printCallback).GenerateCode(compilerResult);
 }

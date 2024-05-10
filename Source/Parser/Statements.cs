@@ -203,6 +203,8 @@ public abstract class StatementWithValue : Statement
     {
         SaveValue = true;
         CompiledType = null;
+        PredictedValue = null;
+        SurroundingBracelet = null;
     }
 }
 
@@ -433,6 +435,7 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
     public ImmutableArray<Token> Modifiers { get; }
     public GeneralType? CompiledType { get; set; }
     public Uri? FilePath { get; }
+
     public override Position Position =>
         new Position(Type, Identifier, InitialValue)
         .Union(Modifiers);
@@ -643,15 +646,12 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
     public Uri? OriginalFile { get; }
 
     public bool IsMethodCall => PrevStatement != null;
-    public StatementWithValue[] MethodParameters
+    public ImmutableArray<StatementWithValue> MethodParameters
     {
         get
         {
-            if (PrevStatement == null)
-            { return Parameters.ToArray(); }
-            List<StatementWithValue> newList = new(Parameters);
-            newList.Insert(0, PrevStatement);
-            return newList.ToArray();
+            if (PrevStatement == null) return Parameters;
+            return Parameters.Insert(0, PrevStatement);
         }
     }
     public override Position Position =>
@@ -821,7 +821,7 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
     public Uri? OriginalFile { get; }
 
     public override Position Position => new(Operator, Left, Right);
-    public StatementWithValue[] Parameters => new StatementWithValue[] { Left, Right };
+    public ImmutableArray<StatementWithValue> Parameters => ImmutableArray.Create(Left, Right);
 
     public BinaryOperatorCall(
         Token op,
@@ -865,11 +865,9 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
 
         result.Append(Operator.Content);
         result.Append('(');
-        for (int i = 0; i < Parameters.Length; i++)
-        {
-            if (i > 0) { result.Append(", "); }
-            result.Append(typeSearch.Invoke(Parameters[i]).ToString());
-        }
+        result.Append(typeSearch.Invoke(Left));
+        result.Append(", ");
+        result.Append(typeSearch.Invoke(Right));
         result.Append(')');
 
         return result.ToString();
@@ -897,7 +895,7 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
     public Uri? OriginalFile { get; }
 
     public override Position Position => new(Operator, Left);
-    public StatementWithValue[] Parameters => new StatementWithValue[] { Left };
+    public ImmutableArray<StatementWithValue> Parameters => ImmutableArray.Create(Left);
 
     public UnaryOperatorCall(
         Token op,
@@ -934,11 +932,7 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 
         result.Append(Operator.Content);
         result.Append('(');
-        for (int i = 0; i < Parameters.Length; i++)
-        {
-            if (i > 0) { result.Append(", "); }
-            result.Append(typeSearch.Invoke(Parameters[i]).ToString());
-        }
+        result.Append(typeSearch.Invoke(Left));
         result.Append(')');
 
         return result.ToString();
@@ -966,7 +960,7 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
     public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
 
-    public StatementWithValue[] Parameters => new StatementWithValue[] { Left };
+    public ImmutableArray<StatementWithValue> Parameters => ImmutableArray.Create(Left);
     public override Position Position => new(Operator, Left);
 
     public ShortOperatorCall(
@@ -1006,11 +1000,7 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
 
         result.Append(Operator.Content);
         result.Append('(');
-        for (int i = 0; i < Parameters.Length; i++)
-        {
-            if (i > 0) result.Append(", ");
-            result.Append(typeSearch.Invoke(Parameters[i]));
-        }
+        result.Append(typeSearch.Invoke(Left));
         result.Append(')');
 
         return result.ToString();
@@ -1195,6 +1185,7 @@ public class Literal : StatementWithValue
     public string Value { get; }
     public Position ImaginaryPosition { get; init; }
     public Token ValueToken { get; }
+
     public override Position Position
         => ValueToken is null ? ImaginaryPosition : new Position(ValueToken);
 
@@ -1272,7 +1263,7 @@ public class Literal : StatementWithValue
     {
         Literal[] result = new Literal[values.Length];
         for (int i = 0; i < values.Length; i++)
-        { result[i] = Literal.CreateAnonymous(values[i], positions[i]); }
+        { result[i] = Literal.CreateAnonymous(values[i], positions[i].Position); }
         return result;
     }
 
@@ -1284,6 +1275,13 @@ public class Literal : StatementWithValue
         { result[i] = Literal.CreateAnonymous(values[i], positions[i]); }
         return result;
     }
+
+    /// <exception cref="NotImplementedException"/>
+    public static IEnumerable<Literal> CreateAnonymous(IEnumerable<DataItem> values, IEnumerable<IPositioned> positions)
+        =>
+        values
+        .Zip(positions)
+        .Select(item => Literal.CreateAnonymous(item.First, item.Second));
 
     public override string ToString()
     {
@@ -1338,17 +1336,21 @@ public class Literal : StatementWithValue
 
     public bool TryConvert<T>([NotNullWhen(true)] out T? value)
     {
-        if (!Utils.TryConvertType(typeof(T), out LiteralType type))
-        {
-            value = default;
-            return false;
-        }
+        value = default;
+
+        LiteralType type;
+
+        if (typeof(T) == typeof(int))
+        { type = LiteralType.Integer; }
+        else if (typeof(T) == typeof(float))
+        { type = LiteralType.Float; }
+        else if (typeof(T) == typeof(string))
+        { type = LiteralType.String; }
+        else
+        { return false; }
 
         if (type != Type)
-        {
-            value = default;
-            return false;
-        }
+        { return false; }
 
         value = type switch
         {

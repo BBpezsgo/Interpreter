@@ -3,6 +3,39 @@
 using Compiler;
 using Runtime;
 
+public struct MainGeneratorSettings
+{
+    public bool GenerateComments;
+    public bool PrintInstructions;
+    public bool DontOptimize;
+    public bool GenerateDebugInstructions;
+    public bool ExternalFunctionsCache;
+    public bool CheckNullPointers;
+    public CompileLevel CompileLevel;
+
+    public MainGeneratorSettings(MainGeneratorSettings other)
+    {
+        GenerateComments = other.GenerateComments;
+        PrintInstructions = other.PrintInstructions;
+        DontOptimize = other.DontOptimize;
+        GenerateDebugInstructions = other.GenerateDebugInstructions;
+        ExternalFunctionsCache = other.ExternalFunctionsCache;
+        CheckNullPointers = other.CheckNullPointers;
+        CompileLevel = other.CompileLevel;
+    }
+
+    public static MainGeneratorSettings Default => new()
+    {
+        GenerateComments = true,
+        PrintInstructions = false,
+        DontOptimize = false,
+        GenerateDebugInstructions = true,
+        ExternalFunctionsCache = false,
+        CheckNullPointers = true,
+        CompileLevel = CompileLevel.Minimal,
+    };
+}
+
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public readonly struct CleanupItem
 {
@@ -83,11 +116,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
     bool CanReturn;
 
     readonly Stack<ScopeInformations> CurrentScopeDebug = new();
-    readonly CompileLevel CompileLevel;
+    CompileLevel CompileLevel => Settings.CompileLevel;
+    readonly MainGeneratorSettings Settings;
 
     #endregion
 
-    public CodeGeneratorForMain(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, settings, analysisCollection, print)
+    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, analysisCollection, print)
     {
         this.ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
         this.GeneratedCode = new List<PreparationInstruction>();
@@ -100,7 +134,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         this.UndefinedGeneralFunctionOffsets = new List<UndefinedOffset<CompiledGeneralFunction>>();
         this.UndefinedConstructorOffsets = new List<UndefinedOffset<CompiledConstructor>>();
         this.TagCount = new Stack<int>();
-        this.CompileLevel = settings.CompileLevel;
+        this.Settings = settings;
     }
 
     void SetUndefinedFunctionOffsets<TFunction>(IEnumerable<UndefinedOffset<TFunction>> undefinedOffsets)
@@ -114,9 +148,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     throw generalFunction.Identifier.Content switch
                     {
-                        BuiltinFunctionNames.Destructor => new InternalException($"Destructor for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
-                        BuiltinFunctionNames.IndexerGet => new InternalException($"Index getter for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
-                        BuiltinFunctionNames.IndexerSet => new InternalException($"Index setter for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        BuiltinFunctionIdentifiers.Destructor => new InternalException($"Destructor for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        BuiltinFunctionIdentifiers.IndexerGet => new InternalException($"Index getter for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        BuiltinFunctionIdentifiers.IndexerSet => new InternalException($"Index setter for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
                         _ => new NotImplementedException(),
                     };
                 }
@@ -139,7 +173,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    BBCodeGeneratorResult GenerateCode(CompilerResult compilerResult, GeneratorSettings settings)
+    BBCodeGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
     {
         if (settings.ExternalFunctionsCache)
         { throw new NotImplementedException(); }
@@ -227,7 +261,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     public static BBCodeGeneratorResult Generate(
         CompilerResult compilerResult,
-        GeneratorSettings settings,
+        MainGeneratorSettings settings,
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null)
     {

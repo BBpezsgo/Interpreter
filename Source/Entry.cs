@@ -60,12 +60,20 @@ public static class Entry
                 BBCodeGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();
 
-                if (!arguments.ThrowErrors)
+                if (arguments.ThrowErrors)
+                {
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null);
+                    generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
+                    analysisCollection.Throw();
+                    analysisCollection.Print();
+                    return;
+                }
+                else
                 {
                     try
                     {
                         CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null);
-                        generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
+                        generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
                     }
@@ -82,16 +90,8 @@ public static class Entry
                         return;
                     }
                 }
-                else
-                {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null);
-                    generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
-                    analysisCollection.Throw();
-                    analysisCollection.Print();
-                    return;
-                }
 
-                if (arguments.GeneratorSettings.PrintInstructions)
+                if (arguments.MainGeneratorSettings.PrintInstructions)
                 {
                     for (int i = 0; i < generatedCode.Code.Length; i++)
                     {

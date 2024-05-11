@@ -51,7 +51,7 @@ public class StructType : GeneralType,
         if (@struct.Template is not null)
         {
             TypeArguments = @struct.Template.Parameters
-                .Select(v => new KeyValuePair<string, GeneralType>(v.Content, new GenericType(v.Content)))
+                .Select(v => new KeyValuePair<string, GeneralType>(v.Content, new GenericType(v)))
                 .ToImmutableDictionary();
         }
         else

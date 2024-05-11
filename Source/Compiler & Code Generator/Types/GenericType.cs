@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
+using LanguageCore.Tokenizing;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -7,6 +8,7 @@ public class GenericType : GeneralType,
     IEquatable<GenericType>
 {
     public string Identifier { get; }
+    public Token? Definition { get; }
 
     public override int Size
     {
@@ -17,11 +19,19 @@ public class GenericType : GeneralType,
     public GenericType(GenericType other)
     {
         Identifier = other.Identifier;
+        Definition = other.Definition;
     }
 
     public GenericType(string identifier)
     {
         Identifier = identifier;
+        Definition = null;
+    }
+
+    public GenericType(Token definition)
+    {
+        Identifier = definition.Content;
+        Definition = definition;
     }
 
     public override bool Equals(object? other) => Equals(other as GenericType);

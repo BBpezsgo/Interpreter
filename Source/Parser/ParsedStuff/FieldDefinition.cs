@@ -14,7 +14,7 @@ public class FieldDefinition :
     public Token? Semicolon { get; set; }
     [NotNull] public StructDefinition? Context { get; set; }
 
-    public Position Position => new Position(Modifiers).Union(Identifier, Type);
+    public Position Position => new Position(Identifier, Type).Union(Modifiers);
 
     public Protection Protection
     {

@@ -1566,6 +1566,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             field.CompiledType = fieldDefinition.Type;
             field.Reference = fieldDefinition;
+            fieldDefinition.References.Add(new Reference<Statement>(field, CurrentFile, CurrentContext));
 
             GenerateCodeForStatement(field.PrevStatement);
 
@@ -1585,7 +1586,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!structType.GetField(field.Identifier.Content, out CompiledField? compiledField, out _))
         { throw new CompilerException($"Field definition \"{field.Identifier}\" not found in type \"{structType}\"", field, CurrentFile); }
 
+        field.CompiledType = compiledField.Type;
         field.Reference = compiledField;
+        compiledField.References.Add(new Reference<Statement>(field, CurrentFile, CurrentContext));
 
         // if (CurrentContext?.Context != null)
         // {
@@ -2008,6 +2011,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             statementToSet.Reference = fieldDefinition;
             statementToSet.CompiledType = statementToSet.CompiledType;
+            fieldDefinition.References.Add(new Reference<Statement>(statementToSet, CurrentFile, CurrentContext));
 
             GenerateCodeForStatement(statementToSet.PrevStatement);
 

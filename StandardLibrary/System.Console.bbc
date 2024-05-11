@@ -10,16 +10,18 @@ export void Clear();
 
 
 [External("stderr")]
-export void PrintError(char data);
+export void PrintError(char message);
 
 //
 //  == PRINT ==
 //
 
 [External("stdout")]
-export void Print(char data);
+export void Print(char message);
 
-// https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
 inline int _FindMaxPowOf10(int num)
 {
     int result = 1;
@@ -32,7 +34,9 @@ inline int _FindMaxPowOf10(int num)
     return result;
 }
 
-// https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
 export inline void Print(int message)
 {
     if (message < 0)
@@ -40,6 +44,7 @@ export inline void Print(int message)
         Print('-');
         message = message * -1;
     }
+    
     int pow10 = _FindMaxPowOf10(message);
     while (pow10)
     {
@@ -107,8 +112,8 @@ export char* ReadLine()
     while (1)
     {
         char inpChar = ReadKey();
-        if (inpChar == '\n') { break; };
-        if (inpChar == '\r') { break; };
+        if (inpChar == '\n') { break; }
+        if (inpChar == '\r') { break; }
 
         result = (temp result) + inpChar;
     }

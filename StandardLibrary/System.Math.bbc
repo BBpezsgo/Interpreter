@@ -1,4 +1,6 @@
 /*
+ * Calculates the sine of `x` using the Taylor series
+ *
  * Source: https://stackoverflow.com/a/67122267
  */
 export inline float Sin(float x)
@@ -18,6 +20,8 @@ export inline float Sin(float x)
 }
 
 /*
+ * Calculates the cosine of `x` using the Taylor series
+ * 
  * Source: https://stackoverflow.com/a/67122267
  */
 export inline float Cos(float x)
@@ -37,6 +41,8 @@ export inline float Cos(float x)
 }
 
 /*
+ * Calculates the value of `base` to the power of `exp`
+ * 
  * Source: https://stackoverflow.com/a/101613
  */
 export int Pow(int base, int exp)
@@ -56,12 +62,15 @@ export int Pow(int base, int exp)
     return result;
 }
 
+/*
+ * Calculates the absolute value of `v`
+ */
 export int Abs(int v)
 {
     if (v < 0) { return v * -1; };
     return v;
 }
-  
+
 export int Min(int a, int b)
 {
     if (a < b) { return a; };
@@ -167,6 +176,8 @@ int Sqrt(int number)
 */
 
 /*
+ * Calculates the square root of `s`
+ * 
  * Source: https://en.wikipedia.org/wiki/Integer_square_root
  */
 export int Sqrt(int s)
@@ -191,6 +202,9 @@ export int Sqrt(int s)
     return x0;
 }
 
+/**
+ * Calculates the base 10 logarithm of `v`
+ */
 export inline int Log10(int v)
 {
     if (v >= 1000000000) { return 9; }
@@ -204,6 +218,9 @@ export inline int Log10(int v)
     if (v >= 10) { return 1; }
 }
 
+/**
+ * Calculates the base 10 logarithm of `v`
+ */
 export inline byte Log10(byte v)
 {
     if (v >= 100) { return 2; }

@@ -176,4 +176,24 @@ public readonly struct ParserResult
             }
         }
     }
+
+    public bool GetFieldAt(Uri file, SinglePosition position, [NotNullWhen(true)] out FieldDefinition? result)
+    {
+        foreach (StructDefinition @struct in Structs)
+        {
+            if (@struct.FilePath != file) continue;
+
+            foreach (FieldDefinition field in @struct.Fields)
+            {
+                if (field.Identifier.Position.Range.Contains(position))
+                {
+                    result = field;
+                    return true;
+                }
+            }
+        }
+
+        result = null;
+        return false;
+    }
 }

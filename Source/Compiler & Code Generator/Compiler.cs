@@ -287,7 +287,7 @@ public sealed class Compiler
                 if (GenericParameters[i][j].Content == name.Content)
                 {
                     GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
-                    result = new GenericType(GenericParameters[i][j].Content);
+                    result = new GenericType(GenericParameters[i][j]);
                     return true;
                 }
             }

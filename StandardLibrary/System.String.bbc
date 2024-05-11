@@ -2,6 +2,10 @@ using System;
 using System.Memory;
 using System.Lists;
 
+/*
+ * Splits the string `string` based on the specified separator `separator` and adds
+ * the substring to the list `result`
+ */
 export void Split(this char* string, char separator, List<char*>* result)
 {
 	char* current = "";
@@ -28,6 +32,9 @@ export void Split(this char* string, char separator, List<char*>* result)
 	}
 }
 
+/*
+ * Checks if the string `text` is null or its length is zero
+ */
 export int IsNullOrEmpty(this char* text)
 {
     if (text)
@@ -41,6 +48,9 @@ export int IsNullOrEmpty(this char* text)
     { return 1; }
 }
 
+/*
+ * Copies the string `text` and returns the copy
+ */
 export char* ToString(this char* text)
 {
     char* res = Alloc(text.Length() * sizeof(char) + 1) as char*;
@@ -54,6 +64,11 @@ export char* ToString(this char* text)
     return res;
 }
 
+/*
+ * Concatenate the two string `a` and `b`
+ * 
+ * This will not modify the string `a` or `b`, it will allocates a new one
+ */
 export char* +(temp char* a, temp char* b)
 {
     int al = a.Length();
@@ -78,6 +93,11 @@ export char* +(temp char* a, temp char* b)
     return result;
 }
 
+/*
+ * Appends the character `b` at the end of the string `a`
+ * 
+ * This will not modify the string `a`, it will allocates a new one
+ */
 export char* +(temp char* a, char b)
 {
     int length = a.Length();
@@ -96,6 +116,9 @@ export char* +(temp char* a, char b)
     return result;
 }
 
+/*
+ * Returns the length of the string `v`
+ */
 export int Length(this char* v)
 {
 	int i = 0;
@@ -104,6 +127,11 @@ export int Length(this char* v)
 	return i;
 }
 
+/*
+ * Copies the string `from` to the destination string `to`
+ * 
+ * Note that both strings must be equal in length
+ */
 export void CopyString(temp char* from, char* to)
 {
     int i = 0;
@@ -141,6 +169,11 @@ export char* Substring(temp this char* v, int start, int length)
     return newV;
 }
 
+/*
+ * Reverses the string `v`
+ * 
+ * This will not modify the string `v`, it will allocates a new one
+ */
 export char* Reverse(temp this char* v)
 {
     int length = v.Length();

@@ -81,6 +81,10 @@ public static class StatementKeywords
 
 public static class LanguageConstants
 {
+    public const string LanguageName = "BBLang";
+    public const string LanguageId = "bbc";
+    public const string LanguageExtension = "bbc";
+
     public static readonly ImmutableArray<string> KeywordList = ImmutableArray.Create
     (
         DeclarationKeywords.Struct,

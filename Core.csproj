@@ -9,6 +9,10 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <LangVersion>preview</LangVersion>
     <PublishAot>false</PublishAot>
+    <AssemblyName>BBLang</AssemblyName>
+    <RootNamespace>LanguageCore</RootNamespace>
+    <PackageId>BBLang</PackageId>
+    <Authors>BB</Authors>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

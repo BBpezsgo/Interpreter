@@ -3,7 +3,7 @@ using System.IO;
 
 namespace LanguageCore.Runtime;
 
-using BBCode.Generator;
+using BBLang.Generator;
 
 /// <summary>
 /// This compiles and runs the code

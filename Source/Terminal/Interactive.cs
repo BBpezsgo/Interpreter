@@ -6,7 +6,7 @@ using Color = System.Drawing.Color;
 
 namespace LanguageCore.Interactive;
 
-using BBCode.Generator;
+using BBLang.Generator;
 using Compiler;
 using Parser;
 using Parser.Statement;
@@ -71,7 +71,7 @@ struct ActiveInteractiveSession
 class InteractiveCompiler
 {
     string _text;
-    BBCodeGeneratorResult _generated;
+    BBLangGeneratorResult _generated;
     Task? _task;
     readonly Action<Task> _onCompiledAsync;
     readonly Queue<Task> _completedTasks;
@@ -79,7 +79,7 @@ class InteractiveCompiler
     public ImmutableArray<Token> Tokens { get; private set; }
     public Statement? Statement { get; private set; }
     public CompilerResult Compiled { get; private set; }
-    public BBCodeGeneratorResult Generated => _generated;
+    public BBLangGeneratorResult Generated => _generated;
     public ParserResult InteractiveAST => new(
         Enumerable.Empty<Error>(),
         Enumerable.Empty<FunctionDefinition>(),
@@ -715,7 +715,7 @@ public class Interactive
 
             Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
-            BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, MainGeneratorSettings.Default);
+            BBLangGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, MainGeneratorSettings.Default);
 
             interpreter = new(true, BytecodeInterpreterSettings.Default, generated.Code, generated.DebugInfo);
 

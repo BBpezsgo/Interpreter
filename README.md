@@ -14,7 +14,7 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 ## Command line arguments
 > 
-> `BBCodeInterpreter.exe` is the compiled compiler program
+> `BBLang.exe` is the compiled compiler program
 > 
 > `[stuff]` - "stuff" is an **optional** argument.
 > 
@@ -24,7 +24,7 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 > 
 > `stuff1;stuff2` you can use **any combination** of the listed arguments (or none) separated by `;` (in this example "stuff1" or "stuff2").
 
-`BBCodeInterpreter.exe [options...] <source path>`
+`BBLang.exe [options...] <source path>`
 
 ### Options:
 
@@ -108,16 +108,16 @@ If you want to download the project and build it, there is how to do that:
 
 Now the folder structure should look like this:
 ```
-./Interpreter/BBCodeInterpreter.csproj
+./Interpreter/Core.csproj
 ./Win32-Stuff/Win32.csproj
 ```
 
-5. Open `./Interpreter/BBCodeInterpreter.csproj` in a **text editor**
+5. Open `./Interpreter/Core.csproj` in a **text editor**
 6. In the `ProjectReference` tags, replace `..\..` with `..` (so it will point to the existing projects you downloaded)
 
 ### Method 1: Building with Visual Studio:
 
-7. Open `./Interpreter/BBCodeInterpreter.csproj` in Visual Studio
+7. Open `./Interpreter/Core.csproj` in Visual Studio
 8. Add the `./Win32-Stuff/Win32.csproj` project to the solution
 9. Now you can build it with the "Build" button
 

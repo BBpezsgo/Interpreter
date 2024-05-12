@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.BBCode.Generator;
+﻿namespace LanguageCore.BBLang.Generator;
 
 using Compiler;
 using Runtime;
@@ -60,7 +60,7 @@ public readonly struct CleanupItem
     string GetDebuggerDisplay() => ToString();
 }
 
-public struct BBCodeGeneratorResult
+public struct BBLangGeneratorResult
 {
     public ImmutableArray<Instruction> Code;
     public DebugInformation? DebugInfo;
@@ -173,7 +173,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    BBCodeGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
+    BBLangGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
     {
         if (settings.ExternalFunctionsCache)
         { throw new NotImplementedException(); }
@@ -252,14 +252,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         Print?.Invoke("Code generated", LogType.Debug);
 
-        return new BBCodeGeneratorResult()
+        return new BBLangGeneratorResult()
         {
             Code = GeneratedCode.Select(v => new Instruction(v)).ToImmutableArray(),
             DebugInfo = DebugInfo,
         };
     }
 
-    public static BBCodeGeneratorResult Generate(
+    public static BBLangGeneratorResult Generate(
         CompilerResult compilerResult,
         MainGeneratorSettings settings,
         PrintCallback? printCallback = null,

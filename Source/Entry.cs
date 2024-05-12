@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace LanguageCore;
 
 using ASM.Generator;
-using BBCode.Generator;
+using BBLang.Generator;
 using Brainfuck;
 using Brainfuck.Generator;
 using Compiler;
@@ -56,7 +56,7 @@ public static class Entry
 
 #endif
 
-                BBCodeGeneratorResult generatedCode;
+                BBLangGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();
 
                 if (arguments.ThrowErrors)

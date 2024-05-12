@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.BBCode.Generator;
+﻿namespace LanguageCore.BBLang.Generator;
 
 using Compiler;
 using Parser.Statement;

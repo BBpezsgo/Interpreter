@@ -10,7 +10,7 @@ public struct ProgramArguments
     public System.IO.FileInfo? File;
 
     public Compiler.CompilerSettings CompilerSettings;
-    public BBCode.Generator.MainGeneratorSettings MainGeneratorSettings;
+    public BBLang.Generator.MainGeneratorSettings MainGeneratorSettings;
     public Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckGeneratorSettings;
     public BytecodeInterpreterSettings BytecodeInterpreterSettings;
 
@@ -35,7 +35,7 @@ public struct ProgramArguments
         LogFlags = LogType.Debug | LogType.Normal | LogType.Warning | LogType.Error,
         RunType = ProgramRunType.Normal,
         CompilerSettings = Compiler.CompilerSettings.Default,
-        MainGeneratorSettings = BBCode.Generator.MainGeneratorSettings.Default,
+        MainGeneratorSettings = BBLang.Generator.MainGeneratorSettings.Default,
         BrainfuckGeneratorSettings = Brainfuck.Generator.BrainfuckGeneratorSettings.Default,
         BytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
         ConsoleGUI = false,

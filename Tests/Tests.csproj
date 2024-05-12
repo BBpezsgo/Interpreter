@@ -27,6 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\BBCodeInterpreter.csproj" />
+    <ProjectReference Include="..\Core.csproj" />
   </ItemGroup>
 </Project>

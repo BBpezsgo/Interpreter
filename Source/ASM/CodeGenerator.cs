@@ -5,7 +5,7 @@
 
 namespace LanguageCore.ASM.Generator;
 
-using BBCode.Generator;
+using BBLang.Generator;
 using Compiler;
 using Parser;
 using Parser.Statement;

@@ -2,7 +2,7 @@
 using System.Text;
 using System.Xml;
 using LanguageCore;
-using LanguageCore.BBCode.Generator;
+using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
@@ -257,7 +257,7 @@ public static class Utils
 
         for (int i = 1; i <= TestCount; i++)
         {
-            string sourceFile = $"{TestFilesPath}{i.ToString().PadLeft(TestFileNameWidth, '0')}.bbc";
+            string sourceFile = $"{TestFilesPath}{i.ToString().PadLeft(TestFileNameWidth, '0')}.{LanguageConstants.LanguageExtension}";
             string resultFile = $"{TestFilesPath}{i.ToString().PadLeft(TestFileNameWidth, '0')}.result";
 
             if (!File.Exists(sourceFile))
@@ -270,7 +270,7 @@ public static class Utils
 
     public static TestFile GetTest(int i)
     {
-        string sourceFile = $"{TestFilesPath}{i.ToString().PadLeft(TestFileNameWidth, '0')}.bbc";
+        string sourceFile = $"{TestFilesPath}{i.ToString().PadLeft(TestFileNameWidth, '0')}.{LanguageConstants.LanguageExtension}";
         string resultFile = $"{TestFilesPath}{i.ToString().PadLeft(TestFileNameWidth, '0')}.result";
         string? inputFile = $"{TestFilesPath}{i.ToString().PadLeft(TestFileNameWidth, '0')}.txt";
 
@@ -305,13 +305,13 @@ public static class Utils
         AnalysisCollection analysisCollection = new();
 
         CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null);
-        BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
+        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
         compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null);
-        BBCodeGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings) { DontOptimize = true }, null, analysisCollection);
+        BBLangGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings) { DontOptimize = true }, null, analysisCollection);
 
         analysisCollection.Throw();
 
-        static (Interpreter, MainResult) Execute(BBCodeGeneratorResult code, string input)
+        static (Interpreter, MainResult) Execute(BBLangGeneratorResult code, string input)
         {
             Interpreter interpreter = new(false, new BytecodeInterpreterSettings()
             {
@@ -678,7 +678,7 @@ public static class Utils
             brainfuckResult = TranslateOutcome(brainfuckResult);
             asmResult = TranslateOutcome(asmResult);
 
-            string translatedName = $"https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/{serialNumber.ToString().PadLeft(2, '0')}.bbc";
+            string translatedName = $"https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/{serialNumber.ToString().PadLeft(2, '0')}.{LanguageConstants.LanguageExtension}";
             translatedName = $"[{serialNumber}]({translatedName})";
 
             file.WriteLine($"| {translatedName} | {bytecodeResult} | {brainfuckResult} | {asmResult} |");

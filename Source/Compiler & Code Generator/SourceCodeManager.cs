@@ -194,7 +194,7 @@ public class SourceCodeManager
         }
 
         string filename = @using.PathString;
-        if (!filename.EndsWith(".bbc", StringComparison.Ordinal)) filename += ".bbc";
+        if (!filename.EndsWith($".{LanguageConstants.LanguageExtension}", StringComparison.Ordinal)) filename += $".{LanguageConstants.LanguageExtension}";
 
         if (Uri.TryCreate(parent, filename, out Uri? uri))
         { yield return uri; }

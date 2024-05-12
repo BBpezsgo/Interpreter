@@ -201,8 +201,8 @@ public class BytecodeProcessor
     {
         static bool CanTraceCallsWith(IReadOnlyList<DataItem> stack, int basePointer)
         {
-            int savedCodePointerAddress = basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection);
-            int savedBasePointerAddress = basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
+            int savedCodePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection);
+            int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
 
             if (savedCodePointerAddress < 0 || savedCodePointerAddress >= stack.Count) return false;
             if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Count) return false;
@@ -214,8 +214,8 @@ public class BytecodeProcessor
         {
             if (!CanTraceCallsWith(stack, basePointer)) return;
 
-            DataItem savedCodePointerD = stack[basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection)];
-            DataItem savedBasePointerD = stack[basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
+            DataItem savedCodePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection)];
+            DataItem savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
 
             if (!savedCodePointerD.Integer.HasValue) return;
             if (!savedBasePointerD.Integer.HasValue) return;
@@ -245,7 +245,7 @@ public class BytecodeProcessor
     {
         static bool CanTraceBPsWith(IReadOnlyList<DataItem> stack, int basePointer)
         {
-            int savedBasePointerAddress = basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
+            int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
 
             if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Count) return false;
 
@@ -256,7 +256,7 @@ public class BytecodeProcessor
         {
             if (!CanTraceBPsWith(stack, basePointer)) return;
 
-            DataItem savedBasePointerD = stack[basePointer + (BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
+            DataItem savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
             if (savedBasePointerD.Type != RuntimeType.Integer) return;
             int newBasePointer = savedBasePointerD.VInt;
             result.Add(newBasePointer);

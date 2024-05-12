@@ -147,12 +147,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         {
             GeneralType initialValueType = FindStatementType(initialValue, type);
 
+            if (initialValueType.Size != type.Size)
+            { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
+
             if (type is ArrayType arrayType)
             {
-                if (arrayType.Of == BasicType.Char)
+                if (arrayType.Of == BasicType.Char &&
+                    initialValue is Literal literal)
                 {
-                    if (initialValue is not Literal literal)
-                    { throw new NotSupportedException($"Only string literals supported", initialValue, CurrentFile); }
                     if (literal.Type != LiteralType.String)
                     { throw new NotSupportedException($"Only string literals supported", literal, CurrentFile); }
                     if (literal.Value.Length != arrayType.Length)
@@ -175,13 +177,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     }
                 }
                 else
-                { throw new NotImplementedException(); }
+                {
+                    int arraySize = arrayType.Length;
+
+                    int size = Snippets.ARRAY_SIZE(arraySize);
+
+                    int address = Stack.PushVirtual(size);
+                    variables.Push(new Variable(name, address, true, deallocateOnClean, type, size));
+                }
             }
             else
             {
-                if (initialValueType.Size != type.Size)
-                { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
-
                 int address = Stack.PushVirtual(type.Size);
                 variables.Push(new Variable(name, address, true, deallocateOnClean, type));
             }
@@ -237,6 +243,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         GeneralType prevType = FindStatementType(field.PrevStatement);
         GeneralType type = FindStatementType(field);
+        GeneralType valueType = FindStatementType(value);
 
         if (prevType is PointerType pointerType)
         {
@@ -250,7 +257,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             field.Reference = fieldDefinition;
             field.CompiledType = fieldDefinition.Type;
 
-            if (type.Size != GetValueSize(value))
+            if (type.Size != valueType.Size)
             { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
 
             int _pointerAddress = Stack.NextAddress;
@@ -272,7 +279,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (!TryGetAddress(field, out int address, out int size))
         { throw new CompilerException($"Failed to get field address", field, CurrentFile); }
 
-        if (size != GetValueSize(value))
+        if (size != valueType.Size)
         { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
 
         CompileSetter(address, value);
@@ -331,7 +338,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 return;
             }
 
-            int valueSize = GetValueSize(value);
+            GeneralType valueType = FindStatementType(value);
+            int valueSize = valueType.Size;
 
             if (variable.Type is ArrayType arrayType)
             {
@@ -413,7 +421,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
         */
 
-        if (GetValueSize(value) != 1)
+        GeneralType valueType = FindStatementType(value);
+
+        if (valueType.Size != 1)
         { throw new CompilerException($"size 1 bruh allowed on heap thingy", value, CurrentFile); }
 
         int valueAddress = Stack.NextAddress;
@@ -647,7 +657,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (arrayType is PointerType pointerType)
+        if (!GetIndexGetter(arrayType, out CompiledFunction? indexer, out Dictionary<string, GeneralType>? typeArguments, true, out _))
+        { }
+
+        if (indexer == null && arrayType is PointerType pointerType)
         {
             int resultAddress = Stack.Push(0);
 
@@ -674,15 +687,38 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        GenerateCodeForStatement(new FunctionCall(
-            indexCall.PrevStatement,
-            Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet),
-            new StatementWithValue[]
+        if (indexer == null)
+        { throw new CompilerException($"Index getter \"{arrayType}[]\" not found", indexCall, CurrentFile); }
+
+        if (!indexer.CanUse(CurrentFile))
+        {
+            AnalysisCollection?.Errors.Add(new Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", indexCall, CurrentFile));
+            return;
+        }
+
+        if (TryEvaluate(indexer, ImmutableArray.Create(indexCall.PrevStatement, indexCall.Index), out DataItem? returnValue, out Statement[]? runtimeStatements))
+        {
+            if (indexCall.SaveValue && returnValue.HasValue && runtimeStatements.Length == 0)
             {
-                indexCall.Index,
-            },
-            indexCall.Brackets,
-            indexCall.OriginalFile));
+                Stack.Push(returnValue.Value);
+                return;
+            }
+
+            if (!indexCall.SaveValue)
+            {
+                Uri? savedFile = CurrentFile;
+                CurrentFile = null;
+                foreach (Statement runtimeStatement in runtimeStatements)
+                { GenerateCodeForStatement(runtimeStatement); }
+                CurrentFile = savedFile;
+                return;
+            }
+        }
+
+        GenerateCodeForFunction(indexer, ImmutableArray.Create(indexCall.PrevStatement, indexCall.Index), typeArguments, indexCall);
+
+        if (!indexCall.SaveValue && indexer.ReturnSomething)
+        { Stack.Pop(); }
     }
     void GenerateCodeForStatement(LinkedIf @if, bool linked = false)
     {

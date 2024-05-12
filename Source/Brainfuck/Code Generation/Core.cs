@@ -539,18 +539,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         return usages;
     }
 
-    #region GetValueSize
-    int GetValueSize(StatementWithValue statement)
-    {
-        GeneralType statementType = FindStatementType(statement);
-
-        if (statementType == BasicType.Void)
-        { throw new CompilerException($"Statement \"{statement}\" (with type \"{statementType}\") does not have a size", statement, CurrentFile); }
-
-        return statementType.Size;
-    }
-    #endregion
-
     #region TryGetAddress
 
     bool TryGetAddress(Statement? statement, out int address, out int size)

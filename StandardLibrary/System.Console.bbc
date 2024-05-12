@@ -1,5 +1,6 @@
 using System.String;
 using System.Memory;
+using System.Lists;
 
 [External("console-set")]
 export void Set(char data, int x, int y);
@@ -62,6 +63,44 @@ export inline void Print(temp char* message)
         Print(message[i]);
     }
 }
+
+template<T>
+export inline void PrintLine(List<T>* list)
+{
+	Print(list);
+	PrintLine();
+}
+
+template<T>
+export void Print(List<T>* list)
+{
+	if (!list)
+	{
+		Print("{ }");
+		return;
+	}
+	
+    int length = list.Length();
+
+	if (!length)
+	{
+		Print("{ }");
+		return;
+	}
+	
+	Print("{ ");
+	
+    for (int i; i < length; i++)
+    {
+        if (i > 0)
+        { Print(", "); }
+
+        Print(list[i]);
+    }
+
+	Print(" }");
+}
+
 
 //
 //  == PRINT LINE ==

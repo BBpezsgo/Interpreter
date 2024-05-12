@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.Text;
-using System.Threading.Tasks;
-using Win32;
 using Win32.Console;
 
 namespace LanguageCore.Intel;
@@ -14,7 +8,6 @@ namespace LanguageCore.Intel;
 #pragma warning disable IDE0059 // Unnecessary assignment of a value
 #pragma warning disable IDE0051 // Remove unused private members
 #pragma warning disable RCS1213 // Remove unused member declaration
-#pragma warning disable RCS1259 // Remove empty syntax
 #pragma warning disable RCS1089 // Use --/++ operator instead of assignment
 
 [Flags]
@@ -341,7 +334,7 @@ public unsafe struct I8086
 {
     public bool IsHalted;
     Registers Registers;
-    Pin Pins;
+    // Pin Pins;
 
     readonly byte[] Memory;
     readonly ConsoleRenderer Console;

@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace LanguageCore.ASM;
+﻿namespace LanguageCore.ASM;
 
 public enum InstructionOperandType
 {
@@ -19,7 +13,6 @@ public enum InstructionOperandType
     Label,
 }
 
-[SuppressMessage("Usage", "CA2231")]
 public readonly struct InstructionOperand : IEquatable<InstructionOperand>
 {
     public readonly InstructionOperandType Type;
@@ -67,6 +60,9 @@ public readonly struct InstructionOperand : IEquatable<InstructionOperand>
         _2 == other._2;
 
     public override int GetHashCode() => HashCode.Combine(Type, _1, _2);
+
+    public static bool operator ==(InstructionOperand left, InstructionOperand right) => left.Equals(right);
+    public static bool operator !=(InstructionOperand left, InstructionOperand right) => !left.Equals(right);
 
     public static implicit operator InstructionOperand(int immediate) => new(InstructionOperandType.Immediate, checked((ushort)immediate));
     public static implicit operator InstructionOperand(Intel.Register register) => new(InstructionOperandType.Register, (ushort)register);

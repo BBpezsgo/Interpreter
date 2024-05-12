@@ -1,5 +1,7 @@
 ﻿#pragma warning disable IDE0051 // Remove unused private members
 #pragma warning disable IDE0060 // Remove unused parameter
+#pragma warning disable RCS1213 // Remove unused member declaration
+#pragma warning disable CS0414
 
 namespace LanguageCore.ASM.Generator;
 
@@ -11,7 +13,6 @@ using Runtime;
 using Tokenizing;
 using LiteralStatement = Parser.Statement.Literal;
 using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.GeneralType Type);
-using Registers = LanguageCore.ASM.Registers;
 
 public class ImportedAsmFunction
 {

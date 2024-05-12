@@ -4,12 +4,12 @@ using System.Lists;
 List<int>* list = new List<int>*;
 list.Add(66);
 list.Add(67);
-PrintLine(temp list.ToString());
+PrintLine(list);
 
 list.Remove(0);
-PrintLine(temp list.ToString());
+PrintLine(list);
 
 list.Clear();
-PrintLine(temp list.ToString());
+PrintLine(list);
 
 delete list;

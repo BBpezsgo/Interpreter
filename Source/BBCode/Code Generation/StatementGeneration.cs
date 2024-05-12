@@ -301,42 +301,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GenerateCodeForValueSetter(new Identifier(newVariable.Identifier, newVariable.FilePath), newVariable.InitialValue);
         AddComment("}");
-        return;
-
-        GeneralType valueType = FindStatementType(newVariable.InitialValue);
-
-        AssignTypeCheck(compiledVariable.Type, valueType, newVariable.InitialValue);
-
-        if (compiledVariable.Type is BuiltinType &&
-            TryCompute(compiledVariable.InitialValue, out DataItem yeah))
-        {
-            compiledVariable.InitialValue.PredictedValue = yeah;
-            AddInstruction(Opcode.Push, yeah);
-        }
-        else if (compiledVariable.Type is ArrayType arrayType)
-        {
-            if (arrayType.Of != BasicType.Char)
-            { throw new InternalException(); }
-            if (compiledVariable.InitialValue is not LiteralStatement literal)
-            { throw new InternalException(); }
-            if (literal.Type != LiteralType.String)
-            { throw new InternalException(); }
-            if (literal.Value.Length != arrayType.Length)
-            { throw new InternalException(); }
-
-            for (int i = 0; i < literal.Value.Length; i++)
-            {
-                AddInstruction(Opcode.Push, new DataItem(literal.Value[i]));
-            }
-        }
-        else
-        {
-            GenerateCodeForStatement(newVariable.InitialValue);
-        }
-
-        StackStore(new ValueAddress(compiledVariable), compiledVariable.Type.Size);
-
-        AddComment("}");
     }
     void GenerateCodeForStatement(KeywordCall keywordCall)
     {
@@ -2303,18 +2267,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         List<CleanupItem> result = new();
         foreach (Statement statement in statements)
-        {
-            CleanupItem item = GenerateCodeForVariable(statement);
-            if (item.SizeOnStack == 0) continue;
-
-            result.Add(item);
-        }
-        return result.ToArray();
-    }
-    CleanupItem[] GenerateCodeForVariable(IEnumerable<VariableDeclaration> statements)
-    {
-        List<CleanupItem> result = new();
-        foreach (VariableDeclaration statement in statements)
         {
             CleanupItem item = GenerateCodeForVariable(statement);
             if (item.SizeOnStack == 0) continue;

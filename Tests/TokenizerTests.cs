@@ -225,7 +225,7 @@ public class TokenizerTests
         TokenSpecificAssert(tokens);
     }
 
-    [TestMethod, Ignore]
+    [TestMethod, Ignore("CR not supported")]
     public void Test14()
     {
         string text = "\ra";
@@ -243,7 +243,7 @@ public class TokenizerTests
         TokenSpecificAssert(tokens);
     }
 
-    [TestMethod, Ignore]
+    [TestMethod, Ignore("CR not supported")]
     public void Test15()
     {
         string text = "\r a";

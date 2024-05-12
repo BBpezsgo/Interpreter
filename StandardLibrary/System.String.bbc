@@ -94,6 +94,29 @@ export char* +(temp char* a, temp char* b)
 }
 
 /*
+ * Inserts the character `a` at the start of the string `b`
+ * 
+ * This will not modify the string `b`, it will allocates a new one
+ */
+export char* +(char a, temp char* b)
+{
+    int length = b.Length();
+
+    char* result = Alloc((length + 2) * sizeof(char)) as char*;
+  
+    for (int i; i < length; i++)
+    {
+        result[i + 1] = b[i];
+    }
+  
+    result[0] = a;
+
+    result[length + 1] = '\0';
+
+    return result;
+}
+
+/*
  * Appends the character `b` at the end of the string `a`
  * 
  * This will not modify the string `a`, it will allocates a new one

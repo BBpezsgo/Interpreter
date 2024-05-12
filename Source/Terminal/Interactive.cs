@@ -140,7 +140,7 @@ class InteractiveCompiler
         }
     }
 
-    public void CompileAsync(string text)
+    public void StartCompilation(string text)
     {
         if (Statement != null && string.Equals(text, _text))
         { return; }
@@ -150,12 +150,7 @@ class InteractiveCompiler
 
         _text = text;
         _task = Task.Run(CompileTask);
-        _task.ContinueWith(OnTaskCompleted);
-    }
-
-    void OnTaskCompleted(Task task)
-    {
-        _completedTasks.Enqueue(task);
+        _task.ContinueWith(_completedTasks.Enqueue);
     }
 
     void CompileTask()
@@ -241,7 +236,7 @@ public class Interactive
 
     public Interactive()
     {
-        CompilerCache = new InteractiveCompiler(OnCompiledAsync);
+        CompilerCache = new InteractiveCompiler(OnCompiled);
         Input = new StringBuilder();
         CursorPosition = 0;
         Entered = false;
@@ -558,7 +553,7 @@ public class Interactive
         renderer.ResetStyle();
     }
 
-    void OnCompiledAsync(Task task)
+    void OnCompiled(Task task)
     {
         if (task.IsFaulted)
         {
@@ -597,7 +592,7 @@ public class Interactive
 
     void CompileAndColorizeInput(int _ = -1)
     {
-        CompilerCache.CompileAsync(Input.ToString());
+        CompilerCache.StartCompilation(Input.ToString());
         /*
         try
         {

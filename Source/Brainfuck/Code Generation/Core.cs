@@ -708,10 +708,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             GenerateTopLevelStatements(statements, file, i < compilerResult.TopLevelStatements.Length - 1);
         }
 
-        // Heap.Destroy();
-
         if (Heap.IsUsed)
         {
+            Heap.Destroy();
+
             string? heapInit = Heap.LateInit();
             Code.Insert(0, heapInit);
         }

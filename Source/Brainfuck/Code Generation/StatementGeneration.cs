@@ -13,6 +13,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     bool AllowLoopUnrolling => !Settings.DontOptimize;
     bool AllowFunctionInlining => !Settings.DontOptimize;
     bool AllowPrecomputing => !Settings.DontOptimize;
+    bool AllowEvaluating => !Settings.DontOptimize;
     bool AllowOtherOptimizations => !Settings.DontOptimize;
 
     void GenerateAllocator(int size, IPositioned position)
@@ -28,15 +29,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         {
             AnalysisCollection?.Errors.Add(new Error($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
             return;
-        }
-
-        if (TryEvaluate(allocator, parameters, out DataItem? returnValue, out Statement[]? runtimeStatements))
-        {
-            if (returnValue.HasValue && runtimeStatements.Length == 0)
-            {
-                Stack.Push(returnValue.Value);
-                return;
-            }
         }
 
         GenerateCodeForFunction(allocator, parameters, null, position);
@@ -116,6 +108,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         if (CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, variableDeclaration.Identifier.Content, out _))
         { throw new CompilerException($"Variable \"{variableDeclaration.Identifier.Content}\" already defined", variableDeclaration.Identifier, CurrentFile); }
+
+        if (variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
+        { return 0; }
 
         GeneralType type;
 
@@ -694,25 +689,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         {
             AnalysisCollection?.Errors.Add(new Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", indexCall, CurrentFile));
             return;
-        }
-
-        if (TryEvaluate(indexer, ImmutableArray.Create(indexCall.PrevStatement, indexCall.Index), out DataItem? returnValue, out Statement[]? runtimeStatements))
-        {
-            if (indexCall.SaveValue && returnValue.HasValue && runtimeStatements.Length == 0)
-            {
-                Stack.Push(returnValue.Value);
-                return;
-            }
-
-            if (!indexCall.SaveValue)
-            {
-                Uri? savedFile = CurrentFile;
-                CurrentFile = null;
-                foreach (Statement runtimeStatement in runtimeStatements)
-                { GenerateCodeForStatement(runtimeStatement); }
-                CurrentFile = savedFile;
-                return;
-            }
         }
 
         GenerateCodeForFunction(indexer, ImmutableArray.Create(indexCall.PrevStatement, indexCall.Index), typeArguments, indexCall);
@@ -1353,6 +1329,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         if (statement.InitialValue == null) return;
 
+        if (statement.Modifiers.Contains(ModifierKeywords.Const))
+        { return; }
+
         if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, statement.Identifier.Content, out Variable variable))
         { throw new CompilerException($"Variable \"{statement.Identifier.Content}\" not found", statement.Identifier, CurrentFile); }
 
@@ -1390,25 +1369,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         {
             AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledFunction.ToReadable()}\" cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
             return;
-        }
-
-        if (TryEvaluate(compiledFunction, functionCall.MethodParameters, out DataItem? returnValue, out Statement[]? runtimeStatements))
-        {
-            if (functionCall.SaveValue && returnValue.HasValue && runtimeStatements.Length == 0)
-            {
-                Stack.Push(returnValue.Value);
-                return;
-            }
-
-            if (!functionCall.SaveValue)
-            {
-                Uri? savedFile = CurrentFile;
-                CurrentFile = null;
-                foreach (Statement runtimeStatement in runtimeStatements)
-                { GenerateCodeForStatement(runtimeStatement); }
-                CurrentFile = savedFile;
-                return;
-            }
         }
 
         GenerateCodeForFunction(compiledFunction, functionCall.MethodParameters, typeArguments, functionCall);
@@ -2547,13 +2507,30 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         return true;
     }
 
-    void GenerateCodeForFunction(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned callerPosition)
+    void GenerateCodeForFunction(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned caller)
     {
+        if (AllowEvaluating &&
+            TryEvaluate(function, parameters, out DataItem? returnValue, out Statement[]? runtimeStatements))
+        {
+            Uri? savedFile = CurrentFile;
+            CurrentFile = null;
+            foreach (Statement runtimeStatement in runtimeStatements)
+            { GenerateCodeForStatement(runtimeStatement); }
+            CurrentFile = savedFile;
+
+            if (returnValue.HasValue &&
+                caller is StatementWithValue callerWithValue &&
+                callerWithValue.SaveValue)
+            { Stack.Push(returnValue.Value); }
+
+            return;
+        }
+
         if (!AllowFunctionInlining ||
             !IsFunctionInlineable(function, parameters) ||
             !InlineMacro(function, parameters, out Statement? inlined))
         {
-            GenerateCodeForFunction_(function, parameters, typeArguments, callerPosition);
+            GenerateCodeForFunction_(function, parameters, typeArguments, caller);
             return;
         }
 
@@ -2570,7 +2547,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             Restore(originalSnapshot);
             RestoreCode(originalCode);
 
-            GenerateCodeForFunction_(function, parameters, typeArguments, callerPosition);
+            GenerateCodeForFunction_(function, parameters, typeArguments, caller);
             return;
         }
 
@@ -2581,7 +2558,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         Restore(originalSnapshot);
         RestoreCode(originalCode);
 
-        GenerateCodeForFunction_(function, parameters, typeArguments, callerPosition);
+        GenerateCodeForFunction_(function, parameters, typeArguments, caller);
 
         CodeSnapshot notInlinedCode = SnapshotCode();
         int notInlinedLength = notInlinedCode.Code.Length - originalCodeLength;
@@ -2628,19 +2605,20 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains(ModifierKeywords.Const))
             { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
-            bool deallocateOnClean = defined.Modifiers.Contains(ModifierKeywords.Temp);
-            deallocateOnClean = deallocateOnClean && passedType is PointerType;
+            bool canDeallocate = defined.Modifiers.Contains(ModifierKeywords.Temp);
+
+            canDeallocate = canDeallocate && passedType is PointerType;
 
             if (StatementCanBeDeallocated(passed, out bool explicitDeallocate))
             {
-                if (explicitDeallocate && !deallocateOnClean)
+                if (explicitDeallocate && !canDeallocate)
                 { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passed, CurrentFile)); }
             }
             else
             {
                 if (explicitDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate {passedType}", passed, CurrentFile)); }
-                deallocateOnClean = false;
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passed, CurrentFile)); }
+                canDeallocate = false;
             }
 
             if (passed is ModifiedStatement modifiedStatement)
@@ -2690,7 +2668,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (defined.Modifiers.Contains(ModifierKeywords.Const))
                 { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed, CurrentFile); }
 
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
+                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, canDeallocate);
 
                 bool parameterFound = false;
                 Variable compiledParameter = default;

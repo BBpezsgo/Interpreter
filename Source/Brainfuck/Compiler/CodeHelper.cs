@@ -69,7 +69,7 @@ public readonly struct AutoJumpBlock : IDisposable
         ClearCondition = clearCondition;
     }
 
-    public void Dispose()
+    void IDisposable.Dispose()
     {
         Generator.Code.JumpEnd(ConditionAddress, ClearCondition);
     }
@@ -84,7 +84,7 @@ public readonly struct AutoCodeBlock : IDisposable
         Generator = generator;
     }
 
-    public void Dispose()
+    void IDisposable.Dispose()
     {
         Generator.Code.EndBlock();
     }
@@ -95,10 +95,14 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 {
     const int HalfByte = byte.MaxValue / 2;
     const int InitialSize = 1024;
+    const int IndentationSize = 2;
 
     public int Pointer => _pointer;
     public int BranchDepth => _branchDepth;
     public int Length => _code.Length;
+
+    public bool AddComments { get; set; }
+    public bool AddSmallComments { get; set; }
 
     StringBuilder _code;
     int _indent;
@@ -107,10 +111,13 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     public CodeHelper()
     {
-        this._code = new StringBuilder(InitialSize);
-        this._indent = 0;
-        this._pointer = 0;
-        this._branchDepth = 0;
+        _code = new StringBuilder(InitialSize);
+        _indent = 0;
+        _pointer = 0;
+        _branchDepth = 0;
+
+        AddComments = false;
+        AddSmallComments = false;
     }
 
     /// <exception cref="NotImplementedException"/>
@@ -131,20 +138,16 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     #region Comments
 
-    public int Indent(int indent)
-    {
-        this._indent += indent;
-        return this._indent;
-    }
-
     public void LineBreak()
     {
+        if (!AddComments) return;
         _code.Append("\r\n");
         _code.Append(' ', _indent);
     }
 
     public void CommentLine(string text)
     {
+        if (!AddComments) return;
         LineBreak();
         _code.Append(BrainfuckCode.ReplaceCodes(text, '_'));
         LineBreak();
@@ -152,25 +155,28 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     public void StartBlock()
     {
+        if (!AddComments) return;
         LineBreak();
         _code.Append('{');
-        this._indent += 2;
+        _indent += IndentationSize;
         LineBreak();
     }
 
     public void StartBlock(string label)
     {
+        if (!AddComments) return;
         LineBreak();
-        this._code.Append(BrainfuckCode.ReplaceCodes(label, '_'));
-        this._code.Append(' ');
-        this._code.Append('{');
-        this._indent += 2;
+        _code.Append(BrainfuckCode.ReplaceCodes(label, '_'));
+        _code.Append(' ');
+        _code.Append('{');
+        _indent += IndentationSize;
         LineBreak();
     }
 
     public void EndBlock()
     {
-        this._indent -= 2;
+        if (!AddComments) return;
+        _indent -= IndentationSize;
         LineBreak();
         _code.Append('}');
         LineBreak();
@@ -248,10 +254,10 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </summary>
     public void CopyValue(int source, int target, int tempAddress)
     {
-        StartBlock($"CopyValueWithTemp({source}; {tempAddress}; {target})");
+        if (AddSmallComments) StartBlock($"CopyValueWithTemp({source}; {tempAddress}; {target})");
         MoveValue(source, target, tempAddress);
         MoveAddValue(tempAddress, source);
-        EndBlock();
+        if (AddSmallComments) EndBlock();
     }
 
     /// <summary>
@@ -417,6 +423,41 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     /// <summary>
     /// <para>
+    /// <b>Pointer:</b> <paramref name="address2"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="address1"/>[-] <paramref name="address2"/>[-]
+    /// </code>
+    /// </para>
+    /// </summary>
+    public void ClearValue(int address1, int address2)
+    {
+        ClearValue(address1);
+        ClearValue(address2);
+    }
+
+    /// <summary>
+    /// <para>
+    /// <b>Pointer:</b> <paramref name="address3"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="address1"/>[-] <paramref name="address2"/>[-] <paramref name="address3"/>[-]
+    /// </code>
+    /// </para>
+    /// </summary>
+    public void ClearValue(int address1, int address2, int address3)
+    {
+        ClearValue(address1);
+        ClearValue(address2);
+        ClearValue(address3);
+    }
+
+    /// <summary>
+    /// <para>
     /// <b>Pointer:</b> Last of <paramref name="addresses"/>
     /// </para>
     /// <para>
@@ -443,18 +484,45 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </code>
     /// </para>
     /// </summary>
-    public void MoveValue(int from, params int[] to)
+    public void MoveValue(int from, int to)
     {
-        StartBlock($"MoveValue({from}; {string.Join("; ", to)})");
+        if (AddSmallComments) StartBlock($"MoveValue({from}; {string.Join("; ", to)})");
 
-        CommentLine($"Clear the destination {string.Join("; ", to)}:");
+        if (AddSmallComments) CommentLine($"Clear the destination {string.Join("; ", to)}:");
         ClearValue(to);
 
-        CommentLine($"Move value from {from} to {string.Join("; ", to)}:");
+        if (AddSmallComments) CommentLine($"Move value from {from} to {string.Join("; ", to)}:");
         MoveAddValue(from, to);
 
-        EndBlock();
+        if (AddSmallComments) EndBlock();
     }
+
+    /// <summary>
+    /// <para>
+    /// <b>Pointer:</b> <paramref name="from"/>
+    /// </para>
+    /// <para>
+    /// <b>Code:</b>
+    /// <code>
+    /// <paramref name="to1"/>[-] <paramref name="to2"/>[-]
+    /// <paramref name="from"/>[-<paramref name="to1"/>+<paramref name="to2"/>+<paramref name="from"/>]
+    /// </code>
+    /// </para>
+    /// </summary>
+    public void MoveValue(int from, int to1, int to2)
+    {
+        if (AddSmallComments) StartBlock($"MoveValue({from}; {to1}; {to2})");
+
+        if (AddSmallComments) CommentLine($"Clear the destination {to1}; {to2}:");
+        ClearValue(to1);
+        ClearValue(to2);
+
+        if (AddSmallComments) CommentLine($"Move value from {from} to {to1}; {to2}:");
+        MoveAddValue(from, to1, to2);
+
+        if (AddSmallComments) EndBlock();
+    }
+
     /// <summary>
     /// <para>
     /// <b>Pointer:</b> <paramref name="from"/>
@@ -465,29 +533,44 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </code>
     /// </para>
     /// </summary>
-    public void MoveAddValue(int from, params int[] to)
+    public void MoveAddValue(int from, int to)
     {
-        this.JumpStart(from);
-        this.AddValue(from, -1);
-
-        for (int i = 0; i < to.Length; i++)
-        { AddValue(to[i], 1); }
-
-        this.JumpEnd(from);
+        JumpStart(from);
+        AddValue(from, -1);
+        AddValue(to, 1);
+        JumpEnd(from);
     }
+
+    /// <summary>
+    /// <para>
+    /// <b>Pointer:</b> <paramref name="from"/>
+    /// </para>
+    /// <para>
+    /// <code>
+    /// <paramref name="from"/>[-<paramref name="to1"/>+<paramref name="to2"/>+<paramref name="from"/>]
+    /// </code>
+    /// </para>
+    /// </summary>
+    public void MoveAddValue(int from, int to1, int to2)
+    {
+        JumpStart(from);
+        AddValue(from, -1);
+        AddValue(to1, 1);
+        AddValue(to2, 1);
+        JumpEnd(from);
+    }
+
     /// <summary>
     /// <b>Pointer:</b> <paramref name="from"/>
     /// </summary>
-    public void MoveSubValue(int from, params int[] to)
+    public void MoveSubValue(int from, int to)
     {
-        this.JumpStart(from);
-        this.AddValue(from, -1);
-
-        for (int i = 0; i < to.Length; i++)
-        { AddValue(to[i], -1); }
-
-        this.JumpEnd(from);
+        JumpStart(from);
+        AddValue(from, -1);
+        AddValue(to, -1);
+        JumpEnd(from);
     }
+
     /// <summary>
     /// <para>
     /// <b>Pointer:</b> Not modified
@@ -684,59 +767,82 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public void ClearValueUnsafe(params int[] addresses)
-    {
-        for (int i = 0; i < addresses.Length; i++)
-        { ClearValueUnsafe(addresses[i]); }
-    }
-
-    /// <summary>
-    /// <b>Pointer:</b> Restored to the last state
-    /// </summary>
-    public void MoveValueUnsafe(int from, params int[] to)
+    public void MoveValueUnsafe(int from, int to)
         => MoveValueUnsafe(from, true, to);
 
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public void MoveValueUnsafe(int from, bool clearDestination, params int[] to)
+    public void MoveValueUnsafe(int from, int to1, int to2)
+        => MoveValueUnsafe(from, true, to1, to2);
+
+    /// <summary>
+    /// <b>Pointer:</b> Restored to the last state
+    /// </summary>
+    public void MoveValueUnsafe(int from, bool clearDestination, int to)
     {
         if (clearDestination)
         {
-            CommentLine($"Clear the destination ({string.Join("; ", to)}) :");
-            for (int i = 0; i < to.Length; i++)
-            { ClearValueUnsafe(to[i]); }
+            if (AddSmallComments) CommentLine($"Clear the destination ({to}) :");
+            ClearValueUnsafe(to);
         }
 
-        CommentLine($"Move the value (from {from}):");
+        if (AddSmallComments) CommentLine($"Move the value (from {from}):");
         MoveAddValueUnsafe(from, to);
     }
 
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public void MoveAddValueUnsafe(int from, params int[] to)
+    public void MoveValueUnsafe(int from, bool clearDestination, int to1, int to2)
     {
-        this.JumpStartUnsafe(from);
-        this.AddValueUnsafe(from, -1);
+        if (clearDestination)
+        {
+            if (AddSmallComments) CommentLine($"Clear the destination ({to1}; {to2}) :");
+            ClearValueUnsafe(to1);
+            ClearValueUnsafe(to2);
+        }
 
-        for (int i = 0; i < to.Length; i++)
-        { AddValueUnsafe(to[i], 1); }
-
-        this.JumpEndUnsafe(from);
+        if (AddSmallComments) CommentLine($"Move the value (from {from}):");
+        MoveAddValueUnsafe(from, to1, to2);
     }
+
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public void MoveSubValueUnsafe(int from, params int[] to)
+    public void MoveAddValueUnsafe(int from, int to)
     {
-        this.JumpStartUnsafe(from);
-        this.AddValueUnsafe(from, -1);
+        JumpStartUnsafe(from);
+        AddValueUnsafe(from, -1);
 
-        for (int i = 0; i < to.Length; i++)
-        { AddValueUnsafe(to[i], -1); }
+        AddValueUnsafe(to, 1);
 
-        this.JumpEndUnsafe(from);
+        JumpEndUnsafe(from);
+    }
+
+    /// <summary>
+    /// <b>Pointer:</b> Restored to the last state
+    /// </summary>
+    public void MoveAddValueUnsafe(int from, int to1, int to2)
+    {
+        JumpStartUnsafe(from);
+        AddValueUnsafe(from, -1);
+
+        AddValueUnsafe(to1, 1);
+        AddValueUnsafe(to2, 1);
+
+        JumpEndUnsafe(from);
+    }
+
+    /// <summary>
+    /// <b>Pointer:</b> Restored to the last state
+    /// </summary>
+    public void MoveSubValueUnsafe(int from, int to)
+    {
+        JumpStartUnsafe(from);
+        AddValueUnsafe(from, -1);
+        AddValueUnsafe(to, -1);
+        JumpEndUnsafe(from);
     }
 
     /// <summary>
@@ -744,9 +850,9 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </summary>
     public void JumpStartUnsafe(int conditionOffset)
     {
-        this.MovePointerUnsafe(conditionOffset);
-        this.Append('[');
-        this.MovePointerUnsafe(-conditionOffset);
+        MovePointerUnsafe(conditionOffset);
+        Append('[');
+        MovePointerUnsafe(-conditionOffset);
     }
 
     /// <summary>
@@ -754,13 +860,24 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </summary>
     public void JumpEndUnsafe(int conditionOffset)
     {
-        this.MovePointerUnsafe(conditionOffset);
-        this.Append(']');
-        this.MovePointerUnsafe(-conditionOffset);
+        MovePointerUnsafe(conditionOffset);
+        Append(']');
+        MovePointerUnsafe(-conditionOffset);
     }
 
-    public void Append(string code) => _code.Append(code);
-    public void Append(char code) => _code.Append(code);
+    public void Append(string code)
+    {
+        if (!AddComments)
+        { foreach (char c in code) Append(c); }
+        else
+        { _code.Append(code); }
+    }
+    public void Append(char code)
+    {
+        if (!AddComments && !BrainfuckCode.IsCode(code))
+        { return; }
+        _code.Append(code);
+    }
     public void Append(char code, int count) => _code.Append(code, count);
     public void Insert(int index, string? value) => _code.Insert(index, value);
 
@@ -770,5 +887,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
         _code = new(_code.ToString()),
         _indent = _indent,
         _pointer = _pointer,
+        AddComments = AddComments,
+        AddSmallComments = AddSmallComments,
     };
 }

@@ -28,29 +28,20 @@ public abstract class CodeGenerator
         public override string ToString() => Function?.ToString() ?? "null";
     }
 
-    protected class ControlFlowBlock : IDuplicatable<ControlFlowBlock>
+    protected readonly struct ControlFlowBlock
     {
-        public readonly int FlagAddress;
-        public readonly Stack<int> PendingJumps;
-        public readonly Stack<bool> Doings;
+        public int FlagAddress { get; }
+        public Stack<int> PendingJumps { get; }
+        public Stack<bool> Doings { get; }
 
         public ControlFlowBlock(int flagAddress)
         {
             FlagAddress = flagAddress;
-
             PendingJumps = new Stack<int>();
-            PendingJumps.Push(0);
-
             Doings = new Stack<bool>();
-            Doings.Push(false);
-        }
 
-        public ControlFlowBlock Duplicate()
-        {
-            ControlFlowBlock result = new(FlagAddress);
-            result.PendingJumps.Set(PendingJumps);
-            result.Doings.Set(Doings);
-            return result;
+            PendingJumps.Push(0);
+            Doings.Push(false);
         }
     }
 
@@ -274,10 +265,17 @@ public abstract class CodeGenerator
         TypeArguments.AddRange(arguments);
     }
 
+    protected void SetTypeArguments(ImmutableDictionary<string, GeneralType> arguments)
+    {
+        TypeArguments.Clear();
+        TypeArguments.AddRange(arguments);
+    }
+
     protected void SetTypeArguments(Dictionary<string, GeneralType> arguments, out Dictionary<string, GeneralType> old)
     {
         old = new Dictionary<string, GeneralType>(TypeArguments);
-        SetTypeArguments(arguments);
+        TypeArguments.Clear();
+        TypeArguments.AddRange(arguments);
     }
 
     #region GetEnum()
@@ -1297,7 +1295,7 @@ public abstract class CodeGenerator
         }
 
         if (!type.AllGenericsDefined())
-        { throw new InternalException($"Failed to qualify all generics in variable \"{newVariable.Identifier}\" type \"{type}\"", newVariable.FilePath); }
+        { throw new InternalException($"Failed to qualify all generics in variable \"{newVariable.Identifier}\" type \"{type}\"", newVariable.Type, newVariable.FilePath); }
 
         return new CompiledVariable(memoryOffset, type, newVariable);
     }

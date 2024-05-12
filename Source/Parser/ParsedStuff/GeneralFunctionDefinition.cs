@@ -6,6 +6,9 @@ using Tokenizing;
 public class GeneralFunctionDefinition : FunctionThingDefinition,
     IInContext<StructDefinition>
 {
+    /// <summary>
+    /// Set by the <see cref="StructDefinition"/>
+    /// </summary>
     [NotNull] public StructDefinition? Context { get; set; }
 
     public override bool IsTemplate

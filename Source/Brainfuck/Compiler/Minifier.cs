@@ -1,4 +1,5 @@
-﻿using LanguageCore.Runtime;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Runtime;
 
 namespace LanguageCore.Brainfuck;
 

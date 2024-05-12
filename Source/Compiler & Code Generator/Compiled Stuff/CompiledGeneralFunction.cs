@@ -14,10 +14,11 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
     IHaveInstructionOffset,
     ICompiledFunction
 {
+    public int InstructionOffset { get; set; } = -1;
+
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct Context { get; }
-    public int InstructionOffset { get; set; } = -1;
     public List<Reference<Statement>> References { get; }
 
     public bool ReturnSomething => Type != BasicType.Void;

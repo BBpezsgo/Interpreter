@@ -11,6 +11,7 @@ public class HeapCodeHelper
     public int Size { get; }
     public int OffsettedStart => GetOffsettedStart(Start);
     public bool IsUsed { get; private set; }
+    public bool AddSmallComments { get; set; }
 
     CodeHelper _code;
 
@@ -19,6 +20,7 @@ public class HeapCodeHelper
         _code = code;
         Start = start;
         Size = size;
+        AddSmallComments = false;
     }
 
     /*
@@ -139,7 +141,11 @@ public class HeapCodeHelper
         if (Size <= 0) return null;
         if (Size > 126) throw new CompilerException($"HEAP size must be smaller than 127", null, null);
 
-        CodeHelper code = new();
+        CodeHelper code = new()
+        {
+            AddSmallComments = AddSmallComments,
+            AddComments = AddSmallComments,
+        };
 
         code.StartBlock("Initialize HEAP");
 

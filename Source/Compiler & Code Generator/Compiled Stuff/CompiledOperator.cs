@@ -14,10 +14,11 @@ public class CompiledOperator : FunctionDefinition,
     ICompiledFunction,
     IHaveInstructionOffset
 {
+    public int InstructionOffset { get; set; } = -1;
+
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct? Context { get; }
-    public int InstructionOffset { get; set; } = -1;
     public List<Reference<StatementWithValue>> References { get; }
 
     public bool ReturnSomething => Type != BasicType.Void;

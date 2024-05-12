@@ -994,7 +994,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         { return; }
 
         if (!GetVariable(statement.Identifier.Content, out CompiledVariable? variable))
-        { throw new InternalException($"Variable \"{statement.Identifier.Content}\" not found", CurrentFile); }
+        { throw new InternalException($"Variable \"{statement.Identifier.Content}\" not found", statement.Identifier, CurrentFile); }
 
         if (variable.IsInitialized) return;
 

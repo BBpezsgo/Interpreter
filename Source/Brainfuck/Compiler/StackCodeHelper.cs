@@ -13,7 +13,7 @@ public readonly struct StackAddress : IDisposable
         IsSomething = true;
     }
 
-    public void Dispose()
+    void IDisposable.Dispose()
     {
         if (!IsSomething) { return; }
         if (Stack.LastAddress != Address)

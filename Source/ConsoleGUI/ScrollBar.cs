@@ -60,11 +60,11 @@ public class ScrollBar
 
         Coord currentPos = e.MousePosition;
         currentPos.X -= (short)sender.Rect.X;
-        currentPos.Y -= (short)((short)sender.Rect.Y + (short)1);
+        currentPos.Y -= (short)(sender.Rect.Y + 1);
 
         Coord pressedPos = ConsoleMouse.LeftPressedAt;
         pressedPos.X -= (short)sender.Rect.X;
-        pressedPos.Y -= (short)((short)sender.Rect.Y + (short)1);
+        pressedPos.Y -= (short)(sender.Rect.Y + 1);
 
         if (pressedPos.X != Parent.Rect.Width - 1)
         { return; }
@@ -86,8 +86,7 @@ public class ScrollBar
         }
     }
 
-#pragma warning disable CA1822, IDE0060 
-    public void FeedEvent(Element sender, KeyEvent e)
-    { }
-#pragma warning restore IDE0060, CA1822 
+#pragma warning disable CA1822, IDE0060
+    public void FeedEvent(Element sender, KeyEvent e) { }
+#pragma warning restore CA1822, IDE0060
 }

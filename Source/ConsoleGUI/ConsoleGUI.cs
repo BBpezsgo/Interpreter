@@ -92,8 +92,12 @@ internal sealed class ConsoleGUI
     const int TIMER_AUTO_REFRESH_CONSOLE = 500;
     const int TIMER_REFRESH_CONSOLE = 100;
 
-    public Element[] Elements = Array.Empty<Element>();
-    public Element? FilledElement;
+    public static ConsoleGUI? Instance { get; set; }
+
+    public Element[] Elements { get; set; } = Array.Empty<Element>();
+    public Element? FilledElement { get; set; }
+    public bool NextRefreshConsole { get; set; }
+    public bool Destroyed { get; private set; }
 
     readonly SafeFileHandle ConsoleHandle;
 
@@ -114,12 +118,8 @@ internal sealed class ConsoleGUI
     Coord MousePosition;
 
     bool ResizeElements;
-    public bool NextRefreshConsole;
-
-    public static ConsoleGUI? Instance;
 
     double LastTick;
-    public bool Destroyed { get; private set; }
 
     public ConsoleGUI()
     {

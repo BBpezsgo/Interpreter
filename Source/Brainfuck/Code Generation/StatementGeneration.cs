@@ -2725,7 +2725,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 if (function.Type.Size != 1)
                 {
-                    throw new CompilerException($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
+                    throw new CompilerException($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.FilePath);
                 }
                 Code += ',';
             }
@@ -2767,7 +2767,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledVariables.PushRange(compiledParameters);
         CurrentFile = function.FilePath;
         CompiledLocalConstants.PushRange(constantParameters);
-        CompiledLocalConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 
@@ -2861,7 +2861,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 if (function.Type.Size != 1)
                 {
-                    throw new CompilerException($"Function with attribute \"StandardInput\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
+                    throw new CompilerException($"Function with attribute \"StandardInput\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.FilePath);
                 }
                 Code += ',';
             }
@@ -2903,7 +2903,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledVariables.PushRange(compiledParameters);
         CurrentFile = function.FilePath;
         CompiledLocalConstants.PushRange(constantParameters);
-        CompiledLocalConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 
@@ -2992,7 +2992,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledVariables.PushIf(returnVariable);
         CompiledVariables.PushRange(compiledParameters);
         CompiledLocalConstants.PushRange(constantParameters);
-        CompiledLocalConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
 
         if (function.Block is null)
         { throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath); }
@@ -3191,7 +3191,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledVariables.PushRange(compiledParameters);
         CurrentFile = function.FilePath;
         CompiledLocalConstants.PushRange(constantParameters);
-        CompiledLocalConstants.AddRangeIf(frame.savedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 

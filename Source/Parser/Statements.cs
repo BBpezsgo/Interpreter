@@ -37,138 +37,33 @@ public readonly struct TokenPair :
 
 public static class StatementExtensions
 {
-    public static bool GetStatementAt<T>(this ParserResult parserResult, SinglePosition position, [NotNullWhen(true)] out T? statement)
-        where T : IPositioned
-    {
-        statement = StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.Range.Contains(position));
-        return statement is not null;
-    }
-
-    public static bool GetStatementAt(this ParserResult parserResult, SinglePosition position, [NotNullWhen(true)] out Statement? statement)
-    {
-        statement = StatementExtensions.GetStatement(parserResult, statement => statement.Position.Range.Contains(position));
-        return statement is not null;
-    }
-
-    public static T? GetStatementAt<T>(this ParserResult parserResult, SinglePosition position)
-        where T : IPositioned
-        => StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.Range.Contains(position));
-
     public static Statement? GetStatementAt(this ParserResult parserResult, SinglePosition position)
-        => StatementExtensions.GetStatement(parserResult, statement => statement.Position.Range.Contains(position));
-
-    public static IEnumerable<T> GetStatements<T>(this ParserResult parserResult)
-    {
-        foreach (Statement statement in parserResult.GetStatementsRecursively())
-        {
-            if (statement is T _statement)
-            { yield return _statement; }
-        }
-    }
-
-    public static IEnumerable<T> GetStatements<T>(this ParserResult parserResult, Func<T, bool> condition)
-    {
-        foreach (Statement statement in parserResult.GetStatementsRecursively())
-        {
-            if (statement is T _statement && condition.Invoke(_statement))
-            { yield return _statement; }
-        }
-    }
-
-    public static IEnumerable<T> GetStatements<T>(this Statement statement)
-    {
-        foreach (Statement subStatement in statement.GetStatementsRecursively(true))
-        {
-            if (subStatement is T _subStatement)
-            { yield return _subStatement; }
-        }
-    }
-
-    public static IEnumerable<T> GetStatements<T>(this Statement statement, Func<T, bool> condition)
-    {
-        foreach (Statement subStatement in statement.GetStatementsRecursively(true))
-        {
-            if (subStatement is T _subStatement && condition.Invoke(_subStatement))
-            { yield return _subStatement; }
-        }
-    }
-
-    public static T? GetStatement<T>(this ParserResult parserResult)
-    {
-        foreach (Statement statement in parserResult.GetStatementsRecursively())
-        {
-            if (statement is T _statement)
-            { return _statement; }
-        }
-        return default;
-    }
-
-    public static Statement? GetStatement(this ParserResult parserResult)
-    {
-        foreach (Statement statement in parserResult.GetStatementsRecursively())
-        { return statement; }
-        return default;
-    }
-
-    public static T? GetStatement<T>(this ParserResult parserResult, Func<T, bool> condition)
-    {
-        foreach (Statement statement in parserResult.GetStatementsRecursively())
-        {
-            if (statement is T statement_ && condition.Invoke(statement_))
-            { return statement_; }
-        }
-        return default;
-    }
+        => parserResult.GetStatementsRecursively()
+        .FirstOrDefault(statement => statement.Position.Range.Contains(position));
 
     public static Statement? GetStatement(this ParserResult parserResult, Func<Statement, bool> condition)
-    {
-        foreach (Statement statement in parserResult.GetStatementsRecursively())
-        {
-            if (condition.Invoke(statement))
-            { return statement; }
-        }
-        return default;
-    }
-
-    public static bool GetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result)
-        => (result = GetStatement<T>(parserResult)) != null;
-
-    public static bool GetStatement(this ParserResult parserResult, [NotNullWhen(true)] out Statement? result)
-        => (result = GetStatement(parserResult)) != null;
-
-    public static bool GetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
-        => (result = GetStatement<T>(parserResult, condition)) != null;
-
-    public static T? GetStatement<T>(this Statement statement)
-    {
-        foreach (Statement subStatement in statement.GetStatementsRecursively(true))
-        {
-            if (subStatement is T _subStatement)
-            { return _subStatement; }
-        }
-        return default;
-    }
+        => parserResult.GetStatementsRecursively()
+        .FirstOrDefault(condition);
 
     public static T? GetStatement<T>(this Statement statement, Func<T, bool> condition)
-    {
-        foreach (Statement subStatement in statement.GetStatementsRecursively(true))
-        {
-            if (subStatement is T _subStatement && condition.Invoke(_subStatement))
-            { return _subStatement; }
-        }
-        return default;
-    }
+        => statement.GetStatementsRecursively(true)
+        .OfType<T>()
+        .FirstOrDefault(condition);
 
-    public static bool GetStatement<T>(this Statement statement, [NotNullWhen(true)] out T? result)
-        => (result = GetStatement<T>(statement)) != null;
+    public static bool GetStatementAt(this ParserResult parserResult, SinglePosition position, [NotNullWhen(true)] out Statement? statement)
+        => (statement = GetStatement(parserResult, statement => statement.Position.Range.Contains(position))) is not null;
 
     public static bool GetStatement<T>(this Statement statement, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
-        => (result = GetStatement<T>(statement, condition)) != null;
+        => (result = GetStatement(statement, condition)) is not null;
 }
 
 public abstract class Statement : IPositioned
 {
+    /// <summary>
+    /// Set by the <see cref="Parser"/>
+    /// </summary>
     public Token? Semicolon { get; internal set; }
+
     public abstract Position Position { get; }
 
     protected Statement()
@@ -194,9 +89,22 @@ public abstract class AnyAssignment : Statement
 
 public abstract class StatementWithValue : Statement
 {
+    /// <summary>
+    /// Set by the <see cref="Parser"/>
+    /// </summary>
     public bool SaveValue { get; internal set; } = true;
+
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
     public GeneralType? CompiledType { get; internal set; }
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
     public DataItem? PredictedValue { get; internal set; }
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
     public TokenPair? SurroundingBracelet { get; internal set; }
 
     protected StatementWithValue()
@@ -226,6 +134,7 @@ public class Block : Statement
 {
     public ImmutableArray<Statement> Statements { get; }
     public TokenPair Brackets { get; }
+
     public override Position Position => new(Brackets);
 
     public Block(IEnumerable<Statement> statements, TokenPair brackets)
@@ -291,6 +200,7 @@ public class LinkedIf : LinkedIfThing
 {
     public StatementWithValue Condition { get; }
     public LinkedIfThing? NextLink { get; init; }
+
     public override Position Position => new(Keyword, Condition, Block);
 
     public LinkedIf(Token keyword, StatementWithValue condition, Statement block) : base(keyword, block)
@@ -341,6 +251,7 @@ public class CompileTag : Statement, IInFile
     public Token Identifier { get; }
     public ImmutableArray<Literal> Parameters { get; }
     public Uri? FilePath { get; }
+
     public override Position Position =>
         new Position(Operator, Identifier)
         .Union(Parameters);
@@ -376,6 +287,7 @@ public class LiteralList : StatementWithValue
 {
     public TokenPair Brackets { get; }
     public ImmutableArray<StatementWithValue> Values { get; }
+
     public override Position Position => new(Brackets);
 
     public LiteralList(IEnumerable<StatementWithValue> values, TokenPair brackets)
@@ -429,11 +341,15 @@ public class LiteralList : StatementWithValue
 
 public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifiable<Token>
 {
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public GeneralType? CompiledType { get; set; }
+
     public TypeInstance Type { get; }
     public Token Identifier { get; }
     public StatementWithValue? InitialValue { get; }
     public ImmutableArray<Token> Modifiers { get; }
-    public GeneralType? CompiledType { get; set; }
     public Uri? FilePath { get; }
 
     public override Position Position =>
@@ -494,6 +410,7 @@ public class TypeStatement : StatementWithValue
 {
     public Token Keyword { get; }
     public TypeInstance Type { get; }
+
     public override Position Position => new(Keyword, Type);
 
     public TypeStatement(Token keyword, TypeInstance type)
@@ -523,10 +440,14 @@ public class TypeStatement : StatementWithValue
 
 public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
 {
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public object? Reference { get; set; }
+
     public StatementWithValue PrevStatement { get; }
     public TokenPair Brackets { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
-    public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
 
     public override Position Position => new(PrevStatement, Brackets);
@@ -638,11 +559,15 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
 
 public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
 {
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public object? Reference { get; set; }
+
     public Token Identifier { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
     public StatementWithValue? PrevStatement { get; }
     public TokenPair Brackets { get; }
-    public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
 
     public bool IsMethodCall => PrevStatement != null;
@@ -746,6 +671,7 @@ public class KeywordCall : StatementWithValue, IReadable
 {
     public Token Identifier { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
+
     public override Position Position =>
         new Position(Identifier)
         .Union(Parameters);
@@ -816,6 +742,9 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
 
     public Token Operator { get; }
     public StatementWithValue Left { get; }
+    /// <summary>
+    /// Set by the <see cref="Parser"/>
+    /// </summary>
     public StatementWithValue Right { get; set; }
     public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
@@ -889,9 +818,13 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 {
     public const int ParameterCount = 1;
 
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public object? Reference { get; set; }
+
     public Token Operator { get; }
     public StatementWithValue Left { get; }
-    public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
 
     public override Position Position => new(Operator, Left);
@@ -953,11 +886,15 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
 {
     /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public object? Reference { get; set; }
+
+    /// <summary>
     /// This should be "++" or "--"
     /// </summary>
     public Token Operator { get; }
     public StatementWithValue Left { get; }
-    public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
 
     public ImmutableArray<StatementWithValue> Parameters => ImmutableArray.Create(Left);
@@ -1047,12 +984,16 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
 public class Assignment : AnyAssignment, IReferenceableTo
 {
     /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public object? Reference { get; set; }
+
+    /// <summary>
     /// This should always be <c>"="</c>
     /// </summary>
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; }
-    public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
 
     public override Position Position => new(Operator, Left, Right);
@@ -1109,13 +1050,17 @@ public class Assignment : AnyAssignment, IReferenceableTo
 public class CompoundAssignment : AnyAssignment, IReferenceableTo
 {
     /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public object? Reference { get; set; }
+
+    /// <summary>
     /// This should always starts with <c>"="</c>
     /// </summary>
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; }
     public Uri? OriginalFile { get; }
-    public object? Reference { get; set; }
 
     public override Position Position => new(Operator, Left, Right);
 
@@ -1371,8 +1316,12 @@ public class Literal : StatementWithValue
 
 public class Identifier : StatementWithValue, IReferenceableTo
 {
-    public Token Token { get; }
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
     public object? Reference { get; set; }
+
+    public Token Token { get; }
     public Uri? OriginalFile { get; }
 
     public string Content => Token.Content;
@@ -1398,6 +1347,7 @@ public class AddressGetter : StatementWithValue
 {
     public Token Operator { get; }
     public StatementWithValue PrevStatement { get; }
+
     public override Position Position => new(Operator, PrevStatement);
 
     public AddressGetter(Token operatorToken, StatementWithValue prevStatement)
@@ -1422,6 +1372,7 @@ public class Pointer : StatementWithValue
 {
     public Token Operator { get; }
     public StatementWithValue PrevStatement { get; }
+
     public override Position Position => new(Operator, PrevStatement);
 
     public Pointer(Token operatorToken, StatementWithValue prevStatement)
@@ -1446,6 +1397,7 @@ public class WhileLoop : StatementWithBlock
 {
     public Token Keyword { get; }
     public StatementWithValue Condition { get; }
+
     public override Position Position => new(Keyword, Block);
 
     public WhileLoop(Token keyword, StatementWithValue condition, Block block)
@@ -1476,6 +1428,7 @@ public class ForLoop : StatementWithBlock
     public VariableDeclaration VariableDeclaration { get; }
     public StatementWithValue Condition { get; }
     public AnyAssignment Expression { get; }
+
     public override Position Position => new(Keyword, Block);
 
     public ForLoop(Token keyword, VariableDeclaration variableDeclaration, StatementWithValue condition, AnyAssignment expression, Block block)
@@ -1511,6 +1464,7 @@ public class ForLoop : StatementWithBlock
 public class IfContainer : Statement
 {
     public ImmutableArray<BaseBranch> Parts { get; }
+
     public override Position Position => new(Parts);
 
     public IfContainer(IEnumerable<BaseBranch> parts)
@@ -1574,6 +1528,7 @@ public abstract class BaseBranch : StatementWithAnyBlock
 {
     public Token Keyword { get; }
     public IfPart Type { get; }
+
     public override Position Position => new(Keyword, Block);
 
     protected BaseBranch(Token keyword, IfPart type, Statement block)
@@ -1657,6 +1612,7 @@ public class NewInstance : StatementWithValue, IHaveType
 {
     public Token Keyword { get; }
     public TypeInstance Type { get; }
+
     public override Position Position => new(Keyword, Type);
 
     public NewInstance(Token keyword, TypeInstance typeName)
@@ -1676,11 +1632,15 @@ public class NewInstance : StatementWithValue, IHaveType
 
 public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo, IHaveType
 {
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public object? Reference { get; set; }
+
     public Token Keyword { get; }
     public TypeInstance Type { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
     public TokenPair Brackets { get; }
-    public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
 
     public override Position Position =>
@@ -1767,10 +1727,14 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo, 
 
 public class IndexCall : StatementWithValue, IReadable, IReferenceableTo
 {
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public object? Reference { get; set; }
+
     public StatementWithValue PrevStatement { get; }
     public StatementWithValue Index { get; }
     public TokenPair Brackets { get; }
-    public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
 
     public override Position Position => new(PrevStatement, Index);
@@ -1820,9 +1784,13 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo
 
 public class Field : StatementWithValue, IReferenceableTo
 {
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public object? Reference { get; set; }
+
     public Token Identifier { get; }
     public StatementWithValue PrevStatement { get; }
-    public object? Reference { get; set; }
     public Uri? OriginalFile { get; }
 
     public override Position Position => new(PrevStatement, Identifier);
@@ -1880,6 +1848,7 @@ public class ModifiedStatement : StatementWithValue
 {
     public StatementWithValue Statement { get; }
     public Token Modifier { get; }
+
     public override Position Position
         => new(Modifier, Statement);
 

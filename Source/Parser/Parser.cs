@@ -13,12 +13,6 @@ public sealed class Parser
     Token? CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
     Token? PreviousToken => (CurrentTokenIndex >= 1 && CurrentTokenIndex <= Tokens.Length) ? Tokens[CurrentTokenIndex - 1] : null;
 
-    static readonly string[] Modifiers = new string[]
-    {
-        ProtectionKeywords.Export,
-        ModifierKeywords.Inline,
-    };
-
     static readonly string[] AllModifiers = new string[]
     {
         ProtectionKeywords.Export,
@@ -513,7 +507,7 @@ public sealed class Parser
         while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
             Token[] parameterModifiers = ExpectModifiers();
-            CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.This, ModifierKeywords.Ref, ModifierKeywords.Temp);
+            CheckParameterModifiers(parameterModifiers, parameters.Count, ParameterModifiers);
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }

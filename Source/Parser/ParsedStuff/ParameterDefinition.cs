@@ -9,10 +9,14 @@ public class ParameterDefinition :
     IInContext<FunctionThingDefinition>,
     IIdentifiable<Token>
 {
+    /// <summary>
+    /// Set by the <see cref="FunctionThingDefinition"/>
+    /// </summary>
+    [NotNull] public FunctionThingDefinition? Context { get; set; }
+
     public Token Identifier { get; }
     public TypeInstance Type { get; }
     public ImmutableArray<Token> Modifiers { get; }
-    [NotNull] public FunctionThingDefinition? Context { get; set; }
 
     public bool IsRef => Modifiers.Contains(ModifierKeywords.Ref);
     public Position Position =>

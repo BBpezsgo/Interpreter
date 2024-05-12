@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore;
 
-public struct Range
+public static class Range
 {
     public static bool Overlaps<T>(MutableRange<T> a, MutableRange<T> b)
         where T : IEquatable<T>, IComparisonOperators<T, T, bool>

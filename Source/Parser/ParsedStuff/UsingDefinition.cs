@@ -4,10 +4,13 @@ using Tokenizing;
 
 public class UsingDefinition : IPositioned
 {
+    /// <summary>
+    /// Set by the compiler
+    /// </summary>
+    public string? CompiledUri { get; set; }
+
     public ImmutableArray<Token> Path { get; }
     public Token Keyword { get; }
-    /// <summary> Set by the Compiler </summary>
-    public string? CompiledUri { get; set; }
 
     public string PathString
     {

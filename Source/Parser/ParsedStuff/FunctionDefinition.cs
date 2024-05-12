@@ -7,9 +7,13 @@ public class FunctionDefinition : FunctionThingDefinition,
     IHaveType,
     IInContext<StructDefinition?>
 {
+    /// <summary>
+    /// Set by the <see cref="StructDefinition"/>
+    /// </summary>
+    public StructDefinition? Context { get; set; }
+
     public ImmutableArray<AttributeUsage> Attributes { get; }
     public TypeInstance Type { get; }
-    public StructDefinition? Context { get; set; }
 
     public override Position Position => base.Position.Union(Type);
 

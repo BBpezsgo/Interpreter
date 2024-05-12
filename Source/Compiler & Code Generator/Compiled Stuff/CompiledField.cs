@@ -9,8 +9,9 @@ public class CompiledField : FieldDefinition,
     IInContext<CompiledStruct>,
     IReferenceable<Statement>
 {
-    public new GeneralType Type { get; }
     public new CompiledStruct Context { get; set; }
+
+    public new GeneralType Type { get; }
     public List<Reference<Statement>> References { get; }
 
     public CompiledField(GeneralType type, CompiledStruct context, FieldDefinition definition) : base(definition)

@@ -283,7 +283,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"Symbol name \"{newVariable.Identifier}\" conflicts with an another symbol name", newVariable.Identifier, newVariable.FilePath); }
 
         if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable))
-        { throw new InternalException($"Variable \"{newVariable.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", CurrentFile); }
+        { throw new InternalException($"Variable \"{newVariable.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.Identifier, newVariable.FilePath); }
 
         if (compiledVariable.IsInitialized) return;
 
@@ -1074,7 +1074,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 OnGotStatementType(literal, new BuiltinType(BasicType.Char));
 
-                if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", CurrentFile);
+                if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, CurrentFile);
                 AddInstruction(Opcode.Push, new DataItem(literal.Value[0]));
                 break;
             }

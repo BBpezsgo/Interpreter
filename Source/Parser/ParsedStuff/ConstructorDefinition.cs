@@ -8,8 +8,12 @@ public class ConstructorDefinition : FunctionThingDefinition,
     IInContext<StructDefinition?>,
     IIdentifiable<TypeInstance>
 {
-    public TypeInstance Type { get; }
+    /// <summary>
+    /// Set by the <see cref="StructDefinition"/>
+    /// </summary>
     [NotNull] public StructDefinition? Context { get; set; }
+
+    public TypeInstance Type { get; }
 
     public override bool IsTemplate
     {

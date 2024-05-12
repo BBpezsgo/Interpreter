@@ -8,14 +8,17 @@ public class FieldDefinition :
     IInContext<StructDefinition>,
     IIdentifiable<Token>
 {
+    /// <summary>
+    /// Set by the <see cref="StructDefinition"/>
+    /// </summary>
+    [NotNull] public StructDefinition? Context { get; set; }
+
     public ImmutableArray<Token> Modifiers { get; }
     public TypeInstance Type { get; }
     public Token Identifier { get; }
     public Token? Semicolon { get; set; }
-    [NotNull] public StructDefinition? Context { get; set; }
 
     public Position Position => new Position(Identifier, Type).Union(Modifiers);
-
     public Protection Protection
     {
         get

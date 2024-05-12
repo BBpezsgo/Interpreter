@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.Brainfuck;
+﻿namespace LanguageCore.Compiler;
 
 public readonly struct PredictedNumber<T> :
     IAdditionOperators<PredictedNumber<T>, PredictedNumber<T>, PredictedNumber<T>>,

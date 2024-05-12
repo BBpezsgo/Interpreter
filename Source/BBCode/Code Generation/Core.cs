@@ -43,14 +43,14 @@ public readonly struct CleanupItem
     public readonly bool ShouldDeallocate;
     public readonly GeneralType? Type;
 
+    public static CleanupItem Null => new(0, false, null);
+
     public CleanupItem(int size, bool shouldDeallocate, GeneralType? type)
     {
         SizeOnStack = size;
         ShouldDeallocate = shouldDeallocate;
         Type = type;
     }
-
-    public static CleanupItem Null => new(0, false, null);
 
     public override string ToString()
     {
@@ -265,11 +265,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null)
     {
-        // UnusedFunctionManager.RemoveUnusedFunctions(
-        //     ref compilerResult,
-        //     printCallback,
-        //     settings.CompileLevel);
-
-        return new CodeGeneratorForMain(compilerResult, settings, analysisCollection, printCallback).GenerateCode(compilerResult, settings);
+        CodeGeneratorForMain generator = new(compilerResult, settings, analysisCollection, printCallback);
+        return generator.GenerateCode(compilerResult, settings);
     }
 }

@@ -25,6 +25,18 @@ public static class GeneralExtensions
         collection.AddRange(newValues);
     }
 
+    public static void Set<T>(this List<T> collection, ReadOnlySpan<T> newValues)
+    {
+        collection.Clear();
+        collection.AddRange(newValues);
+    }
+
+    public static void Set<T>(this List<T> collection, T[] newValues)
+    {
+        collection.Clear();
+        collection.AddRange(newValues);
+    }
+
     public static bool ContainsNull<T>([NotNullWhen(false)] this IEnumerable<T?> values, [NotNullWhen(false)] out IEnumerable<T>? nonnullValues) where T : class
     {
         nonnullValues = null;

@@ -2,7 +2,9 @@
 
 public sealed class Error : NotExceptionBut
 {
+#if DEBUG
     bool IsDebugged;
+#endif
 
     public Error(string message, Position position, Uri? uri, bool @break = true) : base(message, position, uri)
     {

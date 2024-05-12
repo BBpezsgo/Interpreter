@@ -11,14 +11,8 @@ public static class CharCode
 
 public static class BrainfuckCode
 {
-    public static readonly char[] CodeCharacters = new char[]
-    {
-        '+', '-',
-        '<', '>',
-        '[', ']',
-        '.', ',',
-        '$',
-    };
+    public static bool IsCode(char c)
+        => c is '+' or '-' or '<' or '>' or '[' or ']' or '.' or ',' or '$';
 
     public static string GenerateModification(int modification, char increment, char decrement)
     {
@@ -249,7 +243,7 @@ public static class BrainfuckCode
             {
                 progress.Print(i, code.Length);
 
-                if (!CodeCharacters.Contains(code[i]))
+                if (!IsCode(code[i]))
                 {
                     debugInformation?.OffsetCodeFrom(result.Length, -1);
                     continue;
@@ -262,7 +256,7 @@ public static class BrainfuckCode
         {
             for (int i = 0; i < code.Length; i++)
             {
-                if (!CodeCharacters.Contains(code[i]))
+                if (!IsCode(code[i]))
                 {
                     debugInformation?.OffsetCodeFrom(result.Length, -1);
                     continue;
@@ -280,7 +274,7 @@ public static class BrainfuckCode
         StringBuilder result = new(code.Length);
         for (int i = 0; i < code.Length; i++)
         {
-            if (CodeCharacters.Contains(code[i])) continue;
+            if (IsCode(code[i])) continue;
             result.Append(code[i]);
         }
         return result.ToString();
@@ -291,7 +285,7 @@ public static class BrainfuckCode
         StringBuilder builder = new(code);
         for (int i = 0; i < builder.Length; i++)
         {
-            if (!CodeCharacters.Contains(code[i]))
+            if (!IsCode(code[i]))
             {
                 builder[i] = replaceWith;
             }
@@ -304,7 +298,7 @@ public static class BrainfuckCode
         StringBuilder builder = new(code);
         for (int i = 0; i < builder.Length; i++)
         {
-            if (CodeCharacters.Contains(code[i]))
+            if (IsCode(code[i]))
             {
                 builder[i] = replaceWith;
             }
@@ -344,7 +338,7 @@ public static class BrainfuckCode
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
                     }
-                    else if (CodeCharacters.Contains(code[i]))
+                    else if (IsCode(code[i]))
                     {
                         expectNumber = false;
                         Console.ForegroundColor = ConsoleColor.Magenta;
@@ -367,7 +361,7 @@ public static class BrainfuckCode
         '+' or '-' => ConsoleColor.Blue,
         '[' or ']' => ConsoleColor.Green,
         '.' or ',' => ConsoleColor.Magenta,
-        _ => CodeCharacters.Contains(code) ? ConsoleColor.Magenta : ConsoleColor.DarkGray,
+        _ => IsCode(code) ? ConsoleColor.Magenta : ConsoleColor.DarkGray,
     };
 
     /// <summary>

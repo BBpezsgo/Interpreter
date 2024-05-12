@@ -4,9 +4,10 @@ using Parser.Statement;
 
 public class CompiledVariable : VariableDeclaration, IHaveCompiledType
 {
+    public bool IsInitialized { get; set; }
+
     public new GeneralType Type { get; }
     public int MemoryAddress { get; }
-    public bool IsInitialized { get; set; }
 
     public CompiledVariable(int memoryAddress, GeneralType type, VariableDeclaration declaration) : base(declaration)
     {

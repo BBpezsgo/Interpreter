@@ -5,24 +5,6 @@ using Parser;
 using Parser.Statement;
 using Runtime;
 
-readonly struct CleanupItem
-{
-    /// <summary>
-    /// The actual data size on the stack
-    /// </summary>
-    public readonly int Size;
-    /// <summary>
-    /// The element count
-    /// </summary>
-    public readonly int Count;
-
-    public CleanupItem(int size, int count)
-    {
-        Size = size;
-        Count = count;
-    }
-}
-
 public struct BrainfuckGeneratorResult
 {
     public string Code;
@@ -55,6 +37,8 @@ public struct BrainfuckGeneratorSettings
     public bool GenerateDebugInformation;
     public bool ShowProgress;
     public bool DontOptimize;
+    public bool GenerateSmallComments;
+    public bool GenerateComments;
 
     public readonly int HeapStart => StackSize + 1;
 
@@ -66,6 +50,8 @@ public struct BrainfuckGeneratorSettings
         GenerateDebugInformation = true,
         ShowProgress = true,
         DontOptimize = false,
+        GenerateSmallComments = false,
+        GenerateComments = false,
     };
 
     public BrainfuckGeneratorSettings(BrainfuckGeneratorSettings other)
@@ -76,6 +62,8 @@ public struct BrainfuckGeneratorSettings
         GenerateDebugInformation = other.GenerateDebugInformation;
         ShowProgress = other.ShowProgress;
         DontOptimize = other.DontOptimize;
+        GenerateSmallComments = other.GenerateSmallComments;
+        GenerateComments = other.GenerateComments;
     }
 }
 
@@ -142,7 +130,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             : this(code, debugInfo, position?.Position ?? Position.UnknownPosition, currentFile)
         { }
 
-        public void Dispose()
+        void IDisposable.Dispose()
         {
             if (DebugInfo is null) return;
             if (Position == Position.UnknownPosition) return;
@@ -184,7 +172,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             InstructionStart = code.Length;
         }
 
-        public void Dispose()
+        void IDisposable.Dispose()
         {
             if (DebugInfo is null) return;
 
@@ -201,39 +189,56 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         }
     }
 
-    struct GeneratorSnapshot
+    readonly struct GeneratorSnapshot
     {
-        public readonly Variable[] Variables;
-        public readonly int[] VariableCleanupStack;
-        public readonly ControlFlowBlock[] Returns;
-        public readonly ControlFlowBlock[] Breaks;
-        public readonly bool[] InMacro;
+        public readonly ImmutableArray<Variable> Variables;
+        public readonly ImmutableArray<int> VariableCleanupStack;
+        public readonly ImmutableArray<ControlFlowBlock> Returns;
+        public readonly ImmutableArray<ControlFlowBlock> Breaks;
+        public readonly ImmutableArray<bool> InMacro;
 
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        public int Optimizations;
+        public readonly int Optimizations;
 
-        public readonly ISameCheck[] CurrentMacro;
+        public readonly ImmutableArray<ISameCheck> CurrentMacro;
 
-        public string? VariableCanBeDiscarded;
+        public readonly string? VariableCanBeDiscarded;
 
         public readonly DebugInformation? DebugInfo;
 
         public GeneratorSnapshot(CodeGeneratorForBrainfuck v)
         {
-            Variables = v.CompiledVariables.ToArray();
+            Variables = v.CompiledVariables.ToImmutableArray();
 
-            VariableCleanupStack = v.VariableCleanupStack.ToArray();
-            Returns = v.Returns.Duplicate().ToArray();
-            Breaks = v.Breaks.Duplicate().ToArray();
-            InMacro = v.InMacro.ToArray();
+            VariableCleanupStack = v.VariableCleanupStack.ToImmutableArray();
+            Returns = v.Returns.ToImmutableArray();
+            Breaks = v.Breaks.ToImmutableArray();
+            InMacro = v.InMacro.ToImmutableArray();
 
             Optimizations = v.Optimizations;
 
-            CurrentMacro = v.CurrentMacro.ToArray();
+            CurrentMacro = v.CurrentMacro.ToImmutableArray();
 
             VariableCanBeDiscarded = v.VariableCanBeDiscarded;
 
             DebugInfo = v.DebugInfo?.Duplicate();
+        }
+
+        public void Restore(CodeGeneratorForBrainfuck v)
+        {
+            v.CompiledVariables.Set(Variables);
+
+            v.VariableCleanupStack.Set(VariableCleanupStack);
+            v.Returns.Set(Returns);
+            v.Breaks.Set(Breaks);
+            v.InMacro.Set(InMacro);
+
+            v.Optimizations = Optimizations;
+
+            v.CurrentMacro.Set(CurrentMacro);
+
+            v.VariableCanBeDiscarded = VariableCanBeDiscarded;
+
+            v.DebugInfo = DebugInfo;
         }
     }
 
@@ -246,64 +251,28 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         public CodeSnapshot(CodeGeneratorForBrainfuck generator)
         {
             Code = generator.Code.Duplicate();
-            Heap = new HeapCodeHelper(Code, generator.Heap.Start, generator.Heap.Size);
+            Heap = new HeapCodeHelper(Code, generator.Heap.Start, generator.Heap.Size)
+            {
+                AddSmallComments = generator.Heap.AddSmallComments,
+            };
             Stack = new StackCodeHelper(Code, generator.Stack);
         }
-    }
 
-    struct GeneratorStackFrame
-    {
-        public Dictionary<string, GeneralType>? savedTypeArguments;
-        public ControlFlowBlock[] savedBreaks;
-        public Variable[] savedVariables;
-        public Uri? savedFilePath;
-        public IConstant[] savedConstants;
-    }
-
-    [SuppressMessage("Style", "IDE0017")]
-    GeneratorStackFrame PushStackFrame(Dictionary<string, GeneralType>? typeArguments)
-    {
-        GeneratorStackFrame newFrame = new();
-
-        newFrame.savedTypeArguments = null;
-        if (typeArguments != null)
-        { SetTypeArguments(typeArguments, out newFrame.savedTypeArguments); }
-
-        newFrame.savedBreaks = Breaks.Duplicate().ToArray();
-        Breaks.Clear();
-
-        newFrame.savedVariables = CompiledVariables.ToArray();
-        CompiledVariables.Clear();
-
-        if (CurrentMacro.Count == 1)
+        public void Restore(CodeGeneratorForBrainfuck generator)
         {
-            CompiledVariables.PushRange(newFrame.savedVariables);
-            for (int i = 0; i < CompiledVariables.Count; i++)
-            { CompiledVariables[i] = new Variable(CompiledVariables[i].Name, CompiledVariables[i].Address, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size); }
+            generator.Code = Code;
+            generator.Heap = Heap;
+            generator.Stack = Stack;
         }
-
-        newFrame.savedFilePath = CurrentFile;
-
-        newFrame.savedConstants = CompiledLocalConstants.ToArray();
-        CompiledLocalConstants.Clear();
-
-        return newFrame;
     }
-    void PopStackFrame(GeneratorStackFrame frame)
+
+    readonly struct GeneratorStackFrame
     {
-        CurrentFile = frame.savedFilePath;
-
-        CompiledVariables.Set(frame.savedVariables);
-
-        CompiledLocalConstants.Set(frame.savedConstants);
-
-        if (Breaks.Count > 0)
-        { throw new InternalException(); }
-
-        Breaks.Set(frame.savedBreaks);
-
-        if (frame.savedTypeArguments != null)
-        { SetTypeArguments(frame.savedTypeArguments); }
+        public ImmutableDictionary<string, GeneralType>? SavedTypeArguments { get; init; }
+        public ImmutableArray<ControlFlowBlock> SavedBreaks { get; init; }
+        public ImmutableArray<Variable> SavedVariables { get; init; }
+        public Uri? SavedFilePath { get; init; }
+        public ImmutableArray<IConstant> SavedConstants { get; init; }
     }
 
     #region Fields
@@ -342,9 +311,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         PrintCallback? print) : base(compilerResult, analysisCollection, print)
     {
         CompiledVariables = new Stack<Variable>();
-        Code = new CodeHelper();
+        Code = new CodeHelper()
+        {
+            AddSmallComments = brainfuckSettings.GenerateSmallComments,
+            AddComments = brainfuckSettings.GenerateComments,
+        };
         Stack = new StackCodeHelper(Code, 0, brainfuckSettings.StackSize);
-        Heap = new HeapCodeHelper(Code, brainfuckSettings.HeapStart, brainfuckSettings.HeapSize);
+        Heap = new HeapCodeHelper(Code, brainfuckSettings.HeapStart, brainfuckSettings.HeapSize)
+        {
+            AddSmallComments = brainfuckSettings.GenerateSmallComments,
+        };
         CurrentMacro = new Stack<ISameCheck>();
         VariableCleanupStack = new Stack<int>();
         Returns = new Stack<ControlFlowBlock>();
@@ -355,42 +331,60 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     }
 
     GeneratorSnapshot Snapshot() => new(this);
-    void Restore(GeneratorSnapshot snapshot)
-    {
-        CompiledVariables.Clear();
-        CompiledVariables.AddRange(snapshot.Variables);
-
-        // Stack = snapshot.Stack;
-        // Heap = snapshot.Heap;
-
-        VariableCleanupStack.Clear();
-        VariableCleanupStack.AddRange(snapshot.VariableCleanupStack);
-
-        Returns.Clear();
-        Returns.AddRange(snapshot.Returns);
-
-        Breaks.Clear();
-        Breaks.AddRange(snapshot.Breaks);
-
-        InMacro.Clear();
-        InMacro.AddRange(snapshot.InMacro);
-
-        Optimizations = snapshot.Optimizations;
-
-        CurrentMacro.Clear();
-        CurrentMacro.AddRange(snapshot.CurrentMacro);
-
-        VariableCanBeDiscarded = new string(snapshot.VariableCanBeDiscarded);
-
-        DebugInfo = snapshot.DebugInfo?.Duplicate();
-    }
+    void Restore(GeneratorSnapshot snapshot) => snapshot.Restore(this);
 
     CodeSnapshot SnapshotCode() => new(this);
-    void RestoreCode(CodeSnapshot snapshot)
+    void RestoreCode(CodeSnapshot snapshot) => snapshot.Restore(this);
+
+    GeneratorStackFrame PushStackFrame(Dictionary<string, GeneralType>? typeArguments)
     {
-        Code = snapshot.Code.Duplicate();
-        Heap = new HeapCodeHelper(Code, snapshot.Heap.Start, snapshot.Heap.Size);
-        Stack = new StackCodeHelper(Code, snapshot.Stack);
+        Dictionary<string, GeneralType>? savedTypeArguments = null;
+
+        if (typeArguments != null)
+        { SetTypeArguments(typeArguments, out savedTypeArguments); }
+
+        ImmutableArray<ControlFlowBlock> savedBreaks = Breaks.ToImmutableArray();
+        Breaks.Clear();
+
+        ImmutableArray<Variable> savedVariables = CompiledVariables.ToImmutableArray();
+        CompiledVariables.Clear();
+
+        if (CurrentMacro.Count == 1)
+        {
+            CompiledVariables.PushRange(savedVariables);
+            for (int i = 0; i < CompiledVariables.Count; i++)
+            { CompiledVariables[i] = new Variable(CompiledVariables[i].Name, CompiledVariables[i].Address, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size); }
+        }
+
+        Uri? savedFilePath = CurrentFile;
+
+        ImmutableArray<IConstant> savedConstants = CompiledLocalConstants.ToImmutableArray();
+        CompiledLocalConstants.Clear();
+
+        return new GeneratorStackFrame()
+        {
+            SavedBreaks = savedBreaks,
+            SavedVariables = savedVariables,
+            SavedConstants = savedConstants,
+            SavedFilePath = savedFilePath,
+            SavedTypeArguments = savedTypeArguments?.ToImmutableDictionary(),
+        };
+    }
+    void PopStackFrame(GeneratorStackFrame frame)
+    {
+        CurrentFile = frame.SavedFilePath;
+
+        CompiledVariables.Set(frame.SavedVariables);
+
+        CompiledLocalConstants.Set(frame.SavedConstants);
+
+        if (Breaks.Count > 0)
+        { throw new InternalException(); }
+
+        Breaks.Set(frame.SavedBreaks);
+
+        if (frame.SavedTypeArguments != null)
+        { SetTypeArguments(frame.SavedTypeArguments); }
     }
 
     DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, DebugInfo, position, CurrentFile);
@@ -451,12 +445,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         throw new NotImplementedException();
     }
 
-    static bool GetVariable(IEnumerable<Variable> variables, string name, out Variable variable)
-        => GetVariable(variables.ToArray(), name, out variable);
-
-    static bool GetVariable(Variable[] variables, string name, out Variable variable)
+    static bool GetVariable(IReadOnlyList<Variable> variables, string name, out Variable variable)
     {
-        for (int i = variables.Length - 1; i >= 0; i--)
+        for (int i = variables.Count - 1; i >= 0; i--)
         {
             if (variables[i].Name == name)
             {

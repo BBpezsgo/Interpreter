@@ -14,8 +14,8 @@ public readonly struct CollectedAST
 {
     public ParserResult ParserResult { get; }
     public Uri Uri { get; }
-    public ImmutableArray<Token> Tokens => ParserResult.OriginalTokens;
     public UsingDefinition? Using { get; }
+    public ImmutableArray<Token> Tokens => ParserResult.OriginalTokens;
 
     public CollectedAST(ParserResult parserResult, Uri uri, UsingDefinition? @using)
     {

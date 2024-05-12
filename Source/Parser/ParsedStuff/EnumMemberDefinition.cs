@@ -9,9 +9,13 @@ public class EnumMemberDefinition :
     IInContext<EnumDefinition>,
     IIdentifiable<Token>
 {
+    /// <summary>
+    /// Set by the <see cref="EnumDefinition"/>
+    /// </summary>
+    [NotNull] public EnumDefinition? Context { get; set; }
+
     public Token Identifier { get; }
     public StatementWithValue? Value { get; }
-    [NotNull] public EnumDefinition? Context { get; set; }
 
     public Position Position => new(Identifier, Value);
 

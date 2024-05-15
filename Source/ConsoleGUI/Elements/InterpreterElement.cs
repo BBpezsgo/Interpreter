@@ -204,7 +204,7 @@ public sealed partial class InterpreterElement : WindowElement
             Interpreter.DoUpdate();
             if (Interpreter.BytecodeInterpreter.IsDone)
             {
-                ConsoleGUI.Instance?.Destroy();
+                ConsoleGUI.Instance?.Dispose();
                 return;
             }
         }

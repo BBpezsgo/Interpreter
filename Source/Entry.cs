@@ -65,7 +65,6 @@ public static class Entry
                     generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
-                    return;
                 }
                 else
                 {
@@ -149,14 +148,19 @@ public static class Entry
                     Output.WriteLine();
                     Output.Write("Press any key to start executing");
                     Console.ReadKey();
+                    Console.ResetColor();
+                    Console.Clear();
 
                     ConsoleGUI.ConsoleGUI gui = new()
                     {
                         FilledElement = new ConsoleGUI.InterpreterElement(_interpreter)
                     };
 
-                    while (!gui.Destroyed)
-                    { gui.Tick(); }
+                    while (!gui.IsDisposed)
+                    {
+                        gui.Tick();
+                        Thread.Sleep(10);
+                    }
 
                     Console.Clear();
                     Console.ResetColor();

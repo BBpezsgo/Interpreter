@@ -16,6 +16,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     bool AllowEvaluating => !Settings.DontOptimize;
     bool AllowOtherOptimizations => !Settings.DontOptimize;
 
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int Optimizations { get; set; }
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int Precomputations { get; set; }
+    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int FunctionEvaluations { get; set; }
+
     void GenerateAllocator(int size, IPositioned position)
     {
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create<StatementWithValue>(Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position));
@@ -327,7 +331,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 Code.SetValue(variable.Address, constantValue);
 
-                Optimizations++;
+                Precomputations++;
 
                 VariableCanBeDiscarded = null;
                 return;
@@ -441,7 +445,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 Code.SetValue(address, constantValue.Byte ?? (byte)0);
 
-                Optimizations++;
+                Precomputations++;
 
                 return;
             }
@@ -501,7 +505,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             GeneralType indexType = FindStatementType(statement.Index);
             if (indexType is not BuiltinType)
-            { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", statement.Index, CurrentFile); }
+            { throw new CompilerException($"Index type must be built-in (ie. \"int\") and not {indexType}", statement.Index, CurrentFile); }
             int indexAddress = Stack.NextAddress;
             GenerateCodeForStatement(statement.Index);
 
@@ -664,7 +668,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             GeneralType indexType = FindStatementType(indexCall.Index);
             if (indexType is not BuiltinType)
-            { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", indexCall.Index, CurrentFile); }
+            { throw new CompilerException($"Index type must be built-in (ie. \"int\") and not {indexType}", indexCall.Index, CurrentFile); }
             int indexAddress = Stack.NextAddress;
             GenerateCodeForStatement(indexCall.Index);
 
@@ -1109,9 +1113,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (statement.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                StatementWithValue deletable = statement.Parameters[0];
-
-                GenerateDestructor(deletable);
+                GenerateDestructor(statement.Parameters[0]);
 
                 break;
             }
@@ -1186,7 +1188,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     Code.AddValue(variable.Address, constantValue);
 
-                    Optimizations++;
+                    Precomputations++;
                     return;
                 }
 
@@ -1232,7 +1234,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     Code.AddValue(variable.Address, -constantValue);
 
-                    Optimizations++;
+                    Precomputations++;
                     return;
                 }
 
@@ -1351,11 +1353,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             if (functionCall.Parameters.Length != 1)
             { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
 
-            StatementWithValue param0 = functionCall.Parameters[0];
-            GeneralType param0Type = FindStatementType(param0);
+            StatementWithValue parameter = functionCall.Parameters[0];
+            GeneralType parameterType = FindStatementType(parameter);
 
             if (functionCall.SaveValue)
-            { Stack.Push(param0Type.Size); }
+            { Stack.Push(parameterType.Size); }
 
             return;
         }
@@ -1517,7 +1519,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (AllowPrecomputing && TryCompute(statement, out DataItem computed))
         {
             Stack.Push(computed);
-            Optimizations++;
+            Precomputations++;
             return;
         }
 
@@ -1909,7 +1911,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (AllowPrecomputing && TryCompute(statement, out DataItem computed))
         {
             Stack.Push(computed);
-            Optimizations++;
+            Precomputations++;
             return;
         }
 
@@ -2523,6 +2525,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 callerWithValue.SaveValue)
             { Stack.Push(returnValue.Value); }
 
+            FunctionEvaluations++;
             return;
         }
 

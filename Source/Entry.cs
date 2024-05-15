@@ -208,6 +208,8 @@ public static class Entry
                     analysisCollection.Throw();
                     analysisCollection.Print();
                     Output.LogDebug($"Optimized {generated.Optimizations} statements");
+                    Output.LogDebug($"Precomputed {generated.Precomputations} statements");
+                    Output.LogDebug($"Evaluated {generated.FunctionEvaluations} functions");
                 }
                 else
                 {
@@ -219,6 +221,8 @@ public static class Entry
                         analysisCollection.Throw();
                         analysisCollection.Print();
                         Output.LogDebug($"Optimized {generated.Optimizations} statements");
+                        Output.LogDebug($"Precomputed {generated.Precomputations} statements");
+                        Output.LogDebug($"Evaluated {generated.FunctionEvaluations} functions");
                     }
                     catch (LanguageException exception)
                     {

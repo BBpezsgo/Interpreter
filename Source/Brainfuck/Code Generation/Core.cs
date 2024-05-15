@@ -9,6 +9,8 @@ public struct BrainfuckGeneratorResult
 {
     public string Code;
     public int Optimizations;
+    public int Precomputations;
+    public int FunctionEvaluations;
     public DebugInformation? DebugInfo;
 }
 
@@ -198,6 +200,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         public readonly ImmutableArray<bool> InMacro;
 
         public readonly int Optimizations;
+        public readonly int Precomputations;
+        public readonly int FunctionEvaluations;
 
         public readonly ImmutableArray<ISameCheck> CurrentMacro;
 
@@ -215,6 +219,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             InMacro = v.InMacro.ToImmutableArray();
 
             Optimizations = v.Optimizations;
+            Precomputations = v.Precomputations;
+            FunctionEvaluations = v.FunctionEvaluations;
 
             CurrentMacro = v.CurrentMacro.ToImmutableArray();
 
@@ -233,6 +239,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             v.InMacro.Set(InMacro);
 
             v.Optimizations = Optimizations;
+            v.Precomputations = Precomputations;
+            v.FunctionEvaluations = FunctionEvaluations;
 
             v.CurrentMacro.Set(CurrentMacro);
 
@@ -288,9 +296,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     readonly Stack<ControlFlowBlock> Returns;
     readonly Stack<ControlFlowBlock> Breaks;
-
-    [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-    int Optimizations;
 
     readonly Stack<ISameCheck> CurrentMacro;
 
@@ -728,6 +733,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         {
             Code = Code.ToString(),
             Optimizations = Optimizations,
+            Precomputations = Precomputations,
+            FunctionEvaluations = FunctionEvaluations,
             DebugInfo = DebugInfo,
         };
     }

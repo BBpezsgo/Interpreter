@@ -59,18 +59,16 @@ public readonly struct Position :
         return $"{Range.Start.ToStringMin()}-{Range.End.ToStringMin()}";
     }
 
-    public string? ToStringCool(string? prefix = null, string? postfix = null)
+    public string? ToStringCool()
     {
-        if (Range.Start.Line < 0)
-        { return null; }
-
-        if (this == Position.UnknownPosition)
+        if (Range.Start.Line < 0 ||
+            this == Position.UnknownPosition)
         { return null; }
 
         if (Range.Start.Character < 0)
-        { return $"{prefix}line {Range.Start.Character}{postfix}"; }
+        { return $"line {Range.Start.Character}"; }
 
-        return $"{prefix}line {Range.Start.Line} and column {Range.Start.Character}{postfix}";
+        return $"line {Range.Start.Line} and column {Range.Start.Character}";
     }
 
     string GetDebuggerDisplay()

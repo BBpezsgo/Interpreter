@@ -10,7 +10,7 @@ public interface IDuplicatable<T> : ICloneable
     object ICloneable.Clone() => Duplicate();
 }
 
-public static partial class Utils
+public static class Utils
 {
     public static T Max<T>(T a, T b)
         where T : IComparisonOperators<T, T, bool>
@@ -19,6 +19,22 @@ public static partial class Utils
     public static T Min<T>(T a, T b)
         where T : IComparisonOperators<T, T, bool>
         => a < b ? a : b;
+
+    public static bool SequenceEquals<T1, T2>(ImmutableArray<T1> collectionA, ImmutableArray<T2> collectionB)
+        where T1 : IEquatable<T2>
+    {
+        if (collectionA.Length != collectionB.Length) return false;
+
+        for (int i = 0; i < collectionA.Length; i++)
+        {
+            T1 a = collectionA[i];
+            T2 b = collectionB[i];
+
+            if (!a.Equals(b)) return false;
+        }
+
+        return true;
+    }
 
     public static bool SequenceEquals<T1, T2>(IEnumerable<T1> collectionA, IEnumerable<T2> collectionB)
         where T1 : IEquatable<T2>

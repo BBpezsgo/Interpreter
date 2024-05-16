@@ -98,12 +98,15 @@ public class CompiledFunction : FunctionDefinition,
         return new CompiledFunction(newType, newParameters, this);
     }
 
-    public static string ToReadable(string identifier, IEnumerable<GeneralType?> parameters)
+    public static string ToReadable(string identifier, IEnumerable<string?>? parameters)
     {
         StringBuilder result = new();
         result.Append(identifier);
         result.Append('(');
-        result.AppendJoin(", ", parameters.Select(v => v?.ToString() ?? "?"));
+        if (parameters is null)
+        { result.Append("..."); }
+        else
+        { result.AppendJoin(", ", parameters.Select(v => v ?? "?")); }
         result.Append(')');
         return result.ToString();
     }

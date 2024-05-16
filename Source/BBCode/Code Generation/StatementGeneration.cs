@@ -34,8 +34,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(size);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator, out _, true, out _))
-        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", size, CurrentFile); }
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? error, AddCompilable))
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found: {error}", size, CurrentFile); }
+        CompiledFunction? allocator = result.Function;
 
         if (!allocator.ReturnSomething)
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size, CurrentFile); }
@@ -102,8 +103,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
         ImmutableArray<GeneralType> parameterTypes = FindStatementTypes(parameters);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, true, out _))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
+        CompiledFunction? deallocator = result.Function;
 
         deallocator.References.Add(new Reference<StatementWithValue>(value, CurrentFile, CurrentContext));
 
@@ -172,10 +174,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateDeallocator(GeneralType deallocateableType, Position position)
     {
-        GeneralType[] parameterTypes = new GeneralType[] { deallocateableType };
+        ImmutableArray<GeneralType> parameterTypes = ImmutableArray.Create(deallocateableType);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, true, out WillBeCompilerException? notFoundError))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundError, AddCompilable))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found ({notFoundError.Message})", position, CurrentFile); }
+        CompiledFunction? deallocator = result.Function;
 
         if (!deallocator.CanUse(CurrentFile))
         {
@@ -221,8 +224,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForParameterCleanup(parameterCleanup);
 
         AddComment("}");
-
-        // AddInstruction(Opcode.Free);
     }
 
     void GenerateDestructor(GeneralType deallocateableType, Position position)
@@ -232,8 +233,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AnalysisCollection?.Warnings.Add(new Warning($"Deallocation only working on pointers or pointer so I skip this", position, CurrentFile));
             return;
         }
+        ImmutableArray<GeneralType> argumentTypes = ImmutableArray.Create<GeneralType>(deallocateablePointerType);
 
-        if (!GetGeneralFunction(deallocateablePointerType.To, new GeneralType[] { deallocateablePointerType }, BuiltinFunctionIdentifiers.Destructor, out CompiledGeneralFunction? destructor, out _, true, out WillBeCompilerException? error))
+        if (!GetGeneralFunction(deallocateablePointerType.To, argumentTypes, BuiltinFunctionIdentifiers.Destructor, CurrentFile, out FunctionQueryResult<CompiledGeneralFunction>? result, out WillBeCompilerException? error, AddCompilable))
         {
             AddComment($"Pointer value should be already there");
             GenerateDeallocator(deallocateableType, position);
@@ -247,6 +249,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             return;
         }
+
+        CompiledGeneralFunction? destructor = result.Function;
 
         if (!destructor.CanUse(CurrentFile))
         {
@@ -601,9 +605,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
         { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
 
-        if (compiledFunction.IsMacro)
-        { AnalysisCollection?.Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
-
         if (compiledFunction.BuiltinFunctionName == BuiltinFunctions.Allocate)
         {
             GenerateAllocator(functionCall.Parameters[0]);
@@ -726,9 +727,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetFunction(anyCall, out CompiledFunction? compiledFunction, out _, true, out WillBeCompilerException? notFound) &&
+        if (GetFunction(anyCall, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound, AddCompilable) &&
             anyCall.ToFunctionCall(out FunctionCall? functionCall))
         {
+            CompiledFunction compiledFunction = result.Function;
+
             if (anyCall.PrevStatement is Identifier _identifier2)
             { _identifier2.Token.AnalyzedType = TokenAnalyzedType.FunctionName; }
             anyCall.Reference = compiledFunction;
@@ -837,8 +840,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetOperator(@operator, out CompiledOperator? operatorDefinition, out _, false, out _))
+        if (GetOperator(@operator, CurrentFile, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
+            CompiledOperator? operatorDefinition = result.Function;
+
             operatorDefinition.References.Add((@operator, CurrentFile, CurrentContext));
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
@@ -942,8 +947,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetOperator(@operator, out CompiledOperator? operatorDefinition, out _, false, out _))
+        if (GetOperator(@operator, CurrentFile, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
+            CompiledOperator? operatorDefinition = result.Function;
+
             operatorDefinition.References.Add((@operator, CurrentFile, CurrentContext));
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
@@ -1137,8 +1144,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetFunction(variable.Token.Content, expectedType, out CompiledFunction? compiledFunction, out _))
+        if (GetFunction(variable.Token.Content, expectedType, out FunctionQueryResult<CompiledFunction>? result, out _))
         {
+            CompiledFunction? compiledFunction = result.Function;
+
             compiledFunction.References.Add((variable, CurrentFile, CurrentContext));
             variable.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
             variable.Reference = compiledFunction;
@@ -1454,8 +1463,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute);
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Parameters);
 
-        if (!GetConstructor(instanceType, parameters, out CompiledConstructor? compiledFunction, out _, true, out WillBeCompilerException? notFound))
+        if (!GetConstructor(instanceType, parameters, CurrentFile, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound, AddCompilable))
         { throw notFound.Instantiate(constructorCall.Type, CurrentFile); }
+
+        CompiledConstructor? compiledFunction = result.Function;
 
         compiledFunction.References.Add((constructorCall, CurrentFile, CurrentContext));
         OnGotStatementType(constructorCall, compiledFunction.Type);
@@ -1465,9 +1476,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AnalysisCollection?.Errors.Add(new Error($"Constructor {compiledFunction.ToReadable()} could not be called due to its protection level", constructorCall.Type, CurrentFile));
             return;
         }
-
-        if (compiledFunction.IsMacro)
-        { throw new NotImplementedException(); }
 
         AddComment($"Call {compiledFunction.ToReadable()} {{");
 
@@ -1653,11 +1661,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (!GetIndexGetter(prevType, out CompiledFunction? indexer, out _, true, out _))
-        { }
-
-        if (indexer == null && prevType is PointerType pointerType)
+        if (!GetIndexGetter(prevType, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
         {
+            if (prevType is not PointerType pointerType)
+            { throw new CompilerException($"Index getter \"{prevType}[]\" not found", index, CurrentFile); }
+
             GenerateCodeForStatement(index.PrevStatement);
 
             AddInstruction(Opcode.Push, pointerType.To.Size);
@@ -1676,9 +1684,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (indexer == null)
-        { throw new CompilerException($"Index getter \"{prevType}[]\" not found", index, CurrentFile); }
-
         GenerateCodeForFunctionCall_Function(new FunctionCall(
                 index.PrevStatement,
                 Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet),
@@ -1688,7 +1693,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 },
                 index.Brackets,
                 index.OriginalFile
-            ), indexer);
+            ), result.Function);
     }
     void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
     {
@@ -2045,11 +2050,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer, out _, true, out _))
-        { }
-
-        if (indexer == null && prevType is PointerType pointerType)
+        if (!GetIndexSetter(prevType, valueType, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
         {
+            if (prevType is not PointerType pointerType)
+            { throw new CompilerException($"Index setter \"{prevType}[...] = {valueType}\" not found", statementToSet, CurrentFile); }
+
             AssignTypeCheck(pointerType.To, valueType, value);
 
             GenerateCodeForStatement(value);
@@ -2072,23 +2077,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (indexer != null)
-        {
-            GenerateCodeForFunctionCall_Function(new FunctionCall(
-                    statementToSet.PrevStatement,
-                    Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerSet),
-                    new StatementWithValue[]
-                    {
-                        statementToSet.Index,
-                        value,
-                    },
-                    statementToSet.Brackets,
-                    statementToSet.OriginalFile
-                ), indexer);
-            return;
-        }
-
-        throw new CompilerException($"Index setter \"{prevType}[...] = {valueType}\" not found", statementToSet, CurrentFile);
+        GenerateCodeForFunctionCall_Function(new FunctionCall(
+            statementToSet.PrevStatement,
+            Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerSet),
+            new StatementWithValue[]
+            {
+                statementToSet.Index,
+                value,
+            },
+            statementToSet.Brackets,
+            statementToSet.OriginalFile
+        ), result.Function);
     }
     void GenerateCodeForValueSetter(Pointer statementToSet, StatementWithValue value)
     {
@@ -2439,7 +2438,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             DebugInfo?.FunctionInformations.Add(new FunctionInformations()
             {
                 IsValid = true,
-                IsMacro = false,
                 SourcePosition = function.Identifier.Position,
                 Identifier = function.Identifier.Content,
                 File = function.FilePath,

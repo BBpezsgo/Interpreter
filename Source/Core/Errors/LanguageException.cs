@@ -4,8 +4,8 @@ namespace LanguageCore;
 
 public class LanguageException : Exception, IInFile
 {
-    public Position Position { get; }
-    public Uri? Uri { get; }
+    public Position Position { get; protected set; }
+    public Uri? Uri { get; protected set; }
 
     Uri? IInFile.FilePath => Uri;
 
@@ -23,7 +23,7 @@ public class LanguageException : Exception, IInFile
     {
         StringBuilder result = new(Message);
 
-        result.Append(Position.ToStringCool(" (at ", ")"));
+        result.Append(Position.ToStringCool().Surround(" (at ", ")"));
 
         if (Uri != null)
         { result.Append($" (in {Uri})"); }

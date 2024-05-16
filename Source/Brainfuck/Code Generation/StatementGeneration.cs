@@ -24,18 +24,18 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create<StatementWithValue>(Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position));
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), out CompiledFunction? allocator, out _, true, out _))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, CurrentFile); }
-        if (!allocator.ReturnSomething)
+        if (!result.Function.ReturnSomething)
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", position, CurrentFile); }
 
-        if (!allocator.CanUse(CurrentFile))
+        if (!result.Function.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
+            AnalysisCollection?.Errors.Add(new Error($"Function \"{result.Function.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
             return;
         }
 
-        GenerateCodeForFunction(allocator, parameters, null, position);
+        GenerateCodeForFunction(result.Function, parameters, null, position);
     }
 
     void GenerateDestructor(StatementWithValue value)
@@ -51,7 +51,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (!GetGeneralFunction(deallocateablePointerType.To, parameterTypes, BuiltinFunctionIdentifiers.Destructor, out CompiledGeneralFunction? destructor, out Dictionary<string, GeneralType>? typeArguments, false, out WillBeCompilerException? error))
+        if (!GetGeneralFunction(deallocateablePointerType.To, parameterTypes, BuiltinFunctionIdentifiers.Destructor, CurrentFile, out FunctionQueryResult<CompiledGeneralFunction>? result, out WillBeCompilerException? error))
         {
             GenerateDeallocator(value);
 
@@ -63,6 +63,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             return;
         }
+
+        (CompiledGeneralFunction? destructor, Dictionary<string, GeneralType>? typeArguments) = result;
 
         if (!destructor.CanUse(CurrentFile))
         {
@@ -83,10 +85,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
         ImmutableArray<GeneralType> parameterTypes = FindStatementTypes(parameters);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, out CompiledFunction? deallocator, out _, false, out _))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
 
-        GenerateCodeForFunction(deallocator, parameters, null, value);
+        GenerateCodeForFunction(result.Function, parameters, null, value);
     }
 
     #region PrecompileVariables
@@ -469,11 +471,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GeneralType prevType = FindStatementType(statement.PrevStatement);
         GeneralType valueType = FindStatementType(value);
 
-        if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer, out Dictionary<string, GeneralType>? typeArguments, false, out _))
-        { }
-
-        if (indexer is not null)
+        if (GetIndexSetter(prevType, valueType, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _))
         {
+            (CompiledFunction? indexer, Dictionary<string, GeneralType>? typeArguments) = result;
+
             if (!indexer.CanUse(CurrentFile))
             {
                 AnalysisCollection?.Errors.Add(new Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", statement, CurrentFile));
@@ -656,11 +657,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (!GetIndexGetter(arrayType, out CompiledFunction? indexer, out Dictionary<string, GeneralType>? typeArguments, true, out _))
-        { }
-
-        if (indexer == null && arrayType is PointerType pointerType)
+        if (!GetIndexGetter(arrayType, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
         {
+            if (arrayType is not PointerType pointerType)
+            { throw new CompilerException($"Index getter \"{arrayType}[]\" not found", indexCall, CurrentFile); }
+
             int resultAddress = Stack.Push(0);
 
             int pointerAddress = Stack.NextAddress;
@@ -686,8 +687,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (indexer == null)
-        { throw new CompilerException($"Index getter \"{arrayType}[]\" not found", indexCall, CurrentFile); }
+        (CompiledFunction? indexer, Dictionary<string, GeneralType>? typeArguments) = result;
 
         if (!indexer.CanUse(CurrentFile))
         {
@@ -1146,7 +1146,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         {
             BinaryOperatorCall @operator = statement.GetOperatorCall();
-            if (GetOperator(@operator, out _, out _, false, out _))
+            if (GetOperator(@operator, CurrentFile, out _, out _))
             {
                 GenerateCodeForStatement(statement.ToAssignment());
                 return;
@@ -1263,7 +1263,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         {
             BinaryOperatorCall @operator = statement.GetOperatorCall();
-            if (GetOperator(@operator, out _, out _, false, out _))
+            if (GetOperator(@operator, CurrentFile, out _, out _))
             {
                 GenerateCodeForStatement(statement.ToAssignment());
                 return;
@@ -1362,8 +1362,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out Dictionary<string, GeneralType>? typeArguments, false, out WillBeCompilerException? notFound))
+        if (!GetFunction(functionCall, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound))
         { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
+
+        (CompiledFunction? compiledFunction, Dictionary<string, GeneralType>? typeArguments) = result;
 
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
@@ -1388,8 +1390,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (instanceType is StructType structType)
         { structType.Struct?.References.Add((constructorCall.Type, CurrentFile, CurrentMacro.Last)); }
 
-        if (!GetConstructor(instanceType, parameters, out CompiledConstructor? constructor, out Dictionary<string, GeneralType>? typeArguments, false, out WillBeCompilerException? notFound))
+        if (!GetConstructor(instanceType, parameters, CurrentFile, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound))
         { throw notFound.Instantiate(constructorCall.Keyword, CurrentFile); }
+        (CompiledConstructor? constructor, Dictionary<string, GeneralType>? typeArguments) = result;
 
         typeArguments ??= new Dictionary<string, GeneralType>();
 
@@ -1488,7 +1491,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (GetFunction(statement.Token.Content, out _, out _))
+        if (GetFunction(FunctionQuery.Create<CompiledFunction>(statement.Token.Content), out _, out _))
         { throw new NotSupportedException($"Function pointers not supported by brainfuck", statement, CurrentFile); }
 
         throw new CompilerException($"Symbol \"{statement}\" not found", statement, CurrentFile);
@@ -1498,8 +1501,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
         {
-            if (GetOperator(statement, out CompiledOperator? compiledOperator, out Dictionary<string, GeneralType>? typeArguments, false, out _))
+            if (GetOperator(statement, CurrentFile, out FunctionQueryResult<CompiledOperator>? result, out _))
             {
+                (CompiledOperator? compiledOperator, Dictionary<string, GeneralType>? typeArguments) = result;
+
                 statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 if (!compiledOperator.CanUse(CurrentFile))
@@ -1890,8 +1895,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
         {
-            if (GetOperator(statement, out CompiledOperator? compiledOperator, out Dictionary<string, GeneralType>? typeArguments, false, out _))
+            if (GetOperator(statement, CurrentFile, out FunctionQueryResult<CompiledOperator>? result, out _))
             {
+                (CompiledOperator? compiledOperator, Dictionary<string, GeneralType>? typeArguments) = result;
+
                 statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 if (!compiledOperator.CanUse(CurrentFile))
@@ -2751,12 +2758,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
 
         if (function.ParameterCount != parameters.Length)
-        { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
+        { throw new CompilerException($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
         if (function.Block is null)
         { throw new CompilerException($"Function \"{function.ToReadable()}\" does not have any body definition", callerPosition, CurrentFile); }
 
-        using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ToReadable(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
+        using ConsoleProgressLabel progressLabel = new($"Generating function \"{function.ToReadable(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
 
         progressLabel.Print();
 
@@ -2802,7 +2809,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 }
             }
 
-            using (Code.Block(this, $"Deallocate macro variables ({CompiledVariables.Count})"))
+            using (Code.Block(this, $"Deallocate function variables ({CompiledVariables.Count})"))
             {
                 for (int i = 0; i < CompiledVariables.Count; i++)
                 {
@@ -2822,7 +2829,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 }
             }
 
-            using (Code.Block(this, $"Clean up macro variables ({CompiledVariables.Count})"))
+            using (Code.Block(this, $"Clean up function variables ({CompiledVariables.Count})"))
             {
                 int n = CompiledVariables.Count;
                 for (int i = 0; i < n; i++)
@@ -2887,12 +2894,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
 
         if (function.ParameterCount != parameters.Length)
-        { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
+        { throw new CompilerException($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
         if (function.Block is null)
         { throw new CompilerException($"Function \"{function.ToReadable()}\" does not have any body definition", callerPosition, CurrentFile); }
 
-        using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ToReadable(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
+        using ConsoleProgressLabel progressLabel = new($"Generating function \"{function.ToReadable(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
 
         progressLabel.Print();
 
@@ -2938,7 +2945,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.Brackets.End))
         {
-            using (Code.Block(this, $"Deallocate macro variables ({CompiledVariables.Count})"))
+            using (Code.Block(this, $"Deallocate function variables ({CompiledVariables.Count})"))
             {
                 for (int i = 0; i < CompiledVariables.Count; i++)
                 {
@@ -2958,7 +2965,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 }
             }
 
-            using (Code.Block(this, $"Clean up macro variables ({CompiledVariables.Count})"))
+            using (Code.Block(this, $"Clean up function variables ({CompiledVariables.Count})"))
             {
                 int n = CompiledVariables.Count;
                 for (int i = 0; i < n; i++)
@@ -2984,7 +2991,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ParameterCount != parameters.Length)
-        { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
+        { throw new CompilerException($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
         Variable? returnVariable = null;
 
@@ -3025,9 +3032,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             Stack.Pop();
         }
 
-        using (Code.Block(this, $"Clean up macro variables ({CompiledVariables.Count})"))
+        using (Code.Block(this, $"Clean up function variables ({CompiledVariables.Count})"))
         {
-            using (Code.Block(this, $"Deallocate macro variables ({CompiledVariables.Count})"))
+            using (Code.Block(this, $"Deallocate function variables ({CompiledVariables.Count})"))
             {
                 for (int i = 0; i < CompiledVariables.Count; i++)
                 {
@@ -3072,7 +3079,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (function.Block is null)
         { throw new CompilerException($"Constructor \"{function.ToReadable()}\" does not have any body definition", callerPosition, CurrentFile); }
 
-        using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ToReadable(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
+        using ConsoleProgressLabel progressLabel = new($"Generating function \"{function.ToReadable(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
 
         progressLabel.Print();
 
@@ -3227,7 +3234,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.Brackets.End))
         {
-            using (Code.Block(this, $"Deallocate macro variables ({CompiledVariables.Count})"))
+            using (Code.Block(this, $"Deallocate function variables ({CompiledVariables.Count})"))
             {
                 for (int i = 0; i < CompiledVariables.Count; i++)
                 {
@@ -3247,7 +3254,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 }
             }
 
-            using (Code.Block(this, $"Clean up macro variables ({CompiledVariables.Count})"))
+            using (Code.Block(this, $"Clean up function variables ({CompiledVariables.Count})"))
             {
                 int n = CompiledVariables.Count;
                 for (int i = 0; i < n; i++)
@@ -3292,7 +3299,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 }
             }
 
-            throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile);
+            throw new NotSupportedException($"Recursive functions are not supported (The function \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile);
         }
 
         return true;

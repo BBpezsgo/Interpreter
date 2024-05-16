@@ -96,22 +96,25 @@ public struct FunctionInformations
     public string Identifier;
     public Uri? File;
     public string ReadableIdentifier;
-    public bool IsMacro;
     public MutableRange<int> Instructions;
 
     public readonly bool Contains(int instruction) =>
         Instructions.Start <= instruction &&
         Instructions.End > instruction;
 
-    public override readonly string ToString()
+    public override readonly string? ToString()
     {
-        if (!IsValid) return "<unknown>";
+        if (!IsValid) return null;
+
         StringBuilder result = new();
 
-        if (IsMacro)
-        { result.Append("macro "); }
-
         result.Append(ReadableIdentifier);
+
+        if (SourcePosition != Position.UnknownPosition)
+        { result.Append(SourcePosition.ToStringCool().Surround(" (at ", ")")); }
+
+        if (File != null)
+        { result.Append($" (in {File})"); }
 
         return result.ToString();
     }
@@ -122,9 +125,6 @@ public struct FunctionInformations
         StringBuilder result = new();
 
         result.Append(Instructions.ToString());
-
-        if (IsMacro)
-        { result.Append("macro "); }
 
         result.Append(ReadableIdentifier);
 

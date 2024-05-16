@@ -2,6 +2,12 @@
 
 public static class GeneralExtensions
 {
+    public static string? Surround(this string? text, string prefix, string suffix)
+    {
+        if (text is null) return null;
+        return prefix + text + suffix;
+    }
+
     public static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements) where TKey : notnull
     {
         foreach (KeyValuePair<TKey, TValue> pair in elements)
@@ -35,6 +41,19 @@ public static class GeneralExtensions
     {
         collection.Clear();
         collection.AddRange(newValues);
+    }
+
+    public static bool ContainsNull<T>([NotNullWhen(false)] this ImmutableArray<T?> values, [NotNullWhen(false)] out ImmutableArray<T> nonnullValues) where T : class
+    {
+        nonnullValues = default;
+        for (int i = 0; i < values.Length; i++)
+        {
+            if (values[i] is null) return true;
+        }
+#pragma warning disable CS8619
+        nonnullValues = values;
+#pragma warning restore CS8619
+        return false;
     }
 
     public static bool ContainsNull<T>([NotNullWhen(false)] this IEnumerable<T?> values, [NotNullWhen(false)] out IEnumerable<T>? nonnullValues) where T : class

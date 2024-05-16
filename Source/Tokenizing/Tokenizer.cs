@@ -504,14 +504,18 @@ public abstract partial class Tokenizer
             CurrentToken.Content.Append(currChar);
             CurrentToken.TokenType = PreparationTokenType.LiteralFloat;
         }
-        else if (currChar == 'x' && CurrentToken.TokenType == PreparationTokenType.LiteralNumber)
+        else if (currChar == 'x' &&
+            CurrentToken.TokenType == PreparationTokenType.LiteralNumber &&
+            CurrentToken.Content.Equals("0"))
         {
             if (!CurrentToken.ToString().EndsWith('0'))
             { throw new TokenizerException($"Am I stupid or this is not a hex number?", CurrentToken.Position, File); }
             CurrentToken.Content.Append(currChar);
             CurrentToken.TokenType = PreparationTokenType.LiteralHex;
         }
-        else if (currChar == 'b' && CurrentToken.TokenType == PreparationTokenType.LiteralNumber)
+        else if (currChar == 'b' &&
+            CurrentToken.TokenType == PreparationTokenType.LiteralNumber &&
+            CurrentToken.Content.Equals("0"))
         {
             if (!CurrentToken.Content.ToString().EndsWith('0'))
             { throw new TokenizerException($"Am I stupid or this is not a binary number?", CurrentToken.Position, File); }

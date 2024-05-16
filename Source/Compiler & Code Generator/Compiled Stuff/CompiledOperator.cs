@@ -43,16 +43,7 @@ public class CompiledOperator : FunctionDefinition,
         this.References = new List<Reference<StatementWithValue>>(other.References);
     }
 
-    public bool IsSame(CompiledOperator other)
-    {
-        if (this.Type != other.Type) return false;
-        if (this.Identifier.Content != other.Identifier.Content) return false;
-        if (this.ParameterTypes.Length != other.ParameterTypes.Length) return false;
-        for (int i = 0; i < this.ParameterTypes.Length; i++)
-        { if (this.ParameterTypes[i] != other.ParameterTypes[i]) return false; }
-
-        return true;
-    }
+    public bool IsSame(CompiledOperator other) => Extensions.IsSame(this, other);
     public bool IsSame(ISameCheck? other) => other is CompiledOperator other2 && IsSame(other2);
 
     public new CompiledOperator Duplicate() => new(Type, new List<GeneralType>(ParameterTypes).ToArray(), Context, this);

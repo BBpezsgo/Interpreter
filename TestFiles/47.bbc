@@ -1,0 +1,9 @@
+using System;
+using "47b";
+
+struct Bruh
+{
+	int hi;
+}
+
+A();

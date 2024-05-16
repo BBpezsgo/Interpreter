@@ -3,8 +3,6 @@
 public class RuntimeException : LanguageException
 {
     public RuntimeContext? Context;
-    public Position SourcePosition;
-    public Uri? SourceFile;
     public ImmutableArray<FunctionInformations> CallStack;
     public FunctionInformations? CurrentFrame;
     string? Arrows;
@@ -15,9 +13,9 @@ public class RuntimeException : LanguageException
         RuntimeContext context = Context.Value;
 
         if (!debugInfo.TryGetSourceLocation(context.CodePointer, out SourceCodeLocation sourcePosition))
-        { SourcePosition = Position.UnknownPosition; }
+        { Position = Position.UnknownPosition; }
         else
-        { SourcePosition = sourcePosition.SourcePosition; }
+        { Position = sourcePosition.SourcePosition; }
 
         if (sourcePosition.Uri is not null &&
             debugInfo.OriginalFiles.TryGetValue(sourcePosition.Uri, out ImmutableArray<Tokenizing.Token> tokens))
@@ -27,8 +25,8 @@ public class RuntimeException : LanguageException
 
         CallStack = debugInfo.GetFunctionInformations(context.CallTrace).ToImmutableArray();
 
-        SourceFile = sourcePosition.Uri;
-        SourceFile ??= CallStack.Length > 0 ? CallStack[^1].File : null;
+        Uri = sourcePosition.Uri;
+        Uri ??= CallStack.Length > 0 ? CallStack[^1].File : null;
     }
 
     public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
@@ -49,43 +47,54 @@ public class RuntimeException : LanguageException
 
         StringBuilder result = new(Message);
 
-        result.Append(SourcePosition.ToStringCool(" (at ", ")"));
+        result.Append(Position.ToStringCool().Surround(" (at ", ")"));
 
-        if (SourceFile != null)
-        { result.Append($" (in {SourceFile})"); }
+        if (Uri != null)
+        { result.Append($" (in {Uri})"); }
 
-        result.Append(Environment.NewLine);
+        result.AppendLine();
 
         if (Arrows is not null)
         {
             result.Append(Arrows);
-            result.Append(Environment.NewLine);
-            result.Append(Environment.NewLine);
+            result.AppendLine();
+            result.AppendLine();
         }
 
-        result.Append($"Code Pointer: ");
-        result.Append(context.CodePointer);
+        result.Append($"Code Pointer: {context.CodePointer}");
 
-        result.Append(Environment.NewLine);
+        const int callTraceIndent = 1;
+
+        result.AppendLine();
         result.Append("Call Stack:");
         if (context.CallTrace.Length == 0)
-        { result.Append(" (CallTrace is empty)"); }
+        { result.Append(" <empty>"); }
         else
         {
-            result.AppendLine();
-            result.Append('\t');
-            result.Append(' ');
-            if (CallStack == default)
-            { result.AppendJoin("\n   ", context.CallTrace); }
+            if (CallStack.IsDefaultOrEmpty)
+            {
+                for (int i = 0; i < CallStack.Length; i++)
+                {
+                    result.AppendLine();
+                    result.Append(' ', callTraceIndent);
+                    result.Append($"<unknown> {context.CallTrace[i]}");
+                }
+            }
             else
-            { result.AppendJoin("\n   ", CallStack); }
+            {
+                for (int i = 0; i < CallStack.Length; i++)
+                {
+                    result.AppendLine();
+                    result.Append(' ', callTraceIndent);
+                    result.Append(CallStack[i].ToString() ?? $"<unknown> {context.CallTrace[i]}");
+                }
+            }
         }
 
         if (CurrentFrame.HasValue)
         {
             result.AppendLine();
-            result.Append('\t');
-            result.Append(' ');
+            result.Append(' ', callTraceIndent);
             result.Append(CurrentFrame.Value.ToString());
             result.Append(" (current)");
         }

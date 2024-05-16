@@ -202,7 +202,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         for (int i = 0; i < compilerResult.TopLevelStatements.Length - 1; i++)
         {
             (ImmutableArray<Parser.Statement.Statement> statements, Uri? file) = compilerResult.TopLevelStatements[i];
-            CurrentFile = compilerResult.File;
+            CurrentFile = file;
 #if DEBUG
             if (CurrentFile == null)
             { Debugger.Break(); }

@@ -44,7 +44,7 @@ public class CompiledConstructor : ConstructorDefinition,
     public bool IsSame(CompiledConstructor other)
     {
         if (!Type.Equals(other.Type)) return false;
-        if (!GeneralType.AreEquals(ParameterTypes, other.ParameterTypes)) return false;
+        if (!Utils.SequenceEquals(ParameterTypes, other.ParameterTypes)) return false;
         return true;
     }
 

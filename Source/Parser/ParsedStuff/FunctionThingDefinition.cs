@@ -22,7 +22,6 @@ public abstract class FunctionThingDefinition :
     public bool IsExtension => (Parameters.Count > 0) && Parameters[0].Modifiers.Contains(ModifierKeywords.This);
     public int ParameterCount => Parameters.Count;
     public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
-    public bool IsMacro => Modifiers.Contains("macro");
     public bool IsInlineable => Modifiers.Contains(ModifierKeywords.Inline);
     public virtual bool IsTemplate => Template is not null;
 

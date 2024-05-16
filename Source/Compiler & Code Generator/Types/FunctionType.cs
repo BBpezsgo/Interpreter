@@ -37,14 +37,14 @@ public class FunctionType : GeneralType,
     {
         if (other is null) return false;
         if (!other.ReturnType.Equals(ReturnType)) return false;
-        if (!GeneralType.AreEquals(Parameters, other.Parameters)) return false;
+        if (!Utils.SequenceEquals(Parameters, other.Parameters)) return false;
         return true;
     }
     public bool Equals(CompiledFunction? other)
     {
         if (other is null) return false;
         if (!other.Type.Equals(ReturnType)) return false;
-        if (!GeneralType.AreEquals(Parameters, other.ParameterTypes)) return false;
+        if (!Utils.SequenceEquals(Parameters, other.ParameterTypes)) return false;
         return true;
     }
     public override bool Equals(TypeInstance? other)
@@ -52,7 +52,7 @@ public class FunctionType : GeneralType,
         if (other is null) return false;
         if (other is not TypeInstanceFunction otherFunction) return false;
         if (!ReturnType.Equals(otherFunction.FunctionReturnType)) return false;
-        if (!GeneralType.AreEquals(Parameters, otherFunction.FunctionParameterTypes)) return false;
+        if (!Utils.SequenceEquals(Parameters, otherFunction.FunctionParameterTypes)) return false;
         return true;
     }
     public override int GetHashCode() => HashCode.Combine(ReturnType, Parameters, ReturnSomething);

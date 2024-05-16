@@ -83,13 +83,6 @@ public class FunctionDefinition : FunctionThingDefinition,
         return result.ToString();
     }
 
-    public bool IsSame(FunctionDefinition other)
-    {
-        if (this.Identifier.Content != other.Identifier.Content) return false;
-        if (!this.Parameters.TypeEquals(other.Parameters)) return false;
-        return true;
-    }
-
     public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), Template, FilePath)
     {
         Block = Block,

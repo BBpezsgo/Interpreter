@@ -28,7 +28,8 @@ public abstract class NotExceptionBut : IInFile
     {
         StringBuilder result = new(Message);
 
-        result.Append(Position.ToStringCool(" (at ", ")"));
+        result.Append(Position.ToStringCool().Surround(" (at ", ")"));
+
         if (Uri != null)
         { result.Append($" (in {Uri})"); }
 

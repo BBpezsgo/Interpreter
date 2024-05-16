@@ -239,55 +239,12 @@ public abstract class GeneralType :
         return false;
     }
 
-    public static bool AreEquals(IEnumerable<GeneralType?>? itemsA, IEnumerable<TypeInstance?>? itemsB)
-    {
-        if (itemsA is null && itemsB is null) return true;
-        if (itemsA is null || itemsB is null) return false;
-
-        IEnumerator<GeneralType?> enumA = itemsA.GetEnumerator();
-        IEnumerator<TypeInstance?> enumB = itemsB.GetEnumerator();
-
-        while (true)
-        {
-            GeneralType? a = enumA.Current;
-            TypeInstance? b = enumB.Current;
-
-            if (enumA.MoveNext() != enumB.MoveNext()) return false;
-
-            if (a is null && b is null) continue;
-            if (a is null || b is null) return false;
-
-            if (!a.Equals(b)) return false;
-        }
-    }
-
-    public static bool AreEquals(IEnumerable<GeneralType> itemsA, IEnumerable<GeneralType> itemsB)
-        => AreEquals(itemsA.ToArray(), itemsB.ToArray());
-
-    public static bool AreEquals(GeneralType[] itemsA, GeneralType[] itemsB)
-    {
-        if (itemsA is null && itemsB is null) return true;
-        if (itemsA is null || itemsB is null) return false;
-
-        if (itemsA.Length != itemsB.Length) return false;
-
-        for (int i = 0; i < itemsA.Length; i++)
-        {
-            GeneralType a = itemsA[i];
-            GeneralType b = itemsB[i];
-
-            if (!a.Equals(b)) return false;
-        }
-
-        return true;
-    }
-
     /// <exception cref="NotImplementedException"/>
     public static bool TryGetTypeParameters(IEnumerable<GeneralType> definedParameters, IEnumerable<GeneralType> passedParameters, Dictionary<string, GeneralType> typeParameters)
-        => GeneralType.TryGetTypeParameters(definedParameters.ToArray(), passedParameters.ToArray(), typeParameters);
+        => GeneralType.TryGetTypeParameters(definedParameters.ToImmutableArray(), passedParameters.ToImmutableArray(), typeParameters);
 
     /// <exception cref="NotImplementedException"/>
-    public static bool TryGetTypeParameters(GeneralType[] definedParameters, GeneralType[] passedParameters, Dictionary<string, GeneralType> typeParameters)
+    public static bool TryGetTypeParameters(ImmutableArray<GeneralType> definedParameters, ImmutableArray<GeneralType> passedParameters, Dictionary<string, GeneralType> typeParameters)
     {
         if (definedParameters.Length != passedParameters.Length) return false;
 

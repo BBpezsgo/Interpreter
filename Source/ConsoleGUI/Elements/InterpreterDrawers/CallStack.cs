@@ -49,13 +49,6 @@ public partial class InterpreterElement
             }
             else
             {
-                if (callframe.IsMacro)
-                {
-                    sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
-                    sender.DrawBuffer.AddText("macro ");
-                    sender.DrawBuffer.ForegroundColor = CharColor.Silver;
-                }
-
                 if (callframe.ReadableIdentifier.Contains('(', StringComparison.Ordinal))
                 {
                     string functionName = callframe.ReadableIdentifier[..callframe.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal)];
@@ -134,13 +127,6 @@ public partial class InterpreterElement
 
                 sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                 sender.DrawBuffer.BackgroundColor = CharColor.Black;
-
-                if (callframe.IsMacro)
-                {
-                    sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
-                    sender.DrawBuffer.AddText("macro ");
-                    sender.DrawBuffer.ForegroundColor = CharColor.Silver;
-                }
 
                 if (callframe.ReadableIdentifier.Contains('(', StringComparison.Ordinal))
                 {

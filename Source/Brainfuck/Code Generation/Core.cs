@@ -184,7 +184,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
                 Identifier = Identifier,
                 ReadableIdentifier = ReadableIdentifier,
                 Instructions = (InstructionStart, Code.Length),
-                IsMacro = false,
                 IsValid = true,
                 SourcePosition = Position,
             });

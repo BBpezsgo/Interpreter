@@ -1,11 +1,21 @@
 ﻿namespace LanguageCore;
 
 using Compiler;
+using LanguageCore.Parser;
 using Runtime;
 using Tokenizing;
 
 public static class Extensions
 {
+    public static bool IsSame<TFunction>(this TFunction a, TFunction b)
+        where TFunction : FunctionThingDefinition, ICompiledFunction
+    {
+        if (!a.Type.Equals(b.Type)) return false;
+        if (!a.Identifier.Content.Equals(b.Identifier.Content)) return false;
+        if (!Utils.SequenceEquals(a.ParameterTypes, b.ParameterTypes)) return false;
+        return true;
+    }
+
     public static IEnumerable<T> Duplicate<T>(this IEnumerable<T> values)
         where T : IDuplicatable<T>
         => values.Select(item => item.Duplicate());

@@ -693,9 +693,6 @@ public class CodeGeneratorForAsm : CodeGenerator
             }
         }
 
-        if (compiledFunction.IsMacro)
-        { AnalysisCollection?.Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
-
         Stack<ParameterCleanupItem> parameterCleanup;
 
         int returnValueSize = 0;
@@ -1046,10 +1043,10 @@ public class CodeGeneratorForAsm : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (!GetFunction(functionCall, out CompiledFunction? compiledFunction, out _, false, out WillBeCompilerException? notFound))
+        if (!GetFunction(functionCall, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound))
         { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
 
-        GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
+        GenerateCodeForFunctionCall_Function(functionCall, result.Function);
     }
     void GenerateCodeForStatement(ConstructorCall constructorCall)
     {
@@ -1099,8 +1096,10 @@ public class CodeGeneratorForAsm : CodeGenerator
             return;
         }
 
-        if (GetFunction(statement.Token.Content, expectedType, out CompiledFunction? compiledFunction, out _))
+        if (GetFunction(statement.Token.Content, expectedType, out FunctionQueryResult<CompiledFunction>? result, out _))
         {
+            CompiledFunction compiledFunction = result.Function;
+
             if (!TryGetFunctionLabel(compiledFunction, out string? label))
             {
                 StringBuilder functionLabel = new();
@@ -1147,7 +1146,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     }
     void GenerateCodeForStatement(BinaryOperatorCall statement)
     {
-        if (GetOperator(statement, out _, out _, false, out _))
+        if (GetOperator(statement, CurrentFile, out _, out _))
         {
             throw new NotImplementedException();
         }
@@ -1391,7 +1390,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     }
     void GenerateCodeForStatement(UnaryOperatorCall statement)
     {
-        if (GetOperator(statement, out _, out _, false, out _))
+        if (GetOperator(statement, CurrentFile, out _, out _))
         {
             throw new NotImplementedException();
         }

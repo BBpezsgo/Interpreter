@@ -1381,7 +1381,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         using DebugInfoBlock debugBlock = DebugBlock(constructorCall);
 
-        GeneralType instanceType = FindType(constructorCall.Type);
+        GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute, constructorCall.OriginalFile);
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Parameters);
 
         if (instanceType is StructType structType)
@@ -1577,7 +1577,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                             Code.CopyValue(left.Address, resultAddress, Stack.NextAddress);
 
-                            Code.AddValue(resultAddress, -right.VByte);
+                            Code.AddValue(resultAddress, -right.UnsafeByte);
 
                             Optimizations++;
 
@@ -2044,7 +2044,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         using DebugInfoBlock debugBlock = DebugBlock(newInstance);
 
-        GeneralType instanceType = FindType(newInstance.Type);
+        GeneralType instanceType = GeneralType.From(newInstance.Type, FindType, TryCompute);
 
         switch (instanceType)
         {
@@ -2209,7 +2209,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     void GenerateCodeForPrinter(DataItem value)
     {
         int tempAddress = Stack.NextAddress;
-        using (Code.Block(this, $"Print value {value.ToString(null)} (on address {tempAddress})"))
+        using (Code.Block(this, $"Print value {value} (on address {tempAddress})"))
         {
             Code.SetValue(tempAddress, value);
             Code.SetPointer(tempAddress);

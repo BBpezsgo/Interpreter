@@ -2,7 +2,6 @@
 
 using Parser;
 using Runtime;
-using Tokenizing;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public abstract class GeneralType :
@@ -28,28 +27,11 @@ public abstract class GeneralType :
     };
 
     /// <exception cref="InternalException"/>
-    public static GeneralType From(
-        Token type,
-        Uri relevantFile,
-        FindType? typeFinder,
-        Uri? uri)
-    {
-        if (TypeKeywords.BasicTypes.TryGetValue(type.Content, out BasicType builtinType))
-        { return new BuiltinType(builtinType); }
-
-        if (typeFinder is null ||
-            !typeFinder.Invoke(type, relevantFile, out GeneralType? result))
-        { throw new CompilerException($"Can't parse \"{type}\" to {nameof(GeneralType)}", type, uri); }
-
-        return result;
-    }
-
-    /// <exception cref="InternalException"/>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="CompilerException"/>
     public static GeneralType From(
         TypeInstance type,
-        FindType? typeFinder,
+        FindType typeFinder,
         ComputeValue? constComputer = null,
         Uri? uri = null) => type switch
         {
@@ -64,7 +46,7 @@ public abstract class GeneralType :
     /// <exception cref="ArgumentNullException"/>
     public static ArrayType From(
         TypeInstanceStackArray type,
-        FindType? typeFinder,
+        FindType typeFinder,
         ComputeValue? constComputer = null,
         Uri? uri = null)
     {
@@ -98,7 +80,7 @@ public abstract class GeneralType :
     /// <exception cref="ArgumentNullException"/>
     public static FunctionType From(
         TypeInstanceFunction type,
-        FindType? typeFinder,
+        FindType typeFinder,
         ComputeValue? constComputer = null,
         Uri? uri = null)
     {
@@ -115,7 +97,7 @@ public abstract class GeneralType :
     /// <exception cref="ArgumentNullException"/>
     public static PointerType From(
         TypeInstancePointer type,
-        FindType? typeFinder,
+        FindType typeFinder,
         ComputeValue? constComputer = null,
         Uri? uri = null)
     {
@@ -131,7 +113,7 @@ public abstract class GeneralType :
     /// <exception cref="ArgumentNullException"/>
     public static GeneralType From(
         TypeInstanceSimple type,
-        FindType? typeFinder,
+        FindType typeFinder,
         ComputeValue? constComputer = null,
         Uri? uri = null)
     {
@@ -143,8 +125,6 @@ public abstract class GeneralType :
             type.SetAnalyzedType(result);
             return result;
         }
-
-        ArgumentNullException.ThrowIfNull(typeFinder);
 
         if (!typeFinder.Invoke(type.Identifier, type.OriginalFile, out result))
         { throw new CompilerException($"Can't parse \"{type}\" to {nameof(GeneralType)}", type, uri); }
@@ -172,18 +152,9 @@ public abstract class GeneralType :
         return result;
     }
 
-    /// <exception cref="InternalException"/>
-    /// <exception cref="ArgumentNullException"/>
-    public static GeneralType From(
-        IHaveType type,
-        FindType? typeFinder,
-        ComputeValue? constComputer = null,
-        Uri? uri = null)
-        => GeneralType.From(type.Type, typeFinder, constComputer, uri);
-
     public static IEnumerable<GeneralType> FromArray(
         IEnumerable<TypeInstance>? types,
-        FindType? typeFinder,
+        FindType typeFinder,
         ComputeValue? constComputer = null,
         Uri? uri = null)
     {
@@ -195,7 +166,7 @@ public abstract class GeneralType :
 
     public static IEnumerable<GeneralType> FromArray(
         IEnumerable<IHaveType>? types,
-        FindType? typeFinder,
+        FindType typeFinder,
         ComputeValue? constComputer = null,
         Uri? uri = null)
         => GeneralType.FromArray(types?.Select(v => v.Type), typeFinder, constComputer, uri);

@@ -1415,7 +1415,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         AddComment($"new {newObject.Type} {{");
 
-        GeneralType instanceType = FindType(newObject.Type);
+        GeneralType instanceType = GeneralType.From(newObject.Type, FindType, TryCompute);
 
         newObject.Type.SetAnalyzedType(instanceType);
         OnGotStatementType(newObject, instanceType);
@@ -1763,13 +1763,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (targetType is not FunctionType && type == targetType)
         {
             AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", typeCast.Keyword, CurrentFile));
-            return;
-        }
-
-        if (type is BuiltinType && targetType is BuiltinType targetBuiltinType2)
-        {
-            AddInstruction(Opcode.Push, new DataItem((byte)targetBuiltinType2.Type.Convert()));
-            AddInstruction(Opcode.TypeSet);
         }
     }
 

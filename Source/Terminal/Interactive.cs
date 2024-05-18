@@ -786,21 +786,20 @@ public class Interactive
             {
                 case RuntimeType.Byte:
                     output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append(exitCode.VByte);
+                    output.Append(exitCode.UnsafeByte);
                     break;
                 case RuntimeType.Integer:
                     output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append(exitCode.VInt);
+                    output.Append(exitCode.UnsafeInt);
                     break;
                 case RuntimeType.Single:
                     output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append($"{exitCode.VSingle}f");
+                    output.Append($"{exitCode.UnsafeFloat}f");
                     break;
                 case RuntimeType.Char:
                     output.ForegroundColor = InteractiveColors.LiteralString;
-                    output.Append($"'{exitCode.VChar}'");
+                    output.Append($"'{exitCode.UnsafeChar}'");
                     break;
-                case RuntimeType.Null:
                 default:
                     output.ForegroundColor = InteractiveColors.Keyword;
                     output.Append("null");

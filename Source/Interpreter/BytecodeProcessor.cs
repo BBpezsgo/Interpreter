@@ -217,11 +217,11 @@ public class BytecodeProcessor
             DataItem savedCodePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection)];
             DataItem savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
 
-            if (!savedCodePointerD.Integer.HasValue) return;
-            if (!savedBasePointerD.Integer.HasValue) return;
+            if (!savedCodePointerD.Int.HasValue) return;
+            if (!savedBasePointerD.Int.HasValue) return;
 
-            int savedCodePointer = savedCodePointerD.Integer.Value;
-            int savedBasePointer = savedBasePointerD.Integer.Value;
+            int savedCodePointer = savedCodePointerD.Int.Value;
+            int savedBasePointer = savedBasePointerD.Int.Value;
 
             callTrace.Add(savedCodePointer);
 
@@ -258,7 +258,7 @@ public class BytecodeProcessor
 
             DataItem savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
             if (savedBasePointerD.Type != RuntimeType.Integer) return;
-            int newBasePointer = savedBasePointerD.VInt;
+            int newBasePointer = savedBasePointerD.UnsafeInt;
             result.Add(newBasePointer);
             if (newBasePointer == basePointer) return;
             TraceBasePointers(result, stack, newBasePointer);
@@ -415,9 +415,6 @@ public class BytecodeProcessor
 
             case Opcode.SetCodePointer: SET_CODEPOINTER(); break;
 
-            case Opcode.TypeGet: TYPE_GET(); break;
-            case Opcode.TypeSet: TYPE_SET(); break;
-
             case Opcode.GetRegister: GET_REGISTER(); break;
 
             default: throw new UnreachableException();
@@ -427,12 +424,12 @@ public class BytecodeProcessor
     #region Memory Manipulation
 
     public int GetAddress(Instruction instruction)
-        => GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode);
+        => GetAddress(instruction.Parameter.Int ?? 0, instruction.AddressingMode);
 
     public int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
     {
         AddressingMode.Absolute => offset,
-        AddressingMode.Runtime => Memory[Registers.StackPointer - StackDirection].VInt,
+        AddressingMode.Runtime => Memory[Registers.StackPointer - StackDirection].Int!.Value,
         AddressingMode.BasePointerRelative => Registers.BasePointer + offset,
         AddressingMode.StackPointerRelative => Registers.StackPointer + offset,
 
@@ -486,7 +483,7 @@ public class BytecodeProcessor
     void HEAP_ALLOC()
     {
         DataItem sizeData = Pop();
-        int size = sizeData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode {nameof(Opcode.Allocate)}, got {sizeData.Type}");
+        int size = sizeData.Int ?? throw new RuntimeException($"Expected an integer parameter for opcode {nameof(Opcode.Allocate)}, got {sizeData.Type}");
 
         int block = HeapUtils.Allocate(Memory, size);
 
@@ -498,7 +495,7 @@ public class BytecodeProcessor
     void HEAP_FREE()
     {
         DataItem pointerData = Pop();
-        int pointer = pointerData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode {nameof(Opcode.Free)}, got {pointerData.Type}");
+        int pointer = pointerData.Int ?? throw new RuntimeException($"Expected an integer parameter for opcode {nameof(Opcode.Free)}, got {pointerData.Type}");
 
         HeapUtils.Deallocate(Memory, pointer);
 
@@ -848,28 +845,6 @@ public class BytecodeProcessor
         };
     }
 
-    void TYPE_SET()
-    {
-        RuntimeType targetType = (RuntimeType)(byte)Pop();
-        DataItem value = Pop();
-
-        if (!DataItem.TryCast(ref value, targetType))
-        { throw new RuntimeException($"Cannot cast {value.Type} to {targetType}"); }
-
-        Push(value);
-
-        Step();
-    }
-
-    void TYPE_GET()
-    {
-        DataItem value = Pop();
-        byte type = (byte)value.Type;
-        Push(new DataItem(type));
-
-        Step();
-    }
-
     #endregion
 
     #region External Calls
@@ -887,7 +862,7 @@ public class BytecodeProcessor
         if (functionId_.Type != RuntimeType.Integer)
         { throw new RuntimeException($"Invalid operand {functionId_} for instruction {nameof(Opcode.CallExternal)}"); }
 
-        int functionId = functionId_.VInt;
+        int functionId = functionId_.UnsafeInt;
 
         if (!ExternalFunctions.TryGetValue(functionId, out ExternalFunctionBase? function))
         { throw new RuntimeException($"Undefined external function {functionId}"); }
@@ -924,7 +899,7 @@ public class BytecodeProcessor
 
     void GET_REGISTER()
     {
-        int? register = CurrentInstruction.Parameter.Integer;
+        int? register = CurrentInstruction.Parameter.Int;
         switch (register)
         {
             case 1: Push(Registers.CodePointer); break;

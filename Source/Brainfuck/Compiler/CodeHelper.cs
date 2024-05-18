@@ -126,9 +126,9 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     {
         return v.Type switch
         {
-            Runtime.RuntimeType.Byte => v.VByte,
-            Runtime.RuntimeType.Integer => v.VInt,
-            Runtime.RuntimeType.Char => CharCode.GetByte(v.VChar),
+            Runtime.RuntimeType.Byte => v.UnsafeByte,
+            Runtime.RuntimeType.Integer => v.UnsafeInt,
+            Runtime.RuntimeType.Char => CharCode.GetByte(v.UnsafeChar),
 
             Runtime.RuntimeType.Single => throw new NotImplementedException("Floats not supported by brainfuck :("),
             Runtime.RuntimeType.Null => throw new InternalException(),

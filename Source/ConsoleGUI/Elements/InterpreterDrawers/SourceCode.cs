@@ -145,24 +145,24 @@ public partial class InterpreterElement
                 {
                     case RuntimeType.Byte:
                         b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Parameter.VByte.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Parameter.UnsafeByte.ToString(CultureInfo.InvariantCulture));
                         b.AddText(' ');
                         break;
                     case RuntimeType.Integer:
                         b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Parameter.VInt.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Parameter.UnsafeInt.ToString(CultureInfo.InvariantCulture));
                         b.AddText(' ');
                         break;
                     case RuntimeType.Single:
                         b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Parameter.VSingle.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Parameter.UnsafeFloat.ToString(CultureInfo.InvariantCulture));
                         b.AddText('f');
                         b.AddText(' ');
                         break;
                     case RuntimeType.Char:
                         b.ForegroundColor = CharColor.BrightYellow;
                         b.AddText('\'');
-                        b.AddText(instruction.Parameter.VChar.Escape());
+                        b.AddText(instruction.Parameter.UnsafeChar.Escape());
                         b.AddText('\'');
                         b.AddText(' ');
                         break;

@@ -1213,8 +1213,6 @@ public abstract class CodeGenerator
 
     #endregion
 
-    #region FindType()
-
     protected bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
     {
         if (TypeKeywords.BasicTypes.TryGetValue(name.Content, out BasicType builtinType))
@@ -1262,11 +1260,6 @@ public abstract class CodeGenerator
         result = null;
         return false;
     }
-
-    protected GeneralType FindType(TypeInstance name)
-        => GeneralType.From(name, FindType, TryCompute);
-
-    #endregion
 
     #region Memory Helpers
 
@@ -1976,7 +1969,7 @@ public abstract class CodeGenerator
             return OnGotStatementType(identifier, new EnumType(@enum, identifier.OriginalFile));
         }
 
-        if (GetFunction(identifier.Token.Content, expectedType, out FunctionQueryResult<CompiledFunction>? function, out WillBeCompilerException? functionError))
+        if (GetFunction(identifier.Token.Content, expectedType, out FunctionQueryResult<CompiledFunction>? function, out _))
         {
             identifier.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
             return OnGotStatementType(identifier, new FunctionType(function.Function));

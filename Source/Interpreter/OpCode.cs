@@ -578,11 +578,6 @@ public enum Opcode : byte
     Free,
     #endregion
 
-    #region === TYPE OPERATINS ===
-    TypeGet,
-    TypeSet,
-    #endregion
-
     #region === REGISTERS ===
 
     /// <summary>

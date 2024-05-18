@@ -647,7 +647,15 @@ public sealed class Compiler
                     ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                     {
                         Output.LogDebug($"{name}({string.Join(", ", p)})");
-                        return DataItem.GetDefaultValue(returnType);
+                        return returnType switch
+                        {
+                            BasicType.Void => DataItem.Null,
+                            BasicType.Byte => new DataItem((byte)0),
+                            BasicType.Integer => new DataItem((int)0),
+                            BasicType.Float => new DataItem((float)0),
+                            BasicType.Char => new DataItem((char)0),
+                            _ => throw new UnreachableException(),
+                        };
                     });
                 }
             }

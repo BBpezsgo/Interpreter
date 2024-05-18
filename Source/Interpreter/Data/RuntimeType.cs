@@ -4,7 +4,7 @@ public enum RuntimeType : byte
 {
     Null,
     Byte,
+    Char,
     Integer,
     Single,
-    Char,
 }

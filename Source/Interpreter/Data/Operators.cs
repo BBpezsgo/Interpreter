@@ -22,10 +22,10 @@ public partial struct DataItem :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new DataItem((byte)(a._byte + b._byte)),
+            RuntimeType.Byte => new DataItem((byte)(a._integer + b._integer)),
             RuntimeType.Integer => new DataItem((int)(a._integer + b._integer)),
             RuntimeType.Single => new DataItem((float)(a._single + b._single)),
-            RuntimeType.Char => new DataItem((ushort)(a._char + b._char)),
+            RuntimeType.Char => new DataItem((ushort)((char)a._integer + (char)b._integer)),
             _ => throw new RuntimeException($"Can't do + operation with type {a_} and {b_}"),
         };
     }
@@ -38,10 +38,10 @@ public partial struct DataItem :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new DataItem((byte)(a._byte - b._byte)),
+            RuntimeType.Byte => new DataItem((byte)(a._integer - b._integer)),
             RuntimeType.Integer => new DataItem((int)(a._integer - b._integer)),
             RuntimeType.Single => new DataItem((float)(a._single - b._single)),
-            RuntimeType.Char => new DataItem((ushort)(a._char - b._char)),
+            RuntimeType.Char => new DataItem((ushort)((char)a._integer - (char)b._integer)),
             _ => throw new RuntimeException($"Can't do - operation with type {a_} and {b_}"),
         };
     }
@@ -49,41 +49,41 @@ public partial struct DataItem :
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static DataItem operator <<(DataItem leftSide, DataItem rightSide)
-        => leftSide << (rightSide.Integer ?? throw new RuntimeException($"Can't do << operation with type {leftSide.Type} and {rightSide.Type}"));
+        => leftSide << (rightSide.Int ?? throw new RuntimeException($"Can't do << operation with type {leftSide.Type} and {rightSide.Type}"));
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static DataItem operator >>(DataItem leftSide, DataItem rightSide)
-        => leftSide >> (rightSide.Integer ?? throw new RuntimeException($"Can't do >> operation with type {leftSide.Type} and {rightSide.Type}"));
+        => leftSide >> (rightSide.Int ?? throw new RuntimeException($"Can't do >> operation with type {leftSide.Type} and {rightSide.Type}"));
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static DataItem operator >>>(DataItem leftSide, DataItem rightSide)
-        => leftSide >>> (rightSide.Integer ?? throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type} and {rightSide.Type}"));
+        => leftSide >>> (rightSide.Int ?? throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type} and {rightSide.Type}"));
 
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static DataItem operator <<(DataItem leftSide, int rightSide) => leftSide.Type switch
     {
-        RuntimeType.Byte => new DataItem(unchecked((byte)(leftSide._byte << rightSide))),
+        RuntimeType.Byte => new DataItem(unchecked((byte)(leftSide._integer << rightSide))),
         RuntimeType.Integer => new DataItem(unchecked((int)(leftSide._integer << rightSide))),
-        RuntimeType.Char => new DataItem(unchecked((char)(leftSide._char << rightSide))),
+        RuntimeType.Char => new DataItem(unchecked((char)(leftSide._integer << rightSide))),
         _ => throw new RuntimeException($"Can't do << operation with type {leftSide.Type}"),
     };
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static DataItem operator >>(DataItem leftSide, int rightSide) => leftSide.Type switch
     {
-        RuntimeType.Byte => new DataItem(unchecked((byte)(leftSide._byte >> rightSide))),
+        RuntimeType.Byte => new DataItem(unchecked((byte)(leftSide._integer >> rightSide))),
         RuntimeType.Integer => new DataItem(unchecked((int)(leftSide._integer >> rightSide))),
-        RuntimeType.Char => new DataItem(unchecked((char)(leftSide._char >> rightSide))),
+        RuntimeType.Char => new DataItem(unchecked((char)(leftSide._integer >> rightSide))),
         _ => throw new RuntimeException($"Can't do >> operation with type {leftSide.Type}"),
     };
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static DataItem operator >>>(DataItem leftSide, int rightSide) => leftSide.Type switch
     {
-        RuntimeType.Byte => new DataItem(unchecked((byte)(leftSide._byte >>> rightSide))),
+        RuntimeType.Byte => new DataItem(unchecked((byte)(leftSide._integer >>> rightSide))),
         RuntimeType.Integer => new DataItem(unchecked((int)(leftSide._integer >>> rightSide))),
-        RuntimeType.Char => new DataItem(unchecked((char)(leftSide._char >>> rightSide))),
+        RuntimeType.Char => new DataItem(unchecked((char)(leftSide._integer >>> rightSide))),
         _ => throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type}"),
     };
 
@@ -95,10 +95,10 @@ public partial struct DataItem :
         return Type switch
         {
             RuntimeType.Null => true,
-            RuntimeType.Byte => _byte == other._byte,
+            RuntimeType.Byte => (byte)_integer == (byte)other._integer,
             RuntimeType.Integer => _integer == other._integer,
             RuntimeType.Single => _single == other._single,
-            RuntimeType.Char => _char == other._char,
+            RuntimeType.Char => (char)_integer == (char)other._integer,
             _ => false,
         };
     }
@@ -141,10 +141,10 @@ public partial struct DataItem :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new DataItem((byte)(a._byte * b._byte)),
+            RuntimeType.Byte => new DataItem((byte)(a._integer * b._integer)),
             RuntimeType.Integer => new DataItem((int)(a._integer * b._integer)),
             RuntimeType.Single => new DataItem((float)(a._single * b._single)),
-            RuntimeType.Char => new DataItem((ushort)(a._char * b._char)),
+            RuntimeType.Char => new DataItem((ushort)(a._integer * b._integer)),
             _ => throw new RuntimeException($"Can't do * operation with type {a_} and {b_}"),
         };
     }
@@ -157,10 +157,10 @@ public partial struct DataItem :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new DataItem((byte)(a._byte / b._byte)),
+            RuntimeType.Byte => new DataItem((byte)(a._integer / b._integer)),
             RuntimeType.Integer => new DataItem((int)(a._integer / b._integer)),
             RuntimeType.Single => new DataItem((float)(a._single / b._single)),
-            RuntimeType.Char => new DataItem((ushort)(a._char / b._char)),
+            RuntimeType.Char => new DataItem((ushort)(a._integer / b._integer)),
             _ => throw new RuntimeException($"Can't do / operation with type {a_} and {b_}"),
         };
     }
@@ -173,10 +173,10 @@ public partial struct DataItem :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new DataItem((byte)(a._byte % b._byte)),
+            RuntimeType.Byte => new DataItem((byte)(a._integer % b._integer)),
             RuntimeType.Integer => new DataItem((int)(a._integer % b._integer)),
             RuntimeType.Single => new DataItem((float)(a._single % b._single)),
-            RuntimeType.Char => new DataItem((ushort)(a._char % b._char)),
+            RuntimeType.Char => new DataItem((ushort)(a._integer % b._integer)),
             _ => throw new RuntimeException($"Can't do % operation with type {a_} and {b_}"),
         };
     }
@@ -188,10 +188,10 @@ public partial struct DataItem :
         return a.Type switch
         {
             RuntimeType.Null => false,
-            RuntimeType.Byte => a._byte < b._byte,
+            RuntimeType.Byte => (byte)a._integer < (byte)b._integer,
             RuntimeType.Integer => a._integer < b._integer,
             RuntimeType.Single => a._single < b._single,
-            RuntimeType.Char => a._char < b._char,
+            RuntimeType.Char => (char)a._integer < (char)b._integer,
             _ => false,
         };
     }
@@ -202,10 +202,10 @@ public partial struct DataItem :
         return a.Type switch
         {
             RuntimeType.Null => false,
-            RuntimeType.Byte => a._byte > b._byte,
+            RuntimeType.Byte => (byte)a._integer > (byte)b._integer,
             RuntimeType.Integer => a._integer > b._integer,
             RuntimeType.Single => a._single > b._single,
-            RuntimeType.Char => a._char > b._char,
+            RuntimeType.Char => (char)a._integer > (char)b._integer,
             _ => false,
         };
     }
@@ -217,10 +217,10 @@ public partial struct DataItem :
         return a.Type switch
         {
             RuntimeType.Null => false,
-            RuntimeType.Byte => a._byte <= b._byte,
+            RuntimeType.Byte => (byte)a._integer <= (byte)b._integer,
             RuntimeType.Integer => a._integer <= b._integer,
             RuntimeType.Single => a._single <= b._single,
-            RuntimeType.Char => a._char <= b._char,
+            RuntimeType.Char => (char)a._integer <= (char)b._integer,
             _ => false,
         };
     }
@@ -231,10 +231,10 @@ public partial struct DataItem :
         return a.Type switch
         {
             RuntimeType.Null => false,
-            RuntimeType.Byte => a._byte >= b._byte,
+            RuntimeType.Byte => (byte)a._integer >= (byte)b._integer,
             RuntimeType.Integer => a._integer >= b._integer,
             RuntimeType.Single => a._single >= b._single,
-            RuntimeType.Char => a._char >= b._char,
+            RuntimeType.Char => (char)a._integer >= (char)b._integer,
             _ => false,
         };
     }
@@ -248,10 +248,10 @@ public partial struct DataItem :
         return a.Type switch
         {
             RuntimeType.Null => b.IsNull,
-            RuntimeType.Byte => a._byte == b._byte,
+            RuntimeType.Byte => (byte)a._integer == (byte)b._integer,
             RuntimeType.Integer => a._integer == b._integer,
             RuntimeType.Single => a._single == b._single,
-            RuntimeType.Char => a._char == b._char,
+            RuntimeType.Char => (char)a._integer == (char)b._integer,
             _ => false,
         };
     }
@@ -262,10 +262,10 @@ public partial struct DataItem :
     /// <exception cref="RuntimeException"/>
     public static DataItem operator !(DataItem value) => value.Type switch
     {
-        RuntimeType.Byte => new DataItem((byte)((value._byte == 0) ? (byte)1 : (byte)0)),
+        RuntimeType.Byte => new DataItem((byte)((value._integer == 0) ? (byte)1 : (byte)0)),
         RuntimeType.Integer => new DataItem((int)((value._integer == 0) ? (int)1 : (int)0)),
         RuntimeType.Single => new DataItem((float)((value._single == 0) ? (float)1f : (float)0f)),
-        RuntimeType.Char => new DataItem((char)((value._single == 0) ? (ushort)1 : (ushort)0)),
+        RuntimeType.Char => new DataItem((char)((value._integer == 0) ? (ushort)1 : (ushort)0)),
         _ => throw new RuntimeException($"Can't do ! operation with type {value.Type}"),
     };
 
@@ -273,10 +273,10 @@ public partial struct DataItem :
     /// <exception cref="RuntimeException"/>
     public static DataItem operator +(DataItem value) => value.Type switch
     {
-        RuntimeType.Byte => new DataItem((byte)(+value._byte)),
-        RuntimeType.Integer => new DataItem((int)(+value._integer)),
-        RuntimeType.Single => new DataItem((float)(+value._single)),
-        RuntimeType.Char => new DataItem((char)(+value._char)),
+        RuntimeType.Byte => new DataItem((byte)+value._integer),
+        RuntimeType.Integer => new DataItem((int)+value._integer),
+        RuntimeType.Single => new DataItem((float)+value._single),
+        RuntimeType.Char => new DataItem((char)+value._integer),
         _ => throw new RuntimeException($"Can't do + operation with type {value.Type}"),
     };
 
@@ -284,10 +284,10 @@ public partial struct DataItem :
     /// <exception cref="RuntimeException"/>
     public static DataItem operator -(DataItem value) => value.Type switch
     {
-        RuntimeType.Byte => new DataItem((byte)(-value._byte)),
-        RuntimeType.Integer => new DataItem((int)(-value._integer)),
-        RuntimeType.Single => new DataItem((float)(-value._single)),
-        RuntimeType.Char => new DataItem((char)(-value._char)),
+        RuntimeType.Byte => new DataItem((byte)-value._integer),
+        RuntimeType.Integer => new DataItem((int)-value._integer),
+        RuntimeType.Single => new DataItem((float)-value._single),
+        RuntimeType.Char => new DataItem((char)-value._integer),
         _ => throw new RuntimeException($"Can't do - operation with type {value.Type}"),
     };
 
@@ -300,9 +300,9 @@ public partial struct DataItem :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new DataItem((byte)(a._byte | b._byte)),
+            RuntimeType.Byte => new DataItem((byte)(a._integer | b._integer)),
             RuntimeType.Integer => new DataItem((int)(a._integer | b._integer)),
-            RuntimeType.Char => new DataItem((ushort)(a._char | b._char)),
+            RuntimeType.Char => new DataItem((ushort)(a._integer | b._integer)),
             _ => throw new RuntimeException($"Can't do | operation with type {a_} and {b_}"),
         };
     }
@@ -315,9 +315,9 @@ public partial struct DataItem :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new DataItem((byte)(a._byte & b._byte)),
+            RuntimeType.Byte => new DataItem((byte)(a._integer & b._integer)),
             RuntimeType.Integer => new DataItem((int)(a._integer & b._integer)),
-            RuntimeType.Char => new DataItem((ushort)(a._char & b._char)),
+            RuntimeType.Char => new DataItem((ushort)(a._integer & b._integer)),
             _ => throw new RuntimeException($"Can't do & operation with type {a_} and {b_}"),
         };
     }
@@ -330,47 +330,19 @@ public partial struct DataItem :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new DataItem((byte)(a._byte ^ b._byte)),
+            RuntimeType.Byte => new DataItem((byte)(a._integer ^ b._integer)),
             RuntimeType.Integer => new DataItem((int)(a._integer ^ b._integer)),
-            RuntimeType.Char => new DataItem((ushort)(a._char ^ b._char)),
+            RuntimeType.Char => new DataItem((ushort)(a._integer ^ b._integer)),
             _ => throw new RuntimeException($"Can't do ^ operation with type {a_} and {b_}"),
         };
     }
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
-    public static DataItem operator ~(DataItem value)
+    public static DataItem operator ~(DataItem value) => value.Type switch
     {
-        if (value.Type == RuntimeType.Byte)
-        {
-            byte? left = value.Byte;
-
-            if (left.HasValue)
-            {
-                int r = ~left.Value;
-                if (r < byte.MinValue || r > byte.MaxValue)
-                { return new DataItem(r); }
-                else
-                { return new DataItem((byte)r); }
-            }
-        }
-
-        {
-            int? left = value.Integer;
-
-            if (left.HasValue)
-            { return new DataItem(~left.Value); }
-        }
-
-        throw new RuntimeException($"Can't do ~ operation with type {value.Type}");
-    }
-
-    /// <inheritdoc/>
-    /// <exception cref="NotImplementedException"/>
-    [DoesNotReturn]
-    public static DataItem operator --(DataItem value) => throw new NotImplementedException();
-
-    /// <inheritdoc/>
-    /// <exception cref="NotImplementedException"/>
-    [DoesNotReturn]
-    public static DataItem operator ++(DataItem value) => throw new NotImplementedException();
+        RuntimeType.Byte => new DataItem((byte)~value._integer),
+        RuntimeType.Integer => new DataItem(~value._integer),
+        RuntimeType.Char => new DataItem((char)~value._integer),
+        _ => throw new RuntimeException($"Can't do ~ operation with type {value.Type}"),
+    };
 }

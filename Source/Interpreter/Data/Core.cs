@@ -12,10 +12,8 @@ public readonly partial struct DataItem
 
     #region Value Fields
 
-    [FieldOffset(1)] readonly byte _byte;
     [FieldOffset(1)] readonly int _integer;
     [FieldOffset(1)] readonly float _single;
-    [FieldOffset(1)] readonly char _char;
 
     #endregion
 
@@ -23,31 +21,29 @@ public readonly partial struct DataItem
 
     #region Value Properties
 
-    /// <exception cref="RuntimeException"/>
-    public byte VByte => Type switch
+    public int UnsafeInt => _integer;
+    public char UnsafeChar => (char)_integer;
+    public byte UnsafeByte => (byte)_integer;
+    public float UnsafeFloat => _single;
+
+    public int? Int => Type switch
     {
-        RuntimeType.Byte => _byte,
-        _ => throw new RuntimeException($"Can't cast {Type} to {typeof(byte)}")
-    };
-    /// <exception cref="RuntimeException"/>
-    public int VInt => Type switch
-    {
+        RuntimeType.Byte => _integer,
         RuntimeType.Integer => _integer,
-        _ => throw new RuntimeException($"Can't cast {Type} to {typeof(int)}")
+        RuntimeType.Char => _integer,
+        RuntimeType.Single => (int)_single,
+        RuntimeType.Null => null,
+        _ => throw new UnreachableException(),
     };
-    /// <exception cref="RuntimeException"/>
-    public float VSingle => Type switch
+
+    public byte? Byte => Type switch
     {
-        RuntimeType.Single => _single,
-        _ => throw new RuntimeException($"Can't cast {Type} to {typeof(float)}")
-    };
-    /// <exception cref="RuntimeException"/>
-    public char VChar => Type switch
-    {
-        RuntimeType.Char => _char,
-        RuntimeType.Integer => (char)_integer,
-        RuntimeType.Byte => (char)_integer,
-        _ => throw new RuntimeException($"Can't cast {Type} to {typeof(char)}")
+        RuntimeType.Byte => (byte)_integer,
+        RuntimeType.Integer => (byte)_integer,
+        RuntimeType.Single => (byte)_single,
+        RuntimeType.Char => (byte)_integer,
+        RuntimeType.Null => null,
+        _ => throw new UnreachableException(),
     };
 
     #endregion
@@ -58,87 +54,48 @@ public readonly partial struct DataItem
     {
         Type = type;
         _integer = default;
-        _byte = default;
         _single = default;
-        _char = default;
     }
 
     public DataItem(int value) : this(RuntimeType.Integer)
     { _integer = value; }
     public DataItem(byte value) : this(RuntimeType.Byte)
-    { _byte = value; }
+    { _integer = value; }
     public DataItem(float value) : this(RuntimeType.Single)
     { _single = value; }
     public DataItem(char value) : this(RuntimeType.Char)
-    { _char = value; }
+    { _integer = value; }
     public DataItem(bool value) : this(value ? 1 : 0)
     { }
 
     #endregion
 
-    public int? Integer => Type switch
-    {
-        RuntimeType.Byte => VByte,
-        RuntimeType.Integer => VInt,
-        RuntimeType.Char => VChar,
-        RuntimeType.Single => null,
-        RuntimeType.Null => null,
-        _ => throw new UnreachableException(),
-    };
-
-    public byte? Byte
-    {
-        get
-        {
-            switch (Type)
-            {
-                case RuntimeType.Byte:
-                    return _byte;
-                case RuntimeType.Integer:
-                    if (_integer is >= byte.MinValue and <= byte.MaxValue)
-                    { return (byte)_integer; }
-                    return null;
-                case RuntimeType.Single:
-                    if (!float.IsInteger(_single)) return null;
-                    if (_single is >= byte.MinValue and <= byte.MaxValue)
-                    { return (byte)_single; }
-                    return null;
-                case RuntimeType.Char:
-                    if ((ushort)_char is >= byte.MinValue and <= byte.MaxValue)
-                    { return (byte)_char; }
-                    return null;
-                default:
-                    return null;
-            }
-        }
-    }
-
     public object? GetValue() => Type switch
     {
         RuntimeType.Null => (object?)null,
-        RuntimeType.Byte => (object)_byte,
+        RuntimeType.Byte => (object)(byte)_integer,
         RuntimeType.Integer => (object)_integer,
         RuntimeType.Single => (object)_single,
-        RuntimeType.Char => (object)_char,
+        RuntimeType.Char => (object)(char)_integer,
         _ => throw new UnreachableException(),
     };
 
     public string GetDebuggerDisplay() => Type switch
     {
         RuntimeType.Null => "null",
-        RuntimeType.Integer => VInt.ToString(CultureInfo.InvariantCulture),
-        RuntimeType.Byte => VByte.ToString(CultureInfo.InvariantCulture),
-        RuntimeType.Single => VSingle.ToString(CultureInfo.InvariantCulture) + "f",
-        RuntimeType.Char => $"'{VChar.Escape()}'",
+        RuntimeType.Integer => _integer.ToString(CultureInfo.InvariantCulture),
+        RuntimeType.Byte => ((byte)_integer).ToString(CultureInfo.InvariantCulture),
+        RuntimeType.Single => _single.ToString(CultureInfo.InvariantCulture) + "f",
+        RuntimeType.Char => $"'{((char)_integer).Escape()}'",
         _ => throw new UnreachableException(),
     };
 
     public override int GetHashCode() => Type switch
     {
-        RuntimeType.Byte => HashCode.Combine(Type, _byte),
+        RuntimeType.Byte => HashCode.Combine(Type, (byte)_integer),
         RuntimeType.Integer => HashCode.Combine(Type, _integer),
         RuntimeType.Single => HashCode.Combine(Type, _single),
-        RuntimeType.Char => HashCode.Combine(Type, _char),
+        RuntimeType.Char => HashCode.Combine(Type, (char)_integer),
         _ => throw new UnreachableException(),
     };
 
@@ -151,7 +108,7 @@ public readonly partial struct DataItem
         {
             case RuntimeType.Byte:
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write(_byte);
+                Console.Write((byte)_integer);
                 break;
             case RuntimeType.Integer:
                 Console.ForegroundColor = ConsoleColor.Green;
@@ -163,7 +120,7 @@ public readonly partial struct DataItem
                 break;
             case RuntimeType.Char:
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"\'{_char.Escape()}\'");
+                Console.Write($"\'{((char)_integer).Escape()}\'");
                 break;
             case RuntimeType.Null:
                 Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -197,7 +154,7 @@ public readonly partial struct DataItem
                 TypeCode.SByte => new DataItem((sbyte)value),
                 TypeCode.Byte => new DataItem((byte)value),
                 TypeCode.Int16 => new DataItem((short)value),
-                TypeCode.UInt16 => new DataItem((ushort)value),
+                TypeCode.UInt16 => new DataItem((char)value),
                 TypeCode.Int32 => new DataItem((int)value),
                 TypeCode.Single => new DataItem((float)value),
                 _ => throw new NotImplementedException($"Cannot convert {value} to {typeof(DataItem)}"),
@@ -205,26 +162,6 @@ public readonly partial struct DataItem
             _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(DataItem)}"),
         };
     }
-
-    public static DataItem GetDefaultValue(RuntimeType type) => type switch
-    {
-        RuntimeType.Byte => new DataItem((byte)0),
-        RuntimeType.Integer => new DataItem((int)0),
-        RuntimeType.Single => new DataItem((float)0f),
-        RuntimeType.Char => new DataItem((char)'\0'),
-        _ => DataItem.Null,
-    };
-
-    /// <exception cref="InternalException"/>
-    public static DataItem GetDefaultValue(Compiler.BasicType type) => type switch
-    {
-        Compiler.BasicType.Byte => new DataItem((byte)0),
-        Compiler.BasicType.Integer => new DataItem((int)0),
-        Compiler.BasicType.Float => new DataItem((float)0f),
-        Compiler.BasicType.Char => new DataItem((char)'\0'),
-        Compiler.BasicType.Void => throw new InternalException($"Type {type} does not have a default value"),
-        _ => DataItem.Null,
-    };
 
     public static bool TryShrinkTo8bit(ref DataItem value)
     {
@@ -234,15 +171,15 @@ public readonly partial struct DataItem
 
             case RuntimeType.Char:
             {
-                if (value._char < byte.MinValue || value._char > byte.MaxValue)
+                if ((char)value._integer is < (char)byte.MinValue or > (char)byte.MaxValue)
                 { return false; }
-                value = new DataItem((byte)value._char);
+                value = new DataItem((byte)value._integer);
                 return true;
             }
 
             case RuntimeType.Integer:
             {
-                if (value._integer < byte.MinValue || value._integer > byte.MaxValue)
+                if (value._integer is < byte.MinValue or > byte.MaxValue)
                 { return false; }
                 value = new DataItem((byte)value._integer);
                 return true;
@@ -266,7 +203,7 @@ public readonly partial struct DataItem
 
             case RuntimeType.Integer:
             {
-                if (value._integer < char.MinValue || value._integer > char.MaxValue)
+                if (value._integer is < char.MinValue or > char.MaxValue)
                 { return false; }
                 value = new DataItem((char)value._integer);
                 return true;

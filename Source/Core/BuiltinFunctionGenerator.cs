@@ -5,12 +5,11 @@ public enum ExternalFunctionCheckFlags : byte
 {
     None = 0,
     CheckParamLength = 1,
-    CheckParamType = 2,
 }
 
 public abstract class ExternalFunctionBase : ISimpleReadable
 {
-    public const ExternalFunctionCheckFlags DefaultFlags = ExternalFunctionCheckFlags.CheckParamLength | ExternalFunctionCheckFlags.CheckParamType;
+    public const ExternalFunctionCheckFlags DefaultFlags = ExternalFunctionCheckFlags.CheckParamLength;
 
     public readonly ImmutableArray<RuntimeType> Parameters;
     public readonly string? Name;
@@ -19,7 +18,6 @@ public abstract class ExternalFunctionBase : ISimpleReadable
     public readonly ExternalFunctionCheckFlags Flags;
 
     public bool CheckParameterLength => ((byte)Flags & (byte)ExternalFunctionCheckFlags.CheckParamLength) != 0;
-    public bool CheckParameterType => ((byte)Flags & (byte)ExternalFunctionCheckFlags.CheckParamType) != 0;
 
     public BytecodeProcessor? BytecodeInterpreter;
 
@@ -36,9 +34,6 @@ public abstract class ExternalFunctionBase : ISimpleReadable
     {
         if (CheckParameterLength && parameters.Length != Parameters.Length)
         { throw new RuntimeException($"Wrong number of parameters passed to external function {Name} ({parameters.Length}): expected {Parameters.Length}"); }
-
-        if (CheckParameterType)
-        { ExternalFunctionGenerator.CheckTypes(parameters, Parameters); }
     }
 
     public string ToReadable()
@@ -153,12 +148,9 @@ public static unsafe class ExternalFunctionGenerator
     [RequiresUnreferencedCode("Loading Assembly")]
     public static void LoadAssembly(this Dictionary<int, ExternalFunctionBase> externalFunctions, System.Reflection.Assembly assembly)
     {
-        Type[] exportedTypes = assembly.GetExportedTypes();
-
-        foreach (Type type in exportedTypes)
+        foreach (Type type in assembly.GetExportedTypes())
         {
-            System.Reflection.MethodInfo[] methods = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-            foreach (System.Reflection.MethodInfo method in methods)
+            foreach (System.Reflection.MethodInfo method in type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public))
             { externalFunctions.AddExternalFunction(method); }
         }
     }
@@ -506,28 +498,6 @@ public static unsafe class ExternalFunctionGenerator
                 GetValue<T5>(sender, args[5]));
 
             return DataItem.GetValue(result);
-        });
-    }
-
-    /// <exception cref="RuntimeException"/>
-    public static void CheckTypes(IEnumerable<DataItem> values, IEnumerable<RuntimeType> types)
-    {
-        Utils.SequenceEquals(values, types, (value, type) =>
-        {
-            if (value.Type != type)
-            { throw new RuntimeException($"Invalid parameter type {value.Type}: expected {type}"); }
-            return true;
-        });
-    }
-
-    /// <exception cref="RuntimeException"/>
-    public static void CheckTypes(IEnumerable<DataItem> values, IEnumerable<Compiler.BasicType> types)
-    {
-        Utils.SequenceEquals(values, types, (value, type) =>
-        {
-            if (value.Type.Convert() != type)
-            { throw new RuntimeException($"Invalid parameter type {value.Type}: expected {type}"); }
-            return true;
         });
     }
 

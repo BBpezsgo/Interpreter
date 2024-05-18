@@ -639,7 +639,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         if (!DataItem.TryShrinkTo8bit(ref addressToSet))
         { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, CurrentFile); }
 
-        address = addressToSet.VByte;
+        address = addressToSet.UnsafeByte;
         size = 1;
 
         return true;

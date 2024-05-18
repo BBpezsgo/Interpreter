@@ -45,7 +45,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!allocator.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", size, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", size, CurrentFile));
             return;
         }
 
@@ -111,7 +111,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!deallocator.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", value, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", value, CurrentFile));
             return;
         }
 
@@ -182,7 +182,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!deallocator.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
             return;
         }
 
@@ -254,7 +254,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!destructor.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{deallocateablePointerType}\" function cannot be called due to its protection level", position, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Destructor for type \"{deallocateablePointerType}\" function cannot be called due to its protection level", position, CurrentFile));
             AddComment("}");
             return;
         }
@@ -284,10 +284,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
         if (GetConstant(newVariable.Identifier.Content, out _))
-        { throw new CompilerException($"Symbol name \"{newVariable.Identifier}\" conflicts with an another symbol name", newVariable.Identifier, newVariable.FilePath); }
+        { throw new CompilerException($"Symbol name \"{newVariable.Identifier}\" conflicts with an another symbol name", newVariable.Identifier, newVariable.File); }
 
         if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable))
-        { throw new InternalException($"Variable \"{newVariable.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.Identifier, newVariable.FilePath); }
+        { throw new InternalException($"Variable \"{newVariable.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.Identifier, newVariable.File); }
 
         if (compiledVariable.IsInitialized) return;
 
@@ -298,12 +298,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment($"New Variable \"{newVariable.Identifier.Content}\" {{");
 
         if (GetConstant(newVariable.Identifier.Content, out _))
-        { throw new CompilerException($"Can not set constant value: it is readonly", newVariable, newVariable.FilePath); }
+        { throw new CompilerException($"Can not set constant value: it is readonly", newVariable, newVariable.File); }
 
         if (newVariable.InitialValue is LiteralList)
         { throw new NotImplementedException(); }
 
-        GenerateCodeForValueSetter(new Identifier(newVariable.Identifier, newVariable.FilePath), newVariable.InitialValue);
+        GenerateCodeForValueSetter(new Identifier(newVariable.Identifier, newVariable.File), newVariable.InitialValue);
         AddComment("}");
     }
     void GenerateCodeForStatement(KeywordCall keywordCall)
@@ -315,9 +315,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (keywordCall.Parameters.Length > 1)
             { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
-            if (InMacro.Last)
-            { throw new NotImplementedException(); }
-
             if (keywordCall.Parameters.Length == 1)
             {
                 AddComment(" Param 0:");
@@ -327,7 +324,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 GenerateCodeForStatement(returnValue);
 
-                if (InFunction || InMacro.Last)
+                if (InFunction)
                 {
                     StackStore(GetReturnValueAddress(returnValueType), returnValueType.Size);
                 }
@@ -375,9 +372,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (BreakInstructions.Count == 0)
             { throw new CompilerException($"The keyword \"{StatementKeywords.Break}\" does not available in the current context", keywordCall.Identifier, CurrentFile); }
-
-            if (InMacro.Last)
-            { throw new NotImplementedException(); }
 
             BreakInstructions.Last.Add(GeneratedCode.Count);
             AddInstruction(Opcode.Jump, 0);
@@ -598,7 +592,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!compiledFunction.CanUse(functionCall.OriginalFile ?? CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
             return;
         }
 
@@ -727,7 +721,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetFunction(anyCall, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound, AddCompilable) &&
+        if (GetFunction(anyCall, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound, AddCompilable) &&
             anyCall.ToFunctionCall(out FunctionCall? functionCall))
         {
             CompiledFunction compiledFunction = result.Function;
@@ -851,7 +845,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (!operatorDefinition.CanUse(CurrentFile))
             {
-                AnalysisCollection?.Errors.Add(new Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
+                AnalysisCollection?.Errors.Add(new LanguageError($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
                 return;
             }
 
@@ -958,7 +952,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (!operatorDefinition.CanUse(CurrentFile))
             {
-                AnalysisCollection?.Errors.Add(new Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
+                AnalysisCollection?.Errors.Add(new LanguageError($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
                 return;
             }
 
@@ -1134,7 +1128,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetGlobalVariable(variable.Content, out CompiledVariable? globalVariable))
+        if (GetGlobalVariable(variable.Content, variable.OriginalFile, out CompiledVariable? globalVariable, out _))
         {
             variable.Token.AnalyzedType = TokenAnalyzedType.VariableName;
             variable.Reference = globalVariable;
@@ -1473,7 +1467,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!compiledFunction.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Constructor {compiledFunction.ToReadable()} could not be called due to its protection level", constructorCall.Type, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Constructor {compiledFunction.ToReadable()} could not be called due to its protection level", constructorCall.Type, CurrentFile));
             return;
         }
 
@@ -1850,15 +1844,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         });
     }
 
-    CleanupItem[] CompileVariables(IEnumerable<VariableDeclaration> statements, bool addComments = true)
+    ImmutableArray<CleanupItem> CompileVariables(IEnumerable<VariableDeclaration> statements, bool addComments = true)
     {
         if (addComments) AddComment("Variables {");
 
-        List<CleanupItem> result = new();
+        ImmutableArray<CleanupItem>.Builder result = ImmutableArray.CreateBuilder<CleanupItem>();
 
         foreach (VariableDeclaration statement in statements)
         {
-            CleanupItem item = GenerateCodeForVariable(statement);
+            CleanupItem item = GenerateCodeForLocalVariable(statement);
             if (item.SizeOnStack == 0) continue;
 
             result.Add(item);
@@ -1866,10 +1860,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (addComments) AddComment("}");
 
-        return result.ToArray();
+        return result.ToImmutable();
     }
 
-    void CleanupVariables(CleanupItem[] cleanupItems, Position position)
+    void CleanupVariables(ImmutableArray<CleanupItem> cleanupItems, Position position)
     {
         if (cleanupItems.Length == 0) return;
         AddComment("Clear Variables");
@@ -1890,6 +1884,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             CompiledVariables.Pop();
+        }
+    }
+
+    void CleanupGlobalVariables(CleanupItem[] cleanupItems, Position position)
+    {
+        if (cleanupItems.Length == 0) return;
+        AddComment("Clear Global Variables");
+        for (int i = cleanupItems.Length - 1; i >= 0; i--)
+        {
+            CleanupItem item = cleanupItems[i];
+
+            if (item.ShouldDeallocate)
+            {
+                if (item.SizeOnStack != 1) throw new InternalException();
+                if (item.Type is null) throw new InternalException();
+                GenerateDestructor(item.Type, position);
+            }
+            else
+            {
+                for (int x = 0; x < item.SizeOnStack; x++)
+                { AddInstruction(Opcode.Pop); }
+            }
+
+            CompiledGlobalVariables.Pop();
         }
     }
 
@@ -1943,7 +1961,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             StackStore(new ValueAddress(variable), variable.Type.Size);
         }
-        else if (GetGlobalVariable(statementToSet.Content, out CompiledVariable? globalVariable))
+        else if (GetGlobalVariable(statementToSet.Content, statementToSet.OriginalFile, out CompiledVariable? globalVariable, out _))
         {
             statementToSet.Token.AnalyzedType = TokenAnalyzedType.VariableName;
             statementToSet.CompiledType = globalVariable.Type;
@@ -2101,20 +2119,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
     }
 
-    void GenerateCodeForInlinedMacro(Statement inlinedMacro)
-    {
-        InMacro.Push(true);
-        if (inlinedMacro is Block block)
-        { GenerateCodeForStatement(block); }
-        else if (inlinedMacro is KeywordCall keywordCall &&
-            keywordCall.Identifier.Equals(StatementKeywords.Return) &&
-            keywordCall.Parameters.Length == 1)
-        { GenerateCodeForStatement(keywordCall.Parameters[0]); }
-        else
-        { GenerateCodeForStatement(inlinedMacro); }
-        InMacro.Pop();
-    }
-
     #endregion
 
     void OnScopeEnter(Block block) => OnScopeEnter(block.Position, block.Statements.OfType<VariableDeclaration>());
@@ -2164,9 +2168,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         DebugInfo?.ScopeInformations.Add(scope);
     }
 
-    #region GenerateCodeFor...
+    #region GenerateCodeForLocalVariable
 
-    CleanupItem GenerateCodeForVariable(VariableDeclaration newVariable)
+    CleanupItem GenerateCodeForLocalVariable(VariableDeclaration newVariable)
     {
         if (newVariable.Modifiers.Contains(ModifierKeywords.Const)) return CleanupItem.Null;
 
@@ -2256,32 +2260,149 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         return new CleanupItem(size, newVariable.Modifiers.Contains(ModifierKeywords.Temp), compiledVariable.Type);
     }
-    CleanupItem GenerateCodeForVariable(Statement st)
+    CleanupItem GenerateCodeForLocalVariable(Statement st)
     {
         if (st is VariableDeclaration newVariable)
-        { return GenerateCodeForVariable(newVariable); }
+        { return GenerateCodeForLocalVariable(newVariable); }
         return CleanupItem.Null;
     }
-    CleanupItem[] GenerateCodeForVariable(IEnumerable<Statement> statements)
+    ImmutableArray<CleanupItem> GenerateCodeForLocalVariable(IEnumerable<Statement> statements)
     {
-        List<CleanupItem> result = new();
+        ImmutableArray<CleanupItem>.Builder result = ImmutableArray.CreateBuilder<CleanupItem>();
+
         foreach (Statement statement in statements)
         {
-            CleanupItem item = GenerateCodeForVariable(statement);
+            CleanupItem item = GenerateCodeForLocalVariable(statement);
             if (item.SizeOnStack == 0) continue;
 
             result.Add(item);
         }
-        return result.ToArray();
+
+        return result.ToImmutable();
     }
+
+    #endregion
+
+    #region GenerateCodeForGlobalVariable
+
+    CleanupItem GenerateCodeForGlobalVariable(VariableDeclaration newVariable)
+    {
+        if (newVariable.Modifiers.Contains(ModifierKeywords.Const)) return CleanupItem.Null;
+
+        newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
+
+        int offset = TagCount.LastOrDefault + GlobalVariablesSize;
+
+        CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
+
+        StackElementInformations debugInfo = new()
+        {
+            Kind = StackElementKind.Variable,
+            Tag = compiledVariable.Identifier.Content,
+            Address = offset * BytecodeProcessor.StackDirection,
+            BasepointerRelative = false,
+            Size = compiledVariable.Type.Size,
+        };
+
+        if (compiledVariable.Type is PointerType)
+        { debugInfo.Type = StackElementType.HeapPointer; }
+        else
+        { debugInfo.Type = StackElementType.Value; }
+        newVariable.CompiledType = compiledVariable.Type;
+
+        CompiledGlobalVariables.Add(compiledVariable);
+
+        newVariable.Type.SetAnalyzedType(compiledVariable.Type);
+
+        int size;
+
+        if (!Settings.DontOptimize &&
+            TryCompute(newVariable.InitialValue, out DataItem computedInitialValue))
+        {
+            newVariable.InitialValue.PredictedValue = computedInitialValue;
+
+            AddComment($"Initial value {{");
+
+            size = 1;
+
+            AddInstruction(Opcode.Push, computedInitialValue);
+            compiledVariable.IsInitialized = true;
+
+            if (size <= 0)
+            { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
+
+            AddComment("}");
+        }
+        else if (compiledVariable.Type is ArrayType arrayType &&
+            arrayType.Of == BasicType.Char &&
+            newVariable.InitialValue is LiteralStatement literalStatement &&
+            literalStatement.Type == LiteralType.String &&
+            literalStatement.Value.Length == arrayType.Length)
+        {
+            size = literalStatement.Value.Length;
+            compiledVariable.IsInitialized = true;
+
+            for (int i = 0; i < literalStatement.Value.Length; i++)
+            {
+                AddInstruction(Opcode.Push, new DataItem(literalStatement.Value[i]));
+            }
+        }
+        else
+        {
+            AddComment($"Initial value {{");
+
+            size = GenerateInitialValue(compiledVariable.Type);
+
+            if (size <= 0)
+            { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
+
+            AddComment("}");
+        }
+
+        if (size != compiledVariable.Type.Size)
+        { throw new InternalException($"Variable size ({compiledVariable.Type.Size}) and initial value size ({size}) mismatch"); }
+
+        return new CleanupItem(size, newVariable.Modifiers.Contains(ModifierKeywords.Temp), compiledVariable.Type);
+    }
+    CleanupItem GenerateCodeForGlobalVariable(Statement st)
+    {
+        if (st is VariableDeclaration newVariable)
+        { return GenerateCodeForGlobalVariable(newVariable); }
+        return CleanupItem.Null;
+    }
+    void GenerateCodeForGlobalVariable(IEnumerable<Statement> statements, Stack<CleanupItem> cleanupStack)
+    {
+        foreach (Statement statement in statements)
+        {
+            CleanupItem item = GenerateCodeForGlobalVariable(statement);
+            if (item.SizeOnStack == 0) continue;
+
+            cleanupStack.Push(item);
+        }
+    }
+
+    #endregion
+
+    #region GenerateCodeFor...
 
     int VariablesSize
     {
         get
         {
             int sum = 0;
-            for (int i = 0; i < CompiledVariables.Count; i++)
-            { sum += CompiledVariables[i].Type.Size; }
+            foreach (CompiledVariable variable in CompiledVariables)
+            { sum += variable.Type.Size; }
+            return sum;
+        }
+    }
+
+    int GlobalVariablesSize
+    {
+        get
+        {
+            int sum = 0;
+            foreach (CompiledVariable variable in CompiledGlobalVariables)
+            { sum += variable.Type.Size; }
             return sum;
         }
     }
@@ -2300,7 +2421,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (function.Identifier is not null &&
             LanguageConstants.KeywordList.Contains(function.Identifier.ToString()))
-        { throw new CompilerException($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
+        { throw new CompilerException($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.File); }
 
         if (function.Identifier is not null)
         { function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName; }
@@ -2325,15 +2446,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         InFunction = true;
 
         TagCount.Push(0);
-        InMacro.Push(false);
 
         CompiledParameters.Clear();
         CompiledVariables.Clear();
         ReturnInstructions.Clear();
 
-        CompileParameters(function.Parameters.ToArray());
+        CompileParameters(function.Parameters);
 
-        CurrentFile = function.FilePath;
+        CurrentFile = function.File;
 
         int instructionStart = GeneratedCode.Count;
 
@@ -2341,7 +2461,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.Push, new DataItem(false));
         TagCount[^1]++;
 
-        OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath));
+        OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.File));
 
         if (function is IHaveCompiledType returnType)
         {
@@ -2440,7 +2560,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 IsValid = true,
                 SourcePosition = function.Identifier.Position,
                 Identifier = function.Identifier.Content,
-                File = function.FilePath,
+                File = function.File,
                 ReadableIdentifier = function.ToReadable(),
                 Instructions = (instructionStart, GeneratedCode.Count),
             });
@@ -2450,7 +2570,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledVariables.Clear();
         ReturnInstructions.Clear();
 
-        InMacro.Pop();
         TagCount.Pop();
 
         CurrentContext = null;
@@ -2512,9 +2631,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return generatedAnything;
     }
 
-    void GenerateCodeForTopLevelStatements(IEnumerable<Statement> statements, bool hasExitCode)
+    void CompileParameters(ImmutableArray<ParameterDefinition> parameters)
     {
-        if (!statements.Any()) return;
+        int paramsSize = 0;
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            GeneralType parameterType = GeneralType.From(parameters[i].Type, FindType);
+            parameters[i].Type.SetAnalyzedType(parameterType);
+
+            CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));
+
+            paramsSize += parameterType.Size;
+        }
+    }
+
+    void GenerateCodeForTopLevelStatements(ImmutableArray<Statement> statements)
+    {
+        if (statements.IsDefaultOrEmpty) return;
 
         CurrentScopeDebug.Push(new ScopeInformations()
         {
@@ -2528,34 +2661,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         });
 
         AddComment("TopLevelStatements {");
-
-        if (hasExitCode)
-        {
-            // Exit code instruction already added
-            CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
-            {
-                Address = 0,
-                BasepointerRelative = false,
-                Kind = StackElementKind.Internal,
-                Size = 1,
-                Tag = "Exit Code",
-                Type = StackElementType.Value,
-            });
-        }
-
-        AddInstruction(Opcode.GetRegister, 2);
-        AddInstruction(Opcode.Push, -1 * BytecodeProcessor.StackDirection);
-        AddInstruction(Opcode.MathAdd);
-
-        CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
-        {
-            Address = AbsoluteGlobalOffset * BytecodeProcessor.StackDirection,
-            BasepointerRelative = true,
-            Kind = StackElementKind.Internal,
-            Size = 1,
-            Tag = "Absolute Global Offset",
-            Type = StackElementType.Value,
-        });
 
         AddInstruction(Opcode.GetBasePointer);
         AddInstruction(Opcode.SetBasePointer, AddressingMode.StackPointerRelative, 0);
@@ -2572,7 +2677,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentContext = null;
         TagCount.Push(0);
-        InMacro.Push(false);
         ReturnInstructions.Push(new List<int>());
 
         CanReturn = true;
@@ -2589,7 +2693,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         TagCount.Last++;
 
         AddComment("Variables");
-        CleanupStack.Push(GenerateCodeForVariable(statements));
+        CleanupStack.Push(GenerateCodeForLocalVariable(statements));
 
         AddComment("Statements {");
         foreach (Statement statement in statements)
@@ -2600,17 +2704,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions.Pop();
 
         CompiledGlobalVariables.AddRange(CompiledVariables);
-        CleanupVariables(CleanupStack.Pop(), statements.Last().Position.NextLine());
+        CleanupVariables(CleanupStack.Pop(), statements[^1].Position.NextLine());
 
         CanReturn = false;
         AddInstruction(Opcode.Pop);
         TagCount.Last--;
 
-        InMacro.Pop();
         TagCount.Pop();
 
         AddInstruction(Opcode.SetBasePointer, AddressingMode.Runtime, 0);
-        AddInstruction(Opcode.Pop);
 
         AddComment("}");
 
@@ -2619,19 +2721,125 @@ public partial class CodeGeneratorForMain : CodeGenerator
         DebugInfo?.ScopeInformations.Add(scope);
     }
 
-    void CompileParameters(ParameterDefinition[] parameters)
-    {
-        int paramsSize = 0;
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            GeneralType parameterType = GeneralType.From(parameters[i].Type, FindType);
-            parameters[i].Type.SetAnalyzedType(parameterType);
-
-            this.CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));
-
-            paramsSize += parameterType.Size;
-        }
-    }
-
     #endregion
+
+    BBLangGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
+    {
+        if (settings.ExternalFunctionsCache)
+        { throw new NotImplementedException(); }
+
+        Print?.Invoke("Generating code ...", LogType.Debug);
+
+        List<string> usedExternalFunctions = new();
+
+        foreach (CompiledFunction function in CompiledFunctions)
+        {
+            if (function.IsExternal)
+            { usedExternalFunctions.Add(function.ExternalFunctionName); }
+        }
+
+        foreach (CompiledOperator @operator in CompiledOperators)
+        {
+            if (@operator.IsExternal)
+            { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
+        }
+
+        foreach ((ImmutableArray<Statement> statements, _) in compilerResult.TopLevelStatements)
+        {
+            CompileGlobalConstants(statements);
+        }
+
+        CurrentScopeDebug.Push(new ScopeInformations()
+        {
+            Location = new SourceCodeLocation()
+            {
+                Instructions = (GeneratedCode.Count, GeneratedCode.Count),
+                SourcePosition = Position.UnknownPosition,
+                Uri = CurrentFile,
+            },
+            Stack = new List<StackElementInformations>(),
+        });
+
+        {
+            // Exit code
+
+            AddComment("Push exit code:");
+            AddInstruction(Opcode.Push, new DataItem(0));
+        }
+
+        {
+            // Absolute global offset
+
+            AddInstruction(Opcode.GetRegister, 2);
+            AddInstruction(Opcode.Push, -1 * BytecodeProcessor.StackDirection);
+            AddInstruction(Opcode.MathAdd);
+
+            CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+            {
+                Address = AbsoluteGlobalOffset * BytecodeProcessor.StackDirection,
+                BasepointerRelative = true,
+                Kind = StackElementKind.Internal,
+                Size = 1,
+                Tag = "Absolute Global Offset",
+                Type = StackElementType.Value,
+            });
+        }
+
+        for (int i = 0; i < compilerResult.TopLevelStatements.Length - 1; i++)
+        {
+            (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[i];
+            CurrentFile = file;
+            Print?.Invoke($"Generating top level statements for file {file?.ToString() ?? "null"} ...", LogType.Debug);
+            GenerateCodeForTopLevelStatements(statements);
+            CurrentFile = null;
+        }
+
+        if (compilerResult.TopLevelStatements.Length > 0)
+        {
+            CurrentFile = compilerResult.File;
+            Print?.Invoke($"Generating top level statements for file {compilerResult.TopLevelStatements[^1].File?.ToString() ?? "null"} ...", LogType.Debug);
+            GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements[^1].Statements);
+            CurrentFile = null;
+        }
+
+        AddInstruction(Opcode.Pop); // Pop abs global offset
+
+        AddInstruction(Opcode.Exit); // Exit code already there
+
+        {
+            ScopeInformations scope = CurrentScopeDebug.Pop();
+            scope.Location.Instructions.End = GeneratedCode.Count - 1;
+            DebugInfo?.ScopeInformations.Add(scope);
+        }
+
+        while (true)
+        {
+            bool generatedAnything = false;
+
+            generatedAnything = GenerateCodeForFunctions(CompiledFunctions) || generatedAnything;
+            generatedAnything = GenerateCodeForFunctions(CompiledOperators) || generatedAnything;
+            generatedAnything = GenerateCodeForFunctions(CompiledGeneralFunctions) || generatedAnything;
+            generatedAnything = GenerateCodeForFunctions(CompiledConstructors) || generatedAnything;
+
+            generatedAnything = GenerateCodeForCompilableFunctions(CompilableFunctions) || generatedAnything;
+            generatedAnything = GenerateCodeForCompilableFunctions(CompilableConstructors) || generatedAnything;
+            generatedAnything = GenerateCodeForCompilableFunctions(CompilableOperators) || generatedAnything;
+            generatedAnything = GenerateCodeForCompilableFunctions(CompilableGeneralFunctions) || generatedAnything;
+
+            if (!generatedAnything) break;
+        }
+
+        SetUndefinedFunctionOffsets(UndefinedFunctionOffsets);
+        SetUndefinedFunctionOffsets(UndefinedConstructorOffsets);
+        SetUndefinedFunctionOffsets(UndefinedOperatorFunctionOffsets);
+        SetUndefinedFunctionOffsets(UndefinedGeneralFunctionOffsets);
+
+        Print?.Invoke("Code generated", LogType.Debug);
+
+        return new BBLangGeneratorResult()
+        {
+            Code = GeneratedCode.Select(v => new Instruction(v)).ToImmutableArray(),
+            DebugInfo = DebugInfo,
+        };
+    }
 }

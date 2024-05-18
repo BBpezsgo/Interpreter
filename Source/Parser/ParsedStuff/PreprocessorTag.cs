@@ -18,7 +18,6 @@ public class PreprocessorTag : Statement
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
         if (includeThis) yield return this;
-        yield break;
     }
 
     public override string ToString() => $"{Identifier} {Argument}".Trim();

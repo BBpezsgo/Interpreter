@@ -19,7 +19,7 @@ public static class AnyTokenizer
     /// <exception cref="System.Threading.Tasks.TaskCanceledException"/>
     /// <exception cref="HttpRequestException"/>
     /// <exception cref="AggregateException"/>
-    public static TokenizerResult Tokenize(Uri uri, IEnumerable<string> preprocessorVariables, TokenizerSettings? settings = null)
+    public static TokenizerResult Tokenize(Uri uri, IEnumerable<string>? preprocessorVariables = null, TokenizerSettings? settings = null)
     {
         if (uri.IsFile)
         { return StreamTokenizer.Tokenize(uri.LocalPath, preprocessorVariables, settings); }

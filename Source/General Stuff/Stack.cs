@@ -1,4 +1,6 @@
-﻿namespace LanguageCore;
+﻿using System.Runtime.InteropServices;
+
+namespace LanguageCore;
 
 public class Stack<T> : List<T>
 {
@@ -7,6 +9,18 @@ public class Stack<T> : List<T>
     {
         get => Count > 0 ? this[^1] : throw new InvalidOperationException("Stack is empty");
         set => this[^1] = value;
+    }
+
+    public T? LastOrDefault => Count > 0 ? this[^1] : default;
+
+    /// <exception cref="InvalidOperationException"/>
+    public ref T LastRef
+    {
+        get
+        {
+            if (Count == 0) throw new InvalidOperationException("Stack is empty");
+            return ref CollectionsMarshal.AsSpan(this)[^1];
+        }
     }
 
     public Stack() { }

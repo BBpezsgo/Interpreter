@@ -8,7 +8,7 @@ public class StreamTokenizer : Tokenizer,
     readonly Stream Stream;
     bool IsDisposed;
 
-    StreamTokenizer(TokenizerSettings settings, Stream stream, Uri? file, IEnumerable<string> preprocessorVariables) : base(settings, file, preprocessorVariables)
+    StreamTokenizer(TokenizerSettings settings, Stream stream, Uri? file, IEnumerable<string>? preprocessorVariables) : base(settings, file, preprocessorVariables)
     {
         Stream = stream;
     }
@@ -22,14 +22,14 @@ public class StreamTokenizer : Tokenizer,
     /// <exception cref="System.NotSupportedException"/>
     /// <exception cref="IOException"/>
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string filePath, IEnumerable<string> preprocessorVariables, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null)
+    public static TokenizerResult Tokenize(string file, IEnumerable<string>? preprocessorVariables = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null)
     {
-        FileStream stream = System.IO.File.OpenRead(filePath);
-        return StreamTokenizer.Tokenize(stream, preprocessorVariables, new Uri(filePath), settings, progress, (int)stream.Length);
+        FileStream stream = System.IO.File.OpenRead(file);
+        return StreamTokenizer.Tokenize(stream, preprocessorVariables, new Uri(file), settings, progress, (int)stream.Length);
     }
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream, IEnumerable<string> preprocessorVariables, Uri? file = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null, int? totalBytes = null)
+    public static TokenizerResult Tokenize(Stream stream, IEnumerable<string>? preprocessorVariables = null, Uri? file = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null, int? totalBytes = null)
     {
         settings ??= TokenizerSettings.Default;
 
@@ -59,8 +59,8 @@ public class StreamTokenizer : Tokenizer,
 
             for (int i = 0; i < block.Length; i++)
             {
-                offsetTotal++;
                 ProcessCharacter(block[i], offsetTotal);
+                offsetTotal++;
             }
         }
 
@@ -86,8 +86,8 @@ public class StreamTokenizer : Tokenizer,
 
             for (int i = 0; i < block.Length; i++)
             {
-                offsetTotal++;
                 ProcessCharacter(block[i], offsetTotal);
+                offsetTotal++;
             }
 
             totalBytesRead += read;

@@ -163,7 +163,7 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
     }
 }
 
-public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
+public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>, IReferenceableTo
 {
     public Token Identifier { get; }
     public ImmutableArray<TypeInstance>? TypeArguments { get; }
@@ -171,9 +171,13 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
         new Position(Identifier)
         .Union(TypeArguments);
 
-    public TypeInstanceSimple(Token identifier, IEnumerable<TypeInstance>? typeArguments = null) : base()
+    public object? Reference { get; set; }
+    public Uri OriginalFile { get; }
+
+    public TypeInstanceSimple(Token identifier, Uri file, IEnumerable<TypeInstance>? typeArguments = null) : base()
     {
         this.Identifier = identifier;
+        this.OriginalFile = file;
         this.TypeArguments = typeArguments?.ToImmutableArray();
     }
 
@@ -204,13 +208,13 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
         { Identifier.AnalyzedType = analyzedType; }
     }
 
-    public static TypeInstanceSimple CreateAnonymous(string name)
-        => new(Token.CreateAnonymous(name), null);
+    public static TypeInstanceSimple CreateAnonymous(string name, Uri file)
+        => new(Token.CreateAnonymous(name), file);
 
-    public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<TypeInstance>? typeArguments)
-        => new(Token.CreateAnonymous(name), typeArguments);
+    public static TypeInstanceSimple CreateAnonymous(string name, Uri file, IEnumerable<TypeInstance>? typeArguments)
+        => new(Token.CreateAnonymous(name), file, typeArguments);
 
-    public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<Token>? typeArguments)
+    public static TypeInstanceSimple CreateAnonymous(string name, Uri file, IEnumerable<Token>? typeArguments)
     {
         TypeInstance[]? genericTypesConverted;
         if (typeArguments == null)
@@ -221,11 +225,11 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
             genericTypesConverted = new TypeInstance[genericTypesA.Length];
             for (int i = 0; i < genericTypesA.Length; i++)
             {
-                genericTypesConverted[i] = TypeInstanceSimple.CreateAnonymous(genericTypesA[i].Content);
+                genericTypesConverted[i] = TypeInstanceSimple.CreateAnonymous(genericTypesA[i].Content, file);
             }
         }
 
-        return new TypeInstanceSimple(Token.CreateAnonymous(name), genericTypesConverted);
+        return new TypeInstanceSimple(Token.CreateAnonymous(name), file, genericTypesConverted);
     }
 
     public override string ToString()

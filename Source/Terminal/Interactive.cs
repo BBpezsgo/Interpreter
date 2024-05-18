@@ -81,7 +81,7 @@ class InteractiveCompiler
     public CompilerResult Compiled { get; private set; }
     public BBLangGeneratorResult Generated => _generated;
     public ParserResult InteractiveAST => new(
-        Enumerable.Empty<Error>(),
+        Enumerable.Empty<LanguageError>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),
@@ -98,7 +98,7 @@ class InteractiveCompiler
         _text = string.Empty;
         Tokens = ImmutableArray<Token>.Empty;
         Statement = null;
-        Compiled = CompilerResult.Empty;
+        Compiled = CompilerResult.MakeEmpty(Utils.AssemblyFile);
         _generated = default;
         _task = null;
         _onCompiledAsync = onCompiledAsync;
@@ -111,14 +111,14 @@ class InteractiveCompiler
         { return; }
 
         _text = text;
-        Tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive).Tokens;
+        Tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive, Utils.AssemblyFile).Tokens;
         Statement = default;
         Compiled = default;
         _generated = default;
 
         if (Tokens.Length != 0)
         {
-            Statement = Parser.ParseStatement(Tokens, null);
+            Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
 
             Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
@@ -134,7 +134,8 @@ class InteractiveCompiler
                 PreprocessorVariables.Interactive,
                 null,
                 null,
-                null);
+                null,
+                Utils.AssemblyFile);
 
             _generated = CodeGeneratorForMain.Generate(Compiled, MainGeneratorSettings.Default);
         }
@@ -155,14 +156,14 @@ class InteractiveCompiler
 
     void CompileTask()
     {
-        Tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive).Tokens;
+        Tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive, Utils.AssemblyFile).Tokens;
         Statement = default;
         Compiled = default;
         _generated = default;
 
         if (Tokens.Length != 0)
         {
-            Statement = Parser.ParseStatement(Tokens, null);
+            Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
 
             Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
@@ -178,7 +179,8 @@ class InteractiveCompiler
                 PreprocessorVariables.Interactive,
                 null,
                 null,
-                null);
+                null,
+                Utils.AssemblyFile);
 
             _generated = CodeGeneratorForMain.Generate(Compiled, MainGeneratorSettings.Default);
         }

@@ -1,0 +1,10 @@
+using System;
+using "46b";
+
+int yeah;
+
+yeah = 55;
+
+Bruh();
+
+return yeah;

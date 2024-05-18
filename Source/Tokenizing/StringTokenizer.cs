@@ -4,13 +4,13 @@ public sealed class StringTokenizer : Tokenizer
 {
     readonly string Text;
 
-    StringTokenizer(TokenizerSettings settings, string text, Uri? file, IEnumerable<string> preprocessorVariables) : base(settings, file, preprocessorVariables)
+    StringTokenizer(TokenizerSettings settings, string text, Uri? file, IEnumerable<string>? preprocessorVariables) : base(settings, file, preprocessorVariables)
     {
         Text = text;
     }
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string text, IEnumerable<string> preprocessorVariables, Uri? file = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null)
+    public static TokenizerResult Tokenize(string text, IEnumerable<string>? preprocessorVariables = null, Uri? file = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null)
     {
         settings ??= TokenizerSettings.Default;
 

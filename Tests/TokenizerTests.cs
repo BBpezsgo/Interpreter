@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 
 namespace Tests;
 
+using System.Text;
 using LanguageCore;
 using LanguageCore.Tokenizing;
 
@@ -28,43 +29,77 @@ public class TokenizerTests
         => Assert.AreEqual(token.ToOriginalString().Length, token.Position.AbsoluteRange.Size());
 
     [TestMethod]
-    public void Test1()
+    public void Test01()
     {
         string text = "a";
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
-        Position[] positions = new Position[]
         {
-            new(
-                ((0, 0), (0, 1)),
-                (0, 1)
-            ),
-        };
+            ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            Position[] positions = new Position[]
+            {
+                new(
+                    ((0, 0), (0, 1)),
+                    (0, 1)
+                ),
+            };
 
-        AssertUtils.PositionEquals(tokens, positions);
-        TokenSpecificAssert(tokens);
+            AssertUtils.PositionEquals(tokens, positions);
+            TokenSpecificAssert(tokens);
+        }
+
+        {
+            using MemoryStream stream = new(Encoding.ASCII.GetBytes(text));
+            ImmutableArray<Token> tokens = StreamTokenizer.Tokenize(stream, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            Position[] positions = new Position[]
+            {
+                new(
+                    ((0, 0), (0, 1)),
+                    (0, 1)
+                ),
+            };
+
+            AssertUtils.PositionEquals(tokens, positions);
+            TokenSpecificAssert(tokens);
+        }
     }
 
     [TestMethod]
-    public void Test2()
+    public void Test02()
     {
         string text = "ab";
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
-        Position[] positions = new Position[]
         {
-            new(
-                ((0, 0), (0, 2)),
-                (0, 2)
-            ),
-        };
+            ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            Position[] positions = new Position[]
+            {
+                new(
+                    ((0, 0), (0, 2)),
+                    (0, 2)
+                ),
+            };
 
-        AssertUtils.PositionEquals(tokens, positions);
-        TokenSpecificAssert(tokens);
+            AssertUtils.PositionEquals(tokens, positions);
+            TokenSpecificAssert(tokens);
+        }
+
+        {
+            using MemoryStream stream = new(Encoding.ASCII.GetBytes(text));
+            ImmutableArray<Token> tokens = StreamTokenizer.Tokenize(stream, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            Position[] positions = new Position[]
+            {
+                new(
+                    ((0, 0), (0, 2)),
+                    (0, 2)
+                ),
+            };
+
+            AssertUtils.PositionEquals(tokens, positions);
+            TokenSpecificAssert(tokens);
+        }
     }
 
     [TestMethod]
-    public void Test3()
+    public void Test03()
     {
         string text = "";
 
@@ -76,7 +111,7 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    public void Test4()
+    public void Test04()
     {
         string text = string.Empty;
 
@@ -88,7 +123,7 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    public void Test5()
+    public void Test05()
     {
         string text = " a";
 
@@ -106,7 +141,7 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    public void Test6()
+    public void Test06()
     {
         string text = "a\r\n";
 
@@ -124,7 +159,7 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    public void Test7()
+    public void Test07()
     {
         string text = " \r\n";
 
@@ -136,7 +171,7 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    public void Test8()
+    public void Test08()
     {
         string text = " a\r\n";
 
@@ -154,7 +189,7 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    public void Test9()
+    public void Test09()
     {
         string text = "\r\na";
 
@@ -615,13 +650,121 @@ public class TokenizerTests
         AssertUtils.PositionEquals(tokens, positions);
         TokenSpecificAssert(tokens);
     }
+
+    [TestMethod]
+    [ExpectedException(typeof(TokenizerException))]
+    public void Test35()
+    {
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("\"\\ubruh\"", Enumerable.Empty<string>(), settings: Settings).Tokens;
+
+        Position[] positions = new Position[]
+        {
+            new(
+                ((0, 0), (0, 7)),
+                (0, 7)
+            ),
+        };
+
+        AssertUtils.PositionEquals(tokens, positions);
+        TokenSpecificAssert(tokens);
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(TokenizerException))]
+    public void Test36()
+    {
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("\'\\ubruh\'", Enumerable.Empty<string>(), settings: Settings).Tokens;
+
+        Position[] positions = new Position[]
+        {
+            new(
+                ((0, 0), (0, 7)),
+                (0, 7)
+            ),
+        };
+
+        AssertUtils.PositionEquals(tokens, positions);
+        TokenSpecificAssert(tokens);
+    }
+
+    [TestMethod]
+    public void Test37()
+    {
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/=", Enumerable.Empty<string>(), settings: Settings).Tokens;
+
+        Position[] positions = new Position[]
+        {
+            new(
+                ((0, 0), (0, 2)),
+                (0, 2)
+            ),
+        };
+
+        AssertUtils.PositionEquals(tokens, positions);
+        TokenSpecificAssert(tokens);
+    }
+
+    [TestMethod]
+    public void Test38()
+    {
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/**/", Enumerable.Empty<string>(), settings: Settings).Tokens;
+
+        Position[] positions = new Position[]
+        {
+            new(
+                ((0, 0), (0, 4)),
+                (0, 4)
+            ),
+        };
+
+        AssertUtils.PositionEquals(tokens, positions);
+        TokenSpecificAssert(tokens);
+    }
+
+    [TestMethod]
+    public void Test39()
+    {
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/-", Enumerable.Empty<string>(), settings: Settings).Tokens;
+
+        Position[] positions = new Position[]
+        {
+            new(
+                ((0, 0), (0, 1)),
+                (0, 1)
+            ),
+            new(
+                ((0, 1), (0, 2)),
+                (1, 2)
+            ),
+        };
+
+        AssertUtils.PositionEquals(tokens, positions);
+        TokenSpecificAssert(tokens);
+    }
+
+    [TestMethod, Ignore("I'm tired")]
+    public void Test40()
+    {
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/***/", Enumerable.Empty<string>(), settings: Settings).Tokens;
+
+        Position[] positions = new Position[]
+        {
+            new(
+                ((0, 0), (0, 5)),
+                (0, 5)
+            )
+        };
+
+        AssertUtils.PositionEquals(tokens, positions);
+        TokenSpecificAssert(tokens);
+    }
 }
 
 [TestClass, TestCategory("Token Utils")]
 public class TokenTests
 {
     [TestMethod]
-    public void Test1()
+    public void Test01()
     {
         Token token = StringTokenizer.Tokenize("ab", Enumerable.Empty<string>()).Tokens[0];
 
@@ -641,7 +784,7 @@ public class TokenTests
     }
 
     [TestMethod]
-    public void Test2()
+    public void Test02()
     {
         Token token = StringTokenizer.Tokenize("a", Enumerable.Empty<string>()).Tokens[0];
 
@@ -658,7 +801,7 @@ public class TokenTests
     }
 
     [TestMethod]
-    public void Test3()
+    public void Test03()
     {
         Token token = Token.Empty;
 
@@ -669,7 +812,7 @@ public class TokenTests
     }
 
     [TestMethod]
-    public void Test4()
+    public void Test04()
     {
         Token token = StringTokenizer.Tokenize("abcd", Enumerable.Empty<string>()).Tokens[0];
 
@@ -689,7 +832,7 @@ public class TokenTests
     }
 
     [TestMethod]
-    public void Test5()
+    public void Test05()
     {
         Token token = StringTokenizer.Tokenize("abc", Enumerable.Empty<string>()).Tokens[0];
 
@@ -715,7 +858,7 @@ public class TokenTests
     }
 
     [TestMethod]
-    public void Test7()
+    public void Test07()
     {
         Token token = StringTokenizer.Tokenize("abc", Enumerable.Empty<string>()).Tokens[0];
 

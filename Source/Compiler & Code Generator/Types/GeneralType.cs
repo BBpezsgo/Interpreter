@@ -30,6 +30,7 @@ public abstract class GeneralType :
     /// <exception cref="InternalException"/>
     public static GeneralType From(
         Token type,
+        Uri relevantFile,
         FindType? typeFinder,
         Uri? uri)
     {
@@ -37,7 +38,7 @@ public abstract class GeneralType :
         { return new BuiltinType(builtinType); }
 
         if (typeFinder is null ||
-            !typeFinder.Invoke(type, out GeneralType? result))
+            !typeFinder.Invoke(type, relevantFile, out GeneralType? result))
         { throw new CompilerException($"Can't parse \"{type}\" to {nameof(GeneralType)}", type, uri); }
 
         return result;
@@ -145,7 +146,7 @@ public abstract class GeneralType :
 
         ArgumentNullException.ThrowIfNull(typeFinder);
 
-        if (!typeFinder.Invoke(type.Identifier, out result))
+        if (!typeFinder.Invoke(type.Identifier, type.OriginalFile, out result))
         { throw new CompilerException($"Can't parse \"{type}\" to {nameof(GeneralType)}", type, uri); }
 
         if (result is StructType resultStructType &&
@@ -154,11 +155,11 @@ public abstract class GeneralType :
             if (type.TypeArguments.HasValue)
             {
                 IEnumerable<GeneralType> typeParameters = GeneralType.FromArray(type.TypeArguments.Value, typeFinder, constComputer, uri);
-                result = new StructType(resultStructType.Struct, typeParameters.ToImmutableList());
+                result = new StructType(resultStructType.Struct, type.OriginalFile, typeParameters.ToImmutableList());
             }
             else
             {
-                result = new StructType(resultStructType.Struct);
+                result = new StructType(resultStructType.Struct, type.OriginalFile);
             }
         }
         else
@@ -389,7 +390,7 @@ public abstract class GeneralType :
                         { return null; }
                     }
 
-                    return new StructType(structType.Struct, structTypeParameterValues);
+                    return new StructType(structType.Struct, structType.OriginalFile, structTypeParameterValues);
                 }
 
                 break;

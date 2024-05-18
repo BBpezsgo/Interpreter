@@ -76,7 +76,7 @@ public static class Output
         Console.ResetColor();
     }
 
-    public static void LogError(Error error)
+    public static void LogError(LanguageError error)
     {
         Console.ForegroundColor = ErrorColor;
         Console.WriteLine(error.ToString());

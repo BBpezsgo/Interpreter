@@ -49,7 +49,7 @@ public class FunctionDefinition : FunctionThingDefinition,
         Token identifier,
         ParameterDefinitionCollection parameters,
         TemplateInfo? templateInfo,
-        Uri? file)
+        Uri file)
         : base(modifiers, identifier, parameters, templateInfo, file)
     {
         Attributes = attributes.ToImmutableArray();
@@ -83,7 +83,7 @@ public class FunctionDefinition : FunctionThingDefinition,
         return result.ToString();
     }
 
-    public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), Template, FilePath)
+    public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), Template, File)
     {
         Block = Block,
         Context = Context,

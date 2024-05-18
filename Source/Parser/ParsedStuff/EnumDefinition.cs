@@ -11,7 +11,7 @@ public class EnumDefinition :
     public Token Identifier { get; }
     public ImmutableArray<EnumMemberDefinition> Members { get; }
     public ImmutableArray<AttributeUsage> Attributes { get; }
-    public Uri? FilePath { get; }
+    public Uri File { get; }
 
     public Position Position =>
         new Position(Identifier)
@@ -22,20 +22,20 @@ public class EnumDefinition :
         Identifier = other.Identifier;
         Attributes = other.Attributes;
         Members = other.Members;
-        FilePath = other.FilePath;
+        File = other.File;
     }
 
     public EnumDefinition(
         Token identifier,
         IEnumerable<AttributeUsage> attributes,
         IEnumerable<EnumMemberDefinition> members,
-        Uri? file)
+        Uri file)
     {
         Identifier = identifier;
         Attributes = attributes.ToImmutableArray();
         foreach (EnumMemberDefinition member in members) member.Context = this;
         Members = members.ToImmutableArray();
-        FilePath = file;
+        File = file;
     }
 
     public override string ToString() => $"enum {Identifier}";

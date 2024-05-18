@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace LanguageCore;
 
+using System.Threading;
 using ASM.Generator;
 using BBLang.Generator;
 using Brainfuck;

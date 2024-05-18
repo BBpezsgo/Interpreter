@@ -78,5 +78,5 @@ public class BuiltinType : GeneralType,
         _ => throw new UnreachableException(),
     };
 
-    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(ToString());
+    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(ToString(), null);
 }

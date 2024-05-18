@@ -14,7 +14,7 @@ public abstract class FunctionThingDefinition :
     public ParameterDefinitionCollection Parameters { get; }
     public Statement.Block? Block { get; init; }
     public TemplateInfo? Template { get; }
-    public Uri? FilePath { get; }
+    public Uri File { get; }
 
     /// <summary>
     /// The first parameter is labeled as "this"
@@ -38,7 +38,7 @@ public abstract class FunctionThingDefinition :
         Parameters = other.Parameters;
         Block = other.Block;
         Template = other.Template;
-        FilePath = other.FilePath;
+        File = other.File;
     }
 
     protected FunctionThingDefinition(
@@ -46,7 +46,7 @@ public abstract class FunctionThingDefinition :
         Token identifier,
         ParameterDefinitionCollection parameters,
         TemplateInfo? template,
-        Uri? file)
+        Uri file)
     {
         parameters.Context = this;
         foreach (ParameterDefinition parameter in parameters) parameter.Context = this;
@@ -55,7 +55,7 @@ public abstract class FunctionThingDefinition :
         Identifier = identifier;
         Parameters = parameters;
         Template = template;
-        FilePath = file;
+        File = file;
     }
 
     string ISimpleReadable.ToReadable() => ToReadable();

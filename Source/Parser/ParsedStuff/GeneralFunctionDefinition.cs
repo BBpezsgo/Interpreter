@@ -30,11 +30,11 @@ public class GeneralFunctionDefinition : FunctionThingDefinition,
         Token identifier,
         IEnumerable<Token> modifiers,
         ParameterDefinitionCollection parameters,
-        Uri? file)
+        Uri file)
         : base(modifiers, identifier, parameters, null, file)
     { }
 
-    public GeneralFunctionDefinition Duplicate() => new(Identifier, Modifiers, Parameters.Duplicate(), FilePath)
+    public GeneralFunctionDefinition Duplicate() => new(Identifier, Modifiers, Parameters.Duplicate(), File)
     {
         Block = Block,
         Context = Context,

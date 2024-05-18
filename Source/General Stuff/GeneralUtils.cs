@@ -12,6 +12,8 @@ public interface IDuplicatable<T> : ICloneable
 
 public static class Utils
 {
+    public static Uri AssemblyFile => new(System.Reflection.Assembly.GetExecutingAssembly().Location, UriKind.Absolute);
+
     public static T Max<T>(T a, T b)
         where T : IComparisonOperators<T, T, bool>
         => a > b ? a : b;

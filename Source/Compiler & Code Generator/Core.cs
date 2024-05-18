@@ -147,9 +147,10 @@ public interface IHaveInstructionOffset
     public int InstructionOffset { get; set; }
 }
 
-public interface ICompiledFunction
+public interface ICompiledFunction :
+    IHaveCompiledType,
+    IInFile
 {
-    public GeneralType Type { get; }
     public bool ReturnSomething => Type != BasicType.Void;
     public Block? Block { get; }
     public IReadOnlyList<ParameterDefinition> Parameters { get; }

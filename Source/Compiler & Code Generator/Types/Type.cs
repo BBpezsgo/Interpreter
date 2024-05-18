@@ -14,4 +14,4 @@ public enum BasicType
 }
 
 public delegate bool ComputeValue(StatementWithValue value, out DataItem computedValue);
-public delegate bool FindType(Token token, [NotNullWhen(true)] out GeneralType? computedValue);
+public delegate bool FindType(Token token, Uri relevantFile, [NotNullWhen(true)] out GeneralType? computedValue);

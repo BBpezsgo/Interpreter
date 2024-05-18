@@ -31,7 +31,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         if (!result.Function.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Function \"{result.Function.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{result.Function.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
             return;
         }
 
@@ -68,7 +68,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         if (!destructor.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Destructor for type {deallocateableType} cannot be called due to its protection level", value, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Destructor for type {deallocateableType} cannot be called due to its protection level", value, CurrentFile));
             return;
         }
 
@@ -135,9 +135,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             variableDeclaration.Type.SetAnalyzedType(type);
         }
 
-        return PrecompileVariable(CompiledVariables, variableDeclaration.Identifier.Content, type, initialValue, variableDeclaration.Modifiers.Contains(ModifierKeywords.Temp));
+        return PrecompileVariable(CompiledVariables, variableDeclaration.Identifier.Content, type, variableDeclaration.File, initialValue, variableDeclaration.Modifiers.Contains(ModifierKeywords.Temp));
     }
-    int PrecompileVariable(Stack<Variable> variables, string name, GeneralType type, StatementWithValue? initialValue, bool deallocateOnClean)
+    int PrecompileVariable(Stack<Variable> variables, string name, GeneralType type, Uri file, StatementWithValue? initialValue, bool deallocateOnClean)
     {
         if (CodeGeneratorForBrainfuck.GetVariable(variables, name, out _))
         { return 0; }
@@ -168,7 +168,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         int size = Snippets.ARRAY_SIZE(arraySize);
 
                         int address = Stack.PushVirtual(size);
-                        variables.Push(new Variable(name, address, true, deallocateOnClean, type, size)
+                        variables.Push(new Variable(name, file, address, true, deallocateOnClean, type, size)
                         {
                             IsInitialized = true
                         });
@@ -184,13 +184,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
                     int address = Stack.PushVirtual(size);
-                    variables.Push(new Variable(name, address, true, deallocateOnClean, type, size));
+                    variables.Push(new Variable(name, file, address, true, deallocateOnClean, type, size));
                 }
             }
             else
             {
                 int address = Stack.PushVirtual(type.Size);
-                variables.Push(new Variable(name, address, true, deallocateOnClean, type));
+                variables.Push(new Variable(name, file, address, true, deallocateOnClean, type));
             }
         }
         else
@@ -202,12 +202,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 int size = Snippets.ARRAY_SIZE(arraySize);
 
                 int address = Stack.PushVirtual(size);
-                variables.Push(new Variable(name, address, true, deallocateOnClean, type, size));
+                variables.Push(new Variable(name, file, address, true, deallocateOnClean, type, size));
             }
             else
             {
                 int address = Stack.PushVirtual(type.Size);
-                variables.Push(new Variable(name, address, true, deallocateOnClean, type));
+                variables.Push(new Variable(name, file, address, true, deallocateOnClean, type));
             }
         }
 
@@ -477,7 +477,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             if (!indexer.CanUse(CurrentFile))
             {
-                AnalysisCollection?.Errors.Add(new Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", statement, CurrentFile));
+                AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", statement, CurrentFile));
                 return;
             }
 
@@ -691,7 +691,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         if (!indexer.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", indexCall, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", indexCall, CurrentFile));
             return;
         }
 
@@ -1058,9 +1058,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     statement.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                if (InMacro.Last)
-                { throw new NotImplementedException(); }
-
                 if (statement.Parameters.Length == 1)
                 {
                     if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, ReturnVariableName, out Variable returnVariable))
@@ -1362,16 +1359,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (!GetFunction(functionCall, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound))
+        if (!GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound))
         { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
 
         (CompiledFunction? compiledFunction, Dictionary<string, GeneralType>? typeArguments) = result;
 
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
-        if (!compiledFunction.CanUse(CurrentFile))
+        if (!compiledFunction.CanUse(functionCall.OriginalFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledFunction.ToReadable()}\" cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{compiledFunction.ToReadable()}\" cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
             return;
         }
 
@@ -1401,7 +1398,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         if (!constructor.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"Constructor {constructor.ToReadable()} could not be called due to its protection level", constructorCall.Type, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Constructor {constructor.ToReadable()} could not be called due to its protection level", constructorCall.Type, CurrentFile));
             return;
         }
 
@@ -1509,7 +1506,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 if (!compiledOperator.CanUse(CurrentFile))
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
                     return;
                 }
 
@@ -1903,7 +1900,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                 if (!compiledOperator.CanUse(CurrentFile))
                 {
-                    AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
                     return;
                 }
 
@@ -2081,7 +2078,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 foreach ((CompiledField field, int offset) in structType.Fields)
                 {
                     if (field.Type is not BuiltinType builtinType)
-                    { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.FilePath); }
+                    { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.File); }
 
                     int offsettedAddress = address + offset;
 
@@ -2092,15 +2089,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                             break;
                         case BasicType.Integer:
                             Code.SetValue(offsettedAddress, 0);
-                            AnalysisCollection?.Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.FilePath));
+                            AnalysisCollection?.Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.File));
                             break;
                         case BasicType.Char:
                             Code.SetValue(offsettedAddress, '\0');
                             break;
                         case BasicType.Float:
-                            throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, structType.Struct.FilePath);
+                            throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, structType.Struct.File);
                         default:
-                            throw new CompilerException($"Unknown field type \"{builtinType}\"", field.Identifier, structType.Struct.FilePath);
+                            throw new CompilerException($"Unknown field type \"{builtinType}\"", field.Identifier, structType.Struct.File);
                     }
                 }
 
@@ -2648,7 +2645,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         if (v.Type != definedType)
                         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                        compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
+                        compiledParameters.Push(new Variable(defined.Identifier.Content, defined.File, v.Address, false, false, v.Type, v.Size));
                         continue;
                     }
                     case ModifierKeywords.Const:
@@ -2678,7 +2675,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (defined.Modifiers.Contains(ModifierKeywords.Const))
                 { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed, CurrentFile); }
 
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, canDeallocate);
+                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, defined.File, value, canDeallocate);
 
                 bool parameterFound = false;
                 Variable compiledParameter = default;
@@ -2749,7 +2746,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 if (function.Type.Size != 1)
                 {
-                    throw new CompilerException($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.FilePath);
+                    throw new CompilerException($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File);
                 }
                 Code += ',';
             }
@@ -2772,7 +2769,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (function.ReturnSomething)
         {
             GeneralType returnType = function.Type;
-            returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), false, false, returnType);
+            returnVariable = new Variable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, returnType);
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -2782,14 +2779,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         List<IConstant> constantParameters = new();
 
         CurrentMacro.Push(function);
-        InMacro.Push(false);
 
         GenerateCodeForParameterPassing(function, parameters, compiledParameters, constantParameters);
 
         GeneratorStackFrame frame = PushStackFrame(typeArguments);
         CompiledVariables.PushIf(returnVariable);
         CompiledVariables.PushRange(compiledParameters);
-        CurrentFile = function.FilePath;
+        CurrentFile = function.File;
         CompiledLocalConstants.PushRange(constantParameters);
         CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
 
@@ -2804,7 +2800,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 using (Code.Block(this, $"Finish \"return\" block"))
                 {
                     if (Returns.Pop().FlagAddress != Stack.LastAddress)
-                    { throw new InternalException(string.Empty, function.Block, function.FilePath); }
+                    { throw new InternalException(string.Empty, function.Block, function.File); }
                     Stack.Pop();
                 }
             }
@@ -2820,9 +2816,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     {
                         GenerateDestructor(
                             new TypeCast(
-                                new Identifier(Token.CreateAnonymous(variable.Name), null),
+                                new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -2843,7 +2839,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         PopStackFrame(frame);
 
-        InMacro.Pop();
         CurrentMacro.Pop();
     }
 
@@ -2885,7 +2880,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 if (function.Type.Size != 1)
                 {
-                    throw new CompilerException($"Function with attribute \"StandardInput\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.FilePath);
+                    throw new CompilerException($"Function with attribute \"StandardInput\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File);
                 }
                 Code += ',';
             }
@@ -2908,7 +2903,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (true) // always returns something
         {
             GeneralType returnType = function.Type;
-            returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), false, false, returnType);
+            returnVariable = new Variable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, returnType);
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -2918,14 +2913,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         List<IConstant> constantParameters = new();
 
         CurrentMacro.Push(function);
-        InMacro.Push(false);
 
         GenerateCodeForParameterPassing(function, parameters, compiledParameters, constantParameters);
 
         GeneratorStackFrame frame = PushStackFrame(typeArguments);
         CompiledVariables.PushIf(returnVariable);
         CompiledVariables.PushRange(compiledParameters);
-        CurrentFile = function.FilePath;
+        CurrentFile = function.File;
         CompiledLocalConstants.PushRange(constantParameters);
         CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
 
@@ -2938,7 +2932,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             using (DebugBlock(function.Block.Brackets.End))
             {
                 if (Returns.Pop().FlagAddress != Stack.LastAddress)
-                { throw new InternalException(string.Empty, function.Block, function.FilePath); }
+                { throw new InternalException(string.Empty, function.Block, function.File); }
                 Stack.Pop();
             }
         }
@@ -2956,9 +2950,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     {
                         GenerateDestructor(
                             new TypeCast(
-                                new Identifier(Token.CreateAnonymous(variable.Name), null),
+                                new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -2982,7 +2976,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         PopStackFrame(frame);
 
-        InMacro.Pop();
         CurrentMacro.Pop();
     }
 
@@ -2998,7 +2991,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (function.ReturnSomething)
         {
             GeneralType returnType = GeneralType.InsertTypeParameters(function.Type, typeArguments) ?? function.Type;
-            returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), false, false, returnType);
+            returnVariable = new Variable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, returnType);
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -3008,7 +3001,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         List<IConstant> constantParameters = new();
 
         CurrentMacro.Push(function);
-        InMacro.Push(false);
 
         GenerateCodeForParameterPassing(function, parameters, compiledParameters, constantParameters);
 
@@ -3019,11 +3011,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
 
         if (function.Block is null)
-        { throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath); }
+        { throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.File); }
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 
-        GenerateCodeForStatement(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.FilePath));
+        GenerateCodeForStatement(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.File));
 
         if (returnBlock is not null)
         {
@@ -3045,9 +3037,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     {
                         GenerateDestructor(
                             new TypeCast(
-                                new Identifier(Token.CreateAnonymous(variable.Name), null),
+                                new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -3065,7 +3057,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         PopStackFrame(frame);
 
-        InMacro.Pop();
         CurrentMacro.Pop();
     }
 
@@ -3090,7 +3081,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         List<IConstant> constantParameters = new();
 
         CurrentMacro.Push(function);
-        InMacro.Push(false);
 
         NewInstance newInstance = callerPosition.ToInstantiation();
 
@@ -3101,7 +3091,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         if (newInstanceType != function.ParameterTypes[0])
         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {0}: Expected {function.ParameterTypes[0]}, passed {newInstanceType}", newInstance, CurrentFile); }
 
-        compiledParameters.Add(new Variable(function.Parameters[0].Identifier.Content, newInstanceAddress, false, false, newInstanceType));
+        compiledParameters.Add(new Variable(function.Parameters[0].Identifier.Content, function.Parameters[0].File, newInstanceAddress, false, false, newInstanceType));
 
         for (int i = 1; i < function.Parameters.Count; i++)
         {
@@ -3148,7 +3138,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         if (v.Type != definedType)
                         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                        compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, false, false, v.Type, v.Size));
+                        compiledParameters.Push(new Variable(defined.Identifier.Content, defined.File, v.Address, false, false, v.Type, v.Size));
                         continue;
                     }
                     case ModifierKeywords.Const:
@@ -3179,7 +3169,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (defined.Modifiers.Contains(ModifierKeywords.Const))
                 { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed, CurrentFile); }
 
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
+                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, defined.File, value, defined.Modifiers.Contains(ModifierKeywords.Temp) && deallocateOnClean);
 
                 bool parameterFound = false;
                 Variable compiledParameter = default;
@@ -3213,7 +3203,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         GeneratorStackFrame frame = PushStackFrame(typeArguments);
         CompiledVariables.PushRange(compiledParameters);
-        CurrentFile = function.FilePath;
+        CurrentFile = function.File;
         CompiledLocalConstants.PushRange(constantParameters);
         CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
 
@@ -3227,7 +3217,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             using (Code.Block(this, $"Finish \"return\" block"))
             {
                 if (Returns.Pop().FlagAddress != Stack.LastAddress)
-                { throw new InternalException(string.Empty, function.Block, function.FilePath); }
+                { throw new InternalException(string.Empty, function.Block, function.File); }
                 Stack.Pop();
             }
         }
@@ -3245,9 +3235,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     {
                         GenerateDestructor(
                             new TypeCast(
-                                new Identifier(Token.CreateAnonymous(variable.Name), null),
+                                new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -3268,7 +3258,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         PopStackFrame(frame);
 
-        InMacro.Pop();
         CurrentMacro.Pop();
     }
 

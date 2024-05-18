@@ -7,7 +7,8 @@ using Tokenizing;
 public class EnumMemberDefinition :
     IPositioned,
     IInContext<EnumDefinition>,
-    IIdentifiable<Token>
+    IIdentifiable<Token>,
+    IInFile
 {
     /// <summary>
     /// Set by the <see cref="EnumDefinition"/>
@@ -18,6 +19,7 @@ public class EnumMemberDefinition :
     public StatementWithValue? Value { get; }
 
     public Position Position => new(Identifier, Value);
+    public Uri File => Context?.File ?? throw new NullReferenceException($"{nameof(Context.File)} is null");
 
     public EnumMemberDefinition(EnumMemberDefinition other)
     {

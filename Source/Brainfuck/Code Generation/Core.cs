@@ -74,10 +74,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     const string ReturnVariableName = "@return";
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    struct Variable
+    struct Variable :
+        IIdentifiable<string>,
+        IHaveCompiledType,
+        IInFile
     {
         public readonly string Name;
         public readonly int Address;
+        public readonly Uri File;
 
         public readonly bool HaveToClean;
         public readonly bool DeallocateOnClean;
@@ -88,12 +92,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         public bool IsDiscarded;
         public bool IsInitialized;
 
-        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, GeneralType type)
-            : this(name, address, haveToClean, deallocateOnClean, type, type.Size) { }
-        public Variable(string name, int address, bool haveToClean, bool deallocateOnClean, GeneralType type, int size)
+        readonly string IIdentifiable<string>.Identifier => Name;
+        readonly GeneralType IHaveCompiledType.Type => Type;
+        readonly Uri IInFile.File => File;
+
+        public Variable(string name, Uri file, int address, bool haveToClean, bool deallocateOnClean, GeneralType type)
+            : this(name, file, address, haveToClean, deallocateOnClean, type, type.Size) { }
+        public Variable(string name, Uri file, int address, bool haveToClean, bool deallocateOnClean, GeneralType type, int size)
         {
             Name = name;
             Address = address;
+            File = file;
 
             HaveToClean = haveToClean;
             DeallocateOnClean = deallocateOnClean;
@@ -196,7 +205,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         public readonly ImmutableArray<int> VariableCleanupStack;
         public readonly ImmutableArray<ControlFlowBlock> Returns;
         public readonly ImmutableArray<ControlFlowBlock> Breaks;
-        public readonly ImmutableArray<bool> InMacro;
 
         public readonly int Optimizations;
         public readonly int Precomputations;
@@ -215,7 +223,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             VariableCleanupStack = v.VariableCleanupStack.ToImmutableArray();
             Returns = v.Returns.ToImmutableArray();
             Breaks = v.Breaks.ToImmutableArray();
-            InMacro = v.InMacro.ToImmutableArray();
 
             Optimizations = v.Optimizations;
             Precomputations = v.Precomputations;
@@ -235,7 +242,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             v.VariableCleanupStack.Set(VariableCleanupStack);
             v.Returns.Set(Returns);
             v.Breaks.Set(Breaks);
-            v.InMacro.Set(InMacro);
 
             v.Optimizations = Optimizations;
             v.Precomputations = Precomputations;
@@ -278,7 +284,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         public ImmutableDictionary<string, GeneralType>? SavedTypeArguments { get; init; }
         public ImmutableArray<ControlFlowBlock> SavedBreaks { get; init; }
         public ImmutableArray<Variable> SavedVariables { get; init; }
-        public Uri? SavedFilePath { get; init; }
+        public Uri? SavedFile { get; init; }
         public ImmutableArray<IConstant> SavedConstants { get; init; }
     }
 
@@ -357,10 +363,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         {
             CompiledVariables.PushRange(savedVariables);
             for (int i = 0; i < CompiledVariables.Count; i++)
-            { CompiledVariables[i] = new Variable(CompiledVariables[i].Name, CompiledVariables[i].Address, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size); }
+            { CompiledVariables[i] = new Variable(CompiledVariables[i].Name, CompiledVariables[i].File, CompiledVariables[i].Address, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size); }
         }
 
-        Uri? savedFilePath = CurrentFile;
+        Uri? savedFile = CurrentFile;
 
         ImmutableArray<IConstant> savedConstants = CompiledLocalConstants.ToImmutableArray();
         CompiledLocalConstants.Clear();
@@ -370,13 +376,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             SavedBreaks = savedBreaks,
             SavedVariables = savedVariables,
             SavedConstants = savedConstants,
-            SavedFilePath = savedFilePath,
+            SavedFile = savedFile,
             SavedTypeArguments = savedTypeArguments?.ToImmutableDictionary(),
         };
     }
     void PopStackFrame(GeneratorStackFrame frame)
     {
-        CurrentFile = frame.SavedFilePath;
+        CurrentFile = frame.SavedFile;
 
         CompiledVariables.Set(frame.SavedVariables);
 
@@ -397,7 +403,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     DebugFunctionBlock<CompiledFunction> FunctionBlock(CompiledFunction function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
-        function.FilePath,
+        function.File,
         function.Identifier.Content,
         function.ToReadable(typeArguments),
         function.Position);
@@ -405,7 +411,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledOperator function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
-        function.FilePath,
+        function.File,
         function.Identifier.Content,
         function.ToReadable(typeArguments),
         function.Position);
@@ -413,7 +419,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledGeneralFunction function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
-        function.FilePath,
+        function.File,
         function.Identifier.Content,
         function.ToReadable(typeArguments),
         function.Position);
@@ -421,7 +427,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledConstructor function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
-        function.FilePath,
+        function.File,
         function.Type.ToString(),
         function.ToReadable(typeArguments),
         function.Position);
@@ -508,11 +514,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
                         new TypeCast(
                             new Identifier(
                                 Tokenizing.Token.CreateAnonymous(variable.Name, Tokenizing.TokenType.Identifier),
-                                null
+                                variable.File
                                 ),
-                            Tokenizing.Token.CreateAnonymous("as"),
+                            Tokenizing.Token.CreateAnonymous(StatementKeywords.As),
                             new TypeInstancePointer(
-                                TypeInstanceSimple.CreateAnonymous("int"),
+                                TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile),
                                 Tokenizing.Token.CreateAnonymous("*", Tokenizing.TokenType.Operator))
                             )
                         );
@@ -651,14 +657,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     #endregion
 
-    void GenerateTopLevelStatements(ImmutableArray<Statement> statements, Uri? file, bool isImported)
+    void GenerateTopLevelStatements(ImmutableArray<Statement> statements, Uri file, bool isImported)
     {
-        Print?.Invoke($"  Generating top level statements for file {file?.ToString() ?? "null"} ...", LogType.Debug);
+        Print?.Invoke($"  Generating top level statements for file {file.ToString() ?? "null"} ...", LogType.Debug);
 
         CurrentFile = file;
 
         if (!isImported)
-        { CompiledVariables.Add(new Variable(ReturnVariableName, Stack.PushVirtual(1), false, false, new BuiltinType(BasicType.Integer))); }
+        { CompiledVariables.Add(new Variable(ReturnVariableName, file, Stack.PushVirtual(1), false, false, new BuiltinType(BasicType.Integer))); }
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(statements)); }
@@ -667,18 +673,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(null, FindControlFlowUsage(statements));
 
+        using (ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress))
         {
-            InMacro.Push(false);
-
-            using ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress);
-
             for (int i = 0; i < statements.Length; i++)
             {
                 progressBar.Print(i, statements.Length);
                 GenerateCodeForStatement(statements[i]);
             }
-
-            InMacro.Pop();
         }
 
         if (returnBlock is not null)
@@ -708,7 +709,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
         for (int i = 0; i < compilerResult.TopLevelStatements.Length; i++)
         {
-            (ImmutableArray<Statement> statements, Uri? file) = compilerResult.TopLevelStatements[i];
+            (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[i];
             GenerateTopLevelStatements(statements, file, i < compilerResult.TopLevelStatements.Length - 1);
         }
 

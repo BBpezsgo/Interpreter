@@ -9,7 +9,8 @@ public class ParameterDefinitionCollection :
     IPositioned,
     IReadOnlyList<ParameterDefinition>,
     IDuplicatable<ParameterDefinitionCollection>,
-    IInContext<FunctionThingDefinition>
+    IInContext<FunctionThingDefinition>,
+    IInFile
 {
     /// <summary>
     /// Set by the <see cref="FunctionThingDefinition"/>
@@ -22,6 +23,7 @@ public class ParameterDefinitionCollection :
     public Position Position =>
         new Position(Brackets)
         .Union(Parameters);
+    public Uri File => Context?.File ?? throw new NullReferenceException($"{nameof(Context.File)} is null");
 
     public ParameterDefinition this[int index] => Parameters[index];
     public ParameterDefinition this[Index index] => Parameters[index];
@@ -82,8 +84,6 @@ public class ParameterDefinitionCollection :
         return result.ToString();
     }
 
-    public string ToString(IEnumerable<GeneralType> types)
-        => ToString(types.ToImmutableArray());
     public string ToString(ImmutableArray<GeneralType> types)
     {
         StringBuilder result = new();
@@ -105,4 +105,6 @@ public class ParameterDefinitionCollection :
 
         return result.ToString();
     }
+
+    public static implicit operator ImmutableArray<ParameterDefinition>(ParameterDefinitionCollection parameters) => parameters.Parameters;
 }

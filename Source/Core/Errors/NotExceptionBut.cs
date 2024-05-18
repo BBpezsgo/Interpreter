@@ -1,27 +1,23 @@
-﻿using LanguageCore.Parser;
+﻿namespace LanguageCore;
 
-namespace LanguageCore;
-
-public abstract class NotExceptionBut : IInFile
+public abstract class NotExceptionBut : IDiagnostics
 {
     public string Message { get; }
     public Position Position { get; }
-    public Uri? Uri { get; }
-
-    Uri? IInFile.FilePath => Uri;
+    public Uri? File { get; }
 
     protected NotExceptionBut(string message, Position position, Uri? file)
     {
         Message = message;
         Position = position;
-        Uri = file;
+        File = file;
     }
 
     public string? GetArrows()
     {
-        if (Uri == null) return null;
-        if (!Uri.IsFile) return null;
-        return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(Uri.LocalPath));
+        if (File == null) return null;
+        if (!File.IsFile) return null;
+        return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(File.LocalPath));
     }
 
     public override string ToString()
@@ -30,8 +26,8 @@ public abstract class NotExceptionBut : IInFile
 
         result.Append(Position.ToStringCool().Surround(" (at ", ")"));
 
-        if (Uri != null)
-        { result.Append($" (in {Uri})"); }
+        if (File != null)
+        { result.Append($" (in {File})"); }
 
         return result.ToString();
     }

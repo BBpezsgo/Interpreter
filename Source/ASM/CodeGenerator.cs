@@ -608,7 +608,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     {
         if (!compiledFunction.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new Error($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
             return;
         }
 
@@ -996,7 +996,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         if (variable.IsInitialized) return;
 
-        GenerateCodeForSetter(new Identifier(statement.Identifier, statement.FilePath), statement.InitialValue);
+        GenerateCodeForSetter(new Identifier(statement.Identifier, statement.File), statement.InitialValue);
 
         variable.IsInitialized = true;
     }
@@ -1043,7 +1043,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (!GetFunction(functionCall, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound))
+        if (!GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound))
         { throw notFound.Instantiate(functionCall.Identifier, CurrentFile); }
 
         GenerateCodeForFunctionCall_Function(functionCall, result.Function);
@@ -1543,7 +1543,7 @@ public class CodeGeneratorForAsm : CodeGenerator
     void GenerateCodeForFunction(FunctionThingDefinition function)
     {
         if (LanguageConstants.KeywordList.Contains(function.Identifier.Content))
-        { throw new CompilerException($"The identifier \"{function.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
+        { throw new CompilerException($"The identifier \"{function.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.File); }
 
         function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
@@ -1590,7 +1590,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         CompileParameters(function.Parameters.ToArray());
 
-        CurrentFile = function.FilePath;
+        CurrentFile = function.File;
 
         Builder.CodeBuilder.AppendCommentLine("Begin frame");
 
@@ -1605,12 +1605,10 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.BP);
 
-        CurrentFile = null;
-
         Return();
 
+        CurrentFile = null;
         CompiledParameters.Clear();
-
         InFunction = false;
         FunctionFrameSize.Pop(0);
         Builder.CodeBuilder.Indent = 0;

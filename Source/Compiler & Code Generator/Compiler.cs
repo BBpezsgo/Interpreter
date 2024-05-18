@@ -22,9 +22,9 @@ public readonly struct CompilerResult
     public readonly ImmutableArray<CompileTag> Hashes;
     public readonly ImmutableArray<CompiledEnum> Enums;
 
-    public readonly ImmutableArray<(ImmutableArray<Statement> Statements, Uri? File)> TopLevelStatements;
+    public readonly ImmutableArray<(ImmutableArray<Statement> Statements, Uri File)> TopLevelStatements;
 
-    public readonly Uri? File;
+    public readonly Uri File;
 
     public readonly IEnumerable<Uri> Files
     {
@@ -34,7 +34,7 @@ public readonly struct CompilerResult
 
             foreach (CompiledFunction function in Functions)
             {
-                Uri? file = function.FilePath;
+                Uri? file = function.File;
                 if (file is not null && !alreadyExists.Contains(file))
                 {
                     alreadyExists.Add(file);
@@ -44,7 +44,7 @@ public readonly struct CompilerResult
 
             foreach (CompiledGeneralFunction generalFunction in GeneralFunctions)
             {
-                Uri? file = generalFunction.FilePath;
+                Uri? file = generalFunction.File;
                 if (file is not null && !alreadyExists.Contains(file))
                 {
                     alreadyExists.Add(file);
@@ -54,7 +54,7 @@ public readonly struct CompilerResult
 
             foreach (CompiledOperator @operator in Operators)
             {
-                Uri? file = @operator.FilePath;
+                Uri? file = @operator.File;
                 if (file is not null && !alreadyExists.Contains(file))
                 {
                     alreadyExists.Add(file);
@@ -64,7 +64,7 @@ public readonly struct CompilerResult
 
             foreach (CompiledStruct @struct in Structs)
             {
-                Uri? file = @struct.FilePath;
+                Uri? file = @struct.File;
                 if (file is not null && !alreadyExists.Contains(file))
                 {
                     alreadyExists.Add(file);
@@ -74,7 +74,7 @@ public readonly struct CompilerResult
 
             foreach (CompiledEnum @enum in Enums)
             {
-                Uri? file = @enum.FilePath;
+                Uri? file = @enum.File;
                 if (file is not null && !alreadyExists.Contains(file))
                 {
                     alreadyExists.Add(file);
@@ -111,7 +111,7 @@ public readonly struct CompilerResult
         }
     }
 
-    public static CompilerResult Empty => new(
+    public static CompilerResult MakeEmpty(Uri file) => new(
         Enumerable.Empty<KeyValuePair<Uri, CollectedAST>>(),
         Enumerable.Empty<CompiledFunction>(),
         Enumerable.Empty<CompiledGeneralFunction>(),
@@ -121,8 +121,8 @@ public readonly struct CompilerResult
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<CompileTag>(),
         Enumerable.Empty<CompiledEnum>(),
-        Enumerable.Empty<(ImmutableArray<Statement>, Uri?)>(),
-        null);
+        Enumerable.Empty<(ImmutableArray<Statement>, Uri)>(),
+        file);
 
     public CompilerResult(
         IEnumerable<KeyValuePair<Uri, CollectedAST>> tokens,
@@ -134,8 +134,8 @@ public readonly struct CompilerResult
         IEnumerable<CompiledStruct> structs,
         IEnumerable<CompileTag> hashes,
         IEnumerable<CompiledEnum> enums,
-        IEnumerable<(ImmutableArray<Statement> Statements, Uri? File)> topLevelStatements,
-        Uri? file)
+        IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
+        Uri file)
     {
         Raw = tokens.ToImmutableDictionary();
         Functions = functions.ToImmutableArray();
@@ -156,7 +156,7 @@ public readonly struct CompilerResult
     {
         foreach (TThing? thing in things)
         {
-            if (thing.FilePath != file)
+            if (thing.File != file)
             { continue; }
 
             if (!thing.Identifier.Position.Range.Contains(position))
@@ -189,7 +189,7 @@ public readonly struct CompilerResult
     {
         foreach (CompiledStruct @struct in Structs)
         {
-            if (@struct.FilePath != file) continue;
+            if (@struct.File != file) continue;
 
             foreach (CompiledField field in @struct.Fields)
             {
@@ -242,7 +242,7 @@ public sealed class Compiler
     readonly List<StructDefinition> Structs = new();
     readonly List<EnumDefinition> Enums = new();
 
-    readonly List<(ImmutableArray<Statement> Statements, Uri? File)> TopLevelStatements = new();
+    readonly List<(ImmutableArray<Statement> Statements, Uri File)> TopLevelStatements = new();
 
     readonly Stack<ImmutableArray<Token>> GenericParameters = new();
 
@@ -266,17 +266,17 @@ public sealed class Compiler
         TokenizerSettings = tokenizerSettings;
     }
 
-    bool FindType(Token name, [NotNullWhen(true)] out GeneralType? result)
+    bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
     {
-        if (CodeGenerator.GetStruct(CompiledStructs, name.Content, out CompiledStruct? @struct, out _))
+        if (CodeGenerator.GetStruct(CompiledStructs, name.Content, relevantFile, out CompiledStruct? @struct, out _))
         {
-            result = new StructType(@struct);
+            result = new StructType(@struct, relevantFile);
             return true;
         }
 
         if (CodeGenerator.GetEnum(CompiledEnums, name.Content, out CompiledEnum? @enum))
         {
-            result = new EnumType(@enum);
+            result = new EnumType(@enum, relevantFile);
             return true;
         }
 
@@ -287,7 +287,7 @@ public sealed class Compiler
                 if (GenericParameters[i][j].Content == name.Content)
                 {
                     GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
-                    result = new GenericType(GenericParameters[i][j]);
+                    result = new GenericType(GenericParameters[i][j], relevantFile);
                     return true;
                 }
             }
@@ -302,8 +302,8 @@ public sealed class Compiler
             "function",
             null,
 
-            CodeGenerator.FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content),
-       out CodeGenerator.FunctionQueryResult<CompiledFunction>? result_,
+            CodeGenerator.FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, relevantFile),
+            out CodeGenerator.FunctionQueryResult<CompiledFunction>? result_,
             out _
         ))
         {
@@ -318,12 +318,9 @@ public sealed class Compiler
     CompiledStruct CompileStruct(StructDefinition @struct)
     {
         if (LanguageConstants.KeywordList.Contains(@struct.Identifier.Content))
-        { throw new CompilerException($"Illegal struct name \"{@struct.Identifier.Content}\"", @struct.Identifier, @struct.FilePath); }
+        { throw new CompilerException($"Illegal struct name \"{@struct.Identifier.Content}\"", @struct.Identifier, @struct.File); }
 
         @struct.Identifier.AnalyzedType = TokenAnalyzedType.Struct;
-
-        if (CodeGenerator.GetStruct(CompiledStructs, @struct.Identifier.Content, out _, out _))
-        { throw new CompilerException($"Struct \"{@struct.Identifier.Content}\" already exist", @struct.Identifier, @struct.FilePath); }
 
         if (@struct.Template is not null)
         {
@@ -334,11 +331,11 @@ public sealed class Compiler
 
         CompiledField[] compiledFields = new CompiledField[@struct.Fields.Length];
 
-        for (int j = 0; j < @struct.Fields.Length; j++)
+        for (int i = 0; i < @struct.Fields.Length; i++)
         {
-            FieldDefinition field = @struct.Fields[j];
+            FieldDefinition field = @struct.Fields[i];
             CompiledField newField = new(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field);
-            compiledFields[j] = newField;
+            compiledFields[i] = newField;
         }
 
         if (@struct.Template is not null)
@@ -363,14 +360,14 @@ public sealed class Compiler
         {
             if (!ExternalFunctions.TryGet(externalName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
             {
-                // AnalysisCollection?.Warnings.Add(exception.InstantiateWarning(attribute, function.FilePath));
+                // AnalysisCollection?.Warnings.Add(exception.InstantiateWarning(attribute, function.File));
             }
             else
             {
                 if (externalFunction.Parameters.Length != function.Parameters.Count)
-                { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
                 if (externalFunction.ReturnSomething != (type != BasicType.Void))
-                { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.FilePath); }
+                { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.File); }
 
                 for (int i = 0; i < externalFunction.Parameters.Length; i++)
                 {
@@ -381,7 +378,7 @@ public sealed class Compiler
                     if (passedParameterType == definedParameterType)
                     { continue; }
 
-                    throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
+                    throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.File);
                 }
 
                 if (function.Template is not null)
@@ -399,15 +396,15 @@ public sealed class Compiler
         {
             if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out (GeneralType ReturnValue, GeneralType[] Parameters) builtinFunction))
             {
-                // AnalysisCollection?.Warnings.Add(new Warning($"Builtin function \"{builtinName}\" not found", attribute, function.FilePath));
+                // AnalysisCollection?.Warnings.Add(new Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
             }
             else
             {
                 if (builtinFunction.Parameters.Length != function.Parameters.Count)
-                { throw new CompilerException($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File); }
 
                 if (builtinFunction.ReturnValue != type)
-                { throw new CompilerException($"Wrong type defined for function \"{builtinName}\"", function.Type, function.FilePath); }
+                { throw new CompilerException($"Wrong type defined for function \"{builtinName}\"", function.Type, function.File); }
 
                 for (int i = 0; i < builtinFunction.Parameters.Length; i++)
                 {
@@ -421,7 +418,7 @@ public sealed class Compiler
                     if (passedParameterType is PointerType && definedParameterType is PointerType)
                     { continue; }
 
-                    throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
+                    throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.File);
                 }
             }
         }
@@ -448,19 +445,19 @@ public sealed class Compiler
             if (ExternalFunctions.TryGet(name, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
             {
                 if (externalFunction.Parameters.Length != function.Parameters.Count)
-                { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
                 if (externalFunction.ReturnSomething != (type != BasicType.Void))
-                { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.FilePath); }
+                { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.File); }
 
                 for (int i = 0; i < externalFunction.Parameters.Length; i++)
                 {
                     if (TypeKeywords.BasicTypes.TryGetValue(function.Parameters[i].Type.ToString(), out BasicType builtinType))
                     {
                         if (externalFunction.Parameters[i].Convert() != builtinType)
-                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.Parameters[i]} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
+                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.Parameters[i]} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.File); }
                     }
                     else
-                    { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.Parameters[i]} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
+                    { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.Parameters[i]} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.File); }
                 }
 
                 return new CompiledOperator(
@@ -470,7 +467,7 @@ public sealed class Compiler
                     function);
             }
 
-            AnalysisCollection?.Errors.Add(exception.InstantiateError(attribute.Identifier, function.FilePath));
+            AnalysisCollection?.Errors.Add(exception.InstantiateError(attribute.Identifier, function.File));
         }
 
         return new CompiledOperator(
@@ -519,7 +516,7 @@ public sealed class Compiler
         CompiledEnumMember compiledMember = new(member);
 
         if (!CodeGenerator.TryComputeSimple(member.Value, out DataItem computedValue))
-        { throw new CompilerException($"I can't compute this. The developer should make a better preprocessor for this case I think...", member.Value, member.Context.FilePath); }
+        { throw new CompilerException($"I can't compute this. The developer should make a better preprocessor for this case I think...", member.Value, member.Context.File); }
 
         compiledMember.ComputedValue = computedValue;
 
@@ -573,14 +570,14 @@ public sealed class Compiler
             file);
     }
 
-    CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings)
+    CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings, Uri file)
     {
-        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(usings, null, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, null);
+        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(usings, file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, null);
 
-        foreach (CollectedAST file in files.Values)
-        { AddAST(file); }
+        foreach (CollectedAST file_ in files.Values)
+        { AddAST(file_); }
 
-        TopLevelStatements.Add(([statement], null));
+        TopLevelStatements.Add(([statement], file));
 
         CompileInternal();
 
@@ -595,7 +592,7 @@ public sealed class Compiler
             Tags,
             CompiledEnums,
             TopLevelStatements,
-            null);
+            file);
     }
 
     void CompileTag(CompileTag tag)
@@ -605,7 +602,7 @@ public sealed class Compiler
             case "bf":
             {
                 if (tag.Parameters.Length < 2)
-                { AnalysisCollection?.Errors.Add(new Error($"Compile tag \"{tag.Identifier}\" requires minimum 2 parameter", tag.Identifier, tag.FilePath)); break; }
+                { AnalysisCollection?.Errors.Add(new LanguageError($"Compile tag \"{tag.Identifier}\" requires minimum 2 parameter", tag.Identifier, tag.File)); break; }
                 string name = tag.Parameters[0].Value;
 
                 if (ExternalFunctions.TryGet(name, out _, out _)) break;
@@ -623,13 +620,13 @@ public sealed class Compiler
 
                         if (paramType == BasicType.Void && i > 0)
                         {
-                            AnalysisCollection?.Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.FilePath));
+                            AnalysisCollection?.Errors.Add(new LanguageError($"Invalid type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.File));
                             return;
                         }
                     }
                     else
                     {
-                        AnalysisCollection?.Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.FilePath));
+                        AnalysisCollection?.Errors.Add(new LanguageError($"Unknown type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.File));
                         return;
                     }
                 }
@@ -656,7 +653,7 @@ public sealed class Compiler
             }
             break;
             default:
-                AnalysisCollection?.Warnings.Add(new Warning($"Hash \"{tag.Identifier}\" does not exists, so this is ignored", tag.Identifier, tag.FilePath));
+                AnalysisCollection?.Warnings.Add(new Warning($"Hash \"{tag.Identifier}\" does not exists, so this is ignored", tag.Identifier, tag.File));
                 break;
         }
     }
@@ -668,7 +665,7 @@ public sealed class Compiler
             where TThing2 : IIdentifiable<Token>, IInFile
         {
             if (!a.Identifier.Content.Equals(b.Identifier.Content)) return false;
-            if (a.FilePath != b.FilePath) return false;
+            if (a.File != b.File) return false;
             return true;
         }
 
@@ -704,7 +701,7 @@ public sealed class Compiler
         foreach (EnumDefinition @enum in Enums)
         {
             if (IsThingExists(@enum))
-            { throw new CompilerException("Symbol already exists", @enum.Identifier, @enum.FilePath); }
+            { throw new CompilerException("Symbol already exists", @enum.Identifier, @enum.File); }
 
             CompiledEnums.Add(CompileEnum(@enum));
         }
@@ -712,7 +709,7 @@ public sealed class Compiler
         foreach (StructDefinition @struct in Structs)
         {
             if (IsThingExists(@struct))
-            { throw new CompilerException("Symbol already exists", @struct.Identifier, @struct.FilePath); }
+            { throw new CompilerException("Symbol already exists", @struct.Identifier, @struct.File); }
 
             CompiledStructs.Add(CompileStruct(@struct));
         }
@@ -722,7 +719,7 @@ public sealed class Compiler
             CompiledOperator compiled = CompileOperator(@operator, null);
 
             if (CompiledOperators.Any(other => FunctionEquality(compiled, other)))
-            { throw new CompilerException($"Operator {compiled.ToReadable()} already defined", @operator.Identifier, @operator.FilePath); }
+            { throw new CompilerException($"Operator {compiled.ToReadable()} already defined", @operator.Identifier, @operator.File); }
 
             CompiledOperators.Add(compiled);
         }
@@ -732,7 +729,7 @@ public sealed class Compiler
             CompiledFunction compiled = CompileFunction(function, null);
 
             if (CompiledFunctions.Any(other => FunctionEquality(compiled, other)))
-            { throw new CompilerException($"Function {compiled.ToReadable()} already defined", function.Identifier, function.FilePath); }
+            { throw new CompilerException($"Function {compiled.ToReadable()} already defined", function.Identifier, function.File); }
 
             CompiledFunctions.Add(compiled);
         }
@@ -751,17 +748,17 @@ public sealed class Compiler
                 foreach (ParameterDefinition parameter in method.Parameters)
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
-                    { throw new CompilerException($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.FilePath); }
+                    { throw new CompilerException($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File); }
                 }
 
-                GeneralType returnType = new StructType(compiledStruct);
+                GeneralType returnType = new StructType(compiledStruct, method.File);
 
                 if (method.Identifier.Content == BuiltinFunctionIdentifiers.Destructor)
                 {
                     List<ParameterDefinition> parameters = method.Parameters.ToList();
                     parameters.Insert(0, new ParameterDefinition(
                         new Token[] { Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This) },
-                        TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.Template?.Parameters),
+                        TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)
                     );
@@ -770,7 +767,7 @@ public sealed class Compiler
                         method.Identifier,
                         method.Modifiers,
                         new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
-                        method.FilePath)
+                        method.File)
                     {
                         Context = method.Context,
                         Block = method.Block,
@@ -783,7 +780,7 @@ public sealed class Compiler
                     parameters = method.Parameters.ToList();
                     parameters.Insert(0, new ParameterDefinition(
                         new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
-                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.Template?.Parameters)),
+                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters)),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)
                     );
@@ -792,7 +789,7 @@ public sealed class Compiler
                         method.Identifier,
                         method.Modifiers,
                         new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
-                        method.FilePath)
+                        method.File)
                     {
                         Context = method.Context,
                         Block = method.Block,
@@ -801,10 +798,10 @@ public sealed class Compiler
                     CompiledGeneralFunction methodWithPointer = CompileGeneralFunction(copy, returnType, compiledStruct);
 
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
-                    { throw new CompilerException($"Function with name \'{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.FilePath); }
+                    { throw new CompilerException($"Function with name \'{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File); }
 
                     if (CompiledGeneralFunctions.Any(methodWithPointer.IsSame))
-                    { throw new CompilerException($"Function with name \'{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.FilePath); }
+                    { throw new CompilerException($"Function with name \'{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.File); }
 
                     CompiledGeneralFunctions.Add(methodWithRef);
                     CompiledGeneralFunctions.Add(methodWithPointer);
@@ -816,7 +813,7 @@ public sealed class Compiler
                     CompiledGeneralFunction methodWithRef = CompileGeneralFunction(method, returnType, compiledStruct);
 
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
-                    { throw new CompilerException($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.FilePath); }
+                    { throw new CompilerException($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File); }
 
                     CompiledGeneralFunctions.Add(methodWithRef);
                 }
@@ -827,13 +824,13 @@ public sealed class Compiler
                 foreach (ParameterDefinition parameter in method.Parameters)
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
-                    { throw new CompilerException($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.FilePath); }
+                    { throw new CompilerException($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File); }
                 }
 
                 List<ParameterDefinition> parameters = method.Parameters.ToList();
                 parameters.Insert(0, new ParameterDefinition(
                     new Token[] { Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This) },
-                    TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.Template?.Parameters),
+                    TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters),
                     Token.CreateAnonymous(StatementKeywords.This),
                     method)
                 );
@@ -845,7 +842,7 @@ public sealed class Compiler
                     method.Identifier,
                     new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
                     method.Template,
-                    method.FilePath)
+                    method.File)
                 {
                     Context = method.Context,
                     Block = method.Block,
@@ -857,7 +854,7 @@ public sealed class Compiler
                 parameters.Insert(0,
                     new ParameterDefinition(
                         new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
-                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, compiledStruct.Template?.Parameters)),
+                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters)),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)
                     );
@@ -869,7 +866,7 @@ public sealed class Compiler
                     method.Identifier,
                     new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
                     method.Template,
-                    method.FilePath)
+                    method.File)
                 {
                     Context = method.Context,
                     Block = method.Block,
@@ -878,10 +875,10 @@ public sealed class Compiler
                 CompiledFunction methodWithPointer = CompileFunction(copy, compiledStruct);
 
                 if (CompiledFunctions.Any(methodWithRef.IsSame))
-                { throw new CompilerException($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.FilePath); }
+                { throw new CompilerException($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File); }
 
                 if (CompiledFunctions.Any(methodWithPointer.IsSame))
-                { throw new CompilerException($"Function with name \"{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.FilePath); }
+                { throw new CompilerException($"Function with name \"{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.File); }
 
                 CompiledFunctions.Add(methodWithRef);
                 CompiledFunctions.Add(methodWithPointer);
@@ -892,7 +889,7 @@ public sealed class Compiler
                 foreach (ParameterDefinition parameter in constructor.Parameters)
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
-                    { throw new CompilerException($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.FilePath); }
+                    { throw new CompilerException($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File); }
                 }
 
                 if (constructor.Type is TypeInstancePointer)
@@ -910,7 +907,7 @@ public sealed class Compiler
                         constructor.Type,
                         constructor.Modifiers,
                         new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
-                        constructor.FilePath)
+                        constructor.File)
                     {
                         Block = constructor.Block,
                         Context = constructor.Context,
@@ -919,7 +916,7 @@ public sealed class Compiler
                     CompiledConstructor constructorWithNothing = CompileConstructor(constructorDefWithNothing, compiledStruct);
 
                     if (CompiledConstructors.Any(constructorWithNothing.IsSame))
-                    { throw new CompilerException($"Constructor with name '{constructorWithNothing.ToReadable()}' already defined", constructor.Type, compiledStruct.FilePath); }
+                    { throw new CompilerException($"Constructor with name '{constructorWithNothing.ToReadable()}' already defined", constructor.Type, compiledStruct.File); }
 
                     CompiledConstructors.Add(constructorWithNothing);
                 }
@@ -938,7 +935,7 @@ public sealed class Compiler
                         constructor.Type,
                         constructor.Modifiers,
                         new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
-                        constructor.FilePath)
+                        constructor.File)
                     {
                         Block = constructor.Block,
                         Context = constructor.Context,
@@ -947,7 +944,7 @@ public sealed class Compiler
                     CompiledConstructor constructorWithRef = CompileConstructor(constructorDefWithRef, compiledStruct);
 
                     if (CompiledConstructors.Any(constructorWithRef.IsSame))
-                    { throw new CompilerException($"Constructor with name \"{constructorWithRef.ToReadable()}\" already defined", constructor.Type, compiledStruct.FilePath); }
+                    { throw new CompilerException($"Constructor with name \"{constructorWithRef.ToReadable()}\" already defined", constructor.Type, compiledStruct.File); }
 
                     CompiledConstructors.Add(constructorWithRef);
 
@@ -964,7 +961,7 @@ public sealed class Compiler
                         constructor.Type,
                         constructor.Modifiers,
                         new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
-                        constructor.FilePath)
+                        constructor.File)
                     {
                         Block = constructor.Block,
                         Context = constructor.Context,
@@ -973,7 +970,7 @@ public sealed class Compiler
                     CompiledConstructor constructorWithPointer = CompileConstructor(constructorDefWithPointer, compiledStruct);
 
                     if (CompiledConstructors.Any(constructorWithPointer.IsSame))
-                    { throw new CompilerException($"Constructor with name '{constructorWithPointer.ToReadable()}' already defined", constructor.Type, compiledStruct.FilePath); }
+                    { throw new CompilerException($"Constructor with name '{constructorWithPointer.ToReadable()}' already defined", constructor.Type, compiledStruct.File); }
 
                     CompiledConstructors.Add(constructorWithPointer);
                 }
@@ -1033,7 +1030,8 @@ public sealed class Compiler
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,
         AnalysisCollection? analysisCollection,
-        TokenizerSettings? tokenizerSettings)
+        TokenizerSettings? tokenizerSettings,
+        Uri file)
     {
         Compiler compiler = new(
             externalFunctions,
@@ -1042,6 +1040,6 @@ public sealed class Compiler
             analysisCollection,
             preprocessorVariables,
             tokenizerSettings);
-        return compiler.CompileInteractiveInternal(statement, usings);
+        return compiler.CompileInteractiveInternal(statement, usings, file);
     }
 }

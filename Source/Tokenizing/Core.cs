@@ -18,7 +18,7 @@ public abstract partial class Tokenizer
     int CurrentLine;
     string? SavedUnicode;
 
-    protected Tokenizer(TokenizerSettings settings, Uri? file, IEnumerable<string> preprocessorVariables)
+    protected Tokenizer(TokenizerSettings settings, Uri? file, IEnumerable<string>? preprocessorVariables)
     {
         CurrentToken = new(default);
         CurrentColumn = 0;
@@ -32,7 +32,7 @@ public abstract partial class Tokenizer
         SavedUnicode = null;
         File = file;
 
-        PreprocessorVariables = new HashSet<string>(preprocessorVariables);
+        PreprocessorVariables = preprocessorVariables is null ? new HashSet<string>() : new HashSet<string>(preprocessorVariables);
         PreprocessorConditions = new Stack<PreprocessThing>();
     }
 

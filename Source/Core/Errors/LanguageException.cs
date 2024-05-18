@@ -1,21 +1,15 @@
-﻿using LanguageCore.Parser;
+﻿namespace LanguageCore;
 
-namespace LanguageCore;
-
-public class LanguageException : Exception, IInFile
+public class LanguageException : Exception, IDiagnostics
 {
     public Position Position { get; protected set; }
-    public Uri? Uri { get; protected set; }
-
-    Uri? IInFile.FilePath => Uri;
+    public Uri? File { get; protected set; }
 
     protected LanguageException(string message, Position position, Uri? uri) : base(message)
     {
         Position = position;
-        Uri = uri;
+        File = uri;
     }
-
-    public LanguageException(Error error) : this(error.Message, error.Position, error.Uri) { }
 
     public LanguageException(string message, Exception inner) : base(message, inner) { }
 
@@ -25,8 +19,8 @@ public class LanguageException : Exception, IInFile
 
         result.Append(Position.ToStringCool().Surround(" (at ", ")"));
 
-        if (Uri != null)
-        { result.Append($" (in {Uri})"); }
+        if (File != null)
+        { result.Append($" (in {File})"); }
 
         if (InnerException != null)
         { result.Append($" {InnerException}"); }
@@ -36,9 +30,9 @@ public class LanguageException : Exception, IInFile
 
     public string? GetArrows()
     {
-        if (Uri == null) return null;
-        if (!Uri.IsFile) return null;
-        return GetArrows(Position, System.IO.File.ReadAllText(Uri.LocalPath));
+        if (File == null) return null;
+        if (!File.IsFile) return null;
+        return GetArrows(Position, System.IO.File.ReadAllText(File.LocalPath));
     }
 
     public static string? GetArrows(Position position, string text)

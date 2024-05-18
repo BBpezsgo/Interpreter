@@ -243,6 +243,8 @@ public abstract partial class Tokenizer
     /// <exception cref="TokenizerException"/>
     protected void ProcessCharacter(char currChar, int offsetTotal)
     {
+        Again:
+
         if (CurrentToken.TokenType == PreparationTokenType.STRING_UnicodeCharacter)
         {
             if (SavedUnicode == null) throw new InternalException($"{nameof(SavedUnicode)} is null");
@@ -424,9 +426,16 @@ public abstract partial class Tokenizer
         {
             CurrentToken.TokenType = PreparationTokenType.Operator;
             if (currChar == '=')
-            { CurrentToken.Content.Append(currChar); }
-            EndToken(offsetTotal);
-            goto FinishCharacter;
+            {
+                CurrentToken.Content.Append(currChar);
+                EndToken(offsetTotal, true);
+                goto FinishCharacter;
+            }
+            else
+            {
+                EndToken(offsetTotal);
+                goto Again;
+            }
         }
         else if (CurrentToken.TokenType == PreparationTokenType.Comment && (currChar is not '\n' and not '\r'))
         {
@@ -721,7 +730,7 @@ public abstract partial class Tokenizer
             }
         }
 
-FinishCharacter:
+        FinishCharacter:
         CurrentColumn++;
         if (currChar is '\n')
         {
@@ -803,7 +812,7 @@ FinishCharacter:
 
         Tokens.Add(CurrentToken.Instantiate());
 
-Finish:
+        Finish:
         CurrentToken.TokenType = PreparationTokenType.Whitespace;
         CurrentToken.Content.Clear();
 

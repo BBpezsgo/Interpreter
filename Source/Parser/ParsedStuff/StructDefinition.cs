@@ -12,7 +12,7 @@ public class StructDefinition :
     public Token Identifier { get; }
     public Token BracketStart { get; }
     public Token BracketEnd { get; }
-    public Uri? FilePath { get; }
+    public Uri File { get; }
     public ImmutableArray<FieldDefinition> Fields { get; }
     public ImmutableArray<Token> Modifiers { get; }
     public TemplateInfo? Template { get; init; }
@@ -30,7 +30,7 @@ public class StructDefinition :
         Identifier = other.Identifier;
         BracketStart = other.BracketStart;
         BracketEnd = other.BracketEnd;
-        FilePath = other.FilePath;
+        File = other.File;
         Fields = other.Fields;
         Modifiers = other.Modifiers;
         Template = other.Template;
@@ -51,7 +51,7 @@ public class StructDefinition :
         IEnumerable<GeneralFunctionDefinition> generalMethods,
         IEnumerable<FunctionDefinition> operators,
         IEnumerable<ConstructorDefinition> constructors,
-        Uri? file)
+        Uri file)
     {
         foreach (FunctionDefinition method in methods) method.Context = this;
         foreach (GeneralFunctionDefinition generalMethod in generalMethods) generalMethod.Context = this;
@@ -70,7 +70,7 @@ public class StructDefinition :
         Constructors = constructors.ToImmutableArray();
         Modifiers = modifiers.ToImmutableArray();
 
-        FilePath = file;
+        File = file;
     }
 
     public override string ToString() => $"struct {Identifier.Content}";

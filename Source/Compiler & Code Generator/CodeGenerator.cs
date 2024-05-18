@@ -43,6 +43,268 @@ public abstract class CodeGenerator
         }
     }
 
+    #region Protected Fields
+
+    protected ImmutableArray<CompiledStruct> CompiledStructs;
+    protected ImmutableArray<CompiledFunction> CompiledFunctions;
+    protected ImmutableArray<CompiledOperator> CompiledOperators;
+    protected ImmutableArray<CompiledConstructor> CompiledConstructors;
+    protected ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
+    protected ImmutableArray<CompiledEnum> CompiledEnums;
+    protected ImmutableArray<IConstant> CompiledGlobalConstants;
+
+    protected readonly Stack<IConstant> CompiledLocalConstants;
+    protected readonly Stack<int> LocalConstantsStack;
+
+    protected readonly Stack<CompiledParameter> CompiledParameters;
+    protected readonly Stack<CompiledVariable> CompiledVariables;
+    protected readonly Stack<CompiledVariable> CompiledGlobalVariables;
+
+    protected IReadOnlyList<CompliableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
+    protected IReadOnlyList<CompliableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;
+    protected IReadOnlyList<CompliableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions => compilableGeneralFunctions;
+    protected IReadOnlyList<CompliableTemplate<CompiledConstructor>> CompilableConstructors => compilableConstructors;
+
+    protected Uri? CurrentFile;
+    protected bool InFunction;
+    protected readonly Dictionary<string, GeneralType> TypeArguments;
+    protected DebugInformation? DebugInfo;
+
+    protected readonly PrintCallback? Print;
+    protected readonly AnalysisCollection? AnalysisCollection;
+
+    #endregion
+
+    #region Private Fields
+
+    readonly List<CompliableTemplate<CompiledFunction>> compilableFunctions = new();
+    readonly List<CompliableTemplate<CompiledOperator>> compilableOperators = new();
+    readonly List<CompliableTemplate<CompiledGeneralFunction>> compilableGeneralFunctions = new();
+    readonly List<CompliableTemplate<CompiledConstructor>> compilableConstructors = new();
+
+    #endregion
+
+    protected CodeGenerator(CompilerResult compilerResult, AnalysisCollection? analysisCollection, PrintCallback? print)
+    {
+        CompiledGlobalConstants = ImmutableArray.Create<IConstant>();
+
+        CompiledLocalConstants = new Stack<IConstant>();
+        LocalConstantsStack = new Stack<int>();
+
+        CompiledParameters = new Stack<CompiledParameter>();
+        CompiledVariables = new Stack<CompiledVariable>();
+        CompiledGlobalVariables = new Stack<CompiledVariable>();
+
+        compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
+        compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
+        compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
+
+        CurrentFile = null;
+        InFunction = false;
+        TypeArguments = new Dictionary<string, GeneralType>();
+
+        CompiledStructs = compilerResult.Structs;
+        CompiledFunctions = compilerResult.Functions;
+        CompiledOperators = compilerResult.Operators;
+        CompiledConstructors = compilerResult.Constructors;
+        CompiledGeneralFunctions = compilerResult.GeneralFunctions;
+        CompiledEnums = compilerResult.Enums;
+
+        AnalysisCollection = analysisCollection;
+        Print = print;
+    }
+
+    public static void ValidateTypeArguments(IEnumerable<KeyValuePair<string, GeneralType>> arguments)
+    {
+        foreach (KeyValuePair<string, GeneralType> pair in arguments)
+        {
+            if (pair.Value is GenericType)
+            { throw new InternalException($"{pair.Value} is generic"); }
+        }
+    }
+
+    protected void CleanupLocalConstants()
+    {
+        int count = LocalConstantsStack.Pop();
+        CompiledLocalConstants.Pop(count);
+    }
+
+    protected bool GetConstant(string identifier, [NotNullWhen(true)] out IConstant? constant)
+    {
+        constant = null;
+
+        foreach (IConstant _constant in CompiledLocalConstants)
+        {
+            if (_constant.Identifier != identifier)
+            { continue; }
+
+            if (constant is not null)
+            { throw new CompilerException($"Constant \"{constant.Identifier}\" defined more than once", constant, constant.File); }
+
+            constant = _constant;
+        }
+
+        foreach (IConstant _constant in CompiledGlobalConstants)
+        {
+            if (_constant.Identifier != identifier)
+            { continue; }
+
+            if (constant is not null)
+            { throw new CompilerException($"Constant \"{constant.Identifier}\" defined more than once", constant, constant.File); }
+
+            constant = _constant;
+        }
+
+        return constant is not null;
+    }
+
+    protected bool StatementCanBeDeallocated(StatementWithValue statement, out bool explicitly)
+    {
+        if (statement is ModifiedStatement modifiedStatement &&
+            modifiedStatement.Modifier.Equals(ModifierKeywords.Temp))
+        {
+            if (modifiedStatement.Statement is LiteralStatement ||
+                modifiedStatement.Statement is BinaryOperatorCall ||
+                modifiedStatement.Statement is UnaryOperatorCall)
+            {
+                AnalysisCollection?.Hints.Add(new Hint($"Unnecessary explicit temp modifier ({modifiedStatement.Statement.GetType().Name} statements are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
+            }
+
+            explicitly = true;
+            return true;
+        }
+
+        if (statement is LiteralStatement)
+        {
+            explicitly = false;
+            return true;
+        }
+
+        if (statement is BinaryOperatorCall)
+        {
+            explicitly = false;
+            return true;
+        }
+
+        if (statement is UnaryOperatorCall)
+        {
+            explicitly = false;
+            return true;
+        }
+
+        explicitly = default;
+        return false;
+    }
+
+    #region AddCompilable()
+
+    protected void AddCompilable(CompliableTemplate<CompiledFunction> compilable)
+    {
+        for (int i = 0; i < compilableFunctions.Count; i++)
+        {
+            if (compilableFunctions[i].Function.IsSame(compilable.Function))
+            { return; }
+        }
+        compilableFunctions.Add(compilable);
+    }
+
+    protected void AddCompilable(CompliableTemplate<CompiledOperator> compilable)
+    {
+        for (int i = 0; i < compilableOperators.Count; i++)
+        {
+            if (compilableOperators[i].Function.IsSame(compilable.Function))
+            { return; }
+        }
+        compilableOperators.Add(compilable);
+    }
+
+    protected void AddCompilable(CompliableTemplate<CompiledGeneralFunction> compilable)
+    {
+        for (int i = 0; i < compilableGeneralFunctions.Count; i++)
+        {
+            if (compilableGeneralFunctions[i].Function.IsSame(compilable.Function))
+            { return; }
+        }
+        compilableGeneralFunctions.Add(compilable);
+    }
+
+    protected void AddCompilable(CompliableTemplate<CompiledConstructor> compilable)
+    {
+        for (int i = 0; i < compilableConstructors.Count; i++)
+        {
+            if (compilableConstructors[i].Function.IsSame(compilable.Function))
+            { return; }
+        }
+        compilableConstructors.Add(compilable);
+    }
+
+    #endregion
+
+    #region SetTypeArguments()
+
+    protected void SetTypeArguments(Dictionary<string, GeneralType> arguments)
+    {
+        TypeArguments.Clear();
+        TypeArguments.AddRange(arguments);
+    }
+
+    protected void SetTypeArguments(ImmutableDictionary<string, GeneralType> arguments)
+    {
+        TypeArguments.Clear();
+        TypeArguments.AddRange(arguments);
+    }
+
+    protected void SetTypeArguments(Dictionary<string, GeneralType> arguments, out Dictionary<string, GeneralType> old)
+    {
+        old = new Dictionary<string, GeneralType>(TypeArguments);
+        TypeArguments.Clear();
+        TypeArguments.AddRange(arguments);
+    }
+
+    #endregion
+
+    #region GetEnum()
+
+    protected bool GetEnum(string name, [NotNullWhen(true)] out CompiledEnum? @enum)
+        => CodeGenerator.GetEnum(CompiledEnums, name, out @enum);
+
+    public static bool GetEnum(IEnumerable<CompiledEnum> enums, string name, [NotNullWhen(true)] out CompiledEnum? @enum)
+    {
+        foreach (CompiledEnum @enum_ in enums)
+        {
+            if (@enum_ == null) continue;
+            if (@enum_.Identifier.Content == name)
+            {
+                @enum = @enum_;
+                return true;
+            }
+        }
+        @enum = null;
+        return false;
+    }
+
+    #endregion
+
+    protected virtual bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
+    {
+        if (GetVariable(symbolName, out CompiledVariable? variable))
+        {
+            type = variable.Type;
+            return true;
+        }
+
+        if (GetParameter(symbolName, out CompiledParameter? parameter))
+        {
+            type = parameter.Type;
+            return true;
+        }
+
+        type = null;
+        return false;
+    }
+
+    #region Get Functions ...
+
     public static class FunctionQuery
     {
         public static FunctionQuery<TFunction, string, GeneralType> Create<TFunction>(
@@ -210,48 +472,6 @@ public abstract class CodeGenerator
         public IEnumerable<CompliableTemplate<TFunction>> Compilable { get; init; }
     }
 
-    #region Protected Fields
-
-    protected ImmutableArray<CompiledStruct> CompiledStructs;
-    protected ImmutableArray<CompiledFunction> CompiledFunctions;
-    protected ImmutableArray<CompiledOperator> CompiledOperators;
-    protected ImmutableArray<CompiledConstructor> CompiledConstructors;
-    protected ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
-    protected ImmutableArray<CompiledEnum> CompiledEnums;
-    protected ImmutableArray<IConstant> CompiledGlobalConstants;
-
-    protected readonly Stack<IConstant> CompiledLocalConstants;
-    protected readonly Stack<int> LocalConstantsStack;
-
-    protected readonly List<CompiledParameter> CompiledParameters;
-    protected readonly List<CompiledVariable> CompiledVariables;
-    protected readonly List<CompiledVariable> CompiledGlobalVariables;
-
-    protected IReadOnlyList<CompliableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
-    protected IReadOnlyList<CompliableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;
-    protected IReadOnlyList<CompliableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions => compilableGeneralFunctions;
-    protected IReadOnlyList<CompliableTemplate<CompiledConstructor>> CompilableConstructors => compilableConstructors;
-
-    protected Uri? CurrentFile;
-    protected bool InFunction;
-    protected readonly Stack<bool> InMacro;
-    protected readonly Dictionary<string, GeneralType> TypeArguments;
-    protected DebugInformation? DebugInfo;
-
-    protected readonly PrintCallback? Print;
-    protected readonly AnalysisCollection? AnalysisCollection;
-
-    #endregion
-
-    #region Private Fields
-
-    readonly List<CompliableTemplate<CompiledFunction>> compilableFunctions = new();
-    readonly List<CompliableTemplate<CompiledOperator>> compilableOperators = new();
-    readonly List<CompliableTemplate<CompiledGeneralFunction>> compilableGeneralFunctions = new();
-    readonly List<CompliableTemplate<CompiledConstructor>> compilableConstructors = new();
-
-    #endregion
-
     Functions<CompiledFunction> GetFunctions() => new()
     {
         Compiled = CompiledFunctions,
@@ -275,228 +495,6 @@ public abstract class CodeGenerator
         Compiled = CompiledConstructors,
         Compilable = compilableConstructors,
     };
-
-    protected CodeGenerator(CompilerResult compilerResult, AnalysisCollection? analysisCollection, PrintCallback? print)
-    {
-        CompiledGlobalConstants = ImmutableArray.Create<IConstant>();
-
-        CompiledLocalConstants = new Stack<IConstant>();
-        LocalConstantsStack = new Stack<int>();
-
-        CompiledParameters = new List<CompiledParameter>();
-        CompiledVariables = new List<CompiledVariable>();
-        CompiledGlobalVariables = new List<CompiledVariable>();
-
-        compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
-        compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
-        compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
-
-        CurrentFile = null;
-        InFunction = false;
-        InMacro = new Stack<bool>();
-        TypeArguments = new Dictionary<string, GeneralType>();
-
-        CompiledStructs = compilerResult.Structs;
-        CompiledFunctions = compilerResult.Functions;
-        CompiledOperators = compilerResult.Operators;
-        CompiledConstructors = compilerResult.Constructors;
-        CompiledGeneralFunctions = compilerResult.GeneralFunctions;
-        CompiledEnums = compilerResult.Enums;
-
-        AnalysisCollection = analysisCollection;
-        Print = print;
-    }
-
-    public static void ValidateTypeArguments(IEnumerable<KeyValuePair<string, GeneralType>> arguments)
-    {
-        foreach (KeyValuePair<string, GeneralType> pair in arguments)
-        {
-            if (pair.Value is GenericType)
-            { throw new InternalException($"{pair.Value} is generic"); }
-        }
-    }
-
-    protected void CleanupLocalConstants()
-    {
-        int count = LocalConstantsStack.Pop();
-        CompiledLocalConstants.Pop(count);
-    }
-
-    protected bool GetConstant(string identifier, [NotNullWhen(true)] out IConstant? constant)
-    {
-        constant = null;
-
-        foreach (IConstant _constant in CompiledLocalConstants)
-        {
-            if (_constant.Identifier != identifier)
-            { continue; }
-
-            if (constant is not null)
-            { throw new CompilerException($"Constant \"{constant.Identifier}\" defined more than once", constant, constant.FilePath); }
-
-            constant = _constant;
-        }
-
-        foreach (IConstant _constant in CompiledGlobalConstants)
-        {
-            if (_constant.Identifier != identifier)
-            { continue; }
-
-            if (constant is not null)
-            { throw new CompilerException($"Constant \"{constant.Identifier}\" defined more than once", constant, constant.FilePath); }
-
-            constant = _constant;
-        }
-
-        return constant is not null;
-    }
-
-    protected bool StatementCanBeDeallocated(StatementWithValue statement, out bool explicitly)
-    {
-        if (statement is ModifiedStatement modifiedStatement &&
-            modifiedStatement.Modifier.Equals(ModifierKeywords.Temp))
-        {
-            if (modifiedStatement.Statement is LiteralStatement ||
-                modifiedStatement.Statement is BinaryOperatorCall ||
-                modifiedStatement.Statement is UnaryOperatorCall)
-            {
-                AnalysisCollection?.Hints.Add(new Hint($"Unnecessary explicit temp modifier ({modifiedStatement.Statement.GetType().Name} statements are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
-            }
-
-            explicitly = true;
-            return true;
-        }
-
-        if (statement is LiteralStatement)
-        {
-            explicitly = false;
-            return true;
-        }
-
-        if (statement is BinaryOperatorCall)
-        {
-            explicitly = false;
-            return true;
-        }
-
-        if (statement is UnaryOperatorCall)
-        {
-            explicitly = false;
-            return true;
-        }
-
-        explicitly = default;
-        return false;
-    }
-
-    #region AddCompilable()
-
-    protected void AddCompilable(CompliableTemplate<CompiledFunction> compilable)
-    {
-        for (int i = 0; i < compilableFunctions.Count; i++)
-        {
-            if (compilableFunctions[i].Function.IsSame(compilable.Function))
-            { return; }
-        }
-        compilableFunctions.Add(compilable);
-    }
-
-    protected void AddCompilable(CompliableTemplate<CompiledOperator> compilable)
-    {
-        for (int i = 0; i < compilableOperators.Count; i++)
-        {
-            if (compilableOperators[i].Function.IsSame(compilable.Function))
-            { return; }
-        }
-        compilableOperators.Add(compilable);
-    }
-
-    protected void AddCompilable(CompliableTemplate<CompiledGeneralFunction> compilable)
-    {
-        for (int i = 0; i < compilableGeneralFunctions.Count; i++)
-        {
-            if (compilableGeneralFunctions[i].Function.IsSame(compilable.Function))
-            { return; }
-        }
-        compilableGeneralFunctions.Add(compilable);
-    }
-
-    protected void AddCompilable(CompliableTemplate<CompiledConstructor> compilable)
-    {
-        for (int i = 0; i < compilableConstructors.Count; i++)
-        {
-            if (compilableConstructors[i].Function.IsSame(compilable.Function))
-            { return; }
-        }
-        compilableConstructors.Add(compilable);
-    }
-
-    #endregion
-
-    #region SetTypeArguments()
-
-    protected void SetTypeArguments(Dictionary<string, GeneralType> arguments)
-    {
-        TypeArguments.Clear();
-        TypeArguments.AddRange(arguments);
-    }
-
-    protected void SetTypeArguments(ImmutableDictionary<string, GeneralType> arguments)
-    {
-        TypeArguments.Clear();
-        TypeArguments.AddRange(arguments);
-    }
-
-    protected void SetTypeArguments(Dictionary<string, GeneralType> arguments, out Dictionary<string, GeneralType> old)
-    {
-        old = new Dictionary<string, GeneralType>(TypeArguments);
-        TypeArguments.Clear();
-        TypeArguments.AddRange(arguments);
-    }
-
-    #endregion
-
-    #region GetEnum()
-
-    protected bool GetEnum(string name, [NotNullWhen(true)] out CompiledEnum? @enum)
-        => CodeGenerator.GetEnum(CompiledEnums, name, out @enum);
-
-    public static bool GetEnum(IEnumerable<CompiledEnum?> enums, string name, [NotNullWhen(true)] out CompiledEnum? @enum)
-    {
-        foreach (CompiledEnum? @enum_ in enums)
-        {
-            if (@enum_ == null) continue;
-            if (@enum_.Identifier.Content == name)
-            {
-                @enum = @enum_;
-                return true;
-            }
-        }
-        @enum = null;
-        return false;
-    }
-
-    #endregion
-
-    protected virtual bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
-    {
-        if (GetVariable(symbolName, out CompiledVariable? variable))
-        {
-            type = variable.Type;
-            return true;
-        }
-
-        if (GetParameter(symbolName, out CompiledParameter? parameter))
-        {
-            type = parameter.Type;
-            return true;
-        }
-
-        type = null;
-        return false;
-    }
-
-    #region GetOtherFunctions()
 
     protected bool GetConstructor(
         GeneralType type,
@@ -680,10 +678,6 @@ public abstract class CodeGenerator
         );
     }
 
-    #endregion
-
-    #region GetFunction()
-
     protected bool GetFunction(
         string identifier,
         GeneralType? type,
@@ -708,7 +702,6 @@ public abstract class CodeGenerator
 
     protected bool GetFunction(
         AnyCall call,
-        Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
         [NotNullWhen(false)] out WillBeCompilerException? error,
@@ -725,7 +718,6 @@ public abstract class CodeGenerator
 
         return GetFunction(
             functionCall,
-            relevantFile,
 
             out result,
             out error,
@@ -735,7 +727,6 @@ public abstract class CodeGenerator
 
     protected bool GetFunction(
         FunctionCall functionCallStatement,
-        Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
         [NotNullWhen(false)] out WillBeCompilerException? error,
@@ -743,7 +734,7 @@ public abstract class CodeGenerator
     {
         string identifier = functionCallStatement.Identifier.Content;
         ImmutableArray<GeneralType> argumentTypes = FindStatementTypes(functionCallStatement.MethodParameters);
-        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(identifier, argumentTypes, functionCallStatement.OriginalFile ?? relevantFile, null, addCompilable);
+        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(identifier, argumentTypes, functionCallStatement.OriginalFile, null, addCompilable);
         return GetFunction(
             query,
             out result,
@@ -780,7 +771,7 @@ public abstract class CodeGenerator
     {
         TFunction? result_ = default;
         Dictionary<string, GeneralType>? typeArguments = null;
-        error = null;
+        WillBeCompilerException? error_ = null;
         readableName ??= query.ToReadable();
 
         string kindNameLower = kindName.ToLowerInvariant();
@@ -804,7 +795,7 @@ public abstract class CodeGenerator
             return false;
         }
 
-        bool HandleIdentifier(TFunction function, ref TFunction? result, ref WillBeCompilerException? error, ref FunctionPerfectus perfectus)
+        bool HandleIdentifier(TFunction function)
         {
             if (query.Identifier is not null &&
                 !function.Identifier.Equals(query.Identifier))
@@ -814,15 +805,15 @@ public abstract class CodeGenerator
             return true;
         }
 
-        bool HandleParameterCount(TFunction function, ref TFunction? result, ref WillBeCompilerException? error, ref FunctionPerfectus perfectus)
+        bool HandleParameterCount(TFunction function)
         {
             if (query.ArgumentCount.HasValue &&
                 function.ParameterTypes.Count != query.ArgumentCount.Value)
             {
                 if (perfectus < FunctionPerfectus.ParameterCount)
                 {
-                    result = function;
-                    error = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: wrong number of parameters passed to {function.ToReadable()}");
+                    result_ = function;
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: wrong number of parameters passed to {function.ToReadable()}");
                 }
                 return false;
             }
@@ -831,7 +822,7 @@ public abstract class CodeGenerator
             return true;
         }
 
-        bool HandleParameterTypes(TFunction function, ref TFunction? result, ref WillBeCompilerException? error, ref FunctionPerfectus perfectus)
+        bool HandleParameterTypes(TFunction function)
         {
             if (query.Arguments.HasValue &&
                 !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (defined, passed) =>
@@ -847,8 +838,8 @@ public abstract class CodeGenerator
             {
                 if (perfectus < FunctionPerfectus.ParameterTypes)
                 {
-                    result = function;
-                    error = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types doesn't match with {function.ToReadable()}");
+                    result_ = function;
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -857,15 +848,15 @@ public abstract class CodeGenerator
             return true;
         }
 
-        bool HandlePerfectParameterTypes(TFunction function, ref TFunction? result, ref WillBeCompilerException? error, ref FunctionPerfectus perfectus)
+        bool HandlePerfectParameterTypes(TFunction function)
         {
             if (query.Arguments.HasValue &&
                 !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value))
             {
                 if (perfectus < FunctionPerfectus.PerfectReturnType)
                 {
-                    result = function;
-                    error = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return types doesn't match with {function.ToReadable()}");
+                    result_ = function;
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return types doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -873,12 +864,12 @@ public abstract class CodeGenerator
             if (perfectus < FunctionPerfectus.PerfectReturnType)
             {
                 perfectus = Max(perfectus, FunctionPerfectus.PerfectReturnType);
-                result = function;
+                result_ = function;
             }
             return true;
         }
 
-        bool HandleReturnType(TFunction function, ref TFunction? result, ref WillBeCompilerException? error, ref FunctionPerfectus perfectus)
+        bool HandleReturnType(TFunction function)
         {
             if (query.ReturnType != null && (
                 query.ReturnType.Equals(function.Type) ||
@@ -887,8 +878,8 @@ public abstract class CodeGenerator
             {
                 if (perfectus < FunctionPerfectus.ReturnType)
                 {
-                    result = function;
-                    error = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return types doesn't match with {function.ToReadable()}");
+                    result_ = function;
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return types doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -897,15 +888,15 @@ public abstract class CodeGenerator
             return true;
         }
 
-        bool HandlePerfectReturnType(TFunction function, ref TFunction? result, ref WillBeCompilerException? error, ref FunctionPerfectus perfectus)
+        bool HandlePerfectReturnType(TFunction function)
         {
             if (query.ReturnType != null &&
                 !function.Type.Equals(query.ReturnType))
             {
                 if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                 {
-                    result = function;
-                    error = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types doesn't match with {function.ToReadable()}");
+                    result_ = function;
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -913,15 +904,15 @@ public abstract class CodeGenerator
             if (perfectus < FunctionPerfectus.PerfectParameterTypes)
             {
                 perfectus = Max(perfectus, FunctionPerfectus.PerfectParameterTypes);
-                result = function;
+                result_ = function;
             }
             return true;
         }
 
-        bool HandleFile(TFunction function, ref TFunction? result, ref WillBeCompilerException? error, ref FunctionPerfectus perfectus)
+        bool HandleFile(TFunction function)
         {
             if (query.RelevantFile is null ||
-                function.FilePath != query.RelevantFile)
+                function.File != query.RelevantFile)
             {
                 // Not in the same file
                 return false;
@@ -929,41 +920,44 @@ public abstract class CodeGenerator
 
             if (perfectus >= FunctionPerfectus.File)
             {
-                error = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: multiple {kindNameLower}s matched in the same file");
+                error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: multiple {kindNameLower}s matched in the same file");
                 // Debugger.Break();
             }
 
             perfectus = FunctionPerfectus.File;
-            result = function;
+            result_ = function;
             return true;
         }
 
         foreach (TFunction function in functions.Compiled.Where(f => !f.IsTemplate).Concat(functions.Compilable.Select(f => f.Function)))
         {
-            if (!HandleIdentifier(function, ref result_, ref error, ref perfectus))
+            if (!HandleIdentifier(function))
             { continue; }
 
-            if (!HandleParameterCount(function, ref result_, ref error, ref perfectus))
+            if (!HandleParameterCount(function))
             { continue; }
 
-            if (!HandleParameterTypes(function, ref result_, ref error, ref perfectus))
+            if (!HandleParameterTypes(function))
             { continue; }
 
-            if (!HandleReturnType(function, ref result_, ref error, ref perfectus))
+            if (!HandleReturnType(function))
             { continue; }
 
             // MATCHED --> Searching for most relevant function
 
             if (perfectus < FunctionPerfectus.Good)
-            { result_ = function; }
+            {
+                result_ = function;
+                perfectus = FunctionPerfectus.Good;
+            }
 
-            if (!HandlePerfectParameterTypes(function, ref result_, ref error, ref perfectus))
+            if (!HandlePerfectParameterTypes(function))
             { continue; }
 
-            if (!HandlePerfectReturnType(function, ref result_, ref error, ref perfectus))
+            if (!HandlePerfectReturnType(function))
             { continue; }
 
-            if (!HandleFile(function, ref result_, ref error, ref perfectus))
+            if (!HandleFile(function))
             { continue; }
         }
 
@@ -972,10 +966,10 @@ public abstract class CodeGenerator
 
         foreach (TFunction function in functions.Compiled.Where(f => f.IsTemplate))
         {
-            if (!HandleIdentifier(function, ref result_, ref error, ref perfectus))
+            if (!HandleIdentifier(function))
             { continue; }
 
-            if (!HandleParameterCount(function, ref result_, ref error, ref perfectus))
+            if (!HandleParameterCount(function))
             { continue; }
 
             if (!query.Arguments.HasValue)
@@ -994,7 +988,7 @@ public abstract class CodeGenerator
             if (perfectus < FunctionPerfectus.File)
             { result_ = function; }
 
-            if (!HandleFile(function, ref result_, ref error, ref perfectus))
+            if (!HandleFile(function))
             { continue; }
         }
 
@@ -1015,10 +1009,11 @@ public abstract class CodeGenerator
                 TypeArguments = typeArguments,
                 Perfectus = perfectus,
             };
+            error = error_;
             return true;
         }
 
-        error ??= new WillBeCompilerException($"{kindNameCapital} {readableName} not found");
+        error = error_ ?? new WillBeCompilerException($"{kindNameCapital} {readableName} not found");
         result = null;
         return false;
     }
@@ -1078,10 +1073,10 @@ public abstract class CodeGenerator
         variableDeclaration.Identifier.AnalyzedType = TokenAnalyzedType.ConstantName;
 
         if (variableDeclaration.InitialValue == null)
-        { throw new CompilerException($"Constant value must have initial value", variableDeclaration, variableDeclaration.FilePath); }
+        { throw new CompilerException($"Constant value must have initial value", variableDeclaration, variableDeclaration.File); }
 
         if (!TryCompute(variableDeclaration.InitialValue, out DataItem constantValue))
-        { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.FilePath); }
+        { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.File); }
 
         if (variableDeclaration.Type != StatementKeywords.Var)
         {
@@ -1089,13 +1084,13 @@ public abstract class CodeGenerator
             variableDeclaration.Type.SetAnalyzedType(constantType);
 
             if (constantType is not BuiltinType builtinType)
-            { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, variableDeclaration.FilePath); }
+            { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, variableDeclaration.File); }
 
             DataItem.TryCast(ref constantValue, builtinType.RuntimeType);
         }
 
         if (GetConstant(variableDeclaration.Identifier.Content, out _))
-        { throw new CompilerException($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.FilePath); }
+        { throw new CompilerException($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.File); }
 
         return new(constantValue, variableDeclaration);
     }
@@ -1104,31 +1099,115 @@ public abstract class CodeGenerator
 
     #region GetStruct()
 
-    protected bool GetStruct(string structName, [NotNullWhen(true)] out CompiledStruct? result, [NotNullWhen(false)] out WillBeCompilerException? error)
-        => CodeGenerator.GetStruct(CompiledStructs, structName, out result, out error);
-
-    public static bool GetStruct(IEnumerable<CompiledStruct> structs, string structName, [NotNullWhen(true)] out CompiledStruct? result, [NotNullWhen(false)] out WillBeCompilerException? error)
+    public enum StructPerfectus
     {
-        result = null;
-        error = null;
+        None,
 
-        foreach (CompiledStruct @struct in structs)
+        /// <summary>
+        /// The identifier is good
+        /// </summary>
+        Identifier,
+
+        /// <summary>
+        /// Boundary between good and bad structs
+        /// </summary>
+        Good,
+
+        // == MATCHED --> Searching for the most relevant struct ==
+
+        /// <summary>
+        /// The struct is in the same file
+        /// </summary>
+        File,
+    }
+
+    protected bool GetStruct(
+        string structName,
+        Uri? relevantFile,
+
+        [NotNullWhen(true)] out CompiledStruct? result,
+        [NotNullWhen(false)] out WillBeCompilerException? error)
+        => CodeGenerator.GetStruct(
+            CompiledStructs,
+
+            structName,
+            relevantFile,
+
+            out result,
+            out error);
+
+    public static bool GetStruct(
+        IEnumerable<CompiledStruct> structs,
+
+        string structName,
+        Uri? relevantFile,
+
+        [NotNullWhen(true)] out CompiledStruct? result,
+        [NotNullWhen(false)] out WillBeCompilerException? error)
+    {
+        CompiledStruct? result_ = default;
+        WillBeCompilerException? error_ = null;
+
+        StructPerfectus perfectus = StructPerfectus.None;
+
+        static StructPerfectus Max(StructPerfectus a, StructPerfectus b) => a > b ? a : b;
+
+        bool HandleIdentifier(CompiledStruct function)
         {
-            if (@struct.Identifier.Content != structName)
-            { continue; }
+            if (structName is not null &&
+                !function.Identifier.Equals(structName))
+            { return false; }
 
-            if (result is not null)
-            {
-                Debugger.Break();
-                error = new WillBeCompilerException($"Struct \"{structName}\" not found: multiple structs matched");
-                return false;
-            }
-
-            result = @struct;
+            perfectus = Max(perfectus, StructPerfectus.Identifier);
             return true;
         }
 
-        error = new WillBeCompilerException($"Struct \"{structName}\" not found");
+        bool HandleFile(CompiledStruct function)
+        {
+            if (relevantFile is null ||
+                function.File != relevantFile)
+            {
+                // Not in the same file
+                return false;
+            }
+
+            if (perfectus >= StructPerfectus.File)
+            {
+                error_ = new WillBeCompilerException($"Struct {structName} not found: multiple structs matched in the same file");
+                // Debugger.Break();
+            }
+
+            perfectus = StructPerfectus.File;
+            result_ = function;
+            return true;
+        }
+
+        foreach (CompiledStruct function in structs)
+        {
+            if (!HandleIdentifier(function))
+            { continue; }
+
+            // MATCHED --> Searching for most relevant struct
+
+            if (perfectus < StructPerfectus.Good)
+            {
+                result_ = function;
+                perfectus = StructPerfectus.Good;
+            }
+
+            if (!HandleFile(function))
+            { continue; }
+        }
+
+        if (result_ is not null && perfectus >= StructPerfectus.Good)
+        {
+            result = result_;
+            error = error_;
+            return true;
+        }
+
+        error = error_ ?? new WillBeCompilerException($"Struct {structName} not found");
+        result = null;
         return false;
     }
 
@@ -1136,7 +1215,7 @@ public abstract class CodeGenerator
 
     #region FindType()
 
-    protected bool FindType(Token name, [NotNullWhen(true)] out GeneralType? result)
+    protected bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
     {
         if (TypeKeywords.BasicTypes.TryGetValue(name.Content, out BasicType builtinType))
         {
@@ -1144,19 +1223,19 @@ public abstract class CodeGenerator
             return true;
         }
 
-        if (GetStruct(name.Content, out CompiledStruct? @struct, out _))
+        if (GetStruct(name.Content, relevantFile, out CompiledStruct? @struct, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.Struct;
-            @struct.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name), CurrentFile));
+            @struct.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, null), CurrentFile));
 
-            result = new StructType(@struct);
+            result = new StructType(@struct, relevantFile);
             return true;
         }
 
         if (GetEnum(name.Content, out CompiledEnum? @enum))
         {
             name.AnalyzedType = TokenAnalyzedType.Enum;
-            result = new EnumType(@enum);
+            result = new EnumType(@enum, relevantFile);
             return true;
         }
 
@@ -1166,7 +1245,7 @@ public abstract class CodeGenerator
             return true;
         }
 
-        if (GetFunction(FunctionQuery.Create<CompiledFunction>(name.Content), out FunctionQueryResult<CompiledFunction>? function, out _))
+        if (GetFunction(FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, relevantFile), out FunctionQueryResult<CompiledFunction>? function, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.FunctionName;
             function.Function.References.Add(new Reference<StatementWithValue>(new Identifier(name, null), CurrentFile));
@@ -1174,7 +1253,7 @@ public abstract class CodeGenerator
             return true;
         }
 
-        if (GetGlobalVariable(name.Content, out CompiledVariable? globalVariable))
+        if (GetGlobalVariable(name.Content, relevantFile, out CompiledVariable? globalVariable, out _))
         {
             result = globalVariable.Type;
             return true;
@@ -1207,6 +1286,28 @@ public abstract class CodeGenerator
 
     #endregion
 
+    public enum GlobalVariablePerfectus
+    {
+        None,
+
+        /// <summary>
+        /// The identifier is good
+        /// </summary>
+        Identifier,
+
+        /// <summary>
+        /// Boundary between good and bad global variables
+        /// </summary>
+        Good,
+
+        // == MATCHED --> Searching for the most relevant global variable ==
+
+        /// <summary>
+        /// The global variable is in the same file
+        /// </summary>
+        File,
+    }
+
     protected bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
     {
         foreach (CompiledVariable compiledVariable_ in CompiledVariables)
@@ -1221,17 +1322,76 @@ public abstract class CodeGenerator
         return false;
     }
 
-    protected bool GetGlobalVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
+    protected bool GetGlobalVariable(
+        string variableName,
+        Uri relevantFile,
+
+        [NotNullWhen(true)] out CompiledVariable? result,
+        [NotNullWhen(false)] out WillBeCompilerException? error)
     {
-        foreach (CompiledVariable compiledVariable_ in CompiledGlobalVariables)
+        CompiledVariable? result_ = default;
+        WillBeCompilerException? error_ = null;
+
+        GlobalVariablePerfectus perfectus = GlobalVariablePerfectus.None;
+
+        static GlobalVariablePerfectus Max(GlobalVariablePerfectus a, GlobalVariablePerfectus b) => a > b ? a : b;
+
+        bool HandleIdentifier(CompiledVariable variable)
         {
-            if (compiledVariable_.Identifier.Content == variableName)
-            {
-                compiledVariable = compiledVariable_;
-                return true;
-            }
+            if (variableName is not null &&
+                !variable.Identifier.Equals(variableName))
+            { return false; }
+
+            perfectus = Max(perfectus, GlobalVariablePerfectus.Identifier);
+            return true;
         }
-        compiledVariable = null;
+
+        bool HandleFile(CompiledVariable variable)
+        {
+            if (relevantFile is null ||
+                variable.File != relevantFile)
+            {
+                // Not in the same file
+                return false;
+            }
+
+            if (perfectus >= GlobalVariablePerfectus.File)
+            {
+                error_ = new WillBeCompilerException($"Global variable {variableName} not found: multiple variables matched in the same file");
+                // Debugger.Break();
+            }
+
+            perfectus = GlobalVariablePerfectus.File;
+            result_ = variable;
+            return true;
+        }
+
+        foreach (CompiledVariable variable in CompiledGlobalVariables)
+        {
+            if (!HandleIdentifier(variable))
+            { continue; }
+
+            // MATCHED --> Searching for most relevant global variable
+
+            if (perfectus < GlobalVariablePerfectus.Good)
+            {
+                result_ = variable;
+                perfectus = GlobalVariablePerfectus.Good;
+            }
+
+            if (!HandleFile(variable))
+            { continue; }
+        }
+
+        if (result_ is not null && perfectus >= GlobalVariablePerfectus.Good)
+        {
+            result = result_;
+            error = error_;
+            return true;
+        }
+
+        error = error_ ?? new WillBeCompilerException($"Global variable {variableName} not found");
+        result = null;
         return false;
     }
 
@@ -1336,7 +1496,7 @@ public abstract class CodeGenerator
         if (GetVariable(variable.Content, out CompiledVariable? localVariable))
         { return new ValueAddress(localVariable); }
 
-        if (GetGlobalVariable(variable.Content, out CompiledVariable? globalVariable))
+        if (GetGlobalVariable(variable.Content, variable.OriginalFile, out CompiledVariable? globalVariable, out _))
         { return GetGlobalVariableAddress(globalVariable); }
 
         throw new CompilerException($"Local symbol \"{variable.Content}\" not found", variable, CurrentFile);
@@ -1414,7 +1574,7 @@ public abstract class CodeGenerator
         if (GetVariable(variable.Content, out CompiledVariable? localVariable))
         { return new ValueAddress(localVariable); }
 
-        if (GetGlobalVariable(variable.Content, out CompiledVariable? globalVariable))
+        if (GetGlobalVariable(variable.Content, variable.OriginalFile, out CompiledVariable? globalVariable, out _))
         { return GetGlobalVariableAddress(globalVariable); }
 
         throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
@@ -1457,7 +1617,7 @@ public abstract class CodeGenerator
         if (newVariable.Type == StatementKeywords.Var)
         {
             if (newVariable.InitialValue == null)
-            { throw new CompilerException($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.FilePath); }
+            { throw new CompilerException($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.File); }
 
             type = FindStatementType(newVariable.InitialValue);
         }
@@ -1470,7 +1630,7 @@ public abstract class CodeGenerator
         }
 
         if (!type.AllGenericsDefined())
-        { throw new InternalException($"Failed to qualify all generics in variable \"{newVariable.Identifier}\" type \"{type}\"", newVariable.Type, newVariable.FilePath); }
+        { throw new InternalException($"Failed to qualify all generics in variable \"{newVariable.Identifier}\" type \"{type}\"", newVariable.Type, newVariable.File); }
 
         return new CompiledVariable(memoryOffset, type, newVariable);
     }
@@ -1519,7 +1679,7 @@ public abstract class CodeGenerator
                 throw new NotImplementedException($"Initial value for structs is not implemented");
             case EnumType enumType:
                 if (enumType.Enum.Members.Length == 0)
-                { throw new CompilerException($"Could not get enum \"{enumType.Enum.Identifier.Content}\" initial value: enum has no members", enumType.Enum.Identifier, enumType.Enum.FilePath); }
+                { throw new CompilerException($"Could not get enum \"{enumType.Enum.Identifier.Content}\" initial value: enum has no members", enumType.Enum.Identifier, enumType.Enum.File); }
                 return enumType.Enum.Members[0].ComputedValue;
             case FunctionType:
                 return new DataItem(int.MaxValue);
@@ -1596,8 +1756,7 @@ public abstract class CodeGenerator
     {
         if (functionCall.Identifier.Content == "sizeof") return new BuiltinType(BasicType.Integer);
 
-        // TODO: functionCall.OriginalFile can be null
-        if (!GetFunction(functionCall, functionCall.OriginalFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundError))
+        if (!GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundError))
         { throw notFoundError.Instantiate(functionCall, CurrentFile); }
 
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
@@ -1802,7 +1961,7 @@ public abstract class CodeGenerator
                 identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                 identifier.Reference = variable;
             }
-            else if (GetGlobalVariable(identifier.Content, out CompiledVariable? globalVariable))
+            else if (GetGlobalVariable(identifier.Content, identifier.OriginalFile, out CompiledVariable? globalVariable, out _))
             {
                 identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                 identifier.Reference = globalVariable;
@@ -1814,7 +1973,7 @@ public abstract class CodeGenerator
         if (GetEnum(identifier.Content, out CompiledEnum? @enum))
         {
             identifier.Token.AnalyzedType = TokenAnalyzedType.Enum;
-            return OnGotStatementType(identifier, new EnumType(@enum));
+            return OnGotStatementType(identifier, new EnumType(@enum, identifier.OriginalFile));
         }
 
         if (GetFunction(identifier.Token.Content, expectedType, out FunctionQueryResult<CompiledFunction>? function, out WillBeCompilerException? functionError))
@@ -1829,7 +1988,7 @@ public abstract class CodeGenerator
             { return _type; }
         }
 
-        if (FindType(identifier.Token, out GeneralType? result))
+        if (FindType(identifier.Token, identifier.OriginalFile, out GeneralType? result))
         { return OnGotStatementType(identifier, result); }
 
         throw new CompilerException($"Symbol \"{identifier.Content}\" not found", identifier, CurrentFile);
@@ -2416,7 +2575,7 @@ public abstract class CodeGenerator
             type: statement.Type,
             variableName: statement.Identifier,
             initialValue: InlineMacro(statement.InitialValue, parameters),
-            file: statement.FilePath)
+            file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2914,8 +3073,7 @@ public abstract class CodeGenerator
             return true;
         }
 
-        // TODO: functionCall.OriginalFile can be null
-        if (GetFunction(functionCall, functionCall.OriginalFile, out FunctionQueryResult<CompiledFunction>? result, out _))
+        if (GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out _))
         {
             CompiledFunction? function = result.Function;
 
@@ -3248,7 +3406,7 @@ public abstract class CodeGenerator
 
         CurrentEvaluationContext.Push(context);
         Uri? prevFile = CurrentFile;
-        CurrentFile = (function as IInFile)?.FilePath;
+        CurrentFile = function.File;
 
         bool success = TryEvaluate(function.Block, context);
 

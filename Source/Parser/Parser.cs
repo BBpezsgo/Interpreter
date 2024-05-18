@@ -8,7 +8,7 @@ public sealed class Parser
     int CurrentTokenIndex;
     readonly Token[] Tokens;
     readonly ImmutableArray<Token> OriginalTokens;
-    readonly Uri? File;
+    readonly Uri File;
 
     Token? CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
     Token? PreviousToken => (CurrentTokenIndex >= 1 && CurrentTokenIndex <= Tokens.Length) ? Tokens[CurrentTokenIndex - 1] : null;
@@ -94,7 +94,7 @@ public sealed class Parser
 #pragma warning restore RCS1213, IDE0052, CA1823
 
     // === Result ===
-    readonly List<Error> Errors = new();
+    readonly List<LanguageError> Errors = new();
     readonly List<FunctionDefinition> Functions = new();
     readonly List<FunctionDefinition> Operators = new();
     readonly List<EnumDefinition> Enums = new();
@@ -104,7 +104,7 @@ public sealed class Parser
     readonly List<Statement.Statement> TopLevelStatements = new();
     // === ===
 
-    Parser(ImmutableArray<Token> tokens, Uri? file)
+    Parser(ImmutableArray<Token> tokens, Uri file)
     {
         OriginalTokens = tokens;
         Tokens = tokens
@@ -124,20 +124,20 @@ public sealed class Parser
     /// <exception cref="SyntaxException"/>
     /// <exception cref="InternalException"/>
     /// <exception cref="TokenizerException"/>
-    public static ParserResult ParseFile(string filePath, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings = null, ConsoleProgressBar? tokenizerProgressBar = null)
+    public static ParserResult ParseFile(string file, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings = null, ConsoleProgressBar? tokenizerProgressBar = null)
     {
-        TokenizerResult tokens = StreamTokenizer.Tokenize(filePath, preprocessorVariables, tokenizerSettings, tokenizerProgressBar);
-        Uri uri = new(filePath, UriKind.Absolute);
+        TokenizerResult tokens = StreamTokenizer.Tokenize(file, preprocessorVariables, tokenizerSettings, tokenizerProgressBar);
+        Uri uri = new(file, UriKind.Absolute);
         ParserResult result = new Parser(tokens.Tokens, uri).ParseInternal();
         return result;
     }
 
     /// <exception cref="EndlessLoopException"/>
     /// <exception cref="SyntaxException"/>
-    public static ParserResult Parse(ImmutableArray<Token> tokens, Uri? file)
+    public static ParserResult Parse(ImmutableArray<Token> tokens, Uri file)
         => new Parser(tokens, file).ParseInternal();
 
-    public static Statement.Statement ParseStatement(ImmutableArray<Token> tokens, Uri? file)
+    public static Statement.Statement ParseStatement(ImmutableArray<Token> tokens, Uri file)
         => new Parser(tokens, file).ParseStatementInternal();
 
     ParserResult ParseInternal()
@@ -174,7 +174,7 @@ public sealed class Parser
     {
         if (ExpectStatementUnchecked(out Statement.Statement? statement))
         {
-            if (Errors.Count > 0) { throw Errors[0].ToException(); }
+            if (Errors.Count > 0) { throw Errors[0]; }
             return statement;
         }
         else
@@ -274,7 +274,7 @@ public sealed class Parser
             }
             else
             {
-                Errors.Add(new Error($"Expected library name after \"{DeclarationKeywords.Using}\"", keyword, File));
+                Errors.Add(new LanguageError($"Expected library name after \"{DeclarationKeywords.Using}\"", keyword, File));
             }
             return false;
         }
@@ -599,7 +599,7 @@ public sealed class Parser
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
-        { Errors.Add(new Error($"Body is required for general function definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
+        { Errors.Add(new LanguageError($"Body is required for general function definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
 
         function = new GeneralFunctionDefinition(
             possibleNameT,
@@ -659,7 +659,7 @@ public sealed class Parser
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
-        { Errors.Add(new Error($"Body is required for constructor definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
+        { Errors.Add(new LanguageError($"Body is required for constructor definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
 
         function = new ConstructorDefinition(
             type,
@@ -1376,7 +1376,7 @@ public sealed class Parser
         if (NeedSemicolon(statement))
         {
             if (!ExpectOperator(";", out semicolon))
-            { Errors.Add(new Error($"Please put a \";\" here (after {statement.GetType().Name})", statement.Position.After(), File)); }
+            { Errors.Add(new LanguageError($"Please put a \";\" here (after {statement.GetType().Name})", statement.Position.After(), File)); }
         }
         else
         { ExpectOperator(";", out semicolon); }
@@ -1725,10 +1725,10 @@ public sealed class Parser
         keywordCall = new(possibleFunctionName, parameters);
 
         if (keywordCall.Parameters.Length < minParameterCount)
-        { Errors.Add(new Error($"This keyword-call (\"{possibleFunctionName}\") requires minimum {minParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
+        { Errors.Add(new LanguageError($"This keyword-call (\"{possibleFunctionName}\") requires minimum {minParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
 
         if (keywordCall.Parameters.Length > maxParameterCount)
-        { Errors.Add(new Error($"This keyword-call (\"{possibleFunctionName}\") requires maximum {maxParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
+        { Errors.Add(new LanguageError($"This keyword-call (\"{possibleFunctionName}\") requires maximum {maxParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
 
         return true;
     }
@@ -1836,11 +1836,11 @@ public sealed class Parser
         foreach (Token modifier in modifiers)
         {
             if (!validModifiers.Contains(modifier.Content))
-            { Errors.Add(new Error($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
+            { Errors.Add(new LanguageError($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
 
             if (modifier.Content == ModifierKeywords.This &&
                 parameterIndex != 0)
-            { Errors.Add(new Error($"Modifier \"{ModifierKeywords.This}\" only valid on the first parameter", modifier, File)); }
+            { Errors.Add(new LanguageError($"Modifier \"{ModifierKeywords.This}\" only valid on the first parameter", modifier, File)); }
         }
     }
 
@@ -1849,7 +1849,7 @@ public sealed class Parser
         foreach (Token modifier in modifiers)
         {
             if (!validModifiers.Contains(modifier.Content))
-            { Errors.Add(new Error($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
+            { Errors.Add(new LanguageError($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
         }
     }
 
@@ -1931,14 +1931,14 @@ public sealed class Parser
 
     bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type)
     {
-        if (ExpectType(flags, out type, out Error? error))
+        if (ExpectType(flags, out type, out LanguageError? error))
         { return true; }
         if (error is not null)
         { Errors.Add(error.Break()); }
         return false;
     }
 
-    bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type, [MaybeNullWhen(true)] out Error? error)
+    bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type, [MaybeNullWhen(true)] out LanguageError? error)
     {
         type = default;
         error = null;
@@ -1948,7 +1948,7 @@ public sealed class Parser
         if (possibleType.Equals(StatementKeywords.Return))
         { return false; }
 
-        type = new TypeInstanceSimple(possibleType);
+        type = new TypeInstanceSimple(possibleType, File);
 
         if (possibleType.Content.Equals("any"))
         {
@@ -1956,12 +1956,12 @@ public sealed class Parser
 
             if ((flags & AllowedType.ExplicitAny) == 0)
             {
-                error = new Error($"Type \"{possibleType.Content}\" is not valid in the current context", possibleType, File, false);
+                error = new LanguageError($"Type \"{possibleType.Content}\" is not valid in the current context", possibleType, File, false);
                 return false;
             }
 
             if (ExpectOperator(TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType, out Token? illegalT))
-            { Errors.Add(new Error($"This is not allowed", illegalT, File)); }
+            { Errors.Add(new LanguageError($"This is not allowed", illegalT, File)); }
 
             if (ExpectOperator("*", out Token? pointerOperator))
             { type = new TypeInstancePointer(type, pointerOperator); }
@@ -1975,12 +1975,12 @@ public sealed class Parser
 
             if ((flags & AllowedType.Implicit) == 0)
             {
-                error = new Error($"Implicit type not allowed in the current context", possibleType, File, false);
+                error = new LanguageError($"Implicit type not allowed in the current context", possibleType, File, false);
                 return false;
             }
 
             if (ExpectOperator(TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType, out Token? illegalT))
-            { Errors.Add(new Error($"This is not allowed", illegalT, File)); }
+            { Errors.Add(new LanguageError($"This is not allowed", illegalT, File)); }
 
             return true;
         }
@@ -2031,7 +2031,7 @@ public sealed class Parser
                     { continue; }
                 }
 
-                type = new TypeInstanceSimple(possibleType, genericTypes);
+                type = new TypeInstanceSimple(possibleType, File, genericTypes);
                 withGenerics = true;
             }
             else if (!withGenerics && ExpectOperator("("))
@@ -2071,10 +2071,10 @@ public sealed class Parser
                 ExpectOneValue(out StatementWithValue? sizeValue);
 
                 if (sizeValue == null && !flags.HasFlag(AllowedType.StackArrayWithoutLength))
-                { Errors.Add(new Error($"Expected value as array size", bracketStart1, File)); }
+                { Errors.Add(new LanguageError($"Expected value as array size", bracketStart1, File)); }
 
                 if (sizeValue != null && !flags.HasFlag(AllowedType.StackArrayWithLength))
-                { Errors.Add(new Error($"Expected value as array size", bracketStart1, File)); }
+                { Errors.Add(new LanguageError($"Expected value as array size", bracketStart1, File)); }
 
                 if (!ExpectOperator("]"))
                 { return false; }

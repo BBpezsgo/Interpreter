@@ -2,14 +2,14 @@
 
 public class AnalysisCollection
 {
-    public readonly List<Error> Errors;
+    public readonly List<LanguageError> Errors;
     public readonly List<Warning> Warnings;
     public readonly List<Information> Informations;
     public readonly List<Hint> Hints;
 
     public AnalysisCollection()
     {
-        Errors = new List<Error>();
+        Errors = new List<LanguageError>();
         Warnings = new List<Warning>();
         Informations = new List<Information>();
         Hints = new List<Hint>();
@@ -18,7 +18,7 @@ public class AnalysisCollection
     public void Throw()
     {
         if (Errors.Count == 0) return;
-        throw Errors[0].ToException();
+        throw Errors[0];
     }
 
     public void Print()

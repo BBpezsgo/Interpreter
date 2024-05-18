@@ -25,8 +25,8 @@ public class RuntimeException : LanguageException
 
         CallStack = debugInfo.GetFunctionInformations(context.CallTrace).ToImmutableArray();
 
-        Uri = sourcePosition.Uri;
-        Uri ??= CallStack.Length > 0 ? CallStack[^1].File : null;
+        File = sourcePosition.Uri;
+        File ??= CallStack.Length > 0 ? CallStack[^1].File : null;
     }
 
     public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
@@ -49,8 +49,8 @@ public class RuntimeException : LanguageException
 
         result.Append(Position.ToStringCool().Surround(" (at ", ")"));
 
-        if (Uri != null)
-        { result.Append($" (in {Uri})"); }
+        if (File != null)
+        { result.Append($" (in {File})"); }
 
         result.AppendLine();
 

@@ -1,13 +1,16 @@
 ﻿namespace LanguageCore.Compiler;
 
+using LanguageCore.Parser.Statement;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class StructType : GeneralType,
-    IEquatable<StructType>
+    IEquatable<StructType>,
+    IReferenceableTo<CompiledStruct>
 {
     public CompiledStruct Struct { get; }
     public ImmutableDictionary<string, GeneralType> TypeArguments { get; }
+    public Uri OriginalFile { get; }
 
     public override int Size
     {
@@ -39,26 +42,34 @@ public class StructType : GeneralType,
         }
     }
 
+    CompiledStruct? IReferenceableTo<CompiledStruct>.Reference
+    {
+        get => Struct;
+        set => throw null!;
+    }
+
     public StructType(StructType other)
     {
         Struct = other.Struct;
         TypeArguments = other.TypeArguments;
+        OriginalFile = other.OriginalFile;
     }
 
-    public StructType(CompiledStruct @struct)
+    public StructType(CompiledStruct @struct, Uri originalFile)
     {
         Struct = @struct;
         if (@struct.Template is not null)
         {
             TypeArguments = @struct.Template.Parameters
-                .Select(v => new KeyValuePair<string, GeneralType>(v.Content, new GenericType(v)))
+                .Select(v => new KeyValuePair<string, GeneralType>(v.Content, new GenericType(v, originalFile)))
                 .ToImmutableDictionary();
         }
         else
         { TypeArguments = ImmutableDictionary<string, GeneralType>.Empty; }
+        OriginalFile = originalFile;
     }
 
-    public StructType(CompiledStruct @struct, IReadOnlyList<GeneralType> typeArguments)
+    public StructType(CompiledStruct @struct, Uri originalFile, IReadOnlyList<GeneralType> typeArguments)
     {
         Struct = @struct;
         if (@struct.Template is not null)
@@ -75,6 +86,7 @@ public class StructType : GeneralType,
         }
         else
         { TypeArguments = ImmutableDictionary<string, GeneralType>.Empty; }
+        OriginalFile = originalFile;
     }
 
     public bool GetField(string name, [NotNullWhen(true)] out CompiledField? field, [NotNullWhen(true)] out int offset)
@@ -162,5 +174,5 @@ public class StructType : GeneralType,
         return result.ToString();
     }
 
-    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(Struct.Identifier.Content, TypeArguments?.Values.Select(v => v.ToTypeInstance()));
+    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(Struct.Identifier.Content, OriginalFile, TypeArguments?.Values.Select(v => v.ToTypeInstance()));
 }

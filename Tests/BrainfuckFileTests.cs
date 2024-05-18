@@ -50,7 +50,7 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout), Ignore("Function pointers are not supported")] public void Test43() => Utils.GetTest(43).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test44() => Utils.GetTest(44).DoBrainfuck();
     [TestMethod] public void Test45() => Utils.GetTest(45).DoBrainfuck();
-    [TestMethod, Ignore] public void Test46() => Utils.GetTest(46).DoBrainfuck();
+    [TestMethod] public void Test46() => Utils.GetTest(46).DoBrainfuck();
     [TestMethod] public void Test47() => Utils.GetTest(47).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore] public void Test48() => Utils.GetTest(48).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore] public void Test49() => Utils.GetTest(49).DoBrainfuck();

@@ -9,14 +9,19 @@ public static class ExportableExtensions
     {
         if (self.IsExport) return true;
         if (sourceFile == null) return true;
-        if (sourceFile == self.FilePath) return true;
+        if (sourceFile == self.File) return true;
         return false;
     }
 }
 
+public interface IMaybeInFile
+{
+    public Uri? File { get; }
+}
+
 public interface IInFile
 {
-    public Uri? FilePath { get; }
+    public Uri File { get; }
 }
 
 public interface IExportable : IInFile
@@ -46,7 +51,7 @@ public struct UsingAnalysis
 
 public readonly struct ParserResult
 {
-    public readonly Error[] Errors;
+    public readonly LanguageError[] Errors;
 
     public readonly ImmutableArray<FunctionDefinition> Functions;
     public readonly ImmutableArray<FunctionDefinition> Operators;
@@ -65,7 +70,7 @@ public readonly struct ParserResult
     public bool IsEmpty { get; private init; }
 
     public static ParserResult Empty => new(
-        Enumerable.Empty<Error>(),
+        Enumerable.Empty<LanguageError>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),
@@ -78,7 +83,7 @@ public readonly struct ParserResult
     { IsEmpty = true };
 
     public ParserResult(
-        IEnumerable<Error> errors,
+        IEnumerable<LanguageError> errors,
         IEnumerable<FunctionDefinition> functions,
         IEnumerable<FunctionDefinition> operators,
         IEnumerable<StructDefinition> structs,
@@ -181,7 +186,7 @@ public readonly struct ParserResult
     {
         foreach (StructDefinition @struct in Structs)
         {
-            if (@struct.FilePath != file) continue;
+            if (@struct.File != file) continue;
 
             foreach (FieldDefinition field in @struct.Fields)
             {

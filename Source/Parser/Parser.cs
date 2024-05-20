@@ -97,7 +97,6 @@ public sealed class Parser
     readonly List<LanguageError> Errors = new();
     readonly List<FunctionDefinition> Functions = new();
     readonly List<FunctionDefinition> Operators = new();
-    readonly List<EnumDefinition> Enums = new();
     readonly Dictionary<string, StructDefinition> Structs = new();
     readonly List<UsingDefinition> Usings = new();
     readonly List<CompileTag> Hashes = new();
@@ -165,7 +164,6 @@ public sealed class Parser
             Usings,
             Hashes,
             TopLevelStatements,
-            Enums,
             OriginalTokens,
             Tokens);
     }
@@ -303,70 +301,14 @@ public sealed class Parser
     void ParseCodeBlock()
     {
         if (ExpectStructDefinition()) { }
-        else if (ExpectClassDefinition()) { }
         else if (ExpectFunctionDefinition(out FunctionDefinition? functionDefinition))
         { Functions.Add(functionDefinition); }
         else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
         { Operators.Add(operatorDefinition); }
-        else if (ExpectEnumDefinition(out EnumDefinition? enumDefinition))
-        { Enums.Add(enumDefinition); }
         else if (ExpectStatement(out Statement.Statement? statement))
         { TopLevelStatements.Add(statement); }
         else
         { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken, File); }
-    }
-
-    bool ExpectEnumDefinition([NotNullWhen(true)] out EnumDefinition? enumDefinition)
-    {
-        int parseStart = CurrentTokenIndex;
-        enumDefinition = null;
-
-        AttributeUsage[] attributes = ExpectAttributes();
-
-        if (!ExpectIdentifier(DeclarationKeywords.Enum, out Token? keyword))
-        { CurrentTokenIndex = parseStart; return false; }
-
-        keyword.AnalyzedType = TokenAnalyzedType.Keyword;
-
-        if (!ExpectIdentifier(out Token? identifier))
-        { throw new SyntaxException($"Expected an identifier (the enum's name) after keyword \"{keyword}\"", keyword.Position.After(), File); }
-
-        if (!ExpectOperator("{"))
-        { throw new SyntaxException($"There should be a \"{{\" (after enum identifier)", identifier.Position.After(), File); }
-
-        identifier.AnalyzedType = TokenAnalyzedType.Enum;
-
-        List<EnumMemberDefinition> members = new();
-
-        while (!ExpectOperator("}"))
-        {
-            if (!ExpectIdentifier(out Token? enumMemberIdentifier))
-            { throw new SyntaxException($"There should be an identifier (the enum member's name) (not \"{CurrentToken}\")", CurrentToken?.Position ?? PreviousToken?.Position.After(), File); }
-
-            enumMemberIdentifier.AnalyzedType = TokenAnalyzedType.EnumMember;
-
-            StatementWithValue? enumMemberValue = null;
-
-            if (ExpectOperator("=", out Token? assignOperator))
-            {
-                if (!ExpectOneValue(out enumMemberValue))
-                { throw new SyntaxException($"There should be a value (after enum member) and not \"{CurrentToken}\"", assignOperator.Position.After(), File); }
-            }
-
-            members.Add(new EnumMemberDefinition(enumMemberIdentifier, enumMemberValue));
-
-            if (ExpectOperator("}"))
-            { break; }
-
-            if (ExpectOperator(","))
-            { continue; }
-
-            throw new SyntaxException($"Expected \",\" or \"}}\" (not \"{CurrentToken}\")", PreviousToken?.Position.After(), File);
-        }
-
-        enumDefinition = new(identifier, attributes, members, File);
-
-        return true;
     }
 
     bool ExpectOperatorDefinition([NotNullWhen(true)] out FunctionDefinition? function)
@@ -669,64 +611,6 @@ public sealed class Parser
         {
             Block = block
         };
-
-        return true;
-    }
-
-    bool ExpectClassDefinition()
-    {
-        int startTokenIndex = CurrentTokenIndex;
-
-        ExpectAttributes();
-
-        ExpectTemplateInfo(out _);
-
-        Token[] modifiers = ExpectModifiers();
-
-        if (!ExpectIdentifier("class", out Token? keyword))
-        { CurrentTokenIndex = startTokenIndex; return false; }
-
-        if (!ExpectIdentifier(out Token? possibleClassName))
-        { throw new SyntaxException($"Expected class identifier after keyword \"{keyword}\"", keyword.Position.After(), File); }
-
-        if (!ExpectOperator("{", out _))
-        { throw new SyntaxException("Expected \"{\" after class identifier", possibleClassName.Position.After(), File); }
-
-        keyword.AnalyzedType = TokenAnalyzedType.Keyword;
-
-        List<FieldDefinition> fields = new();
-        List<FunctionDefinition> methods = new();
-        List<FunctionDefinition> operators = new();
-        List<GeneralFunctionDefinition> generalMethods = new();
-
-        int endlessSafe = 0;
-        while (!ExpectOperator("}", out _))
-        {
-            if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
-            { operators.Add(operatorDefinition); }
-            else if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition))
-            { methods.Add(methodDefinition); }
-            else if (ExpectGeneralFunctionDefinition(out GeneralFunctionDefinition? generalMethodDefinition))
-            { generalMethods.Add(generalMethodDefinition); }
-            else if (ExpectField(out FieldDefinition? field))
-            {
-                fields.Add(field);
-                if (ExpectOperator(";", out Token? semicolon))
-                { field.Semicolon = semicolon; }
-            }
-            else if (ExpectConstructorDefinition(out _))
-            { }
-            else
-            { throw new SyntaxException($"Expected field definition or \"}}\"", CurrentToken?.Position ?? PreviousToken?.Position.After(), File); }
-
-            endlessSafe++;
-            if (endlessSafe > 50)
-            {
-                throw new EndlessLoopException();
-            }
-        }
-
-        CheckModifiers(modifiers, ProtectionKeywords.Export);
 
         return true;
     }

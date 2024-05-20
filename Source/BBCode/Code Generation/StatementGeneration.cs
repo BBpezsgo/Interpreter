@@ -13,11 +13,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
     #region AddInstruction()
 
     void AddInstruction(PreparationInstruction instruction) => GeneratedCode.Add(instruction);
-    void AddInstruction(Opcode opcode) => AddInstruction(new PreparationInstruction(opcode));
-    void AddInstruction(Opcode opcode, DataItem param0) => AddInstruction(new PreparationInstruction(opcode, param0));
-    void AddInstruction(Opcode opcode, int param0) => AddInstruction(new PreparationInstruction(opcode, new DataItem(param0)));
-    void AddInstruction(Opcode opcode, AddressingMode addressingMode) => AddInstruction(new PreparationInstruction(opcode, addressingMode));
-    void AddInstruction(Opcode opcode, AddressingMode addressingMode, int param0) => AddInstruction(new PreparationInstruction(opcode, addressingMode, new DataItem(param0)));
+
+    void AddInstruction(
+        Opcode opcode)
+        => AddInstruction(new PreparationInstruction(opcode));
+
+    void AddInstruction(
+        Opcode opcode,
+        DataItem operand)
+        => AddInstruction(new PreparationInstruction(opcode, operand));
+
+    void AddInstruction(
+        Opcode opcode,
+        int operand)
+        => AddInstruction(new PreparationInstruction(opcode, new DataItem(operand)));
+
+    void AddInstruction(Opcode opcode,
+        InstructionOperand operand1)
+        => AddInstruction(new PreparationInstruction(opcode, operand1));
+
+    void AddInstruction(Opcode opcode,
+        InstructionOperand operand1,
+        InstructionOperand operand2)
+        => AddInstruction(new PreparationInstruction(opcode, operand1, operand2));
 
     void AddComment(string comment)
     {
@@ -363,7 +381,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             StatementWithValue throwValue = keywordCall.Parameters[0];
 
             GenerateCodeForStatement(throwValue);
-            AddInstruction(Opcode.Throw);
+            using (RegisterUsage.Auto reg = Registers.GetFree())
+            {
+                AddInstruction(Opcode.Pop, reg.Register);
+                AddInstruction(Opcode.Throw, reg.Register);
+            }
 
             return;
         }
@@ -562,8 +584,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { returnValueOffset -= parameterCleanup[i].Size; }
 
         AddComment(" .:");
-        AddInstruction(Opcode.Push, externalFunction.Id);
-        AddInstruction(Opcode.CallExternal, externalFunction.Parameters.Length);
+        AddInstruction(Opcode.CallExternal, externalFunction.Id);
 
         if (compiledFunction.ReturnSomething)
         {
@@ -889,42 +910,182 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment("}");
         }
-        else if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
+        else if (LanguageOperators.BinaryOperators.Contains(@operator.Operator.Content))
         {
-            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != BinaryOperatorCall.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {BinaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
-
             FindStatementType(@operator);
+
+            GeneralType leftType = FindStatementType(@operator.Left);
+            GeneralType rightType = FindStatementType(@operator.Right);
+
+            BitWidth leftBitWidth = GetBitWidth(leftType);
+            BitWidth rightBitWidth = GetBitWidth(rightType);
+            BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
 
             int jumpInstruction = -1;
 
             GenerateCodeForStatement(@operator.Left);
 
-            if (opcode == Opcode.LogicAND)
+            if (leftType != BasicType.Float &&
+                rightType == BasicType.Float)
             {
-                StackLoad(new ValueAddress(-1, AddressingMode.StackPointerRelative));
-                jumpInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JumpIfZero);
-            }
-            else if (opcode == Opcode.LogicOR)
-            {
-                StackLoad(new ValueAddress(-1, AddressingMode.StackPointerRelative));
-                AddInstruction(Opcode.LogicNOT);
-                jumpInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JumpIfZero);
+                AddInstruction(Opcode.FTo,
+                    Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection),
+                    Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection));
             }
 
-            if (@operator.Right != null) GenerateCodeForStatement(@operator.Right);
-            AddInstruction(opcode);
+            if (@operator.Operator.Content == BinaryOperatorCall.LogicalAND)
+            {
+                StackLoad(new ValueAddress(-1, AddressingMode.StackPointerRelative));
+
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    AddInstruction(Opcode.Pop, reg.Register);
+                    AddInstruction(Opcode.Compare, reg.Register, 0);
+                    jumpInstruction = GeneratedCode.Count;
+                    AddInstruction(Opcode.JumpIfEqual, 0);
+                }
+            }
+            else if (@operator.Operator.Content == BinaryOperatorCall.LogicalOR)
+            {
+                StackLoad(new ValueAddress(-1, AddressingMode.StackPointerRelative));
+
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    AddInstruction(Opcode.Pop, reg.Get(bitWidth));
+                    AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
+
+                    jumpInstruction = GeneratedCode.Count;
+                    AddInstruction(Opcode.JumpIfNotEqual, 0);
+                }
+            }
+
+            GenerateCodeForStatement(@operator.Right);
+
+            if (leftType == BasicType.Float &&
+                rightType != BasicType.Float)
+            {
+                AddInstruction(Opcode.FTo,
+                    Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection),
+                    Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection));
+            }
+
+            using (RegisterUsage.Auto regLeft = Registers.GetFree())
+            using (RegisterUsage.Auto regRight = Registers.GetFree())
+            {
+                bool isFloat = leftType == BasicType.Float || rightType == BasicType.Float;
+
+                AddInstruction(Opcode.Pop, regRight.Get(bitWidth));
+                AddInstruction(Opcode.Pop, regLeft.Get(bitWidth));
+
+                switch (@operator.Operator.Content)
+                {
+                    case BinaryOperatorCall.Addition:
+                        AddInstruction(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.Subtraction:
+                        AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.Multiplication:
+                        AddInstruction(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.Division:
+                        AddInstruction(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.Modulo:
+                        AddInstruction(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.LogicalAND:
+                        AddInstruction(Opcode.LogicAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.LogicalOR:
+                        AddInstruction(Opcode.LogicOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.BitwiseAND:
+                        AddInstruction(Opcode.BitsAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.BitwiseOR:
+                        AddInstruction(Opcode.BitsOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.BitwiseXOR:
+                        AddInstruction(Opcode.BitsXOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.BitshiftLeft:
+                        AddInstruction(Opcode.BitsShiftLeft, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+                    case BinaryOperatorCall.BitshiftRight:
+                        AddInstruction(Opcode.BitsShiftRight, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        break;
+
+                    case BinaryOperatorCall.CompEQ:
+                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.JumpIfEqual, 3);
+                        AddInstruction(Opcode.Push, 0);
+                        AddInstruction(Opcode.Jump, 2);
+                        AddInstruction(Opcode.Push, 1);
+                        break;
+
+                    case BinaryOperatorCall.CompNEQ:
+                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.JumpIfNotEqual, 3);
+                        AddInstruction(Opcode.Push, 0);
+                        AddInstruction(Opcode.Jump, 2);
+                        AddInstruction(Opcode.Push, 1);
+                        break;
+
+                    case BinaryOperatorCall.CompGT:
+                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.JumpIfLessOrEqual, 3);
+                        AddInstruction(Opcode.Push, 1);
+                        AddInstruction(Opcode.Jump, 2);
+                        AddInstruction(Opcode.Push, 0);
+                        break;
+
+                    case BinaryOperatorCall.CompGEQ:
+                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.JumpIfLess, 3);
+                        AddInstruction(Opcode.Push, 1);
+                        AddInstruction(Opcode.Jump, 2);
+                        AddInstruction(Opcode.Push, 0);
+                        break;
+
+                    case BinaryOperatorCall.CompLT:
+                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.JumpIfLess, 3);
+                        AddInstruction(Opcode.Push, 0);
+                        AddInstruction(Opcode.Jump, 2);
+                        AddInstruction(Opcode.Push, 1);
+                        break;
+
+                    case BinaryOperatorCall.CompLEQ:
+                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(Opcode.JumpIfLessOrEqual, 3);
+                        AddInstruction(Opcode.Push, 0);
+                        AddInstruction(Opcode.Jump, 2);
+                        AddInstruction(Opcode.Push, 1);
+                        break;
+
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
 
             if (jumpInstruction != -1)
-            { GeneratedCode[jumpInstruction].Parameter = GeneratedCode.Count - jumpInstruction; }
+            { GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction; }
         }
         else if (@operator.Operator.Content == "=")
         {
-            if (BinaryOperatorCall.ParameterCount != 2)
-            { throw new CompilerException($"Wrong number of parameters passed to assignment operator \"{@operator.Operator.Content}\": required {2} passed {BinaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
-
             GenerateCodeForValueSetter(@operator.Left, @operator.Right);
         }
         else
@@ -996,22 +1157,36 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment("}");
         }
-        else if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
+        else if (LanguageOperators.UnaryOperators.Contains(@operator.Operator.Content))
         {
-            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != UnaryOperatorCall.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator \"{@operator.Operator.Content}\": required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {UnaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
+            GeneralType leftType = FindStatementType(@operator.Left);
+            BitWidth bitWidth = GetBitWidth(leftType);
 
-            GenerateCodeForStatement(@operator.Left);
+            switch (@operator.Operator.Content)
+            {
+                case UnaryOperatorCall.LogicalNOT:
+                {
+                    GenerateCodeForStatement(@operator.Left);
 
-            AddInstruction(opcode);
+                    using (RegisterUsage.Auto reg = Registers.GetFree())
+                    {
+                        AddInstruction(Opcode.Pop, reg.Get(bitWidth));
+                        AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
+                        AddInstruction(Opcode.JumpIfEqual, 3);
+                        AddInstruction(Opcode.Push, 0);
+                        AddInstruction(Opcode.Jump, 2);
+                        AddInstruction(Opcode.Push, 1);
+                    }
+
+                    return;
+                }
+                default: throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile);
+            }
         }
         else
         { throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile); }
     }
-    void GenerateCodeForStatement(Assignment setter)
-    {
-        GenerateCodeForValueSetter(setter.Left, setter.Right);
-    }
+    void GenerateCodeForStatement(Assignment setter) => GenerateCodeForValueSetter(setter.Left, setter.Right);
     void GenerateCodeForStatement(LiteralStatement literal)
     {
         switch (literal.Type)
@@ -1059,31 +1234,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Set string data {");
 
-        for (int i = 0; i < literal.Length; i++)
+        using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            // Prepare value
-            AddInstruction(Opcode.Push, new DataItem(literal[i]));
+            // Save pointer
+            AddInstruction(Opcode.Move, reg.Register, Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection));
 
-            // Calculate pointer
-            StackLoad(new ValueAddress(-2, AddressingMode.StackPointerRelative));
-            AddInstruction(Opcode.Push, i);
-            AddInstruction(Opcode.MathAdd);
+            for (int i = 0; i < literal.Length; i++)
+            {
+                AddInstruction(Opcode.Move, reg.Register.ToPtr(i), literal[i]);
+            }
 
-            // Set value
-            AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
-        }
-
-        {
-            // Prepare value
-            AddInstruction(Opcode.Push, new DataItem('\0'));
-
-            // Calculate pointer
-            StackLoad(new ValueAddress(-2, AddressingMode.StackPointerRelative));
-            AddInstruction(Opcode.Push, literal.Length);
-            AddInstruction(Opcode.MathAdd);
-
-            // Set value
-            AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
+            AddInstruction(Opcode.Move, reg.Register.ToPtr(literal.Length), '\0');
         }
 
         AddComment("}");
@@ -1186,7 +1347,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForStatement(Pointer memoryAddressFinder)
     {
         GenerateCodeForStatement(memoryAddressFinder.PrevStatement);
-        AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.Push, reg.Register.ToPtr());
+        }
     }
     void GenerateCodeForStatement(WhileLoop whileLoop)
     {
@@ -1231,8 +1396,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int conditionOffset = GeneratedCode.Count;
         GenerateCodeForStatement(whileLoop.Condition);
 
-        int conditionJumpOffset = GeneratedCode.Count;
-        AddInstruction(Opcode.JumpIfZero, 0);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.Compare, reg.Register, 0);
+            AddInstruction(Opcode.JumpIfEqual, 0);
+        }
+        int conditionJumpOffset = GeneratedCode.Count - 1;
 
         BreakInstructions.Push(new List<int>());
 
@@ -1243,7 +1413,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         FinishJumpInstructions(BreakInstructions.Last);
 
-        GeneratedCode[conditionJumpOffset].Parameter = GeneratedCode.Count - conditionJumpOffset;
+        GeneratedCode[conditionJumpOffset].Operand1 = GeneratedCode.Count - conditionJumpOffset;
 
         OnScopeExit(whileLoop.Block.Brackets.End.Position);
 
@@ -1296,7 +1466,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("For-loop condition");
         int conditionOffsetFor = GeneratedCode.Count;
         GenerateCodeForStatement(forLoop.Condition);
-        AddInstruction(Opcode.JumpIfZero, 0);
+
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.Compare, reg.Register, 0);
+            AddInstruction(Opcode.JumpIfEqual, 0);
+        }
+
         int conditionJumpOffsetFor = GeneratedCode.Count - 1;
 
         BreakInstructions.Push(new List<int>());
@@ -1308,7 +1485,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Jump back");
         AddInstruction(Opcode.Jump, conditionOffsetFor - GeneratedCode.Count);
-        GeneratedCode[conditionJumpOffsetFor].Parameter = GeneratedCode.Count - conditionJumpOffsetFor;
+        GeneratedCode[conditionJumpOffsetFor].Operand1 = GeneratedCode.Count - conditionJumpOffsetFor;
 
         FinishJumpInstructions(BreakInstructions.Pop());
 
@@ -1320,7 +1497,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         List<int> jumpOutInstructions = new();
 
-        foreach (BaseBranch ifSegment in @if.Parts)
+        foreach (BaseBranch ifSegment in @if.Branches)
         {
             if (ifSegment is IfBranch partIf)
             {
@@ -1346,8 +1523,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddComment("If condition");
                 GenerateCodeForStatement(partIf.Condition);
                 AddComment("If jump-to-next");
-                int jumpNextInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JumpIfZero, 0);
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    AddInstruction(Opcode.Pop, reg.Register);
+                    AddInstruction(Opcode.Compare, reg.Register, 0);
+                    AddInstruction(Opcode.JumpIfEqual, 0);
+                }
+                int jumpNextInstruction = GeneratedCode.Count - 1;
 
                 GenerateCodeForStatement(partIf.Block);
 
@@ -1357,7 +1539,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment("}");
 
-                GeneratedCode[jumpNextInstruction].Parameter = GeneratedCode.Count - jumpNextInstruction;
+                GeneratedCode[jumpNextInstruction].Operand1 = GeneratedCode.Count - jumpNextInstruction;
             }
             else if (ifSegment is ElseIfBranch partElseif)
             {
@@ -1383,8 +1565,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddComment("Elseif condition");
                 GenerateCodeForStatement(partElseif.Condition);
                 AddComment("Elseif jump-to-next");
-                int jumpNextInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.JumpIfZero, 0);
+
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    AddInstruction(Opcode.Pop, reg.Register);
+                    AddInstruction(Opcode.Compare, reg.Register, 0);
+                    AddInstruction(Opcode.JumpIfEqual, 0);
+                }
+                int jumpNextInstruction = GeneratedCode.Count - 1;
 
                 GenerateCodeForStatement(partElseif.Block);
 
@@ -1394,7 +1582,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment("}");
 
-                GeneratedCode[jumpNextInstruction].Parameter = GeneratedCode.Count - jumpNextInstruction;
+                GeneratedCode[jumpNextInstruction].Operand1 = GeneratedCode.Count - jumpNextInstruction;
             }
             else if (ifSegment is ElseBranch partElse)
             {
@@ -1408,7 +1596,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         foreach (int item in jumpOutInstructions)
         {
-            GeneratedCode[item].Parameter = GeneratedCode.Count - item;
+            GeneratedCode[item].Operand1 = GeneratedCode.Count - item;
         }
     }
     void GenerateCodeForStatement(NewInstance newObject)
@@ -1426,13 +1614,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 GenerateAllocator(Literal.CreateAnonymous(pointerType.To.Size, newObject.Type));
 
-                for (int offset = 0; offset < pointerType.To.Size; offset++)
+                using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    AddInstruction(Opcode.Push, 0);
-                    StackLoad(new ValueAddress(-2, AddressingMode.StackPointerRelative));
-                    AddInstruction(Opcode.Push, offset);
-                    AddInstruction(Opcode.MathAdd);
-                    AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
+                    AddInstruction(Opcode.Move, reg.Register, Register.StackPointer.ToPtr(-1));
+
+                    for (int offset = 0; offset < pointerType.To.Size; offset++)
+                    {
+                        AddInstruction(Opcode.Move, reg.Register.ToPtr(offset), 0);
+                    }
                 }
 
                 break;
@@ -1480,7 +1669,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(newInstance);
 
         for (int i = 0; i < newInstanceType.Size; i++)
-        { AddInstruction(Opcode.StackLoad, AddressingMode.StackPointerRelative, -newInstanceType.Size * BytecodeProcessor.StackDirection); }
+        {
+            AddInstruction(Opcode.Push, Register.StackPointer.ToPtr(-newInstanceType.Size * BytecodeProcessor.StackDirection));
+        }
 
         parameterCleanup = GenerateCodeForParameterPassing(constructorCall.Parameters, compiledFunction);
         parameterCleanup.Insert(0, (newInstanceType.Size, false, newInstanceType, newInstance.Position));
@@ -1501,17 +1692,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
 
         GeneralType prevType = FindStatementType(field.PrevStatement);
-
-        if (prevType is EnumType enumType)
-        {
-            if (!enumType.Enum.GetValue(field.Identifier.Content, out DataItem enumValue))
-            { throw new CompilerException($"I didn't find anything like \"{field.Identifier.Content}\" in the enum {enumType.Enum.Identifier}", field.Identifier, CurrentFile); }
-
-            OnGotStatementType(field, new BuiltinType(enumValue.Type));
-
-            AddInstruction(Opcode.Push, enumValue);
-            return;
-        }
 
         if (prevType is ArrayType arrayType && field.Identifier.Equals("Length"))
         {
@@ -1538,9 +1718,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             CheckPointerNull();
 
-            AddInstruction(Opcode.Push, fieldOffset);
-            AddInstruction(Opcode.MathAdd);
-            AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
+            using (RegisterUsage.Auto reg = Registers.GetFree())
+            {
+                AddInstruction(Opcode.Pop, reg.Register);
+                AddInstruction(Opcode.Push, reg.Register.ToPtr(fieldOffset));
+            }
 
             return;
         }
@@ -1628,27 +1810,44 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             {
-                ValueAddress address = GetDataAddress(identifier);
-                AddInstruction(Opcode.Push, address.Address * BytecodeProcessor.StackDirection);
-
-                switch (address.AddressingMode)
+                using (RegisterUsage.Auto reg1 = Registers.GetFree())
                 {
-                    case AddressingMode.Absolute:
-                    case AddressingMode.Runtime:
-                        throw new NotImplementedException();
-                    case AddressingMode.BasePointerRelative:
-                        AddInstruction(Opcode.GetBasePointer);
-                        AddInstruction(Opcode.MathAdd);
-                        break;
-                    default:
-                        throw new UnreachableException();
+                    ValueAddress address = GetDataAddress(identifier);
+                    AddInstruction(Opcode.Move, reg1.Register, address.Address * BytecodeProcessor.StackDirection);
+
+                    switch (address.AddressingMode)
+                    {
+                        case AddressingMode.Absolute:
+                        case AddressingMode.Runtime:
+                            throw new NotImplementedException();
+                        case AddressingMode.BasePointerRelative:
+                            AddInstruction(Opcode.MathAdd, reg1.Register, Register.BasePointer);
+                            break;
+                        default:
+                            throw new UnreachableException();
+                    }
+                    AddInstruction(Opcode.Push, reg1.Register);
+
+                    GenerateCodeForStatement(index.Index);
+
+                    using (RegisterUsage.Auto reg2 = Registers.GetFree())
+                    {
+                        AddInstruction(Opcode.Pop, reg2.Register);
+
+                        AddInstruction(Opcode.Pop, reg1.Register);
+
+                        if (BytecodeProcessor.StackDirection > 0)
+                        {
+                            AddInstruction(Opcode.MathAdd, reg1.Register, reg2.Register);
+                        }
+                        else
+                        {
+                            AddInstruction(Opcode.MathSub, reg1.Register, reg2.Register);
+                        }
+                    }
+
+                    AddInstruction(Opcode.Push, reg1.Register.ToPtr());
                 }
-
-                GenerateCodeForStatement(index.Index);
-                if (BytecodeProcessor.StackDirection > 0) AddInstruction(Opcode.MathAdd);
-                else AddInstruction(Opcode.MathSub);
-
-                AddInstruction(Opcode.StackLoad, AddressingMode.Runtime);
                 return;
             }
 
@@ -1662,18 +1861,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(index.PrevStatement);
 
-            AddInstruction(Opcode.Push, pointerType.To.Size);
             GeneralType indexType = FindStatementType(index.Index);
             if (indexType is not BuiltinType)
             { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", index.Index, CurrentFile); }
             GenerateCodeForStatement(index.Index);
-            AddInstruction(Opcode.MathMult);
 
-            AddInstruction(Opcode.MathAdd);
+            using (RegisterUsage.Auto reg1 = Registers.GetFree())
+            {
+                AddInstruction(Opcode.Pop, reg1.Register);
+                AddInstruction(Opcode.MathMult, reg1.Register, pointerType.To.Size);
 
-            CheckPointerNull();
+                using (RegisterUsage.Auto reg2 = Registers.GetFree())
+                {
+                    AddInstruction(Opcode.Pop, reg2.Register);
+                    AddInstruction(Opcode.MathAdd, reg1.Register, reg2.Register);
+                }
 
-            AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
+                AddInstruction(Opcode.Push, reg1.Register);
+
+                CheckPointerNull();
+
+                AddInstruction(Opcode.Pop, reg1.Register);
+                AddInstruction(Opcode.Push, reg1.Register.ToPtr());
+            }
 
             return;
         }
@@ -1707,21 +1917,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else
             {
-                AddInstruction(Opcode.Push, address.Address * BytecodeProcessor.StackDirection);
-
-                switch (address.AddressingMode)
+                using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    case AddressingMode.Absolute:
-                        break;
-                    case AddressingMode.Runtime:
-                        throw new NotImplementedException();
-                    case AddressingMode.BasePointerRelative:
-                        AddInstruction(Opcode.GetBasePointer);
-                        AddInstruction(Opcode.MathAdd);
-                        break;
-                    case AddressingMode.StackPointerRelative:
-                    default:
-                        throw new UnreachableException();
+                    AddInstruction(Opcode.Move, reg.Register, address.Address * BytecodeProcessor.StackDirection);
+
+                    switch (address.AddressingMode)
+                    {
+                        case AddressingMode.Absolute:
+                            break;
+                        case AddressingMode.Runtime:
+                            throw new NotImplementedException();
+                        case AddressingMode.BasePointerRelative:
+                            AddInstruction(Opcode.MathAdd, reg.Register, Register.BasePointer);
+                            break;
+                        default:
+                            throw new UnreachableException();
+                    }
+
+                    AddInstruction(Opcode.Push, reg.Register);
                 }
             }
             return;
@@ -1735,8 +1948,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         throw new NotImplementedException();
     }
-    void GenerateCodeForStatement(LiteralList listValue)
-    { throw new NotImplementedException(); }
+    [DoesNotReturn]
+    void GenerateCodeForStatement(LiteralList listValue) => throw new NotImplementedException();
     void GenerateCodeForStatement(TypeCast typeCast)
     {
         GeneralType statementType = FindStatementType(typeCast.PrevStatement);
@@ -2072,18 +2285,33 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
-            AddInstruction(Opcode.Push, pointerType.To.Size);
             GeneralType indexType = FindStatementType(statementToSet.Index);
             if (indexType is not BuiltinType)
             { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", statementToSet.Index, CurrentFile); }
             GenerateCodeForStatement(statementToSet.Index);
-            AddInstruction(Opcode.MathMult);
 
-            AddInstruction(Opcode.MathAdd);
+            using (RegisterUsage.Auto reg1 = Registers.GetFree())
+            {
+                AddInstruction(Opcode.Pop, reg1.Register);
+                AddInstruction(Opcode.MathMult, reg1.Register, pointerType.To.Size);
 
-            CheckPointerNull();
+                using (RegisterUsage.Auto reg2 = Registers.GetFree())
+                {
+                    AddInstruction(Opcode.Pop, reg2.Register);
 
-            AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
+                    AddInstruction(Opcode.MathAdd, reg1.Register, reg2.Register);
+
+                    AddInstruction(Opcode.Push, reg1.Register);
+
+                    CheckPointerNull();
+
+                    AddInstruction(Opcode.Pop, reg1.Register);
+
+                    AddInstruction(Opcode.Pop, reg2.Register);
+
+                    AddInstruction(Opcode.Move, reg1.Register.ToPtr(), reg2.Register);
+                }
+            }
 
             return;
         }
@@ -2107,9 +2335,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (targetType.Size != 1) throw new NotImplementedException();
 
         GenerateCodeForStatement(value);
+
         GenerateCodeForStatement(statementToSet.PrevStatement);
 
-        AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.Pop, reg.Register);
+
+            AddInstruction(Opcode.Pop, reg.Register.ToPtr());
+        }
     }
 
     #endregion
@@ -2149,9 +2383,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (CanReturn)
         {
             StackLoad(ReturnFlagAddress);
-            AddInstruction(Opcode.LogicNOT);
-            ReturnInstructions.Last.Add(GeneratedCode.Count);
-            AddInstruction(Opcode.JumpIfZero, 0);
+
+            using (RegisterUsage.Auto reg = Registers.GetFree())
+            {
+                AddInstruction(Opcode.Pop, reg.Register);
+                AddInstruction(Opcode.Compare, reg.Register, 0);
+                ReturnInstructions.Last.Add(GeneratedCode.Count);
+                AddInstruction(Opcode.JumpIfNotEqual, 0);
+            }
         }
 
         CleanupLocalConstants();
@@ -2406,7 +2645,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         foreach (int jumpInstruction in jumpInstructions)
         {
-            GeneratedCode[jumpInstruction].Parameter = jumpTo - jumpInstruction;
+            GeneratedCode[jumpInstruction].Operand1 = jumpTo - jumpInstruction;
         }
     }
 
@@ -2655,8 +2894,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("TopLevelStatements {");
 
-        AddInstruction(Opcode.GetBasePointer);
-        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackPointerRelative, 0);
+        AddInstruction(Opcode.Push, Register.BasePointer);
+        AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
         {
@@ -2705,7 +2944,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         TagCount.Pop();
 
-        AddInstruction(Opcode.SetBasePointer, AddressingMode.Runtime, 0);
+        AddInstruction(Opcode.Pop,
+            Register.BasePointer);
 
         AddComment("}");
 
@@ -2763,9 +3003,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             // Absolute global offset
 
-            AddInstruction(Opcode.GetRegister, 2);
-            AddInstruction(Opcode.Push, -1 * BytecodeProcessor.StackDirection);
-            AddInstruction(Opcode.MathAdd);
+            using (RegisterUsage.Auto reg = Registers.GetFree())
+            {
+                AddInstruction(Opcode.Move, reg.Register, Register.StackPointer);
+
+                AddInstruction(Opcode.MathAdd, reg.Register, -1 * BytecodeProcessor.StackDirection);
+
+                AddInstruction(Opcode.Push, reg.Register);
+            }
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
             {

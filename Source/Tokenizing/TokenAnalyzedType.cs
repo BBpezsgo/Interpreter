@@ -15,8 +15,6 @@ public enum TokenAnalyzedType
     CompileTagParameter,
     Statement,
     BuiltinType,
-    Enum,
-    EnumMember,
     TypeParameter,
     ConstantName,
 }

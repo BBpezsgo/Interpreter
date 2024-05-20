@@ -4,7 +4,6 @@ using System.Runtime.InteropServices;
 namespace LanguageCore;
 
 using System.Threading;
-using ASM.Generator;
 using BBLang.Generator;
 using Brainfuck;
 using Brainfuck.Generator;
@@ -101,12 +100,7 @@ public static class Entry
                         Console.ResetColor();
                         Console.Write(' ');
 
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.Write(instruction.AddressingMode);
-                        Console.ResetColor();
-                        Console.Write(' ');
-
-                        instruction.Parameter.DebugPrint();
+                        instruction.Operand1.Value.DebugPrint();
 
                         Console.WriteLine();
                     }
@@ -130,7 +124,7 @@ public static class Entry
                     Console.WriteLine($" ===== STACK ===== ");
                     Console.WriteLine();
 
-                    foreach (DataItem item in interpreter.BytecodeInterpreter.EnumerateStack())
+                    foreach (DataItem item in interpreter.BytecodeInterpreter.GetStack())
                     {
                         item.DebugPrint();
                         Console.WriteLine();
@@ -461,9 +455,10 @@ public static class Entry
                 }
                 break;
             }
+            /*
             case ProgramRunType.ASM:
             {
-                bool is16Bits = false;
+                const bool is16Bits = true;
 
                 AnalysisCollection analysisCollection = new();
 
@@ -515,9 +510,10 @@ public static class Entry
                         { throw runtimeException; }
                     }
                 }
-
                 break;
             }
+            */
+
             default: throw new NotImplementedException($"Mode \"{arguments.RunType}\" isn't implemented for some reason");
         }
     }

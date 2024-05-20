@@ -56,7 +56,6 @@ public readonly struct ParserResult
     public readonly ImmutableArray<FunctionDefinition> Functions;
     public readonly ImmutableArray<FunctionDefinition> Operators;
     public readonly ImmutableArray<StructDefinition> Structs;
-    public readonly ImmutableArray<EnumDefinition> Enums;
 
     public readonly ImmutableArray<UsingDefinition> Usings;
     public readonly List<UsingAnalysis> UsingsAnalytics;
@@ -77,7 +76,6 @@ public readonly struct ParserResult
         Enumerable.Empty<UsingDefinition>(),
         Enumerable.Empty<CompileTag>(),
         Enumerable.Empty<Statement.Statement>(),
-        Enumerable.Empty<EnumDefinition>(),
         Enumerable.Empty<Token>(),
         Enumerable.Empty<Token>())
     { IsEmpty = true };
@@ -90,7 +88,6 @@ public readonly struct ParserResult
         IEnumerable<UsingDefinition> usings,
         IEnumerable<Statement.CompileTag> hashes,
         IEnumerable<Statement.Statement> topLevelStatements,
-        IEnumerable<EnumDefinition> enums,
         IEnumerable<Token> originalTokens,
         IEnumerable<Token> tokens)
     {
@@ -103,7 +100,6 @@ public readonly struct ParserResult
         UsingsAnalytics = new();
         Hashes = hashes.ToImmutableArray();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
-        Enums = enums.ToImmutableArray();
         OriginalTokens = originalTokens.ToImmutableArray();
         Tokens = tokens.ToImmutableArray();
 

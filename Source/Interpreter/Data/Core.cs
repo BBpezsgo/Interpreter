@@ -21,30 +21,10 @@ public readonly partial struct DataItem
 
     #region Value Properties
 
-    public int UnsafeInt => _integer;
-    public char UnsafeChar => (char)_integer;
-    public byte UnsafeByte => (byte)_integer;
-    public float UnsafeFloat => _single;
-
-    public int? Int => Type switch
-    {
-        RuntimeType.Byte => _integer,
-        RuntimeType.Integer => _integer,
-        RuntimeType.Char => _integer,
-        RuntimeType.Single => (int)_single,
-        RuntimeType.Null => null,
-        _ => throw new UnreachableException(),
-    };
-
-    public byte? Byte => Type switch
-    {
-        RuntimeType.Byte => (byte)_integer,
-        RuntimeType.Integer => (byte)_integer,
-        RuntimeType.Single => (byte)_single,
-        RuntimeType.Char => (byte)_integer,
-        RuntimeType.Null => null,
-        _ => throw new UnreachableException(),
-    };
+    public int Int => _integer;
+    public char Char => (char)_integer;
+    public byte Byte => (byte)_integer;
+    public float Single => _single;
 
     #endregion
 
@@ -65,6 +45,8 @@ public readonly partial struct DataItem
     { _single = value; }
     public DataItem(char value) : this(RuntimeType.Char)
     { _integer = value; }
+    public DataItem(ushort value) : this(RuntimeType.Char)
+    { _integer = value; }
     public DataItem(bool value) : this(value ? 1 : 0)
     { }
 
@@ -72,30 +54,30 @@ public readonly partial struct DataItem
 
     public object? GetValue() => Type switch
     {
-        RuntimeType.Null => (object?)null,
-        RuntimeType.Byte => (object)(byte)_integer,
-        RuntimeType.Integer => (object)_integer,
-        RuntimeType.Single => (object)_single,
-        RuntimeType.Char => (object)(char)_integer,
+        RuntimeType.Null => null,
+        RuntimeType.Byte => Byte,
+        RuntimeType.Integer => Int,
+        RuntimeType.Single => Single,
+        RuntimeType.Char => Char,
         _ => throw new UnreachableException(),
     };
 
     public string GetDebuggerDisplay() => Type switch
     {
         RuntimeType.Null => "null",
-        RuntimeType.Integer => _integer.ToString(CultureInfo.InvariantCulture),
-        RuntimeType.Byte => ((byte)_integer).ToString(CultureInfo.InvariantCulture),
-        RuntimeType.Single => _single.ToString(CultureInfo.InvariantCulture) + "f",
-        RuntimeType.Char => $"'{((char)_integer).Escape()}'",
+        RuntimeType.Integer => Int.ToString(CultureInfo.InvariantCulture),
+        RuntimeType.Byte => Byte.ToString(CultureInfo.InvariantCulture),
+        RuntimeType.Single => Single.ToString(CultureInfo.InvariantCulture) + "f",
+        RuntimeType.Char => $"'{Char.Escape()}'",
         _ => throw new UnreachableException(),
     };
 
     public override int GetHashCode() => Type switch
     {
-        RuntimeType.Byte => HashCode.Combine(Type, (byte)_integer),
-        RuntimeType.Integer => HashCode.Combine(Type, _integer),
-        RuntimeType.Single => HashCode.Combine(Type, _single),
-        RuntimeType.Char => HashCode.Combine(Type, (char)_integer),
+        RuntimeType.Byte => HashCode.Combine(Type, Byte),
+        RuntimeType.Integer => HashCode.Combine(Type, Int),
+        RuntimeType.Single => HashCode.Combine(Type, Single),
+        RuntimeType.Char => HashCode.Combine(Type, Char),
         _ => throw new UnreachableException(),
     };
 
@@ -108,19 +90,19 @@ public readonly partial struct DataItem
         {
             case RuntimeType.Byte:
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write((byte)_integer);
+                Console.Write(Byte);
                 break;
             case RuntimeType.Integer:
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write(_integer);
+                Console.Write(Int);
                 break;
             case RuntimeType.Single:
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write(_single);
+                Console.Write(Single);
                 break;
             case RuntimeType.Char:
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"\'{((char)_integer).Escape()}\'");
+                Console.Write($"\'{Char.Escape()}\'");
                 break;
             case RuntimeType.Null:
                 Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -135,33 +117,26 @@ public readonly partial struct DataItem
     }
 
     /// <exception cref="NotImplementedException"/>
-    /// <exception cref="ArgumentNullException"/>
-    public static DataItem GetValue(object? value)
+    public static DataItem GetValue(object value) => value switch
     {
-        ArgumentNullException.ThrowIfNull(value, nameof(value));
+        byte v => new DataItem(v),
+        int v => new DataItem(v),
+        float v => new DataItem(v),
+        bool v => new DataItem(v),
+        char v => new DataItem(v),
+        _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(DataItem)}"),
+    };
 
-        return value switch
-        {
-            byte v => new DataItem(v),
-            int v => new DataItem(v),
-            float v => new DataItem(v),
-            bool v => new DataItem(v),
-            char v => new DataItem(v),
-            Enum v => v.GetTypeCode() switch
-            {
-                TypeCode.Boolean => new DataItem((bool)value),
-                TypeCode.Char => new DataItem((char)value),
-                TypeCode.SByte => new DataItem((sbyte)value),
-                TypeCode.Byte => new DataItem((byte)value),
-                TypeCode.Int16 => new DataItem((short)value),
-                TypeCode.UInt16 => new DataItem((char)value),
-                TypeCode.Int32 => new DataItem((int)value),
-                TypeCode.Single => new DataItem((float)value),
-                _ => throw new NotImplementedException($"Cannot convert {value} to {typeof(DataItem)}"),
-            },
-            _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(DataItem)}"),
-        };
-    }
+    /// <exception cref="NotImplementedException"/>
+    public static DataItem GetValue<T>(T value) where T : notnull => value switch
+    {
+        byte v => new DataItem(v),
+        int v => new DataItem(v),
+        float v => new DataItem(v),
+        bool v => new DataItem(v),
+        char v => new DataItem(v),
+        _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(DataItem)}"),
+    };
 
     public static bool TryShrinkTo8bit(ref DataItem value)
     {
@@ -171,17 +146,17 @@ public readonly partial struct DataItem
 
             case RuntimeType.Char:
             {
-                if ((char)value._integer is < (char)byte.MinValue or > (char)byte.MaxValue)
+                if (value.Char is < (char)byte.MinValue or > (char)byte.MaxValue)
                 { return false; }
-                value = new DataItem((byte)value._integer);
+                value = new DataItem((byte)value.Char);
                 return true;
             }
 
             case RuntimeType.Integer:
             {
-                if (value._integer is < byte.MinValue or > byte.MaxValue)
+                if (value.Int is < byte.MinValue or > byte.MaxValue)
                 { return false; }
-                value = new DataItem((byte)value._integer);
+                value = new DataItem((byte)value.Int);
                 return true;
             }
 
@@ -195,7 +170,7 @@ public readonly partial struct DataItem
         {
             case RuntimeType.Byte:
             {
-                value = new DataItem((char)value._integer);
+                value = new DataItem((char)value.Byte);
                 return true;
             }
 
@@ -203,9 +178,9 @@ public readonly partial struct DataItem
 
             case RuntimeType.Integer:
             {
-                if (value._integer is < char.MinValue or > char.MaxValue)
+                if (value.Int is < char.MinValue or > char.MaxValue)
                 { return false; }
-                value = new DataItem((char)value._integer);
+                value = new DataItem((char)value.Int);
                 return true;
             }
 

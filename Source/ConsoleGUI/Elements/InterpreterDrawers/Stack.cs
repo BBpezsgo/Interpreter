@@ -8,47 +8,13 @@ public partial class InterpreterElement
 {
     void GetDataMovementIndicators(Instruction instruction, List<int> loadIndicators, List<int> storeIndicators)
     {
-        if (instruction.Opcode == Opcode.StackStore)
-        {
-            storeIndicators.Add(Interpreter.BytecodeInterpreter.GetAddress(instruction));
-        }
-
-        if (instruction.Opcode == Opcode.StackStore ||
-            instruction.Opcode == Opcode.HeapSet)
-        {
-            if (instruction.AddressingMode == AddressingMode.Runtime)
-            { loadIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer - (2 * BytecodeProcessor.StackDirection)); }
-            else
-            { loadIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer - (1 * BytecodeProcessor.StackDirection)); }
-        }
-
-        if (instruction.Opcode == Opcode.StackLoad)
-        {
-            loadIndicators.Add(Interpreter.BytecodeInterpreter.GetAddress(instruction));
-            storeIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer);
-        }
-
-        if (instruction.Opcode == Opcode.Push ||
-            instruction.Opcode == Opcode.GetBasePointer ||
-            instruction.Opcode == Opcode.HeapGet)
+        if (instruction.Opcode is
+            Opcode.Push)
         { storeIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer); }
 
-        if (instruction.Opcode == Opcode.Pop)
+        if (instruction.Opcode is
+            Opcode.Pop)
         { loadIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer - BytecodeProcessor.StackDirection); }
-
-        if (instruction.Opcode == Opcode.MathAdd ||
-            instruction.Opcode == Opcode.MathDiv ||
-            instruction.Opcode == Opcode.MathMod ||
-            instruction.Opcode == Opcode.MathMult ||
-            instruction.Opcode == Opcode.MathSub ||
-            instruction.Opcode == Opcode.BitsAND ||
-            instruction.Opcode == Opcode.BitsOR ||
-            instruction.Opcode == Opcode.LogicAND ||
-            instruction.Opcode == Opcode.LogicOR)
-        {
-            loadIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer - (1 * BytecodeProcessor.StackDirection));
-            storeIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer - (2 * BytecodeProcessor.StackDirection));
-        }
     }
 
     void StackElement_OnBeforeDraw(InlineElement sender)
@@ -140,21 +106,21 @@ public partial class InterpreterElement
             {
                 case RuntimeType.Byte:
                     b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.UnsafeByte.ToString(CultureInfo.InvariantCulture));
+                    b.AddText(item.Byte.ToString(CultureInfo.InvariantCulture));
                     break;
                 case RuntimeType.Integer:
                     b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.UnsafeInt.ToString(CultureInfo.InvariantCulture));
+                    b.AddText(item.Int.ToString(CultureInfo.InvariantCulture));
                     break;
                 case RuntimeType.Single:
                     b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.UnsafeFloat.ToString(CultureInfo.InvariantCulture));
+                    b.AddText(item.Single.ToString(CultureInfo.InvariantCulture));
                     b.AddText('f');
                     break;
                 case RuntimeType.Char:
                     b.ForegroundColor = CharColor.BrightYellow;
                     b.AddText('\'');
-                    b.AddText(item.UnsafeChar.Escape());
+                    b.AddText(item.Char.Escape());
                     b.AddText('\'');
                     break;
                 default:
@@ -179,9 +145,10 @@ public partial class InterpreterElement
             {
                 Range<int> range = itemDebugInfo.GetRange(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart);
 
-                if (itemDebugInfo.Kind == StackElementKind.Variable ||
-                    itemDebugInfo.Kind == StackElementKind.Parameter ||
-                    itemDebugInfo.Kind == StackElementKind.Internal)
+                if (itemDebugInfo.Kind is
+                    StackElementKind.Variable or
+                    StackElementKind.Parameter or
+                    StackElementKind.Internal)
                 {
                     if (range.Start == range.End)
                     {

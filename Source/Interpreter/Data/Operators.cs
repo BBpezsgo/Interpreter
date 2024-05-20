@@ -49,15 +49,15 @@ public partial struct DataItem :
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static DataItem operator <<(DataItem leftSide, DataItem rightSide)
-        => leftSide << (rightSide.Int ?? throw new RuntimeException($"Can't do << operation with type {leftSide.Type} and {rightSide.Type}"));
+        => leftSide << rightSide.Int;
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static DataItem operator >>(DataItem leftSide, DataItem rightSide)
-        => leftSide >> (rightSide.Int ?? throw new RuntimeException($"Can't do >> operation with type {leftSide.Type} and {rightSide.Type}"));
+        => leftSide >> rightSide.Int;
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static DataItem operator >>>(DataItem leftSide, DataItem rightSide)
-        => leftSide >>> (rightSide.Int ?? throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type} and {rightSide.Type}"));
+        => leftSide >>> rightSide.Int;
 
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>

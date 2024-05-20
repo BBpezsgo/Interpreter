@@ -89,7 +89,6 @@ class InteractiveCompiler
         Enumerable.Empty<CompileTag>(),
         Statement != null ? [Statement] :
         Enumerable.Empty<Statement>(),
-        Enumerable.Empty<EnumDefinition>(),
         Enumerable.Empty<Token>(),
         Enumerable.Empty<Token>());
 
@@ -209,8 +208,6 @@ static class InteractiveColors
     public static readonly Color FieldName = Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
     public static readonly Color LocalSymbol = Color.FromArgb(int.Parse("9cdcfe", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
     public static readonly Color Statement = Color.FromArgb(int.Parse("d8a0df", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color Enum = Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color EnumMember = Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
     public static readonly Color TypeParameter = Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
 }
 
@@ -275,8 +272,7 @@ public class Interactive
         if (e.IsDown == 0) return;
         if (!EnableInput) return;
 
-        if ((e.UnicodeChar >= '!' && e.UnicodeChar <= '~') ||
-            e.UnicodeChar == ' ')
+        if (e.UnicodeChar is (>= '!' and <= '~') or ' ')
         {
             if (CursorPosition == Input.Length)
             { Input.Append(e.UnicodeChar); }
@@ -678,8 +674,6 @@ public class Interactive
                         TokenAnalyzedType.CompileTag => Color.White,
                         TokenAnalyzedType.CompileTagParameter => Color.White,
                         TokenAnalyzedType.Statement => InteractiveColors.Statement,
-                        TokenAnalyzedType.Enum => InteractiveColors.Enum,
-                        TokenAnalyzedType.EnumMember => InteractiveColors.EnumMember,
                         TokenAnalyzedType.TypeParameter => InteractiveColors.TypeParameter,
                         _ => Color.White,
                     };
@@ -786,19 +780,19 @@ public class Interactive
             {
                 case RuntimeType.Byte:
                     output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append(exitCode.UnsafeByte);
+                    output.Append(exitCode.Byte);
                     break;
                 case RuntimeType.Integer:
                     output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append(exitCode.UnsafeInt);
+                    output.Append(exitCode.Int);
                     break;
                 case RuntimeType.Single:
                     output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append($"{exitCode.UnsafeFloat}f");
+                    output.Append($"{exitCode.Single}f");
                     break;
                 case RuntimeType.Char:
                     output.ForegroundColor = InteractiveColors.LiteralString;
-                    output.Append($"'{exitCode.UnsafeChar}'");
+                    output.Append($"'{exitCode.Char}'");
                     break;
                 default:
                     output.ForegroundColor = InteractiveColors.Keyword;

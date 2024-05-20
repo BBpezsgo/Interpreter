@@ -31,6 +31,26 @@ public static class Extensions
     }
 
     /// <exception cref="NotImplementedException"/>
+    public static BasicType ToType(this BitWidth v) => v switch
+    {
+        BitWidth._8 => BasicType.Byte,
+        BitWidth._16 => BasicType.Char,
+        BitWidth._32 => BasicType.Integer,
+        _ => throw new UnreachableException(),
+    };
+
+    /// <exception cref="NotImplementedException"/>
+    public static BitWidth ToBitWidth(this BasicType v) => v switch
+    {
+        BasicType.Byte => BitWidth._8,
+        BasicType.Char => BitWidth._16,
+        BasicType.Integer => BitWidth._32,
+        BasicType.Void => throw new NotImplementedException(),
+        BasicType.Float => BitWidth._32,
+        _ => throw new UnreachableException(),
+    };
+
+    /// <exception cref="NotImplementedException"/>
     public static BasicType Convert(this RuntimeType v) => v switch
     {
         RuntimeType.Byte => BasicType.Byte,

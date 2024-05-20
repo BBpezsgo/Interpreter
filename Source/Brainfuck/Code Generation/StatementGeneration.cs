@@ -442,10 +442,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         {
             if (AllowPrecomputing && TryCompute(value, out DataItem constantValue))
             {
-                // if (constantValue.Size != 1)
-                // { throw new CompilerException($"Value size can be only 1", value, CurrentFile); }
-
-                Code.SetValue(address, constantValue.Byte ?? (byte)0);
+                Code.SetValue(address, constantValue.Byte);
 
                 Precomputations++;
 
@@ -1054,11 +1051,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
 
-                if (statement.Parameters.Length != 0 &&
-                    statement.Parameters.Length != 1)
+                if (statement.Parameters.Length is not 0 and not 1)
                 { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                if (statement.Parameters.Length == 1)
+                if (statement.Parameters.Length is 1)
                 {
                     if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, ReturnVariableName, out Variable returnVariable))
                     { throw new CompilerException($"Can't return value for some reason :(", statement, CurrentFile); }
@@ -1577,7 +1573,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                             Code.CopyValue(left.Address, resultAddress, Stack.NextAddress);
 
-                            Code.AddValue(resultAddress, -right.UnsafeByte);
+                            Code.AddValue(resultAddress, -right.Byte);
 
                             Optimizations++;
 

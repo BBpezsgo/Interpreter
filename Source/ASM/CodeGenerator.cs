@@ -2,6 +2,7 @@
 #pragma warning disable IDE0060 // Remove unused parameter
 #pragma warning disable RCS1213 // Remove unused member declaration
 #pragma warning disable CS0414
+#pragma warning disable CS0612 // Type or member is obsolete
 
 namespace LanguageCore.ASM.Generator;
 
@@ -11,6 +12,7 @@ using Parser;
 using Parser.Statement;
 using Runtime;
 using Tokenizing;
+using InstructionOperand = LanguageCore.ASM.InstructionOperand;
 using LiteralStatement = Parser.Statement.Literal;
 using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.GeneralType Type);
 
@@ -127,7 +129,19 @@ public class CodeGeneratorForAsm : CodeGenerator
         return false;
     }
 
-    protected override void StackLoad(ValueAddress address)
+    void StackStore(ValueAddress address, int size)
+    {
+        for (int i = size - 1; i >= 0; i--)
+        { StackStore(address + i); }
+    }
+
+    void StackLoad(ValueAddress address, int size)
+    {
+        for (int currentOffset = 0; currentOffset < size; currentOffset++)
+        { StackLoad(address + currentOffset); }
+    }
+
+    void StackLoad(ValueAddress address)
     {
         if (address.IsReference)
         {
@@ -170,7 +184,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             default: throw new UnreachableException();
         }
     }
-    protected override void StackStore(ValueAddress address)
+    void StackStore(ValueAddress address)
     {
         if (address.IsReference)
         {
@@ -453,10 +467,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         throw new CompilerException($"Symbol \"{statement.Content}\" not found", statement, CurrentFile);
     }
 
-    void GenerateCodeForSetter(Field field, StatementWithValue value)
-    {
-        throw new NotImplementedException();
-    }
+    void GenerateCodeForSetter(Field field, StatementWithValue value) => throw new NotImplementedException();
 
     void GenerateCodeForSetter(Pointer statement, StatementWithValue value)
     {
@@ -490,10 +501,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         throw new NotImplementedException();
     }
 
-    void GenerateCodeForSetter(IndexCall statement, StatementWithValue value)
-    {
-        throw new NotImplementedException();
-    }
+    void GenerateCodeForSetter(IndexCall statement, StatementWithValue value) => throw new NotImplementedException();
 
     #endregion
 
@@ -704,12 +712,6 @@ public class CodeGeneratorForAsm : CodeGenerator
         if (compiledFunction.IsExternal)
         {
             throw new NotImplementedException();
-            // switch (compiledFunction.ExternalFunctionName)
-            // {
-            //     case "stdout":
-            //     default:
-            //         throw new NotImplementedException();
-            // }
         }
 
         parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);
@@ -825,9 +827,9 @@ public class CodeGeneratorForAsm : CodeGenerator
     void GenerateCodeForStatement(IfContainer @if)
     {
         string endLabel = Builder.CodeBuilder.NewLabel("if_end");
-        for (int i = 0; i < @if.Parts.Length; i++)
+        for (int i = 0; i < @if.Branches.Length; i++)
         {
-            BaseBranch part = @if.Parts[i];
+            BaseBranch part = @if.Branches[i];
 
             if (part is IfBranch ifBranch)
             {
@@ -1150,17 +1152,16 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             throw new NotImplementedException();
         }
-        else if (LanguageOperators.OpCodes.TryGetValue(statement.Operator.Content, out Opcode opcode))
+        else if (LanguageOperators.BinaryOperatorsOld.TryGetValue(statement.Operator.Content, out Opcode opcode))
         {
-            if (LanguageOperators.ParameterCounts[statement.Operator.Content] != BinaryOperatorCall.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageOperators.ParameterCounts[statement.Operator.Content]} passed {BinaryOperatorCall.ParameterCount}", statement.Operator, CurrentFile); }
-
             GenerateCodeForStatement(statement.Left);
             GenerateCodeForStatement(statement.Right);
 
+            throw new NotImplementedException();
+            /*
             switch (opcode)
             {
-                case Opcode.LogicLT:
+                case Opcode.CompLT:
                 {
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
@@ -1178,7 +1179,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
-                case Opcode.LogicMT:
+                case Opcode.CompMT:
                 {
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
@@ -1195,7 +1196,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
-                case Opcode.LogicLTEQ:
+                case Opcode.CompLTEQ:
                 {
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
@@ -1212,7 +1213,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
-                case Opcode.LogicMTEQ:
+                case Opcode.CompMTEQ:
                 {
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
@@ -1268,7 +1269,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
                     break;
                 }
-                case Opcode.LogicEQ:
+                case Opcode.CompEQ:
                 {
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
@@ -1285,7 +1286,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                     Builder.CodeBuilder.AppendLabel(label2);
                     break;
                 }
-                case Opcode.LogicNEQ:
+                case Opcode.CompNEQ:
                 {
                     string label1 = Builder.CodeBuilder.NewLabel();
                     string label2 = Builder.CodeBuilder.NewLabel();
@@ -1384,6 +1385,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 default:
                     throw new NotImplementedException();
             }
+            */
         }
         else
         { throw new CompilerException($"Unknown operator \"{statement.Operator.Content}\"", statement.Operator, CurrentFile); }
@@ -1394,13 +1396,11 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             throw new NotImplementedException();
         }
-        else if (LanguageOperators.OpCodes.TryGetValue(statement.Operator.Content, out Opcode opcode))
+        else if (LanguageOperators.UnaryOperatorsOld.TryGetValue(statement.Operator.Content, out Opcode opcode))
         {
-            if (LanguageOperators.ParameterCounts[statement.Operator.Content] != UnaryOperatorCall.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageOperators.ParameterCounts[statement.Operator.Content]} passed {UnaryOperatorCall.ParameterCount}", statement.Operator, CurrentFile); }
-
             GenerateCodeForStatement(statement.Left);
 
+            /*
             switch (opcode)
             {
                 case Opcode.LogicNOT:
@@ -1423,6 +1423,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 default:
                     throw new NotImplementedException();
             }
+            */
         }
         else
         { throw new CompilerException($"Unknown operator \"{statement.Operator.Content}\"", statement.Operator, CurrentFile); }
@@ -1491,8 +1492,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             if (statement is KeywordCall keywordCall &&
                 keywordCall.Identifier.Equals(StatementKeywords.Return))
             {
-                if (keywordCall.Parameters.Length != 0 &&
-                    keywordCall.Parameters.Length != 1)
+                if (keywordCall.Parameters.Length is not 0 and not 1)
                 { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {keywordCall.Parameters.Length})", keywordCall, CurrentFile); }
 
                 if (keywordCall.Parameters.Length == 1)

@@ -1,12 +1,12 @@
 ﻿namespace LanguageCore;
 
 using Compiler;
+using LanguageCore.Parser.Statement;
 using Runtime;
 
 public static class DeclarationKeywords
 {
     public const string Struct = "struct";
-    public const string Enum = "enum";
     public const string Using = "using";
     public const string Template = "template";
 }
@@ -19,7 +19,7 @@ public static class TypeKeywords
     public const string Float = "float";
     public const string Char = "char";
 
-    public static readonly ImmutableArray<string> List = ImmutableArray.Create
+    public static ImmutableArray<string> List { get; } = ImmutableArray.Create
     (
         TypeKeywords.Void,
         TypeKeywords.Byte,
@@ -28,7 +28,7 @@ public static class TypeKeywords
         TypeKeywords.Char
     );
 
-    public static readonly ImmutableDictionary<string, RuntimeType> RuntimeTypes = new Dictionary<string, RuntimeType>()
+    public static ImmutableDictionary<string, RuntimeType> RuntimeTypes { get; } = new Dictionary<string, RuntimeType>()
     {
         { TypeKeywords.Byte, RuntimeType.Byte },
         { TypeKeywords.Int, RuntimeType.Integer },
@@ -36,7 +36,7 @@ public static class TypeKeywords
         { TypeKeywords.Char, RuntimeType.Char },
     }.ToImmutableDictionary();
 
-    public static readonly ImmutableDictionary<string, BasicType> BasicTypes = new Dictionary<string, BasicType>()
+    public static ImmutableDictionary<string, BasicType> BasicTypes { get; } = new Dictionary<string, BasicType>()
     {
         { TypeKeywords.Byte, BasicType.Byte },
         { TypeKeywords.Int, BasicType.Integer },
@@ -85,10 +85,9 @@ public static class LanguageConstants
     public const string LanguageId = "bbc";
     public const string LanguageExtension = "bbc";
 
-    public static readonly ImmutableArray<string> KeywordList = ImmutableArray.Create
+    public static ImmutableArray<string> KeywordList { get; } = ImmutableArray.Create
     (
         DeclarationKeywords.Struct,
-        DeclarationKeywords.Enum,
         DeclarationKeywords.Using,
         DeclarationKeywords.Template,
 
@@ -107,69 +106,46 @@ public static class LanguageConstants
 
 public static class LanguageOperators
 {
-    public static readonly ImmutableDictionary<string, Opcode> OpCodes = new Dictionary<string, Opcode>()
+    public static HashSet<string> UnaryOperators { get; } = new HashSet<string>()
     {
-        { "!", Opcode.LogicNOT },
-        { "+", Opcode.MathAdd },
-        { "<", Opcode.LogicLT },
-        { ">", Opcode.LogicMT },
-        { "-", Opcode.MathSub },
-        { "*", Opcode.MathMult },
-        { "/", Opcode.MathDiv },
-        { "%", Opcode.MathMod },
-        { "==", Opcode.LogicEQ },
-        { "!=", Opcode.LogicNEQ },
-        { "&&", Opcode.LogicAND },
-        { "||", Opcode.LogicOR },
-        { "&", Opcode.BitsAND },
-        { "|", Opcode.BitsOR },
-        { "^", Opcode.BitsXOR },
-        { "<=", Opcode.LogicLTEQ },
-        { ">=", Opcode.LogicMTEQ },
-        { "<<", Opcode.BitsShiftLeft },
-        { ">>", Opcode.BitsShiftRight },
-    }.ToImmutableDictionary();
+        "!",
+    };
 
-    public static readonly ImmutableDictionary<string, int> ParameterCounts = new Dictionary<string, int>()
+    public static HashSet<string> BinaryOperators { get; } = new HashSet<string>()
     {
-        { "|", 2 },
-        { "&", 2 },
-        { "^", 2 },
-        { "<<", 2 },
-        { ">>", 2 },
-        { "!", 1 },
+        BinaryOperatorCall.CompLT,
+        BinaryOperatorCall.CompGT,
+        BinaryOperatorCall.CompEQ,
+        BinaryOperatorCall.CompNEQ,
+        BinaryOperatorCall.CompLEQ,
+        BinaryOperatorCall.CompGEQ,
 
-        { "==", 2 },
-        { "!=", 2 },
-        { "<=", 2 },
-        { ">=", 2 },
+        BinaryOperatorCall.Addition,
+        BinaryOperatorCall.Subtraction,
+        BinaryOperatorCall.Multiplication,
+        BinaryOperatorCall.Division,
+        BinaryOperatorCall.Modulo,
+        BinaryOperatorCall.LogicalAND,
+        BinaryOperatorCall.LogicalOR,
+        BinaryOperatorCall.BitwiseAND,
+        BinaryOperatorCall.BitwiseOR,
+        BinaryOperatorCall.BitwiseXOR,
+        BinaryOperatorCall.BitshiftLeft,
+        BinaryOperatorCall.BitshiftRight,
+    };
 
-        { "<", 2 },
-        { ">", 2 },
-
-        { "+", 2 },
-        { "-", 2 },
-
-        { "*", 2 },
-        { "/", 2 },
-        { "%", 2 },
-
-        { "&&", 2 },
-        { "||", 2 },
-    }.ToImmutableDictionary();
-
-    public static readonly ImmutableDictionary<string, int> Precedencies = new Dictionary<string, int>()
+    public static ImmutableDictionary<string, int> Precedencies { get; } = new Dictionary<string, int>()
     {
-        { "|", 4 },
-        { "&", 4 },
-        { "^", 4 },
-        { "<<", 4 },
-        { ">>", 4 },
+        { BinaryOperatorCall.BitwiseOR, 4 },
+        { BinaryOperatorCall.BitwiseAND, 4 },
+        { BinaryOperatorCall.BitwiseXOR, 4 },
+        { BinaryOperatorCall.BitshiftLeft, 4 },
+        { BinaryOperatorCall.BitshiftRight, 4 },
 
-        { "==", 5 },
-        { "!=", 5 },
-        { "<=", 5 },
-        { ">=", 5 },
+        { BinaryOperatorCall.CompEQ, 5 },
+        { BinaryOperatorCall.CompNEQ, 5 },
+        { BinaryOperatorCall.CompLEQ, 5 },
+        { BinaryOperatorCall.CompGEQ, 5 },
 
         { "=", 10 },
 
@@ -180,21 +156,21 @@ public static class LanguageOperators
         { "/=", 12 },
         { "%=", 12 },
 
-        { "<", 20 },
-        { ">", 20 },
+        { BinaryOperatorCall.CompLT, 20 },
+        { BinaryOperatorCall.CompGT, 20 },
 
-        { "+", 30 },
-        { "-", 30 },
+        { BinaryOperatorCall.Addition, 30 },
+        { BinaryOperatorCall.Subtraction, 30 },
 
-        { "*", 31 },
-        { "/", 31 },
-        { "%", 31 },
+        { BinaryOperatorCall.Multiplication, 31 },
+        { BinaryOperatorCall.Division, 31 },
+        { BinaryOperatorCall.Modulo, 31 },
 
         { "++", 40 },
         { "--", 40 },
 
-        { "&&", 2 },
-        { "||", 2 },
+        { BinaryOperatorCall.LogicalAND, 2 },
+        { BinaryOperatorCall.LogicalOR, 2 },
     }.ToImmutableDictionary();
 }
 
@@ -206,7 +182,7 @@ public static class AttributeConstants
 
 public static class BuiltinFunctions
 {
-    public static readonly ImmutableDictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)> Prototypes = new Dictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)>()
+    public static ImmutableDictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)> Prototypes { get; } = new Dictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)>()
     {
         { Allocate, (new PointerType(new BuiltinType(BasicType.Integer)), [ new BuiltinType(BasicType.Integer) ]) },
         { Free, (new BuiltinType(BasicType.Void), [ new PointerType(new BuiltinType(BasicType.Integer)) ]) },

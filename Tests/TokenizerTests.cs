@@ -852,7 +852,7 @@ public class TokenTests
     }
 
     [TestMethod]
-    public void Test6()
+    public void Test06()
     {
         Token token = StringTokenizer.Tokenize("0x545fadf3", Enumerable.Empty<string>()).Tokens[0];
     }

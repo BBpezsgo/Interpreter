@@ -27,10 +27,13 @@
 
   <ItemGroup>
     <Compile Remove="out\**" />
+    <Compile Remove="Source\ASM\**" />
     <Compile Remove="Tests\**" />
     <EmbeddedResource Remove="out\**" />
+    <EmbeddedResource Remove="Source\ASM\**" />
     <EmbeddedResource Remove="Tests\**" />
     <None Remove="out\**" />
+    <None Remove="Source\ASM\**" />
     <None Remove="Tests\**" />
   </ItemGroup>
 

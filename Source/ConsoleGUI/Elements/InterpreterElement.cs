@@ -92,13 +92,13 @@ public sealed partial class InterpreterElement : WindowElement
 
         ClearBuffer();
 
-        InlineElement statePanel = new()
+        InlineElement registersPanel = new()
         {
             HasBorder = true,
-            Title = "State",
-            Layout = new InlineLayout(InlineLayoutSizeMode.Fixed, 4),
+            Title = "Registers",
+            Layout = new InlineLayout(InlineLayoutSizeMode.Fixed, 7),
         };
-        statePanel.OnBeforeDraw += StateElement_OnBeforeDraw;
+        registersPanel.OnBeforeDraw += RegistersElement_OnBeforeDraw;
 
         InlineElement codePanel = new()
         {
@@ -156,7 +156,7 @@ public sealed partial class InterpreterElement : WindowElement
                     {
                         Elements = new Element[]
                         {
-                            statePanel,
+                            registersPanel,
                             ConsolePanel,
                             codePanel,
                         }
@@ -329,11 +329,6 @@ public sealed partial class InterpreterElement : WindowElement
 
             return;
         }
-    }
-
-    public override void OnDestroy()
-    {
-        this.Interpreter.Dispose();
     }
 
     public override void RefreshSize()

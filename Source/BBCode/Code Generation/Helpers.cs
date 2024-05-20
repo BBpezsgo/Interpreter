@@ -19,21 +19,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.Push, 0);
 
         StackLoad(AbsoluteGlobalAddress);
-        AddInstruction(Opcode.GetBasePointer);
+        AddInstruction(Opcode.Push, Register.BasePointer);
 
         GenerateCodeForStatement(address);
 
-        AddInstruction(Opcode.Push, GeneratedCode.Count + 3);
-        AddInstruction(Opcode.MathSub);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.MathSub, reg.Register, GeneratedCode.Count + 2);
 
-        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackPointerRelative, -1 * BytecodeProcessor.StackDirection);
+            AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
-        int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Jump, AddressingMode.Runtime);
+            int jumpInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.Jump, reg.Register);
 
-        GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
-
-        return jumpInstruction;
+            GeneratedCode[returnToValueInstruction].Operand1 = GeneratedCode.Count;
+            return jumpInstruction;
+        }
     }
 
     int Call(int absoluteAddress)
@@ -42,28 +44,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.Push, 0);
 
         StackLoad(AbsoluteGlobalAddress);
-        AddInstruction(Opcode.GetBasePointer);
+        AddInstruction(Opcode.Push, Register.BasePointer);
 
-        AddInstruction(Opcode.SetBasePointer, AddressingMode.StackPointerRelative, 0 * BytecodeProcessor.StackDirection);
+        AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
         int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Jump, AddressingMode.Absolute, absoluteAddress - GeneratedCode.Count);
+        AddInstruction(Opcode.Jump, absoluteAddress - GeneratedCode.Count);
 
-        GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
+        GeneratedCode[returnToValueInstruction].Operand1 = GeneratedCode.Count;
 
         return jumpInstruction;
     }
 
     void Return()
     {
-        AddInstruction(Opcode.SetBasePointer, AddressingMode.Runtime, 0 * BytecodeProcessor.StackDirection);
+        AddInstruction(Opcode.Pop, Register.BasePointer);
         AddInstruction(Opcode.Pop); // Pop AbsoluteGlobalOffset
-        AddInstruction(Opcode.SetCodePointer, AddressingMode.Runtime);
+        AddInstruction(Opcode.Return);
     }
 
-    /// <exception cref="NotImplementedException"/>
-    /// <exception cref="CompilerException"/>
-    /// <exception cref="InternalException"/>
     int GenerateInitialValue(GeneralType type)
     {
         if (type is StructType structType)
@@ -99,16 +98,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
     #region Memory Helpers
 
     protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
+        => new ValueAddress(variable.MemoryAddress, AddressingMode.Absolute) + 3;
+
+    void StackStore(ValueAddress address, int size)
     {
-        return new ValueAddress(variable.MemoryAddress, AddressingMode.Absolute) + 3;
+        for (int i = size - 1; i >= 0; i--)
+        { StackStore(address + i); }
     }
 
-    protected override void StackLoad(ValueAddress address)
+    void StackLoad(ValueAddress address, int size)
+    {
+        for (int i = 0; i < size; i++)
+        { StackLoad(address + i); }
+    }
+
+    void StackLoad(ValueAddress address)
     {
         if (address.IsReference)
         {
             StackLoad(address.ToUnreferenced());
-            AddInstruction(Opcode.StackLoad, AddressingMode.Runtime);
+            using (RegisterUsage.Auto reg = Registers.GetFree())
+            {
+                AddInstruction(Opcode.Pop, reg.Register);
+                AddInstruction(Opcode.Push, reg.Register.ToPtr());
+            }
             return;
         }
 
@@ -121,31 +134,47 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             case AddressingMode.Absolute:
                 StackLoad(AbsoluteGlobalAddress);
-                AddInstruction(Opcode.Push, address.Address);
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    AddInstruction(Opcode.Pop, reg.Register);
 
-                if (BytecodeProcessor.StackDirection > 0) AddInstruction(Opcode.MathAdd);
-                else AddInstruction(Opcode.MathSub);
+                    if (BytecodeProcessor.StackDirection > 0)
+                    {
+                        AddInstruction(Opcode.MathAdd, reg.Register, address.Address);
+                    }
+                    else
+                    {
+                        AddInstruction(Opcode.MathSub, reg.Register, address.Address);
+                    }
 
-                AddInstruction(Opcode.StackLoad, AddressingMode.Runtime);
+                    AddInstruction(Opcode.Push, reg.Register.ToPtr());
+                }
                 break;
             case AddressingMode.BasePointerRelative:
+                AddInstruction(Opcode.Push, Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
+                break;
+
             case AddressingMode.StackPointerRelative:
-                AddInstruction(Opcode.StackLoad, address.AddressingMode, address.Address * BytecodeProcessor.StackDirection);
+                AddInstruction(Opcode.Push, Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
                 break;
 
             case AddressingMode.Runtime:
-                AddInstruction(Opcode.Push, address.Address);
-                AddInstruction(Opcode.StackLoad, address.AddressingMode);
+                AddInstruction(Opcode.Push, new InstructionOperand(address.Address, InstructionOperandType.Pointer));
                 break;
             default: throw new UnreachableException();
         }
     }
-    protected override void StackStore(ValueAddress address)
+
+    void StackStore(ValueAddress address)
     {
         if (address.IsReference)
         {
             StackLoad(address.ToUnreferenced());
-            AddInstruction(Opcode.StackStore, AddressingMode.Runtime);
+            using (RegisterUsage.Auto reg = Registers.GetFree())
+            {
+                AddInstruction(Opcode.Pop, reg.Register);
+                AddInstruction(Opcode.Pop, reg.Register.ToPtr());
+            }
             return;
         }
 
@@ -158,22 +187,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             case AddressingMode.Absolute:
                 StackLoad(AbsoluteGlobalAddress);
-                AddInstruction(Opcode.Push, address.Address);
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    AddInstruction(Opcode.Pop, reg.Register);
 
-                if (BytecodeProcessor.StackDirection > 0) AddInstruction(Opcode.MathAdd);
-                else AddInstruction(Opcode.MathSub);
+                    if (BytecodeProcessor.StackDirection > 0)
+                    {
+                        AddInstruction(Opcode.MathAdd, reg.Register, address.Address);
+                    }
+                    else
+                    {
+                        AddInstruction(Opcode.MathSub, reg.Register, address.Address);
+                    }
 
-                AddInstruction(Opcode.StackStore, AddressingMode.Runtime);
+                    AddInstruction(Opcode.Pop, reg.Register.ToPtr());
+                }
                 break;
             case AddressingMode.BasePointerRelative:
-                AddInstruction(Opcode.StackStore, AddressingMode.BasePointerRelative, address.Address * BytecodeProcessor.StackDirection);
+                AddInstruction(Opcode.Pop, Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
                 break;
             case AddressingMode.StackPointerRelative:
-                AddInstruction(Opcode.StackStore, AddressingMode.StackPointerRelative, address.Address * BytecodeProcessor.StackDirection);
+                AddInstruction(Opcode.Pop, Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
                 break;
             case AddressingMode.Runtime:
-                AddInstruction(Opcode.Push, address.Address);
-                AddInstruction(Opcode.StackStore, AddressingMode.Runtime);
+                AddInstruction(Opcode.Pop, new InstructionOperand(address.Address, InstructionOperandType.Pointer));
                 break;
             default: throw new UnreachableException();
         }
@@ -185,13 +222,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment($"Check for pointer zero {{");
         if (preservePointer)
         { StackLoad(new ValueAddress(-1, AddressingMode.StackPointerRelative)); }
-        AddInstruction(Opcode.LogicNOT);
 
-        int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.JumpIfZero);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.Compare, reg.Register, 0);
+            AddInstruction(Opcode.JumpIfNotEqual, 0);
+        }
+
+        int jumpInstruction = GeneratedCode.Count - 1;
+
         GenerateCodeForLiteralString(exceptionMessage);
-        AddInstruction(Opcode.Throw);
-        GeneratedCode[jumpInstruction].Parameter = GeneratedCode.Count - jumpInstruction;
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.Throw, reg.Register);
+        }
+        GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction;
 
         AddComment($"}}");
     }
@@ -202,9 +249,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CheckPointerNull(exceptionMessage: nullExceptionMessage);
 
-        AddInstruction(Opcode.Push, offset);
-        AddInstruction(Opcode.MathAdd);
-        AddInstruction(Opcode.HeapGet, AddressingMode.Runtime);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.Push, reg.Register.ToPtr(offset));
+        }
     }
 
     void HeapStore(ValueAddress pointerAddress, int offset, string nullExceptionMessage = "null pointer")
@@ -213,9 +262,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CheckPointerNull(exceptionMessage: nullExceptionMessage);
 
-        AddInstruction(Opcode.Push, offset);
-        AddInstruction(Opcode.MathAdd);
-        AddInstruction(Opcode.HeapSet, AddressingMode.Runtime);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.Pop, reg.Register.ToPtr(offset));
+        }
     }
 
     #endregion
@@ -228,9 +279,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly Stack<int> TagCount;
 
     public ValueAddress GetReturnValueAddress(GeneralType returnType)
-    {
-        return new ValueAddress(-(ParametersSize + TagsBeforeBasePointer + returnType.Size), AddressingMode.BasePointerRelative);
-    }
+        => new(-(ParametersSize + TagsBeforeBasePointer + returnType.Size), AddressingMode.BasePointerRelative);
 
     public static ValueAddress SavedBasePointerAddress => new(SavedBasePointerOffset, AddressingMode.BasePointerRelative);
     public static ValueAddress SavedCodePointerAddress => new(SavedCodePointerOffset, AddressingMode.BasePointerRelative);

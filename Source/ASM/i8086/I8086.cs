@@ -481,7 +481,7 @@ public unsafe struct I8086
         if (rm == 0b_110 && mode == 0)
         { throw new NotImplementedException(); }
 
-        return mode == 0b_01 || mode == 0b_10;
+        return mode is 0b_01 or 0b_10;
     }
 
     static bool NeedDHigh(byte rm, byte mode)

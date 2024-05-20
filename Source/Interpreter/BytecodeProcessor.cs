@@ -1,4 +1,5 @@
 ﻿using System.Collections.Frozen;
+using System.Runtime.InteropServices;
 
 namespace LanguageCore.Runtime;
 
@@ -9,31 +10,6 @@ public readonly struct RuntimeContext
     public ImmutableArray<Instruction> Code { get; init; }
     public IReadOnlyList<DataItem> Memory { get; init; }
     public int CodeSampleStart { get; init; }
-}
-
-public sealed class UserInvoke
-{
-    public int InstructionOffset { get; }
-    public ImmutableArray<DataItem> Arguments { get; }
-    public Action<DataItem> Callback { get; }
-    public bool NeedReturnValue { get; }
-    public bool IsInvoking { get; set; }
-
-    public UserInvoke(int instructionOffset, IEnumerable<DataItem> arguments, Action<DataItem> callback)
-    {
-        InstructionOffset = instructionOffset;
-        Arguments = arguments.ToImmutableArray();
-        Callback = callback;
-        NeedReturnValue = true;
-
-        IsInvoking = false;
-    }
-
-    public UserInvoke(int instructionOffset, IEnumerable<DataItem> arguments, Action callback)
-        : this(instructionOffset, arguments, _ => callback.Invoke())
-    {
-        NeedReturnValue = false;
-    }
 }
 
 public struct BytecodeInterpreterSettings
@@ -61,42 +37,36 @@ public interface ISleep
 
 public class TickSleep : ISleep
 {
-    readonly int _ticks;
-    int _elapsed;
+    readonly int Ticks;
+    int Elapsed;
 
     public TickSleep(int ticks)
     {
-        _ticks = ticks;
+        Ticks = ticks;
     }
 
     public bool Tick()
     {
-        _elapsed++;
-        return _elapsed < _ticks;
+        Elapsed++;
+        return Elapsed < Ticks;
     }
 }
 
 public class TimeSleep : ISleep
 {
-    readonly double _timeout;
-    readonly double _started;
-
-    public TimeSleep(double timeout, double now)
-    {
-        _timeout = timeout;
-        _started = now;
-    }
+    readonly double Timeout;
+    readonly double Started;
 
     public TimeSleep(double timeout)
     {
-        _timeout = timeout;
-        _started = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+        Timeout = timeout;
+        Started = DateTime.UtcNow.TimeOfDay.TotalSeconds;
     }
 
     public bool Tick()
     {
         double now = DateTime.UtcNow.TimeOfDay.TotalSeconds;
-        return now - _started < _timeout;
+        return now - Started < Timeout;
     }
 }
 
@@ -111,19 +81,16 @@ public class BytecodeProcessor
 
     readonly BytecodeInterpreterSettings Settings;
 
-    bool IsUserInvoking => UserInvokes.Count > 0 && UserInvokes.Peek().IsInvoking;
-    readonly Queue<UserInvoke> UserInvokes;
-
     ISleep? CurrentSleep;
 
     public Registers Registers;
     public readonly DataItem[] Memory;
-
     public ImmutableArray<Instruction> Code;
+    readonly FrozenDictionary<int, ExternalFunctionBase> ExternalFunctions;
 
     public int StackStart => Settings.HeapSize;
 
-    public IEnumerable<DataItem> EnumerateStack()
+    public IEnumerable<DataItem> GetStack()
     {
         ArraySegment<DataItem> stack = GetStack(out bool shouldReverse);
         if (shouldReverse)
@@ -160,18 +127,14 @@ public class BytecodeProcessor
         }
     }
 
-    readonly FrozenDictionary<int, ExternalFunctionBase> ExternalFunctions;
-
     public BytecodeProcessor(ImmutableArray<Instruction> code, FrozenDictionary<int, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings)
     {
-        UserInvokes = new Queue<UserInvoke>();
         Settings = settings;
         ExternalFunctions = externalFunctions;
 
         Code = code;
 
         Memory = new DataItem[settings.HeapSize + StackSize];
-        // HeapUtils.Init(Memory);
 
         if (StackDirection > 0)
         { Registers.StackPointer = Settings.HeapSize; }
@@ -182,11 +145,6 @@ public class BytecodeProcessor
     }
 
     public void Sleep(ISleep sleep) => CurrentSleep = sleep;
-
-    public void Call(int instructionOffset, Action<DataItem> callback, params DataItem[] arguments)
-        => UserInvokes.Enqueue(new UserInvoke(instructionOffset, arguments, callback));
-    public void Call(int instructionOffset, Action callback, params DataItem[] arguments)
-        => UserInvokes.Enqueue(new UserInvoke(instructionOffset, arguments, callback));
 
     RuntimeContext GetContext() => new()
     {
@@ -217,11 +175,8 @@ public class BytecodeProcessor
             DataItem savedCodePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection)];
             DataItem savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
 
-            if (!savedCodePointerD.Int.HasValue) return;
-            if (!savedBasePointerD.Int.HasValue) return;
-
-            int savedCodePointer = savedCodePointerD.Int.Value;
-            int savedBasePointer = savedBasePointerD.Int.Value;
+            int savedCodePointer = savedCodePointerD.Int;
+            int savedBasePointer = savedBasePointerD.Int;
 
             callTrace.Add(savedCodePointer);
 
@@ -258,7 +213,7 @@ public class BytecodeProcessor
 
             DataItem savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
             if (savedBasePointerD.Type != RuntimeType.Integer) return;
-            int newBasePointer = savedBasePointerD.UnsafeInt;
+            int newBasePointer = savedBasePointerD.Int;
             result.Add(newBasePointer);
             if (newBasePointer == basePointer) return;
             TraceBasePointers(result, stack, newBasePointer);
@@ -275,14 +230,8 @@ public class BytecodeProcessor
     void Step() => Registers.CodePointer++;
     void Step(int num) => Registers.CodePointer += num;
 
-    /// <exception cref="RuntimeException"/>
-    /// <exception cref="UserException"/>
-    /// <exception cref="InternalException"/>
     public bool Tick()
     {
-        // if (Registers.StackPointer > Settings.StackMaxSize)
-        // { throw new RuntimeException("Stack size exceed the StackMaxSize", GetContext()); }
-
         if (CurrentSleep is not null)
         {
             if (CurrentSleep.Tick())
@@ -291,42 +240,7 @@ public class BytecodeProcessor
             { CurrentSleep = null; }
         }
 
-        if (IsDone)
-        {
-            if (IsUserInvoking)
-            {
-                UserInvoke userInvoke = UserInvokes.Dequeue();
-
-                for (int i = 0; i < userInvoke.Arguments.Length; i++)
-                { Pop(); }
-
-                DataItem returnValue = userInvoke.NeedReturnValue ? Pop() : DataItem.Null;
-                userInvoke.Callback?.Invoke(returnValue);
-                return true;
-            }
-
-            if (UserInvokes.Count > 0)
-            {
-                UserInvoke userInvoke = UserInvokes.Peek();
-
-                Registers.CodePointer = userInvoke.InstructionOffset;
-                Push(new DataItem(0));
-                for (int i = 0; i < userInvoke.Arguments.Length; i++)
-                { Push(userInvoke.Arguments[i]); }
-
-                Push(new DataItem(0));
-                Push(new DataItem(Code.Length));
-
-                Registers.BasePointer = Registers.StackPointer;
-
-                userInvoke.IsInvoking = true;
-                return true;
-            }
-
-            return false;
-        }
-
-        int lastCodePointer = Registers.CodePointer;
+        if (IsDone) return false;
 
         try
         {
@@ -347,16 +261,9 @@ public class BytecodeProcessor
             throw new RuntimeException(error.Message, error, GetContext());
         }
 
-        if (lastCodePointer == Registers.CodePointer)
-        { throw new RuntimeException($"Execution stuck at instruction {lastCodePointer}", GetContext()); }
-
         return true;
     }
 
-    /// <exception cref="RuntimeException"/>
-    /// <exception cref="UserException"/>
-    /// <exception cref="InternalException"/>
-    /// <exception cref="Exception"/>
     void Process()
     {
         switch (CurrentInstruction.Opcode)
@@ -368,54 +275,53 @@ public class BytecodeProcessor
             case Opcode.Push: PUSH_VALUE(); break;
             case Opcode.Pop: POP_VALUE(); break;
 
-            case Opcode.StackLoad: LOAD_VALUE(); break;
-            case Opcode.StackStore: STORE_VALUE(); break;
-
-            case Opcode.JumpIfZero: JUMP_BY_IF_FALSE(); break;
             case Opcode.Jump: JUMP_BY(); break;
             case Opcode.Throw: THROW(); break;
+
+            case Opcode.JumpIfEqual: JumpIfEqual(); break;
+            case Opcode.JumpIfNotEqual: JumpIfNotEqual(); break;
+            case Opcode.JumpIfGreater: JumpIfGreater(); break;
+            case Opcode.JumpIfGreaterOrEqual: JumpIfGreaterOrEqual(); break;
+            case Opcode.JumpIfLess: JumpIfLess(); break;
+            case Opcode.JumpIfLessOrEqual: JumpIfLessOrEqual(); break;
 
             case Opcode.Call: CALL(); break;
             case Opcode.Return: RETURN(); break;
 
             case Opcode.CallExternal: CALL_EXTERNAL(); break;
 
-            case Opcode.MathAdd: MATH_ADD(); break;
-            case Opcode.MathSub: MATH_SUB(); break;
-            case Opcode.MathMult: MATH_MULT(); break;
-            case Opcode.MathDiv: MATH_DIV(); break;
-            case Opcode.MathMod: MATH_MOD(); break;
+            case Opcode.MathAdd: MathAdd(); break;
+            case Opcode.MathSub: MathSub(); break;
+            case Opcode.MathMult: MathMult(); break;
+            case Opcode.MathDiv: MathDiv(); break;
+            case Opcode.MathMod: MathMod(); break;
 
-            case Opcode.BitsShiftLeft: BITSHIFT_LEFT(); break;
-            case Opcode.BitsShiftRight: BITSHIFT_RIGHT(); break;
+            case Opcode.FMathAdd: FMathAdd(); break;
+            case Opcode.FMathSub: FMathSub(); break;
+            case Opcode.FMathMult: FMathMult(); break;
+            case Opcode.FMathDiv: FMathDiv(); break;
+            case Opcode.FMathMod: FMathMod(); break;
 
-            case Opcode.BitsAND: BITS_AND(); break;
-            case Opcode.BitsOR: BITS_OR(); break;
-            case Opcode.BitsXOR: BITS_XOR(); break;
-            case Opcode.BitsNOT: BITS_NOT(); break;
+            case Opcode.Compare: Compare(); break;
 
-            case Opcode.LogicLT: LOGIC_LT(); break;
-            case Opcode.LogicMT: LOGIC_MT(); break;
-            case Opcode.LogicEQ: LOGIC_EQ(); break;
-            case Opcode.LogicNEQ: LOGIC_NEQ(); break;
-            case Opcode.LogicLTEQ: LOGIC_LTEQ(); break;
-            case Opcode.LogicMTEQ: LOGIC_MTEQ(); break;
-            case Opcode.LogicNOT: LOGIC_NOT(); break;
-            case Opcode.LogicOR: LOGIC_OR(); break;
-            case Opcode.LogicAND: LOGIC_AND(); break;
+            case Opcode.BitsShiftLeft: BitsShiftLeft(); break;
+            case Opcode.BitsShiftRight: BitsShiftRight(); break;
 
-            case Opcode.HeapGet: HEAP_GET(); break;
-            case Opcode.HeapSet: HEAP_SET(); break;
+            case Opcode.BitsAND: BitsAND(); break;
+            case Opcode.BitsOR: BitsOR(); break;
+            case Opcode.BitsXOR: BitsXOR(); break;
+            case Opcode.BitsNOT: BitsNOT(); break;
+
+            case Opcode.LogicOR: LogicOR(); break;
+            case Opcode.LogicAND: LogicAND(); break;
+
+            case Opcode.Move: Move(); break;
 
             case Opcode.Allocate: HEAP_ALLOC(); break;
             case Opcode.Free: HEAP_FREE(); break;
 
-            case Opcode.GetBasePointer: GET_BASEPOINTER(); break;
-            case Opcode.SetBasePointer: SET_BASEPOINTER(); break;
-
-            case Opcode.SetCodePointer: SET_CODEPOINTER(); break;
-
-            case Opcode.GetRegister: GET_REGISTER(); break;
+            case Opcode.FTo: FTo(); break;
+            case Opcode.FFrom: FFrom(); break;
 
             default: throw new UnreachableException();
         }
@@ -423,38 +329,166 @@ public class BytecodeProcessor
 
     #region Memory Manipulation
 
-    public int GetAddress(Instruction instruction)
-        => GetAddress(instruction.Parameter.Int ?? 0, instruction.AddressingMode);
-
-    public int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
+    public bool GetPointer(InstructionOperand operand, out int pointer)
     {
-        AddressingMode.Absolute => offset,
-        AddressingMode.Runtime => Memory[Registers.StackPointer - StackDirection].Int!.Value,
-        AddressingMode.BasePointerRelative => Registers.BasePointer + offset,
-        AddressingMode.StackPointerRelative => Registers.StackPointer + offset,
+        switch (operand.Type)
+        {
+            case InstructionOperandType.Pointer:
+                pointer = operand.Value.Int;
+                return true;
+            case InstructionOperandType.PointerBP:
+                pointer = Registers.BasePointer + operand.Value.Int;
+                return true;
+            case InstructionOperandType.PointerSP:
+                pointer = Registers.StackPointer + operand.Value.Int;
+                return true;
+            case InstructionOperandType.PointerEAX:
+                pointer = Registers.EAX + operand.Value.Int;
+                return true;
+            case InstructionOperandType.PointerEBX:
+                pointer = Registers.EBX + operand.Value.Int;
+                return true;
+            case InstructionOperandType.PointerECX:
+                pointer = Registers.ECX + operand.Value.Int;
+                return true;
+            case InstructionOperandType.PointerEDX:
+                pointer = Registers.EDX + operand.Value.Int;
+                return true;
+            default:
+                pointer = default;
+                return false;
+        }
+    }
 
+    DataItem GetData(InstructionOperand operand) => operand.Type switch
+    {
+        InstructionOperandType.Immediate => operand.Value,
+        InstructionOperandType.Pointer => Memory[operand.Value.Int],
+        InstructionOperandType.PointerBP => Memory[Registers.BasePointer + operand.Value.Int],
+        InstructionOperandType.PointerSP => Memory[Registers.StackPointer + operand.Value.Int],
+        InstructionOperandType.PointerEAX => Memory[Registers.EAX + operand.Value.Int],
+        InstructionOperandType.PointerEBX => Memory[Registers.EBX + operand.Value.Int],
+        InstructionOperandType.PointerECX => Memory[Registers.ECX + operand.Value.Int],
+        InstructionOperandType.PointerEDX => Memory[Registers.EDX + operand.Value.Int],
+        InstructionOperandType.Register => operand.Value.Int switch
+        {
+            RegisterIds.CodePointer => new DataItem(Registers.CodePointer),
+            RegisterIds.StackPointer => new DataItem(Registers.StackPointer),
+            RegisterIds.BasePointer => new DataItem(Registers.BasePointer),
+            RegisterIds.EAX => new DataItem(Registers.EAX),
+            RegisterIds.AX => new DataItem(Registers.AX),
+            RegisterIds.AH => new DataItem(Registers.AH),
+            RegisterIds.AL => new DataItem(Registers.AL),
+            RegisterIds.EBX => new DataItem(Registers.EBX),
+            RegisterIds.BX => new DataItem(Registers.BX),
+            RegisterIds.BH => new DataItem(Registers.BH),
+            RegisterIds.BL => new DataItem(Registers.BL),
+            RegisterIds.ECX => new DataItem(Registers.ECX),
+            RegisterIds.CX => new DataItem(Registers.CX),
+            RegisterIds.CH => new DataItem(Registers.CH),
+            RegisterIds.CL => new DataItem(Registers.CL),
+            RegisterIds.EDX => new DataItem(Registers.EDX),
+            RegisterIds.DX => new DataItem(Registers.DX),
+            RegisterIds.DH => new DataItem(Registers.DH),
+            RegisterIds.DL => new DataItem(Registers.DL),
+            _ => throw new UnreachableException(),
+        },
         _ => throw new UnreachableException(),
     };
 
-    /// <exception cref="InternalException"/>
-    int FetchAddress() => CurrentInstruction.AddressingMode switch
+    void SetData(InstructionOperand operand, DataItem value)
     {
-        AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-        AddressingMode.Runtime => (int)Pop(),
-        AddressingMode.BasePointerRelative => Registers.BasePointer + (int)CurrentInstruction.Parameter,
-        AddressingMode.StackPointerRelative => Registers.StackPointer + (int)CurrentInstruction.Parameter,
-
-        _ => throw new UnreachableException(),
-    };
-
-    /// <exception cref="InternalException"/>
-    DataItem FetchData() => CurrentInstruction.AddressingMode switch
-    {
-        AddressingMode.Absolute => CurrentInstruction.Parameter,
-        AddressingMode.Runtime => Pop(),
-
-        _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
-    };
+        switch (operand.Type)
+        {
+            case InstructionOperandType.Immediate:
+                throw new RuntimeException($"Can't set an immediate value");
+            case InstructionOperandType.Pointer:
+                Memory[operand.Value.Int] = value;
+                break;
+            case InstructionOperandType.PointerBP:
+                Memory[Registers.BasePointer + operand.Value.Int] = value;
+                break;
+            case InstructionOperandType.PointerSP:
+                Memory[Registers.StackPointer + operand.Value.Int] = value;
+                break;
+            case InstructionOperandType.PointerEAX:
+                Memory[Registers.EAX + operand.Value.Int] = value;
+                break;
+            case InstructionOperandType.PointerEBX:
+                Memory[Registers.EBX + operand.Value.Int] = value;
+                break;
+            case InstructionOperandType.PointerECX:
+                Memory[Registers.ECX + operand.Value.Int] = value;
+                break;
+            case InstructionOperandType.PointerEDX:
+                Memory[Registers.EDX + operand.Value.Int] = value;
+                break;
+            case InstructionOperandType.Register:
+                switch (operand.Value.Int)
+                {
+                    case RegisterIds.CodePointer:
+                        Registers.CodePointer = value.Int;
+                        break;
+                    case RegisterIds.StackPointer:
+                        Registers.StackPointer = value.Int;
+                        break;
+                    case RegisterIds.BasePointer:
+                        Registers.BasePointer = value.Int;
+                        break;
+                    case RegisterIds.EAX:
+                        Registers.EAX = value.Int;
+                        break;
+                    case RegisterIds.AX:
+                        Registers.AX = value.Char;
+                        break;
+                    case RegisterIds.AH:
+                        Registers.AH = value.Byte;
+                        break;
+                    case RegisterIds.AL:
+                        Registers.AL = value.Byte;
+                        break;
+                    case RegisterIds.EBX:
+                        Registers.EBX = value.Int;
+                        break;
+                    case RegisterIds.BX:
+                        Registers.BX = value.Char;
+                        break;
+                    case RegisterIds.BH:
+                        Registers.BH = value.Byte;
+                        break;
+                    case RegisterIds.BL:
+                        Registers.BL = value.Byte;
+                        break;
+                    case RegisterIds.ECX:
+                        Registers.ECX = value.Int;
+                        break;
+                    case RegisterIds.CX:
+                        Registers.CX = value.Char;
+                        break;
+                    case RegisterIds.CH:
+                        Registers.CH = value.Byte;
+                        break;
+                    case RegisterIds.CL:
+                        Registers.CL = value.Byte;
+                        break;
+                    case RegisterIds.EDX:
+                        Registers.EDX = value.Int;
+                        break;
+                    case RegisterIds.DX:
+                        Registers.DX = value.Char;
+                        break;
+                    case RegisterIds.DH:
+                        Registers.DH = value.Byte;
+                        break;
+                    case RegisterIds.DL:
+                        Registers.DL = value.Byte;
+                        break;
+                    default: throw new UnreachableException();
+                }
+                break;
+            default: throw new UnreachableException();
+        }
+    }
 
     void Push(DataItem data)
     {
@@ -482,39 +516,31 @@ public class BytecodeProcessor
 
     void HEAP_ALLOC()
     {
-        DataItem sizeData = Pop();
-        int size = sizeData.Int ?? throw new RuntimeException($"Expected an integer parameter for opcode {nameof(Opcode.Allocate)}, got {sizeData.Type}");
+        DataItem sizeData = GetData(CurrentInstruction.Operand2);
+        int size = sizeData.Int;
 
-        int block = HeapUtils.Allocate(Memory, size);
+        int ptr = HeapUtils.Allocate(Memory, size);
 
-        Push(new DataItem(block));
+        SetData(CurrentInstruction.Operand1, ptr);
 
         Step();
     }
 
     void HEAP_FREE()
     {
-        DataItem pointerData = Pop();
-        int pointer = pointerData.Int ?? throw new RuntimeException($"Expected an integer parameter for opcode {nameof(Opcode.Free)}, got {pointerData.Type}");
+        DataItem pointerData = GetData(CurrentInstruction.Operand1);
+        int pointer = pointerData.Int;
 
         HeapUtils.Deallocate(Memory, pointer);
 
         Step();
     }
 
-    void HEAP_GET()
+    void Move()
     {
-        int address = FetchAddress();
-        DataItem value = Memory[address];
-        Push(value);
-        Step();
-    }
+        DataItem value = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, value);
 
-    void HEAP_SET()
-    {
-        int address = FetchAddress();
-        DataItem value = Pop();
-        Memory[address] = value;
         Step();
     }
 
@@ -522,17 +548,16 @@ public class BytecodeProcessor
 
     #region Flow Control
 
-    /// <exception cref="UserException"/>
     void THROW()
     {
-        int pointer = (int)Pop();
+        int pointer = GetData(CurrentInstruction.Operand1).Int;
         string? value = HeapUtils.GetString(Memory, pointer);
         throw new UserException(value ?? "null");
     }
 
     void CALL()
     {
-        int relativeAddress = (int)FetchData();
+        int relativeAddress = GetData(CurrentInstruction.Operand1).Int;
 
         Push(new DataItem(Registers.CodePointer));
 
@@ -543,26 +568,14 @@ public class BytecodeProcessor
     {
         DataItem codePointer = Pop();
 
-        Registers.CodePointer = (int)codePointer;
+        Registers.CodePointer = codePointer.Int;
     }
 
     void JUMP_BY()
     {
-        int relativeAddress = (int)FetchData();
+        int relativeAddress = GetData(CurrentInstruction.Operand1).Int;
 
         Step(relativeAddress);
-    }
-
-    void JUMP_BY_IF_FALSE()
-    {
-        int relativeAddress = (int)FetchData();
-
-        DataItem condition = Pop();
-
-        if (condition)
-        { Step(); }
-        else
-        { Step(relativeAddress); }
     }
 
     void EXIT()
@@ -570,152 +583,159 @@ public class BytecodeProcessor
         Registers.CodePointer = Code.Length;
     }
 
+    void JumpIfEqual()
+    {
+        if (Registers.Flags.Get(Flags.Zero))
+        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfNotEqual()
+    {
+        if (!Registers.Flags.Get(Flags.Zero))
+        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfGreater()
+    {
+        if ((!(Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow))) && !Registers.Flags.Get(Flags.Zero))
+        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfGreaterOrEqual()
+    {
+        if (!(Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow)))
+        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfLess()
+    {
+        if (Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow))
+        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfLessOrEqual()
+    {
+        if ((Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow)) || Registers.Flags.Get(Flags.Zero))
+        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        else
+        { Step(); }
+    }
+
+    #endregion
+
+    #region Comparison Operations
+
+    void Compare()
+    {
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+
+        ALU.Subtract(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        Step();
+    }
+
     #endregion
 
     #region Logic Operations
 
-    void BITSHIFT_LEFT()
+    void LogicAND()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, (bool)dst && (bool)src);
 
-        Push(leftSide << rightSide);
+        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
 
         Step();
     }
 
-    void BITSHIFT_RIGHT()
+    void LogicOR()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, (bool)dst || (bool)src);
 
-        Push(leftSide >> rightSide);
+        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
 
         Step();
     }
 
-    void LOGIC_LT()
+    void BitsShiftLeft()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
-
-        Push(new DataItem(leftSide < rightSide));
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Int << src.Int);
 
         Step();
     }
 
-    void LOGIC_NOT()
+    void BitsShiftRight()
     {
-        DataItem v = Pop();
-        Push(!v);
-        Step();
-    }
-
-    void LOGIC_MT()
-    {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
-
-        Push(new DataItem(leftSide > rightSide));
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Int >> src.Int);
 
         Step();
     }
 
-    void LOGIC_AND()
+    void BitsOR()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Int | src.Int);
 
-        Push(new DataItem((bool)leftSide && (bool)rightSide));
+        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
 
         Step();
     }
 
-    void LOGIC_OR()
+    void BitsXOR()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Int ^ src.Int);
 
-        Push(new DataItem((bool)leftSide || (bool)rightSide));
+        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
 
         Step();
     }
 
-    void LOGIC_EQ()
+    void BitsNOT()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
-
-        Push(new DataItem(leftSide == rightSide));
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        SetData(CurrentInstruction.Operand1, ~dst.Int);
 
         Step();
     }
 
-    void LOGIC_NEQ()
+    void BitsAND()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Int & src.Int);
 
-        Push(new DataItem(leftSide != rightSide));
-
-        Step();
-    }
-
-    void BITS_OR()
-    {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
-
-        Push(leftSide | rightSide);
-
-        Step();
-    }
-
-    void BITS_XOR()
-    {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
-
-        Push(leftSide ^ rightSide);
-
-        Step();
-    }
-
-    void BITS_NOT()
-    {
-        DataItem rightSide = Pop();
-
-        Push(~rightSide);
-
-        Step();
-    }
-
-    void LOGIC_LTEQ()
-    {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
-
-        Push(new DataItem(leftSide <= rightSide));
-
-        Step();
-    }
-
-    void LOGIC_MTEQ()
-    {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
-
-        Push(new DataItem(leftSide >= rightSide));
-
-        Step();
-    }
-
-    void BITS_AND()
-    {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
-
-        Push(leftSide & rightSide);
+        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
 
         Step();
     }
@@ -724,52 +744,128 @@ public class BytecodeProcessor
 
     #region Math Operations
 
-    void MATH_ADD()
+    void MathAdd()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
 
-        Push(leftSide + rightSide);
+        dst = ALU.Add(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        SetData(CurrentInstruction.Operand1, dst);
 
         Step();
     }
 
-    void MATH_DIV()
+    void MathDiv()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
 
-        Push(leftSide / rightSide);
+        dst = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new DataItem((byte)(dst.Byte / src.Byte)),
+            BitWidth._16 => new DataItem((char)(dst.Char / src.Char)),
+            BitWidth._32 => new DataItem((int)(dst.Int / src.Int)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, dst);
 
         Step();
     }
 
-    void MATH_SUB()
+    void MathSub()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
 
-        Push(leftSide - rightSide);
+        dst = ALU.Subtract(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        SetData(CurrentInstruction.Operand1, dst);
 
         Step();
     }
 
-    void MATH_MULT()
+    void MathMult()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
 
-        Push(leftSide * rightSide);
+        dst = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new DataItem((byte)(dst.Byte * src.Byte)),
+            BitWidth._16 => new DataItem((char)(dst.Char * src.Char)),
+            BitWidth._32 => new DataItem((int)(dst.Int * src.Int)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, dst);
+
+        Registers.Flags.SetCarry(dst.Int, CurrentInstruction.BitWidth);
 
         Step();
     }
 
-    void MATH_MOD()
+    void MathMod()
     {
-        DataItem rightSide = Pop();
-        DataItem leftSide = Pop();
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
 
-        Push(leftSide % rightSide);
+        dst = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new DataItem((byte)(dst.Byte / src.Byte)),
+            BitWidth._16 => new DataItem((char)(dst.Char / src.Char)),
+            BitWidth._32 => new DataItem((int)(dst.Int / src.Int)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, dst);
+
+        Step();
+    }
+
+    #endregion
+
+    #region Float Math Operations
+
+    void FMathAdd()
+    {
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Single + src.Single);
+
+        Step();
+    }
+
+    void FMathDiv()
+    {
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Single / src.Single);
+
+        Step();
+    }
+
+    void FMathSub()
+    {
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Single - src.Single);
+
+        Step();
+    }
+
+    void FMathMult()
+    {
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Single * src.Single);
+
+        Step();
+    }
+
+    void FMathMod()
+    {
+        DataItem dst = GetData(CurrentInstruction.Operand1);
+        DataItem src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.Single % src.Single);
 
         Step();
     }
@@ -780,33 +876,17 @@ public class BytecodeProcessor
 
     void PUSH_VALUE()
     {
-        DataItem value = CurrentInstruction.Parameter;
-        Push(value);
+        DataItem v = GetData(CurrentInstruction.Operand1);
+        Push(v);
 
         Step();
     }
 
     void POP_VALUE()
     {
-        Pop();
-
-        Step();
-    }
-
-    void STORE_VALUE()
-    {
-        int address = FetchAddress();
-        DataItem value = Pop();
-        Memory[address] = value;
-
-        Step();
-    }
-
-    void LOAD_VALUE()
-    {
-        int address = FetchAddress();
-        DataItem value = Memory[address];
-        Push(value);
+        DataItem v = Pop();
+        if (!CurrentInstruction.Operand1.Value.IsNull)
+        { SetData(CurrentInstruction.Operand1, v); }
 
         Step();
     }
@@ -815,80 +895,76 @@ public class BytecodeProcessor
 
     #region Utility Operations
 
-    void GET_BASEPOINTER()
+    void FTo()
     {
-        Push(new DataItem(Registers.BasePointer));
+        DataItem data = GetData(CurrentInstruction.Operand2);
+        switch (data.Type)
+        {
+            case RuntimeType.Null:
+                SetData(CurrentInstruction.Operand1, DataItem.Null);
+                break;
+            case RuntimeType.Single:
+                SetData(CurrentInstruction.Operand1, data);
+                break;
+            default:
+                SetData(CurrentInstruction.Operand1, (float)data);
+                break;
+        }
 
         Step();
     }
 
-    void SET_BASEPOINTER()
+    void FFrom()
     {
-        Registers.BasePointer = CurrentInstruction.AddressingMode switch
+        DataItem data = GetData(CurrentInstruction.Operand2);
+        switch (data.Type)
         {
-            AddressingMode.Runtime => (int)Pop(),
-            AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-            AddressingMode.StackPointerRelative => Registers.StackPointer + (int)CurrentInstruction.Parameter,
-            _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SetBasePointer}"),
-        };
+            case RuntimeType.Null:
+            case RuntimeType.Byte:
+            case RuntimeType.Char:
+            case RuntimeType.Integer:
+                SetData(CurrentInstruction.Operand1, data);
+                break;
+            case RuntimeType.Single:
+                SetData(CurrentInstruction.Operand1, (int)data.Single);
+                break;
+        }
 
         Step();
-    }
-
-    void SET_CODEPOINTER()
-    {
-        Registers.CodePointer = CurrentInstruction.AddressingMode switch
-        {
-            AddressingMode.Runtime => (int)Pop(),
-            AddressingMode.Absolute => (int)CurrentInstruction.Parameter,
-            _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SetCodePointer}"),
-        };
     }
 
     #endregion
 
     #region External Calls
 
-    void OnExternalReturnValue(DataItem returnValue)
-    {
-        Push(returnValue);
-    }
-
-    /// <exception cref="InternalException"/>
-    /// <exception cref="RuntimeException"/>
     void CALL_EXTERNAL()
     {
-        DataItem functionId_ = Pop();
-        if (functionId_.Type != RuntimeType.Integer)
-        { throw new RuntimeException($"Invalid operand {functionId_} for instruction {nameof(Opcode.CallExternal)}"); }
-
-        int functionId = functionId_.UnsafeInt;
+        int functionId = GetData(CurrentInstruction.Operand1).Int;
 
         if (!ExternalFunctions.TryGetValue(functionId, out ExternalFunctionBase? function))
         { throw new RuntimeException($"Undefined external function {functionId}"); }
 
-        int parameterCount = (int)CurrentInstruction.Parameter;
-
-        List<DataItem> parameters = new();
-        for (int i = 0; i < (int)CurrentInstruction.Parameter; i++)
-        { parameters.Add(Memory[Registers.StackPointer - ((1 + i) * StackDirection)]); }
-        parameters.Reverse();
+        DataItem[] parameters = new DataItem[function.Parameters.Length];
+        for (int i = 0; i < function.Parameters.Length; i++)
+        {
+            parameters[parameters.Length - 1 - i] = Memory[Registers.StackPointer - ((1 + i) * StackDirection)];
+        }
 
         if (function is ExternalFunctionManaged managedFunction)
         {
-            managedFunction.OnReturn = OnExternalReturnValue;
-            managedFunction.Callback(parameters.ToArray());
+            managedFunction.OnReturn = Push;
+            managedFunction.Callback(ImmutableArray.Create(parameters));
         }
         else if (function is ExternalFunctionSimple simpleFunction)
         {
             if (function.ReturnSomething)
             {
-                DataItem returnValue = simpleFunction.Call(this, parameters.ToArray());
+                DataItem returnValue = simpleFunction.Call(this, ImmutableArray.Create(parameters));
                 Push(returnValue);
             }
             else
             {
-                simpleFunction.Call(this, parameters.ToArray());
+                simpleFunction.Call(this, ImmutableArray.Create(parameters));
             }
         }
 
@@ -897,26 +973,371 @@ public class BytecodeProcessor
 
     #endregion
 
-    void GET_REGISTER()
-    {
-        int? register = CurrentInstruction.Parameter.Int;
-        switch (register)
-        {
-            case 1: Push(Registers.CodePointer); break;
-            case 2: Push(Registers.StackPointer); break;
-            case 3: Push(Registers.BasePointer); break;
-            default: throw new RuntimeException($"Invalid register {register}");
-        }
-
-        Step();
-    }
-
     #endregion
 }
 
+[Flags]
+public enum Flags
+{
+    _ = 0b_0000000000000000,
+    Carry = 0b_0000000000000001,
+    // Parity = 0b_0000000000000100,
+    // AuxiliaryCarry = 0b_0000000000010000,
+    Zero = 0b_0000000001000000,
+    Sign = 0b_0000000010000000,
+
+    // Trap = 0b_0000000100000000,
+    // InterruptEnable = 0b_0000001000000000,
+    // Direction = 0b_0000010000000000,
+    Overflow = 0b_0000100000000000,
+}
+
+[StructLayout(LayoutKind.Explicit)]
 public struct Registers
 {
-    public int CodePointer;
-    public int BasePointer;
-    public int StackPointer;
+    [FieldOffset(0)] public int CodePointer;
+    [FieldOffset(4)] public int StackPointer;
+    [FieldOffset(8)] public int BasePointer;
+
+    [FieldOffset(12)] public int EAX;
+    [FieldOffset(14)] public ushort AX;
+    [FieldOffset(14)] public byte AH;
+    [FieldOffset(15)] public byte AL;
+
+    [FieldOffset(16)] public int EBX;
+    [FieldOffset(18)] public ushort BX;
+    [FieldOffset(18)] public byte BH;
+    [FieldOffset(19)] public byte BL;
+
+    [FieldOffset(20)] public int ECX;
+    [FieldOffset(22)] public ushort CX;
+    [FieldOffset(22)] public byte CH;
+    [FieldOffset(23)] public byte CL;
+
+    [FieldOffset(24)] public int EDX;
+    [FieldOffset(26)] public ushort DX;
+    [FieldOffset(26)] public byte DH;
+    [FieldOffset(27)] public byte DL;
+
+    [FieldOffset(28)] public Flags Flags;
+}
+
+public static class ALU
+{
+    public static DataItem Add(DataItem a, DataItem b, BitWidth bitWidth, ref Flags flags)
+    {
+        long _a = bitWidth switch
+        {
+            BitWidth._8 => a.Byte,
+            BitWidth._16 => a.Char,
+            BitWidth._32 => a.Int,
+            _ => throw new UnreachableException(),
+        };
+        long _b = bitWidth switch
+        {
+            BitWidth._8 => b.Byte,
+            BitWidth._16 => b.Char,
+            BitWidth._32 => b.Int,
+            _ => throw new UnreachableException(),
+        };
+        long result = _a + _b;
+
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Sign, unchecked((long)result & (long)0x80) != (long)0);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Sign, unchecked((long)result & (long)0x8000) != (long)0);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Sign, unchecked((long)result & (long)0x80000000) != (long)0);
+                break;
+        }
+
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Zero, (result & (long)0xFF) == (long)0);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Zero, (result & (long)0xFFFF) == (long)0);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Zero, (result & (long)0xFFFFFFFF) == (long)0);
+                break;
+        }
+
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Carry, result > (long)0xFF);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Carry, result > (long)0xFFFF);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Carry, result > (long)0xFFFFFFFF);
+                break;
+        }
+
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x80) == (long)0x80);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x8000) == (long)0x8000);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x80000000) == (long)0x80000000);
+                break;
+        }
+
+        return bitWidth switch
+        {
+            BitWidth._8 => new DataItem(unchecked((byte)result)),
+            BitWidth._16 => new DataItem(unchecked((char)result)),
+            BitWidth._32 => new DataItem(unchecked((int)result)),
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    public static DataItem Subtract(DataItem a, DataItem b, BitWidth bitWidth, ref Flags flags)
+    {
+        long _a = bitWidth switch
+        {
+            BitWidth._8 => a.Byte,
+            BitWidth._16 => a.Char,
+            BitWidth._32 => a.Int,
+            _ => throw new UnreachableException(),
+        };
+        long _b = bitWidth switch
+        {
+            BitWidth._8 => b.Byte,
+            BitWidth._16 => b.Char,
+            BitWidth._32 => b.Int,
+            _ => throw new UnreachableException(),
+        };
+        long result = _a - _b;
+
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Sign, unchecked((long)result & (long)0x80) != (long)0);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Sign, unchecked((long)result & (long)0x8000) != (long)0);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Sign, unchecked((long)result & (long)0x80000000) != (long)0);
+                break;
+        }
+
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Zero, (result & (long)0xFF) == (long)0);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Zero, (result & (long)0xFFFF) == (long)0);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Zero, (result & (long)0xFFFFFFFF) == (long)0);
+                break;
+        }
+
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Carry, result > (long)0xFF);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Carry, result > (long)0xFFFF);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Carry, result > (long)0xFFFFFFFF);
+                break;
+        }
+
+        // switch (bitWidth)
+        // {
+        //     case BitWidth._8:
+        //         flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x80) == (long)0x80);
+        //         break;
+        //     case BitWidth._16:
+        //         flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x8000) == (long)0x8000);
+        //         break;
+        //     case BitWidth._32:
+        //         flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x80000000) == (long)0x80000000);
+        //         break;
+        // }
+
+        return bitWidth switch
+        {
+            BitWidth._8 => new DataItem(unchecked((byte)result)),
+            BitWidth._16 => new DataItem(unchecked((char)result)),
+            BitWidth._32 => new DataItem(unchecked((int)result)),
+            _ => throw new UnreachableException(),
+        };
+    }
+}
+
+public static class FlagExtensions
+{
+    public static void Set(ref this Flags flags, Flags flag, bool value)
+    {
+        if (value) flags |= flag;
+        else flags &= ~flag;
+    }
+
+    public static bool Get(ref this Flags flags, Flags flag) => (flags & flag) != 0;
+
+    public static void SetSign(ref this Flags flags, int v, BitWidth bitWidth)
+    {
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Sign, unchecked((uint)v & (uint)0x80) != 0);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Sign, unchecked((uint)v & (uint)0x8000) != 0);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Sign, v < 0);
+                // flags.Set(Flags.Sign, unchecked((uint)v & (uint)0x80000000) != 0);
+                break;
+        }
+    }
+
+    public static void SetZero(ref this Flags flags, int v, BitWidth bitWidth)
+    {
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Zero, (v & 0xFF) == 0);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Zero, (v & 0xFFFF) == 0);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Zero, (v & 0xFFFFFFFF) == 0);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// https://github.com/amensch/e8086/blob/master/e8086/i8086/ConditionalRegister.cs
+    /// </summary>
+    public static void SetCarry(ref this Flags flags, long result, BitWidth bitWidth)
+    {
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Carry, result > 0xFF);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Carry, result > 0xFFFF);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Carry, result > 0xFFFFFFFF);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// https://github.com/amensch/e8086/blob/master/e8086/i8086/ConditionalRegister.cs
+    /// </summary>
+    public static void SetOverflowAfterAdd(ref this Flags flags, int source, int destination, BitWidth bitWidth)
+    {
+        long result = source + destination;
+
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Overflow, ((result ^ source) & (result ^ destination) & 0x80) == 0x80);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Overflow, ((result ^ source) & (result ^ destination) & 0x8000) == 0x8000);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Overflow, ((result ^ source) & (result ^ destination) & 0x80000000) == 0x80000000);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// https://github.com/amensch/e8086/blob/master/e8086/i8086/ConditionalRegister.cs
+    /// </summary>
+    public static void SetOverflowAfterSub(ref this Flags flags, int source, int destination, BitWidth bitWidth)
+    {
+        long result = destination - source;
+
+        switch (bitWidth)
+        {
+            case BitWidth._8:
+                flags.Set(Flags.Overflow, ((result ^ destination) & (source ^ destination) & 0x80) == 0x80);
+                break;
+            case BitWidth._16:
+                flags.Set(Flags.Overflow, ((result ^ destination) & (source ^ destination) & 0x8000) == 0x8000);
+                break;
+            case BitWidth._32:
+                flags.Set(Flags.Overflow, ((result ^ destination) & (source ^ destination) & 0x80000000) == 0x80000000);
+                break;
+        }
+    }
+}
+
+public enum Register
+{
+    CodePointer = 0b_00_00_001,
+    StackPointer = 0b_00_00_010,
+    BasePointer = 0b_00_00_011,
+
+    EAX = 0b_00_00_100,
+    AX = 0b_00_01_100,
+    AH = 0b_00_10_100,
+    AL = 0b_00_11_100,
+
+    EBX = 0b_01_00_100,
+    BX = 0b_01_01_100,
+    BH = 0b_01_10_100,
+    BL = 0b_01_11_100,
+
+    ECX = 0b_10_00_100,
+    CX = 0b_10_01_100,
+    CH = 0b_10_10_100,
+    CL = 0b_10_11_100,
+
+    EDX = 0b_11_00_100,
+    DX = 0b_11_01_100,
+    DH = 0b_11_10_100,
+    DL = 0b_11_11_100,
+}
+
+public static class RegisterIds
+{
+    public const int CodePointer = 0b_00_00_001;
+    public const int StackPointer = 0b_00_00_010;
+    public const int BasePointer = 0b_00_00_011;
+
+    public const int EAX = 0b_00_00_100;
+    public const int AX = 0b_00_01_100;
+    public const int AH = 0b_00_10_100;
+    public const int AL = 0b_00_11_100;
+
+    public const int EBX = 0b_01_00_100;
+    public const int BX = 0b_01_01_100;
+    public const int BH = 0b_01_10_100;
+    public const int BL = 0b_01_11_100;
+
+    public const int ECX = 0b_10_00_100;
+    public const int CX = 0b_10_01_100;
+    public const int CH = 0b_10_10_100;
+    public const int CL = 0b_10_11_100;
+
+    public const int EDX = 0b_11_00_100;
+    public const int DX = 0b_11_01_100;
+    public const int DH = 0b_11_10_100;
+    public const int DL = 0b_11_11_100;
 }

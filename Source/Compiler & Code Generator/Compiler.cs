@@ -20,7 +20,6 @@ public readonly struct CompilerResult
 
     public readonly ImmutableArray<CompiledStruct> Structs;
     public readonly ImmutableArray<CompileTag> Hashes;
-    public readonly ImmutableArray<CompiledEnum> Enums;
 
     public readonly ImmutableArray<(ImmutableArray<Statement> Statements, Uri File)> TopLevelStatements;
 
@@ -71,16 +70,6 @@ public readonly struct CompilerResult
                     yield return file;
                 }
             }
-
-            foreach (CompiledEnum @enum in Enums)
-            {
-                Uri? file = @enum.File;
-                if (file is not null && !alreadyExists.Contains(file))
-                {
-                    alreadyExists.Add(file);
-                    yield return file;
-                }
-            }
         }
     }
 
@@ -120,7 +109,6 @@ public readonly struct CompilerResult
         Enumerable.Empty<KeyValuePair<int, ExternalFunctionBase>>(),
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<CompileTag>(),
-        Enumerable.Empty<CompiledEnum>(),
         Enumerable.Empty<(ImmutableArray<Statement>, Uri)>(),
         file);
 
@@ -133,7 +121,6 @@ public readonly struct CompilerResult
         IEnumerable<KeyValuePair<int, ExternalFunctionBase>> externalFunctions,
         IEnumerable<CompiledStruct> structs,
         IEnumerable<CompileTag> hashes,
-        IEnumerable<CompiledEnum> enums,
         IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
         Uri file)
     {
@@ -145,7 +132,6 @@ public readonly struct CompilerResult
         ExternalFunctions = externalFunctions.ToDictionary();
         Structs = structs.ToImmutableArray();
         Hashes = hashes.ToImmutableArray();
-        Enums = enums.ToImmutableArray();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
         File = file;
     }
@@ -181,9 +167,6 @@ public readonly struct CompilerResult
 
     public bool GetStructAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledStruct? result)
         => GetThingAt<CompiledStruct, Token>(Structs, file, position, out result);
-
-    public bool GetEnumAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledEnum? result)
-        => GetThingAt<CompiledEnum, Token>(Enums, file, position, out result);
 
     public bool GetFieldAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledField? result)
     {
@@ -235,12 +218,10 @@ public sealed class Compiler
     readonly List<CompiledConstructor> CompiledConstructors = new();
     readonly List<CompiledFunction> CompiledFunctions = new();
     readonly List<CompiledGeneralFunction> CompiledGeneralFunctions = new();
-    readonly List<CompiledEnum> CompiledEnums = new();
 
     readonly List<FunctionDefinition> Operators = new();
     readonly List<FunctionDefinition> Functions = new();
     readonly List<StructDefinition> Structs = new();
-    readonly List<EnumDefinition> Enums = new();
 
     readonly List<(ImmutableArray<Statement> Statements, Uri File)> TopLevelStatements = new();
 
@@ -271,12 +252,6 @@ public sealed class Compiler
         if (CodeGenerator.GetStruct(CompiledStructs, name.Content, relevantFile, out CompiledStruct? @struct, out _))
         {
             result = new StructType(@struct, relevantFile);
-            return true;
-        }
-
-        if (CodeGenerator.GetEnum(CompiledEnums, name.Content, out CompiledEnum? @enum))
-        {
-            result = new EnumType(@enum, relevantFile);
             return true;
         }
 
@@ -511,24 +486,6 @@ public sealed class Compiler
         return result;
     }
 
-    static CompiledEnumMember CompileEnumMember(EnumMemberDefinition member)
-    {
-        CompiledEnumMember compiledMember = new(member);
-
-        if (!CodeGenerator.TryComputeSimple(member.Value, out DataItem computedValue))
-        { throw new CompilerException($"I can't compute this. The developer should make a better preprocessor for this case I think...", member.Value, member.Context.File); }
-
-        compiledMember.ComputedValue = computedValue;
-
-        return compiledMember;
-    }
-
-    static IEnumerable<CompiledEnumMember> CompileEnumMembers(IEnumerable<EnumMemberDefinition> members)
-        => members.Select(CompileEnumMember);
-
-    static CompiledEnum CompileEnum(EnumDefinition @enum)
-        => new(CompileEnumMembers(@enum.Members), @enum);
-
     void AddAST(CollectedAST collectedAST, bool addTopLevelStatements = true)
     {
         if (addTopLevelStatements)
@@ -537,7 +494,6 @@ public sealed class Compiler
         Functions.AddRange(collectedAST.ParserResult.Functions);
         Operators.AddRange(collectedAST.ParserResult.Operators);
         Structs.AddRange(collectedAST.ParserResult.Structs);
-        Enums.AddRange(collectedAST.ParserResult.Enums);
         Tags.AddRange(collectedAST.ParserResult.Hashes);
     }
 
@@ -565,7 +521,6 @@ public sealed class Compiler
             ExternalFunctions,
             CompiledStructs,
             Tags,
-            CompiledEnums,
             TopLevelStatements,
             file);
     }
@@ -590,7 +545,6 @@ public sealed class Compiler
             ExternalFunctions,
             CompiledStructs,
             Tags,
-            CompiledEnums,
             TopLevelStatements,
             file);
     }
@@ -634,17 +588,17 @@ public sealed class Compiler
                 BasicType returnType = parameterTypes[0];
                 List<BasicType> x = parameterTypes.ToList();
                 x.RemoveAt(0);
-                RuntimeType[] pTypes = x.ToArray().Select(v => v.Convert()).ToArray();
+                ImmutableArray<RuntimeType> pTypes = x.Select(v => v.Convert()).ToImmutableArray();
 
                 if (returnType == BasicType.Void)
                 {
-                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, ImmutableArray<DataItem> p) =>
                         Output.LogDebug($"{name}({string.Join(", ", p)})")
                     );
                 }
                 else
                 {
-                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, ImmutableArray<DataItem> p) =>
                     {
                         Output.LogDebug($"{name}({string.Join(", ", p)})");
                         return returnType switch
@@ -689,9 +643,6 @@ public sealed class Compiler
         bool IsThingExists<TThing>(TThing thing)
             where TThing : IIdentifiable<Token>, IInFile
         {
-            if (CompiledEnums.Any(other => ThingEquality(other, thing)))
-            { return true; }
-
             if (CompiledStructs.Any(other => ThingEquality(other, thing)))
             { return true; }
 
@@ -704,14 +655,6 @@ public sealed class Compiler
         foreach (CompileTag tag in Tags)
         {
             CompileTag(tag);
-        }
-
-        foreach (EnumDefinition @enum in Enums)
-        {
-            if (IsThingExists(@enum))
-            { throw new CompilerException("Symbol already exists", @enum.Identifier, @enum.File); }
-
-            CompiledEnums.Add(CompileEnum(@enum));
         }
 
         foreach (StructDefinition @struct in Structs)

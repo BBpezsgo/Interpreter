@@ -130,45 +130,36 @@ public partial class InterpreterElement
             b.AddText(instruction.Opcode.ToString());
             b.AddText(' ');
 
-            if (instruction.Opcode == Opcode.StackLoad ||
-                instruction.Opcode == Opcode.StackStore ||
-                instruction.Opcode == Opcode.HeapGet ||
-                instruction.Opcode == Opcode.HeapSet)
+            if (!instruction.Operand1.Value.IsNull)
             {
-                b.AddText(instruction.AddressingMode.ToString());
-                b.AddText(' ');
-            }
-
-            if (!instruction.Parameter.IsNull)
-            {
-                switch (instruction.Parameter.Type)
+                switch (instruction.Operand1.Value.Type)
                 {
                     case RuntimeType.Byte:
                         b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Parameter.UnsafeByte.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Operand1.Value.Byte.ToString(CultureInfo.InvariantCulture));
                         b.AddText(' ');
                         break;
                     case RuntimeType.Integer:
                         b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Parameter.UnsafeInt.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Operand1.Value.Int.ToString(CultureInfo.InvariantCulture));
                         b.AddText(' ');
                         break;
                     case RuntimeType.Single:
                         b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Parameter.UnsafeFloat.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Operand1.Value.Single.ToString(CultureInfo.InvariantCulture));
                         b.AddText('f');
                         b.AddText(' ');
                         break;
                     case RuntimeType.Char:
                         b.ForegroundColor = CharColor.BrightYellow;
                         b.AddText('\'');
-                        b.AddText(instruction.Parameter.UnsafeChar.Escape());
+                        b.AddText(instruction.Operand1.Value.Char.Escape());
                         b.AddText('\'');
                         b.AddText(' ');
                         break;
                     default:
                         b.ForegroundColor = CharColor.White;
-                        b.AddText(instruction.Parameter.ToString(CultureInfo.InvariantCulture));
+                        b.AddText(instruction.Operand1.Value.ToString(CultureInfo.InvariantCulture));
                         b.AddText(' ');
                         break;
                 }

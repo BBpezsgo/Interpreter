@@ -154,7 +154,7 @@ public static class Minifier
                     }
                     else
                     {
-                        result = result[..(newLength)];
+                        result = result[..newLength];
                     }
 
                     correction_.CopyTo(result[i..]);

@@ -8,7 +8,7 @@
 ## [Language Server](https://github.com/BBpezsgo/BBCode-LanguageServer)
 
 ## About
-It's my own programming language with three different output formats: bytecodes (executed by a custom interpreter), x86-64 assembly (that can be assembled by [nasm](https://www.nasm.us/) (WIP)), and [brainfuck](https://esolangs.org/wiki/brainfuck) (with limitations).
+It's my own programming language that can generate bytecodes (executed by a custom interpreter) and [brainfuck](https://esolangs.org/wiki/brainfuck) (with limitations).
 
 I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tutorial series](https://www.youtube.com/watch?v=2DTNDrdqGlo&list=PLZjGMBjt_VVAMW53XnMtNfAQowZwMviBF) showing how to make a parser and a compiler. I basically copied the code with minimal changes. When the series ended, I was left on my own, so I improved the code myself.
 
@@ -28,18 +28,11 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 ### Options:
 
-**Modes:**
-> Use only one of these!
+**Brainfuck:**
 
-- `--brainfuck|-bf` Compiles and executes the code with a brainfuck interpreter.
+- - `--brainfuck|-bf` Compiles and executes the code with a brainfuck interpreter.
 > [!WARNING]
 > Expect buggy behavior and missing features!
-
-- `--asm` Generates an assembly file, assemble it with nasm and execute the result exe file.
-> [!WARNING]
-> Expect buggy behavior and missing features!
-
-- The default mode is custom bytecodes that the interpreter can execute (this will automatically execute after the compiling).
 
 **Logging:**
 - `--hide-debug|-hd` Hides debug logs

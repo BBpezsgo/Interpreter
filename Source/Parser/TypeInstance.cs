@@ -52,9 +52,6 @@ public abstract class TypeInstance : IEquatable<TypeInstance>, IPositioned
                 return true;
             case FunctionType functionType:
                 return TryGetAnalyzedType(functionType.ReturnType, out analyzedType);
-            case EnumType:
-                analyzedType = TokenAnalyzedType.Enum;
-                return true;
             default:
                 return false;
         }
@@ -79,9 +76,9 @@ public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStack
     public bool Equals(TypeInstanceStackArray? other)
     {
         if (other is null) return false;
-        if (!this.StackArrayOf.Equals(other.StackArrayOf)) return false;
+        if (!StackArrayOf.Equals(other.StackArrayOf)) return false;
 
-        if (this.StackArraySize is null != other.StackArraySize is null) return false;
+        if ((StackArraySize is null) != (other.StackArraySize is null)) return false;
 
         return true;
     }

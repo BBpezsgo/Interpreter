@@ -26,23 +26,16 @@ public partial class InterpreterElement
         {
             Instruction instruction = _instruction.Value;
 
-            if (instruction.Opcode == Opcode.HeapSet)
+            switch (instruction.Opcode)
             {
-                if (instruction.AddressingMode == AddressingMode.Runtime)
-                { storeIndicators.Add(Interpreter.BytecodeInterpreter.Memory[Interpreter.BytecodeInterpreter.Registers.StackPointer - BytecodeProcessor.StackDirection].Int!.Value); }
-                else
-                { storeIndicators.Add((int)instruction.Parameter); }
-            }
-
-            if (instruction.Opcode == Opcode.HeapGet)
-            {
-                if (instruction.AddressingMode == AddressingMode.Runtime)
+                case Opcode.Move:
                 {
-                    if (this.Interpreter.BytecodeInterpreter.Memory[Interpreter.BytecodeInterpreter.Registers.StackPointer - BytecodeProcessor.StackDirection].Type == RuntimeType.Integer)
-                    { loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory[Interpreter.BytecodeInterpreter.Registers.StackPointer - BytecodeProcessor.StackDirection].Int!.Value); }
+                    if (Interpreter.BytecodeInterpreter.GetPointer(instruction.Operand1, out int dstPtr))
+                    { storeIndicators.Add(dstPtr); }
+                    if (Interpreter.BytecodeInterpreter.GetPointer(instruction.Operand2, out int srcPtr))
+                    { loadIndicators.Add(srcPtr); }
+                    break;
                 }
-                else
-                { loadIndicators.Add((int)instruction.Parameter); }
             }
         }
 
@@ -125,21 +118,21 @@ public partial class InterpreterElement
                     {
                         case RuntimeType.Byte:
                             b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(item.UnsafeByte.ToString(CultureInfo.InvariantCulture));
+                            b.AddText(item.Byte.ToString(CultureInfo.InvariantCulture));
                             break;
                         case RuntimeType.Integer:
                             b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(item.UnsafeInt.ToString(CultureInfo.InvariantCulture));
+                            b.AddText(item.Int.ToString(CultureInfo.InvariantCulture));
                             break;
                         case RuntimeType.Single:
                             b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(item.UnsafeFloat.ToString(CultureInfo.InvariantCulture));
+                            b.AddText(item.Single.ToString(CultureInfo.InvariantCulture));
                             b.AddText('f');
                             break;
                         case RuntimeType.Char:
                             b.ForegroundColor = CharColor.BrightYellow;
                             b.AddText('\'');
-                            b.AddText(item.UnsafeChar.Escape());
+                            b.AddText(item.Char.Escape());
                             b.AddText('\'');
                             break;
                         default:

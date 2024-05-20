@@ -6,7 +6,7 @@ using LanguageCore;
 public class PositionTests
 {
     [TestMethod]
-    public void Test1()
+    public void Test01()
     {
         Position v = new(new Range<SinglePosition>((0, 0), (0, 2)), new Range<int>(0, 2));
         (Position a, Position b) = v.Slice(1);
@@ -16,7 +16,7 @@ public class PositionTests
     }
 
     [TestMethod]
-    public void Test2()
+    public void Test02()
     {
         Position v = new(new Range<SinglePosition>((0, 0), (0, 3)), new Range<int>(0, 3));
         (Position a, Position b) = v.Slice(1);
@@ -26,7 +26,7 @@ public class PositionTests
     }
 
     [TestMethod]
-    public void Test3()
+    public void Test03()
     {
         Position v = new(new Range<SinglePosition>((0, 0), (0, 3)), new Range<int>(0, 3));
         (Position a, Position b) = v.Slice(2);
@@ -36,7 +36,7 @@ public class PositionTests
     }
 
     [TestMethod]
-    public void Test4()
+    public void Test04()
     {
         Position v = new(new Range<SinglePosition>((0, 1), (0, 4)), new Range<int>(1, 4));
         (Position a, Position b) = v.Slice(2);
@@ -46,7 +46,7 @@ public class PositionTests
     }
 
     [TestMethod]
-    public void Test5()
+    public void Test05()
     {
         Position v = new(new Range<SinglePosition>((0, 1), (0, 4)), new Range<int>(1, 4));
         (Position a, Position b) = v.Slice(0);
@@ -56,7 +56,7 @@ public class PositionTests
     }
 
     [TestMethod]
-    public void Test6()
+    public void Test06()
     {
         Position v = new(new Range<SinglePosition>((0, 1), (0, 4)), new Range<int>(1, 4));
         (Position a, Position b) = v.Slice(3);
@@ -67,7 +67,7 @@ public class PositionTests
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentOutOfRangeException))]
-    public void Test7()
+    public void Test07()
     {
         Position v = new(new Range<SinglePosition>((0, 1), (0, 4)), new Range<int>(1, 4));
         _ = v.Slice(4);
@@ -75,14 +75,14 @@ public class PositionTests
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentOutOfRangeException))]
-    public void Test8()
+    public void Test08()
     {
         Position v = new(new Range<SinglePosition>((0, 1), (0, 4)), new Range<int>(1, 4));
         _ = v.Slice(-1);
     }
 
     [TestMethod]
-    public void Test9()
+    public void Test09()
     {
         Position v = new(new Range<SinglePosition>((0, 0), (0, 0)), new Range<int>(0, 0));
         (Position a, Position b) = v.Slice(0);

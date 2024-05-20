@@ -3,118 +3,11 @@ using System.IO;
 
 namespace LanguageCore.Runtime;
 
-using BBLang.Generator;
-
 /// <summary>
 /// This compiles and runs the code
 /// </summary>
 public class Interpreter
 {
-    public enum InterpreterState
-    {
-        Initialized,
-        Destroyed,
-        Running,
-        CodeExecuted,
-    }
-
-    protected abstract class Stream
-    {
-        public int ID;
-        public int MemoryAddress;
-        public int BufferSize;
-
-        protected Stream(int id, int memoryAddress, int bufferSize)
-        {
-            ID = id;
-            MemoryAddress = memoryAddress;
-            BufferSize = bufferSize;
-        }
-
-        public abstract void Dispose();
-
-        public abstract void Tick(in ArraySegment<DataItem> memory);
-    }
-
-    protected class InputStream : Stream
-    {
-        public int Length;
-
-        public System.IO.Stream SystemStream;
-
-        public bool SystemHasData => SystemStream.Position >= SystemStream.Length;
-        public int RemainingBufferSize => BufferSize - Length;
-
-        public InputStream(int id, int memoryAddress, int bufferSize, System.IO.Stream stream)
-            : base(id, memoryAddress, bufferSize)
-        {
-            SystemStream = stream ?? throw new ArgumentNullException(nameof(stream));
-        }
-
-        public override void Dispose()
-        {
-            this.SystemStream?.Close();
-            this.SystemStream?.Dispose();
-
-            Debug.WriteLine($"[STREAM {ID}]: Disposed");
-        }
-
-        public void ClearBuffer()
-        {
-            this.Length = 0;
-
-            Debug.WriteLine($"[STREAM {ID}]: Buffer cleared");
-        }
-
-        public override void Tick(in ArraySegment<DataItem> memory)
-        {
-            if (RemainingBufferSize == 0) return;
-            if (SystemHasData) return;
-
-            byte[] buffer = new byte[RemainingBufferSize];
-            int readCount = SystemStream.Read(buffer, 0, RemainingBufferSize);
-
-            for (int i = 0; i < readCount; i++)
-            { memory[i + MemoryAddress] = new DataItem(buffer[i]); }
-            Length += readCount;
-
-            Debug.WriteLine($"[STREAM {ID}]: (AUTO) Read {readCount} bytes");
-        }
-    }
-
-    protected class OutputStream : Stream
-    {
-        public int Pointer;
-
-        public System.IO.Stream SystemStream;
-
-        public OutputStream(int id, int memoryAddress, int bufferSize, System.IO.Stream stream)
-            : base(id, memoryAddress, bufferSize)
-        {
-            SystemStream = stream ?? throw new ArgumentNullException(nameof(stream));
-        }
-
-        public override void Dispose()
-        {
-            this.SystemStream?.Close();
-            this.SystemStream?.Dispose();
-
-            Debug.WriteLine($"[STREAM {ID}]: Disposed");
-        }
-
-        public void Flush(byte[] buffer)
-        {
-            this.Pointer = 0;
-
-            this.SystemStream.Write(buffer, 0, buffer.Length);
-            this.SystemStream.Flush();
-
-            Debug.WriteLine($"[STREAM {ID}]: Write {buffer.Length} bytes");
-        }
-
-        public override void Tick(in ArraySegment<DataItem> memory) { }
-    }
-
     public delegate void OnOutputEventHandler(Interpreter sender, string message, LogType logType);
     public delegate void OnStdErrorEventHandler(Interpreter sender, char data);
     public delegate void OnStdOutEventHandler(Interpreter sender, char data);
@@ -145,24 +38,14 @@ public class Interpreter
     protected bool IsPaused;
     ExternalFunctionManaged? ReturnValueConsumer;
 
-    protected readonly List<Stream> Streams;
-
     readonly bool ThrowExceptions;
 
     public Interpreter(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation)
     {
-        Streams = new List<Stream>();
         ThrowExceptions = !handleErrors;
         DebugInformation = debugInformation;
 
         BytecodeInterpreter = new BytecodeProcessor(program, GenerateExternalFunctions().ToFrozenDictionary(), settings);
-    }
-
-    public void Dispose()
-    {
-        foreach (Stream stream in Streams)
-        { stream.Dispose(); }
-        Streams.Clear();
     }
 
     /// <summary>
@@ -189,7 +72,7 @@ public class Interpreter
 
         #region Console
 
-        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, Array.Empty<RuntimeType>(), (DataItem[] parameters, ExternalFunctionManaged function) =>
+        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, (ImmutableArray<DataItem> parameters, ExternalFunctionManaged function) =>
         {
             this.IsPaused = true;
             this.ReturnValueConsumer = function;
@@ -224,107 +107,6 @@ public class Interpreter
 
         #endregion
 
-        #region Streams
-
-        externalFunctions.AddExternalFunction("stream-create",
-            (int bufferSize, int bufferMemoryAddress) =>
-            {
-                int newID = 1;
-                while (true)
-                {
-                    bool idIsUnique = true;
-                    for (int i = 0; i < Streams.Count; i++)
-                    {
-                        if (Streams[i].ID == newID)
-                        {
-                            newID++;
-                            idIsUnique = false;
-                            break;
-                        }
-                    }
-                    if (idIsUnique) break;
-                }
-
-                Stream newStream = new InputStream(newID, bufferMemoryAddress, bufferSize, System.IO.File.Open(@"C:\Users\bazsi\Desktop\test.txt", FileMode.OpenOrCreate));
-
-                Streams.Add(newStream);
-
-                return newID;
-            });
-        externalFunctions.AddExternalFunction("stream-dispose",
-            (int id) =>
-            {
-                for (int i = Streams.Count - 1; i >= 0; i--)
-                {
-                    if (Streams[i].ID != id) continue;
-
-                    Stream stream = Streams[i];
-                    stream.Dispose();
-                    Streams.RemoveAt(i);
-
-                    return;
-                }
-
-                throw new RuntimeException($"Stream {id} not found");
-            });
-        externalFunctions.AddExternalFunction("stream-flush",
-            (int id, int count) =>
-            {
-                for (int i = 0; i < Streams.Count; i++)
-                {
-                    if (Streams[i].ID != id) continue;
-
-                    if (Streams[i] is not OutputStream stream)
-                    { throw new RuntimeException($"Stream {id} is not OutputStream"); }
-
-                    byte[] buffer = new byte[count];
-                    for (int j = 0; j < count; j++)
-                    {
-                        buffer[j] = BytecodeInterpreter! /* This can't be null */ .Memory[j + stream.MemoryAddress].Byte ?? 0;
-                    }
-
-                    stream.Flush(buffer);
-
-                    return;
-                }
-
-                throw new RuntimeException($"Stream {id} not found");
-            });
-        externalFunctions.AddExternalFunction("stream-length",
-            (int id) =>
-            {
-                for (int i = 0; i < Streams.Count; i++)
-                {
-                    if (Streams[i].ID != id) continue;
-
-                    if (Streams[i] is not InputStream stream)
-                    { throw new RuntimeException($"Stream {id} is not InputStream"); }
-
-                    return stream.Length;
-                }
-
-                throw new RuntimeException($"Stream {id} not found");
-            });
-        externalFunctions.AddExternalFunction("stream-clear",
-            (int id) =>
-            {
-                for (int i = 0; i < Streams.Count; i++)
-                {
-                    if (Streams[i].ID != id) continue;
-
-                    if (Streams[i] is not InputStream stream)
-                    { throw new RuntimeException($"Stream {id} is not InputStream"); }
-
-                    stream.ClearBuffer();
-
-                    return;
-                }
-
-                throw new RuntimeException($"Stream {id} not found");
-            });
-
-        #endregion
-
         AddStaticExternalFunctions(externalFunctions);
 
         return externalFunctions;
@@ -345,7 +127,7 @@ public class Interpreter
     {
         #region Console
 
-        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, Array.Empty<RuntimeType>(), (DataItem[] parameters, ExternalFunctionManaged function) => { });
+        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, (ImmutableArray<DataItem> parameters, ExternalFunctionManaged function) => { });
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, (char @char) => { });
         externalFunctions.AddExternalFunction("console-set", (char @char, int x, int y) => { });
         externalFunctions.AddExternalFunction("console-clear", () => { });
@@ -391,19 +173,11 @@ public class Interpreter
     /// <exception cref="Exception"/>
     public void Update()
     {
-        for (int i = 0; i < Streams.Count; i++)
-        { Streams[i].Tick(BytecodeInterpreter.Memory); }
-
         if (BytecodeInterpreter.IsDone || IsPaused) return;
 
         try
         {
-            if (!BytecodeInterpreter.Tick())
-            {
-                for (int i = 0; i < Streams.Count; i++)
-                { Streams[i].Dispose(); }
-                Streams.Clear();
-            }
+            BytecodeInterpreter.Tick();
         }
         catch (UserException error)
         {

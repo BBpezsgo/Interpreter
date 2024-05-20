@@ -153,7 +153,7 @@ public static class HeapUtils
 
     public static int Allocate(ArraySegment<DataItem> heap, int sizeNeed)
     {
-        if (sizeNeed < ushort.MinValue || sizeNeed > ushort.MaxValue)
+        if (sizeNeed is < ushort.MinValue or > ushort.MaxValue)
         { throw new OverflowException(); }
 
         FixSize(ref sizeNeed);

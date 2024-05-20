@@ -178,8 +178,8 @@ public class Block : Statement
 
         for (int i = 0; i < Statements.Length; i++)
         {
-            foreach (Statement substatement in Statements[i].GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in Statements[i].GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 
@@ -221,16 +221,16 @@ public class LinkedIf : LinkedIfThing
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Condition.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Block.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        { yield return statement; }
 
         if (NextLink != null)
         {
-            foreach (Statement substatement in NextLink.GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in NextLink.GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 }
@@ -246,8 +246,8 @@ public class LinkedElse : LinkedIfThing
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Block.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -281,10 +281,10 @@ public class CompileTag : Statement, IInFile
     {
         if (includeThis) yield return this;
 
-        for (int i = 0; i < Parameters.Length; i++)
+        foreach (Literal parameter in Parameters)
         {
-            foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in parameter.GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 }
@@ -308,8 +308,8 @@ public class LiteralList : StatementWithValue
 
         for (int i = 0; i < Values.Length; i++)
         {
-            foreach (Statement substatement in Values[i].GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in Values[i].GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 
@@ -396,8 +396,8 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
 
         if (InitialValue != null)
         {
-            foreach (Statement substatement in InitialValue.GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in InitialValue.GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 
@@ -552,13 +552,13 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        { yield return statement; }
 
         for (int i = 0; i < Parameters.Length; i++)
         {
-            foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in Parameters[i].GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 }
@@ -661,14 +661,14 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
 
         if (PrevStatement != null)
         {
-            foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+            { yield return statement; }
         }
 
         for (int i = 0; i < Parameters.Length; i++)
         {
-            foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in Parameters[i].GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 }
@@ -736,8 +736,8 @@ public class KeywordCall : StatementWithValue, IReadable
 
         for (int i = 0; i < Parameters.Length; i++)
         {
-            foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in Parameters[i].GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 }
@@ -745,6 +745,29 @@ public class KeywordCall : StatementWithValue, IReadable
 public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 {
     public const int ParameterCount = 2;
+
+    #region Operators
+
+    public const string BitshiftLeft = "<<";
+    public const string BitshiftRight = ">>";
+    public const string Addition = "+";
+    public const string Subtraction = "-";
+    public const string Multiplication = "*";
+    public const string Division = "/";
+    public const string Modulo = "%";
+    public const string BitwiseAND = "&";
+    public const string BitwiseOR = "|";
+    public const string BitwiseXOR = "^";
+    public const string CompLT = "<";
+    public const string CompGT = ">";
+    public const string CompGEQ = ">=";
+    public const string CompLEQ = "<=";
+    public const string CompNEQ = "!=";
+    public const string CompEQ = "==";
+    public const string LogicalAND = "&&";
+    public const string LogicalOR = "||";
+
+    #endregion
 
     public Token Operator { get; }
     public StatementWithValue Left { get; }
@@ -812,17 +835,23 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Left.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Right.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Right.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
 public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 {
     public const int ParameterCount = 1;
+
+    #region Operators
+
+    public const string LogicalNOT = "!";
+
+    #endregion
 
     /// <summary>
     /// Set by the compiler
@@ -881,8 +910,8 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Left.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -961,8 +990,8 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Left.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 
     /// <exception cref="NotImplementedException"/>
@@ -1045,11 +1074,11 @@ public class Assignment : AnyAssignment, IReferenceableTo
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Left.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Right.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Right.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1122,11 +1151,11 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Left.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Right.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Right.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1369,8 +1398,8 @@ public class AddressGetter : StatementWithValue
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1394,8 +1423,8 @@ public class Pointer : StatementWithValue
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1420,11 +1449,11 @@ public class WhileLoop : StatementWithBlock
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Condition.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Block.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1453,38 +1482,38 @@ public class ForLoop : StatementWithBlock
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in VariableDeclaration.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in VariableDeclaration.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Condition.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Expression.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Expression.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Block.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
 public class IfContainer : Statement
 {
-    public ImmutableArray<BaseBranch> Parts { get; }
+    public ImmutableArray<BaseBranch> Branches { get; }
 
-    public override Position Position => new(Parts);
+    public override Position Position => new(Branches);
 
     public IfContainer(IEnumerable<BaseBranch> parts)
     {
-        Parts = parts.ToImmutableArray();
+        Branches = parts.ToImmutableArray();
     }
 
     /// <exception cref="NotImplementedException"/>
     LinkedIfThing? ToLinks(int i)
     {
-        if (i >= Parts.Length)
+        if (i >= Branches.Length)
         { return null; }
 
-        if (Parts[i] is ElseIfBranch elseIfBranch)
+        if (Branches[i] is ElseIfBranch elseIfBranch)
         {
             return new LinkedIf(elseIfBranch.Keyword, elseIfBranch.Condition, elseIfBranch.Block)
             {
@@ -1492,7 +1521,7 @@ public class IfContainer : Statement
             };
         }
 
-        if (Parts[i] is ElseBranch elseBranch)
+        if (Branches[i] is ElseBranch elseBranch)
         {
             return new LinkedElse(elseBranch.Keyword, elseBranch.Block);
         }
@@ -1504,8 +1533,8 @@ public class IfContainer : Statement
     /// <exception cref="NotImplementedException"/>
     public LinkedIf ToLinks()
     {
-        if (Parts.Length == 0) throw new InternalException();
-        if (Parts[0] is not IfBranch ifBranch) throw new InternalException();
+        if (Branches.Length == 0) throw new InternalException();
+        if (Branches[0] is not IfBranch ifBranch) throw new InternalException();
         return new LinkedIf(ifBranch.Keyword, ifBranch.Condition, ifBranch.Block)
         {
             NextLink = ToLinks(1),
@@ -1516,17 +1545,17 @@ public class IfContainer : Statement
     {
         if (includeThis) yield return this;
 
-        for (int i = 0; i < Parts.Length; i++)
+        foreach (BaseBranch branch in Branches)
         {
-            foreach (Statement substatement in Parts[i].GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in branch.GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 
     public override string ToString()
     {
-        if (Parts.Length == 0) return "null";
-        return Parts[0].ToString();
+        if (Branches.Length == 0) return "null";
+        return Branches[0].ToString();
     }
 }
 
@@ -1569,11 +1598,11 @@ public class IfBranch : BaseBranch
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Condition.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Block.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1591,11 +1620,11 @@ public class ElseIfBranch : BaseBranch
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Condition.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Block.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1609,8 +1638,8 @@ public class ElseBranch : BaseBranch
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Block.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1716,10 +1745,10 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo, 
     {
         if (includeThis) yield return this;
 
-        for (int i = 0; i < Parameters.Length; i++)
+        foreach (StatementWithValue parameter in Parameters)
         {
-            foreach (Statement substatement in Parameters[i].GetStatementsRecursively(true))
-            { yield return substatement; }
+            foreach (Statement statement in parameter.GetStatementsRecursively(true))
+            { yield return statement; }
         }
     }
 
@@ -1780,11 +1809,11 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        { yield return statement; }
 
-        foreach (Statement substatement in Index.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Index.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1818,8 +1847,8 @@ public class Field : StatementWithValue, IReferenceableTo
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1845,8 +1874,8 @@ public class TypeCast : StatementWithValue, IHaveType
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in PrevStatement.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }
 
@@ -1871,7 +1900,7 @@ public class ModifiedStatement : StatementWithValue
     {
         if (includeThis) yield return this;
 
-        foreach (Statement substatement in Statement.GetStatementsRecursively(true))
-        { yield return substatement; }
+        foreach (Statement statement in Statement.GetStatementsRecursively(true))
+        { yield return statement; }
     }
 }

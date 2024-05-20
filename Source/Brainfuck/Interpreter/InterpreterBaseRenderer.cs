@@ -257,7 +257,6 @@ public partial class InterpreterBase<TCode>
                 Tokenizing.TokenAnalyzedType.Attribute => CharColor.BrightGreen,
                 Tokenizing.TokenAnalyzedType.Type => CharColor.BrightGreen,
                 Tokenizing.TokenAnalyzedType.Struct => CharColor.BrightGreen,
-                Tokenizing.TokenAnalyzedType.Enum => CharColor.BrightGreen,
                 Tokenizing.TokenAnalyzedType.BuiltinType => CharColor.BrightBlue,
                 Tokenizing.TokenAnalyzedType.Keyword => CharColor.BrightBlue,
                 Tokenizing.TokenAnalyzedType.FunctionName => CharColor.BrightYellow,
@@ -311,7 +310,7 @@ public partial class InterpreterBase<TCode>
 
             { // Character
                 char chr = CharCode.GetChar(Memory[i]);
-                if (Memory[i] < 32 || Memory[i] > 126)
+                if (Memory[i] is < 32 or > 126)
                 { chr = ' '; }
 
                 string textToPrint = chr.ToString().PadRight(4, ' ');
@@ -410,7 +409,7 @@ public partial class InterpreterBase<TCode>
             { }
             else if (text[i] == '\t')
             { renderer[x, y] = new ConsoleChar(' ', CharColor.White, CharColor.Black); }
-            else if (text[i] < 32 || text[i] > 127)
+            else if (text[i] is < (char)32 or > (char)127)
             { renderer[x, y] = new ConsoleChar(' ', CharColor.White, CharColor.Black); }
             else
             { renderer[x, y] = new ConsoleChar(text[i], CharColor.White, CharColor.Black); }

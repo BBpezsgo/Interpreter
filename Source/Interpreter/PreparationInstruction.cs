@@ -4,28 +4,34 @@
 public class PreparationInstruction
 {
     public Opcode Opcode;
-    public AddressingMode AddressingMode;
-    public DataItem Parameter;
+    public InstructionOperand Operand1;
+    public InstructionOperand Operand2;
 
-    public PreparationInstruction(Opcode opcode, DataItem parameter)
+    public PreparationInstruction(
+        Opcode opcode)
     {
         Opcode = opcode;
-        AddressingMode = AddressingMode.Absolute;
-        Parameter = parameter;
+        Operand1 = default;
+        Operand2 = default;
     }
 
-    public PreparationInstruction(Opcode opcode, AddressingMode addressingMode = AddressingMode.Absolute)
+    public PreparationInstruction(
+        Opcode opcode,
+        InstructionOperand operand1)
     {
         Opcode = opcode;
-        AddressingMode = addressingMode;
-        Parameter = DataItem.Null;
+        Operand1 = operand1;
+        Operand2 = default;
     }
 
-    public PreparationInstruction(Opcode opcode, AddressingMode addressingMode, DataItem parameter)
+    public PreparationInstruction(
+        Opcode opcode,
+        InstructionOperand operand1,
+        InstructionOperand operand2)
     {
         Opcode = opcode;
-        AddressingMode = addressingMode;
-        Parameter = parameter;
+        Operand1 = operand1;
+        Operand2 = operand2;
     }
 
     public override string ToString()
@@ -34,15 +40,17 @@ public class PreparationInstruction
 
         result.Append(Opcode.ToString());
 
-        if (Opcode == Opcode.StackLoad ||
-            Opcode == Opcode.StackStore)
+        if (!Operand1.Value.IsNull)
         {
             result.Append(' ');
-            result.Append(AddressingMode.ToString());
+            result.Append(Operand1.ToString());
         }
 
-        if (!Parameter.IsNull)
-        { result.Append($" {{ {Parameter} }}"); }
+        if (!Operand2.Value.IsNull)
+        {
+            result.Append(' ');
+            result.Append(Operand2.ToString());
+        }
 
         return result.ToString();
     }

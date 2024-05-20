@@ -51,7 +51,7 @@ public struct ConsoleProgressBar : IDisposable
         Console.WriteLine();
     }
 
-    public void Print(int iterator, int count) => Print((float)(iterator) / (float)count);
+    public void Print(int iterator, int count) => Print((float)iterator / (float)count);
     public void Print(float progress)
     {
         _progress = progress;
@@ -79,7 +79,7 @@ public struct ConsoleProgressBar : IDisposable
         Console.ForegroundColor = _color;
         for (int i = 0; i < width; i++)
         {
-            float v = (float)(i + 1) / (float)(width);
+            float v = (float)(i + 1) / (float)width;
             if (v <= _progress)
             { Console.Write('═'); }
             else

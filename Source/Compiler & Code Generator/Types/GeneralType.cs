@@ -10,14 +10,13 @@ public abstract class GeneralType :
     IEquatable<BasicType>,
     IEquatable<RuntimeType>
 {
-    public bool CanBeBuiltin => this is BuiltinType or EnumType or PointerType;
+    public bool CanBeBuiltin => this is BuiltinType or PointerType;
 
     public abstract int Size { get; }
 
     public static GeneralType From(GeneralType other) => other switch
     {
         BuiltinType v => new BuiltinType(v),
-        EnumType v => new EnumType(v),
         StructType v => new StructType(v),
         GenericType v => new GenericType(v),
         FunctionType v => new FunctionType(v),
@@ -192,24 +191,7 @@ public abstract class GeneralType :
     public abstract override int GetHashCode();
     public abstract override string ToString();
     public bool Equals(BasicType other) => this is BuiltinType builtinType && builtinType.Type == other;
-    public bool Equals(RuntimeType other)
-    {
-        if (this is EnumType enumType)
-        {
-            for (int i = 0; i < enumType.Enum.Members.Length; i++)
-            {
-                if (enumType.Enum.Members[i].ComputedValue.Type == other)
-                { return true; }
-            }
-        }
-
-        if (this is BuiltinType builtinType)
-        {
-            return builtinType.RuntimeType == other;
-        }
-
-        return false;
-    }
+    public bool Equals(RuntimeType other) => this is BuiltinType builtinType && builtinType.RuntimeType == other;
 
     /// <exception cref="NotImplementedException"/>
     public static bool TryGetTypeParameters(IEnumerable<GeneralType> definedParameters, IEnumerable<GeneralType> passedParameters, Dictionary<string, GeneralType> typeParameters)
@@ -291,7 +273,6 @@ public abstract class GeneralType :
         {
             case GenericType: return false;
             case BuiltinType: return true;
-            case EnumType: return true;
             case PointerType pointerType: return pointerType.To.AllGenericsDefined();
             case ArrayType arrayType: return arrayType.Of.AllGenericsDefined();
 
@@ -356,8 +337,7 @@ public abstract class GeneralType :
 
                     for (int i = 0; i < structTypeParameterValues.Length; i++)
                     {
-                        if (structTypeParameterValues[i] is null ||
-                            structTypeParameterValues[i] is GenericType)
+                        if (structTypeParameterValues[i] is null or GenericType)
                         { return null; }
                     }
 

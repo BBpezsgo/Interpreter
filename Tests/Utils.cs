@@ -54,6 +54,7 @@ public readonly struct TestFile
         expected.Assert(resultUnoptimized, memoryShouldBeEmpty, expectedMemoryPointer);
     }
 
+    /*
     /// <exception cref="AssertFailedException"/>
     public void DoAssembly()
     {
@@ -62,6 +63,7 @@ public readonly struct TestFile
         ExpectedResult expected = GetExpectedResult();
         expected.Assert(result);
     }
+    */
 }
 
 public readonly struct ExpectedResult
@@ -425,6 +427,7 @@ public static class Utils
         return (resultNormal, resultCompact, resultUnoptimized);
     }
 
+    /*
     public static AssemblyResult RunAssembly(FileInfo file, string input)
     {
         AnalysisCollection analysisCollection = new();
@@ -474,6 +477,7 @@ public static class Utils
 
         return new AssemblyResult(process);
     }
+    */
 
     static string? GetLatestResultFile(string testResultsDirectory)
     {
@@ -620,14 +624,13 @@ public static class Utils
 
         file.WriteLine();
 
-        file.WriteLine("| File | Bytecode | Brainfuck | ASM |");
-        file.WriteLine("|:----:|:--------:|:---------:|:---:|");
+        file.WriteLine("| File | Bytecode | Brainfuck |");
+        file.WriteLine("|:----:|:--------:|:---------:|");
 
         foreach ((int serialNumber, List<(string? Category, string Outcome)>? fileResults) in sortedTestFiles)
         {
             string? bytecodeResult = null;
             string? brainfuckResult = null;
-            string? asmResult = null;
 
             foreach ((string? category, string outcome) in fileResults)
             {
@@ -635,13 +638,11 @@ public static class Utils
                 {
                     case "Main": bytecodeResult = outcome; break;
                     case "Brainfuck": brainfuckResult = outcome; break;
-                    case "Assembly": asmResult = outcome; break;
                 }
             }
 
             if (bytecodeResult == "NotExecuted" &&
-                brainfuckResult == "NotExecuted" &&
-                asmResult == "NotExecuted")
+                brainfuckResult == "NotExecuted")
             { continue; }
 
             static string? TranslateOutcome(string? outcome) => outcome switch
@@ -654,12 +655,11 @@ public static class Utils
 
             bytecodeResult = TranslateOutcome(bytecodeResult);
             brainfuckResult = TranslateOutcome(brainfuckResult);
-            asmResult = TranslateOutcome(asmResult);
 
             string translatedName = $"https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/{serialNumber.ToString().PadLeft(2, '0')}.{LanguageConstants.LanguageExtension}";
             translatedName = $"[{serialNumber}]({translatedName})";
 
-            file.WriteLine($"| {translatedName} | {bytecodeResult} | {brainfuckResult} | {asmResult} |");
+            file.WriteLine($"| {translatedName} | {bytecodeResult} | {brainfuckResult} |");
         }
     }
 }

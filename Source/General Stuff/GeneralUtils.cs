@@ -128,7 +128,7 @@ public static class Utils
             case '\t': return EscapedCharacters.Tab;
             case '\v': return EscapedCharacters.V;
             default:
-                if (v >= 0x20 && v <= 0x7e)
+                if (v is >= (char)0x20 and <= (char)0x7e)
                 {
                     modified = false;
                     return char.ToString(v);

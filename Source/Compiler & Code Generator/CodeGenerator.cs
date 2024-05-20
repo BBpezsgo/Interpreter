@@ -50,7 +50,6 @@ public abstract class CodeGenerator
     protected ImmutableArray<CompiledOperator> CompiledOperators;
     protected ImmutableArray<CompiledConstructor> CompiledConstructors;
     protected ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
-    protected ImmutableArray<CompiledEnum> CompiledEnums;
     protected ImmutableArray<IConstant> CompiledGlobalConstants;
 
     protected readonly Stack<IConstant> CompiledLocalConstants;
@@ -108,7 +107,6 @@ public abstract class CodeGenerator
         CompiledOperators = compilerResult.Operators;
         CompiledConstructors = compilerResult.Constructors;
         CompiledGeneralFunctions = compilerResult.GeneralFunctions;
-        CompiledEnums = compilerResult.Enums;
 
         AnalysisCollection = analysisCollection;
         Print = print;
@@ -163,9 +161,10 @@ public abstract class CodeGenerator
         if (statement is ModifiedStatement modifiedStatement &&
             modifiedStatement.Modifier.Equals(ModifierKeywords.Temp))
         {
-            if (modifiedStatement.Statement is LiteralStatement ||
-                modifiedStatement.Statement is BinaryOperatorCall ||
-                modifiedStatement.Statement is UnaryOperatorCall)
+            if (modifiedStatement.Statement is
+                LiteralStatement or
+                BinaryOperatorCall or
+                UnaryOperatorCall)
             {
                 AnalysisCollection?.Hints.Add(new Hint($"Unnecessary explicit temp modifier ({modifiedStatement.Statement.GetType().Name} statements are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
             }
@@ -259,28 +258,6 @@ public abstract class CodeGenerator
         old = new Dictionary<string, GeneralType>(TypeArguments);
         TypeArguments.Clear();
         TypeArguments.AddRange(arguments);
-    }
-
-    #endregion
-
-    #region GetEnum()
-
-    protected bool GetEnum(string name, [NotNullWhen(true)] out CompiledEnum? @enum)
-        => CodeGenerator.GetEnum(CompiledEnums, name, out @enum);
-
-    public static bool GetEnum(IEnumerable<CompiledEnum> enums, string name, [NotNullWhen(true)] out CompiledEnum? @enum)
-    {
-        foreach (CompiledEnum @enum_ in enums)
-        {
-            if (@enum_ == null) continue;
-            if (@enum_.Identifier.Content == name)
-            {
-                @enum = @enum_;
-                return true;
-            }
-        }
-        @enum = null;
-        return false;
     }
 
     #endregion
@@ -786,9 +763,6 @@ public abstract class CodeGenerator
             if (from.Equals(to))
             { return true; }
 
-            if (to is EnumType enumType && enumType.Enum.Type == from)
-            { return true; }
-
             if (to is PointerType && from == BasicType.Integer)
             { return true; }
 
@@ -992,7 +966,7 @@ public abstract class CodeGenerator
             { continue; }
         }
 
-        Finish:
+    Finish:
 
         if (result_ is not null && perfectus >= FunctionPerfectus.Good)
         {
@@ -1230,13 +1204,6 @@ public abstract class CodeGenerator
             return true;
         }
 
-        if (GetEnum(name.Content, out CompiledEnum? @enum))
-        {
-            name.AnalyzedType = TokenAnalyzedType.Enum;
-            result = new EnumType(@enum, relevantFile);
-            return true;
-        }
-
         if (TypeArguments.TryGetValue(name.Content, out GeneralType? typeArgument))
         {
             result = typeArgument;
@@ -1260,24 +1227,6 @@ public abstract class CodeGenerator
         result = null;
         return false;
     }
-
-    #region Memory Helpers
-
-    protected virtual void StackStore(ValueAddress address, int size)
-    {
-        for (int i = size - 1; i >= 0; i--)
-        { StackStore(address + i); }
-    }
-    protected virtual void StackLoad(ValueAddress address, int size)
-    {
-        for (int currentOffset = 0; currentOffset < size; currentOffset++)
-        { StackLoad(address + currentOffset); }
-    }
-
-    protected abstract void StackLoad(ValueAddress address);
-    protected abstract void StackStore(ValueAddress address);
-
-    #endregion
 
     public enum GlobalVariablePerfectus
     {
@@ -1410,12 +1359,6 @@ public abstract class CodeGenerator
         if (destination.Size != valueType.Size)
         { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.Size}) value to {destination} (size of {destination.Size})", value, CurrentFile); }
 
-        if (destination is EnumType destEnumType)
-        { if (destEnumType.Enum.IsSameType(valueType)) return; }
-
-        if (valueType is EnumType valEnumType)
-        { if (valEnumType.Enum.IsSameType(destination)) return; }
-
         if (destination is PointerType &&
             valueType == BasicType.Integer)
         { return; }
@@ -1456,9 +1399,6 @@ public abstract class CodeGenerator
         if (destination.Size != valueType.Size)
         { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.Size}) value to {destination} (size of {destination.Size})", valuePosition, CurrentFile); }
 
-        if (destination is EnumType destEnumType)
-        { if (destEnumType.Enum.IsSameType(valueType)) return; }
-
         if (destination is PointerType)
         { return; }
 
@@ -1466,8 +1406,37 @@ public abstract class CodeGenerator
             value.Type == RuntimeType.Integer)
         { return; }
 
+        if (destination is BuiltinType builtinDestination &&
+            valueType is BuiltinType builtinValueType)
+        {
+            BitWidth destinationBitWidth = GetBitWidth(builtinDestination);
+            BitWidth valueBitWidth = GetBitWidth(builtinValueType);
+            if (destinationBitWidth >= valueBitWidth)
+            { return; }
+        }
+
         throw new CompilerException($"Can not set a {valueType} type value to the {destination} type", valuePosition, CurrentFile);
     }
+
+    protected static BitWidth MaxBitWidth(BitWidth a, BitWidth b) => a > b ? a : b;
+
+    protected static BitWidth GetBitWidth(GeneralType type) => type switch
+    {
+        BuiltinType v => GetBitWidth(v),
+        PointerType v => GetBitWidth(v),
+        _ => throw new InternalException($"Invalid type {type}"),
+    };
+
+    protected static BitWidth GetBitWidth(BuiltinType type) => type.Type switch
+    {
+        BasicType.Byte => BitWidth._8,
+        BasicType.Integer => BitWidth._32,
+        BasicType.Float => BitWidth._32,
+        BasicType.Char => BitWidth._16,
+        _ => throw new InternalException($"Invalid type {type}"),
+    };
+
+    protected static BitWidth GetBitWidth(PointerType _) => BitWidth._32;
 
     #region Addressing Helpers
 
@@ -1640,50 +1609,34 @@ public abstract class CodeGenerator
         _ => throw new NotImplementedException($"Initial value for type \"{type}\" isn't implemented"),
     };
 
-    protected static bool GetInitialValue(TypeInstance type, out DataItem value)
-    {
-        switch (type.ToString())
-        {
-            case TypeKeywords.Int:
-                value = new DataItem((int)0);
-                return true;
-            case TypeKeywords.Byte:
-                value = new DataItem((byte)0);
-                return true;
-            case TypeKeywords.Float:
-                value = new DataItem((float)0f);
-                return true;
-            case TypeKeywords.Char:
-                value = new DataItem((char)'\0');
-                return true;
-            default:
-                value = default;
-                return false;
-        }
-    }
-
-    protected static DataItem GetInitialValue(GeneralType type)
+    protected static bool GetInitialValue(GeneralType type, out DataItem value)
     {
         switch (type)
         {
             case GenericType:
-                throw new NotImplementedException($"Initial value for type arguments is bruh moment");
             case StructType:
-                throw new NotImplementedException($"Initial value for structs is not implemented");
-            case EnumType enumType:
-                if (enumType.Enum.Members.Length == 0)
-                { throw new CompilerException($"Could not get enum \"{enumType.Enum.Identifier.Content}\" initial value: enum has no members", enumType.Enum.Identifier, enumType.Enum.File); }
-                return enumType.Enum.Members[0].ComputedValue;
             case FunctionType:
-                return new DataItem(int.MaxValue);
+                value = default;
+                return false;
             case BuiltinType builtinType:
-                return GetInitialValue(builtinType.Type);
+                value = GetInitialValue(builtinType.Type);
+                return true;
             case PointerType:
-                return new DataItem(0);
-            default:
-                throw new NotImplementedException();
+                value = new DataItem(0);
+                return true;
+            default: throw new NotImplementedException();
         }
     }
+
+    protected static DataItem GetInitialValue(GeneralType type) => type switch
+    {
+        GenericType => throw new NotImplementedException($"Initial value for type arguments is bruh moment"),
+        StructType => throw new NotImplementedException($"Initial value for structs is not implemented"),
+        FunctionType => new DataItem(int.MaxValue),
+        BuiltinType builtinType => GetInitialValue(builtinType.Type),
+        PointerType => new DataItem(0),
+        _ => throw new NotImplementedException(),
+    };
 
     #endregion
 
@@ -1758,28 +1711,65 @@ public abstract class CodeGenerator
 
     protected GeneralType FindStatementType(BinaryOperatorCall @operator, GeneralType? expectedType)
     {
-        if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
-        {
-            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != BinaryOperatorCall.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {BinaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
-        }
-        else
-        { opcode = Opcode._; }
-
-        if (opcode == Opcode._)
-        { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
-
-        // TODO: @operator.OriginalFile can be null
-        if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? reuslt, out _))
+        if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? _result, out _))
         {
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-            return OnGotStatementType(@operator, reuslt.Function.Type);
+            return OnGotStatementType(@operator, _result.Function.Type);
         }
 
         GeneralType leftType = FindStatementType(@operator.Left);
         GeneralType rightType = FindStatementType(@operator.Right);
 
         CompilerException unknownOperator = new($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile);
+
+        if (!leftType.CanBeBuiltin ||
+            !rightType.CanBeBuiltin ||
+            leftType == BasicType.Void ||
+            rightType == BasicType.Void)
+        { throw unknownOperator; }
+
+        {
+            if (leftType is BuiltinType leftBType &&
+                rightType is BuiltinType rightBType)
+            {
+                bool isFloat =
+                    leftBType.Type == BasicType.Float ||
+                    rightBType.Type == BasicType.Float;
+
+                BitWidth leftBitWidth = GetBitWidth(leftType);
+                BitWidth rightBitWidth = GetBitWidth(rightType);
+                BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
+
+                return @operator.Operator.Content switch
+                {
+                    BinaryOperatorCall.CompLT or
+                    BinaryOperatorCall.CompGT or
+                    BinaryOperatorCall.CompLEQ or
+                    BinaryOperatorCall.CompGEQ or
+                    BinaryOperatorCall.CompEQ or
+                    BinaryOperatorCall.CompNEQ
+                        => new BuiltinType(isFloat ? BasicType.Float : BasicType.Integer),
+
+                    BinaryOperatorCall.LogicalOR or
+                    BinaryOperatorCall.LogicalAND or
+                    BinaryOperatorCall.BitwiseAND or
+                    BinaryOperatorCall.BitwiseOR or
+                    BinaryOperatorCall.BitwiseXOR or
+                    BinaryOperatorCall.BitshiftLeft or
+                    BinaryOperatorCall.BitshiftRight
+                        => new BuiltinType(bitWidth.ToType()),
+
+                    BinaryOperatorCall.Addition or
+                    BinaryOperatorCall.Subtraction or
+                    BinaryOperatorCall.Multiplication or
+                    BinaryOperatorCall.Division or
+                    BinaryOperatorCall.Modulo
+                    => new BuiltinType(isFloat ? BasicType.Float : bitWidth.ToType()),
+
+                    _ => throw unknownOperator,
+                };
+            }
+        }
 
         // switch (leftType)
         // {
@@ -1809,12 +1799,6 @@ public abstract class CodeGenerator
 
         // if (leftType is not BuiltinType || rightType is not BuiltinType)
         // { throw unknownOperator; }
-
-        if (leftType == BasicType.Void || rightType == BasicType.Void)
-        { throw unknownOperator; }
-
-        if (!leftType.CanBeBuiltin || !rightType.CanBeBuiltin || leftType == BasicType.Void || rightType == BasicType.Void)
-        { throw unknownOperator; }
 
         DataItem leftValue = GetInitialValue(leftType);
         DataItem rightValue = GetInitialValue(rightType);
@@ -1851,9 +1835,6 @@ public abstract class CodeGenerator
 
         if (expectedType is not null)
         {
-            if (CanConvertImplicitly(result, expectedType))
-            { return OnGotStatementType(@operator, expectedType); }
-
             if (result == BasicType.Integer &&
                 expectedType is PointerType)
             { return OnGotStatementType(@operator, expectedType); }
@@ -1863,18 +1844,6 @@ public abstract class CodeGenerator
     }
     protected GeneralType FindStatementType(UnaryOperatorCall @operator, GeneralType? expectedType)
     {
-        if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
-        {
-            if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != UnaryOperatorCall.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {UnaryOperatorCall.ParameterCount}", @operator.Operator, CurrentFile); }
-        }
-        else
-        { opcode = Opcode._; }
-
-        if (opcode == Opcode._)
-        { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
-
-        // TODO: @operator.OriginalFile can be null
         if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? result_, out _))
         {
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
@@ -1890,18 +1859,15 @@ public abstract class CodeGenerator
 
         DataItem predictedValue = @operator.Operator.Content switch
         {
-            "!" => !leftValue,
+            UnaryOperatorCall.LogicalNOT => !leftValue,
 
-            _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
+            _ => throw new CompilerException($"Unknown operator {@operator.Operator.Content}", @operator.Operator, CurrentFile),
         };
 
         BuiltinType result = new(predictedValue.Type);
 
         if (expectedType is not null)
         {
-            if (CanConvertImplicitly(result, expectedType))
-            { return OnGotStatementType(@operator, expectedType); }
-
             if (result == BasicType.Integer &&
                 expectedType is PointerType)
             { return OnGotStatementType(@operator, expectedType); }
@@ -1931,9 +1897,6 @@ public abstract class CodeGenerator
     }
     protected GeneralType FindStatementType(Identifier identifier, GeneralType? expectedType = null)
     {
-        if (identifier.Content == "nullptr")
-        { return new BuiltinType(BasicType.Integer); }
-
         if (GetConstant(identifier.Content, out IConstant? constant))
         {
             identifier.Reference = constant;
@@ -1961,12 +1924,6 @@ public abstract class CodeGenerator
             }
 
             return OnGotStatementType(identifier, type);
-        }
-
-        if (GetEnum(identifier.Content, out CompiledEnum? @enum))
-        {
-            identifier.Token.AnalyzedType = TokenAnalyzedType.Enum;
-            return OnGotStatementType(identifier, new EnumType(@enum, identifier.OriginalFile));
         }
 
         if (GetFunction(identifier.Token.Content, expectedType, out FunctionQueryResult<CompiledFunction>? function, out _))
@@ -2045,18 +2002,6 @@ public abstract class CodeGenerator
             }
 
             throw new CompilerException($"Field definition \"{field.Identifier}\" not found in type \"{prevStatementType}\"", field.Identifier, CurrentFile);
-        }
-
-        if (prevStatementType is EnumType enumType)
-        {
-            foreach (CompiledEnumMember enumMember in enumType.Enum.Members)
-            {
-                if (enumMember.Identifier.Content != field.Identifier.Content) continue;
-                field.Identifier.AnalyzedType = TokenAnalyzedType.EnumMember;
-                return OnGotStatementType(field, new BuiltinType(enumMember.ComputedValue.Type));
-            }
-
-            throw new CompilerException($"Enum member \"{enumType}\" not found in enum \"{enumType.Enum.Identifier.Content}\"", field.Identifier, CurrentFile);
         }
 
         throw new CompilerException($"Type \"{prevStatementType}\" does not have a field \"{field.Identifier}\"", field, CurrentFile);
@@ -2344,10 +2289,10 @@ public abstract class CodeGenerator
     static bool InlineMacro(IfContainer statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out IfContainer? inlined)
     {
         inlined = null;
-        BaseBranch[] branches = new BaseBranch[statement.Parts.Length];
+        BaseBranch[] branches = new BaseBranch[statement.Branches.Length];
         for (int i = 0; i < branches.Length; i++)
         {
-            if (!InlineMacro(statement.Parts[i], parameters, out BaseBranch? inlinedBranch))
+            if (!InlineMacro(statement.Branches[i], parameters, out BaseBranch? inlinedBranch))
             { return false; }
             branches[i] = inlinedBranch;
         }
@@ -2707,7 +2652,7 @@ public abstract class CodeGenerator
         KeywordCall v => FindControlFlowUsage(v, inDepth),
         WhileLoop v => FindControlFlowUsage(v.Block.Statements, true),
         ForLoop v => FindControlFlowUsage(v.Block.Statements, true),
-        IfContainer v => FindControlFlowUsage(v.Parts, true),
+        IfContainer v => FindControlFlowUsage(v.Branches, true),
         BaseBranch v => FindControlFlowUsage(v.Block, true),
 
         Assignment => ControlFlowUsage.None,
@@ -3492,7 +3437,7 @@ public abstract class CodeGenerator
     }
     bool TryEvaluate(IfContainer ifContainer, EvaluationContext context)
     {
-        foreach (BaseBranch _branch in ifContainer.Parts)
+        foreach (BaseBranch _branch in ifContainer.Branches)
         {
             switch (_branch)
             {
@@ -3555,7 +3500,8 @@ public abstract class CodeGenerator
         if (variableDeclaration.InitialValue is null &&
             variableDeclaration.Type.ToString() != StatementKeywords.Var)
         {
-            if (!GetInitialValue(variableDeclaration.Type, out value))
+            GeneralType variableType = GeneralType.From(variableDeclaration.Type, FindType, TryCompute, variableDeclaration.File);
+            if (!GetInitialValue(variableType, out value))
             { return false; }
         }
         else
@@ -3751,15 +3697,5 @@ public abstract class CodeGenerator
         }
 
         return statements.ToImmutable();
-    }
-
-    protected static bool CanConvertImplicitly(GeneralType? from, GeneralType? to)
-    {
-        if (from is null || to is null) return false;
-
-        if (to is EnumType enumType && enumType.Enum.Type == from)
-        { return true; }
-
-        return false;
     }
 }

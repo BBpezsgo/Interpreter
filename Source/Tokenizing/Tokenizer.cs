@@ -551,7 +551,7 @@ public abstract partial class Tokenizer
 
             if (CurrentToken.TokenType == PreparationTokenType.LiteralBinary)
             {
-                if (currChar != '0' && currChar != '1')
+                if (currChar is not '0' and not '1')
                 {
                     RefreshTokenPosition(offsetTotal);
                     throw new TokenizerException($"This isn't a binary digit am i right? \'{currChar}\'", CurrentToken.Position.After(), File);

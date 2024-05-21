@@ -9,8 +9,6 @@ using Runtime;
 
 public partial class InterpreterBase
 {
-    protected RendererContext _rendererContext;
-
     protected struct RendererContext
     {
         public Renderer<ConsoleChar>? Renderer;
@@ -20,8 +18,25 @@ public partial class InterpreterBase
     }
 }
 
-public partial class InterpreterBase<TCode>
+public partial class InterpreterBase<TCode> : IDisposable
 {
+    bool _isDisposed;
+    protected RendererContext _rendererContext;
+
+    void Dispose(bool _)
+    {
+        if (_isDisposed) return;
+        _rendererContext.Renderer = null;
+        ConsoleListener.Stop();
+        _isDisposed = true;
+    }
+    ~InterpreterBase() { Dispose(false); }
+    void IDisposable.Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
     [SupportedOSPlatform("windows")]
     public void RunWithUI(bool autoTick = true, int wait = 0)
     {
@@ -165,12 +180,6 @@ public partial class InterpreterBase<TCode>
         */
 
         _rendererContext.Renderer.Render();
-    }
-
-    protected override void DisposeManaged()
-    {
-        _rendererContext.Renderer = null;
-        ConsoleListener.Stop();
     }
 
     int StartToken;

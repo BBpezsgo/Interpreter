@@ -677,45 +677,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
-    void GenerateCodeForFunctionCall_Runtime(FunctionCall functionCall, StatementWithValue compiledVariable)
-    {
-        GeneralType statementType = FindStatementType(compiledVariable);
-        if (statementType is not FunctionType functionType)
-        { throw new CompilerException($"Statement {compiledVariable} is not a function", compiledVariable, CurrentFile); }
-        OnGotStatementType(functionCall, functionType.ReturnType);
-
-        if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
-        { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
-
-        AddComment($"Call {functionType} {{");
-
-        functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
-
-        int returnValueSize = 0;
-        if (functionType.ReturnSomething)
-        {
-            AddComment($"Initial return value {{");
-            returnValueSize = GenerateInitialValue(functionType.ReturnType);
-            AddComment($"}}");
-        }
-
-        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(functionCall.MethodParameters, functionType);
-
-        AddComment(" .:");
-
-        CallRuntime(compiledVariable);
-
-        GenerateCodeForParameterCleanup(parameterCleanup);
-
-        if (functionType.ReturnSomething && !functionCall.SaveValue)
-        {
-            AddComment(" Clear Return Value:");
-            for (int i = 0; i < returnValueSize; i++)
-            { AddInstruction(Opcode.Pop); }
-        }
-
-        AddComment("}");
-    }
 
     void GenerateCodeForStatement(AnyCall anyCall)
     {

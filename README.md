@@ -72,7 +72,7 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 > [!NOTE]
 > Because of how HEAP represented in brainfuck, its size can't be larger than 126.
 
-- `--console-gui|-cg` I use this mode for debugging.
+- `--console-gui|-cg` I use this mode for debugging. [More info](https://github.com/BBpezsgo/Interpreter/wiki/Debugger)
 
 **Other:**
 - `--throw-errors|-te` With this option, the program crashes on any exception and lets the .NET runtime handle them.

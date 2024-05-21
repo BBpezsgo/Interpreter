@@ -305,7 +305,7 @@ public static class Utils
             {
                 string[] dlls = Directory.GetFiles(dllsFolderPath, "*.dll");
                 for (int i = 0; i < dlls.Length; i++)
-                { externalFunctions.LoadAssembly(dlls[i]); }
+                { externalFunctions.LoadAssembly(System.Reflection.Assembly.LoadFile(dlls[i])); }
             }
         }
 

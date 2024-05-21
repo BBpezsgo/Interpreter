@@ -142,10 +142,6 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     [RequiresUnreferencedCode("Loading Assembly")]
-    public static void LoadAssembly(this Dictionary<int, ExternalFunctionBase> externalFunctions, string path)
-        => ExternalFunctionGenerator.LoadAssembly(externalFunctions, System.Reflection.Assembly.LoadFile(path));
-
-    [RequiresUnreferencedCode("Loading Assembly")]
     public static void LoadAssembly(this Dictionary<int, ExternalFunctionBase> externalFunctions, System.Reflection.Assembly assembly)
     {
         foreach (Type type in assembly.GetExportedTypes())

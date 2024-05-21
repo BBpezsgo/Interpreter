@@ -331,69 +331,106 @@ public sealed class Compiler
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
-        if (function.Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out string? externalName, out AttributeUsage? attribute))
+        foreach (AttributeUsage attribute in function.Attributes)
         {
-            if (!ExternalFunctions.TryGet(externalName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+            switch (attribute.Identifier.Content)
             {
-                // AnalysisCollection?.Warnings.Add(exception.InstantiateWarning(attribute, function.File));
-            }
-            else
-            {
-                if (externalFunction.Parameters.Length != function.Parameters.Count)
-                { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
-                if (externalFunction.ReturnSomething != (type != BasicType.Void))
-                { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.File); }
-
-                for (int i = 0; i < externalFunction.Parameters.Length; i++)
+                case AttributeConstants.ExternalIdentifier:
                 {
-                    RuntimeType definedParameterType = externalFunction.Parameters[i];
-                    GeneralType passedParameterType = GeneralType.From(function.Parameters[i].Type, FindType);
-                    function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
+                    if (attribute.Parameters.Length != 1)
+                    {
+                        AnalysisCollection?.Errors.Add(new LanguageError($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute, function.File));
+                        break;
+                    }
 
-                    if (passedParameterType == definedParameterType)
-                    { continue; }
+                    if (attribute.Parameters[0].Type != LiteralType.String)
+                    {
+                        AnalysisCollection?.Errors.Add(new LanguageError($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute, function.File));
+                        break;
+                    }
 
-                    throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.File);
+                    string externalName = attribute.Parameters[0].Value;
+
+                    if (!ExternalFunctions.TryGet(externalName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+                    {
+                        // AnalysisCollection?.Warnings.Add(exception.InstantiateWarning(attribute, function.File));
+                        break;
+                    }
+
+                    if (externalFunction.Parameters.Length != function.Parameters.Count)
+                    { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
+                    if (externalFunction.ReturnSomething != (type != BasicType.Void))
+                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.File); }
+
+                    for (int i = 0; i < externalFunction.Parameters.Length; i++)
+                    {
+                        RuntimeType definedParameterType = externalFunction.Parameters[i];
+                        GeneralType passedParameterType = GeneralType.From(function.Parameters[i].Type, FindType);
+                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
+
+                        if (passedParameterType == definedParameterType)
+                        { continue; }
+
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.File);
+                    }
+
+                    if (function.Template is not null)
+                    { GenericParameters.Pop(); }
+
+                    return new CompiledFunction(
+                        type,
+                        externalFunction.Parameters.Select(v => new BuiltinType(v)).ToArray(),
+                        context,
+                        function);
                 }
-
-                if (function.Template is not null)
-                { GenericParameters.Pop(); }
-
-                return new CompiledFunction(
-                    type,
-                    externalFunction.Parameters.Select(v => new BuiltinType(v)).ToArray(),
-                    context,
-                    function);
-            }
-        }
-
-        if (function.Attributes.TryGetAttribute<string>(AttributeConstants.BuiltinIdentifier, out string? builtinName, out attribute))
-        {
-            if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out (GeneralType ReturnValue, GeneralType[] Parameters) builtinFunction))
-            {
-                // AnalysisCollection?.Warnings.Add(new Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
-            }
-            else
-            {
-                if (builtinFunction.Parameters.Length != function.Parameters.Count)
-                { throw new CompilerException($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File); }
-
-                if (builtinFunction.ReturnValue != type)
-                { throw new CompilerException($"Wrong type defined for function \"{builtinName}\"", function.Type, function.File); }
-
-                for (int i = 0; i < builtinFunction.Parameters.Length; i++)
+                case AttributeConstants.BuiltinIdentifier:
                 {
-                    GeneralType definedParameterType = builtinFunction.Parameters[i];
-                    GeneralType passedParameterType = GeneralType.From(function.Parameters[i].Type, FindType);
-                    function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
+                    if (attribute.Parameters.Length != 1)
+                    {
+                        AnalysisCollection?.Errors.Add(new LanguageError($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute, function.File));
+                        break;
+                    }
 
-                    if (passedParameterType == definedParameterType)
-                    { continue; }
+                    if (attribute.Parameters[0].Type != LiteralType.String)
+                    {
+                        AnalysisCollection?.Errors.Add(new LanguageError($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute, function.File));
+                        break;
+                    }
 
-                    if (passedParameterType is PointerType && definedParameterType is PointerType)
-                    { continue; }
+                    string builtinName = attribute.Parameters[0].Value;
 
-                    throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.File);
+                    if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out (GeneralType ReturnValue, GeneralType[] Parameters) builtinFunction))
+                    {
+                        // AnalysisCollection?.Warnings.Add(new Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
+                        break;
+                    }
+
+                    if (builtinFunction.Parameters.Length != function.Parameters.Count)
+                    { throw new CompilerException($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File); }
+
+                    if (builtinFunction.ReturnValue != type)
+                    { throw new CompilerException($"Wrong type defined for function \"{builtinName}\"", function.Type, function.File); }
+
+                    for (int i = 0; i < builtinFunction.Parameters.Length; i++)
+                    {
+                        GeneralType definedParameterType = builtinFunction.Parameters[i];
+                        GeneralType passedParameterType = GeneralType.From(function.Parameters[i].Type, FindType);
+                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
+
+                        if (passedParameterType == definedParameterType)
+                        { continue; }
+
+                        if (passedParameterType is PointerType && definedParameterType is PointerType)
+                        { continue; }
+
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.File);
+                    }
+                    break;
+                }
+                default:
+                {
+                    AnalysisCollection?.Warnings.Add(new Warning($"Unknown attribute {attribute.Identifier}", attribute.Identifier, function.File));
+                    break;
                 }
             }
         }

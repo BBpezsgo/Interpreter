@@ -47,7 +47,7 @@ public static class Entry
                     DirectoryInfo dllsFolder = new(dllsFolderPath);
                     Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
                     foreach (FileInfo dll in dllsFolder.GetFiles("*.dll"))
-                    { externalFunctions.LoadAssembly(dll.FullName); }
+                    { externalFunctions.LoadAssembly(System.Reflection.Assembly.LoadFile(dll.FullName)); }
                 }
                 else
                 {

@@ -1,13 +1,12 @@
 ﻿using System.Runtime.InteropServices;
 
 namespace LanguageCore.Runtime;
-
 public readonly struct RuntimeContext
 {
     public ImmutableArray<int> CallTrace { get; init; }
     public int CodePointer { get; init; }
     public ImmutableArray<Instruction> Code { get; init; }
-    public IReadOnlyList<DataItem> Memory { get; init; }
+    public IReadOnlyList<RuntimeValue> Memory { get; init; }
     public int CodeSampleStart { get; init; }
 }
 
@@ -83,32 +82,32 @@ public class BytecodeProcessor
     ISleep? CurrentSleep;
 
     public Registers Registers;
-    public readonly DataItem[] Memory;
+    public readonly RuntimeValue[] Memory;
     public ImmutableArray<Instruction> Code;
     readonly FrozenDictionary<int, ExternalFunctionBase> ExternalFunctions;
 
     public int StackStart => Settings.HeapSize;
 
-    public IEnumerable<DataItem> GetStack()
+    public IEnumerable<RuntimeValue> GetStack()
     {
-        ArraySegment<DataItem> stack = GetStack(out bool shouldReverse);
+        ArraySegment<RuntimeValue> stack = GetStack(out bool shouldReverse);
         if (shouldReverse)
         { return stack.Reverse(); }
         else
         { return stack; }
     }
 
-    public ArraySegment<DataItem> GetStack(out bool shouldReverse)
+    public ArraySegment<RuntimeValue> GetStack(out bool shouldReverse)
     {
         if (StackDirection > 0)
         {
             shouldReverse = false;
-            return new ArraySegment<DataItem>(Memory)[StackStart..Registers.StackPointer];
+            return new ArraySegment<RuntimeValue>(Memory)[StackStart..Registers.StackPointer];
         }
         else
         {
             shouldReverse = true;
-            return new ArraySegment<DataItem>(Memory)[(Registers.StackPointer + 1)..];
+            return new ArraySegment<RuntimeValue>(Memory)[(Registers.StackPointer + 1)..];
         }
     }
 
@@ -133,7 +132,7 @@ public class BytecodeProcessor
 
         Code = code;
 
-        Memory = new DataItem[settings.HeapSize + StackSize];
+        Memory = new RuntimeValue[settings.HeapSize + StackSize];
 
         if (StackDirection > 0)
         { Registers.StackPointer = Settings.HeapSize; }
@@ -154,9 +153,9 @@ public class BytecodeProcessor
         CodeSampleStart = Math.Max(Registers.CodePointer - CodeSampleRange, 0),
     };
 
-    public static ImmutableArray<int> TraceCalls(IReadOnlyList<DataItem> stack, int basePointer)
+    public static ImmutableArray<int> TraceCalls(IReadOnlyList<RuntimeValue> stack, int basePointer)
     {
-        static bool CanTraceCallsWith(IReadOnlyList<DataItem> stack, int basePointer)
+        static bool CanTraceCallsWith(IReadOnlyList<RuntimeValue> stack, int basePointer)
         {
             int savedCodePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection);
             int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
@@ -167,19 +166,19 @@ public class BytecodeProcessor
             return true;
         }
 
-        static void TraceCalls(IReadOnlyList<DataItem> stack, List<int> callTrace, int basePointer)
+        static void TraceCalls(IReadOnlyList<RuntimeValue> stack, List<int> callTrace, int basePointer)
         {
             if (!CanTraceCallsWith(stack, basePointer)) return;
 
-            DataItem savedCodePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection)];
-            DataItem savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
+            RuntimeValue savedCodePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection)];
+            RuntimeValue savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
 
             int savedCodePointer = savedCodePointerD.Int;
             int savedBasePointer = savedBasePointerD.Int;
 
             callTrace.Add(savedCodePointer);
 
-            if (savedBasePointer == basePointer) return;
+            if (savedBasePointer == basePointer || callTrace.Contains(savedCodePointer)) return;
             TraceCalls(stack, callTrace, savedBasePointer);
         }
 
@@ -195,9 +194,9 @@ public class BytecodeProcessor
         return callTraceResult.ToImmutableArray();
     }
 
-    public static ImmutableArray<int> TraceBasePointers(IReadOnlyList<DataItem> stack, int basePointer)
+    public static ImmutableArray<int> TraceBasePointers(IReadOnlyList<RuntimeValue> stack, int basePointer)
     {
-        static bool CanTraceBPsWith(IReadOnlyList<DataItem> stack, int basePointer)
+        static bool CanTraceBPsWith(IReadOnlyList<RuntimeValue> stack, int basePointer)
         {
             int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
 
@@ -206,15 +205,13 @@ public class BytecodeProcessor
             return true;
         }
 
-        static void TraceBasePointers(List<int> result, IReadOnlyList<DataItem> stack, int basePointer)
+        static void TraceBasePointers(List<int> result, IReadOnlyList<RuntimeValue> stack, int basePointer)
         {
             if (!CanTraceBPsWith(stack, basePointer)) return;
 
-            DataItem savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
-            if (savedBasePointerD.Type != RuntimeType.Integer) return;
-            int newBasePointer = savedBasePointerD.Int;
+            int newBasePointer = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)].Int;
             result.Add(newBasePointer);
-            if (newBasePointer == basePointer) return;
+            if (newBasePointer == basePointer || result.Contains(newBasePointer)) return;
             TraceBasePointers(result, stack, newBasePointer);
         }
 
@@ -273,6 +270,7 @@ public class BytecodeProcessor
 
             case Opcode.Push: PUSH_VALUE(); break;
             case Opcode.Pop: POP_VALUE(); break;
+            case Opcode.PopTo: POP_TO_VALUE(); break;
 
             case Opcode.Jump: JUMP_BY(); break;
             case Opcode.Throw: THROW(); break;
@@ -359,9 +357,11 @@ public class BytecodeProcessor
         }
     }
 
-    DataItem GetData(InstructionOperand operand) => operand.Type switch
+    RuntimeValue GetData(InstructionOperand operand) => operand.Type switch
     {
-        InstructionOperandType.Immediate => operand.Value,
+        InstructionOperandType.Immediate8 => operand.Value,
+        InstructionOperandType.Immediate16 => operand.Value,
+        InstructionOperandType.Immediate32 => operand.Value,
         InstructionOperandType.Pointer => Memory[operand.Value.Int],
         InstructionOperandType.PointerBP => Memory[Registers.BasePointer + operand.Value.Int],
         InstructionOperandType.PointerSP => Memory[Registers.StackPointer + operand.Value.Int],
@@ -371,35 +371,37 @@ public class BytecodeProcessor
         InstructionOperandType.PointerEDX => Memory[Registers.EDX + operand.Value.Int],
         InstructionOperandType.Register => operand.Value.Int switch
         {
-            RegisterIds.CodePointer => new DataItem(Registers.CodePointer),
-            RegisterIds.StackPointer => new DataItem(Registers.StackPointer),
-            RegisterIds.BasePointer => new DataItem(Registers.BasePointer),
-            RegisterIds.EAX => new DataItem(Registers.EAX),
-            RegisterIds.AX => new DataItem(Registers.AX),
-            RegisterIds.AH => new DataItem(Registers.AH),
-            RegisterIds.AL => new DataItem(Registers.AL),
-            RegisterIds.EBX => new DataItem(Registers.EBX),
-            RegisterIds.BX => new DataItem(Registers.BX),
-            RegisterIds.BH => new DataItem(Registers.BH),
-            RegisterIds.BL => new DataItem(Registers.BL),
-            RegisterIds.ECX => new DataItem(Registers.ECX),
-            RegisterIds.CX => new DataItem(Registers.CX),
-            RegisterIds.CH => new DataItem(Registers.CH),
-            RegisterIds.CL => new DataItem(Registers.CL),
-            RegisterIds.EDX => new DataItem(Registers.EDX),
-            RegisterIds.DX => new DataItem(Registers.DX),
-            RegisterIds.DH => new DataItem(Registers.DH),
-            RegisterIds.DL => new DataItem(Registers.DL),
+            RegisterIds.CodePointer => new RuntimeValue(Registers.CodePointer),
+            RegisterIds.StackPointer => new RuntimeValue(Registers.StackPointer),
+            RegisterIds.BasePointer => new RuntimeValue(Registers.BasePointer),
+            RegisterIds.EAX => new RuntimeValue(Registers.EAX),
+            RegisterIds.AX => new RuntimeValue(Registers.AX),
+            RegisterIds.AH => new RuntimeValue(Registers.AH),
+            RegisterIds.AL => new RuntimeValue(Registers.AL),
+            RegisterIds.EBX => new RuntimeValue(Registers.EBX),
+            RegisterIds.BX => new RuntimeValue(Registers.BX),
+            RegisterIds.BH => new RuntimeValue(Registers.BH),
+            RegisterIds.BL => new RuntimeValue(Registers.BL),
+            RegisterIds.ECX => new RuntimeValue(Registers.ECX),
+            RegisterIds.CX => new RuntimeValue(Registers.CX),
+            RegisterIds.CH => new RuntimeValue(Registers.CH),
+            RegisterIds.CL => new RuntimeValue(Registers.CL),
+            RegisterIds.EDX => new RuntimeValue(Registers.EDX),
+            RegisterIds.DX => new RuntimeValue(Registers.DX),
+            RegisterIds.DH => new RuntimeValue(Registers.DH),
+            RegisterIds.DL => new RuntimeValue(Registers.DL),
             _ => throw new UnreachableException(),
         },
         _ => throw new UnreachableException(),
     };
 
-    void SetData(InstructionOperand operand, DataItem value)
+    void SetData(InstructionOperand operand, RuntimeValue value)
     {
         switch (operand.Type)
         {
-            case InstructionOperandType.Immediate:
+            case InstructionOperandType.Immediate8:
+            case InstructionOperandType.Immediate16:
+            case InstructionOperandType.Immediate32:
                 throw new RuntimeException($"Can't set an immediate value");
             case InstructionOperandType.Pointer:
                 Memory[operand.Value.Int] = value;
@@ -489,7 +491,7 @@ public class BytecodeProcessor
         }
     }
 
-    void Push(DataItem data)
+    void Push(RuntimeValue data)
     {
         if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
@@ -498,7 +500,7 @@ public class BytecodeProcessor
         Registers.StackPointer += StackDirection;
     }
 
-    DataItem Pop()
+    RuntimeValue Pop()
     {
         if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
@@ -515,7 +517,7 @@ public class BytecodeProcessor
 
     void HEAP_ALLOC()
     {
-        DataItem sizeData = GetData(CurrentInstruction.Operand2);
+        RuntimeValue sizeData = GetData(CurrentInstruction.Operand2);
         int size = sizeData.Int;
 
         int ptr = HeapUtils.Allocate(Memory, size);
@@ -527,7 +529,7 @@ public class BytecodeProcessor
 
     void HEAP_FREE()
     {
-        DataItem pointerData = GetData(CurrentInstruction.Operand1);
+        RuntimeValue pointerData = GetData(CurrentInstruction.Operand1);
         int pointer = pointerData.Int;
 
         HeapUtils.Deallocate(Memory, pointer);
@@ -537,7 +539,7 @@ public class BytecodeProcessor
 
     void Move()
     {
-        DataItem value = GetData(CurrentInstruction.Operand2);
+        RuntimeValue value = GetData(CurrentInstruction.Operand2);
         SetData(CurrentInstruction.Operand1, value);
 
         Step();
@@ -558,14 +560,14 @@ public class BytecodeProcessor
     {
         int relativeAddress = GetData(CurrentInstruction.Operand1).Int;
 
-        Push(new DataItem(Registers.CodePointer));
+        Push(new RuntimeValue(Registers.CodePointer));
 
         Step(relativeAddress);
     }
 
     void RETURN()
     {
-        DataItem codePointer = Pop();
+        RuntimeValue codePointer = Pop();
 
         Registers.CodePointer = codePointer.Int;
     }
@@ -636,8 +638,8 @@ public class BytecodeProcessor
 
     void Compare()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
 
         ALU.Subtract(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
 
@@ -650,9 +652,9 @@ public class BytecodeProcessor
 
     void LogicAND()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, (bool)dst && (bool)src);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, ((dst.Int != 0) && (src.Int != 0)) ? 1 : 0);
 
         Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
         Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
@@ -663,9 +665,9 @@ public class BytecodeProcessor
 
     void LogicOR()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, (bool)dst || (bool)src);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, ((dst.Int != 0) || (src.Int != 0)) ? 1 : 0);
 
         Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
         Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
@@ -676,8 +678,8 @@ public class BytecodeProcessor
 
     void BitsShiftLeft()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
         SetData(CurrentInstruction.Operand1, dst.Int << src.Int);
 
         Step();
@@ -685,8 +687,8 @@ public class BytecodeProcessor
 
     void BitsShiftRight()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
         SetData(CurrentInstruction.Operand1, dst.Int >> src.Int);
 
         Step();
@@ -694,8 +696,8 @@ public class BytecodeProcessor
 
     void BitsOR()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
         SetData(CurrentInstruction.Operand1, dst.Int | src.Int);
 
         Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
@@ -707,8 +709,8 @@ public class BytecodeProcessor
 
     void BitsXOR()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
         SetData(CurrentInstruction.Operand1, dst.Int ^ src.Int);
 
         Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
@@ -720,7 +722,7 @@ public class BytecodeProcessor
 
     void BitsNOT()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         SetData(CurrentInstruction.Operand1, ~dst.Int);
 
         Step();
@@ -728,8 +730,8 @@ public class BytecodeProcessor
 
     void BitsAND()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
         SetData(CurrentInstruction.Operand1, dst.Int & src.Int);
 
         Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
@@ -745,8 +747,8 @@ public class BytecodeProcessor
 
     void MathAdd()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
 
         dst = ALU.Add(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
 
@@ -757,14 +759,14 @@ public class BytecodeProcessor
 
     void MathDiv()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
 
         dst = CurrentInstruction.BitWidth switch
         {
-            BitWidth._8 => new DataItem((byte)(dst.Byte / src.Byte)),
-            BitWidth._16 => new DataItem((char)(dst.Char / src.Char)),
-            BitWidth._32 => new DataItem((int)(dst.Int / src.Int)),
+            BitWidth._8 => new RuntimeValue((byte)(dst.Byte / src.Byte)),
+            BitWidth._16 => new RuntimeValue((char)(dst.Char / src.Char)),
+            BitWidth._32 => new RuntimeValue((int)(dst.Int / src.Int)),
             _ => throw new UnreachableException(),
         };
         SetData(CurrentInstruction.Operand1, dst);
@@ -774,8 +776,8 @@ public class BytecodeProcessor
 
     void MathSub()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
 
         dst = ALU.Subtract(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
 
@@ -786,14 +788,14 @@ public class BytecodeProcessor
 
     void MathMult()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
 
         dst = CurrentInstruction.BitWidth switch
         {
-            BitWidth._8 => new DataItem((byte)(dst.Byte * src.Byte)),
-            BitWidth._16 => new DataItem((char)(dst.Char * src.Char)),
-            BitWidth._32 => new DataItem((int)(dst.Int * src.Int)),
+            BitWidth._8 => new RuntimeValue((byte)(dst.Byte * src.Byte)),
+            BitWidth._16 => new RuntimeValue((char)(dst.Char * src.Char)),
+            BitWidth._32 => new RuntimeValue((int)(dst.Int * src.Int)),
             _ => throw new UnreachableException(),
         };
         SetData(CurrentInstruction.Operand1, dst);
@@ -805,14 +807,14 @@ public class BytecodeProcessor
 
     void MathMod()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
 
         dst = CurrentInstruction.BitWidth switch
         {
-            BitWidth._8 => new DataItem((byte)(dst.Byte / src.Byte)),
-            BitWidth._16 => new DataItem((char)(dst.Char / src.Char)),
-            BitWidth._32 => new DataItem((int)(dst.Int / src.Int)),
+            BitWidth._8 => new RuntimeValue((byte)(dst.Byte / src.Byte)),
+            BitWidth._16 => new RuntimeValue((char)(dst.Char / src.Char)),
+            BitWidth._32 => new RuntimeValue((int)(dst.Int / src.Int)),
             _ => throw new UnreachableException(),
         };
         SetData(CurrentInstruction.Operand1, dst);
@@ -826,45 +828,45 @@ public class BytecodeProcessor
 
     void FMathAdd()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Single + src.Single);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single + src.Single));
 
         Step();
     }
 
     void FMathDiv()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Single / src.Single);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single / src.Single));
 
         Step();
     }
 
     void FMathSub()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Single - src.Single);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single - src.Single));
 
         Step();
     }
 
     void FMathMult()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Single * src.Single);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single * src.Single));
 
         Step();
     }
 
     void FMathMod()
     {
-        DataItem dst = GetData(CurrentInstruction.Operand1);
-        DataItem src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Single % src.Single);
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single % src.Single));
 
         Step();
     }
@@ -875,7 +877,7 @@ public class BytecodeProcessor
 
     void PUSH_VALUE()
     {
-        DataItem v = GetData(CurrentInstruction.Operand1);
+        RuntimeValue v = GetData(CurrentInstruction.Operand1);
         Push(v);
 
         Step();
@@ -883,9 +885,15 @@ public class BytecodeProcessor
 
     void POP_VALUE()
     {
-        DataItem v = Pop();
-        if (!CurrentInstruction.Operand1.Value.IsNull)
-        { SetData(CurrentInstruction.Operand1, v); }
+        Pop();
+
+        Step();
+    }
+
+    void POP_TO_VALUE()
+    {
+        RuntimeValue v = Pop();
+        SetData(CurrentInstruction.Operand1, v);
 
         Step();
     }
@@ -896,38 +904,16 @@ public class BytecodeProcessor
 
     void FTo()
     {
-        DataItem data = GetData(CurrentInstruction.Operand2);
-        switch (data.Type)
-        {
-            case RuntimeType.Null:
-                SetData(CurrentInstruction.Operand1, DataItem.Null);
-                break;
-            case RuntimeType.Single:
-                SetData(CurrentInstruction.Operand1, data);
-                break;
-            default:
-                SetData(CurrentInstruction.Operand1, (float)data);
-                break;
-        }
+        RuntimeValue data = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue((float)data.Int));
 
         Step();
     }
 
     void FFrom()
     {
-        DataItem data = GetData(CurrentInstruction.Operand2);
-        switch (data.Type)
-        {
-            case RuntimeType.Null:
-            case RuntimeType.Byte:
-            case RuntimeType.Char:
-            case RuntimeType.Integer:
-                SetData(CurrentInstruction.Operand1, data);
-                break;
-            case RuntimeType.Single:
-                SetData(CurrentInstruction.Operand1, (int)data.Single);
-                break;
-        }
+        RuntimeValue data = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, (int)data.Single);
 
         Step();
     }
@@ -943,7 +929,7 @@ public class BytecodeProcessor
         if (!ExternalFunctions.TryGetValue(functionId, out ExternalFunctionBase? function))
         { throw new RuntimeException($"Undefined external function {functionId}"); }
 
-        DataItem[] parameters = new DataItem[function.Parameters.Length];
+        RuntimeValue[] parameters = new RuntimeValue[function.Parameters.Length];
         for (int i = 0; i < function.Parameters.Length; i++)
         {
             parameters[parameters.Length - 1 - i] = Memory[Registers.StackPointer - ((1 + i) * StackDirection)];
@@ -958,7 +944,7 @@ public class BytecodeProcessor
         {
             if (function.ReturnSomething)
             {
-                DataItem returnValue = simpleFunction.Call(this, ImmutableArray.Create(parameters));
+                RuntimeValue returnValue = simpleFunction.Call(this, ImmutableArray.Create(parameters));
                 Push(returnValue);
             }
             else
@@ -1023,7 +1009,7 @@ public struct Registers
 
 public static class ALU
 {
-    public static DataItem Add(DataItem a, DataItem b, BitWidth bitWidth, ref Flags flags)
+    public static RuntimeValue Add(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags)
     {
         long _a = bitWidth switch
         {
@@ -1095,14 +1081,14 @@ public static class ALU
 
         return bitWidth switch
         {
-            BitWidth._8 => new DataItem(unchecked((byte)result)),
-            BitWidth._16 => new DataItem(unchecked((char)result)),
-            BitWidth._32 => new DataItem(unchecked((int)result)),
+            BitWidth._8 => new RuntimeValue(unchecked((byte)result)),
+            BitWidth._16 => new RuntimeValue(unchecked((char)result)),
+            BitWidth._32 => new RuntimeValue(unchecked((int)result)),
             _ => throw new UnreachableException(),
         };
     }
 
-    public static DataItem Subtract(DataItem a, DataItem b, BitWidth bitWidth, ref Flags flags)
+    public static RuntimeValue Subtract(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags)
     {
         long _a = bitWidth switch
         {
@@ -1174,9 +1160,9 @@ public static class ALU
 
         return bitWidth switch
         {
-            BitWidth._8 => new DataItem(unchecked((byte)result)),
-            BitWidth._16 => new DataItem(unchecked((char)result)),
-            BitWidth._32 => new DataItem(unchecked((int)result)),
+            BitWidth._8 => new RuntimeValue(unchecked((byte)result)),
+            BitWidth._16 => new RuntimeValue(unchecked((char)result)),
+            BitWidth._32 => new RuntimeValue(unchecked((int)result)),
             _ => throw new UnreachableException(),
         };
     }

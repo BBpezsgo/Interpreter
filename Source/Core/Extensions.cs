@@ -7,6 +7,13 @@ using Tokenizing;
 
 public static class Extensions
 {
+    public static ImmutableArray<TItem> Or<TItem>(this ImmutableArray<TItem> self, TItem value)
+    {
+        if (self.IsDefaultOrEmpty)
+        { return ImmutableArray.Create(value); }
+        return self;
+    }
+
     public static bool IsSame<TFunction>(this TFunction a, TFunction b)
         where TFunction : FunctionThingDefinition, ICompiledFunction
     {
@@ -15,10 +22,6 @@ public static class Extensions
         if (!Utils.SequenceEquals(a.ParameterTypes, b.ParameterTypes)) return false;
         return true;
     }
-
-    public static IEnumerable<T> Duplicate<T>(this IEnumerable<T> values)
-        where T : IDuplicatable<T>
-        => values.Select(item => item.Duplicate());
 
     public static bool Contains(this ImmutableArray<Token> tokens, string value)
     {

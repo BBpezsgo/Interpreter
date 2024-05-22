@@ -174,7 +174,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                         });
 
                         for (int i = 0; i < literal.Value.Length; i++)
-                        { Code.ARRAY_SET_CONST(address, i, new DataItem(literal.Value[i])); }
+                        { Code.ARRAY_SET_CONST(address, i, new CompiledValue(literal.Value[i])); }
                     }
                 }
                 else
@@ -327,7 +327,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
         using (Code.Block(this, $"Set variable \"{variable.Name}\" (at {variable.Address}) to {value}"))
         {
-            if (AllowPrecomputing && TryCompute(value, out DataItem constantValue))
+            if (AllowPrecomputing && TryCompute(value, out CompiledValue constantValue))
             {
                 AssignTypeCheck(variable.Type, constantValue, value);
 
@@ -440,7 +440,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         using (Code.Block(this, $"Set value {value} to address {address}"))
         {
-            if (AllowPrecomputing && TryCompute(value, out DataItem constantValue))
+            if (AllowPrecomputing && TryCompute(value, out CompiledValue constantValue))
             {
                 Code.SetValue(address, constantValue.Byte);
 
@@ -699,7 +699,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     }
     void GenerateCodeForStatement(LinkedIf @if, bool linked = false)
     {
-        if (TryCompute(@if.Condition, out DataItem computedCondition))
+        if (TryCompute(@if.Condition, out CompiledValue computedCondition))
         {
             if (computedCondition)
             { GenerateCodeForStatement(Block.CreateIfNotBlock(@if.Block)); }
@@ -962,7 +962,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
             try
             {
-                ImmutableArray<Block> unrolled = Unroll(@for, new Dictionary<StatementWithValue, DataItem>());
+                ImmutableArray<Block> unrolled = Unroll(@for, new Dictionary<StatementWithValue, CompiledValue>());
 
                 for (int i = 0; i < unrolled.Length; i++)
                 { GenerateCodeForStatement(unrolled[i]); }
@@ -1171,10 +1171,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (statement.Right == null)
                 { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                if (AllowPrecomputing && TryCompute(statement.Right, out DataItem constantValue))
+                if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
                 {
                     if (variable.Type is BuiltinType builtinType)
-                    { DataItem.TryCast(ref constantValue, builtinType.RuntimeType); }
+                    { CompiledValue.TryCast(ref constantValue, builtinType.RuntimeType); }
 
                     if (variable.Type != constantValue.Type)
                     { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
@@ -1217,10 +1217,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 if (statement.Right == null)
                 { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                if (AllowPrecomputing && TryCompute(statement.Right, out DataItem constantValue))
+                if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
                 {
                     if (variable.Type is BuiltinType builtinType)
-                    { DataItem.TryCast(ref constantValue, builtinType.RuntimeType); }
+                    { CompiledValue.TryCast(ref constantValue, builtinType.RuntimeType); }
 
                     if (variable.Type != constantValue.Type)
                     { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
@@ -1514,7 +1514,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
 
-        if (AllowPrecomputing && TryCompute(statement, out DataItem computed))
+        if (AllowPrecomputing && TryCompute(statement, out CompiledValue computed))
         {
             Stack.Push(computed);
             Precomputations++;
@@ -1566,7 +1566,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                             statement.Left is Identifier _left &&
                             CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, _left.Content, out Variable left) &&
                             !left.IsDiscarded &&
-                            TryCompute(statement.Right, out DataItem right) &&
+                            TryCompute(statement.Right, out CompiledValue right) &&
                             right.Type == RuntimeType.Byte)
                         {
                             int resultAddress = Stack.PushVirtual(1);
@@ -1814,7 +1814,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     using (Code.Block(this, "Compute left-side value"))
                     { GenerateCodeForStatement(statement.Left); }
 
-                    if (!TryCompute(statement.Right, out DataItem offsetConst))
+                    if (!TryCompute(statement.Right, out CompiledValue offsetConst))
                     { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
                     if (offsetConst != 0)
@@ -1836,7 +1836,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     using (Code.Block(this, "Compute left-side value"))
                     { GenerateCodeForStatement(statement.Left); }
 
-                    if (!TryCompute(statement.Right, out DataItem offsetConst))
+                    if (!TryCompute(statement.Right, out CompiledValue offsetConst))
                     { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
                     if (offsetConst != 0)
@@ -1864,7 +1864,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                 }
                 case "&":
                 {
-                    if (TryCompute(statement.Right, out DataItem right) && right == 1)
+                    if (TryCompute(statement.Right, out CompiledValue right) && right == 1)
                     {
                         int leftAddress = Stack.NextAddress;
                         using (Code.Block(this, "Compute left-side value"))
@@ -1908,7 +1908,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             }
         }
 
-        if (AllowPrecomputing && TryCompute(statement, out DataItem computed))
+        if (AllowPrecomputing && TryCompute(statement, out CompiledValue computed))
         {
             Stack.Push(computed);
             Precomputations++;
@@ -1996,7 +1996,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         using DebugInfoBlock debugBlock = DebugBlock(pointer);
 
-        if (TryCompute(pointer, out DataItem computed))
+        if (TryCompute(pointer, out CompiledValue computed))
         {
             Stack.Push(computed);
             return;
@@ -2116,7 +2116,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (TryCompute(field, out DataItem computed))
+        if (TryCompute(field, out CompiledValue computed))
         {
             Stack.Push(computed);
             return;
@@ -2186,7 +2186,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
     void GenerateCodeForPrinter(StatementWithValue value)
     {
-        if (TryCompute(value, out DataItem constantToPrint))
+        if (TryCompute(value, out CompiledValue constantToPrint))
         {
             GenerateCodeForPrinter(constantToPrint);
             return;
@@ -2202,7 +2202,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         GeneralType valueType = FindStatementType(value);
         GenerateCodeForValuePrinter(value, valueType);
     }
-    void GenerateCodeForPrinter(DataItem value)
+    void GenerateCodeForPrinter(CompiledValue value)
     {
         int tempAddress = Stack.NextAddress;
         using (Code.Block(this, $"Print value {value} (on address {tempAddress})"))
@@ -2512,7 +2512,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     void GenerateCodeForFunction(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, Dictionary<string, GeneralType>? typeArguments, IPositioned caller)
     {
         if (AllowEvaluating &&
-            TryEvaluate(function, parameters, out DataItem? returnValue, out Statement[]? runtimeStatements))
+            TryEvaluate(function, parameters, out CompiledValue? returnValue, out Statement[]? runtimeStatements))
         {
             Uri? savedFile = CurrentFile;
             CurrentFile = null;
@@ -2647,7 +2647,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     case ModifierKeywords.Const:
                     {
                         StatementWithValue valueStatement = modifiedStatement.Statement;
-                        if (!TryCompute(valueStatement, out DataItem constValue))
+                        if (!TryCompute(valueStatement, out CompiledValue constValue))
                         { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
                         constantParameters.Add(new CompiledParameterConstant(constValue, defined));
@@ -3140,7 +3140,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     case ModifierKeywords.Const:
                     {
                         StatementWithValue valueStatement = modifiedStatement.Statement;
-                        if (!TryCompute(valueStatement, out DataItem constValue))
+                        if (!TryCompute(valueStatement, out CompiledValue constValue))
                         { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
                         constantParameters.Add(new CompiledParameterConstant(constValue, defined));

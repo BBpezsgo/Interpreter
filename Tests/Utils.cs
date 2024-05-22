@@ -297,18 +297,6 @@ public static class Utils
     {
         Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
-        if (file.Directory != null)
-        {
-            string dllsFolderPath = Path.Combine(file.Directory.FullName, BasePath.Replace('/', '\\'));
-
-            if (Directory.Exists(dllsFolderPath))
-            {
-                string[] dlls = Directory.GetFiles(dllsFolderPath, "*.dll");
-                for (int i = 0; i < dlls.Length; i++)
-                { externalFunctions.LoadAssembly(System.Reflection.Assembly.LoadFile(dlls[i])); }
-            }
-        }
-
         AnalysisCollection analysisCollection = new();
 
         CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null);
@@ -617,6 +605,8 @@ public static class Utils
 
         file.WriteLine("# Test Results");
 
+        file.WriteLine($"[![](https://svg.test-summary.com/dashboard.svg?p={passingTestCount}&f={failedTestCount}&s={notRunTestCount})](#)");
+
         file.Write($"[![](https://img.shields.io/badge/Passing-{passingTestCount}-brightgreen?style=plastic])](#) ");
         file.Write($"[![](https://img.shields.io/badge/Failing-{failedTestCount}-red?style=plastic])](#) ");
         file.Write($"[![](https://img.shields.io/badge/Skipped-{notRunTestCount}-silver?style=plastic])](#)");
@@ -675,13 +665,13 @@ public readonly struct MainResult : IResult
     public readonly string StdOutput { get; }
     public readonly string StdError { get; }
     public readonly int ExitCode { get; }
-    public readonly IReadOnlyList<DataItem> Heap { get; }
+    public readonly IReadOnlyList<LanguageCore.Runtime.RuntimeValue> Heap { get; }
 
     public MainResult(string stdOut, string stdErr, BytecodeProcessor interpreter)
     {
         StdOutput = stdOut;
         StdError = stdErr;
-        ExitCode = (int)interpreter.Memory[interpreter.Registers.StackPointer - BytecodeProcessor.StackDirection];
+        ExitCode = interpreter.Memory[interpreter.Registers.StackPointer - BytecodeProcessor.StackDirection].Int;
         Heap = interpreter.Memory;
     }
 }

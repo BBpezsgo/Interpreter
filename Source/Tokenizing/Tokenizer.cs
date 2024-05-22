@@ -508,7 +508,7 @@ public abstract partial class Tokenizer
         }
         else if (currChar == 'e' && (CurrentToken.TokenType is PreparationTokenType.LiteralNumber or PreparationTokenType.LiteralFloat))
         {
-            if (CurrentToken.ToString().Contains(currChar, StringComparison.Ordinal))
+            if (CurrentToken.Contains(currChar))
             { throw new TokenizerException($"Am I stupid or this is not a float number?", CurrentToken.Position, File); }
             CurrentToken.Content.Append(currChar);
             CurrentToken.TokenType = PreparationTokenType.LiteralFloat;
@@ -517,7 +517,7 @@ public abstract partial class Tokenizer
             CurrentToken.TokenType == PreparationTokenType.LiteralNumber &&
             CurrentToken.Content.Equals("0"))
         {
-            if (!CurrentToken.ToString().EndsWith('0'))
+            if (!CurrentToken.EndsWith('0'))
             { throw new TokenizerException($"Am I stupid or this is not a hex number?", CurrentToken.Position, File); }
             CurrentToken.Content.Append(currChar);
             CurrentToken.TokenType = PreparationTokenType.LiteralHex;
@@ -544,7 +544,7 @@ public abstract partial class Tokenizer
             }
             else if (CurrentToken.TokenType == PreparationTokenType.Operator)
             {
-                if (CurrentToken.ToString() != "-")
+                if (!CurrentToken.Equals("-"))
                 { EndToken(offsetTotal); }
                 CurrentToken.TokenType = PreparationTokenType.LiteralNumber;
             }
@@ -778,7 +778,7 @@ public abstract partial class Tokenizer
 
         if (CurrentToken.TokenType == PreparationTokenType.LiteralFloat)
         {
-            if (CurrentToken.ToString().EndsWith('.'))
+            if (CurrentToken.EndsWith('.'))
             {
                 (PreparationToken? number, PreparationToken? op) = CurrentToken.Slice(CurrentToken.Content.Length - 1);
 
@@ -804,7 +804,7 @@ public abstract partial class Tokenizer
 
         if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_FLOAT)
         {
-            if (CurrentToken.ToString().Equals(".", StringComparison.Ordinal))
+            if (CurrentToken.Equals("."))
             { CurrentToken.TokenType = PreparationTokenType.Operator; }
             else
             { CurrentToken.TokenType = PreparationTokenType.LiteralFloat; }

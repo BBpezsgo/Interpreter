@@ -1,8 +1,7 @@
-﻿using LanguageCore;
-using LanguageCore.Runtime;
-using Win32.Console;
+﻿using Win32.Console;
 
 namespace ConsoleGUI;
+using LanguageCore.Runtime;
 
 public partial class InterpreterElement
 {
@@ -40,10 +39,10 @@ public partial class InterpreterElement
         }
 
         int nextHeader = 0;
-        for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Length; i++)
+        for (int i = 0; i < Interpreter.BytecodeInterpreter.Memory.Length; i++)
         {
-            DataItem item = this.Interpreter.BytecodeInterpreter.Memory[i];
-            bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory[i].IsNull);
+            RuntimeValue item = Interpreter.BytecodeInterpreter.Memory[i];
+            bool isHeader = (nextHeader == i) && (Interpreter.BytecodeInterpreter.Memory[i] != 0);
             (int, bool) header = (default, default);
 
             if (isHeader)
@@ -91,7 +90,7 @@ public partial class InterpreterElement
             {
                 b.BackgroundColor = CharColor.Gray;
                 b.AddText("HEADER | ");
-                b.AddText(header.Item1.ToString(CultureInfo.InvariantCulture));
+                b.AddText(header.Item1.ToString());
                 b.AddText(" | ");
                 if (header.Item2)
                 {
@@ -107,39 +106,15 @@ public partial class InterpreterElement
             }
             else
             {
-                if (item.IsNull)
+                if (item == 0)
                 {
                     b.ForegroundColor = CharColor.Gray;
-                    b.AddText("<null>");
+                    b.AddText('0');
                 }
                 else
                 {
-                    switch (item.Type)
-                    {
-                        case RuntimeType.Byte:
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(item.Byte.ToString(CultureInfo.InvariantCulture));
-                            break;
-                        case RuntimeType.Integer:
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(item.Int.ToString(CultureInfo.InvariantCulture));
-                            break;
-                        case RuntimeType.Single:
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(item.Single.ToString(CultureInfo.InvariantCulture));
-                            b.AddText('f');
-                            break;
-                        case RuntimeType.Char:
-                            b.ForegroundColor = CharColor.BrightYellow;
-                            b.AddText('\'');
-                            b.AddText(item.Char.Escape());
-                            b.AddText('\'');
-                            break;
-                        default:
-                            b.ForegroundColor = CharColor.Silver;
-                            b.AddText('?');
-                            break;
-                    }
+                    b.ForegroundColor = CharColor.BrightCyan;
+                    b.AddText(item.Int.ToString());
                 }
             }
 

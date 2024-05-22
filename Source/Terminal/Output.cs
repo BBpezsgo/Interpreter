@@ -37,7 +37,7 @@ public static class Output
     }
 
     public static void LogInfo(string message)
-    { if (LogInfos) LogColor(message, InfoColor); }
+    { if (LogInfos) Log(message, InfoColor); }
 
     public static void LogInfo(Information information)
     {
@@ -45,6 +45,7 @@ public static class Output
 
         Console.ForegroundColor = InfoColor;
         Console.WriteLine(information.ToString());
+
         string? arrows = information.GetArrows();
         if (arrows != null)
         { Console.WriteLine(arrows); }
@@ -57,6 +58,7 @@ public static class Output
 
         Console.ForegroundColor = InfoColor;
         Console.WriteLine(hint.ToString());
+
         string? arrows = hint.GetArrows();
         if (arrows != null)
         { Console.WriteLine(arrows); }
@@ -64,12 +66,13 @@ public static class Output
     }
 
     public static void LogError(string message)
-    { LogColor(message, ErrorColor); }
+    { Log(message, ErrorColor); }
 
     public static void LogError(LanguageException exception)
     {
         Console.ForegroundColor = ErrorColor;
         Console.WriteLine(exception.ToString());
+
         string? arrows = exception.GetArrows();
         if (arrows != null)
         { Console.WriteLine(arrows); }
@@ -80,6 +83,7 @@ public static class Output
     {
         Console.ForegroundColor = ErrorColor;
         Console.WriteLine(error.ToString());
+
         string? arrows = error.GetArrows();
         if (arrows != null)
         { Console.WriteLine(arrows); }
@@ -94,35 +98,30 @@ public static class Output
     }
 
     public static void LogWarning(string message)
-    { if (LogWarnings) LogColor(message, WarningColor); }
+    { if (LogWarnings) Log(message, WarningColor); }
 
     public static void LogWarning(Warning warning)
     {
-        if (LogWarnings)
-        {
-            Console.ForegroundColor = WarningColor;
-            Console.WriteLine(warning.ToString());
-            string? arrows = warning.GetArrows();
-            if (arrows != null)
-            { Console.WriteLine(arrows); }
-            Console.ResetColor();
-        }
+        if (!LogWarnings) return;
+
+        Console.ForegroundColor = WarningColor;
+        Console.WriteLine(warning.ToString());
+
+        string? arrows = warning.GetArrows();
+        if (arrows != null)
+        { Console.WriteLine(arrows); }
+        Console.ResetColor();
     }
 
     public static void LogDebug(string message)
-    { if (LogDebugs) LogColor(message, DebugColor); }
+    { if (LogDebugs) Log(message, DebugColor); }
 
-    static void LogColor(string message, ConsoleColor color)
+    static void Log(string message, ConsoleColor color)
     {
         Console.ForegroundColor = color;
         Console.WriteLine(message);
         Console.ResetColor();
     }
-
-    public static void WriteLine() => Console.Out.WriteLine();
-    public static void WriteLine(string data) => Console.Out.WriteLine(data);
-    public static void Write(string data) => Console.Out.Write(data);
-    public static void WriteError(string data) => Console.Error.Write(data);
 }
 
 [Flags]

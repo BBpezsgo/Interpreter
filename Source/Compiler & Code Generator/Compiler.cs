@@ -79,8 +79,8 @@ public readonly struct CompilerResult
         {
             foreach ((ImmutableArray<Statement> topLevelStatements, _) in TopLevelStatements)
             {
-                for (int i = 0; i < topLevelStatements.Length; i++)
-                { yield return topLevelStatements[i]; }
+                foreach (Statement statement in topLevelStatements)
+                { yield return statement; }
             }
 
             foreach (CompiledFunction function in Functions)
@@ -97,6 +97,34 @@ public readonly struct CompilerResult
             {
                 if (@operator.Block != null) yield return @operator.Block;
             }
+        }
+    }
+
+    public readonly IEnumerable<Statement> StatementsIn(Uri file)
+    {
+        foreach ((ImmutableArray<Statement> topLevelStatements, Uri? _file) in TopLevelStatements)
+        {
+            if (file != _file) continue;
+            foreach (Statement statement in topLevelStatements)
+            { yield return statement; }
+        }
+
+        foreach (CompiledFunction function in Functions)
+        {
+            if (file != function.File) continue;
+            if (function.Block != null) yield return function.Block;
+        }
+
+        foreach (CompiledGeneralFunction function in GeneralFunctions)
+        {
+            if (file != function.File) continue;
+            if (function.Block != null) yield return function.Block;
+        }
+
+        foreach (CompiledOperator @operator in Operators)
+        {
+            if (file != @operator.File) continue;
+            if (@operator.Block != null) yield return @operator.Block;
         }
     }
 
@@ -629,24 +657,16 @@ public sealed class Compiler
 
                 if (returnType == BasicType.Void)
                 {
-                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, ImmutableArray<DataItem> p) =>
+                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, ImmutableArray<RuntimeValue> p) =>
                         Output.LogDebug($"{name}({string.Join(", ", p)})")
                     );
                 }
                 else
                 {
-                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, ImmutableArray<DataItem> p) =>
+                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, ImmutableArray<RuntimeValue> p) =>
                     {
                         Output.LogDebug($"{name}({string.Join(", ", p)})");
-                        return returnType switch
-                        {
-                            BasicType.Void => DataItem.Null,
-                            BasicType.Byte => new DataItem((byte)0),
-                            BasicType.Integer => new DataItem((int)0),
-                            BasicType.Float => new DataItem((float)0),
-                            BasicType.Char => new DataItem((char)0),
-                            _ => throw new UnreachableException(),
-                        };
+                        return default;
                     });
                 }
             }

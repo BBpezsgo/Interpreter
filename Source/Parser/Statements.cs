@@ -107,7 +107,7 @@ public abstract class StatementWithValue : Statement
     /// <summary>
     /// Set by the compiler
     /// </summary>
-    public DataItem? PredictedValue { get; internal set; }
+    public CompiledValue? PredictedValue { get; internal set; }
     /// <summary>
     /// Set by the compiler
     /// </summary>
@@ -454,6 +454,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
     public StatementWithValue PrevStatement { get; }
     public TokenPair Brackets { get; }
     public ImmutableArray<StatementWithValue> Parameters { get; }
+    public ImmutableArray<Token> Commas { get; }
     public Uri OriginalFile { get; }
 
     public override Position Position => new(PrevStatement, Brackets);
@@ -461,11 +462,13 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
     public AnyCall(
         StatementWithValue prevStatement,
         IEnumerable<StatementWithValue> parameters,
+        IEnumerable<Token> commas,
         TokenPair brackets,
         Uri file)
     {
         PrevStatement = prevStatement;
         Parameters = parameters.ToImmutableArray();
+        Commas = commas.ToImmutableArray();
         Brackets = brackets;
         OriginalFile = file;
     }
@@ -1184,7 +1187,7 @@ public class Literal : StatementWithValue
     }
 
     /// <exception cref="NotImplementedException"/>
-    Literal(DataItem value, Token token)
+    Literal(CompiledValue value, Token token)
     {
         Type = value.Type switch
         {
@@ -1218,11 +1221,11 @@ public class Literal : StatementWithValue
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static Literal CreateAnonymous(DataItem value, IPositioned position)
+    public static Literal CreateAnonymous(CompiledValue value, IPositioned position)
         => Literal.CreateAnonymous(value, position.Position);
 
     /// <exception cref="NotImplementedException"/>
-    public static Literal CreateAnonymous(DataItem value, Position position)
+    public static Literal CreateAnonymous(CompiledValue value, Position position)
     {
         TokenType tokenType = value.Type switch
         {
@@ -1239,7 +1242,7 @@ public class Literal : StatementWithValue
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static Literal[] CreateAnonymous(DataItem[] values, IPositioned[] positions)
+    public static Literal[] CreateAnonymous(CompiledValue[] values, IPositioned[] positions)
     {
         Literal[] result = new Literal[values.Length];
         for (int i = 0; i < values.Length; i++)
@@ -1248,7 +1251,7 @@ public class Literal : StatementWithValue
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static Literal[] CreateAnonymous(DataItem[] values, Position[] positions)
+    public static Literal[] CreateAnonymous(CompiledValue[] values, Position[] positions)
     {
         Literal[] result = new Literal[values.Length];
         for (int i = 0; i < values.Length; i++)
@@ -1257,7 +1260,7 @@ public class Literal : StatementWithValue
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static IEnumerable<Literal> CreateAnonymous(IEnumerable<DataItem> values, IEnumerable<IPositioned> positions)
+    public static IEnumerable<Literal> CreateAnonymous(IEnumerable<CompiledValue> values, IEnumerable<IPositioned> positions)
         =>
         values
         .Zip(positions)

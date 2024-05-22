@@ -1,5 +1,7 @@
 ﻿namespace LanguageCore.Brainfuck;
 
+using Compiler;
+
 public interface IBrainfuckGenerator
 {
     public CodeHelper Code { get; }
@@ -122,16 +124,16 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     /// <exception cref="NotImplementedException"/>
     /// <exception cref="InternalException"/>
-    public static int GetInteger(Runtime.DataItem v)
+    public static int GetInteger(CompiledValue v)
     {
         return v.Type switch
         {
-            Runtime.RuntimeType.Byte => v.Byte,
-            Runtime.RuntimeType.Integer => v.Int,
-            Runtime.RuntimeType.Char => CharCode.GetByte(v.Char),
+            RuntimeType.Byte => v.Byte,
+            RuntimeType.Integer => v.Int,
+            RuntimeType.Char => CharCode.GetByte(v.Char),
 
-            Runtime.RuntimeType.Single => throw new NotImplementedException("Floats not supported by brainfuck :("),
-            Runtime.RuntimeType.Null => throw new InternalException(),
+            RuntimeType.Single => throw new NotImplementedException("Floats not supported by brainfuck :("),
+            RuntimeType.Null => throw new InternalException(),
             _ => throw new UnreachableException(),
         };
     }
@@ -335,7 +337,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// <inheritdoc cref="AddValue(int, int)"/>
     /// <exception cref="NotSupportedException"/>
     /// <exception cref="InternalException"/>
-    public void AddValue(Runtime.DataItem value) => AddValue(GetInteger(value));
+    public void AddValue(CompiledValue value) => AddValue(GetInteger(value));
 
     /// <summary>
     /// <para>
@@ -365,7 +367,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </code>
     /// </para>
     /// </summary>
-    public void AddValue(int address, Runtime.DataItem value)
+    public void AddValue(int address, CompiledValue value)
     {
         SetPointer(address);
         AddValue(value);
@@ -402,7 +404,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// <inheritdoc cref="SetValue(int, int)"/>
     /// <exception cref="NotSupportedException"/>
     /// <exception cref="InternalException"/>
-    public void SetValue(int address, Runtime.DataItem value) => SetValue(address, GetInteger(value));
+    public void SetValue(int address, CompiledValue value) => SetValue(address, GetInteger(value));
 
     /// <summary>
     /// <para>
@@ -663,14 +665,14 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
             while (true)
             {
-                if ((index = result.IndexOf("\r\n\r\n", StringComparison.Ordinal)) != -1)
+                if ((index = result.IndexOf("\r\n\r\n")) != -1)
                 {
                     result.Remove(index, 2);
                     debugInformation?.OffsetCodeFrom(index, -2);
                     continue;
                 }
 
-                if ((index = result.IndexOf(" \r\n", StringComparison.Ordinal)) != -1)
+                if ((index = result.IndexOf(" \r\n")) != -1)
                 {
                     result.Remove(index, 1);
                     debugInformation?.OffsetCodeFrom(index, -1);

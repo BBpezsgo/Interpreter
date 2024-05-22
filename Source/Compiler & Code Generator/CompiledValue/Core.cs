@@ -1,12 +1,12 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace LanguageCore.Runtime;
+namespace LanguageCore.Compiler;
 
 [DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
 [StructLayout(LayoutKind.Explicit)]
-public readonly partial struct DataItem
+public readonly partial struct CompiledValue
 {
-    public static DataItem Null => default;
+    public static CompiledValue Null => default;
 
     [field: FieldOffset(0)] public RuntimeType Type { get; }
 
@@ -30,24 +30,24 @@ public readonly partial struct DataItem
 
     #region Constructors
 
-    DataItem(RuntimeType type)
+    CompiledValue(RuntimeType type)
     {
         Type = type;
         _integer = default;
         _single = default;
     }
 
-    public DataItem(int value) : this(RuntimeType.Integer)
+    public CompiledValue(int value) : this(RuntimeType.Integer)
     { _integer = value; }
-    public DataItem(byte value) : this(RuntimeType.Byte)
+    public CompiledValue(byte value) : this(RuntimeType.Byte)
     { _integer = value; }
-    public DataItem(float value) : this(RuntimeType.Single)
+    public CompiledValue(float value) : this(RuntimeType.Single)
     { _single = value; }
-    public DataItem(char value) : this(RuntimeType.Char)
+    public CompiledValue(char value) : this(RuntimeType.Char)
     { _integer = value; }
-    public DataItem(ushort value) : this(RuntimeType.Char)
+    public CompiledValue(ushort value) : this(RuntimeType.Char)
     { _integer = value; }
-    public DataItem(bool value) : this(value ? 1 : 0)
+    public CompiledValue(bool value) : this(value ? 1 : 0)
     { }
 
     #endregion
@@ -117,28 +117,28 @@ public readonly partial struct DataItem
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static DataItem GetValue(object value) => value switch
+    public static CompiledValue GetValue(object value) => value switch
     {
-        byte v => new DataItem(v),
-        int v => new DataItem(v),
-        float v => new DataItem(v),
-        bool v => new DataItem(v),
-        char v => new DataItem(v),
-        _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(DataItem)}"),
+        byte v => new CompiledValue(v),
+        int v => new CompiledValue(v),
+        float v => new CompiledValue(v),
+        bool v => new CompiledValue(v),
+        char v => new CompiledValue(v),
+        _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(CompiledValue)}"),
     };
 
     /// <exception cref="NotImplementedException"/>
-    public static DataItem GetValue<T>(T value) where T : notnull => value switch
+    public static CompiledValue GetValue<T>(T value) where T : notnull => value switch
     {
-        byte v => new DataItem(v),
-        int v => new DataItem(v),
-        float v => new DataItem(v),
-        bool v => new DataItem(v),
-        char v => new DataItem(v),
-        _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(DataItem)}"),
+        byte v => new CompiledValue(v),
+        int v => new CompiledValue(v),
+        float v => new CompiledValue(v),
+        bool v => new CompiledValue(v),
+        char v => new CompiledValue(v),
+        _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(CompiledValue)}"),
     };
 
-    public static bool TryShrinkTo8bit(ref DataItem value)
+    public static bool TryShrinkTo8bit(ref CompiledValue value)
     {
         switch (value.Type)
         {
@@ -148,7 +148,7 @@ public readonly partial struct DataItem
             {
                 if (value.Char is < (char)byte.MinValue or > (char)byte.MaxValue)
                 { return false; }
-                value = new DataItem((byte)value.Char);
+                value = new CompiledValue((byte)value.Char);
                 return true;
             }
 
@@ -156,7 +156,7 @@ public readonly partial struct DataItem
             {
                 if (value.Int is < byte.MinValue or > byte.MaxValue)
                 { return false; }
-                value = new DataItem((byte)value.Int);
+                value = new CompiledValue((byte)value.Int);
                 return true;
             }
 
@@ -164,13 +164,13 @@ public readonly partial struct DataItem
         }
     }
 
-    public static bool TryShrinkTo16bit(ref DataItem value)
+    public static bool TryShrinkTo16bit(ref CompiledValue value)
     {
         switch (value.Type)
         {
             case RuntimeType.Byte:
             {
-                value = new DataItem((char)value.Byte);
+                value = new CompiledValue((char)value.Byte);
                 return true;
             }
 
@@ -180,7 +180,7 @@ public readonly partial struct DataItem
             {
                 if (value.Int is < char.MinValue or > char.MaxValue)
                 { return false; }
-                value = new DataItem((char)value.Int);
+                value = new CompiledValue((char)value.Int);
                 return true;
             }
 

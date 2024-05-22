@@ -13,10 +13,16 @@ public enum Opcode : byte
     Push,
     /// <summary>
     /// <code>
-    /// <paramref name="DST"/> = Pop()
+    /// <see langword="temp"/> = Pop()
     /// </code>
     /// </summary>
     Pop,
+    /// <summary>
+    /// <code>
+    /// <paramref name="DST"/> = Pop()
+    /// </code>
+    /// </summary>
+    PopTo,
     #endregion
 
     #region === FLOW CONTROL ===

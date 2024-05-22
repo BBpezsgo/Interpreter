@@ -26,7 +26,7 @@ public class UsingDefinition : IPositioned
         }
     }
     public Position Position =>
-        new Position(Path)
+        new Position(Path.Or(Keyword))
         .Union(Keyword);
 
     public UsingDefinition(Token keyword, IEnumerable<Token> path)

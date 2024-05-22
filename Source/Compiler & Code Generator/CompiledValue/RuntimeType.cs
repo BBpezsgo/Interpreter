@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.Runtime;
+﻿namespace LanguageCore.Compiler;
 
 public enum RuntimeType : byte
 {

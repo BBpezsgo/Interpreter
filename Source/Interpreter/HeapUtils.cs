@@ -1,5 +1,7 @@
 ﻿namespace LanguageCore.Runtime;
 
+using Compiler;
+
 public static class HeapUtils
 {
     const int BlockSizeMask = 0b_0000_0000_0000_0000_1111_1111_1111_1111;
@@ -7,7 +9,7 @@ public static class HeapUtils
     const int JoinFreeBlocksIterations = 2;
     public const int HeaderSize = 1;
 
-    public static void DebugPrint(IReadOnlyList<DataItem> heap)
+    public static void DebugPrint(IReadOnlyList<RuntimeValue> heap)
     {
         int endlessSafe = heap.Count;
         int i = 0;
@@ -30,7 +32,8 @@ public static class HeapUtils
 
                 for (int j = i + 1; j < (blockSize + i + 1); j++)
                 {
-                    heap[j].DebugPrint();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write(heap[j].Int);
                     Console.Write(" ");
                 }
                 Console.WriteLine();
@@ -51,7 +54,7 @@ public static class HeapUtils
         }
     }
 
-    public static int GetUsedSize(IReadOnlyList<DataItem> heap)
+    public static int GetUsedSize(IReadOnlyList<RuntimeValue> heap)
     {
         int used = 0;
 
@@ -74,7 +77,7 @@ public static class HeapUtils
         return used;
     }
 
-    public static int GetFreeSize(IReadOnlyList<DataItem> heap)
+    public static int GetFreeSize(IReadOnlyList<RuntimeValue> heap)
     {
         int free = 0;
 
@@ -97,50 +100,49 @@ public static class HeapUtils
         return free;
     }
 
-    public static DataItem[] GetData(IReadOnlyList<DataItem> heap, int start, int length)
+    public static RuntimeValue[] GetData(IReadOnlyList<RuntimeValue> heap, int start, int length)
     {
-        DataItem[] result = new DataItem[length];
+        RuntimeValue[] result = new RuntimeValue[length];
         for (int i = 0; i < length; i++)
         { result[i] = heap[start + i]; }
         return result;
     }
 
-    public static void GetData(IReadOnlyList<DataItem> heap, int start, Span<DataItem> buffer)
+    public static void GetData(IReadOnlyList<RuntimeValue> heap, int start, Span<RuntimeValue> buffer)
     {
         for (int i = 0; i < buffer.Length; i++)
         { buffer[i] = heap[start + i]; }
     }
 
-    public static string? GetString(IReadOnlyList<DataItem> heap, int pointer)
+    public static string? GetString(IReadOnlyList<RuntimeValue> heap, int pointer)
     {
         if (pointer == 0)
         { return null; }
         StringBuilder result = new();
-        for (int i = pointer; heap[i]; i++)
-        { result.Append((char)heap[i]); }
+        for (int i = pointer; heap[i].Int != 0; i++)
+        { result.Append((char)heap[i].Int); }
         return result.ToString();
     }
 
-    public static DataItem GetHeader(int size, bool used)
+    public static RuntimeValue GetHeader(int size, bool used)
         => new((size & BlockSizeMask) | (used ? BlockStatusMask : 0));
 
-    public static (ushort, bool) GetHeader(DataItem header)
+    public static (ushort, bool) GetHeader(RuntimeValue header)
     {
-        if (header.IsNull) header = 0;
-        if (header >= 127)
+        if (header.Int >= 127)
         {
-            header -= 127;
-            return ((ushort)header, true);
+            header = header.Int - 127;
+            return ((ushort)header.Int, true);
         }
         else
         {
-            return ((ushort)header, false);
+            return ((ushort)header.Int, false);
         }
 
         // ((ushort)(header.VInt & BlockSizeMask), (header.VInt & BlockStatusMask) != 0);
     }
 
-    public static void Init(ArraySegment<DataItem> heap)
+    public static void Init(ArraySegment<RuntimeValue> heap)
     {
         heap[0] = GetHeader((ushort)(heap.Count - 1), false);
     }
@@ -151,7 +153,7 @@ public static class HeapUtils
         { size = 1; }
     }
 
-    public static int Allocate(ArraySegment<DataItem> heap, int sizeNeed)
+    public static int Allocate(ArraySegment<RuntimeValue> heap, int sizeNeed)
     {
         if (sizeNeed is < ushort.MinValue or > ushort.MaxValue)
         { throw new OverflowException(); }
@@ -211,7 +213,7 @@ public static class HeapUtils
         throw new RuntimeException($"HEAP error: Failed to find free space (size {sizeNeed})");
     }
 
-    public static void Deallocate(ArraySegment<DataItem> heap, int pointer)
+    public static void Deallocate(ArraySegment<RuntimeValue> heap, int pointer)
     {
         int headerPointer = pointer - HeaderSize;
 
@@ -231,7 +233,7 @@ public static class HeapUtils
     /// <see langword="true"/> if any block has been joined, <see langword="false"/> otherwise
     /// </returns>
     /// <exception cref="EndlessLoopException"/>
-    static bool JoinFreeBlocks(ArraySegment<DataItem> heap)
+    static bool JoinFreeBlocks(ArraySegment<RuntimeValue> heap)
     {
         int endlessSafe = heap.Count;
 
@@ -253,7 +255,7 @@ public static class HeapUtils
                     // Update the previous block's header
                     heap[prevOffset] = GetHeader((ushort)((ushort)blockSize + (ushort)prevBlockSize + (ushort)HeaderSize), false);
                     // Remove the current block's header
-                    heap[offset] = DataItem.Null;
+                    heap[offset] = default;
 
                     return true;
                 }
@@ -269,9 +271,9 @@ public static class HeapUtils
         return false;
     }
 
-    static void Clear(ArraySegment<DataItem> heap, int from, int length)
+    static void Clear(ArraySegment<RuntimeValue> heap, int from, int length)
     {
         for (int i = from; i < from + length; i++)
-        { heap[i] = DataItem.Null; }
+        { heap[i] = default; }
     }
 }

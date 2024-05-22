@@ -2,7 +2,8 @@
 
 sealed class PreparationToken :
     IPositioned,
-    IDuplicatable<PreparationToken>
+    IDuplicatable<PreparationToken>,
+    IEquatable<string>
 {
     public PreparationTokenType TokenType { get; set; }
     public StringBuilder Content { get; }
@@ -23,6 +24,9 @@ sealed class PreparationToken :
     }
 
     public override string ToString() => Content.ToString();
+    public bool Equals(string? other) => Content.Equals(other);
+    public bool EndsWith(char v) => Content.Length != 0 && Content[^1] == v;
+    public bool Contains(char v) => Content.Contains(v);
 
     /// <exception cref="InternalException"/>
     public Token Instantiate() => new(this);

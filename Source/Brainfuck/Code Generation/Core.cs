@@ -591,7 +591,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             if (size != 1)
             { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", index, CurrentFile); }
 
-            if (TryCompute(index.Index, out DataItem indexValue))
+            if (TryCompute(index.Index, out CompiledValue indexValue))
             {
                 address = variable.Address + ((int)indexValue * 2 * arrayType.Of.Size);
                 return true;
@@ -633,10 +633,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     bool TryGetAddress(Pointer pointer, out int address, out int size)
     {
-        if (!TryCompute(pointer.PrevStatement, out DataItem addressToSet))
+        if (!TryCompute(pointer.PrevStatement, out CompiledValue addressToSet))
         { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.PrevStatement, CurrentFile); }
 
-        if (!DataItem.TryShrinkTo8bit(ref addressToSet))
+        if (!CompiledValue.TryShrinkTo8bit(ref addressToSet))
         { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, CurrentFile); }
 
         address = addressToSet.Byte;

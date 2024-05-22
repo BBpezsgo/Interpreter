@@ -772,33 +772,12 @@ public class Interactive
 
         if (interpreter.BytecodeInterpreter.Memory.Length > 0)
         {
-            DataItem exitCode = interpreter.BytecodeInterpreter.Memory[interpreter.BytecodeInterpreter.Registers.StackPointer - 1];
+            RuntimeValue exitCode = interpreter.BytecodeInterpreter.Memory[interpreter.BytecodeInterpreter.Registers.StackPointer - 1];
 
             AnsiBuilder output = new();
 
-            switch (exitCode.Type)
-            {
-                case RuntimeType.Byte:
-                    output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append(exitCode.Byte);
-                    break;
-                case RuntimeType.Integer:
-                    output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append(exitCode.Int);
-                    break;
-                case RuntimeType.Single:
-                    output.ForegroundColor = InteractiveColors.LiteralNumber;
-                    output.Append($"{exitCode.Single}f");
-                    break;
-                case RuntimeType.Char:
-                    output.ForegroundColor = InteractiveColors.LiteralString;
-                    output.Append($"'{exitCode.Char}'");
-                    break;
-                default:
-                    output.ForegroundColor = InteractiveColors.Keyword;
-                    output.Append("null");
-                    break;
-            }
+            output.ForegroundColor = InteractiveColors.LiteralNumber;
+            output.Append(exitCode.Int);
 
             output.ResetStyle();
 
@@ -806,7 +785,8 @@ public class Interactive
             Sessions.Add(new InteractiveSession(
                 ColorizeSource(source, CompilerCache.Tokens),
                 output.ToString(),
-                CurrentSession.InterpreterStandardOutput.ToString()));
+                CurrentSession.InterpreterStandardOutput.ToString()
+            ));
         }
         else
         {

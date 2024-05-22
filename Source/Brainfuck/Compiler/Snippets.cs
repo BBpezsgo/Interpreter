@@ -4,6 +4,8 @@ using Win32.Console;
 
 namespace LanguageCore.Brainfuck;
 
+using Compiler;
+
 public static class Snippets
 {
     #region LOGIC
@@ -1224,7 +1226,7 @@ public static class Snippets
         code += "> [>>] << [-<<]";
     }
 
-    public static void ARRAY_SET_CONST(this CodeHelper code, int arrayAddress, int index, Runtime.DataItem value)
+    public static void ARRAY_SET_CONST(this CodeHelper code, int arrayAddress, int index, CompiledValue value)
     {
         index *= 2;
         index += 3;

@@ -1,5 +1,7 @@
 ﻿namespace LanguageCore.Brainfuck;
 
+using Compiler;
+
 public readonly struct StackAddress : IDisposable
 {
     readonly StackCodeHelper Stack;
@@ -74,7 +76,7 @@ public class StackCodeHelper
     /// </summary>
     /// <exception cref="NotSupportedException"/>
     /// <exception cref="InternalException"/>
-    public StackAddress Push(Runtime.DataItem v) => Push(CodeHelper.GetInteger(v));
+    public StackAddress Push(CompiledValue v) => Push(CodeHelper.GetInteger(v));
 
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state

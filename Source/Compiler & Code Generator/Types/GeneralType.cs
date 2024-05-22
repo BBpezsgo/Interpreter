@@ -49,7 +49,7 @@ public abstract class GeneralType :
         ComputeValue? constComputer = null,
         Uri? uri = null)
     {
-        DataItem stackArraySize;
+        CompiledValue stackArraySize;
 
         if (type.StackArraySize is null)
         { throw new NotImplementedException(); }

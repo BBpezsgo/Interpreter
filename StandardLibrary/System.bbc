@@ -105,12 +105,6 @@ export inline byte ParseByte(temp char* v)
     return result;
 }
 
-[External("int-to-float")]
-export float ToFloat(this int v);
-
-[External("float-to-int")]
-export int ToInt(this float v);
-
 /*
  * Source: https://en.wikipedia.org/wiki/Lehmer_random_number_generator
  */

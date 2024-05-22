@@ -1542,6 +1542,7 @@ public sealed class Parser
 
         bool expectParameter = false;
         List<StatementWithValue> parameters = new();
+        List<Token> commas = new();
 
         int endlessSafe = 0;
         Token? bracketEnd;
@@ -1565,17 +1566,18 @@ public sealed class Parser
             if (ExpectOperator(")", out bracketEnd))
             { break; }
 
-            if (!ExpectOperator(","))
+            if (!ExpectOperator(",", out Token? comma))
             { throw new SyntaxException("Expected \",\" to separate parameters", parameter.Position.After(), File); }
             else
             { expectParameter = true; }
+            commas.Add(comma);
 
             endlessSafe++;
             if (endlessSafe > 100)
             { throw new EndlessLoopException(); }
         }
 
-        anyCall = new AnyCall(prevStatement, parameters, new TokenPair(bracketStart, bracketEnd), File);
+        anyCall = new AnyCall(prevStatement, parameters, commas, new TokenPair(bracketStart, bracketEnd), File);
         return true;
     }
 

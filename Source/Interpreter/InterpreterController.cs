@@ -1,6 +1,6 @@
-﻿using System.IO;
+﻿namespace LanguageCore.Runtime;
 
-namespace LanguageCore.Runtime;
+using Compiler;
 
 /// <summary>
 /// This compiles and runs the code
@@ -58,7 +58,7 @@ public class Interpreter
     {
         if (ReturnValueConsumer != null)
         {
-            ReturnValueConsumer.OnReturn?.Invoke(new DataItem(key));
+            ReturnValueConsumer.OnReturn?.Invoke(new RuntimeValue(key));
             ReturnValueConsumer = null;
         }
 
@@ -71,7 +71,7 @@ public class Interpreter
 
         #region Console
 
-        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, (ImmutableArray<DataItem> parameters, ExternalFunctionManaged function) =>
+        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, (ImmutableArray<RuntimeValue> parameters, ExternalFunctionManaged function) =>
         {
             this.IsPaused = true;
             this.ReturnValueConsumer = function;
@@ -124,47 +124,22 @@ public class Interpreter
 
     static void AddRuntimeExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
     {
-        #region Console
-
-        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, (ImmutableArray<DataItem> parameters, ExternalFunctionManaged function) => { });
+        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, (ImmutableArray<RuntimeValue> parameters, ExternalFunctionManaged function) => { });
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, (char @char) => { });
         externalFunctions.AddExternalFunction("console-set", (char @char, int x, int y) => { });
         externalFunctions.AddExternalFunction("console-clear", () => { });
         externalFunctions.AddExternalFunction("stderr", (char @char) => { });
         externalFunctions.AddExternalFunction("sleep", (int t) => { });
-
-        #endregion
-
-        #region Streams
-
-        externalFunctions.AddExternalFunction("stream-create", (int bufferSize, int bufferMemoryAddress) => 0);
-        externalFunctions.AddExternalFunction("stream-dispose", (int id) => { });
-        externalFunctions.AddExternalFunction("stream-flush", (int id, int count) => { });
-        externalFunctions.AddExternalFunction("stream-length", (int id) => 0);
-        externalFunctions.AddExternalFunction("stream-clear", (int id) => { });
-
-        #endregion
     }
 
     static void AddStaticExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
     {
-        #region Enviroment
-
         externalFunctions.AddExternalFunction("utc-time", () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
         externalFunctions.AddExternalFunction("local-time", () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
         externalFunctions.AddExternalFunction("utc-date-day", () => (int)DateTime.Now.DayOfYear);
         externalFunctions.AddExternalFunction("local-date-day", () => (int)DateTime.Now.DayOfYear);
         externalFunctions.AddExternalFunction("utc-date-year", () => (int)DateTime.Now.Year);
         externalFunctions.AddExternalFunction("local-date-year", () => (int)DateTime.Now.Year);
-
-        #endregion
-
-        #region Casts
-
-        externalFunctions.AddExternalFunction("float-to-int", (float v) => (int)v);
-        externalFunctions.AddExternalFunction("int-to-float", (int v) => (float)v);
-
-        #endregion
     }
 
     /// <exception cref="UserException"/>

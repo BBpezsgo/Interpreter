@@ -1,5 +1,7 @@
 ﻿namespace LanguageCore.Runtime;
 
+using Compiler;
+
 public enum AddressingMode : byte
 {
     /// <summary>
@@ -36,8 +38,12 @@ public enum BitWidth : byte
 
 public enum InstructionOperandType : byte
 {
-    Immediate,
+    Immediate8,
+    Immediate16,
+    Immediate32,
+
     Pointer,
+
     Register,
 
     PointerBP,
@@ -51,13 +57,15 @@ public enum InstructionOperandType : byte
 
 public readonly struct InstructionOperand
 {
-    public readonly DataItem Value;
+    public readonly RuntimeValue Value;
     public readonly InstructionOperandType Type;
 
     public BitWidth BitWidth => Type switch
     {
-        InstructionOperandType.Immediate => Value.Type.Convert().ToBitWidth(),
-        InstructionOperandType.Pointer => Value.Type.Convert().ToBitWidth(),
+        InstructionOperandType.Immediate8 => BitWidth._8,
+        InstructionOperandType.Immediate16 => BitWidth._16,
+        InstructionOperandType.Immediate32 => BitWidth._32,
+        InstructionOperandType.Pointer => BitWidth._32,
         InstructionOperandType.Register => (Register)Value.Int switch
         {
             Register.CodePointer => BitWidth._32,
@@ -90,7 +98,7 @@ public readonly struct InstructionOperand
         _ => throw new UnreachableException(),
     };
 
-    public InstructionOperand(DataItem value, InstructionOperandType type)
+    public InstructionOperand(RuntimeValue value, InstructionOperandType type)
     {
         Value = value;
         Type = type;
@@ -98,7 +106,9 @@ public readonly struct InstructionOperand
 
     public override string ToString() => Type switch
     {
-        InstructionOperandType.Immediate => Value.ToString(),
+        InstructionOperandType.Immediate8 => Value.ToString(),
+        InstructionOperandType.Immediate16 => Value.ToString(),
+        InstructionOperandType.Immediate32 => Value.ToString(),
         InstructionOperandType.Pointer => $"[{Value}]",
         InstructionOperandType.Register => Value.Int switch
         {
@@ -132,8 +142,17 @@ public readonly struct InstructionOperand
         _ => throw new UnreachableException(),
     };
 
-    public static implicit operator InstructionOperand(DataItem value) => new(value, InstructionOperandType.Immediate);
-    public static implicit operator InstructionOperand(int value) => new(new DataItem(value), InstructionOperandType.Immediate);
+    public static implicit operator InstructionOperand(CompiledValue value) => value.Type switch
+    {
+        RuntimeType.Null => new InstructionOperand(default, InstructionOperandType.Immediate32),
+        RuntimeType.Byte => new InstructionOperand(value.Byte, InstructionOperandType.Immediate8),
+        RuntimeType.Char => new InstructionOperand(value.Char, InstructionOperandType.Immediate16),
+        RuntimeType.Integer => new InstructionOperand(value.Int, InstructionOperandType.Immediate32),
+        RuntimeType.Single => new InstructionOperand(new RuntimeValue(value.Single), InstructionOperandType.Immediate32),
+        _ => throw new UnreachableException(),
+    };
+
+    public static implicit operator InstructionOperand(int value) => new(new RuntimeValue(value), InstructionOperandType.Immediate32);
     public static implicit operator InstructionOperand(Register register) => new((int)register, InstructionOperandType.Register);
 }
 
@@ -159,19 +178,18 @@ public readonly struct Instruction
     {
         get
         {
-            if (Operand1.Value.IsNull &&
-                Operand2.Value.IsNull)
-            { return BitWidth._32; }
-
-            if (!Operand1.Value.IsNull)
-            { return Operand1.BitWidth; }
-
-            if (!Operand2.Value.IsNull)
-            { return Operand2.BitWidth; }
-
-            BitWidth _1 = Operand1.BitWidth;
-            BitWidth _2 = Operand2.BitWidth;
-            return (_1 > _2) ? _1 : _2;
+            switch (InstructionUtils.ParameterCount(Opcode))
+            {
+                case 0: return BitWidth._32;
+                case 1: return Operand1.BitWidth;
+                case 2:
+                {
+                    BitWidth _1 = Operand1.BitWidth;
+                    BitWidth _2 = Operand2.BitWidth;
+                    return (_1 > _2) ? _1 : _2;
+                }
+                default: throw new UnreachableException();
+            }
         }
     }
     public readonly InstructionOperand Operand1;
@@ -190,13 +208,15 @@ public readonly struct Instruction
 
         result.Append(Opcode.ToString());
 
-        if (!Operand1.Value.IsNull)
+        int parameterCount = InstructionUtils.ParameterCount(Opcode);
+
+        if (parameterCount >= 1)
         {
             result.Append(' ');
             result.Append(Operand1.ToString());
         }
 
-        if (!Operand2.Value.IsNull)
+        if (parameterCount >= 2)
         {
             result.Append(' ');
             result.Append(Operand2.ToString());
@@ -204,4 +224,52 @@ public readonly struct Instruction
 
         return result.ToString();
     }
+}
+
+public static class InstructionUtils
+{
+    public static int ParameterCount(Opcode opcode) => opcode switch
+    {
+        Opcode._ => 0,
+        Opcode.Push => 1,
+        Opcode.Pop => 0,
+        Opcode.PopTo => 1,
+        Opcode.Exit => 0,
+        Opcode.Call => 1,
+        Opcode.Return => 0,
+        Opcode.JumpIfEqual => 1,
+        Opcode.JumpIfNotEqual => 1,
+        Opcode.JumpIfGreater => 1,
+        Opcode.JumpIfGreaterOrEqual => 1,
+        Opcode.JumpIfLess => 1,
+        Opcode.JumpIfLessOrEqual => 1,
+        Opcode.Jump => 1,
+        Opcode.CallExternal => 1,
+        Opcode.Throw => 1,
+        Opcode.Compare => 2,
+        Opcode.LogicOR => 2,
+        Opcode.LogicAND => 2,
+        Opcode.BitsAND => 2,
+        Opcode.BitsOR => 2,
+        Opcode.BitsXOR => 2,
+        Opcode.BitsNOT => 1,
+        Opcode.BitsShiftLeft => 2,
+        Opcode.BitsShiftRight => 2,
+        Opcode.MathAdd => 2,
+        Opcode.MathSub => 2,
+        Opcode.MathMult => 2,
+        Opcode.MathDiv => 2,
+        Opcode.MathMod => 2,
+        Opcode.FMathAdd => 2,
+        Opcode.FMathSub => 2,
+        Opcode.FMathMult => 2,
+        Opcode.FMathDiv => 2,
+        Opcode.FMathMod => 2,
+        Opcode.Allocate => 2,
+        Opcode.Free => 1,
+        Opcode.Move => 2,
+        Opcode.FTo => 1,
+        Opcode.FFrom => 1,
+        _ => throw new UnreachableException(),
+    };
 }

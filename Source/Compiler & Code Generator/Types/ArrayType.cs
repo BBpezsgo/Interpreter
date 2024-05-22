@@ -44,5 +44,5 @@ public class ArrayType : GeneralType,
     public override int GetHashCode() => HashCode.Combine(Of, Length);
     public override string ToString() => $"{Of}[{Length}]";
 
-    public override TypeInstance ToTypeInstance() => new TypeInstanceStackArray(Of.ToTypeInstance(), Literal.CreateAnonymous(new DataItem(Size), Position.UnknownPosition));
+    public override TypeInstance ToTypeInstance() => new TypeInstanceStackArray(Of.ToTypeInstance(), Literal.CreateAnonymous(new CompiledValue(Size), Position.UnknownPosition));
 }

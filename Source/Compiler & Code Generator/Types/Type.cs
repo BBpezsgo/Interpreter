@@ -13,5 +13,5 @@ public enum BasicType
     Char,
 }
 
-public delegate bool ComputeValue(StatementWithValue value, out DataItem computedValue);
+public delegate bool ComputeValue(StatementWithValue value, out CompiledValue computedValue);
 public delegate bool FindType(Token token, Uri relevantFile, [NotNullWhen(true)] out GeneralType? computedValue);

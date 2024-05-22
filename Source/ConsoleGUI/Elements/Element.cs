@@ -7,7 +7,7 @@ namespace ConsoleGUI;
 [SupportedOSPlatform("windows")]
 public class Element : IMainThreadThing
 {
-    public Rectangle Rect { get; set; } = Rectangle.Empty;
+    public Rectangle Rect { get; set; }
 
     public bool HasBorder;
     public string? Title;

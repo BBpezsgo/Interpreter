@@ -23,7 +23,7 @@ public readonly struct Position :
         AbsoluteRange = absoluteRange;
     }
 
-    public Position(params IPositioned?[] elements)
+    public Position(params ReadOnlySpan<IPositioned?> elements)
     {
         if (elements.Length == 0) throw new ArgumentException($"Number of elements must be more than zero", nameof(elements));
 
@@ -33,7 +33,7 @@ public readonly struct Position :
         for (int i = 0; i < elements.Length; i++)
         {
             IPositioned? element = elements[i];
-            if (element == null) continue;
+            if (element is null) continue;
             if (element is Tokenizing.Token token && token.IsAnonymous) continue;
             Position position = element.Position;
             Range = position.Range;
@@ -49,8 +49,18 @@ public readonly struct Position :
         Range = result.Range;
         AbsoluteRange = result.AbsoluteRange;
     }
-    public Position(IEnumerable<IPositioned?> elements) : this(elements.ToArray())
-    { }
+    public Position(IPositioned item1)
+    {
+        Range = Position.UnknownPosition.Range;
+        AbsoluteRange = Position.UnknownPosition.AbsoluteRange;
+
+        if (item1 is null || (item1 is Tokenizing.Token token && token.IsAnonymous)) return;
+
+        Position position = item1.Position;
+        Range = position.Range;
+        AbsoluteRange = position.AbsoluteRange;
+    }
+    public Position(IEnumerable<IPositioned?> elements) : this(elements.ToArray().AsSpan()) { }
 
     public string ToStringRange()
     {

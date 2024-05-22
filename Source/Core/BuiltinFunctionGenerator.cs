@@ -1,5 +1,7 @@
 ﻿namespace LanguageCore.Runtime;
 
+using Compiler;
+
 [Flags]
 public enum ExternalFunctionCheckFlags : byte
 {
@@ -30,7 +32,7 @@ public abstract class ExternalFunctionBase : ISimpleReadable
         Flags = flags;
     }
 
-    protected void BeforeCallback(ImmutableArray<DataItem> parameters)
+    protected void BeforeCallback(ImmutableArray<RuntimeValue> parameters)
     {
         if (CheckParameterLength && parameters.Length != Parameters.Length)
         { throw new RuntimeException($"Wrong number of parameters passed to external function {Name} ({parameters.Length}): expected {Parameters.Length}"); }
@@ -53,28 +55,28 @@ public abstract class ExternalFunctionBase : ISimpleReadable
 
 public class ExternalFunctionSimple : ExternalFunctionBase
 {
-    protected Func<BytecodeProcessor, ImmutableArray<DataItem>, DataItem> callback;
+    protected Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback;
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionSimple(Action<BytecodeProcessor, ImmutableArray<DataItem>> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
+    public ExternalFunctionSimple(Action<BytecodeProcessor, ImmutableArray<RuntimeValue>> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
         : base(id, name, parameters, false, flags)
     {
         this.callback = (sender, v) =>
         {
             callback?.Invoke(sender, v);
-            return DataItem.Null;
+            return default;
         };
     }
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionSimple(Func<BytecodeProcessor, ImmutableArray<DataItem>, DataItem> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
+    public ExternalFunctionSimple(Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
         : base(id, name, parameters, true, flags)
     {
         this.callback = callback;
     }
 
     /// <exception cref="InternalException"/>
-    public DataItem Call(BytecodeProcessor sender, ImmutableArray<DataItem> parameters)
+    public RuntimeValue Call(BytecodeProcessor sender, ImmutableArray<RuntimeValue> parameters)
     {
         base.BeforeCallback(parameters);
 
@@ -87,24 +89,24 @@ public class ExternalFunctionSimple : ExternalFunctionBase
 
 public class ExternalFunctionManaged : ExternalFunctionBase
 {
-    public delegate void ReturnEvent(DataItem returnValue);
+    public delegate void ReturnEvent(RuntimeValue returnValue);
 
     public ReturnEvent? OnReturn;
-    readonly Func<ImmutableArray<DataItem>, DataItem> callback;
+    readonly Func<ImmutableArray<RuntimeValue>, RuntimeValue> callback;
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionManaged(Action<ImmutableArray<DataItem>, ExternalFunctionManaged> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
+    public ExternalFunctionManaged(Action<ImmutableArray<RuntimeValue>, ExternalFunctionManaged> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
              : base(id, name, parameters, true, flags)
     {
-        this.callback = new Func<ImmutableArray<DataItem>, DataItem>((p) =>
+        this.callback = new Func<ImmutableArray<RuntimeValue>, RuntimeValue>((p) =>
         {
             callback?.Invoke(p, this);
-            return DataItem.Null;
+            return default;
         });
     }
 
     /// <exception cref="InternalException"></exception>
-    public void Callback(ImmutableArray<DataItem> parameters)
+    public void Callback(ImmutableArray<RuntimeValue> parameters)
     {
         base.BeforeCallback(parameters);
         callback.Invoke(parameters);
@@ -141,16 +143,6 @@ public static unsafe class ExternalFunctionGenerator
         return true;
     }
 
-    [RequiresUnreferencedCode("Loading Assembly")]
-    public static void LoadAssembly(this Dictionary<int, ExternalFunctionBase> externalFunctions, System.Reflection.Assembly assembly)
-    {
-        foreach (Type type in assembly.GetExportedTypes())
-        {
-            foreach (System.Reflection.MethodInfo method in type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public))
-            { externalFunctions.AddExternalFunction(method); }
-        }
-    }
-
     public static int GenerateId(this Dictionary<int, ExternalFunctionBase> functions, string? name)
     {
         int result;
@@ -166,63 +158,22 @@ public static unsafe class ExternalFunctionGenerator
 
     #region AddExternalFunction()
 
-    /// <exception cref="InternalException"/>
-    /// <exception cref="RuntimeException"/>
-    static ExternalFunctionSimple AddExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, System.Reflection.MethodInfo method)
-        => functions.AddExternalFunction(functions.GenerateId(method.Name), method);
-
-    /// <exception cref="InternalException"/>
-    /// <exception cref="RuntimeException"/>
-    static ExternalFunctionSimple AddExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, System.Reflection.MethodInfo method)
-    {
-        if (!method.IsStatic)
-        { throw new InternalException($"Only static functions can be added as an external function"); }
-
-        ImmutableArray<RuntimeType> parameterTypes = GetTypes(method.GetParameters()).ToImmutableArray();
-
-        ExternalFunctionSimple function;
-
-        if (method.ReturnType != typeof(void))
-        {
-            function = new((sender, parameters) =>
-            {
-                ImmutableArray<object?> parameterValues = GetValues(parameters);
-                object? returnValue = method.Invoke(null, parameterValues.ToArray());
-                if (returnValue is null)
-                { return DataItem.Null; }
-                else
-                { return DataItem.GetValue(returnValue); }
-            }, id, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
-        }
-        else
-        {
-            function = new((sender, parameters) =>
-            {
-                object?[] parameterValues = GetValues(parameters).ToArray();
-                method.Invoke(null, parameterValues);
-            }, id, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
-        }
-
-        functions.AddExternalFunction(function);
-        return function;
-    }
-
-    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<ImmutableArray<DataItem>, ExternalFunctionManaged> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<ImmutableArray<RuntimeValue>, ExternalFunctionManaged> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
         => functions.AddExternalFunction(new ExternalFunctionManaged(callback, functions.GenerateId(name), name, parameterTypes, flags));
 
-    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<ImmutableArray<DataItem>, ExternalFunctionManaged> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<ImmutableArray<RuntimeValue>, ExternalFunctionManaged> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
         => functions.AddExternalFunction(new ExternalFunctionManaged(callback, id, name, parameterTypes, flags));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Func<BytecodeProcessor, ImmutableArray<DataItem>, DataItem> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
         => functions.AddExternalFunction(new ExternalFunctionSimple(callback, id, name, parameterTypes, flags));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Func<BytecodeProcessor, ImmutableArray<DataItem>, DataItem> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
         => functions.AddExternalFunction(new ExternalFunctionSimple(callback, functions.GenerateId(name), name, parameterTypes, flags));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<BytecodeProcessor, ImmutableArray<DataItem>> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<BytecodeProcessor, ImmutableArray<RuntimeValue>> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
         => functions.AddExternalFunction(new ExternalFunctionSimple(callback, id, name, parameterTypes, flags));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<BytecodeProcessor, ImmutableArray<DataItem>> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<BytecodeProcessor, ImmutableArray<RuntimeValue>> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
         => functions.AddExternalFunction(new ExternalFunctionSimple(callback, functions.GenerateId(name), name, parameterTypes, flags));
 
     static void AddExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, ExternalFunctionBase function)
@@ -248,10 +199,12 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?> callback)
+    public static void AddExternalFunction<T0>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0> callback)
+        where T0 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?> callback)
+    public static void AddExternalFunction<T0>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0> callback)
+        where T0 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0>();
 
@@ -259,15 +212,19 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             callback?.Invoke(
-                GetValue<T0>(sender, args[0]));
+                ValueUtils.To<T0>(sender, args[0]));
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?> callback)
+    public static void AddExternalFunction<T0, T1>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0, T1> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?> callback)
+    public static void AddExternalFunction<T0, T1>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0, T1> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1>();
 
@@ -275,16 +232,22 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             callback?.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]));
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?> callback)
+    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0, T1, T2> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?, T2?> callback)
+    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0, T1, T2> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1, T2>();
 
@@ -292,17 +255,25 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             callback?.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]),
-                GetValue<T2>(sender, args[2]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]),
+                ValueUtils.To<T2>(sender, args[2]));
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?, T2?, T3?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0, T1, T2, T3> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1, T2, T3>();
 
@@ -310,18 +281,28 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             callback?.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]),
-                GetValue<T2>(sender, args[2]),
-                GetValue<T3>(sender, args[3]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]),
+                ValueUtils.To<T2>(sender, args[2]),
+                ValueUtils.To<T3>(sender, args[3]));
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?, T4?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?, T2?, T3?, T4?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0, T1, T2, T3, T4> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1, T2, T3, T4>();
 
@@ -329,19 +310,31 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             callback?.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]),
-                GetValue<T2>(sender, args[2]),
-                GetValue<T3>(sender, args[3]),
-                GetValue<T4>(sender, args[4]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]),
+                ValueUtils.To<T2>(sender, args[2]),
+                ValueUtils.To<T3>(sender, args[3]),
+                ValueUtils.To<T4>(sender, args[4]));
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0?, T1?, T2?, T3?, T4?, T5?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<int, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0?, T1?, T2?, T3?, T4?, T5?> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Action<T0, T1, T2, T3, T4, T5> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
@@ -349,12 +342,12 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             callback?.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]),
-                GetValue<T2>(sender, args[2]),
-                GetValue<T3>(sender, args[3]),
-                GetValue<T4>(sender, args[4]),
-                GetValue<T5>(sender, args[5]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]),
+                ValueUtils.To<T2>(sender, args[2]),
+                ValueUtils.To<T3>(sender, args[3]),
+                ValueUtils.To<T4>(sender, args[4]),
+                ValueUtils.To<T5>(sender, args[5]));
         });
     }
 
@@ -373,17 +366,19 @@ public static unsafe class ExternalFunctionGenerator
             CheckParameters(id, name, types, args);
             TResult result = callback.Invoke();
 
-            return DataItem.GetValue(result);
+            return ValueUtils.From(result);
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, TResult> callback)
+    public static void AddExternalFunction<T0, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, TResult> callback)
+    public static void AddExternalFunction<T0, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0>();
 
@@ -391,19 +386,23 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
-                GetValue<T0>(sender, args[0]));
+                ValueUtils.To<T0>(sender, args[0]));
 
-            return DataItem.GetValue(result);
+            return ValueUtils.From(result);
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0, T1, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0, T1, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1>();
 
@@ -411,20 +410,26 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]));
 
-            return DataItem.GetValue(result);
+            return ValueUtils.From(result);
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, T2?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0, T1, T2, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, T2?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0, T1, T2, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1, T2>();
 
@@ -432,21 +437,29 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]),
-                GetValue<T2>(sender, args[2]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]),
+                ValueUtils.To<T2>(sender, args[2]));
 
-            return DataItem.GetValue(result);
+            return ValueUtils.From(result);
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, T2?, T3?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0, T1, T2, T3, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, T2?, T3?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0, T1, T2, T3, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1, T2, T3>();
 
@@ -454,22 +467,32 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]),
-                GetValue<T2>(sender, args[2]),
-                GetValue<T3>(sender, args[3]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]),
+                ValueUtils.To<T2>(sender, args[2]),
+                ValueUtils.To<T3>(sender, args[3]));
 
-            return DataItem.GetValue(result);
+            return ValueUtils.From(result);
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, T2?, T3?, T4?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, T2?, T3?, T4?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1, T2, T3, T4>();
 
@@ -477,23 +500,35 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]),
-                GetValue<T2>(sender, args[2]),
-                GetValue<T3>(sender, args[3]),
-                GetValue<T4>(sender, args[4]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]),
+                ValueUtils.To<T2>(sender, args[2]),
+                ValueUtils.To<T3>(sender, args[3]),
+                ValueUtils.To<T4>(sender, args[4]));
 
-            return DataItem.GetValue(result);
+            return ValueUtils.From(result);
         });
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0?, T1?, T2?, T3?, T4?, T5?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<int, ExternalFunctionBase> functions, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0?, T1?, T2?, T3?, T4?, T5?, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
         where TResult : notnull
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
     {
         ImmutableArray<RuntimeType> types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
@@ -501,32 +536,15 @@ public static unsafe class ExternalFunctionGenerator
         {
             CheckParameters(id, name, types, args);
             TResult result = callback.Invoke(
-                GetValue<T0>(sender, args[0]),
-                GetValue<T1>(sender, args[1]),
-                GetValue<T2>(sender, args[2]),
-                GetValue<T3>(sender, args[3]),
-                GetValue<T4>(sender, args[4]),
-                GetValue<T5>(sender, args[5]));
+                ValueUtils.To<T0>(sender, args[0]),
+                ValueUtils.To<T1>(sender, args[1]),
+                ValueUtils.To<T2>(sender, args[2]),
+                ValueUtils.To<T3>(sender, args[3]),
+                ValueUtils.To<T4>(sender, args[4]),
+                ValueUtils.To<T5>(sender, args[5]));
 
-            return DataItem.GetValue(result);
+            return ValueUtils.From(result);
         });
-    }
-
-    public static ImmutableArray<object?> GetValues(ImmutableArray<DataItem> values)
-    {
-        object?[] result = new object[values.Length];
-        for (int i = 0; i < values.Length; i++)
-        { result[i] = values[i].GetValue(); }
-        return ImmutableArray.Create(result);
-    }
-
-    /// <exception cref="InvalidCastException"/>
-    static T? GetValue<T>(BytecodeProcessor bytecodeProcessor, DataItem data)
-    {
-        if (typeof(T) == typeof(string))
-        { return (T?)(object?)HeapUtils.GetString(bytecodeProcessor.Memory, (int)data); }
-
-        return data.ToType<T>();
     }
 
     public static void SetInterpreter(this IReadOnlyDictionary<int, ExternalFunctionBase> functions, BytecodeProcessor interpreter)
@@ -538,7 +556,7 @@ public static unsafe class ExternalFunctionGenerator
     #endregion
 
     /// <exception cref="RuntimeException"/>
-    static void CheckParameters(int id, string? functionName, ImmutableArray<RuntimeType> required, ImmutableArray<DataItem> passed)
+    static void CheckParameters(int id, string? functionName, ImmutableArray<RuntimeType> required, ImmutableArray<RuntimeValue> passed)
     {
         if (passed.Length != required.Length)
         { throw new RuntimeException($"Wrong number of parameters passed to external function \"{functionName}\" (with id {id}) ({passed.Length}) which requires {required.Length}"); }
@@ -618,18 +636,62 @@ public static unsafe class ExternalFunctionGenerator
         throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
     }
 
-    static IEnumerable<RuntimeType> GetTypes(IEnumerable<System.Reflection.ParameterInfo> parameters)
-        => parameters.Select(v => GetType(v.ParameterType).Convert());
+    #endregion
+}
 
-    static Compiler.BasicType GetType(Type type)
+static class ValueUtils
+{
+    /// <exception cref="NotImplementedException"/>
+    public static RuntimeValue From<T>(T value) where T : notnull => value switch
     {
-        if (type == typeof(byte)) return Compiler.BasicType.Byte;
-        else if (type == typeof(int)) return Compiler.BasicType.Integer;
-        else if (type == typeof(float)) return Compiler.BasicType.Float;
-        else if (type == typeof(float)) return Compiler.BasicType.Float;
-        else if (type == typeof(void)) return Compiler.BasicType.Void;
-        else throw new InternalException($"Unknown type {type.FullName}");
+        byte v => new RuntimeValue(v),
+        int v => new RuntimeValue(v),
+        float v => new RuntimeValue(v),
+        bool v => new RuntimeValue(v),
+        char v => new RuntimeValue(v),
+        _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(RuntimeValue)}"),
+    };
+
+    /// <inheritdoc/>
+    /// <exception cref="InvalidCastException"/>
+    public static T To<T>(BytecodeProcessor bytecodeProcessor, RuntimeValue value)
+        where T : unmanaged
+    {
+        if (typeof(T) == typeof(byte)) return UnsafeCast<byte, T>((byte)value.Int);
+        if (typeof(T) == typeof(sbyte)) return UnsafeCast<sbyte, T>((sbyte)value.Int);
+        if (typeof(T) == typeof(short)) return UnsafeCast<short, T>((short)value.Int);
+        if (typeof(T) == typeof(ushort)) return UnsafeCast<ushort, T>((ushort)value.Int);
+        if (typeof(T) == typeof(int)) return UnsafeCast<int, T>(value.Int);
+        if (typeof(T) == typeof(uint)) return UnsafeCast<uint, T>((uint)value.Int);
+        if (typeof(T) == typeof(long)) return UnsafeCast<long, T>(value.Int);
+        if (typeof(T) == typeof(ulong)) return UnsafeCast<ulong, T>((ulong)value.Int);
+        if (typeof(T) == typeof(float)) return UnsafeCast<float, T>(value.Single);
+        if (typeof(T) == typeof(decimal)) return UnsafeCast<decimal, T>((decimal)value.Single);
+        if (typeof(T) == typeof(double)) return UnsafeCast<double, T>(value.Single);
+        if (typeof(T) == typeof(bool)) return UnsafeCast<bool, T>(value.Int != 0);
+        if (typeof(T) == typeof(char)) return UnsafeCast<char, T>((char)value.Int);
+
+        if (typeof(T) == typeof(IntPtr))
+        {
+            if (IntPtr.Size == 4)
+            { return UnsafeCast<IntPtr, T>(new IntPtr(value.Int)); }
+            else
+            { return UnsafeCast<IntPtr, T>(new IntPtr((long)value.Int)); }
+        }
+
+        if (typeof(T) == typeof(UIntPtr))
+        {
+            if (UIntPtr.Size == 4)
+            { return UnsafeCast<UIntPtr, T>(new UIntPtr((uint)value.Int)); }
+            else
+            { return UnsafeCast<UIntPtr, T>(new UIntPtr((ulong)value.Int)); }
+        }
+
+        throw new NotImplementedException($"Type conversion {typeof(T)} not implemented");
     }
 
-    #endregion
+    static unsafe TTo UnsafeCast<TFrom, TTo>(TFrom value)
+        where TFrom : unmanaged
+        where TTo : unmanaged
+        => *(TTo*)&value;
 }

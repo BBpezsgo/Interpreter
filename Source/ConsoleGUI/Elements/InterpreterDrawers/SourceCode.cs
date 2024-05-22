@@ -1,8 +1,8 @@
-﻿using LanguageCore;
-using LanguageCore.Runtime;
-using Win32.Console;
+﻿using Win32.Console;
 
 namespace ConsoleGUI;
+
+using LanguageCore.Runtime;
 
 public partial class InterpreterElement
 {
@@ -116,7 +116,7 @@ public partial class InterpreterElement
                 }
             }
 
-            LinePrefix((i + 1).ToString(CultureInfo.InvariantCulture));
+            LinePrefix((i + 1).ToString());
             b.BackgroundColor = CharColor.Black;
 
             b.ForegroundColor = CharColor.BrightYellow;
@@ -130,39 +130,11 @@ public partial class InterpreterElement
             b.AddText(instruction.Opcode.ToString());
             b.AddText(' ');
 
-            if (!instruction.Operand1.Value.IsNull)
+            if (instruction.Operand1.Value != 0)
             {
-                switch (instruction.Operand1.Value.Type)
-                {
-                    case RuntimeType.Byte:
-                        b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Operand1.Value.Byte.ToString(CultureInfo.InvariantCulture));
-                        b.AddText(' ');
-                        break;
-                    case RuntimeType.Integer:
-                        b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Operand1.Value.Int.ToString(CultureInfo.InvariantCulture));
-                        b.AddText(' ');
-                        break;
-                    case RuntimeType.Single:
-                        b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(instruction.Operand1.Value.Single.ToString(CultureInfo.InvariantCulture));
-                        b.AddText('f');
-                        b.AddText(' ');
-                        break;
-                    case RuntimeType.Char:
-                        b.ForegroundColor = CharColor.BrightYellow;
-                        b.AddText('\'');
-                        b.AddText(instruction.Operand1.Value.Char.Escape());
-                        b.AddText('\'');
-                        b.AddText(' ');
-                        break;
-                    default:
-                        b.ForegroundColor = CharColor.White;
-                        b.AddText(instruction.Operand1.Value.ToString(CultureInfo.InvariantCulture));
-                        b.AddText(' ');
-                        break;
-                }
+                b.ForegroundColor = CharColor.BrightCyan;
+                b.AddText(instruction.Operand1.Value.Int.ToString());
+                b.AddText(' ');
             }
             b.BackgroundColor = CharColor.Black;
 

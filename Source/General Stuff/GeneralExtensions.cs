@@ -69,22 +69,31 @@ public static class GeneralExtensions
         return false;
     }
 
+    public static bool Contains(this StringBuilder stringBuilder, char value)
+    {
+        foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+        {
+            if (chunk.Span.Contains(value))
+            { return true; }
+        }
+        return false;
+    }
+
+    public static bool Contains(this StringBuilder stringBuilder, ReadOnlySpan<char> value)
+    {
+        foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
+        {
+            if (chunk.Span.Contains(value, StringComparison.Ordinal))
+            { return true; }
+        }
+        return false;
+    }
+
     public static int IndexOf(this StringBuilder stringBuilder, ReadOnlySpan<char> value)
     {
         foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
         {
-            int res = chunk.Span.IndexOf(value);
-            if (res != -1)
-            { return res; }
-        }
-        return -1;
-    }
-
-    public static int IndexOf(this StringBuilder stringBuilder, ReadOnlySpan<char> value, StringComparison comparisonType)
-    {
-        foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
-        {
-            int res = chunk.Span.IndexOf(value, comparisonType);
+            int res = chunk.Span.IndexOf(value, StringComparison.Ordinal);
             if (res != -1)
             { return res; }
         }

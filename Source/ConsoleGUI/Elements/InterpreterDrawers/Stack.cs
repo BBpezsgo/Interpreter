@@ -1,8 +1,9 @@
-﻿using LanguageCore;
-using LanguageCore.Runtime;
-using Win32.Console;
+﻿using Win32.Console;
 
 namespace ConsoleGUI;
+
+using LanguageCore;
+using LanguageCore.Runtime;
 
 public partial class InterpreterElement
 {
@@ -13,7 +14,8 @@ public partial class InterpreterElement
         { storeIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer); }
 
         if (instruction.Opcode is
-            Opcode.Pop)
+            Opcode.Pop or
+            Opcode.PopTo)
         { loadIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer - BytecodeProcessor.StackDirection); }
     }
 
@@ -42,7 +44,7 @@ public partial class InterpreterElement
         if (Interpreter.NextInstruction.HasValue)
         { GetDataMovementIndicators(Interpreter.NextInstruction.Value, loadIndicators, storeIndicators); }
 
-        void DrawElement(int address, DataItem item)
+        void DrawElement(int address, RuntimeValue item)
         {
             if (Interpreter.BytecodeInterpreter.Registers.BasePointer == address)
             {
@@ -89,44 +91,21 @@ public partial class InterpreterElement
             if (!loadIndicatorShown && !storeIndicatorShown)
             { b.AddText(' '); }
 
-            b.AddText(address.ToString(CultureInfo.InvariantCulture));
+            b.AddText(address.ToString());
             b.AddSpace(7);
 
             b.ForegroundColor = CharColor.Silver;
             b.BackgroundColor = CharColor.Black;
 
-            if (item.IsNull)
+            if (item == 0)
             {
                 b.ForegroundColor = CharColor.Gray;
-                b.AddText("<null>");
-                return;
+                b.AddText('0');
             }
-
-            switch (item.Type)
+            else
             {
-                case RuntimeType.Byte:
-                    b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.Byte.ToString(CultureInfo.InvariantCulture));
-                    break;
-                case RuntimeType.Integer:
-                    b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.Int.ToString(CultureInfo.InvariantCulture));
-                    break;
-                case RuntimeType.Single:
-                    b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.Single.ToString(CultureInfo.InvariantCulture));
-                    b.AddText('f');
-                    break;
-                case RuntimeType.Char:
-                    b.ForegroundColor = CharColor.BrightYellow;
-                    b.AddText('\'');
-                    b.AddText(item.Char.Escape());
-                    b.AddText('\'');
-                    break;
-                default:
-                    b.ForegroundColor = CharColor.Silver;
-                    b.AddText('?');
-                    break;
+                b.ForegroundColor = CharColor.BrightCyan;
+                b.AddText(item.Int.ToString());
             }
         }
 
@@ -139,7 +118,7 @@ public partial class InterpreterElement
         { enumerator = enumerator.Reverse(); }
         foreach (int i in enumerator)
         {
-            DataItem item = this.Interpreter.BytecodeInterpreter.Memory[i];
+            RuntimeValue item = this.Interpreter.BytecodeInterpreter.Memory[i];
 
             if (stackDebugInfo.TryGet(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart, i, out StackElementInformations itemDebugInfo))
             {
@@ -221,7 +200,7 @@ public partial class InterpreterElement
             { nextEmpty = enumerator.Last() + 1; }
         }
 
-        DrawElement(nextEmpty, DataItem.Null);
+        DrawElement(nextEmpty, default);
 
         StackScrollBar.Draw(b);
     }

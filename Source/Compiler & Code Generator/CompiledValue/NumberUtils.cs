@@ -1,9 +1,9 @@
-﻿namespace LanguageCore.Runtime;
+﻿namespace LanguageCore.Compiler;
 
-public partial struct DataItem :
-    IEquatable<DataItem>
+public partial struct CompiledValue :
+    IEquatable<CompiledValue>
 {
-    public static bool IsZero(DataItem value) => value.Type switch
+    public static bool IsZero(CompiledValue value) => value.Type switch
     {
         RuntimeType.Null => true,
         RuntimeType.Byte => value.Byte == 0,
@@ -74,39 +74,39 @@ public partial struct DataItem :
     /// <exception cref="InvalidCastException"/>
     public T ToType<T>() => (T)ToType(typeof(T));
 
-    public static bool TryCast(ref DataItem value, RuntimeType targetType)
+    public static bool TryCast(ref CompiledValue value, RuntimeType targetType)
     {
         value = targetType switch
         {
-            RuntimeType.Null => DataItem.Null,
+            RuntimeType.Null => CompiledValue.Null,
             RuntimeType.Byte => value.Type switch
             {
                 RuntimeType.Byte => value,
-                RuntimeType.Integer => (value.Int is >= byte.MinValue and <= byte.MaxValue) ? new DataItem((byte)value.Int) : value,
+                RuntimeType.Integer => (value.Int is >= byte.MinValue and <= byte.MaxValue) ? new CompiledValue((byte)value.Int) : value,
                 RuntimeType.Single => value,
-                RuntimeType.Char => ((ushort)value.Char is >= byte.MinValue and <= byte.MaxValue) ? new DataItem((byte)value.Char) : value,
+                RuntimeType.Char => ((ushort)value.Char is >= byte.MinValue and <= byte.MaxValue) ? new CompiledValue((byte)value.Char) : value,
                 _ => value,
             },
             RuntimeType.Integer => value.Type switch
             {
-                RuntimeType.Byte => new DataItem((int)value.Byte),
+                RuntimeType.Byte => new CompiledValue((int)value.Byte),
                 RuntimeType.Integer => value,
                 RuntimeType.Single => value,
-                RuntimeType.Char => new DataItem((int)value.Char),
+                RuntimeType.Char => new CompiledValue((int)value.Char),
                 _ => value,
             },
             RuntimeType.Single => value.Type switch
             {
-                RuntimeType.Byte => new DataItem((float)value.Byte),
-                RuntimeType.Integer => new DataItem((float)value.Int),
+                RuntimeType.Byte => new CompiledValue((float)value.Byte),
+                RuntimeType.Integer => new CompiledValue((float)value.Int),
                 RuntimeType.Single => value,
-                RuntimeType.Char => new DataItem((float)value.Char),
+                RuntimeType.Char => new CompiledValue((float)value.Char),
                 _ => value,
             },
             RuntimeType.Char => value.Type switch
             {
-                RuntimeType.Byte => new DataItem((char)value.Byte),
-                RuntimeType.Integer => (value.Int is >= char.MinValue and <= char.MaxValue) ? new DataItem((char)value.Int) : value,
+                RuntimeType.Byte => new CompiledValue((char)value.Byte),
+                RuntimeType.Integer => (value.Int is >= char.MinValue and <= char.MaxValue) ? new CompiledValue((char)value.Int) : value,
                 RuntimeType.Single => value,
                 RuntimeType.Char => value,
                 _ => value,
@@ -119,14 +119,14 @@ public partial struct DataItem :
 
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public static bool operator true(DataItem v) => (bool)v;
+    public static bool operator true(CompiledValue v) => (bool)v;
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public static bool operator false(DataItem v) => !(bool)v;
+    public static bool operator false(CompiledValue v) => !(bool)v;
 
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public static explicit operator bool(DataItem v) => v.Type switch
+    public static explicit operator bool(CompiledValue v) => v.Type switch
     {
         RuntimeType.Null => false,
         RuntimeType.Byte => v.Byte != 0,
@@ -135,11 +135,11 @@ public partial struct DataItem :
         RuntimeType.Char => v.Char != 0,
         _ => throw new UnreachableException(),
     };
-    public static implicit operator DataItem(bool v) => new(v);
+    public static implicit operator CompiledValue(bool v) => new(v);
 
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public static explicit operator byte(DataItem v) => v.Type switch
+    public static explicit operator byte(CompiledValue v) => v.Type switch
     {
         RuntimeType.Byte => v.Byte,
         RuntimeType.Integer => (byte)v.Int,
@@ -147,11 +147,11 @@ public partial struct DataItem :
         RuntimeType.Single => (byte)v.Single,
         _ => throw new InvalidCastException($"Can't cast {v.Type} to {typeof(byte)}"),
     };
-    public static implicit operator DataItem(byte v) => new(v);
+    public static implicit operator CompiledValue(byte v) => new(v);
 
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public static explicit operator ushort(DataItem v) => v.Type switch
+    public static explicit operator ushort(CompiledValue v) => v.Type switch
     {
         RuntimeType.Byte => v.Byte,
         RuntimeType.Integer => (ushort)v.Int,
@@ -162,7 +162,7 @@ public partial struct DataItem :
 
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public static explicit operator int(DataItem v) => v.Type switch
+    public static explicit operator int(CompiledValue v) => v.Type switch
     {
         RuntimeType.Byte => v.Byte,
         RuntimeType.Integer => v.Int,
@@ -170,11 +170,11 @@ public partial struct DataItem :
         RuntimeType.Single => (int)v.Single,
         _ => throw new InvalidCastException($"Can't cast {v.Type} to {typeof(int)}"),
     };
-    public static implicit operator DataItem(int v) => new(v);
+    public static implicit operator CompiledValue(int v) => new(v);
 
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public static explicit operator float(DataItem v) => v.Type switch
+    public static explicit operator float(CompiledValue v) => v.Type switch
     {
         RuntimeType.Byte => v.Byte,
         RuntimeType.Integer => v.Int,
@@ -182,11 +182,11 @@ public partial struct DataItem :
         RuntimeType.Single => v.Single,
         _ => throw new InvalidCastException($"Can't cast {v.Type} to {typeof(float)}"),
     };
-    public static implicit operator DataItem(float v) => new(v);
+    public static implicit operator CompiledValue(float v) => new(v);
 
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public static explicit operator char(DataItem v) => v.Type switch
+    public static explicit operator char(CompiledValue v) => v.Type switch
     {
         RuntimeType.Byte => (char)v.Byte,
         RuntimeType.Integer => (char)v.Int,
@@ -194,5 +194,5 @@ public partial struct DataItem :
         RuntimeType.Single => (char)v.Single,
         _ => throw new InvalidCastException($"Can't cast {v.Type} to {typeof(char)}"),
     };
-    public static implicit operator DataItem(char v) => new(v);
+    public static implicit operator CompiledValue(char v) => new(v);
 }

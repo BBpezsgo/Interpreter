@@ -25,7 +25,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.PopTo, reg.Register);
             AddInstruction(Opcode.MathSub, reg.Register, GeneratedCode.Count + 2);
 
             AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
@@ -58,7 +58,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void Return()
     {
-        AddInstruction(Opcode.Pop, Register.BasePointer);
+        AddInstruction(Opcode.PopTo, Register.BasePointer);
         AddInstruction(Opcode.Pop); // Pop AbsoluteGlobalOffset
         AddInstruction(Opcode.Return);
     }
@@ -119,7 +119,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             StackLoad(address.ToUnreferenced());
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                AddInstruction(Opcode.Pop, reg.Register);
+                AddInstruction(Opcode.PopTo, reg.Register);
                 AddInstruction(Opcode.Push, reg.Register.ToPtr());
             }
             return;
@@ -136,7 +136,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 StackLoad(AbsoluteGlobalAddress);
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    AddInstruction(Opcode.Pop, reg.Register);
+                    AddInstruction(Opcode.PopTo, reg.Register);
 
                     if (BytecodeProcessor.StackDirection > 0)
                     {
@@ -172,8 +172,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             StackLoad(address.ToUnreferenced());
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                AddInstruction(Opcode.Pop, reg.Register);
-                AddInstruction(Opcode.Pop, reg.Register.ToPtr());
+                AddInstruction(Opcode.PopTo, reg.Register);
+                AddInstruction(Opcode.PopTo, reg.Register.ToPtr());
             }
             return;
         }
@@ -189,7 +189,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 StackLoad(AbsoluteGlobalAddress);
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    AddInstruction(Opcode.Pop, reg.Register);
+                    AddInstruction(Opcode.PopTo, reg.Register);
 
                     if (BytecodeProcessor.StackDirection > 0)
                     {
@@ -200,17 +200,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         AddInstruction(Opcode.MathSub, reg.Register, address.Address);
                     }
 
-                    AddInstruction(Opcode.Pop, reg.Register.ToPtr());
+                    AddInstruction(Opcode.PopTo, reg.Register.ToPtr());
                 }
                 break;
             case AddressingMode.BasePointerRelative:
-                AddInstruction(Opcode.Pop, Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
+                AddInstruction(Opcode.PopTo, Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
                 break;
             case AddressingMode.StackPointerRelative:
-                AddInstruction(Opcode.Pop, Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
+                AddInstruction(Opcode.PopTo, Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
                 break;
             case AddressingMode.Runtime:
-                AddInstruction(Opcode.Pop, new InstructionOperand(address.Address, InstructionOperandType.Pointer));
+                AddInstruction(Opcode.PopTo, new InstructionOperand(address.Address, InstructionOperandType.Pointer));
                 break;
             default: throw new UnreachableException();
         }
@@ -225,7 +225,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.PopTo, reg.Register);
             AddInstruction(Opcode.Compare, reg.Register, 0);
             AddInstruction(Opcode.JumpIfNotEqual, 0);
         }
@@ -235,7 +235,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForLiteralString(exceptionMessage);
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.PopTo, reg.Register);
             AddInstruction(Opcode.Throw, reg.Register);
         }
         GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction;
@@ -251,7 +251,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            AddInstruction(Opcode.Pop, reg.Register);
+            AddInstruction(Opcode.PopTo, reg.Register);
             AddInstruction(Opcode.Push, reg.Register.ToPtr(offset));
         }
     }
@@ -264,8 +264,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            AddInstruction(Opcode.Pop, reg.Register);
-            AddInstruction(Opcode.Pop, reg.Register.ToPtr(offset));
+            AddInstruction(Opcode.PopTo, reg.Register);
+            AddInstruction(Opcode.PopTo, reg.Register.ToPtr(offset));
         }
     }
 

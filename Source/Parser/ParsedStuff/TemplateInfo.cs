@@ -10,7 +10,7 @@ public class TemplateInfo : IPositioned
     public ImmutableArray<Token> Parameters { get; }
 
     public Position Position =>
-        new Position(Parameters)
+        new Position(Parameters.As<IPositioned>().Or(Brackets))
         .Union(Keyword, Brackets);
 
     public TemplateInfo(Token keyword, TokenPair brackets, IEnumerable<Token> typeParameters)

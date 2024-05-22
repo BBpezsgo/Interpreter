@@ -59,34 +59,6 @@ public static class Entry
 
                 Dictionary<int, ExternalFunctionBase> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
 
-                if (arguments.File.IsFile)
-                {
-#if true
-                    Output.LogDebug($"Skipping loading DLL-s because the compiler compiled in AOT mode");
-#else
-                    FileInfo _file = new(arguments.File.LocalPath);
-
-                    if (_file.Directory is null)
-                    { throw new InternalException($"File \"{_file}\" doesn't have a directory"); }
-
-                    string dllsFolderPath = Path.Combine(_file.Directory.FullName, arguments.CompilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
-                    if (Directory.Exists(dllsFolderPath))
-                    {
-                        DirectoryInfo dllsFolder = new(dllsFolderPath);
-                        Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
-                        foreach (FileInfo dll in dllsFolder.GetFiles("*.dll"))
-                        {
-                            externalFunctions.LoadAssembly(System.Reflection.Assembly.LoadFile(dll.FullName));
-                            Output.LogDebug($"Assembly \"{dll.Name}\" loaded");
-                        }
-                    }
-                    else
-                    {
-                        Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
-                    }
-#endif
-                }
-
                 BBLangGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();
 
@@ -131,7 +103,8 @@ public static class Entry
                         Console.ResetColor();
                         Console.Write(' ');
 
-                        instruction.Operand1.Value.DebugPrint();
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write(instruction.Operand1.Value);
 
                         Console.WriteLine();
                     }
@@ -146,7 +119,7 @@ public static class Entry
                     Console.WriteLine($" ===== HEAP ===== ");
                     Console.WriteLine();
 
-                    if (interpreter.BytecodeInterpreter.Memory[0] != 0)
+                    if (interpreter.BytecodeInterpreter.Memory[0].Int != 0)
                     { HeapUtils.DebugPrint(interpreter.BytecodeInterpreter.Memory); }
                     else
                     { Console.WriteLine("Empty"); }
@@ -155,9 +128,10 @@ public static class Entry
                     Console.WriteLine($" ===== STACK ===== ");
                     Console.WriteLine();
 
-                    foreach (DataItem item in interpreter.BytecodeInterpreter.GetStack())
+                    foreach (RuntimeValue item in interpreter.BytecodeInterpreter.GetStack())
                     {
-                        item.DebugPrint();
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write(item.Int);
                         Console.WriteLine();
                     }
 #endif
@@ -171,8 +145,8 @@ public static class Entry
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     { throw new PlatformNotSupportedException("Console rendering is only supported on Windows"); }
 
-                    Output.WriteLine();
-                    Output.Write("Press any key to start executing");
+                    Console.WriteLine();
+                    Console.Write("Press any key to start executing");
                     Console.ReadKey();
                     Console.ResetColor();
                     Console.Clear();
@@ -196,8 +170,8 @@ public static class Entry
                 {
                     interpreter = new(true, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
 
-                    interpreter.OnStdOut += (sender, data) => Output.Write(char.ToString(data));
-                    interpreter.OnStdError += (sender, data) => Output.WriteError(char.ToString(data));
+                    interpreter.OnStdOut += (sender, data) => Console.Out.Write(char.ToString(data));
+                    interpreter.OnStdError += (sender, data) => Console.Error.Write(char.ToString(data));
 
                     interpreter.OnOutput += (_, message, logType) => Output.Log(message, logType);
 
@@ -272,10 +246,10 @@ public static class Entry
 
                 if (arguments.PrintFlags.HasFlag(PrintFlags.Commented))
                 {
-                    Output.WriteLine();
-                    Output.WriteLine($" === COMPILED ===");
+                    Console.WriteLine();
+                    Console.WriteLine($" === COMPILED ===");
                     BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
-                    Output.WriteLine();
+                    Console.WriteLine();
 
                     pauseBeforeRun = true;
                 }
@@ -289,22 +263,22 @@ public static class Entry
 
                 if (arguments.PrintFlags.HasFlag(PrintFlags.Final))
                 {
-                    Output.WriteLine();
-                    Output.WriteLine($" === FINAL ===");
-                    Output.WriteLine();
+                    Console.WriteLine();
+                    Console.WriteLine($" === FINAL ===");
+                    Console.WriteLine();
                     BrainfuckCode.PrintCode(generated.Code);
-                    Output.WriteLine();
+                    Console.WriteLine();
 
                     pauseBeforeRun = true;
                 }
 
                 if (arguments.PrintFlags.HasFlag(PrintFlags.Simplified))
                 {
-                    Output.WriteLine();
-                    Output.WriteLine($" === SIMPLIFIED ===");
-                    Output.WriteLine();
+                    Console.WriteLine();
+                    Console.WriteLine($" === SIMPLIFIED ===");
+                    Console.WriteLine();
                     BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
-                    Output.WriteLine();
+                    Console.WriteLine();
 
                     pauseBeforeRun = true;
                 }
@@ -319,7 +293,7 @@ public static class Entry
 
                 if (arguments.OutputFile is not null)
                 {
-                    Output.WriteLine($"Writing to \"{arguments.OutputFile}\" ...");
+                    Console.WriteLine($"Writing to \"{arguments.OutputFile}\" ...");
                     File.WriteAllText(arguments.OutputFile, generated.Code);
                 }
 
@@ -331,8 +305,8 @@ public static class Entry
 
                 if (pauseBeforeRun)
                 {
-                    Output.WriteLine();
-                    Output.Write("Press any key to start executing");
+                    Console.WriteLine();
+                    Console.Write("Press any key to start executing");
                     Console.ReadKey();
                 }
 
@@ -351,10 +325,10 @@ public static class Entry
 
                     if (arguments.PrintFlags.HasFlag(PrintFlags.Heap))
                     {
-                        Output.WriteLine();
-                        Output.WriteLine();
-                        Output.WriteLine($" === MEMORY ===");
-                        Output.WriteLine();
+                        Console.WriteLine();
+                        Console.WriteLine();
+                        Console.WriteLine($" === MEMORY ===");
+                        Console.WriteLine();
 
                         const int zerosToShow = 10;
                         int finalIndex = 0;

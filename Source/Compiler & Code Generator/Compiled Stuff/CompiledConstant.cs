@@ -1,7 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
 using LanguageCore.Parser;
-using Runtime;
 
 public interface IConstant :
     IPositioned,
@@ -9,7 +8,7 @@ public interface IConstant :
     IExportable,
     IIdentifiable<string>
 {
-    public DataItem Value { get; }
+    public CompiledValue Value { get; }
 
     public new GeneralType Type => new BuiltinType(Value.Type);
     GeneralType IHaveCompiledType.Type => Type;

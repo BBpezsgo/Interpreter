@@ -12,7 +12,7 @@ public class AttributeUsage :
     public ImmutableArray<Literal> Parameters { get; }
 
     public Position Position =>
-        new Position(Parameters)
+        new Position(Parameters.As<IPositioned>().Or(Identifier))
         .Union(Identifier);
 
     public AttributeUsage(Token identifier, IEnumerable<Literal> parameters)

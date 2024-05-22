@@ -1049,7 +1049,7 @@ public abstract class CodeGenerator
         if (variableDeclaration.InitialValue == null)
         { throw new CompilerException($"Constant value must have initial value", variableDeclaration, variableDeclaration.File); }
 
-        if (!TryCompute(variableDeclaration.InitialValue, out DataItem constantValue))
+        if (!TryCompute(variableDeclaration.InitialValue, out CompiledValue constantValue))
         { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.File); }
 
         if (variableDeclaration.Type != StatementKeywords.Var)
@@ -1060,7 +1060,7 @@ public abstract class CodeGenerator
             if (constantType is not BuiltinType builtinType)
             { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, variableDeclaration.File); }
 
-            DataItem.TryCast(ref constantValue, builtinType.RuntimeType);
+            CompiledValue.TryCast(ref constantValue, builtinType.RuntimeType);
         }
 
         if (GetConstant(variableDeclaration.Identifier.Content, out _))
@@ -1365,7 +1365,7 @@ public abstract class CodeGenerator
 
         if (destination is BuiltinType destBuiltinType &&
             destBuiltinType.Type == BasicType.Byte &&
-            TryCompute(value, out DataItem yeah) &&
+            TryCompute(value, out CompiledValue yeah) &&
             yeah.Type == RuntimeType.Integer)
         { return; }
 
@@ -1389,7 +1389,7 @@ public abstract class CodeGenerator
         throw new CompilerException($"Can not set a {valueType} type value to the {destination} type", value, CurrentFile);
     }
 
-    protected void AssignTypeCheck(GeneralType destination, DataItem value, IPositioned valuePosition)
+    protected void AssignTypeCheck(GeneralType destination, CompiledValue value, IPositioned valuePosition)
     {
         BuiltinType valueType = new(value.Type);
 
@@ -1507,7 +1507,7 @@ public abstract class CodeGenerator
         if (prevType is not ArrayType arrayType)
         { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
 
-        if (!TryCompute(indexCall.Index, out DataItem index))
+        if (!TryCompute(indexCall.Index, out CompiledValue index))
         { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
 
         int prevOffset = GetDataOffset(indexCall.PrevStatement);
@@ -1599,17 +1599,17 @@ public abstract class CodeGenerator
 
     #region GetInitialValue()
 
-    protected static DataItem GetInitialValue(BasicType type) => type switch
+    protected static CompiledValue GetInitialValue(BasicType type) => type switch
     {
-        BasicType.Byte => new DataItem((byte)0),
-        BasicType.Integer => new DataItem((int)0),
-        BasicType.Float => new DataItem((float)0f),
-        BasicType.Char => new DataItem((char)'\0'),
+        BasicType.Byte => new CompiledValue((byte)0),
+        BasicType.Integer => new CompiledValue((int)0),
+        BasicType.Float => new CompiledValue((float)0f),
+        BasicType.Char => new CompiledValue((char)'\0'),
 
         _ => throw new NotImplementedException($"Initial value for type \"{type}\" isn't implemented"),
     };
 
-    protected static bool GetInitialValue(GeneralType type, out DataItem value)
+    protected static bool GetInitialValue(GeneralType type, out CompiledValue value)
     {
         switch (type)
         {
@@ -1622,19 +1622,19 @@ public abstract class CodeGenerator
                 value = GetInitialValue(builtinType.Type);
                 return true;
             case PointerType:
-                value = new DataItem(0);
+                value = new CompiledValue(0);
                 return true;
             default: throw new NotImplementedException();
         }
     }
 
-    protected static DataItem GetInitialValue(GeneralType type) => type switch
+    protected static CompiledValue GetInitialValue(GeneralType type) => type switch
     {
         GenericType => throw new NotImplementedException($"Initial value for type arguments is bruh moment"),
         StructType => throw new NotImplementedException($"Initial value for structs is not implemented"),
-        FunctionType => new DataItem(int.MaxValue),
+        FunctionType => new CompiledValue(int.MaxValue),
         BuiltinType builtinType => GetInitialValue(builtinType.Type),
-        PointerType => new DataItem(0),
+        PointerType => new CompiledValue(0),
         _ => throw new NotImplementedException(),
     };
 
@@ -1800,10 +1800,10 @@ public abstract class CodeGenerator
         // if (leftType is not BuiltinType || rightType is not BuiltinType)
         // { throw unknownOperator; }
 
-        DataItem leftValue = GetInitialValue(leftType);
-        DataItem rightValue = GetInitialValue(rightType);
+        CompiledValue leftValue = GetInitialValue(leftType);
+        CompiledValue rightValue = GetInitialValue(rightType);
 
-        DataItem predictedValue = @operator.Operator.Content switch
+        CompiledValue predictedValue = @operator.Operator.Content switch
         {
             "+" => leftValue + rightValue,
             "-" => leftValue - rightValue,
@@ -1811,8 +1811,8 @@ public abstract class CodeGenerator
             "/" => leftValue,
             "%" => leftValue,
 
-            "&&" => new DataItem((bool)leftValue && (bool)rightValue),
-            "||" => new DataItem((bool)leftValue || (bool)rightValue),
+            "&&" => new CompiledValue((bool)leftValue && (bool)rightValue),
+            "||" => new CompiledValue((bool)leftValue || (bool)rightValue),
 
             "&" => leftValue & rightValue,
             "|" => leftValue | rightValue,
@@ -1821,12 +1821,12 @@ public abstract class CodeGenerator
             "<<" => leftValue << rightValue,
             ">>" => leftValue >> rightValue,
 
-            "<" => new DataItem(leftValue < rightValue),
-            ">" => new DataItem(leftValue > rightValue),
-            "==" => new DataItem(leftValue == rightValue),
-            "!=" => new DataItem(leftValue != rightValue),
-            "<=" => new DataItem(leftValue <= rightValue),
-            ">=" => new DataItem(leftValue >= rightValue),
+            "<" => new CompiledValue(leftValue < rightValue),
+            ">" => new CompiledValue(leftValue > rightValue),
+            "==" => new CompiledValue(leftValue == rightValue),
+            "!=" => new CompiledValue(leftValue != rightValue),
+            "<=" => new CompiledValue(leftValue <= rightValue),
+            ">=" => new CompiledValue(leftValue >= rightValue),
 
             _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
         };
@@ -1855,9 +1855,9 @@ public abstract class CodeGenerator
         if (!leftType.CanBeBuiltin || leftType == BasicType.Void)
         { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content}", @operator.Operator, CurrentFile); }
 
-        DataItem leftValue = GetInitialValue(leftType);
+        CompiledValue leftValue = GetInitialValue(leftType);
 
-        DataItem predictedValue = @operator.Operator.Content switch
+        CompiledValue predictedValue = @operator.Operator.Content switch
         {
             UnaryOperatorCall.LogicalNOT => !leftValue,
 
@@ -2189,6 +2189,7 @@ public abstract class CodeGenerator
         => new(
             prevStatement: InlineMacro(anyCall.PrevStatement, parameters),
             parameters: InlineMacro(anyCall.Parameters, parameters),
+            commas: anyCall.Commas,
             brackets: anyCall.Brackets,
             file: anyCall.OriginalFile)
         {
@@ -2691,34 +2692,34 @@ public abstract class CodeGenerator
 
     protected class EvaluationContext
     {
-        readonly Dictionary<StatementWithValue, DataItem> _values;
-        readonly Stack<Stack<Dictionary<string, DataItem>>>? _frames;
+        readonly Dictionary<StatementWithValue, CompiledValue> _values;
+        readonly Stack<Stack<Dictionary<string, CompiledValue>>>? _frames;
 
         public readonly List<Statement> RuntimeStatements;
-        public Dictionary<string, DataItem>? LastScope => _frames?.Last.Last;
+        public Dictionary<string, CompiledValue>? LastScope => _frames?.Last.Last;
         public bool IsReturning;
         public bool IsBreaking;
 
         public static EvaluationContext Empty => new(null, null);
 
-        public static EvaluationContext EmptyWithVariables => new(null, new Dictionary<string, DataItem>());
+        public static EvaluationContext EmptyWithVariables => new(null, new Dictionary<string, CompiledValue>());
 
-        public EvaluationContext(IDictionary<StatementWithValue, DataItem>? values, IDictionary<string, DataItem>? variables)
+        public EvaluationContext(IDictionary<StatementWithValue, CompiledValue>? values, IDictionary<string, CompiledValue>? variables)
         {
             if (values != null)
-            { _values = new Dictionary<StatementWithValue, DataItem>(values); }
+            { _values = new Dictionary<StatementWithValue, CompiledValue>(values); }
             else
-            { _values = new Dictionary<StatementWithValue, DataItem>(); }
+            { _values = new Dictionary<StatementWithValue, CompiledValue>(); }
 
             if (variables != null)
-            { _frames = new Stack<Stack<Dictionary<string, DataItem>>>() { new() { new Dictionary<string, DataItem>(variables) } }; }
+            { _frames = new Stack<Stack<Dictionary<string, CompiledValue>>>() { new() { new Dictionary<string, CompiledValue>(variables) } }; }
             else
             { _frames = null; }
 
             RuntimeStatements = new List<Statement>();
         }
 
-        public bool TryGetValue(StatementWithValue statement, out DataItem value)
+        public bool TryGetValue(StatementWithValue statement, out CompiledValue value)
         {
             if (_values.TryGetValue(statement, out value))
             { return true; }
@@ -2731,15 +2732,15 @@ public abstract class CodeGenerator
             return false;
         }
 
-        public bool TryGetVariable(string name, out DataItem value)
+        public bool TryGetVariable(string name, out CompiledValue value)
         {
             value = default;
 
             if (_frames == null)
             { return false; }
 
-            Stack<Dictionary<string, DataItem>> frame = _frames.Last;
-            foreach (Dictionary<string, DataItem> scope in frame)
+            Stack<Dictionary<string, CompiledValue>> frame = _frames.Last;
+            foreach (Dictionary<string, CompiledValue> scope in frame)
             {
                 if (scope.TryGetValue(name, out value))
                 { return true; }
@@ -2748,13 +2749,13 @@ public abstract class CodeGenerator
             return false;
         }
 
-        public bool TrySetVariable(string name, DataItem value)
+        public bool TrySetVariable(string name, CompiledValue value)
         {
             if (_frames == null)
             { return false; }
 
-            Stack<Dictionary<string, DataItem>> frame = _frames.Last;
-            foreach (Dictionary<string, DataItem> scope in frame)
+            Stack<Dictionary<string, CompiledValue>> frame = _frames.Last;
+            foreach (Dictionary<string, CompiledValue> scope in frame)
             {
                 if (scope.ContainsKey(name))
                 {
@@ -2768,7 +2769,7 @@ public abstract class CodeGenerator
 
         public bool TryGetType(StatementWithValue statement, [NotNullWhen(true)] out GeneralType? type)
         {
-            if (!TryGetValue(statement, out DataItem value))
+            if (!TryGetValue(statement, out CompiledValue value))
             {
                 type = null;
                 return false;
@@ -2778,13 +2779,13 @@ public abstract class CodeGenerator
             return true;
         }
 
-        public void PushScope(IDictionary<string, DataItem>? variables = null)
+        public void PushScope(IDictionary<string, CompiledValue>? variables = null)
         {
             if (_frames is null) return;
             if (variables is null)
-            { _frames?.Last.Push(new Dictionary<string, DataItem>()); }
+            { _frames?.Last.Push(new Dictionary<string, CompiledValue>()); }
             else
-            { _frames?.Last.Push(new Dictionary<string, DataItem>(variables)); }
+            { _frames?.Last.Push(new Dictionary<string, CompiledValue>(variables)); }
         }
 
         public void PopScope()
@@ -2796,7 +2797,7 @@ public abstract class CodeGenerator
 
     #region TryCompute()
 
-    public static DataItem Compute(string @operator, DataItem left, DataItem right) => @operator switch
+    public static CompiledValue Compute(string @operator, CompiledValue left, CompiledValue right) => @operator switch
     {
         "!" => !left,
 
@@ -2806,8 +2807,8 @@ public abstract class CodeGenerator
         "/" => left / right,
         "%" => left % right,
 
-        "&&" => new DataItem((bool)left && (bool)right),
-        "||" => new DataItem((bool)left || (bool)right),
+        "&&" => new CompiledValue((bool)left && (bool)right),
+        "||" => new CompiledValue((bool)left || (bool)right),
 
         "&" => left & right,
         "|" => left | right,
@@ -2816,25 +2817,25 @@ public abstract class CodeGenerator
         "<<" => left << right,
         ">>" => left >> right,
 
-        "<" => new DataItem(left < right),
-        ">" => new DataItem(left > right),
-        "==" => new DataItem(left == right),
-        "!=" => new DataItem(left != right),
-        "<=" => new DataItem(left <= right),
-        ">=" => new DataItem(left >= right),
+        "<" => new CompiledValue(left < right),
+        ">" => new CompiledValue(left > right),
+        "==" => new CompiledValue(left == right),
+        "!=" => new CompiledValue(left != right),
+        "<=" => new CompiledValue(left <= right),
+        ">=" => new CompiledValue(left >= right),
 
         _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
     };
 
-    bool TryCompute(Pointer pointer, EvaluationContext context, out DataItem value)
+    bool TryCompute(Pointer pointer, EvaluationContext context, out CompiledValue value)
     {
         if (pointer.PrevStatement is AddressGetter addressGetter)
         { return TryCompute(addressGetter.PrevStatement, context, out value); }
 
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute(BinaryOperatorCall @operator, EvaluationContext context, out DataItem value)
+    bool TryCompute(BinaryOperatorCall @operator, EvaluationContext context, out CompiledValue value)
     {
         if (context.TryGetValue(@operator, out value))
         { return true; }
@@ -2842,8 +2843,8 @@ public abstract class CodeGenerator
         // TODO: @operator.OriginalFile can be null
         if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
-            if (TryCompute(@operator.Parameters, context, out ImmutableArray<DataItem> parameterValues) &&
-                TryEvaluate(result.Function, parameterValues, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+            if (TryCompute(@operator.Parameters, context, out ImmutableArray<CompiledValue> parameterValues) &&
+                TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -2851,19 +2852,19 @@ public abstract class CodeGenerator
                 return true;
             }
 
-            value = DataItem.Null;
+            value = CompiledValue.Null;
             return false;
         }
 
-        if (!TryCompute(@operator.Left, context, out DataItem leftValue))
+        if (!TryCompute(@operator.Left, context, out CompiledValue leftValue))
         {
-            value = DataItem.Null;
+            value = CompiledValue.Null;
             return false;
         }
 
         string op = @operator.Operator.Content;
 
-        if (TryCompute(@operator.Right, context, out DataItem rightValue))
+        if (TryCompute(@operator.Right, context, out CompiledValue rightValue))
         {
             value = Compute(op, leftValue, rightValue);
             return true;
@@ -2875,7 +2876,7 @@ public abstract class CodeGenerator
             {
                 if (!(bool)leftValue)
                 {
-                    value = new DataItem(false);
+                    value = new CompiledValue(false);
                     return true;
                 }
                 break;
@@ -2884,7 +2885,7 @@ public abstract class CodeGenerator
             {
                 if ((bool)leftValue)
                 {
-                    value = new DataItem(true);
+                    value = new CompiledValue(true);
                     return true;
                 }
                 break;
@@ -2894,14 +2895,14 @@ public abstract class CodeGenerator
                     context.TryGetValue(@operator, out value))
                 { return true; }
 
-                value = DataItem.Null;
+                value = CompiledValue.Null;
                 return false;
         }
 
         value = leftValue;
         return true;
     }
-    bool TryCompute(UnaryOperatorCall @operator, EvaluationContext context, out DataItem value)
+    bool TryCompute(UnaryOperatorCall @operator, EvaluationContext context, out CompiledValue value)
     {
         if (context.TryGetValue(@operator, out value))
         { return true; }
@@ -2909,8 +2910,8 @@ public abstract class CodeGenerator
         // TODO: @operator.OriginalFile can be null
         if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
-            if (TryCompute(@operator.Parameters, context, out ImmutableArray<DataItem> parameterValues) &&
-                TryEvaluate(result.Function, parameterValues, out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+            if (TryCompute(@operator.Parameters, context, out ImmutableArray<CompiledValue> parameterValues) &&
+                TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -2918,13 +2919,13 @@ public abstract class CodeGenerator
                 return true;
             }
 
-            value = DataItem.Null;
+            value = CompiledValue.Null;
             return false;
         }
 
-        if (!TryCompute(@operator.Left, context, out DataItem leftValue))
+        if (!TryCompute(@operator.Left, context, out CompiledValue leftValue))
         {
-            value = DataItem.Null;
+            value = CompiledValue.Null;
             return false;
         }
 
@@ -2939,51 +2940,51 @@ public abstract class CodeGenerator
         value = leftValue;
         return true;
     }
-    static bool TryCompute(LiteralStatement literal, out DataItem value)
+    static bool TryCompute(LiteralStatement literal, out CompiledValue value)
     {
         switch (literal.Type)
         {
             case LiteralType.Integer:
-                value = new DataItem(literal.GetInt());
+                value = new CompiledValue(literal.GetInt());
                 return true;
             case LiteralType.Float:
-                value = new DataItem(literal.GetFloat());
+                value = new CompiledValue(literal.GetFloat());
                 return true;
             case LiteralType.Char:
                 if (literal.Value.Length != 1)
                 {
-                    value = DataItem.Null;
+                    value = CompiledValue.Null;
                     return false;
                 }
-                value = new DataItem(literal.Value[0]);
+                value = new CompiledValue(literal.Value[0]);
                 return true;
             case LiteralType.String:
             default:
-                value = DataItem.Null;
+                value = CompiledValue.Null;
                 return false;
         }
     }
-    bool TryCompute(KeywordCall keywordCall, out DataItem value)
+    bool TryCompute(KeywordCall keywordCall, out CompiledValue value)
     {
         if (keywordCall.Identifier.Content == "sizeof")
         {
             if (keywordCall.Parameters.Length != 1)
             {
-                value = DataItem.Null;
+                value = CompiledValue.Null;
                 return false;
             }
 
             StatementWithValue param0 = keywordCall.Parameters[0];
             GeneralType param0Type = FindStatementType(param0);
 
-            value = new DataItem(param0Type.Size);
+            value = new CompiledValue(param0Type.Size);
             return true;
         }
 
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute(AnyCall anyCall, EvaluationContext context, out DataItem value)
+    bool TryCompute(AnyCall anyCall, EvaluationContext context, out CompiledValue value)
     {
         if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
         { return TryCompute(functionCall, context, out value); }
@@ -2991,23 +2992,23 @@ public abstract class CodeGenerator
         if (context.TryGetValue(anyCall, out value))
         { return true; }
 
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute(FunctionCall functionCall, EvaluationContext context, out DataItem value)
+    bool TryCompute(FunctionCall functionCall, EvaluationContext context, out CompiledValue value)
     {
         if (functionCall.Identifier.Content == "sizeof")
         {
             if (functionCall.Parameters.Length != 1)
             {
-                value = DataItem.Null;
+                value = CompiledValue.Null;
                 return false;
             }
 
             StatementWithValue param0 = functionCall.Parameters[0];
             GeneralType param0Type = FindStatementType(param0);
 
-            value = new DataItem(param0Type.Size);
+            value = new CompiledValue(param0Type.Size);
             return true;
         }
 
@@ -3023,7 +3024,7 @@ public abstract class CodeGenerator
 
             if (function.IsExternal &&
                 !functionCall.SaveValue &&
-                TryCompute(functionCall.MethodParameters, context, out ImmutableArray<DataItem> parameters))
+                TryCompute(functionCall.MethodParameters, context, out ImmutableArray<CompiledValue> parameters))
             {
                 FunctionCall newFunctionCall = new(
                     null,
@@ -3036,7 +3037,7 @@ public abstract class CodeGenerator
                     Semicolon = functionCall.Semicolon,
                 };
                 context.RuntimeStatements.Add(newFunctionCall);
-                value = DataItem.Null;
+                value = CompiledValue.Null;
                 return true;
             }
 
@@ -3053,7 +3054,7 @@ public abstract class CodeGenerator
                     defined.ToTypeInstance());
             }
 
-            if (TryEvaluate(function, convertedParameters.ToImmutableArray(), out DataItem? returnValue, out Statement[]? runtimeStatements) &&
+            if (TryEvaluate(function, convertedParameters.ToImmutableArray(), out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -3065,10 +3066,10 @@ public abstract class CodeGenerator
         if (context.TryGetValue(functionCall, out value))
         { return true; }
 
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute(Identifier identifier, EvaluationContext context, out DataItem value)
+    bool TryCompute(Identifier identifier, EvaluationContext context, out CompiledValue value)
     {
         if (GetConstant(identifier.Content, out IConstant? constantValue))
         {
@@ -3083,76 +3084,76 @@ public abstract class CodeGenerator
         if (TryGetVariableValue(identifier, out value))
         { return true; }
 
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return false;
     }
-    protected virtual bool TryGetVariableValue(Identifier identifier, out DataItem value)
+    protected virtual bool TryGetVariableValue(Identifier identifier, out CompiledValue value)
     {
         value = default;
         return false;
     }
-    bool TryCompute(Field field, EvaluationContext context, out DataItem value)
+    bool TryCompute(Field field, EvaluationContext context, out CompiledValue value)
     {
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
         if (prevType is ArrayType arrayType && field.Identifier.Equals("Length"))
         {
-            value = new DataItem(arrayType.Length);
+            value = new CompiledValue(arrayType.Length);
             return true;
         }
 
         if (context.TryGetValue(field, out value))
         { return true; }
 
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute(TypeCast typeCast, EvaluationContext context, out DataItem value)
+    bool TryCompute(TypeCast typeCast, EvaluationContext context, out CompiledValue value)
     {
         if (TryCompute(typeCast.PrevStatement, context, out value))
         {
             GeneralType type = GeneralType.From(typeCast.Type, FindType, TryCompute);
             if (type is not BuiltinType builtinType) return false;
-            if (!DataItem.TryCast(ref value, builtinType.RuntimeType))
+            if (!CompiledValue.TryCast(ref value, builtinType.RuntimeType))
             { return false; }
             return true;
         }
 
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute(IndexCall indexCall, EvaluationContext context, out DataItem value)
+    bool TryCompute(IndexCall indexCall, EvaluationContext context, out CompiledValue value)
     {
         if (indexCall.PrevStatement is LiteralStatement literal &&
             literal.Type == LiteralType.String &&
-            TryCompute(indexCall.Index, context, out DataItem index))
+            TryCompute(indexCall.Index, context, out CompiledValue index))
         {
             if (index == literal.Value.Length)
-            { value = new DataItem('\0'); }
+            { value = new CompiledValue('\0'); }
             else
-            { value = new DataItem(literal.Value[(int)index]); }
+            { value = new CompiledValue(literal.Value[(int)index]); }
             return true;
         }
 
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return false;
     }
-    protected bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, out DataItem value)
+    protected bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, out CompiledValue value)
         => TryCompute(statement, EvaluationContext.Empty, out value);
-    bool TryCompute(IEnumerable<StatementWithValue>? statements, EvaluationContext context, [NotNullWhen(true)] out ImmutableArray<DataItem> values)
+    bool TryCompute(IEnumerable<StatementWithValue>? statements, EvaluationContext context, [NotNullWhen(true)] out ImmutableArray<CompiledValue> values)
     {
         if (statements is null)
         {
-            values = ImmutableArray<DataItem>.Empty;
+            values = ImmutableArray<CompiledValue>.Empty;
             return false;
         }
 
-        ImmutableArray<DataItem>.Builder result = ImmutableArray.CreateBuilder<DataItem>();
+        ImmutableArray<CompiledValue>.Builder result = ImmutableArray.CreateBuilder<CompiledValue>();
         foreach (StatementWithValue statement in statements)
         {
-            if (!TryCompute(statement, context, out DataItem value))
+            if (!TryCompute(statement, context, out CompiledValue value))
             {
-                values = ImmutableArray<DataItem>.Empty;
+                values = ImmutableArray<CompiledValue>.Empty;
                 return false;
             }
 
@@ -3162,9 +3163,9 @@ public abstract class CodeGenerator
         values = result.ToImmutable();
         return true;
     }
-    bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, EvaluationContext context, out DataItem value)
+    bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, EvaluationContext context, out CompiledValue value)
     {
-        value = DataItem.Null;
+        value = CompiledValue.Null;
 
         if (statement is null)
         { return false; }
@@ -3192,17 +3193,17 @@ public abstract class CodeGenerator
         };
     }
 
-    public static bool TryComputeSimple(BinaryOperatorCall @operator, out DataItem value)
+    public static bool TryComputeSimple(BinaryOperatorCall @operator, out CompiledValue value)
     {
-        if (!TryComputeSimple(@operator.Left, out DataItem leftValue))
+        if (!TryComputeSimple(@operator.Left, out CompiledValue leftValue))
         {
-            value = DataItem.Null;
+            value = CompiledValue.Null;
             return false;
         }
 
         string op = @operator.Operator.Content;
 
-        if (TryComputeSimple(@operator.Right, out DataItem rightValue))
+        if (TryComputeSimple(@operator.Right, out CompiledValue rightValue))
         {
             value = Compute(op, leftValue, rightValue);
             return true;
@@ -3214,7 +3215,7 @@ public abstract class CodeGenerator
             {
                 if (!leftValue)
                 {
-                    value = new DataItem(false);
+                    value = new CompiledValue(false);
                     return true;
                 }
                 break;
@@ -3223,24 +3224,24 @@ public abstract class CodeGenerator
             {
                 if (leftValue)
                 {
-                    value = new DataItem(true);
+                    value = new CompiledValue(true);
                     return true;
                 }
                 break;
             }
             default:
-                value = DataItem.Null;
+                value = CompiledValue.Null;
                 return false;
         }
 
         value = leftValue;
         return true;
     }
-    public static bool TryComputeSimple(UnaryOperatorCall @operator, out DataItem value)
+    public static bool TryComputeSimple(UnaryOperatorCall @operator, out CompiledValue value)
     {
-        if (!TryComputeSimple(@operator.Left, out DataItem leftValue))
+        if (!TryComputeSimple(@operator.Left, out CompiledValue leftValue))
         {
-            value = DataItem.Null;
+            value = CompiledValue.Null;
             return false;
         }
 
@@ -3255,25 +3256,25 @@ public abstract class CodeGenerator
         value = leftValue;
         return true;
     }
-    public static bool TryComputeSimple(IndexCall indexCall, out DataItem value)
+    public static bool TryComputeSimple(IndexCall indexCall, out CompiledValue value)
     {
         if (indexCall.PrevStatement is LiteralStatement literal &&
             literal.Type == LiteralType.String &&
-            TryComputeSimple(indexCall.Index, out DataItem index))
+            TryComputeSimple(indexCall.Index, out CompiledValue index))
         {
             if (index == literal.Value.Length)
-            { value = new DataItem('\0'); }
+            { value = new CompiledValue('\0'); }
             else
-            { value = new DataItem(literal.Value[(int)index]); }
+            { value = new CompiledValue(literal.Value[(int)index]); }
             return true;
         }
 
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return false;
     }
-    public static bool TryComputeSimple(StatementWithValue? statement, out DataItem value)
+    public static bool TryComputeSimple(StatementWithValue? statement, out CompiledValue value)
     {
-        value = DataItem.Null;
+        value = CompiledValue.Null;
         return statement switch
         {
             LiteralStatement v => TryCompute(v, out value),
@@ -3284,12 +3285,12 @@ public abstract class CodeGenerator
         };
     }
 
-    protected bool TryEvaluate(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+    protected bool TryEvaluate(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
 
-        if (TryCompute(parameters, EvaluationContext.Empty, out ImmutableArray<DataItem> parameterValues) &&
+        if (TryCompute(parameters, EvaluationContext.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
             TryEvaluate(function, parameterValues, out value, out runtimeStatements))
         { return true; }
 
@@ -3309,7 +3310,7 @@ public abstract class CodeGenerator
 
         return false;
     }
-    bool TryEvaluate(ICompiledFunction function, ImmutableArray<DataItem> parameterValues, out DataItem? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunction function, ImmutableArray<CompiledValue> parameterValues, out CompiledValue? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
     {
         value = null;
         runtimeStatements = null;
@@ -3326,7 +3327,7 @@ public abstract class CodeGenerator
             }
         }
 
-        Dictionary<string, DataItem> variables = new();
+        Dictionary<string, CompiledValue> variables = new();
 
         if (function.ReturnSomething)
         {
@@ -3372,7 +3373,7 @@ public abstract class CodeGenerator
 
         while (true)
         {
-            if (!TryCompute(whileLoop.Condition, context, out DataItem condition))
+            if (!TryCompute(whileLoop.Condition, context, out CompiledValue condition))
             { return false; }
 
             if (!condition)
@@ -3407,7 +3408,7 @@ public abstract class CodeGenerator
 
         while (true)
         {
-            if (!TryCompute(forLoop.Condition, context, out DataItem condition))
+            if (!TryCompute(forLoop.Condition, context, out CompiledValue condition))
             { return false; }
 
             if (!condition)
@@ -3443,7 +3444,7 @@ public abstract class CodeGenerator
             {
                 case IfBranch branch:
                 {
-                    if (!TryCompute(branch.Condition, context, out DataItem condition))
+                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
                     { return false; }
 
                     if (!condition)
@@ -3457,7 +3458,7 @@ public abstract class CodeGenerator
 
                 case ElseIfBranch branch:
                 {
-                    if (!TryCompute(branch.Condition, context, out DataItem condition))
+                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
                     { return false; }
 
                     if (!condition)
@@ -3492,7 +3493,7 @@ public abstract class CodeGenerator
     }
     bool TryEvaluate(VariableDeclaration variableDeclaration, EvaluationContext context)
     {
-        DataItem value;
+        CompiledValue value;
 
         if (context.LastScope is null)
         { return false; }
@@ -3522,7 +3523,7 @@ public abstract class CodeGenerator
         if (assignment.Left is not Identifier identifier)
         { return false; }
 
-        if (!TryCompute(assignment.Right, context, out DataItem value))
+        if (!TryCompute(assignment.Right, context, out CompiledValue value))
         { return false; }
 
         if (!context.TrySetVariable(identifier.Content, value))
@@ -3541,7 +3542,7 @@ public abstract class CodeGenerator
 
             if (keywordCall.Parameters.Length == 1)
             {
-                if (!TryCompute(keywordCall.Parameters[0], context, out DataItem returnValue))
+                if (!TryCompute(keywordCall.Parameters[0], context, out CompiledValue returnValue))
                 { return false; }
 
                 if (!context.TrySetVariable("@return", returnValue))
@@ -3599,7 +3600,7 @@ public abstract class CodeGenerator
         string iteratorVariable = loop.VariableDeclaration.Identifier.Content;
         Dictionary<string, StatementWithValue> _params = new()
         {
-            { iteratorVariable, Literal.CreateAnonymous(new DataItem(0), loop.VariableDeclaration) }
+            { iteratorVariable, Literal.CreateAnonymous(new CompiledValue(0), loop.VariableDeclaration) }
         };
 
         StatementWithValue condition = loop.Condition;
@@ -3623,13 +3624,13 @@ public abstract class CodeGenerator
         return true;
     }
 
-    protected ImmutableArray<Block> Unroll(ForLoop loop, Dictionary<StatementWithValue, DataItem> values)
+    protected ImmutableArray<Block> Unroll(ForLoop loop, Dictionary<StatementWithValue, CompiledValue> values)
     {
         VariableDeclaration iteratorVariable = loop.VariableDeclaration;
         StatementWithValue condition = loop.Condition;
         AnyAssignment iteratorExpression = loop.Expression;
 
-        DataItem iterator;
+        CompiledValue iterator;
         if (iteratorVariable.InitialValue is not null)
         {
             if (!TryCompute(iteratorVariable.InitialValue, EvaluationContext.Empty, out iterator))
@@ -3645,7 +3646,7 @@ public abstract class CodeGenerator
         KeyValuePair<string, StatementWithValue> GetIteratorStatement()
             => new(iteratorVariable.Identifier.Content, Literal.CreateAnonymous(iterator, Position.UnknownPosition));
 
-        DataItem ComputeIterator()
+        CompiledValue ComputeIterator()
         {
             KeyValuePair<string, StatementWithValue> _yeah = GetIteratorStatement();
             StatementWithValue _condition = InlineMacro(condition, new Dictionary<string, StatementWithValue>()
@@ -3653,13 +3654,13 @@ public abstract class CodeGenerator
                 {_yeah.Key, _yeah.Value }
             });
 
-            if (!TryCompute(_condition, new EvaluationContext(values, null), out DataItem result))
+            if (!TryCompute(_condition, new EvaluationContext(values, null), out CompiledValue result))
             { throw new CompilerException($"Failed to compute the condition value (\"{_condition}\") for loop unrolling", condition, CurrentFile); }
 
             return result;
         }
 
-        DataItem ComputeExpression()
+        CompiledValue ComputeExpression()
         {
             KeyValuePair<string, StatementWithValue> _yeah = GetIteratorStatement();
             Assignment assignment = iteratorExpression.ToAssignment();
@@ -3672,7 +3673,7 @@ public abstract class CodeGenerator
                 { _yeah.Key, _yeah.Value }
             });
 
-            if (!TryCompute(_value, new EvaluationContext(values, null), out DataItem result))
+            if (!TryCompute(_value, new EvaluationContext(values, null), out CompiledValue result))
             { throw new CompilerException($"Failed to compute the condition value (\"{_value}\") for loop unrolling", condition, CurrentFile); }
 
             return result;

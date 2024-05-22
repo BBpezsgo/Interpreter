@@ -40,13 +40,15 @@ public class PreparationInstruction
 
         result.Append(Opcode.ToString());
 
-        if (!Operand1.Value.IsNull)
+        int parameterCount = InstructionUtils.ParameterCount(Opcode);
+
+        if (parameterCount >= 1)
         {
             result.Append(' ');
             result.Append(Operand1.ToString());
         }
 
-        if (!Operand2.Value.IsNull)
+        if (parameterCount >= 2)
         {
             result.Append(' ');
             result.Append(Operand2.ToString());

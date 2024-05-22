@@ -258,7 +258,7 @@ public class SourceCodeManager
     {
         if (!FromAnywhere(@using, GetSearches(@using, parent, basePath), tokenizerSettings, out ParserResult? ast, out Uri? path))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"File \"{@using.PathString}\" not found", new Position(@using.Path), parent));
+            AnalysisCollection?.Errors.Add(new LanguageError($"File \"{@using.PathString}\" not found", new Position(@using.Path.As<IPositioned>().Or(@using)), parent));
             return new Dictionary<Uri, CollectedAST>();
         }
 

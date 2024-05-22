@@ -14,7 +14,7 @@ public class WindowElement : Element
     Point MouseDragStartPos = Point.Empty;
 
     public bool CanDrag = true;
-    public Element[] Elements = System.Array.Empty<Element>();
+    public Element[] Elements = Array.Empty<Element>();
 
     public override void BeforeDraw()
     {

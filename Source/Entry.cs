@@ -1,9 +1,9 @@
 ﻿using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace LanguageCore;
 
-using System.Threading;
 using BBLang.Generator;
 using Brainfuck;
 using Brainfuck.Generator;
@@ -13,6 +13,31 @@ using Tokenizing;
 
 public static class Entry
 {
+    /// <exception cref="NotSupportedException"/>
+    /// <exception cref="NotImplementedException"/>
+    public static void Run(params string[] arguments)
+    {
+        bool pauseAtEnd = true;
+
+        if (ArgumentParser.Parse(out ProgramArguments arguments_, arguments))
+        {
+            try
+            { Entry.Run(arguments_); }
+            catch (Exception exception)
+            { Output.LogError($"Unhandled exception: {exception}"); }
+
+            if (arguments_.DoNotPause) pauseAtEnd = false;
+        }
+
+        if (pauseAtEnd)
+        {
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine("Press any key to exit");
+            Console.ReadKey();
+        }
+    }
+
     /// <exception cref="NotSupportedException"/>
     /// <exception cref="NotImplementedException"/>
     public static void Run(ProgramArguments arguments)
@@ -30,31 +55,37 @@ public static class Entry
         {
             case ProgramRunType.Normal:
             {
-                Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
+                Output.LogDebug($"Executing \"{arguments.File}\" ...");
 
                 Dictionary<int, ExternalFunctionBase> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
 
-#if AOT
-                Output.LogDebug($"Skipping loading DLL-s because the compiler compiled in AOT mode");
+                if (arguments.File.IsFile)
+                {
+#if true
+                    Output.LogDebug($"Skipping loading DLL-s because the compiler compiled in AOT mode");
 #else
+                    FileInfo _file = new(arguments.File.LocalPath);
 
-                if (arguments.File.Directory is null)
-                { throw new InternalException($"File \"{arguments.File}\" doesn't have a directory"); }
+                    if (_file.Directory is null)
+                    { throw new InternalException($"File \"{_file}\" doesn't have a directory"); }
 
-                string dllsFolderPath = Path.Combine(arguments.File.Directory.FullName, arguments.CompilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
-                if (Directory.Exists(dllsFolderPath))
-                {
-                    DirectoryInfo dllsFolder = new(dllsFolderPath);
-                    Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
-                    foreach (FileInfo dll in dllsFolder.GetFiles("*.dll"))
-                    { externalFunctions.LoadAssembly(System.Reflection.Assembly.LoadFile(dll.FullName)); }
-                }
-                else
-                {
-                    Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
-                }
-
+                    string dllsFolderPath = Path.Combine(_file.Directory.FullName, arguments.CompilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
+                    if (Directory.Exists(dllsFolderPath))
+                    {
+                        DirectoryInfo dllsFolder = new(dllsFolderPath);
+                        Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
+                        foreach (FileInfo dll in dllsFolder.GetFiles("*.dll"))
+                        {
+                            externalFunctions.LoadAssembly(System.Reflection.Assembly.LoadFile(dll.FullName));
+                            Output.LogDebug($"Assembly \"{dll.Name}\" loaded");
+                        }
+                    }
+                    else
+                    {
+                        Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
+                    }
 #endif
+                }
 
                 BBLangGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();
@@ -192,7 +223,7 @@ public static class Entry
             }
             case ProgramRunType.Brainfuck:
             {
-                Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
+                Output.LogDebug($"Executing \"{arguments.File}\" ...");
 
                 BrainfuckGeneratorResult generated;
                 ImmutableArray<Token> tokens;
@@ -201,7 +232,7 @@ public static class Entry
                 AnalysisCollection analysisCollection = new();
                 if (arguments.ThrowErrors)
                 {
-                    tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck).Tokens;
+                    tokens = AnyTokenizer.Tokenize(arguments.File, PreprocessorVariables.Brainfuck).Tokens;
                     CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
@@ -214,7 +245,7 @@ public static class Entry
                 {
                     try
                     {
-                        tokens = StreamTokenizer.Tokenize(arguments.File.FullName, PreprocessorVariables.Brainfuck).Tokens;
+                        tokens = AnyTokenizer.Tokenize(arguments.File, PreprocessorVariables.Brainfuck).Tokens;
                         CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
@@ -289,7 +320,6 @@ public static class Entry
                 if (arguments.OutputFile is not null)
                 {
                     Output.WriteLine($"Writing to \"{arguments.OutputFile}\" ...");
-                    // string compiledFilePath = Path.Combine(Path.GetDirectoryName(arguments.File.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{arguments.File.FullName}\""), Path.GetFileNameWithoutExtension(arguments.File!.FullName) + ".bf");
                     File.WriteAllText(arguments.OutputFile, generated.Code);
                 }
 
@@ -317,25 +347,7 @@ public static class Entry
                 }
                 else
                 {
-                    // Output.WriteLine();
-                    // Output.WriteLine($" === OUTPUT ===");
-                    // Output.WriteLine();
-
-                    if (false)
-                    {
-                        // Stopwatch sw = Stopwatch.StartNew();
-                        // interpreter.Run();
-                        // Console.ResetColor();
-                        // sw.Stop();
-                        // 
-                        // Output.WriteLine();
-                        // Output.WriteLine();
-                        // Output.WriteLine($"Execution time: {sw.ElapsedMilliseconds} ms");
-                    }
-                    else
-                    {
-                        interpreter.Run();
-                    }
+                    interpreter.Run();
 
                     if (arguments.PrintFlags.HasFlag(PrintFlags.Heap))
                     {
@@ -420,16 +432,6 @@ public static class Entry
                             Console.ResetColor();
                             Console.WriteLine();
                         }
-
-                        // byte[] heap = interpreter.GetHeap(arguments.BrainfuckGeneratorSettings);
-                        // Output.WriteLine();
-                        // Output.WriteLine();
-                        // Output.WriteLine($" === HEAP ===");
-                        // Output.WriteLine();
-                        // for (int i = 0; i < heap.Length; i++)
-                        // {
-                        //     Console.WriteLine($"{i}: {heap[i]}");
-                        // }
 
                         Console.WriteLine();
 

@@ -1,9 +1,7 @@
-﻿using System.Collections;
-
-namespace LanguageCore.Parser;
+﻿namespace LanguageCore.Parser;
 
 using Compiler;
-using LanguageCore.Parser.Statement;
+using Statement;
 
 public class ParameterDefinitionCollection :
     IPositioned,

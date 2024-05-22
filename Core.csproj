@@ -13,26 +13,28 @@
     <RootNamespace>LanguageCore</RootNamespace>
     <PackageId>BBLang</PackageId>
     <Authors>BB</Authors>
+    <StartupObject>LanguageCore.Program</StartupObject>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <WarningLevel>9999</WarningLevel>
-    <DefineConstants>$(DefineConstants);_AOT</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <WarningLevel>9999</WarningLevel>
-    <DefineConstants>$(DefineConstants);_AOT</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="out\**" />
+    <Compile Remove="Scripts\BuildJob\**" />
     <Compile Remove="Source\ASM\**" />
     <Compile Remove="Tests\**" />
     <EmbeddedResource Remove="out\**" />
+    <EmbeddedResource Remove="Scripts\BuildJob\**" />
     <EmbeddedResource Remove="Source\ASM\**" />
     <EmbeddedResource Remove="Tests\**" />
     <None Remove="out\**" />
+    <None Remove="Scripts\BuildJob\**" />
     <None Remove="Source\ASM\**" />
     <None Remove="Tests\**" />
   </ItemGroup>

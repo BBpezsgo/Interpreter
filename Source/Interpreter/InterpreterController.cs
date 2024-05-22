@@ -1,5 +1,4 @@
-﻿using System.Collections.Frozen;
-using System.IO;
+﻿using System.IO;
 
 namespace LanguageCore.Runtime;
 

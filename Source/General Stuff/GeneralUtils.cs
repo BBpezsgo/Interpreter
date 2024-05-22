@@ -12,7 +12,7 @@ public interface IDuplicatable<T> : ICloneable
 
 public static class Utils
 {
-    public static Uri AssemblyFile => new(System.Reflection.Assembly.GetExecutingAssembly().Location, UriKind.Absolute);
+    public static Uri AssemblyFile => new(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, Process.GetCurrentProcess().ProcessName + ".exe"), UriKind.Absolute);
 
     public static T Max<T>(T a, T b)
         where T : IComparisonOperators<T, T, bool>

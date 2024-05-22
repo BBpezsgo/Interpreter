@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using LanguageCore;
+﻿using LanguageCore;
 using LanguageCore.Runtime;
 using Win32.Console;
 

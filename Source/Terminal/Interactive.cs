@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using Win32;
 using Win32.Console;
-using Color = System.Drawing.Color;
+using Color = Win32.Gdi32.GdiColor;
 
 namespace LanguageCore.Interactive;
 
@@ -194,21 +194,21 @@ class InteractiveCompiler
 
 static class InteractiveColors
 {
-    public static readonly Color Error = Color.FromArgb(int.Parse("fc3e36", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+    public static readonly Color Error = Color.ParseHex("fc3e36");
 
-    public static readonly Color Comment = Color.FromArgb(int.Parse("57a64a", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color LiteralNumber = Color.FromArgb(int.Parse("b5cea8", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color LiteralString = Color.FromArgb(int.Parse("d69d85", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color Operator = Color.FromArgb(int.Parse("b4b4b4", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+    public static readonly Color Comment = Color.ParseHex("57a64a");
+    public static readonly Color LiteralNumber = Color.ParseHex("b5cea8");
+    public static readonly Color LiteralString = Color.ParseHex("d69d85");
+    public static readonly Color Operator = Color.ParseHex("b4b4b4");
 
-    public static readonly Color Type = Color.FromArgb(int.Parse("4ec9b0", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color Struct = Color.FromArgb(int.Parse("86c691", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color Keyword = Color.FromArgb(int.Parse("569cd6", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color FunctionName = Color.FromArgb(int.Parse("dcdcaa", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color FieldName = Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color LocalSymbol = Color.FromArgb(int.Parse("9cdcfe", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color Statement = Color.FromArgb(int.Parse("d8a0df", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-    public static readonly Color TypeParameter = Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+    public static readonly Color Type = Color.ParseHex("4ec9b0");
+    public static readonly Color Struct = Color.ParseHex("86c691");
+    public static readonly Color Keyword = Color.ParseHex("569cd6");
+    public static readonly Color FunctionName = Color.ParseHex("dcdcaa");
+    public static readonly Color FieldName = Color.ParseHex("dcdcdc");
+    public static readonly Color LocalSymbol = Color.ParseHex("9cdcfe");
+    public static readonly Color Statement = Color.ParseHex("d8a0df");
+    public static readonly Color TypeParameter = Color.ParseHex("b8d7a3");
 }
 
 public class Interactive

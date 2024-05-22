@@ -1,6 +1,5 @@
 ﻿namespace LanguageCore.Compiler;
 
-using System.Collections.Generic;
 using Parser;
 using Parser.Statement;
 

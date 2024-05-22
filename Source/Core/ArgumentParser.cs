@@ -7,7 +7,7 @@ public struct ProgramArguments
     [MemberNotNullWhen(false, nameof(File))]
     public readonly bool IsEmpty => File is null;
 
-    public System.IO.FileInfo? File;
+    public Uri? File;
 
     public Compiler.CompilerSettings CompilerSettings;
     public BBLang.Generator.MainGeneratorSettings MainGeneratorSettings;
@@ -376,10 +376,9 @@ public static class ArgumentParser
 
         if (args.Length > 0)
         {
-            string file = args[^1];
-            if (!System.IO.File.Exists(file))
-            { throw new ArgumentException($"File \"{file}\" not found"); }
-            result.File = new System.IO.FileInfo(file);
+            if (!Uri.TryCreate(args[^1], UriKind.RelativeOrAbsolute, out Uri? file))
+            { throw new ArgumentException($"Invalid uri \"{args[^1]}\""); }
+            result.File = file;
         }
         else
         {
@@ -419,18 +418,6 @@ public static class ArgumentParser
         catch (ArgumentException error)
         {
             Output.LogError(error.Message);
-
-            Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine("Arguments i tried to parse:");
-            Console.Write("{ ");
-            for (int i = 0; i < args.Length; i++)
-            {
-                if (i > 0) Console.Write(", ");
-                Console.Write($"\"{args[i].Escape()}\"");
-            }
-            Console.WriteLine(" }");
-            Console.ResetColor();
-
             return null;
         }
     }

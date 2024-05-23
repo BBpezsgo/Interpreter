@@ -144,7 +144,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     bool CanReturn;
 
-    readonly Stack<ScopeInformations> CurrentScopeDebug = new();
+    readonly Stack<ScopeInformation> CurrentScopeDebug = new();
     CompileLevel CompileLevel => Settings.CompileLevel;
     readonly MainGeneratorSettings Settings;
 

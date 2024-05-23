@@ -665,7 +665,7 @@ public readonly struct MainResult : IResult
     public readonly string StdOutput { get; }
     public readonly string StdError { get; }
     public readonly int ExitCode { get; }
-    public readonly IReadOnlyList<LanguageCore.Runtime.RuntimeValue> Heap { get; }
+    public readonly IReadOnlyList<RuntimeValue> Heap { get; }
 
     public MainResult(string stdOut, string stdErr, BytecodeProcessor interpreter)
     {

@@ -2,7 +2,7 @@
 
 public enum Opcode : byte
 {
-    _ = 0,
+    NOP = 0,
 
     #region === STACK OPERATIONS ===
     /// <summary>

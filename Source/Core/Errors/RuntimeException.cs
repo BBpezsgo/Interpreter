@@ -3,8 +3,8 @@
 public class RuntimeException : LanguageException
 {
     public RuntimeContext? Context;
-    public ImmutableArray<FunctionInformations> CallStack;
-    public FunctionInformations? CurrentFrame;
+    public ImmutableArray<FunctionInformation> CallStack;
+    public FunctionInformation? CurrentFrame;
     string? Arrows;
 
     public void FeedDebugInfo(DebugInformation debugInfo)
@@ -12,7 +12,7 @@ public class RuntimeException : LanguageException
         if (!Context.HasValue) return;
         RuntimeContext context = Context.Value;
 
-        if (!debugInfo.TryGetSourceLocation(context.CodePointer, out SourceCodeLocation sourcePosition))
+        if (!debugInfo.TryGetSourceLocation(context.Registers.CodePointer, out SourceCodeLocation sourcePosition))
         { Position = Position.UnknownPosition; }
         else
         { Position = sourcePosition.SourcePosition; }
@@ -21,9 +21,9 @@ public class RuntimeException : LanguageException
             debugInfo.OriginalFiles.TryGetValue(sourcePosition.Uri, out ImmutableArray<Tokenizing.Token> tokens))
         { Arrows = GetArrows(sourcePosition.SourcePosition, tokens); }
 
-        CurrentFrame = debugInfo.GetFunctionInformations(context.CodePointer);
+        CurrentFrame = debugInfo.GetFunctionInformation(context.Registers.CodePointer);
 
-        CallStack = debugInfo.GetFunctionInformations(context.CallTrace).ToImmutableArray();
+        CallStack = debugInfo.GetFunctionInformation(context.CallTrace).ToImmutableArray();
 
         File = sourcePosition.Uri;
         File ??= CallStack.Length > 0 ? CallStack[^1].File : null;
@@ -61,7 +61,7 @@ public class RuntimeException : LanguageException
             result.AppendLine();
         }
 
-        result.Append($"Code Pointer: {context.CodePointer}");
+        result.Append($"Code Pointer: {context.Registers.CodePointer}");
 
         const int callTraceIndent = 1;
 

@@ -21,10 +21,17 @@ public static class Entry
 
         if (ArgumentParser.Parse(out ProgramArguments arguments_, arguments))
         {
-            try
-            { Entry.Run(arguments_); }
-            catch (Exception exception)
-            { Output.LogError($"Unhandled exception: {exception}"); }
+            if (arguments_.ThrowErrors)
+            {
+                Entry.Run(arguments_);
+            }
+            else
+            {
+                try
+                { Entry.Run(arguments_); }
+                catch (Exception exception)
+                { Output.LogError($"Unhandled exception: {exception}"); }
+            }
 
             if (arguments_.DoNotPause) pauseAtEnd = false;
         }
@@ -110,6 +117,8 @@ public static class Entry
                     }
                 }
 
+                Console.ResetColor();
+
                 Runtime.Interpreter interpreter;
 
                 static void PrintStuff(Runtime.Interpreter interpreter)
@@ -134,6 +143,8 @@ public static class Entry
                         Console.Write(item.Int);
                         Console.WriteLine();
                     }
+
+                    Console.ResetColor();
 #endif
                 }
 

@@ -2,9 +2,30 @@
 
 using Compiler;
 
-/// <summary>
-/// This compiles and runs the code
-/// </summary>
+public readonly struct TimeSleep : IEquatable<TimeSleep>
+{
+    readonly double Timeout;
+    readonly double Started;
+
+    public TimeSleep(double timeout)
+    {
+        Timeout = timeout;
+        Started = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+    }
+
+    public bool Tick()
+    {
+        double now = DateTime.UtcNow.TimeOfDay.TotalSeconds;
+        return now - Started < Timeout;
+    }
+
+    public override bool Equals(object? obj) => obj is TimeSleep other && Equals(other);
+    public bool Equals(TimeSleep other) => Timeout == other.Timeout && Started == other.Started;
+    public override int GetHashCode() => HashCode.Combine(Timeout, Started);
+    public static bool operator ==(TimeSleep left, TimeSleep right) => left.Equals(right);
+    public static bool operator !=(TimeSleep left, TimeSleep right) => !left.Equals(right);
+}
+
 public class Interpreter
 {
     public delegate void OnOutputEventHandler(Interpreter sender, string message, LogType logType);
@@ -38,6 +59,8 @@ public class Interpreter
     ExternalFunctionManaged? ReturnValueConsumer;
 
     readonly bool ThrowExceptions;
+
+    TimeSleep CurrentSleep;
 
     public Interpreter(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation)
     {
@@ -102,7 +125,7 @@ public class Interpreter
 
         externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char));
 
-        externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter! /* This can't be null */ .Sleep(new TimeSleep(t)));
+        externalFunctions.AddExternalFunction("sleep", (int t) => CurrentSleep = new TimeSleep(t));
 
         #endregion
 
@@ -147,7 +170,15 @@ public class Interpreter
     /// <exception cref="Exception"/>
     public void Update()
     {
-        if (BytecodeInterpreter.IsDone || IsPaused) return;
+        if (CurrentSleep != default)
+        {
+            if (CurrentSleep.Tick())
+            { return; }
+            else
+            { CurrentSleep = default; }
+        }
+
+        if (IsPaused) return;
 
         try
         {

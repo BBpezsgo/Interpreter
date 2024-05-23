@@ -93,7 +93,7 @@ public class ParameterDefinitionCollection :
             if (i > 0) result.Append(", ");
             if (Parameters[i].Modifiers.Length > 0)
             {
-                result.AppendJoin(", ", Parameters[i].Modifiers);
+                result.AppendJoin(' ', Parameters[i].Modifiers);
                 result.Append(' ');
             }
             result.Append(types[i].ToString());

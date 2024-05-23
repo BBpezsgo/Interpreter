@@ -1,12 +1,12 @@
 ﻿namespace LanguageCore.Compiler;
 
 using Parser.Statement;
-using Runtime;
 using Tokenizing;
 
 public enum BasicType
 {
     Void,
+    Any,
     Byte,
     Integer,
     Float,

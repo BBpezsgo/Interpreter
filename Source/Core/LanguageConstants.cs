@@ -14,6 +14,7 @@ public static class DeclarationKeywords
 public static class TypeKeywords
 {
     public const string Void = "void";
+    public const string Any = "any";
     public const string Byte = "byte";
     public const string Int = "int";
     public const string Float = "float";
@@ -22,6 +23,7 @@ public static class TypeKeywords
     public static ImmutableArray<string> List { get; } = ImmutableArray.Create
     (
         TypeKeywords.Void,
+        TypeKeywords.Any,
         TypeKeywords.Byte,
         TypeKeywords.Int,
         TypeKeywords.Float,
@@ -38,11 +40,12 @@ public static class TypeKeywords
 
     public static ImmutableDictionary<string, BasicType> BasicTypes { get; } = new Dictionary<string, BasicType>()
     {
+        { TypeKeywords.Void, BasicType.Void },
+        { TypeKeywords.Any, BasicType.Any },
         { TypeKeywords.Byte, BasicType.Byte },
         { TypeKeywords.Int, BasicType.Integer },
         { TypeKeywords.Float, BasicType.Float },
         { TypeKeywords.Char, BasicType.Char },
-        { TypeKeywords.Void, BasicType.Void },
     }.ToImmutableDictionary();
 }
 
@@ -92,6 +95,7 @@ public static class LanguageConstants
         DeclarationKeywords.Template,
 
         TypeKeywords.Void,
+        TypeKeywords.Any,
         TypeKeywords.Byte,
         TypeKeywords.Int,
         TypeKeywords.Float,
@@ -184,8 +188,8 @@ public static class BuiltinFunctions
 {
     public static ImmutableDictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)> Prototypes { get; } = new Dictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)>()
     {
-        { Allocate, (new PointerType(new BuiltinType(BasicType.Integer)), [ new BuiltinType(BasicType.Integer) ]) },
-        { Free, (new BuiltinType(BasicType.Void), [ new PointerType(new BuiltinType(BasicType.Integer)) ]) },
+        { Allocate, (new PointerType(new BuiltinType(BasicType.Any)), [ new BuiltinType(BasicType.Integer) ]) },
+        { Free, (new BuiltinType(BasicType.Void), [ new PointerType(new BuiltinType(BasicType.Any)) ]) },
     }.ToImmutableDictionary();
 
     public const string Allocate = "alloc";

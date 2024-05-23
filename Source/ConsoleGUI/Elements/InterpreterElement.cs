@@ -143,7 +143,7 @@ public sealed partial class InterpreterElement : WindowElement
             HasBorder = true,
             Title = "Call Stack",
         };
-        callStackPanel.OnBeforeDraw += CallstackElement_OnBeforeDraw;
+        callStackPanel.OnBeforeDraw += CallStackElement_OnBeforeDraw;
 
         Elements = new Element[]
         {

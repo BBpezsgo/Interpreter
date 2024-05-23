@@ -1,13 +1,26 @@
 ﻿using System.Runtime.InteropServices;
 
 namespace LanguageCore.Runtime;
+
 public readonly struct RuntimeContext
 {
-    public ImmutableArray<int> CallTrace { get; init; }
-    public int CodePointer { get; init; }
-    public ImmutableArray<Instruction> Code { get; init; }
-    public IReadOnlyList<RuntimeValue> Memory { get; init; }
-    public int CodeSampleStart { get; init; }
+    public readonly Registers Registers;
+    public readonly ImmutableArray<RuntimeValue> Memory;
+    public readonly ImmutableArray<Instruction> Code;
+
+    public readonly ImmutableArray<int> CallTrace;
+
+    public RuntimeContext(
+        Registers registers,
+        ImmutableArray<RuntimeValue> memory,
+        ImmutableArray<Instruction> code)
+    {
+        Registers = registers;
+        Memory = memory;
+        Code = code;
+
+        CallTrace = ImmutableArray.Create(DebugUtils.TraceCalls(Memory, Registers.BasePointer));
+    }
 }
 
 public struct BytecodeInterpreterSettings
@@ -22,55 +35,8 @@ public struct BytecodeInterpreterSettings
     };
 }
 
-public interface ISleep
-{
-    /// <summary>
-    /// Executes every time <see cref="BytecodeProcessor.Tick"/> is called.
-    /// </summary>
-    /// <returns>
-    /// <see langword="true"/> if it is sleeping, <see langword="false"/> otherwise.
-    /// </returns>
-    public bool Tick();
-}
-
-public class TickSleep : ISleep
-{
-    readonly int Ticks;
-    int Elapsed;
-
-    public TickSleep(int ticks)
-    {
-        Ticks = ticks;
-    }
-
-    public bool Tick()
-    {
-        Elapsed++;
-        return Elapsed < Ticks;
-    }
-}
-
-public class TimeSleep : ISleep
-{
-    readonly double Timeout;
-    readonly double Started;
-
-    public TimeSleep(double timeout)
-    {
-        Timeout = timeout;
-        Started = DateTime.UtcNow.TimeOfDay.TotalSeconds;
-    }
-
-    public bool Tick()
-    {
-        double now = DateTime.UtcNow.TimeOfDay.TotalSeconds;
-        return now - Started < Timeout;
-    }
-}
-
 public class BytecodeProcessor
 {
-    const int CodeSampleRange = 20;
     public static readonly int StackDirection = -1;
     public const int StackSize = 256;
 
@@ -78,8 +44,6 @@ public class BytecodeProcessor
     public bool IsDone => Registers.CodePointer >= Code.Length;
 
     readonly BytecodeInterpreterSettings Settings;
-
-    ISleep? CurrentSleep;
 
     public Registers Registers;
     public readonly RuntimeValue[] Memory;
@@ -90,25 +54,10 @@ public class BytecodeProcessor
 
     public IEnumerable<RuntimeValue> GetStack()
     {
-        ArraySegment<RuntimeValue> stack = GetStack(out bool shouldReverse);
-        if (shouldReverse)
-        { return stack.Reverse(); }
-        else
-        { return stack; }
-    }
-
-    public ArraySegment<RuntimeValue> GetStack(out bool shouldReverse)
-    {
         if (StackDirection > 0)
-        {
-            shouldReverse = false;
-            return new ArraySegment<RuntimeValue>(Memory)[StackStart..Registers.StackPointer];
-        }
+        { return new ArraySegment<RuntimeValue>(Memory)[StackStart..Registers.StackPointer]; }
         else
-        {
-            shouldReverse = true;
-            return new ArraySegment<RuntimeValue>(Memory)[(Registers.StackPointer + 1)..];
-        }
+        { return new ArraySegment<RuntimeValue>(Memory)[(Registers.StackPointer + 1)..].Reverse(); }
     }
 
     public Range<int> GetStackInterval(out bool isReversed)
@@ -142,100 +91,17 @@ public class BytecodeProcessor
         externalFunctions.SetInterpreter(this);
     }
 
-    public void Sleep(ISleep sleep) => CurrentSleep = sleep;
-
-    RuntimeContext GetContext() => new()
-    {
-        CallTrace = TraceCalls(Memory, Registers.BasePointer),
-        CodePointer = Registers.CodePointer,
-        Code = Code[Math.Max(Registers.CodePointer - CodeSampleRange, 0)..Math.Clamp(Registers.CodePointer + CodeSampleRange, 0, Code.Length - 1)],
-        Memory = Memory,
-        CodeSampleStart = Math.Max(Registers.CodePointer - CodeSampleRange, 0),
-    };
-
-    public static ImmutableArray<int> TraceCalls(IReadOnlyList<RuntimeValue> stack, int basePointer)
-    {
-        static bool CanTraceCallsWith(IReadOnlyList<RuntimeValue> stack, int basePointer)
-        {
-            int savedCodePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection);
-            int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
-
-            if (savedCodePointerAddress < 0 || savedCodePointerAddress >= stack.Count) return false;
-            if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Count) return false;
-
-            return true;
-        }
-
-        static void TraceCalls(IReadOnlyList<RuntimeValue> stack, List<int> callTrace, int basePointer)
-        {
-            if (!CanTraceCallsWith(stack, basePointer)) return;
-
-            RuntimeValue savedCodePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * StackDirection)];
-            RuntimeValue savedBasePointerD = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)];
-
-            int savedCodePointer = savedCodePointerD.Int;
-            int savedBasePointer = savedBasePointerD.Int;
-
-            callTrace.Add(savedCodePointer);
-
-            if (savedBasePointer == basePointer || callTrace.Contains(savedCodePointer)) return;
-            TraceCalls(stack, callTrace, savedBasePointer);
-        }
-
-        if (!CanTraceCallsWith(stack, basePointer))
-        { return ImmutableArray.Create<int>(); }
-
-        List<int> callTrace = new();
-
-        TraceCalls(stack, callTrace, basePointer);
-
-        int[] callTraceResult = callTrace.ToArray();
-        Array.Reverse(callTraceResult);
-        return callTraceResult.ToImmutableArray();
-    }
-
-    public static ImmutableArray<int> TraceBasePointers(IReadOnlyList<RuntimeValue> stack, int basePointer)
-    {
-        static bool CanTraceBPsWith(IReadOnlyList<RuntimeValue> stack, int basePointer)
-        {
-            int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection);
-
-            if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Count) return false;
-
-            return true;
-        }
-
-        static void TraceBasePointers(List<int> result, IReadOnlyList<RuntimeValue> stack, int basePointer)
-        {
-            if (!CanTraceBPsWith(stack, basePointer)) return;
-
-            int newBasePointer = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * StackDirection)].Int;
-            result.Add(newBasePointer);
-            if (newBasePointer == basePointer || result.Contains(newBasePointer)) return;
-            TraceBasePointers(result, stack, newBasePointer);
-        }
-
-        if (!CanTraceBPsWith(stack, basePointer))
-        { return ImmutableArray.Create<int>(); }
-
-        List<int> result = new();
-        TraceBasePointers(result, stack, basePointer);
-        return result.ToImmutableArray();
-    }
+    RuntimeContext GetContext() => new(
+        Registers,
+        ImmutableCollectionsMarshal.AsImmutableArray(Memory),
+        Code
+    );
 
     void Step() => Registers.CodePointer++;
     void Step(int num) => Registers.CodePointer += num;
 
     public bool Tick()
     {
-        if (CurrentSleep is not null)
-        {
-            if (CurrentSleep.Tick())
-            { return true; }
-            else
-            { CurrentSleep = null; }
-        }
-
         if (IsDone) return false;
 
         try
@@ -264,7 +130,7 @@ public class BytecodeProcessor
     {
         switch (CurrentInstruction.Opcode)
         {
-            case Opcode._: throw new InternalException("Unknown instruction");
+            case Opcode.NOP: break;
 
             case Opcode.Exit: EXIT(); break;
 

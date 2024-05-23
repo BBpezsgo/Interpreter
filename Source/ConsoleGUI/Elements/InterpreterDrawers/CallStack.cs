@@ -1,4 +1,5 @@
-﻿using LanguageCore;
+﻿using System.Runtime.InteropServices;
+using LanguageCore;
 using LanguageCore.Runtime;
 using Win32.Console;
 
@@ -6,25 +7,25 @@ namespace ConsoleGUI;
 
 public partial class InterpreterElement
 {
-    private void CallstackElement_OnBeforeDraw(InlineElement sender)
+    private void CallStackElement_OnBeforeDraw(InlineElement sender)
     {
         sender.ClearBuffer();
         sender.DrawBuffer.StepTo(0);
 
         sender.DrawBuffer.ResetColor();
 
-        ImmutableArray<int> calltraceRaw = BytecodeProcessor.TraceCalls(Interpreter.BytecodeInterpreter.Memory, Interpreter.BytecodeInterpreter.Registers.BasePointer);
+        ReadOnlySpan<int> callTraceRaw = DebugUtils.TraceCalls(ImmutableCollectionsMarshal.AsImmutableArray(Interpreter.BytecodeInterpreter.Memory), Interpreter.BytecodeInterpreter.Registers.BasePointer);
 
-        FunctionInformations[] callstack;
+        FunctionInformation[] callStack;
         if (Interpreter.DebugInformation is not null)
-        { callstack = Interpreter.DebugInformation.GetFunctionInformations(calltraceRaw).ToArray(); }
+        { callStack = Interpreter.DebugInformation.GetFunctionInformation(callTraceRaw.ToArray()).ToArray(); }
         else
-        { callstack = new FunctionInformations[calltraceRaw.Length]; }
+        { callStack = new FunctionInformation[callTraceRaw.Length]; }
 
         int i;
-        for (i = 0; i < callstack.Length; i++)
+        for (i = 0; i < callStack.Length; i++)
         {
-            FunctionInformations callframe = callstack[i];
+            FunctionInformation callFrame = callStack[i];
 
             sender.DrawBuffer.ForegroundColor = CharColor.Silver;
             sender.DrawBuffer.AddText(' ');
@@ -37,16 +38,16 @@ public partial class InterpreterElement
             sender.DrawBuffer.ForegroundColor = CharColor.Silver;
             sender.DrawBuffer.BackgroundColor = CharColor.Black;
 
-            if (!callframe.IsValid)
+            if (!callFrame.IsValid)
             {
                 sender.DrawBuffer.ForegroundColor = CharColor.BrightCyan;
-                sender.DrawBuffer.AddText(calltraceRaw[i].ToString(CultureInfo.InvariantCulture));
+                sender.DrawBuffer.AddText(callTraceRaw[i].ToString(CultureInfo.InvariantCulture));
             }
             else
             {
-                if (callframe.ReadableIdentifier.Contains('(', StringComparison.Ordinal))
+                if (callFrame.ReadableIdentifier.Contains('(', StringComparison.Ordinal))
                 {
-                    string functionName = callframe.ReadableIdentifier[..callframe.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal)];
+                    string functionName = callFrame.ReadableIdentifier[..callFrame.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal)];
 
                     sender.DrawBuffer.ForegroundColor = CharColor.BrightYellow;
                     sender.DrawBuffer.AddText(functionName);
@@ -54,7 +55,7 @@ public partial class InterpreterElement
                     sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                     sender.DrawBuffer.AddChar('(');
 
-                    string parameters = callframe.ReadableIdentifier[(callframe.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal) + 1)..callframe.ReadableIdentifier.IndexOf(')', StringComparison.Ordinal)];
+                    string parameters = callFrame.ReadableIdentifier[(callFrame.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal) + 1)..callFrame.ReadableIdentifier.IndexOf(')', StringComparison.Ordinal)];
 
                     List<string> parameters2;
                     if (!parameters.Contains(',', StringComparison.Ordinal))
@@ -97,7 +98,7 @@ public partial class InterpreterElement
                 }
                 else
                 {
-                    sender.DrawBuffer.AddText(callframe.ReadableIdentifier);
+                    sender.DrawBuffer.AddText(callFrame.ReadableIdentifier);
                 }
             }
 
@@ -108,7 +109,7 @@ public partial class InterpreterElement
 
         if (Interpreter.DebugInformation is not null)
         {
-            FunctionInformations callframe = Interpreter.DebugInformation.GetFunctionInformations(this.Interpreter.BytecodeInterpreter.Registers.CodePointer);
+            FunctionInformation callframe = Interpreter.DebugInformation.GetFunctionInformation(this.Interpreter.BytecodeInterpreter.Registers.CodePointer);
 
             if (callframe.IsValid)
             {

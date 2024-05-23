@@ -59,7 +59,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!allocator.ReturnSomething)
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size, CurrentFile); }
 
-        allocator.References.Add(new Reference<StatementWithValue>(size, CurrentFile, CurrentContext));
+        allocator.References.Add(new Reference<StatementWithValue?>(size, CurrentFile, CurrentContext));
 
         if (!allocator.CanUse(CurrentFile))
         {
@@ -99,7 +99,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        parameterCleanup = GenerateCodeForParameterPassing(parameters, allocator);
+        parameterCleanup = GenerateCodeForArguments(parameters, allocator);
 
         AddComment(" .:");
 
@@ -125,7 +125,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
         CompiledFunction? deallocator = result.Function;
 
-        deallocator.References.Add(new Reference<StatementWithValue>(value, CurrentFile, CurrentContext));
+        deallocator.References.Add(new Reference<StatementWithValue?>(value, CurrentFile, CurrentContext));
 
         if (!deallocator.CanUse(CurrentFile))
         {
@@ -166,7 +166,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        parameterCleanup = GenerateCodeForParameterPassing(parameters, deallocator);
+        parameterCleanup = GenerateCodeForArguments(parameters, deallocator);
 
         AddComment(" .:");
 
@@ -185,9 +185,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForParameterCleanup(parameterCleanup);
 
         AddComment("}");
-
-        // GenerateCodeForStatement(value);
-        // GenerateDeallocator();
     }
 
     void GenerateDeallocator(GeneralType deallocateableType, Position position)
@@ -197,6 +194,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundError, AddCompilable))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found ({notFoundError.Message})", position, CurrentFile); }
         CompiledFunction? deallocator = result.Function;
+
+        deallocator.References.Add(new Reference<StatementWithValue?>(null));
 
         if (!deallocator.CanUse(CurrentFile))
         {
@@ -330,14 +329,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (keywordCall.Identifier.Content == StatementKeywords.Return)
         {
-            if (keywordCall.Parameters.Length > 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
+            if (keywordCall.Arguments.Length > 1)
+            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {keywordCall.Arguments.Length}", keywordCall, CurrentFile); }
 
-            if (keywordCall.Parameters.Length == 1)
+            if (keywordCall.Arguments.Length == 1)
             {
                 AddComment(" Param 0:");
 
-                StatementWithValue returnValue = keywordCall.Parameters[0];
+                StatementWithValue returnValue = keywordCall.Arguments[0];
                 GeneralType returnValueType = FindStatementType(returnValue);
 
                 GenerateCodeForStatement(returnValue);
@@ -373,12 +372,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (keywordCall.Identifier.Content == StatementKeywords.Throw)
         {
-            if (keywordCall.Parameters.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Throw}\": required {1} passed {keywordCall.Parameters}", keywordCall, CurrentFile); }
+            if (keywordCall.Arguments.Length != 1)
+            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Throw}\": required {1} passed {keywordCall.Arguments}", keywordCall, CurrentFile); }
 
             AddComment(" Param 0:");
 
-            StatementWithValue throwValue = keywordCall.Parameters[0];
+            StatementWithValue throwValue = keywordCall.Arguments[0];
 
             GenerateCodeForStatement(throwValue);
             using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -405,13 +404,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (keywordCall.Identifier.Content == StatementKeywords.Delete)
         {
-            if (keywordCall.Parameters.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Delete}\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
+            if (keywordCall.Arguments.Length != 1)
+            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Delete}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall, CurrentFile); }
 
-            GenerateCodeForStatement(keywordCall.Parameters[0]);
+            GenerateCodeForStatement(keywordCall.Arguments[0]);
 
-            GeneralType deletableType = FindStatementType(keywordCall.Parameters[0]);
-            GenerateDestructor(deletableType, keywordCall.Parameters[0].Position);
+            GeneralType deletableType = FindStatementType(keywordCall.Arguments[0]);
+            GenerateDestructor(deletableType, keywordCall.Arguments[0].Position);
 
             return;
         }
@@ -419,50 +418,44 @@ public partial class CodeGeneratorForMain : CodeGenerator
         throw new CompilerException($"Unknown keyword \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile);
     }
 
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(IReadOnlyList<StatementWithValue> parameters, ICompiledFunction compiledFunction)
+    Stack<ParameterCleanupItem> GenerateCodeForArguments(IReadOnlyList<StatementWithValue> arguments, ICompiledFunction compiledFunction, int alreadyPassed = 0)
     {
-        Stack<ParameterCleanupItem> parameterCleanup = new();
+        Stack<ParameterCleanupItem> argumentCleanup = new();
 
-        for (int i = 0; i < parameters.Count; i++)
+        for (int i = 0; i < arguments.Count; i++)
         {
-            StatementWithValue passedParameter = parameters[i];
-            GeneralType passedParameterType = FindStatementType(passedParameter);
-            ParameterDefinition definedParameter = compiledFunction.Parameters[i];
-            GeneralType definedParameterType = compiledFunction.ParameterTypes[i];
+            StatementWithValue argument = arguments[i];
+            GeneralType argumentType = FindStatementType(argument);
+            ParameterDefinition parameter = compiledFunction.Parameters[i + alreadyPassed];
+            GeneralType parameterType = compiledFunction.ParameterTypes[i + alreadyPassed];
 
-            if (!passedParameterType.Equals(definedParameterType))
-            {
-                passedParameter = new TypeCast(
-                    passedParameter,
-                    Token.CreateAnonymous("as"),
-                    definedParameterType.ToTypeInstance());
-                passedParameterType = FindStatementType(passedParameter);
-            }
+            if (argumentType.Size != parameterType.Size)
+            { throw new InternalException($"Bad argument type passed: expected {parameterType} passed {argumentType}"); }
 
-            AddComment($" Pass {definedParameter}:");
+            AddComment($" Pass {parameter}:");
 
-            bool canDeallocate = definedParameter.Modifiers.Contains(ModifierKeywords.Temp);
+            bool canDeallocate = parameter.Modifiers.Contains(ModifierKeywords.Temp);
 
-            canDeallocate = canDeallocate && passedParameterType is PointerType;
+            canDeallocate = canDeallocate && argumentType is PointerType;
 
-            if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
+            if (StatementCanBeDeallocated(argument, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", argument, CurrentFile)); }
             }
             else
             {
                 if (explicitDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", argument, CurrentFile)); }
                 canDeallocate = false;
             }
 
-            GenerateCodeForStatement(passedParameter, definedParameterType);
+            GenerateCodeForStatement(argument, parameterType);
 
-            parameterCleanup.Push((passedParameterType.Size, canDeallocate, passedParameterType, passedParameter.Position));
+            argumentCleanup.Push((argumentType.Size, canDeallocate, argumentType, argument.Position));
         }
 
-        return parameterCleanup;
+        return argumentCleanup;
     }
 
     Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(IReadOnlyList<StatementWithValue> parameters, FunctionType function)
@@ -534,7 +527,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int returnValueOffset = -1;
 
-        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(parameters, compiledFunction);
+        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(parameters, compiledFunction);
         for (int i = 0; i < parameterCleanup.Count; i++)
         { returnValueOffset -= parameterCleanup[i].Size; }
 
@@ -572,18 +565,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
-        { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+        if (functionCall.MethodArguments.Length != compiledFunction.ParameterCount)
+        { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodArguments.Length}", functionCall, CurrentFile); }
 
         if (compiledFunction.BuiltinFunctionName == BuiltinFunctions.Allocate)
         {
-            GenerateAllocator(functionCall.Parameters[0]);
+            GenerateAllocator(functionCall.Arguments[0]);
             return;
         }
 
         if (compiledFunction.BuiltinFunctionName == BuiltinFunctions.Free)
         {
-            GenerateDeallocator(functionCall.Parameters[0]);
+            GenerateDeallocator(functionCall.Arguments[0]);
             return;
         }
 
@@ -596,7 +589,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return;
             }
 
-            GenerateCodeForFunctionCall_External(functionCall.MethodParameters, functionCall.SaveValue, compiledFunction, externalFunction);
+            GenerateCodeForFunctionCall_External(functionCall.MethodArguments, functionCall.SaveValue, compiledFunction, externalFunction);
             return;
         }
 
@@ -612,7 +605,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        parameterCleanup = GenerateCodeForParameterPassing(functionCall.MethodParameters, compiledFunction);
+        parameterCleanup = GenerateCodeForArguments(functionCall.MethodArguments, compiledFunction);
 
         AddComment(" .:");
 
@@ -640,10 +633,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             _identifier.Token.AnalyzedType = TokenAnalyzedType.Keyword;
 
-            if (anyCall.Parameters.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {anyCall.Parameters.Length}", anyCall, CurrentFile); }
+            if (anyCall.Arguments.Length != 1)
+            { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {anyCall.Arguments.Length}", anyCall, CurrentFile); }
 
-            StatementWithValue param = anyCall.Parameters[0];
+            StatementWithValue param = anyCall.Arguments[0];
             GeneralType paramType;
             if (param is TypeStatement typeStatement)
             { paramType = GeneralType.From(typeStatement.Type, FindType, TryCompute); }
@@ -667,21 +660,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { _identifier2.Token.AnalyzedType = TokenAnalyzedType.FunctionName; }
             anyCall.Reference = compiledFunction;
 
-            ImmutableArray<StatementWithValue>.Builder convertedParameters = ImmutableArray.CreateBuilder<StatementWithValue>(functionCall.MethodParameters.Length);
-            for (int i = 0; i < functionCall.MethodParameters.Length; i++)
-            {
-                convertedParameters.Add(functionCall.MethodParameters[i]);
-                GeneralType passed = FindStatementType(functionCall.MethodParameters[i]);
-                GeneralType defined = compiledFunction.ParameterTypes[i];
-                if (passed.Equals(defined)) continue;
-                convertedParameters[i] = new TypeCast(
-                    convertedParameters[i],
-                    Token.CreateAnonymous("as"),
-                    defined.ToTypeInstance());
-            }
-
             if (!Settings.DontOptimize &&
-                TryEvaluate(compiledFunction, convertedParameters.ToImmutable(), out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
+                TryEvaluate(compiledFunction, functionCall.MethodArguments, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -730,8 +710,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         OnGotStatementType(anyCall, functionType.ReturnType);
 
-        if (anyCall.Parameters.Length != functionType.Parameters.Length)
-        { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {anyCall.Parameters.Length}", new Position(anyCall.Parameters.As<IPositioned>().Or(anyCall.Brackets)), CurrentFile); }
+        if (anyCall.Arguments.Length != functionType.Parameters.Length)
+        { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {anyCall.Arguments.Length}", new Position(anyCall.Arguments.As<IPositioned>().Or(anyCall.Brackets)), CurrentFile); }
 
         AddComment($"Call (runtime) {functionType} {{");
 
@@ -743,7 +723,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(anyCall.Parameters, functionType);
+        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(anyCall.Arguments, functionType);
 
         AddComment(" .:");
 
@@ -798,7 +778,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     return;
                 }
 
-                GenerateCodeForFunctionCall_External(@operator.Parameters, @operator.SaveValue, operatorDefinition, externalFunction);
+                GenerateCodeForFunctionCall_External(@operator.Arguments, @operator.SaveValue, operatorDefinition, externalFunction);
                 return;
             }
 
@@ -806,7 +786,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             int returnValueSize = GenerateInitialValue(operatorDefinition.Type);
 
-            Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(@operator.Parameters, operatorDefinition);
+            Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(@operator.Arguments, operatorDefinition);
 
             AddComment(" .:");
 
@@ -1045,7 +1025,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     return;
                 }
 
-                GenerateCodeForFunctionCall_External(@operator.Parameters, @operator.SaveValue, operatorDefinition, externalFunction);
+                GenerateCodeForFunctionCall_External(@operator.Arguments, @operator.SaveValue, operatorDefinition, externalFunction);
                 return;
             }
 
@@ -1053,7 +1033,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             int returnValueSize = GenerateInitialValue(operatorDefinition.Type);
 
-            Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(@operator.Parameters, operatorDefinition);
+            Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(@operator.Arguments, operatorDefinition);
 
             AddComment(" .:");
 
@@ -1560,7 +1540,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForStatement(ConstructorCall constructorCall)
     {
         GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute);
-        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Parameters);
+        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
         if (!GetConstructor(instanceType, parameters, CurrentFile, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound, AddCompilable))
         { throw notFound.Instantiate(constructorCall.Type, CurrentFile); }
@@ -1589,7 +1569,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddInstruction(Opcode.Push, Register.StackPointer.ToPtr(-newInstanceType.Size * BytecodeProcessor.StackDirection));
         }
 
-        parameterCleanup = GenerateCodeForParameterPassing(constructorCall.Parameters, compiledFunction);
+        parameterCleanup = GenerateCodeForArguments(constructorCall.Arguments, compiledFunction, 1);
         parameterCleanup.Insert(0, (newInstanceType.Size, false, newInstanceType, newInstance.Position));
 
         AddComment(" .:");
@@ -2268,7 +2248,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void OnScopeEnter(Position position, IEnumerable<VariableDeclaration> variables)
     {
-        CurrentScopeDebug.Push(new ScopeInformations()
+        CurrentScopeDebug.Push(new ScopeInformation()
         {
             Location = new SourceCodeLocation()
             {
@@ -2276,7 +2256,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 SourcePosition = position,
                 Uri = CurrentFile,
             },
-            Stack = new List<StackElementInformations>(),
+            Stack = new List<StackElementInformation>(),
         });
 
         AddComment("Scope enter");
@@ -2311,9 +2291,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CleanupLocalConstants();
 
-        ScopeInformations scope = CurrentScopeDebug.Pop();
+        ScopeInformation scope = CurrentScopeDebug.Pop();
         scope.Location.Instructions.End = GeneratedCode.Count - 1;
-        DebugInfo?.ScopeInformations.Add(scope);
+        DebugInfo?.ScopeInformation.Add(scope);
     }
 
     #region GenerateCodeForLocalVariable
@@ -2337,12 +2317,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
-        StackElementInformations debugInfo = new()
+        StackElementInformation debugInfo = new()
         {
             Kind = StackElementKind.Variable,
             Tag = compiledVariable.Identifier.Content,
             Address = offset * BytecodeProcessor.StackDirection,
-            BasepointerRelative = true,
+            BasePointerRelative = true,
             Size = compiledVariable.Type.Size,
         };
 
@@ -2443,12 +2423,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
-        StackElementInformations debugInfo = new()
+        StackElementInformation debugInfo = new()
         {
             Kind = StackElementKind.Variable,
             Tag = compiledVariable.Identifier.Content,
             Address = offset * BytecodeProcessor.StackDirection,
-            BasepointerRelative = false,
+            BasePointerRelative = false,
             Size = compiledVariable.Type.Size,
         };
 
@@ -2613,10 +2593,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (function is IHaveCompiledType returnType)
         {
-            CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+            CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
             {
                 Address = GetReturnValueAddress(returnType.Type).Address * BytecodeProcessor.StackDirection,
-                BasepointerRelative = true,
+                BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = returnType.Type.Size,
                 Tag = "Return Value",
@@ -2624,37 +2604,37 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+        CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = ReturnFlagOffset * BytecodeProcessor.StackDirection,
-            BasepointerRelative = true,
+            BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = 1,
             Tag = "Return Flag",
             Type = StackElementType.Value,
         });
-        CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+        CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = SavedBasePointerOffset * BytecodeProcessor.StackDirection,
-            BasepointerRelative = true,
+            BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = 1,
             Tag = "Saved BasePointer",
             Type = StackElementType.Value,
         });
-        CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+        CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = SavedCodePointerOffset * BytecodeProcessor.StackDirection,
-            BasepointerRelative = true,
+            BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = 1,
             Tag = "Saved CodePointer",
             Type = StackElementType.Value,
         });
-        CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+        CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = AbsoluteGlobalOffset * BytecodeProcessor.StackDirection,
-            BasepointerRelative = true,
+            BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = 1,
             Tag = "Absolute Global Offset",
@@ -2665,11 +2645,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             CompiledParameter p = CompiledParameters[i];
 
-            StackElementInformations debugInfo = new()
+            StackElementInformation debugInfo = new()
             {
                 Address = GetBaseAddress(p).Address * BytecodeProcessor.StackDirection,
                 Kind = StackElementKind.Parameter,
-                BasepointerRelative = true,
+                BasePointerRelative = true,
                 Size = p.Type.Size,
                 Tag = p.Identifier.Content,
             };
@@ -2703,7 +2683,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (function.Identifier is not null)
         {
-            DebugInfo?.FunctionInformations.Add(new FunctionInformations()
+            DebugInfo?.FunctionInformation.Add(new FunctionInformation()
             {
                 IsValid = true,
                 SourcePosition = function.Identifier.Position,
@@ -2797,7 +2777,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (statements.IsDefaultOrEmpty) return;
 
-        CurrentScopeDebug.Push(new ScopeInformations()
+        CurrentScopeDebug.Push(new ScopeInformation()
         {
             Location = new SourceCodeLocation()
             {
@@ -2805,7 +2785,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 SourcePosition = new Position(statements),
                 Uri = CurrentFile,
             },
-            Stack = new List<StackElementInformations>(),
+            Stack = new List<StackElementInformation>(),
         });
 
         AddComment("TopLevelStatements {");
@@ -2813,10 +2793,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.Push, Register.BasePointer);
         AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
-        CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+        CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = SavedBasePointerOffset * BytecodeProcessor.StackDirection,
-            BasepointerRelative = true,
+            BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = 1,
             Tag = "Saved BasePointer",
@@ -2829,10 +2809,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CanReturn = true;
         AddInstruction(Opcode.Push, new CompiledValue(false));
-        CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+        CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = ReturnFlagOffset * BytecodeProcessor.StackDirection,
-            BasepointerRelative = true,
+            BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = 1,
             Tag = "Return Flag",
@@ -2864,9 +2844,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
 
-        ScopeInformations scope = CurrentScopeDebug.Pop();
+        ScopeInformation scope = CurrentScopeDebug.Pop();
         scope.Location.Instructions.End = GeneratedCode.Count - 1;
-        DebugInfo?.ScopeInformations.Add(scope);
+        DebugInfo?.ScopeInformation.Add(scope);
     }
 
     #endregion
@@ -2897,7 +2877,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CompileGlobalConstants(statements);
         }
 
-        CurrentScopeDebug.Push(new ScopeInformations()
+        CurrentScopeDebug.Push(new ScopeInformation()
         {
             Location = new SourceCodeLocation()
             {
@@ -2905,7 +2885,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 SourcePosition = Position.UnknownPosition,
                 Uri = CurrentFile,
             },
-            Stack = new List<StackElementInformations>(),
+            Stack = new List<StackElementInformation>(),
         });
 
         {
@@ -2927,10 +2907,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddInstruction(Opcode.Push, reg.Register);
             }
 
-            CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+            CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
             {
                 Address = AbsoluteGlobalOffset * BytecodeProcessor.StackDirection,
-                BasepointerRelative = true,
+                BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = 1,
                 Tag = "Absolute Global Offset",
@@ -2960,9 +2940,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.Exit); // Exit code already there
 
         {
-            ScopeInformations scope = CurrentScopeDebug.Pop();
+            ScopeInformation scope = CurrentScopeDebug.Pop();
             scope.Location.Instructions.End = GeneratedCode.Count - 1;
-            DebugInfo?.ScopeInformations.Add(scope);
+            DebugInfo?.ScopeInformation.Add(scope);
         }
 
         while (true)

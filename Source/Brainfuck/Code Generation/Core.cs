@@ -187,7 +187,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         {
             if (DebugInfo is null) return;
 
-            DebugInfo.FunctionInformations.Add(new FunctionInformations()
+            DebugInfo.FunctionInformation.Add(new FunctionInformation()
             {
                 File = Uri,
                 Identifier = Identifier,

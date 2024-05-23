@@ -169,7 +169,6 @@ public interface IReferenceable
 }
 
 public interface IReferenceable<TBy> : IReferenceable
-    where TBy : notnull
 {
     public new List<Reference<TBy>> References { get; }
     IEnumerable<Reference> IReferenceable.References => References.Select(v => (Reference)v);

@@ -1,7 +1,6 @@
 ﻿namespace LanguageCore.Parser.Statement;
 
 using Compiler;
-using Runtime;
 using Tokenizing;
 
 struct Stringify
@@ -255,35 +254,35 @@ public class CompileTag : Statement, IInFile
 {
     public Token Operator { get; }
     public Token Identifier { get; }
-    public ImmutableArray<Literal> Parameters { get; }
+    public ImmutableArray<Literal> Arguments { get; }
     public Uri File { get; }
 
     public override Position Position =>
         new Position(Operator, Identifier)
-        .Union(Parameters);
+        .Union(Arguments);
 
     public CompileTag(
         Token hashToken,
         Token hashName,
-        IEnumerable<Literal> parameters,
+        IEnumerable<Literal> arguments,
         Uri file)
     {
         Operator = hashToken;
         Identifier = hashName;
-        Parameters = parameters.ToImmutableArray();
+        Arguments = arguments.ToImmutableArray();
         File = file;
     }
 
     public override string ToString()
-        => $"{Operator}{Identifier}{(Parameters.Length > 0 ? string.Join<Literal>(' ', Parameters) : string.Empty)}{Semicolon}";
+        => $"{Operator}{Identifier}{(Arguments.Length > 0 ? string.Join<Literal>(' ', Arguments) : string.Empty)}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
         if (includeThis) yield return this;
 
-        foreach (Literal parameter in Parameters)
+        foreach (Literal argument in Arguments)
         {
-            foreach (Statement statement in parameter.GetStatementsRecursively(true))
+            foreach (Statement statement in argument.GetStatementsRecursively(true))
             { yield return statement; }
         }
     }
@@ -453,7 +452,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
 
     public StatementWithValue PrevStatement { get; }
     public TokenPair Brackets { get; }
-    public ImmutableArray<StatementWithValue> Parameters { get; }
+    public ImmutableArray<StatementWithValue> Arguments { get; }
     public ImmutableArray<Token> Commas { get; }
     public Uri OriginalFile { get; }
 
@@ -467,7 +466,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
         Uri file)
     {
         PrevStatement = prevStatement;
-        Parameters = parameters.ToImmutableArray();
+        Arguments = parameters.ToImmutableArray();
         Commas = commas.ToImmutableArray();
         Brackets = brackets;
         OriginalFile = file;
@@ -482,7 +481,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
         result.Append(PrevStatement);
         result.Append(Brackets.Start);
 
-        for (int i = 0; i < Parameters.Length; i++)
+        for (int i = 0; i < Arguments.Length; i++)
         {
             if (i > 0)
             { result.Append(", "); }
@@ -490,7 +489,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
             if (result.Length >= Stringify.CozyLength)
             { result.Append("..."); break; }
 
-            result.Append(Parameters[i]);
+            result.Append(Arguments[i]);
         }
         result.Append(Brackets.End);
 
@@ -500,14 +499,14 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> TypeSearch)
+    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
     {
         StringBuilder result = new();
         result.Append('(');
-        for (int i = 0; i < Parameters.Length; i++)
+        for (int i = 0; i < Arguments.Length; i++)
         {
             if (i > 0) { result.Append(", "); }
-            result.Append(TypeSearch.Invoke(Parameters[i]).ToString());
+            result.Append(typeSearch.Invoke(Arguments[i]).ToString());
         }
         result.Append(')');
         return result.ToString();
@@ -522,7 +521,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
 
         if (PrevStatement is Identifier functionIdentifier)
         {
-            functionCall = new FunctionCall(null, functionIdentifier.Token, Parameters, Brackets, OriginalFile)
+            functionCall = new FunctionCall(null, functionIdentifier.Token, Arguments, Brackets, OriginalFile)
             {
                 Semicolon = Semicolon,
                 SaveValue = SaveValue,
@@ -536,7 +535,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
 
         if (PrevStatement is Field field)
         {
-            functionCall = new FunctionCall(field.PrevStatement, field.Identifier, Parameters, Brackets, OriginalFile)
+            functionCall = new FunctionCall(field.PrevStatement, field.Identifier, Arguments, Brackets, OriginalFile)
             {
                 Semicolon = Semicolon,
                 SaveValue = SaveValue,
@@ -558,9 +557,9 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo
         foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
         { yield return statement; }
 
-        for (int i = 0; i < Parameters.Length; i++)
+        foreach (StatementWithValue argument in Arguments)
         {
-            foreach (Statement statement in Parameters[i].GetStatementsRecursively(true))
+            foreach (Statement statement in argument.GetStatementsRecursively(true))
             { yield return statement; }
         }
     }
@@ -574,34 +573,34 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
     public object? Reference { get; set; }
 
     public Token Identifier { get; }
-    public ImmutableArray<StatementWithValue> Parameters { get; }
+    public ImmutableArray<StatementWithValue> Arguments { get; }
     public StatementWithValue? PrevStatement { get; }
     public TokenPair Brackets { get; }
     public Uri OriginalFile { get; }
 
     public bool IsMethodCall => PrevStatement != null;
-    public ImmutableArray<StatementWithValue> MethodParameters
+    public ImmutableArray<StatementWithValue> MethodArguments
     {
         get
         {
-            if (PrevStatement == null) return Parameters;
-            return Parameters.Insert(0, PrevStatement);
+            if (PrevStatement == null) return Arguments;
+            return Arguments.Insert(0, PrevStatement);
         }
     }
     public override Position Position =>
         new Position(Brackets, Identifier)
-        .Union(MethodParameters);
+        .Union(MethodArguments);
 
     public FunctionCall(
         StatementWithValue? prevStatement,
         Token identifier,
-        IEnumerable<StatementWithValue> parameters,
+        IEnumerable<StatementWithValue> arguments,
         TokenPair brackets,
         Uri file)
     {
         PrevStatement = prevStatement;
         Identifier = identifier;
-        Parameters = parameters.ToImmutableArray();
+        Arguments = arguments.ToImmutableArray();
         Brackets = brackets;
         OriginalFile = file;
     }
@@ -619,13 +618,13 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
         }
         result.Append(Identifier);
         result.Append(Brackets.Start);
-        for (int i = 0; i < Parameters.Length; i++)
+        for (int i = 0; i < Arguments.Length; i++)
         {
             if (i > 0) result.Append(", ");
 
-            result.Append(Parameters[i]);
+            result.Append(Arguments[i]);
 
-            if (result.Length >= 10 && i + 1 != Parameters.Length)
+            if (result.Length >= 10 && i + 1 != Arguments.Length)
             {
                 result.Append(", ...");
                 break;
@@ -639,20 +638,20 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> TypeSearch)
+    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
     {
         StringBuilder result = new();
         if (PrevStatement != null)
         {
-            result.Append(TypeSearch.Invoke(PrevStatement).ToString());
+            result.Append(typeSearch.Invoke(PrevStatement).ToString());
             result.Append('.');
         }
         result.Append(Identifier.ToString());
         result.Append('(');
-        for (int i = 0; i < Parameters.Length; i++)
+        for (int i = 0; i < Arguments.Length; i++)
         {
             if (i > 0) result.Append(", ");
-            result.Append(TypeSearch.Invoke(Parameters[i]).ToString());
+            result.Append(typeSearch.Invoke(Arguments[i]).ToString());
         }
         result.Append(')');
         return result.ToString();
@@ -668,9 +667,9 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
             { yield return statement; }
         }
 
-        for (int i = 0; i < Parameters.Length; i++)
+        foreach (StatementWithValue argument in Arguments)
         {
-            foreach (Statement statement in Parameters[i].GetStatementsRecursively(true))
+            foreach (Statement statement in argument.GetStatementsRecursively(true))
             { yield return statement; }
         }
     }
@@ -679,16 +678,16 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo
 public class KeywordCall : StatementWithValue, IReadable
 {
     public Token Identifier { get; }
-    public ImmutableArray<StatementWithValue> Parameters { get; }
+    public ImmutableArray<StatementWithValue> Arguments { get; }
 
     public override Position Position =>
         new Position(Identifier)
-        .Union(Parameters);
+        .Union(Arguments);
 
-    public KeywordCall(Token identifier, IEnumerable<StatementWithValue> parameters)
+    public KeywordCall(Token identifier, IEnumerable<StatementWithValue> arguments)
     {
         Identifier = identifier;
-        Parameters = parameters.ToImmutableArray();
+        Arguments = arguments.ToImmutableArray();
     }
 
     public override string ToString()
@@ -698,17 +697,17 @@ public class KeywordCall : StatementWithValue, IReadable
 
         result.Append(Identifier);
 
-        if (Parameters.Length > 0)
+        if (Arguments.Length > 0)
         {
             result.Append(' ');
-            for (int i = 0; i < Parameters.Length; i++)
+            for (int i = 0; i < Arguments.Length; i++)
             {
                 if (i > 0)
                 { result.Append(", "); }
                 if (result.Length >= Stringify.CozyLength)
                 { result.Append("..."); break; }
 
-                result.Append(Parameters[i]);
+                result.Append(Arguments[i]);
             }
         }
 
@@ -717,16 +716,16 @@ public class KeywordCall : StatementWithValue, IReadable
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> TypeSearch)
+    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
     {
         StringBuilder result = new();
         result.Append(Identifier.Content);
         result.Append('(');
-        for (int i = 0; i < Parameters.Length; i++)
+        for (int i = 0; i < Arguments.Length; i++)
         {
             if (i > 0) result.Append(", ");
 
-            result.Append(TypeSearch.Invoke(Parameters[i]));
+            result.Append(typeSearch.Invoke(Arguments[i]));
         }
         result.Append(')');
 
@@ -737,9 +736,9 @@ public class KeywordCall : StatementWithValue, IReadable
     {
         if (includeThis) yield return this;
 
-        for (int i = 0; i < Parameters.Length; i++)
+        foreach (StatementWithValue argument in Arguments)
         {
-            foreach (Statement statement in Parameters[i].GetStatementsRecursively(true))
+            foreach (Statement statement in argument.GetStatementsRecursively(true))
             { yield return statement; }
         }
     }
@@ -782,7 +781,7 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
     public Uri OriginalFile { get; }
 
     public override Position Position => new(Operator, Left, Right);
-    public ImmutableArray<StatementWithValue> Parameters => ImmutableArray.Create(Left, Right);
+    public ImmutableArray<StatementWithValue> Arguments => ImmutableArray.Create(Left, Right);
 
     public BinaryOperatorCall(
         Token op,
@@ -866,7 +865,7 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
     public Uri OriginalFile { get; }
 
     public override Position Position => new(Operator, Left);
-    public ImmutableArray<StatementWithValue> Parameters => ImmutableArray.Create(Left);
+    public ImmutableArray<StatementWithValue> Arguments => ImmutableArray.Create(Left);
 
     public UnaryOperatorCall(
         Token op,
@@ -935,7 +934,7 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo
     public StatementWithValue Left { get; }
     public Uri OriginalFile { get; }
 
-    public ImmutableArray<StatementWithValue> Parameters => ImmutableArray.Create(Left);
+    public ImmutableArray<StatementWithValue> Arguments => ImmutableArray.Create(Left);
     public override Position Position => new(Operator, Left);
 
     public ShortOperatorCall(
@@ -1242,24 +1241,6 @@ public class Literal : StatementWithValue
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static Literal[] CreateAnonymous(CompiledValue[] values, IPositioned[] positions)
-    {
-        Literal[] result = new Literal[values.Length];
-        for (int i = 0; i < values.Length; i++)
-        { result[i] = Literal.CreateAnonymous(values[i], positions[i].Position); }
-        return result;
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static Literal[] CreateAnonymous(CompiledValue[] values, Position[] positions)
-    {
-        Literal[] result = new Literal[values.Length];
-        for (int i = 0; i < values.Length; i++)
-        { result[i] = Literal.CreateAnonymous(values[i], positions[i]); }
-        return result;
-    }
-
-    /// <exception cref="NotImplementedException"/>
     public static IEnumerable<Literal> CreateAnonymous(IEnumerable<CompiledValue> values, IEnumerable<IPositioned> positions)
         =>
         values
@@ -1305,7 +1286,7 @@ public class Literal : StatementWithValue
         value = value.Trim();
         value = value.Replace("_", string.Empty, StringComparison.Ordinal);
         value = value.EndsWith('f') ? value[..^1] : value;
-        return float.Parse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+        return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
     }
     public static bool GetBoolean(string value)
     {
@@ -1677,24 +1658,24 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo, 
 
     public Token Keyword { get; }
     public TypeInstance Type { get; }
-    public ImmutableArray<StatementWithValue> Parameters { get; }
+    public ImmutableArray<StatementWithValue> Arguments { get; }
     public TokenPair Brackets { get; }
     public Uri OriginalFile { get; }
 
     public override Position Position =>
         new Position(Keyword, Type, Brackets)
-        .Union(Parameters);
+        .Union(Arguments);
 
     public ConstructorCall(
         Token keyword,
         TypeInstance typeName,
-        IEnumerable<StatementWithValue> parameters,
+        IEnumerable<StatementWithValue> arguments,
         TokenPair brackets,
         Uri file)
     {
         Keyword = keyword;
         Type = typeName;
-        Parameters = parameters.ToImmutableArray();
+        Arguments = arguments.ToImmutableArray();
         Brackets = brackets;
         OriginalFile = file;
     }
@@ -1709,14 +1690,14 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo, 
         result.Append(Type);
         result.Append(Brackets.Start);
 
-        for (int i = 0; i < Parameters.Length; i++)
+        for (int i = 0; i < Arguments.Length; i++)
         {
             if (i > 0) result.Append(", ");
 
             if (result.Length >= Stringify.CozyLength)
             { result.Append("..."); break; }
 
-            result.Append(Parameters[i]);
+            result.Append(Arguments[i]);
         }
 
         result.Append(Brackets.End);
@@ -1726,18 +1707,18 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo, 
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> TypeSearch)
+    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
     {
         StringBuilder result = new();
         result.Append(Type.ToString());
         result.Append('.');
         result.Append(Keyword.Content);
         result.Append(Brackets.Start);
-        for (int i = 0; i < Parameters.Length; i++)
+        for (int i = 0; i < Arguments.Length; i++)
         {
             if (i > 0) result.Append(", ");
 
-            result.Append(TypeSearch.Invoke(Parameters[i]));
+            result.Append(typeSearch.Invoke(Arguments[i]));
         }
         result.Append(Brackets.End);
 
@@ -1748,9 +1729,9 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo, 
     {
         if (includeThis) yield return this;
 
-        foreach (StatementWithValue parameter in Parameters)
+        foreach (StatementWithValue argument in Arguments)
         {
-            foreach (Statement statement in parameter.GetStatementsRecursively(true))
+            foreach (Statement statement in argument.GetStatementsRecursively(true))
             { yield return statement; }
         }
     }

@@ -1,4 +1,5 @@
 ﻿using Win32.Console;
+using System.Runtime.InteropServices;
 
 namespace ConsoleGUI;
 
@@ -32,11 +33,11 @@ public partial class InterpreterElement
 
         CollectedScopeInfo stackDebugInfo;
         if (Interpreter.DebugInformation is not null)
-        { stackDebugInfo = Interpreter.DebugInformation.GetScopeInformations(Interpreter.BytecodeInterpreter.Registers.CodePointer); }
+        { stackDebugInfo = Interpreter.DebugInformation.GetScopeInformation(Interpreter.BytecodeInterpreter.Registers.CodePointer); }
         else
         { stackDebugInfo = CollectedScopeInfo.Empty; }
 
-        ImmutableArray<int> savedBasePointers = BytecodeProcessor.TraceBasePointers(Interpreter.BytecodeInterpreter.Memory, Interpreter.BytecodeInterpreter.Registers.BasePointer);
+        ReadOnlySpan<int> savedBasePointers = DebugUtils.TraceBasePointers(ImmutableCollectionsMarshal.AsImmutableArray(Interpreter.BytecodeInterpreter.Memory), Interpreter.BytecodeInterpreter.Registers.BasePointer);
 
         List<int> loadIndicators = new();
         List<int> storeIndicators = new();
@@ -44,7 +45,7 @@ public partial class InterpreterElement
         if (Interpreter.NextInstruction.HasValue)
         { GetDataMovementIndicators(Interpreter.NextInstruction.Value, loadIndicators, storeIndicators); }
 
-        void DrawElement(int address, RuntimeValue item)
+        void DrawElement(int address, RuntimeValue item, ReadOnlySpan<int> savedBasePointers)
         {
             if (Interpreter.BytecodeInterpreter.Registers.BasePointer == address)
             {
@@ -111,7 +112,7 @@ public partial class InterpreterElement
 
         Range<int> interval = Interpreter.BytecodeInterpreter.GetStackInterval(out bool isReversed);
 
-        interval = LanguageCore.Range.Intersect(interval, interval.Offset(isReversed ? -StackScrollBar.Offset : StackScrollBar.Offset));
+        interval = Range.Intersect(interval, interval.Offset(isReversed ? -StackScrollBar.Offset : StackScrollBar.Offset));
 
         IEnumerable<int> enumerator = interval.ForEach();
         if (isReversed)
@@ -120,7 +121,7 @@ public partial class InterpreterElement
         {
             RuntimeValue item = this.Interpreter.BytecodeInterpreter.Memory[i];
 
-            if (stackDebugInfo.TryGet(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart, i, out StackElementInformations itemDebugInfo))
+            if (stackDebugInfo.TryGet(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart, i, out StackElementInformation itemDebugInfo))
             {
                 Range<int> range = itemDebugInfo.GetRange(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart);
 
@@ -133,7 +134,7 @@ public partial class InterpreterElement
                     {
                         b.ForegroundColor = CharColor.Silver;
 
-                        DrawElement(i, item);
+                        DrawElement(i, item, savedBasePointers);
 
                         b.ForegroundColor = CharColor.Gray;
                         b.AddText($" ({itemDebugInfo.Kind}) {itemDebugInfo.Tag}");
@@ -147,11 +148,11 @@ public partial class InterpreterElement
                         b.FinishLine();
                         b.ForegroundColor = CharColor.Silver;
 
-                        DrawElement(i, item);
+                        DrawElement(i, item, savedBasePointers);
                     }
                     else if (range.End == i)
                     {
-                        DrawElement(i, item);
+                        DrawElement(i, item, savedBasePointers);
 
                         b.BackgroundColor = CharColor.Black;
                         b.FinishLine();
@@ -161,12 +162,12 @@ public partial class InterpreterElement
                     }
                     else
                     {
-                        DrawElement(i, item);
+                        DrawElement(i, item, savedBasePointers);
                     }
                 }
                 else if (itemDebugInfo.Kind == StackElementKind.Internal)
                 {
-                    DrawElement(i, item);
+                    DrawElement(i, item, savedBasePointers);
 
                     b.ForegroundColor = CharColor.Gray;
                     b.AddText(' ');
@@ -174,12 +175,12 @@ public partial class InterpreterElement
                 }
                 else
                 {
-                    DrawElement(i, item);
+                    DrawElement(i, item, savedBasePointers);
                 }
             }
             else
             {
-                DrawElement(i, item);
+                DrawElement(i, item, savedBasePointers);
             }
 
             b.BackgroundColor = CharColor.Black;
@@ -200,7 +201,7 @@ public partial class InterpreterElement
             { nextEmpty = enumerator.Last() + 1; }
         }
 
-        DrawElement(nextEmpty, default);
+        DrawElement(nextEmpty, default, savedBasePointers);
 
         StackScrollBar.Draw(b);
     }

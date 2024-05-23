@@ -71,6 +71,7 @@ public class BuiltinType : GeneralType,
     public override string ToString() => Type switch
     {
         BasicType.Void => TypeKeywords.Void,
+        BasicType.Any => TypeKeywords.Any,
         BasicType.Byte => TypeKeywords.Byte,
         BasicType.Integer => TypeKeywords.Int,
         BasicType.Float => TypeKeywords.Float,

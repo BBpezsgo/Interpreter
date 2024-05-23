@@ -82,7 +82,7 @@ int JoinFreeBlocks()
 }
 
 [Builtin("alloc")]
-export int* Alloc(int sizeNeed)
+export any* Alloc(int sizeNeed)
 {
     if (sizeNeed == 0)
     { sizeNeed++; }
@@ -159,8 +159,7 @@ export int* Alloc(int sizeNeed)
 }
 
 [Builtin("free")]
-template<T>
-export void Dealloc(T* ptr)
+export void Dealloc(any* ptr)
 {
     int* position = ptr as int*;
     // Print("Deallocate ");
@@ -170,7 +169,7 @@ export void Dealloc(T* ptr)
     int size;
     int allocated;
 
-    GetHeader(ptr - 1, ref size, ref allocated);
+    GetHeader((ptr - 1) as int*, ref size, ref allocated);
     
     if (allocated == 0)
     {
@@ -180,7 +179,7 @@ export void Dealloc(T* ptr)
 
     // Print("Size: ");
     // PrintLine(size);
-    SetHeader(ptr - 1, size, 0);
+    SetHeader((ptr - 1) as int*, size, 0);
 
     // *(ptr - 1) = 0;
 
@@ -194,10 +193,3 @@ export void Dealloc(T* ptr)
     // JoinFreeBlocks();
     while (JoinFreeBlocks()) { }
 }
-
-// [Builtin("alloc")]
-// export int* Alloc(int sizeNeed) { }
-// 
-// [Builtin("free")]
-// template<T>
-// export void Dealloc(T* ptr) { }

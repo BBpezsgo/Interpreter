@@ -442,9 +442,9 @@ public partial class InterpreterBase<TCode> : IDisposable
         renderer.Text(0, rect.Y, new string('─', rect.Width), CharColor.Gray);
         renderer.Text(1, rect.Y, "|Stacktrace|", CharColor.Gray);
 
-        ImmutableArray<FunctionInformations> functionInfos = DebugInfo.GetFunctionInformationsNested(_codePointer);
+        ImmutableArray<FunctionInformation> functionInfos = DebugInfo.GetFunctionInformationNested(_codePointer);
 
-        ReadOnlySpan<FunctionInformations> functionInfos2;
+        ReadOnlySpan<FunctionInformation> functionInfos2;
         if (functionInfos.Length > 10)
         { functionInfos2 = functionInfos.AsSpan(functionInfos.Length - 10, 10); }
         else

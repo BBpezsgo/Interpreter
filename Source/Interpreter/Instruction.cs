@@ -151,34 +151,22 @@ public readonly struct InstructionOperand
         RuntimeType.Single => new InstructionOperand(new RuntimeValue(value.Single), InstructionOperandType.Immediate32),
         _ => throw new UnreachableException(),
     };
-
     public static implicit operator InstructionOperand(int value) => new(new RuntimeValue(value), InstructionOperandType.Immediate32);
     public static implicit operator InstructionOperand(Register register) => new((int)register, InstructionOperandType.Register);
-}
-
-public static class RegisterExtensions
-{
-    public static InstructionOperand ToPtr(this Register register, int offset = 0) => register switch
-    {
-        Register.StackPointer => new InstructionOperand(offset, InstructionOperandType.PointerSP),
-        Register.BasePointer => new InstructionOperand(offset, InstructionOperandType.PointerBP),
-        Register.EAX => new InstructionOperand(offset, InstructionOperandType.PointerEAX),
-        Register.EBX => new InstructionOperand(offset, InstructionOperandType.PointerEBX),
-        Register.ECX => new InstructionOperand(offset, InstructionOperandType.PointerECX),
-        Register.EDX => new InstructionOperand(offset, InstructionOperandType.PointerEDX),
-        _ => throw new NotImplementedException(),
-    };
 }
 
 [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
 public readonly struct Instruction
 {
     public readonly Opcode Opcode;
-    public readonly BitWidth BitWidth
+    public readonly InstructionOperand Operand1;
+    public readonly InstructionOperand Operand2;
+
+    public BitWidth BitWidth
     {
         get
         {
-            switch (InstructionUtils.ParameterCount(Opcode))
+            switch (Opcode.ParameterCount())
             {
                 case 0: return BitWidth._32;
                 case 1: return Operand1.BitWidth;
@@ -192,8 +180,6 @@ public readonly struct Instruction
             }
         }
     }
-    public readonly InstructionOperand Operand1;
-    public readonly InstructionOperand Operand2;
 
     public Instruction(PreparationInstruction other)
     {
@@ -208,7 +194,7 @@ public readonly struct Instruction
 
         result.Append(Opcode.ToString());
 
-        int parameterCount = InstructionUtils.ParameterCount(Opcode);
+        int parameterCount = Opcode.ParameterCount();
 
         if (parameterCount >= 1)
         {
@@ -226,11 +212,25 @@ public readonly struct Instruction
     }
 }
 
-public static class InstructionUtils
+public static class RegisterExtensions
 {
-    public static int ParameterCount(Opcode opcode) => opcode switch
+    public static InstructionOperand ToPtr(this Register register, int offset = 0) => register switch
     {
-        Opcode._ => 0,
+        Register.StackPointer => new InstructionOperand(offset, InstructionOperandType.PointerSP),
+        Register.BasePointer => new InstructionOperand(offset, InstructionOperandType.PointerBP),
+        Register.EAX => new InstructionOperand(offset, InstructionOperandType.PointerEAX),
+        Register.EBX => new InstructionOperand(offset, InstructionOperandType.PointerEBX),
+        Register.ECX => new InstructionOperand(offset, InstructionOperandType.PointerECX),
+        Register.EDX => new InstructionOperand(offset, InstructionOperandType.PointerEDX),
+        _ => throw new NotImplementedException(),
+    };
+}
+
+public static class OpcodeExtensions
+{
+    public static int ParameterCount(this Opcode opcode) => opcode switch
+    {
+        Opcode.NOP => 0,
         Opcode.Push => 1,
         Opcode.Pop => 0,
         Opcode.PopTo => 1,

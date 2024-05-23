@@ -620,15 +620,15 @@ public sealed class Compiler
         {
             case "bf":
             {
-                if (tag.Parameters.Length < 2)
+                if (tag.Arguments.Length < 2)
                 { AnalysisCollection?.Errors.Add(new LanguageError($"Compile tag \"{tag.Identifier}\" requires minimum 2 parameter", tag.Identifier, tag.File)); break; }
-                string name = tag.Parameters[0].Value;
+                string name = tag.Arguments[0].Value;
 
                 if (ExternalFunctions.TryGet(name, out _, out _)) break;
 
-                string[] bfParams = new string[tag.Parameters.Length - 1];
-                for (int i = 1; i < tag.Parameters.Length; i++)
-                { bfParams[i - 1] = tag.Parameters[i].Value; }
+                string[] bfParams = new string[tag.Arguments.Length - 1];
+                for (int i = 1; i < tag.Arguments.Length; i++)
+                { bfParams[i - 1] = tag.Arguments[i].Value; }
 
                 BasicType[] parameterTypes = new BasicType[bfParams.Length];
                 for (int i = 0; i < bfParams.Length; i++)
@@ -639,13 +639,13 @@ public sealed class Compiler
 
                         if (paramType == BasicType.Void && i > 0)
                         {
-                            AnalysisCollection?.Errors.Add(new LanguageError($"Invalid type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.File));
+                            AnalysisCollection?.Errors.Add(new LanguageError($"Invalid type \"{bfParams[i]}\"", tag.Arguments[i + 1], tag.File));
                             return;
                         }
                     }
                     else
                     {
-                        AnalysisCollection?.Errors.Add(new LanguageError($"Unknown type \"{bfParams[i]}\"", tag.Parameters[i + 1], tag.File));
+                        AnalysisCollection?.Errors.Add(new LanguageError($"Unknown type \"{bfParams[i]}\"", tag.Arguments[i + 1], tag.File));
                         return;
                     }
                 }

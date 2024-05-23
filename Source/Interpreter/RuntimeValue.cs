@@ -5,8 +5,6 @@ namespace LanguageCore.Runtime;
 [StructLayout(LayoutKind.Explicit)]
 public readonly struct RuntimeValue : IEquatable<RuntimeValue>
 {
-    public static RuntimeValue Null => default;
-
     [FieldOffset(0)] readonly int _integer;
     [FieldOffset(0)] readonly float _single;
 

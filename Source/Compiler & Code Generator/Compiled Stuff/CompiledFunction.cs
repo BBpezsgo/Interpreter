@@ -6,7 +6,7 @@ using Parser.Statement;
 public class CompiledFunction : FunctionDefinition,
     ISameCheck,
     ISameCheck<CompiledFunction>,
-    IReferenceable<StatementWithValue>,
+    IReferenceable<StatementWithValue?>,
     IDuplicatable<CompiledFunction>,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
@@ -19,7 +19,7 @@ public class CompiledFunction : FunctionDefinition,
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct? Context { get; }
-    public List<Reference<StatementWithValue>> References { get; }
+    public List<Reference<StatementWithValue?>> References { get; }
 
     public bool ReturnSomething => Type != BasicType.Void;
     public TypeInstance TypeToken => base.Type;
@@ -32,7 +32,7 @@ public class CompiledFunction : FunctionDefinition,
         ParameterTypes = parameterTypes.ToImmutableArray();
 
         Context = context;
-        References = new List<Reference<StatementWithValue>>();
+        References = new List<Reference<StatementWithValue?>>();
     }
 
     public CompiledFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledFunction other) : base(other)
@@ -41,7 +41,7 @@ public class CompiledFunction : FunctionDefinition,
         ParameterTypes = parameterTypes.ToImmutableArray();
 
         Context = other.Context;
-        References = new List<Reference<StatementWithValue>>(other.References);
+        References = new List<Reference<StatementWithValue?>>(other.References);
     }
 
     public bool IsSame(CompiledFunction other)

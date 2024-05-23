@@ -1051,15 +1051,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
 
-                if (statement.Parameters.Length is not 0 and not 1)
-                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                if (statement.Arguments.Length is not 0 and not 1)
+                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Arguments.Length})", statement, CurrentFile); }
 
-                if (statement.Parameters.Length is 1)
+                if (statement.Arguments.Length is 1)
                 {
                     if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, ReturnVariableName, out Variable returnVariable))
                     { throw new CompilerException($"Can't return value for some reason :(", statement, CurrentFile); }
 
-                    CompileSetter(returnVariable, statement.Parameters[0]);
+                    CompileSetter(returnVariable, statement.Arguments[0]);
                 }
 
                 if (Returns.Count == 0)
@@ -1081,8 +1081,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
 
-                if (statement.Parameters.Length != 0)
-                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                if (statement.Arguments.Length != 0)
+                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Arguments.Length})", statement, CurrentFile); }
 
                 if (Breaks.Count == 0)
                 { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, CurrentFile); }
@@ -1103,20 +1103,20 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             {
                 statement.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
-                if (statement.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                if (statement.Arguments.Length != 1)
+                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement, CurrentFile); }
 
-                GenerateDestructor(statement.Parameters[0]);
+                GenerateDestructor(statement.Arguments[0]);
 
                 break;
             }
 
             case StatementKeywords.Throw:
             {
-                if (statement.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                if (statement.Arguments.Length != 1)
+                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement, CurrentFile); }
                 GenerateCodeForPrinter(Ansi.Style(Ansi.BrightForegroundRed));
-                GenerateCodeForPrinter(statement.Parameters[0]);
+                GenerateCodeForPrinter(statement.Arguments[0]);
                 GenerateCodeForPrinter(Ansi.Reset);
                 Code.SetPointer(Stack.Push(1));
                 Code += "[]";
@@ -1343,10 +1343,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         {
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
-            if (functionCall.Parameters.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
+            if (functionCall.Arguments.Length != 1)
+            { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Arguments.Length}", functionCall, CurrentFile); }
 
-            StatementWithValue parameter = functionCall.Parameters[0];
+            StatementWithValue parameter = functionCall.Arguments[0];
             GeneralType parameterType = FindStatementType(parameter);
 
             if (functionCall.SaveValue)
@@ -1368,7 +1368,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        GenerateCodeForFunction(compiledFunction, functionCall.MethodParameters, typeArguments, functionCall);
+        GenerateCodeForFunction(compiledFunction, functionCall.MethodArguments, typeArguments, functionCall);
 
         if (!functionCall.SaveValue && compiledFunction.ReturnSomething)
         { Stack.Pop(); }
@@ -1378,7 +1378,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         using DebugInfoBlock debugBlock = DebugBlock(constructorCall);
 
         GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute, constructorCall.OriginalFile);
-        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Parameters);
+        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
         if (instanceType is StructType structType)
         { structType.Struct?.References.Add((constructorCall.Type, CurrentFile, CurrentMacro.Last)); }
@@ -1398,7 +1398,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        GenerateCodeForFunction(constructor, constructorCall.Parameters, typeArguments, constructorCall);
+        GenerateCodeForFunction(constructor, constructorCall.Arguments, typeArguments, constructorCall);
     }
     void GenerateCodeForStatement(Literal statement)
     {
@@ -1506,7 +1506,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     return;
                 }
 
-                GenerateCodeForFunction(compiledOperator, statement.Parameters, typeArguments, statement);
+                GenerateCodeForFunction(compiledOperator, statement.Arguments, typeArguments, statement);
 
                 if (!statement.SaveValue)
                 { Stack.Pop(); }
@@ -1900,7 +1900,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     return;
                 }
 
-                GenerateCodeForFunction(compiledOperator, statement.Parameters, typeArguments, statement);
+                GenerateCodeForFunction(compiledOperator, statement.Arguments, typeArguments, statement);
 
                 if (!statement.SaveValue)
                 { Stack.Pop(); }
@@ -2590,7 +2590,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             GeneralType definedType = function.ParameterTypes[i];
             GeneralType passedType = FindStatementType(passed, definedType);
 
-            if (passedType != definedType)
+            if (passedType.Size != definedType.Size)
             { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
             foreach (Variable compiledParameter in compiledParameters)

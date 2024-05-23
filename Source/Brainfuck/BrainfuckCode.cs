@@ -379,11 +379,11 @@ public static class BrainfuckCode
         { return; }
 
         int j = 0;
-        FunctionInformations last = default;
+        FunctionInformation last = default;
         for (int i = 0; i < code.Length; i++)
         {
             char c = code[i];
-            ImmutableArray<FunctionInformations> funcInfos = debugInformation.GetFunctionInformationsNested(i);
+            ImmutableArray<FunctionInformation> funcInfos = debugInformation.GetFunctionInformationNested(i);
             if (funcInfos.Length > 0)
             {
                 if (!last.IsValid || last.Instructions != funcInfos[0].Instructions)
@@ -416,11 +416,11 @@ public static class BrainfuckCode
         { return; }
 
         int j = 0;
-        FunctionInformations last = default;
+        FunctionInformation last = default;
         for (int i = 0; i < code.Length; i++)
         {
             CompactCodeSegment c = code[i];
-            ImmutableArray<FunctionInformations> funcInfos = debugInformation.GetFunctionInformationsNested(i);
+            ImmutableArray<FunctionInformation> funcInfos = debugInformation.GetFunctionInformationNested(i);
             if (funcInfos.Length > 0)
             {
                 if (!last.IsValid || last.Instructions != funcInfos[0].Instructions)

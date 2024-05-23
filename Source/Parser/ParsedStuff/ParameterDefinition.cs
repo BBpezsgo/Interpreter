@@ -41,5 +41,5 @@ public class ParameterDefinition :
         Context = context;
     }
 
-    public override string ToString() => $"{string.Join(", ", Modifiers)} {Type} {Identifier}".TrimStart();
+    public override string ToString() => $"{string.Join(' ', Modifiers)} {Type} {Identifier}".TrimStart();
 }

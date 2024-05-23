@@ -29,21 +29,21 @@ public enum StackElementType
     StackPointer,
 }
 
-public struct StackElementInformations
+public struct StackElementInformation
 {
     public StackElementKind Kind;
     public StackElementType Type;
     public string Tag;
 
     public int Address;
-    public bool BasepointerRelative;
+    public bool BasePointerRelative;
     public int Size;
 
     public readonly Range<int> GetRange(int basePointer, int absoluteOffset)
     {
         int itemStart = Address;
 
-        if (BasepointerRelative) itemStart += basePointer;
+        if (BasePointerRelative) itemStart += basePointer;
         else itemStart += absoluteOffset;
 
         int itemEnd = itemStart + ((Size - 1) * BytecodeProcessor.StackDirection);
@@ -52,28 +52,28 @@ public struct StackElementInformations
     }
 }
 
-public struct ScopeInformations
+public struct ScopeInformation
 {
     public SourceCodeLocation Location;
-    public List<StackElementInformations> Stack;
+    public List<StackElementInformation> Stack;
 }
 
 public readonly struct CollectedScopeInfo
 {
-    public readonly ImmutableArray<StackElementInformations> Stack;
+    public readonly ImmutableArray<StackElementInformation> Stack;
 
-    public static CollectedScopeInfo Empty => new(Enumerable.Empty<StackElementInformations>());
+    public static CollectedScopeInfo Empty => new(Enumerable.Empty<StackElementInformation>());
 
-    public CollectedScopeInfo(IEnumerable<StackElementInformations> stack)
+    public CollectedScopeInfo(IEnumerable<StackElementInformation> stack)
     {
         Stack = stack.ToImmutableArray();
     }
 
-    public bool TryGet(int basePointer, int absoluteOffset, int address, out StackElementInformations result)
+    public bool TryGet(int basePointer, int absoluteOffset, int address, out StackElementInformation result)
     {
         for (int i = 0; i < Stack.Length; i++)
         {
-            StackElementInformations item = Stack[i];
+            StackElementInformation item = Stack[i];
             Range<int> range = item.GetRange(basePointer, absoluteOffset);
 
             if (range.Contains(address))
@@ -89,7 +89,7 @@ public readonly struct CollectedScopeInfo
 }
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-public struct FunctionInformations
+public struct FunctionInformation
 {
     public bool IsValid;
     public Position SourcePosition;
@@ -135,16 +135,16 @@ public struct FunctionInformations
 public class DebugInformation : IDuplicatable<DebugInformation>
 {
     public readonly List<SourceCodeLocation> SourceCodeLocations;
-    public readonly List<FunctionInformations> FunctionInformations;
-    public readonly List<ScopeInformations> ScopeInformations;
+    public readonly List<FunctionInformation> FunctionInformation;
+    public readonly List<ScopeInformation> ScopeInformation;
     public readonly Dictionary<int, List<string>> CodeComments;
     public readonly Dictionary<Uri, ImmutableArray<Tokenizing.Token>> OriginalFiles;
 
     public DebugInformation(IEnumerable<KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>> originalFiles)
     {
         SourceCodeLocations = new List<SourceCodeLocation>();
-        FunctionInformations = new List<FunctionInformations>();
-        ScopeInformations = new List<ScopeInformations>();
+        FunctionInformation = new List<FunctionInformation>();
+        ScopeInformation = new List<ScopeInformation>();
         CodeComments = new Dictionary<int, List<string>>();
         OriginalFiles = new Dictionary<Uri, ImmutableArray<Tokenizing.Token>>(originalFiles);
     }
@@ -179,17 +179,17 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         return success;
     }
 
-    public IEnumerable<FunctionInformations> GetFunctionInformations(IEnumerable<int> callstack)
+    public IEnumerable<FunctionInformation> GetFunctionInformation(IEnumerable<int> codePointers)
     {
-        foreach (int item in callstack)
-        { yield return GetFunctionInformations(item); }
+        foreach (int item in codePointers)
+        { yield return GetFunctionInformation(item); }
     }
 
-    public FunctionInformations GetFunctionInformations(int codePointer)
+    public FunctionInformation GetFunctionInformation(int codePointer)
     {
-        for (int i = 0; i < FunctionInformations.Count; i++)
+        for (int i = 0; i < FunctionInformation.Count; i++)
         {
-            FunctionInformations function = FunctionInformations[i];
+            FunctionInformation function = FunctionInformation[i];
 
             if (function.Contains(codePointer))
             { return function; }
@@ -197,12 +197,12 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         return default;
     }
 
-    public ImmutableArray<FunctionInformations> GetFunctionInformationsNested(int codePointer)
+    public ImmutableArray<FunctionInformation> GetFunctionInformationNested(int codePointer)
     {
-        List<FunctionInformations> result = new();
-        for (int i = 0; i < FunctionInformations.Count; i++)
+        List<FunctionInformation> result = new();
+        for (int i = 0; i < FunctionInformation.Count; i++)
         {
-            FunctionInformations info = FunctionInformations[i];
+            FunctionInformation info = FunctionInformation[i];
 
             if (info.Contains(codePointer))
             { result.Add(info); }
@@ -211,20 +211,20 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         return result.ToImmutableArray();
     }
 
-    public IEnumerable<ScopeInformations> GetScopes(int codePointer)
+    public IEnumerable<ScopeInformation> GetScopes(int codePointer)
     {
-        for (int i = 0; i < ScopeInformations.Count; i++)
+        for (int i = 0; i < ScopeInformation.Count; i++)
         {
-            ScopeInformations scope = ScopeInformations[i];
+            ScopeInformation scope = ScopeInformation[i];
             if (!scope.Location.Contains(codePointer)) continue;
             yield return scope;
         }
     }
 
-    public CollectedScopeInfo GetScopeInformations(int codePointer)
+    public CollectedScopeInfo GetScopeInformation(int codePointer)
     {
-        List<StackElementInformations> result = new();
-        foreach (ScopeInformations scope in GetScopes(codePointer))
+        List<StackElementInformation> result = new();
+        foreach (ScopeInformation scope in GetScopes(codePointer))
         { result.AddRange(scope.Stack); }
         return new CollectedScopeInfo(result);
     }
@@ -256,28 +256,28 @@ public class DebugInformation : IDuplicatable<DebugInformation>
             SourceCodeLocations[i] = loc;
         }
 
-        for (int i = 0; i < FunctionInformations.Count; i++)
+        for (int i = 0; i < FunctionInformation.Count; i++)
         {
-            FunctionInformations func = FunctionInformations[i];
+            FunctionInformation func = FunctionInformation[i];
 
             if (func.Instructions.Start > from)
             { func.Instructions.Start += offset; }
             if (func.Instructions.End > from)
             { func.Instructions.End += offset; }
 
-            FunctionInformations[i] = func;
+            FunctionInformation[i] = func;
         }
 
-        for (int i = 0; i < ScopeInformations.Count; i++)
+        for (int i = 0; i < ScopeInformation.Count; i++)
         {
-            ScopeInformations scope = ScopeInformations[i];
+            ScopeInformation scope = ScopeInformation[i];
 
             if (scope.Location.Instructions.Start > from)
             { scope.Location.Instructions.Start += offset; }
             if (scope.Location.Instructions.End > from)
             { scope.Location.Instructions.End += offset; }
 
-            ScopeInformations[i] = scope;
+            ScopeInformation[i] = scope;
         }
     }
 
@@ -286,8 +286,8 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         DebugInformation copy = new(OriginalFiles);
 
         copy.SourceCodeLocations.AddRange(SourceCodeLocations);
-        copy.FunctionInformations.AddRange(FunctionInformations);
-        copy.ScopeInformations.AddRange(ScopeInformations);
+        copy.FunctionInformation.AddRange(FunctionInformation);
+        copy.ScopeInformation.AddRange(ScopeInformation);
         copy.CodeComments.AddRange(CodeComments);
 
         return copy;

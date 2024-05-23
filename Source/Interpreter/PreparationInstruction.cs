@@ -40,7 +40,7 @@ public class PreparationInstruction
 
         result.Append(Opcode.ToString());
 
-        int parameterCount = InstructionUtils.ParameterCount(Opcode);
+        int parameterCount = Opcode.ParameterCount();
 
         if (parameterCount >= 1)
         {

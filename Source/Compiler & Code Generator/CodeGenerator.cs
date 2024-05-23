@@ -585,7 +585,7 @@ public abstract class CodeGenerator
         [NotNullWhen(false)] out WillBeCompilerException? error,
         Action<CompliableTemplate<CompiledOperator>>? addCompilable = null)
     {
-        ImmutableArray<GeneralType> arguments = FindStatementTypes(@operator.Parameters);
+        ImmutableArray<GeneralType> arguments = FindStatementTypes(@operator.Arguments);
         FunctionQuery<CompiledOperator, string, GeneralType> query = FunctionQuery.Create(@operator.Operator.Content, arguments, relevantFile, null, addCompilable);
         return GetFunction<CompiledOperator, Token, string>(
             GetOperators(),
@@ -607,7 +607,7 @@ public abstract class CodeGenerator
         [NotNullWhen(false)] out WillBeCompilerException? error,
         Action<CompliableTemplate<CompiledOperator>>? addCompilable = null)
     {
-        ImmutableArray<GeneralType> arguments = FindStatementTypes(@operator.Parameters);
+        ImmutableArray<GeneralType> arguments = FindStatementTypes(@operator.Arguments);
         FunctionQuery<CompiledOperator, string, GeneralType> query = FunctionQuery.Create(@operator.Operator.Content, arguments, relevantFile, null, addCompilable);
         return GetFunction<CompiledOperator, Token, string>(
             GetOperators(),
@@ -710,7 +710,7 @@ public abstract class CodeGenerator
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         string identifier = functionCallStatement.Identifier.Content;
-        ImmutableArray<GeneralType> argumentTypes = FindStatementTypes(functionCallStatement.MethodParameters);
+        ImmutableArray<GeneralType> argumentTypes = FindStatementTypes(functionCallStatement.MethodArguments);
         FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(identifier, argumentTypes, functionCallStatement.OriginalFile, null, addCompilable);
         return GetFunction(
             query,
@@ -764,6 +764,9 @@ public abstract class CodeGenerator
             { return true; }
 
             if (to is PointerType && from == BasicType.Integer)
+            { return true; }
+
+            if (to is PointerType toPtr && from is PointerType && toPtr.To == BasicType.Any)
             { return true; }
 
             return false;
@@ -1213,7 +1216,7 @@ public abstract class CodeGenerator
         if (GetFunction(FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, relevantFile), out FunctionQueryResult<CompiledFunction>? function, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.FunctionName;
-            function.Function.References.Add(new Reference<StatementWithValue>(new Identifier(name, null), CurrentFile));
+            function.Function.References.Add(new Reference<StatementWithValue?>(new Identifier(name, null), CurrentFile));
             result = new FunctionType(function.Function);
             return true;
         }
@@ -1964,7 +1967,7 @@ public abstract class CodeGenerator
     protected GeneralType FindStatementType(ConstructorCall constructorCall)
     {
         GeneralType type = GeneralType.From(constructorCall.Type, FindType);
-        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Parameters);
+        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
         // TODO: constructorCall.OriginalFile can be null
         if (GetConstructor(type, parameters, constructorCall.OriginalFile, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound))
@@ -2114,8 +2117,8 @@ public abstract class CodeGenerator
 
         if (inlined is KeywordCall keywordCall &&
             keywordCall.Identifier.Equals(StatementKeywords.Return) &&
-            keywordCall.Parameters.Length == 1)
-        { inlined = keywordCall.Parameters[0]; }
+            keywordCall.Arguments.Length == 1)
+        { inlined = keywordCall.Arguments[0]; }
 
         return true;
     }
@@ -2170,7 +2173,7 @@ public abstract class CodeGenerator
     static KeywordCall InlineMacro(KeywordCall keywordCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             identifier: keywordCall.Identifier,
-            parameters: InlineMacro(keywordCall.Parameters, parameters))
+            arguments: InlineMacro(keywordCall.Arguments, parameters))
         {
             SaveValue = keywordCall.SaveValue,
             Semicolon = keywordCall.Semicolon,
@@ -2178,7 +2181,7 @@ public abstract class CodeGenerator
 
     static FunctionCall InlineMacro(FunctionCall functionCall, Dictionary<string, StatementWithValue> parameters)
     {
-        IEnumerable<StatementWithValue> _parameters = InlineMacro(functionCall.Parameters, parameters);
+        IEnumerable<StatementWithValue> _parameters = InlineMacro(functionCall.Arguments, parameters);
         StatementWithValue? prevStatement = functionCall.PrevStatement;
         if (prevStatement != null)
         { prevStatement = InlineMacro(prevStatement, parameters); }
@@ -2188,7 +2191,7 @@ public abstract class CodeGenerator
     static AnyCall InlineMacro(AnyCall anyCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(anyCall.PrevStatement, parameters),
-            parameters: InlineMacro(anyCall.Parameters, parameters),
+            parameters: InlineMacro(anyCall.Arguments, parameters),
             commas: anyCall.Commas,
             brackets: anyCall.Brackets,
             file: anyCall.OriginalFile)
@@ -2201,7 +2204,7 @@ public abstract class CodeGenerator
         => new(
             keyword: constructorCall.Keyword,
             typeName: constructorCall.Type,
-            parameters: InlineMacro(constructorCall.Parameters, parameters),
+            arguments: InlineMacro(constructorCall.Arguments, parameters),
             brackets: constructorCall.Brackets,
             file: constructorCall.OriginalFile)
         {
@@ -2843,7 +2846,7 @@ public abstract class CodeGenerator
         // TODO: @operator.OriginalFile can be null
         if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
-            if (TryCompute(@operator.Parameters, context, out ImmutableArray<CompiledValue> parameterValues) &&
+            if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&
                 TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
@@ -2910,7 +2913,7 @@ public abstract class CodeGenerator
         // TODO: @operator.OriginalFile can be null
         if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
-            if (TryCompute(@operator.Parameters, context, out ImmutableArray<CompiledValue> parameterValues) &&
+            if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&
                 TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
@@ -2968,13 +2971,13 @@ public abstract class CodeGenerator
     {
         if (keywordCall.Identifier.Content == "sizeof")
         {
-            if (keywordCall.Parameters.Length != 1)
+            if (keywordCall.Arguments.Length != 1)
             {
                 value = CompiledValue.Null;
                 return false;
             }
 
-            StatementWithValue param0 = keywordCall.Parameters[0];
+            StatementWithValue param0 = keywordCall.Arguments[0];
             GeneralType param0Type = FindStatementType(param0);
 
             value = new CompiledValue(param0Type.Size);
@@ -2999,13 +3002,13 @@ public abstract class CodeGenerator
     {
         if (functionCall.Identifier.Content == "sizeof")
         {
-            if (functionCall.Parameters.Length != 1)
+            if (functionCall.Arguments.Length != 1)
             {
                 value = CompiledValue.Null;
                 return false;
             }
 
-            StatementWithValue param0 = functionCall.Parameters[0];
+            StatementWithValue param0 = functionCall.Arguments[0];
             GeneralType param0Type = FindStatementType(param0);
 
             value = new CompiledValue(param0Type.Size);
@@ -3024,12 +3027,12 @@ public abstract class CodeGenerator
 
             if (function.IsExternal &&
                 !functionCall.SaveValue &&
-                TryCompute(functionCall.MethodParameters, context, out ImmutableArray<CompiledValue> parameters))
+                TryCompute(functionCall.MethodArguments, context, out ImmutableArray<CompiledValue> parameters))
             {
                 FunctionCall newFunctionCall = new(
                     null,
                     functionCall.Identifier,
-                    Literal.CreateAnonymous(parameters, functionCall.MethodParameters),
+                    Literal.CreateAnonymous(parameters, functionCall.MethodArguments),
                     functionCall.Brackets,
                     functionCall.OriginalFile)
                 {
@@ -3041,20 +3044,7 @@ public abstract class CodeGenerator
                 return true;
             }
 
-            StatementWithValue[] convertedParameters = new StatementWithValue[functionCall.MethodParameters.Length];
-            for (int i = 0; i < functionCall.MethodParameters.Length; i++)
-            {
-                convertedParameters[i] = functionCall.MethodParameters[i];
-                GeneralType passed = FindStatementType(functionCall.MethodParameters[i]);
-                GeneralType defined = function.ParameterTypes[i];
-                if (passed.Equals(defined)) continue;
-                convertedParameters[i] = new TypeCast(
-                    convertedParameters[i],
-                    Token.CreateAnonymous("as"),
-                    defined.ToTypeInstance());
-            }
-
-            if (TryEvaluate(function, convertedParameters.ToImmutableArray(), out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
+            if (TryEvaluate(function, functionCall.MethodArguments, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -3537,12 +3527,12 @@ public abstract class CodeGenerator
         {
             context.IsReturning = true;
 
-            if (keywordCall.Parameters.Length == 0)
+            if (keywordCall.Arguments.Length == 0)
             { return true; }
 
-            if (keywordCall.Parameters.Length == 1)
+            if (keywordCall.Arguments.Length == 1)
             {
-                if (!TryCompute(keywordCall.Parameters[0], context, out CompiledValue returnValue))
+                if (!TryCompute(keywordCall.Arguments[0], context, out CompiledValue returnValue))
                 { return false; }
 
                 if (!context.TrySetVariable("@return", returnValue))
@@ -3558,7 +3548,7 @@ public abstract class CodeGenerator
         {
             context.IsBreaking = true;
 
-            if (keywordCall.Parameters.Length != 0)
+            if (keywordCall.Arguments.Length != 0)
             { return false; }
 
             return true;

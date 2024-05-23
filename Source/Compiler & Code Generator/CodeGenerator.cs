@@ -1201,7 +1201,7 @@ public abstract class CodeGenerator
         if (GetStruct(name.Content, relevantFile, out CompiledStruct? @struct, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.Struct;
-            @struct.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, null), CurrentFile));
+            @struct.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), CurrentFile));
 
             result = new StructType(@struct, relevantFile);
             return true;
@@ -1216,7 +1216,7 @@ public abstract class CodeGenerator
         if (GetFunction(FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, relevantFile), out FunctionQueryResult<CompiledFunction>? function, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.FunctionName;
-            function.Function.References.Add(new Reference<StatementWithValue?>(new Identifier(name, null), CurrentFile));
+            function.Function.References.Add(new Reference<StatementWithValue?>(new Identifier(name, relevantFile), CurrentFile));
             result = new FunctionType(function.Function);
             return true;
         }
@@ -3310,7 +3310,7 @@ public abstract class CodeGenerator
 
         for (int i = 0; i < parameterValues.Length; i++)
         {
-            if (!function.Parameters[i].Type.Equals(new BuiltinType(parameterValues[i].Type).ToTypeInstance()))
+            if (!function.ParameterTypes[i].Equals(new BuiltinType(parameterValues[i].Type)))
             {
                 Debugger.Break();
                 return false;

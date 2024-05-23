@@ -257,24 +257,6 @@ public enum Opcode : byte
     FMathMod,
     #endregion
 
-    #region === HEAP OPERATIONS ===
-
-    /// <summary>
-    /// <code>
-    /// <paramref name="DST"/> = alloc(<paramref name="SRC"/>)
-    /// </code>
-    /// </summary>
-    Allocate,
-
-    /// <summary>
-    /// <code>
-    /// free(<paramref name="SRC"/>)
-    /// </code>
-    /// </summary>
-    Free,
-
-    #endregion
-
     #region === REGISTERS ===
 
     /// <summary>

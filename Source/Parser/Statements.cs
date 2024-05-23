@@ -399,16 +399,6 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
             { yield return statement; }
         }
     }
-
-    public static VariableDeclaration CreateAnonymous(GeneralType type, string name, Uri file, StatementWithValue? initialValue = null)
-        => CreateAnonymous(type.ToTypeInstance(), name, file, initialValue);
-
-    public static VariableDeclaration CreateAnonymous(TypeInstance type, string name, Uri file, StatementWithValue? initialValue = null) => new(
-        Enumerable.Empty<Token>(),
-        type,
-        Token.CreateAnonymous(name),
-        initialValue,
-        file);
 }
 
 public class TypeStatement : StatementWithValue

@@ -2,6 +2,56 @@
 
 public static class GeneralExtensions
 {
+    readonly struct EscapedCharacters
+    {
+        public const string QuotationMark = "\\\"";
+        public const string Backslash = @"\\";
+        public const string Null = @"\0";
+        public const string A = @"\a";
+        public const string B = @"\b";
+        public const string F = @"\f";
+        public const string N = @"\n";
+        public const string R = @"\r";
+        public const string Tab = @"\t";
+        public const string V = @"\v";
+        public const string U = @"\u";
+    }
+
+    public static string Escape(this char v)
+    {
+        switch (v)
+        {
+            case '\"': return EscapedCharacters.QuotationMark;
+            case '\\': return EscapedCharacters.Backslash;
+            case '\0': return EscapedCharacters.Null;
+            case '\a': return EscapedCharacters.A;
+            case '\b': return EscapedCharacters.B;
+            case '\f': return EscapedCharacters.F;
+            case '\n': return EscapedCharacters.N;
+            case '\r': return EscapedCharacters.R;
+            case '\t': return EscapedCharacters.Tab;
+            case '\v': return EscapedCharacters.V;
+            default:
+                if (v is >= (char)0x20 and <= (char)0x7e)
+                {
+                    return char.ToString(v);
+                }
+                else
+                {
+                    return EscapedCharacters.U + ((int)v).ToString("x4", CultureInfo.InvariantCulture);
+                }
+        }
+    }
+
+    public static string Escape(this string v)
+    {
+        StringBuilder literal = new(v.Length);
+        for (int i = 0; i < v.Length; i++)
+        { literal.Append(v[i].Escape()); }
+        return literal.ToString();
+    }
+
+    [return: NotNullIfNotNull(nameof(text))]
     public static string? Surround(this string? text, string prefix, string suffix)
     {
         if (text is null) return null;
@@ -25,48 +75,16 @@ public static class GeneralExtensions
         }
     }
 
-    public static void Set<T>(this List<T> collection, IEnumerable<T> newValues)
+    public static void Set<T>(this List<T> collection, ImmutableArray<T> newValues)
     {
         collection.Clear();
-        collection.AddRange(newValues);
+        collection.AddRange(newValues.AsSpan());
     }
 
     public static void Set<T>(this List<T> collection, ReadOnlySpan<T> newValues)
     {
         collection.Clear();
         collection.AddRange(newValues);
-    }
-
-    public static void Set<T>(this List<T> collection, T[] newValues)
-    {
-        collection.Clear();
-        collection.AddRange(newValues);
-    }
-
-    public static bool ContainsNull<T>([NotNullWhen(false)] this ImmutableArray<T?> values, [NotNullWhen(false)] out ImmutableArray<T> nonnullValues) where T : class
-    {
-        nonnullValues = default;
-        for (int i = 0; i < values.Length; i++)
-        {
-            if (values[i] is null) return true;
-        }
-#pragma warning disable CS8619
-        nonnullValues = values;
-#pragma warning restore CS8619
-        return false;
-    }
-
-    public static bool ContainsNull<T>([NotNullWhen(false)] this IEnumerable<T?> values, [NotNullWhen(false)] out IEnumerable<T>? nonnullValues) where T : class
-    {
-        nonnullValues = null;
-        foreach (T? item in values)
-        {
-            if (item is null) return true;
-        }
-#pragma warning disable CS8619
-        nonnullValues = values;
-#pragma warning restore CS8619
-        return false;
     }
 
     public static bool Contains(this StringBuilder stringBuilder, char value)

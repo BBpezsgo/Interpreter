@@ -510,18 +510,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
                 if (variable.DeallocateOnClean &&
                     variable.Type is PointerType)
                 {
-                    GenerateDestructor(
-                        new TypeCast(
-                            new Identifier(
-                                Tokenizing.Token.CreateAnonymous(variable.Name, Tokenizing.TokenType.Identifier),
-                                variable.File
-                                ),
-                            Tokenizing.Token.CreateAnonymous(StatementKeywords.As),
-                            new TypeInstancePointer(
-                                TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile),
-                                Tokenizing.Token.CreateAnonymous("*", Tokenizing.TokenType.Operator))
-                            )
-                        );
+                    GenerateDestructor(new Identifier(Tokenizing.Token.CreateAnonymous(variable.Name), variable.File));
                 }
 
                 CompiledVariables.Pop();

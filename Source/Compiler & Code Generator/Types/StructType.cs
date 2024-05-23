@@ -173,6 +173,4 @@ public class StructType : GeneralType,
 
         return result.ToString();
     }
-
-    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(Struct.Identifier.Content, OriginalFile, TypeArguments?.Values.Select(v => v.ToTypeInstance()));
 }

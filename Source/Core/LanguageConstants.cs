@@ -186,10 +186,10 @@ public static class AttributeConstants
 
 public static class BuiltinFunctions
 {
-    public static ImmutableDictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)> Prototypes { get; } = new Dictionary<string, (GeneralType ReturnValue, GeneralType[] Parameters)>()
+    public static ImmutableDictionary<string, (GeneralType ReturnValue, ImmutableArray<GeneralType> Parameters)> Prototypes { get; } = new Dictionary<string, (GeneralType ReturnValue, ImmutableArray<GeneralType> Parameters)>()
     {
-        { Allocate, (new PointerType(new BuiltinType(BasicType.Any)), [ new BuiltinType(BasicType.Integer) ]) },
-        { Free, (new BuiltinType(BasicType.Void), [ new PointerType(new BuiltinType(BasicType.Any)) ]) },
+        { Allocate, (new PointerType(new BuiltinType(BasicType.Any)), ImmutableArray.Create<GeneralType>(new BuiltinType(BasicType.Integer))) },
+        { Free, (new BuiltinType(BasicType.Void), ImmutableArray.Create<GeneralType>(new PointerType(new BuiltinType(BasicType.Any)))) },
     }.ToImmutableDictionary();
 
     public const string Allocate = "alloc";

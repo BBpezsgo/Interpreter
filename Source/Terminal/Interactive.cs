@@ -123,7 +123,7 @@ class InteractiveCompiler
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
-            { parsed2 = new KeywordCall((Token)StatementKeywords.Return, new StatementWithValue[] { statementWithValue }); }
+            { parsed2 = new KeywordCall((Token)StatementKeywords.Return, ImmutableArray.Create<StatementWithValue>(statementWithValue)); }
 
             Compiled = Compiler.CompileInteractive(
                 parsed2,
@@ -168,7 +168,7 @@ class InteractiveCompiler
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
-            { parsed2 = new KeywordCall((Token)StatementKeywords.Return, new StatementWithValue[] { statementWithValue }); }
+            { parsed2 = new KeywordCall((Token)StatementKeywords.Return, ImmutableArray.Create<StatementWithValue>(statementWithValue)); }
 
             Compiled = Compiler.CompileInteractive(
                 parsed2,

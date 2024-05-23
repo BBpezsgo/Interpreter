@@ -179,10 +179,10 @@ public abstract class GeneralType :
     }
     public static bool operator !=(GeneralType? a, GeneralType? b) => !(a == b);
 
-    public static bool operator ==(GeneralType? a, RuntimeType b) => a is not null && a.Equals(b);
+    public static bool operator ==([NotNullWhen(true)] GeneralType? a, RuntimeType b) => a is not null && a.Equals(b);
     public static bool operator !=(GeneralType? a, RuntimeType b) => !(a == b);
 
-    public static bool operator ==(GeneralType? a, BasicType b) => a is not null && a.Equals(b);
+    public static bool operator ==([NotNullWhen(true)] GeneralType? a, BasicType b) => a is not null && a.Equals(b);
     public static bool operator !=(GeneralType? a, BasicType b) => !(a == b);
 
     public abstract override bool Equals(object? obj);
@@ -358,6 +358,4 @@ public abstract class GeneralType :
             yield return GeneralType.InsertTypeParameters(type, typeArguments) ?? type;
         }
     }
-
-    public abstract TypeInstance ToTypeInstance();
 }

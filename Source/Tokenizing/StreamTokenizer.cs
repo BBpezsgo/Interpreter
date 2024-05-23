@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Runtime.InteropServices;
 
 namespace LanguageCore.Tokenizing;
 
@@ -66,7 +67,7 @@ public class StreamTokenizer : Tokenizer,
 
         EndToken(offsetTotal);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters, Warnings);
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters, Warnings);
     }
 
     TokenizerResult TokenizeInternal(ConsoleProgressBar progress, int total)
@@ -99,7 +100,7 @@ public class StreamTokenizer : Tokenizer,
 
         progress.Print(1f);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters, Warnings);
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters, Warnings);
     }
 
     protected virtual void Dispose(bool disposing)

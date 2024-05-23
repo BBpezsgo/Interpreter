@@ -172,11 +172,10 @@ public static class CompactCode
         return result;
     }
 
-    static readonly OpCodesCompact[] Duplicatable = new OpCodesCompact[]
-    {
+    static readonly ImmutableArray<OpCodesCompact> Duplicatable = ImmutableArray.Create(
         (OpCodesCompact)'>', (OpCodesCompact)'<',
-        (OpCodesCompact)'+', (OpCodesCompact)'-',
-    };
+        (OpCodesCompact)'+', (OpCodesCompact)'-'
+    );
 
     static bool TryGenerateDataMovement(ReadOnlySpan<char> code, ref int index, [NotNullWhen(true)] out CompactCodeSegment result, DebugInformation? debugInfo, ref int removed)
     {

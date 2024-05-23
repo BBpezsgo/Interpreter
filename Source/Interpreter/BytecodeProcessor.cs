@@ -180,9 +180,6 @@ public class BytecodeProcessor
 
             case Opcode.Move: Move(); break;
 
-            case Opcode.Allocate: HEAP_ALLOC(); break;
-            case Opcode.Free: HEAP_FREE(); break;
-
             case Opcode.FTo: FTo(); break;
             case Opcode.FFrom: FFrom(); break;
 
@@ -379,29 +376,7 @@ public class BytecodeProcessor
 
     #region Instruction Methods
 
-    #region HEAP Operations
-
-    void HEAP_ALLOC()
-    {
-        RuntimeValue sizeData = GetData(CurrentInstruction.Operand2);
-        int size = sizeData.Int;
-
-        int ptr = HeapUtils.Allocate(Memory, size);
-
-        SetData(CurrentInstruction.Operand1, ptr);
-
-        Step();
-    }
-
-    void HEAP_FREE()
-    {
-        RuntimeValue pointerData = GetData(CurrentInstruction.Operand1);
-        int pointer = pointerData.Int;
-
-        HeapUtils.Deallocate(Memory, pointer);
-
-        Step();
-    }
+    #region Memory Operations
 
     void Move()
     {

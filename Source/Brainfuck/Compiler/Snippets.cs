@@ -1087,92 +1087,9 @@ public static class Snippets
         code.JumpEnd();
 
         code.MoveValue(tempAddress, addressX);
-
-        /*
-            temp0[-]
-            x-
-            [temp0-x-]
-            temp0[x+temp0-]
-        */
     }
 
     #endregion
-
-    /*
-    public static string Helper(string raw)
-    {
-        char[] codeChars = new char[]
-        {
-            '>', '<',
-            '+', '-',
-            '[', ']',
-            ',', '.',
-        };
-        char[] whitespace = new char[]
-        {
-            ' ', '\0',
-            '\t', '\n',
-            '\r',
-        };
-
-        List<string> usedVariables = new();
-        string currentVariable = "";
-
-        for (int i = 0; i < raw.Length; i++)
-        {
-            var c = raw[i];
-            if (codeChars.Contains(c) || whitespace.Contains(c))
-            {
-                if (!string.IsNullOrEmpty(currentVariable))
-                {
-                    if (!usedVariables.Contains(currentVariable))
-                    {
-                        usedVariables.Add(currentVariable);
-                    }
-                    currentVariable = "";
-                }
-                continue;
-            }
-            currentVariable += c;
-        }
-
-        string result = "public static void SNIPPET(this CompiledCode c";
-        foreach (string v in usedVariables)
-        {
-            result += ", int " + v;
-        }
-        result += ")\n{\n";
-
-        {
-            int i = -1;
-            while (++i < raw.Length)
-            {
-                char c = raw[i];
-                if (whitespace.Contains(c)) continue;
-                if (codeChars.Contains(c))
-                {
-                    result += $"c += \"{c}\";\n";
-                    continue;
-                }
-
-                string _currentVariable = "";
-                while (i < raw.Length)
-                {
-                    if (whitespace.Contains(raw[i])) break;
-                    if (codeChars.Contains(raw[i])) break;
-                    _currentVariable += raw[i];
-                    i++;
-                }
-                i--;
-                result += $"c.SetPointer({_currentVariable});\n";
-            }
-        }
-
-        result += "}";
-
-        return result;
-    }
-    */
 
     #region ARRAY
 

@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.Tokenizing;
+﻿using System.Runtime.InteropServices;
+
+namespace LanguageCore.Tokenizing;
 
 public abstract partial class Tokenizer
 {
@@ -47,7 +49,7 @@ public abstract partial class Tokenizer
         );
     }
 
-    protected static Token[] NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
+    protected static ReadOnlySpan<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
     {
         List<Token> result = new(tokens.Count);
 
@@ -79,6 +81,6 @@ public abstract partial class Tokenizer
             result.Add(token);
         }
 
-        return result.ToArray();
+        return CollectionsMarshal.AsSpan(result);
     }
 }

@@ -37,6 +37,4 @@ public class PointerType : GeneralType,
     }
     public override int GetHashCode() => HashCode.Combine(To);
     public override string ToString() => $"{To}*";
-
-    public override TypeInstance ToTypeInstance() => TypeInstancePointer.CreateAnonymous(To.ToTypeInstance());
 }

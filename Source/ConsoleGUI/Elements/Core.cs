@@ -6,8 +6,7 @@ namespace ConsoleGUI;
 
 public class DrawBuffer
 {
-    static readonly (int x, int y, char character)[] LineSegments = new (int, int, char)[]
-    {
+    static readonly ImmutableArray<(int x, int y, char character)> LineSegments = ImmutableArray.Create<(int, int, char)>(
         (-1, -1, '┐'),
         (-1, 0, '─'),
         (-1, 1, '┘'),
@@ -18,8 +17,8 @@ public class DrawBuffer
 
         (1, -1, '┌'),
         (1, 0, '─'),
-        (1, 1, '└'),
-    };
+        (1, 1, '└')
+    );
 
     public int CurrentLine => Width == 0 ? 0 : CurrentIndex / Width;
     public int CurrentColumn => Width == 0 ? 0 : CurrentIndex % Width;

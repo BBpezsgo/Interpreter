@@ -13,9 +13,9 @@ public static class PositionExtensions
             );
     }
 
-    public static Position Union(this Position a, params Position[]? b)
+    public static Position Union(this Position a, params ReadOnlySpan<Position> b)
     {
-        if (b is null) return a;
+        if (b.IsEmpty) return a;
 
         Position result = a;
 
@@ -45,9 +45,9 @@ public static class PositionExtensions
         return PositionExtensions.Union(a, b.Position);
     }
 
-    public static Position Union(this Position a, params IPositioned?[]? b)
+    public static Position Union(this Position a, params ReadOnlySpan<IPositioned?> b)
     {
-        if (b is null) return a;
+        if (b.IsEmpty) return a;
 
         Position result = a;
 

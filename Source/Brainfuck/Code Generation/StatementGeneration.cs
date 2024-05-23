@@ -1819,10 +1819,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     if (offsetConst != 0)
                     {
-                        if (!Utils.PowerOf2((int)offsetConst))
+                        if (!Utils.PowerOf2(offsetConst.Int))
                         { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
-                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
+                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.Int));
 
                         using (Code.Block(this, $"Snippet MULTIPLY({valueAddress} {offsetAddress})"))
                         { Code.MULTIPLY(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
@@ -1841,10 +1841,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
 
                     if (offsetConst != 0)
                     {
-                        if (!Utils.PowerOf2((int)offsetConst))
+                        if (!Utils.PowerOf2(offsetConst.Int))
                         { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
-                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, (int)offsetConst));
+                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.Int));
 
                         using (Code.Block(this, $"Snippet MATH_DIV({valueAddress} {offsetAddress})"))
                         { Code.MATH_DIV(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
@@ -3031,13 +3031,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
                     if (variable.DeallocateOnClean &&
                         variable.Type is PointerType)
                     {
-                        GenerateDestructor(
-                            new TypeCast(
-                                new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
-                                Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
-                                )
-                            );
+                        GenerateDestructor(new Identifier(Token.CreateAnonymous(variable.Name), variable.File));
                     }
                 }
             }

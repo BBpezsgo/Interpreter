@@ -78,6 +78,4 @@ public class BuiltinType : GeneralType,
         BasicType.Char => TypeKeywords.Char,
         _ => throw new UnreachableException(),
     };
-
-    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(ToString(), null);
 }

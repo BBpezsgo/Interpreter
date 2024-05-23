@@ -68,6 +68,4 @@ public class GenericType : GeneralType,
     }
     public override int GetHashCode() => HashCode.Combine(Identifier);
     public override string ToString() => Identifier;
-
-    public override TypeInstance ToTypeInstance() => TypeInstanceSimple.CreateAnonymous(Identifier, OriginalFile);
 }

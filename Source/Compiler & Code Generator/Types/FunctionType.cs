@@ -71,9 +71,4 @@ public class FunctionType : GeneralType,
 
         return result.ToString();
     }
-
-    public static bool operator ==(FunctionType? left, FunctionType? right) => EqualityComparer<FunctionType>.Default.Equals(left, right);
-    public static bool operator !=(FunctionType? left, FunctionType? right) => !(left == right);
-
-    public override TypeInstance ToTypeInstance() => new TypeInstanceFunction(ReturnType.ToTypeInstance(), Parameters.Select(v => v.ToTypeInstance()));
 }

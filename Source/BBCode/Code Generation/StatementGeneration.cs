@@ -111,9 +111,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForParameterCleanup(parameterCleanup);
 
         AddComment("}");
-
-        // GenerateCodeForStatement(size, new BuiltinType(BasicType.Integer));
-        // AddInstruction(Opcode.Allocate);
     }
 
     void GenerateDeallocator(StatementWithValue value)
@@ -1787,10 +1784,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForFunctionCall_Function(new FunctionCall(
                 index.PrevStatement,
                 Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet),
-                new StatementWithValue[]
-                {
-                    index.Index,
-                },
+                ImmutableArray.Create(index.Index),
                 index.Brackets,
                 index.OriginalFile
             ), result.Function);
@@ -1989,7 +1983,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void CleanupGlobalVariables(CleanupItem[] cleanupItems, Position position)
+    void CleanupGlobalVariables(ImmutableArray<CleanupItem> cleanupItems, Position position)
     {
         if (cleanupItems.Length == 0) return;
         AddComment("Clear Global Variables");
@@ -2215,11 +2209,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForFunctionCall_Function(new FunctionCall(
             statementToSet.PrevStatement,
             Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerSet),
-            new StatementWithValue[]
-            {
-                statementToSet.Index,
-                value,
-            },
+            ImmutableArray.Create<StatementWithValue>(statementToSet.Index, value),
             statementToSet.Brackets,
             statementToSet.OriginalFile
         ), result.Function);

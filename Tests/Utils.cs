@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Xml;
 using LanguageCore;
@@ -179,7 +181,7 @@ public readonly struct ExpectedResult
     {
         Assert((IResult)other);
 
-        if (heapShouldBeEmpty && HeapUtils.GetUsedSize(other.Heap) != 0)
+        if (heapShouldBeEmpty && HeapUtils.GetUsedSize(other.Heap.AsSpan()) != 0)
         { throw new AssertFailedException($"Heap isn't empty"); }
 
         return this;
@@ -665,14 +667,14 @@ public readonly struct MainResult : IResult
     public readonly string StdOutput { get; }
     public readonly string StdError { get; }
     public readonly int ExitCode { get; }
-    public readonly IReadOnlyList<RuntimeValue> Heap { get; }
+    public readonly ImmutableArray<RuntimeValue> Heap { get; }
 
     public MainResult(string stdOut, string stdErr, BytecodeProcessor interpreter)
     {
         StdOutput = stdOut;
         StdError = stdErr;
         ExitCode = interpreter.Memory[interpreter.Registers.StackPointer - BytecodeProcessor.StackDirection].Int;
-        Heap = interpreter.Memory;
+        Heap = ImmutableCollectionsMarshal.AsImmutableArray(interpreter.Memory);
     }
 }
 

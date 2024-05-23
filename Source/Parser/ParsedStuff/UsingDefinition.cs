@@ -35,7 +35,7 @@ public class UsingDefinition : IPositioned
         Keyword = keyword;
     }
 
-    public static UsingDefinition CreateAnonymous(params string[] path)
+    public static UsingDefinition CreateAnonymous(params ReadOnlySpan<string> path)
     {
         Token[] pathTokens = new Token[path.Length];
         for (int i = 0; i < path.Length; i++)
@@ -46,10 +46,10 @@ public class UsingDefinition : IPositioned
     }
 
     public static UsingDefinition CreateAnonymous(Uri uri) => new(
-        Token.CreateAnonymous(DeclarationKeywords.Using), new Token[]
-        {
+        Token.CreateAnonymous(DeclarationKeywords.Using), ImmutableArray.Create<Token>
+        (
             Token.CreateAnonymous(uri.ToString(), TokenType.LiteralString)
-        });
+        ));
 
     public override string ToString() => $"{Keyword} {string.Join('.', Path.Select(token => token.ToOriginalString()))};";
 }

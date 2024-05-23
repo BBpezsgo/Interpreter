@@ -265,8 +265,6 @@ public static class OpcodeExtensions
         Opcode.FMathMult => 2,
         Opcode.FMathDiv => 2,
         Opcode.FMathMod => 2,
-        Opcode.Allocate => 2,
-        Opcode.Free => 1,
         Opcode.Move => 2,
         Opcode.FTo => 1,
         Opcode.FFrom => 1,

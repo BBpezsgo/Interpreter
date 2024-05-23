@@ -40,7 +40,7 @@ struct Buffer
 	float R2 = 2f;
 
 	float K2 = 5f;
-    float K1 = screen_width.ToFloat() * K2 * 3f / (20f * (R1 + R2));
+    float K1 = (screen_width as float) * K2 * 3f / (20f * (R1 + R2));
 
     Buffer<float> zbuffer = new Buffer<float>(screen_width, screen_height);
 
@@ -109,8 +109,8 @@ void RenderFrame(float A, float B, float R1, float R2, float K1, float K2, Buffe
             float ooz = (1f / z);
 
             // x and y projection.  note that y is negated here, because y goes up in 3D space but down on 2D displays.
-            int xp = (screen_width / 2f + K1 * ooz * x).ToInt();
-            int yp = (screen_height / 2f - K1 * ooz * y).ToInt();
+            int xp = (screen_width / 2f + K1 * ooz * x) as int;
+            int yp = (screen_height / 2f - K1 * ooz * y) as int;
 
             // calculate luminance.  ugly, but correct.
             float L = cosphi * costheta * sinB - cosA * costheta * sinphi - sinA * sintheta + cosB * (cosA * sintheta - costheta * sinA * sinphi);
@@ -121,7 +121,7 @@ void RenderFrame(float A, float B, float R1, float R2, float K1, float K2, Buffe
                 if (xp >= 0 && yp >= 0 && xp < screen_width && yp < screen_height && ooz * 1000f > zbuffer.Get(xp, yp))
                 {
                     zbuffer.Set(xp, yp, (ooz * 1000f));
-                    int luminance_index = (L * 2f).ToInt();
+                    int luminance_index = (L * 2f) as int;
                     if (luminance_index == 0) { Set('.', xp, yp); }
                     elseif (luminance_index == 1) { Set(';', xp, yp); }
                     elseif (luminance_index == 2) { Set('#', xp, yp); }

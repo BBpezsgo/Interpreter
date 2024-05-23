@@ -129,7 +129,49 @@ public static class Entry
                     Console.WriteLine();
 
                     if (interpreter.BytecodeInterpreter.Memory[0].Int != 0)
-                    { HeapUtils.DebugPrint(interpreter.BytecodeInterpreter.Memory); }
+                    {
+                        int endlessSafe = interpreter.BytecodeInterpreter.Memory.Length;
+                        int i = 0;
+                        int blockIndex = 0;
+                        while (i + 1 < 127)
+                        {
+                            (int blockSize, bool blockIsUsed) = HeapImplementation.GetHeader(interpreter.BytecodeInterpreter.Memory[i]);
+
+                            Console.Write($"BLOCK {blockIndex} ({i}): ");
+
+                            Console.Write($"SIZE: {blockSize} ");
+
+                            if (blockIsUsed)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                                Console.Write("USED");
+                                Console.ResetColor();
+                                Console.Write(" :");
+                                Console.WriteLine();
+
+                                for (int j = i + 1; j < (blockSize + i + 1); j++)
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Green;
+                                    Console.Write(interpreter.BytecodeInterpreter.Memory[j].Int);
+                                    Console.Write(" ");
+                                }
+                                Console.WriteLine();
+                                Console.WriteLine();
+                            }
+                            else
+                            {
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.Write("FREE");
+                                Console.ResetColor();
+                                Console.WriteLine();
+                            }
+
+                            i += blockSize + 1;
+                            blockIndex++;
+
+                            if (endlessSafe-- < 0) throw new EndlessLoopException();
+                        }
+                    }
                     else
                     { Console.WriteLine("Empty"); }
 

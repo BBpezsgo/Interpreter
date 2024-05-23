@@ -33,7 +33,7 @@ public sealed class StringTokenizer : Tokenizer
 
         EndToken(Text.Length);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters, Warnings);
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters, Warnings);
     }
 
     TokenizerResult TokenizeInternal(ConsoleProgressBar progress)
@@ -48,6 +48,6 @@ public sealed class StringTokenizer : Tokenizer
 
         progress.Print(1f);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings), UnicodeCharacters, Warnings);
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters, Warnings);
     }
 }

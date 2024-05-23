@@ -337,8 +337,7 @@ public sealed class Compiler
         for (int i = 0; i < @struct.Fields.Length; i++)
         {
             FieldDefinition field = @struct.Fields[i];
-            CompiledField newField = new(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field);
-            compiledFields[i] = newField;
+            compiledFields[i] = new CompiledField(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field);
         }
 
         if (@struct.Template is not null)
@@ -427,7 +426,7 @@ public sealed class Compiler
 
                     string builtinName = attribute.Parameters[0].Value;
 
-                    if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out (GeneralType ReturnValue, GeneralType[] Parameters) builtinFunction))
+                    if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out (GeneralType ReturnValue, ImmutableArray<GeneralType> Parameters) builtinFunction))
                     {
                         // AnalysisCollection?.Warnings.Add(new Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
                         break;
@@ -590,7 +589,7 @@ public sealed class Compiler
             file);
     }
 
-    CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings, Uri file)
+    CompilerResult CompileInteractiveInternal(Statement statement, ImmutableArray<UsingDefinition> usings, Uri file)
     {
         ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(usings, file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, null);
 
@@ -765,7 +764,7 @@ public sealed class Compiler
                 {
                     List<ParameterDefinition> parameters = method.Parameters.ToList();
                     parameters.Insert(0, new ParameterDefinition(
-                        new Token[] { Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This) },
+                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)
@@ -787,7 +786,7 @@ public sealed class Compiler
 
                     parameters = method.Parameters.ToList();
                     parameters.Insert(0, new ParameterDefinition(
-                        new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
+                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters)),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)
@@ -837,7 +836,7 @@ public sealed class Compiler
 
                 List<ParameterDefinition> parameters = method.Parameters.ToList();
                 parameters.Insert(0, new ParameterDefinition(
-                    new Token[] { Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This) },
+                    ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This)),
                     TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters),
                     Token.CreateAnonymous(StatementKeywords.This),
                     method)
@@ -861,7 +860,7 @@ public sealed class Compiler
                 parameters = method.Parameters.ToList();
                 parameters.Insert(0,
                     new ParameterDefinition(
-                        new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
+                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters)),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)
@@ -905,7 +904,7 @@ public sealed class Compiler
                     List<ParameterDefinition> parameters = constructor.Parameters.ToList();
                     parameters.Insert(0,
                         new ParameterDefinition(
-                            new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
+                            ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                             constructor.Type,
                             Token.CreateAnonymous(StatementKeywords.This),
                             constructor)
@@ -933,7 +932,7 @@ public sealed class Compiler
                     List<ParameterDefinition> parameters = constructor.Parameters.ToList();
                     parameters.Insert(0,
                         new ParameterDefinition(
-                            new Token[] { Token.CreateAnonymous(ModifierKeywords.This), Token.CreateAnonymous(ModifierKeywords.Ref) },
+                            ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This), Token.CreateAnonymous(ModifierKeywords.Ref)),
                             constructor.Type,
                             Token.CreateAnonymous(StatementKeywords.This),
                             constructor)
@@ -959,7 +958,7 @@ public sealed class Compiler
                     parameters = constructor.Parameters.ToList();
                     parameters.Insert(0,
                         new ParameterDefinition(
-                            new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
+                            ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                             TypeInstancePointer.CreateAnonymous(constructor.Type),
                             Token.CreateAnonymous(StatementKeywords.This),
                             constructor)
@@ -1034,7 +1033,7 @@ public sealed class Compiler
         Statement statement,
         Dictionary<int, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
-        UsingDefinition[] usings,
+        ImmutableArray<UsingDefinition> usings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,
         AnalysisCollection? analysisCollection,

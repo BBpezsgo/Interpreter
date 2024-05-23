@@ -425,41 +425,6 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     /// <summary>
     /// <para>
-    /// <b>Pointer:</b> <paramref name="address2"/>
-    /// </para>
-    /// <para>
-    /// <b>Code:</b>
-    /// <code>
-    /// <paramref name="address1"/>[-] <paramref name="address2"/>[-]
-    /// </code>
-    /// </para>
-    /// </summary>
-    public void ClearValue(int address1, int address2)
-    {
-        ClearValue(address1);
-        ClearValue(address2);
-    }
-
-    /// <summary>
-    /// <para>
-    /// <b>Pointer:</b> <paramref name="address3"/>
-    /// </para>
-    /// <para>
-    /// <b>Code:</b>
-    /// <code>
-    /// <paramref name="address1"/>[-] <paramref name="address2"/>[-] <paramref name="address3"/>[-]
-    /// </code>
-    /// </para>
-    /// </summary>
-    public void ClearValue(int address1, int address2, int address3)
-    {
-        ClearValue(address1);
-        ClearValue(address2);
-        ClearValue(address3);
-    }
-
-    /// <summary>
-    /// <para>
     /// <b>Pointer:</b> Last of <paramref name="addresses"/>
     /// </para>
     /// <para>
@@ -469,7 +434,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </code>
     /// </para>
     /// </summary>
-    public void ClearValue(params int[] addresses)
+    public void ClearValue(params ReadOnlySpan<int> addresses)
     {
         for (int i = 0; i < addresses.Length; i++)
         { ClearValue(addresses[i]); }

@@ -13,8 +13,8 @@ public sealed class Parser
     Token? CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
     Token? PreviousToken => (CurrentTokenIndex >= 1 && CurrentTokenIndex <= Tokens.Length) ? Tokens[CurrentTokenIndex - 1] : null;
 
-    static readonly string[] AllModifiers = new string[]
-    {
+    static readonly ImmutableArray<string> AllModifiers = ImmutableArray.Create<string>
+    (
         ProtectionKeywords.Export,
         ProtectionKeywords.Private,
 
@@ -22,75 +22,75 @@ public sealed class Parser
         ModifierKeywords.Const,
         ModifierKeywords.Ref,
         ModifierKeywords.Temp,
-        ModifierKeywords.This,
-    };
+        ModifierKeywords.This
+    );
 
-    static readonly string[] FunctionModifiers = new string[]
-    {
+    static readonly ImmutableArray<string> FunctionModifiers = ImmutableArray.Create<string>
+    (
         ProtectionKeywords.Export,
-        ModifierKeywords.Inline,
-    };
+        ModifierKeywords.Inline
+    );
 
-    static readonly string[] FieldModifiers = new string[]
-    {
-        ProtectionKeywords.Private,
-    };
+    static readonly ImmutableArray<string> FieldModifiers = ImmutableArray.Create<string>
+    (
+        ProtectionKeywords.Private
+    );
 
-    static readonly string[] GeneralStatementModifiers = new string[]
-    {
-        ModifierKeywords.Temp,
-    };
+    static readonly ImmutableArray<string> GeneralStatementModifiers = ImmutableArray.Create<string>
+    (
+        ModifierKeywords.Temp
+    );
 
-    static readonly string[] VariableModifiers = new string[]
-    {
+    static readonly ImmutableArray<string> VariableModifiers = ImmutableArray.Create<string>
+    (
         ProtectionKeywords.Export,
         ModifierKeywords.Temp,
-        ModifierKeywords.Const,
-    };
+        ModifierKeywords.Const
+    );
 
-    static readonly string[] ParameterModifiers = new string[]
-    {
+    static readonly ImmutableArray<string> ParameterModifiers = ImmutableArray.Create<string>
+    (
         ModifierKeywords.This,
         ModifierKeywords.Ref,
-        ModifierKeywords.Temp,
-    };
+        ModifierKeywords.Temp
+    );
 
-    static readonly string[] ArgumentModifiers = new string[]
-    {
+    static readonly ImmutableArray<string> ArgumentModifiers = ImmutableArray.Create<string>
+    (
         ModifierKeywords.Ref,
-        ModifierKeywords.Temp,
-    };
+        ModifierKeywords.Temp
+    );
 
-    static readonly string[] OverloadableOperators = new string[]
-    {
+    static readonly ImmutableArray<string> OverloadableOperators = ImmutableArray.Create<string>
+    (
         "<<", ">>",
         "+", "-", "*", "/", "%",
         "&", "|", "^",
         "<", ">", ">=", "<=", "!=", "==",
-        "&&", "||",
-    };
+        "&&", "||"
+    );
 
-    static readonly string[] CompoundAssignmentOperators = new string[]
-    {
+    static readonly ImmutableArray<string> CompoundAssignmentOperators = ImmutableArray.Create<string>
+    (
         "+=", "-=", "*=", "/=", "%=",
-        "&=", "|=", "^=",
-    };
+        "&=", "|=", "^="
+    );
 
-    static readonly string[] BinaryOperators = new string[]
-    {
+    static readonly ImmutableArray<string> BinaryOperators = ImmutableArray.Create<string>
+    (
         "<<", ">>",
         "+", "-", "*", "/", "%",
         "&", "|", "^",
-        "<", ">", ">=", "<=", "!=", "==", "&&", "||",
-    };
+        "<", ">", ">=", "<=", "!=", "==", "&&", "||"
+    );
 
-    static readonly string[] UnaryPrefixOperators = new string[]
-    {
-        "!", "~",
-    };
+    static readonly ImmutableArray<string> UnaryPrefixOperators = ImmutableArray.Create<string>
+    (
+        "!", "~"
+    );
 
 #pragma warning disable RCS1213, IDE0052, CA1823 // Remove unread private members
-    static readonly string[] UnaryPostfixOperators = Array.Empty<string>();
+    static readonly ImmutableArray<string> UnaryPostfixOperators = ImmutableArray<string>.Empty;
 #pragma warning restore RCS1213, IDE0052, CA1823
 
     // === Result ===
@@ -280,7 +280,7 @@ public sealed class Parser
         if (!ExpectOperator(";"))
         { throw new SyntaxException($"Please put a \";\" here (after \"{DeclarationKeywords.Using}\")", keyword.Position.After(), File); }
 
-        usingDefinition = new UsingDefinition(keyword, tokens.ToArray());
+        usingDefinition = new UsingDefinition(keyword, tokens);
 
         return true;
     }
@@ -449,7 +449,7 @@ public sealed class Parser
         while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
             Token[] parameterModifiers = ExpectModifiers();
-            CheckParameterModifiers(parameterModifiers, parameters.Count, ParameterModifiers);
+            CheckParameterModifiers(parameterModifiers, parameters.Count, ParameterModifiers.AsSpan());
 
             if (!ExpectType(AllowedType.FunctionPointer | AllowedType.AnyPointer, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
@@ -471,7 +471,7 @@ public sealed class Parser
             { expectParameter = true; }
         }
 
-        CheckModifiers(modifiers, FunctionModifiers);
+        CheckModifiers(modifiers, FunctionModifiers.AsSpan());
 
         Block? block = null;
 
@@ -1089,7 +1089,7 @@ public sealed class Parser
         int startTokenIndex = CurrentTokenIndex;
 
         List<Token> modifiers = new();
-        while (ExpectIdentifier(out Token? modifier, VariableModifiers))
+        while (ExpectIdentifier(out Token? modifier, VariableModifiers.AsSpan()))
         { modifiers.Add(modifier); }
 
         if (!ExpectType(AllowedType.Implicit | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength | AllowedType.AnyPointer, out TypeInstance? possibleType))
@@ -1355,13 +1355,13 @@ public sealed class Parser
             return true;
         }
 
-        if (!ExpectModifiedOrOneValue(out StatementWithValue? leftStatement, GeneralStatementModifiers)) return false;
+        if (!ExpectModifiedOrOneValue(out StatementWithValue? leftStatement, GeneralStatementModifiers.AsSpan())) return false;
 
         while (true)
         {
             if (!ExpectOperator(BinaryOperators, out Token? binaryOperator)) break;
 
-            if (!ExpectModifiedOrOneValue(out StatementWithValue? rightStatement, GeneralStatementModifiers))
+            if (!ExpectModifiedOrOneValue(out StatementWithValue? rightStatement, GeneralStatementModifiers.AsSpan()))
             { throw new SyntaxException($"Expected value after operator \"{binaryOperator}\" (not \"{CurrentToken}\")", binaryOperator.Position.After(), File); }
 
             int rightSidePrecedence = OperatorPrecedence(binaryOperator.Content);
@@ -1480,7 +1480,7 @@ public sealed class Parser
         return false;
     }
 
-    bool ExpectModifiedOrOneValue([NotNullWhen(true)] out StatementWithValue? oneValue, params string[] validModifiers)
+    bool ExpectModifiedOrOneValue([NotNullWhen(true)] out StatementWithValue? oneValue, params ReadOnlySpan<string> validModifiers)
     {
         if (!ExpectIdentifier(out Token? modifier, validModifiers))
         {
@@ -1496,7 +1496,7 @@ public sealed class Parser
         return true;
     }
 
-    bool ExpectModifiedValue([NotNullWhen(true)] out ModifiedStatement? modifiedStatement, params string[] validModifiers)
+    bool ExpectModifiedValue([NotNullWhen(true)] out ModifiedStatement? modifiedStatement, params ReadOnlySpan<string> validModifiers)
     {
         if (!ExpectIdentifier(out Token? modifier, validModifiers))
         {
@@ -1550,7 +1550,7 @@ public sealed class Parser
         {
             StatementWithValue? parameter;
 
-            if (ExpectModifiedValue(out ModifiedStatement? modifiedStatement, ArgumentModifiers))
+            if (ExpectModifiedValue(out ModifiedStatement? modifiedStatement, ArgumentModifiers.AsSpan()))
             {
                 parameter = modifiedStatement;
             }
@@ -1686,7 +1686,7 @@ public sealed class Parser
 
         possibleVariableName.AnalyzedType = TokenAnalyzedType.None;
 
-        CheckModifiers(modifiers, FieldModifiers);
+        CheckModifiers(modifiers, FieldModifiers.AsSpan());
 
         field = new(possibleVariableName, possibleType, modifiers);
 
@@ -1702,7 +1702,7 @@ public sealed class Parser
 
         while (true)
         {
-            if (ExpectIdentifier(out Token? modifier, AllModifiers))
+            if (ExpectIdentifier(out Token? modifier, AllModifiers.AsSpan()))
             {
                 modifier.AnalyzedType = TokenAnalyzedType.Keyword;
                 result.Add(modifier);
@@ -1717,7 +1717,7 @@ public sealed class Parser
         return result.ToArray();
     }
 
-    void CheckParameterModifiers(IEnumerable<Token> modifiers, int parameterIndex, params string[] validModifiers)
+    void CheckParameterModifiers(IEnumerable<Token> modifiers, int parameterIndex, params ReadOnlySpan<string> validModifiers)
     {
         foreach (Token modifier in modifiers)
         {
@@ -1730,7 +1730,7 @@ public sealed class Parser
         }
     }
 
-    void CheckModifiers(IEnumerable<Token> modifiers, params string[] validModifiers)
+    void CheckModifiers(IEnumerable<Token> modifiers, params ReadOnlySpan<string> validModifiers)
     {
         foreach (Token modifier in modifiers)
         {
@@ -1753,7 +1753,7 @@ public sealed class Parser
 
         return true;
     }
-    bool ExpectIdentifier([NotNullWhen(true)] out Token? result, params string[] names)
+    bool ExpectIdentifier([NotNullWhen(true)] out Token? result, params ReadOnlySpan<string> names)
     {
         foreach (string name in names)
         {
@@ -1765,7 +1765,7 @@ public sealed class Parser
     }
 
     bool ExpectOperator(string name) => ExpectOperator(name, out _);
-    bool ExpectOperator(string[] name, [NotNullWhen(true)] out Token? result)
+    bool ExpectOperator(ImmutableArray<string> name, [NotNullWhen(true)] out Token? result)
     {
         result = null;
         SkipCrapTokens();
@@ -1814,7 +1814,7 @@ public sealed class Parser
         AnyPointer = 0b_0010_0000,
     }
 
-    static readonly string[] TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType = new string[] { "<", "(", "[" };
+    static readonly ImmutableArray<string> TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType = ImmutableArray.Create<string>("<", "(", "[");
 
     bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type)
     {

@@ -47,8 +47,8 @@ public partial class InterpreterElement
 
             if (isHeader)
             {
-                header = HeapUtils.GetHeader(item);
-                nextHeader += header.Item1 + HeapUtils.HeaderSize;
+                header = HeapImplementation.GetHeader(item);
+                nextHeader += header.Item1 + HeapImplementation.HeaderSize;
             }
 
             if (i < HeapScrollBar.Offset) continue;

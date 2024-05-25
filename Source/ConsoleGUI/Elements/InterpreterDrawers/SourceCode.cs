@@ -130,12 +130,171 @@ public partial class InterpreterElement
             b.AddText(instruction.Opcode.ToString());
             b.AddText(' ');
 
-            if (instruction.Operand1.Value != 0)
+            int operandCount = instruction.Opcode.ParameterCount();
+
+            void WriteOperand(InstructionOperand operand)
             {
-                b.ForegroundColor = CharColor.BrightCyan;
-                b.AddText(instruction.Operand1.Value.Int.ToString());
+                switch (operand.Type)
+                {
+                    case InstructionOperandType.Immediate8:
+                    case InstructionOperandType.Immediate16:
+                    case InstructionOperandType.Immediate32:
+                        b.ForegroundColor = CharColor.BrightCyan;
+                        b.AddText(operand.Value.ToString());
+                        break;
+                    case InstructionOperandType.Pointer:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText('[');
+                        b.ForegroundColor = CharColor.BrightCyan;
+                        b.AddText(operand.Value.ToString());
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText(']');
+                        break;
+                    case InstructionOperandType.Register:
+                        switch (operand.Value.Int)
+                        {
+                            case RegisterIds.CodePointer:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("CP");
+                                break;
+                            case RegisterIds.StackPointer:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("SP");
+                                break;
+                            case RegisterIds.BasePointer:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("BP");
+                                break;
+                            case RegisterIds.EAX:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("EAX");
+                                break;
+                            case RegisterIds.AX:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("AX");
+                                break;
+                            case RegisterIds.AH:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("AH");
+                                break;
+                            case RegisterIds.AL:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("AL");
+                                break;
+                            case RegisterIds.EBX:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("EBX");
+                                break;
+                            case RegisterIds.BX:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("BX");
+                                break;
+                            case RegisterIds.BH:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("BH");
+                                break;
+                            case RegisterIds.BL:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("BL");
+                                break;
+                            case RegisterIds.ECX:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("ECX");
+                                break;
+                            case RegisterIds.CX:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("CX");
+                                break;
+                            case RegisterIds.CH:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("CH");
+                                break;
+                            case RegisterIds.CL:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("CL");
+                                break;
+                            case RegisterIds.EDX:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("EDX");
+                                break;
+                            case RegisterIds.DX:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("DX");
+                                break;
+                            case RegisterIds.DH:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("DH");
+                                break;
+                            case RegisterIds.DL:
+                                b.ForegroundColor = CharColor.White;
+                                b.AddText("DL");
+                                break;
+                            default: throw new UnreachableException();
+                        }
+                        break;
+                    case InstructionOperandType.PointerBP:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText('[');
+                        b.ForegroundColor = CharColor.White;
+                        b.AddText("BP");
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText(']');
+                        break;
+                    case InstructionOperandType.PointerSP:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText('[');
+                        b.ForegroundColor = CharColor.White;
+                        b.AddText("SP");
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText(']');
+                        break;
+                    case InstructionOperandType.PointerEAX:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText('[');
+                        b.ForegroundColor = CharColor.White;
+                        b.AddText("EAX");
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText(']');
+                        break;
+                    case InstructionOperandType.PointerEBX:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText('[');
+                        b.ForegroundColor = CharColor.White;
+                        b.AddText("EBX");
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText(']');
+                        break;
+                    case InstructionOperandType.PointerECX:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText('[');
+                        b.ForegroundColor = CharColor.White;
+                        b.AddText("ECX");
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText(']');
+                        break;
+                    case InstructionOperandType.PointerEDX:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText('[');
+                        b.ForegroundColor = CharColor.White;
+                        b.AddText("EDX");
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText(']');
+                        break;
+                }
+            }
+
+            if (operandCount >= 1)
+            {
+                WriteOperand(instruction.Operand1);
                 b.AddText(' ');
             }
+
+            if (operandCount >= 2)
+            {
+                b.ForegroundColor = CharColor.BrightCyan;
+                WriteOperand(instruction.Operand2);
+            }
+
             b.BackgroundColor = CharColor.Black;
 
             b.FinishLine();

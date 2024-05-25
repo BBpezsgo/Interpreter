@@ -1,7 +1,7 @@
 ﻿namespace LanguageCore.Compiler;
 
-using LanguageCore.Parser.Statement;
-using LanguageCore.Tokenizing;
+using Parser.Statement;
+using Tokenizing;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -14,6 +14,12 @@ public class GenericType : GeneralType,
     public Uri OriginalFile { get; }
 
     public override int Size
+    {
+        [DoesNotReturn]
+        get => throw new InternalException($"Can not get the size of a generic type");
+    }
+
+    public override int SizeBytes
     {
         [DoesNotReturn]
         get => throw new InternalException($"Can not get the size of a generic type");

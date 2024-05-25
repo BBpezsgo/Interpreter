@@ -71,16 +71,7 @@ public class RuntimeException : LanguageException
         { result.Append(" <empty>"); }
         else
         {
-            if (CallStack.IsDefaultOrEmpty)
-            {
-                for (int i = 0; i < CallStack.Length; i++)
-                {
-                    result.AppendLine();
-                    result.Append(' ', callTraceIndent);
-                    result.Append($"<unknown> {context.CallTrace[i]}");
-                }
-            }
-            else
+            if (!CallStack.IsDefaultOrEmpty)
             {
                 for (int i = 0; i < CallStack.Length; i++)
                 {

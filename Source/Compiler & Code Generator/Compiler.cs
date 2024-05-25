@@ -764,7 +764,7 @@ public sealed class Compiler
                 {
                     List<ParameterDefinition> parameters = method.Parameters.ToList();
                     parameters.Insert(0, new ParameterDefinition(
-                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This)),
+                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)

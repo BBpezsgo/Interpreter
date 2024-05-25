@@ -227,7 +227,7 @@ public static class Utils
 
     const string TestFilesPath = $@"{TestConstants.TheProjectPath}\TestFiles\";
 
-    const int TestCount = 50;
+    const int TestCount = 54;
     static readonly int TestFileNameWidth = (int)Math.Floor(Math.Log10(TestCount)) + 1;
 
     public static LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckGeneratorSettings => new(LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default)
@@ -310,7 +310,7 @@ public static class Utils
 
         static (Interpreter, MainResult) Execute(BBLangGeneratorResult code, string input)
         {
-            Interpreter interpreter = new(false, new BytecodeInterpreterSettings()
+            Interpreter interpreter = new(true, new BytecodeInterpreterSettings()
             {
                 HeapSize = HeapSize,
                 StackMaxSize = BytecodeInterpreterSettings.Default.StackMaxSize,
@@ -479,7 +479,7 @@ public static class Utils
     }
 
     record struct TrxTestDefinition(string Name, string[] Categories, string? ExecutionId, string? MethodClassName, string? MethodName);
-    record struct TrxTestResult(string Id, string Name, string Outcome);
+    record struct TrxTestResult(string Id, string Name, string Outcome, string? ErrorMessage);
 
     static (Dictionary<string, TrxTestDefinition> Definitions, TrxTestResult[] Results) LoadTestResults(string trxFile)
     {
@@ -546,7 +546,12 @@ public static class Utils
                     if (id is null || name is null || outcome is null)
                     { continue; }
 
-                    results.Add(new TrxTestResult(id, name, outcome));
+                    XmlElement? errorMessage_ = _result["Output"]?["ErrorInfo"]?["Message"];
+                    string? errorMessage = null;
+                    if (errorMessage_ is not null && errorMessage_.FirstChild?.NodeType == XmlNodeType.Text)
+                    { errorMessage = errorMessage_.FirstChild.Value; }
+
+                    results.Add(new TrxTestResult(id, name, outcome, errorMessage));
                 }
             }
         }
@@ -562,13 +567,13 @@ public static class Utils
 
         (Dictionary<string, TrxTestDefinition> definitions, TrxTestResult[] results) = LoadTestResults(latest);
 
-        Dictionary<string, List<(string? Category, string Outcome)>> testFiles = new();
+        Dictionary<string, List<(string? Category, string Outcome, string? ErrorMessage)>> testFiles = new();
 
         int passingTestCount = 0;
         int failedTestCount = 0;
         int notRunTestCount = 0;
 
-        foreach ((string id, string name, string outcome) in results)
+        foreach ((string id, string name, string outcome, string? errorMessage) in results)
         {
             string[] categories = definitions[id].Categories;
 
@@ -591,16 +596,16 @@ public static class Utils
 
             if (!isFileTest) continue;
 
-            if (!testFiles.TryGetValue(name, out List<(string? Category, string Outcome)>? fileResults))
+            if (!testFiles.TryGetValue(name, out List<(string? Category, string Outcome, string? ErrorMessage)>? fileResults))
             {
-                fileResults = new List<(string? Category, string Outcome)>();
+                fileResults = new List<(string? Category, string Outcome, string? ErrorMessage)>();
                 testFiles[name] = fileResults;
             }
 
-            fileResults.Add((category, outcome));
+            fileResults.Add((category, outcome, errorMessage));
         }
 
-        (int SerialNumber, List<(string? Category, string Outcome)> Value)[] sortedTestFiles = testFiles.Select(v => (int.Parse(v.Key[4..]), v.Value)).ToArray();
+        (int SerialNumber, List<(string? Category, string Outcome, string? ErrorMessage)> Value)[] sortedTestFiles = testFiles.Select(v => (int.Parse(v.Key[4..]), v.Value)).ToArray();
         Array.Sort(sortedTestFiles, (a, b) => a.SerialNumber.CompareTo(b.SerialNumber));
 
         using StreamWriter file = File.CreateText(resultFile);
@@ -619,22 +624,22 @@ public static class Utils
         file.WriteLine("| File | Bytecode | Brainfuck |");
         file.WriteLine("|:----:|:--------:|:---------:|");
 
-        foreach ((int serialNumber, List<(string? Category, string Outcome)>? fileResults) in sortedTestFiles)
+        foreach ((int serialNumber, List<(string? Category, string Outcome, string? ErrorMessage)>? fileResults) in sortedTestFiles)
         {
-            string? bytecodeResult = null;
-            string? brainfuckResult = null;
+            (string? Outcome, string? ErrorMessage) bytecodeResult = (null, null);
+            (string? Outcome, string? ErrorMessage) brainfuckResult = (null, null);
 
-            foreach ((string? category, string outcome) in fileResults)
+            foreach ((string? category, string outcome, string? errorMessage) in fileResults)
             {
                 switch (category)
                 {
-                    case "Main": bytecodeResult = outcome; break;
-                    case "Brainfuck": brainfuckResult = outcome; break;
+                    case "Main": bytecodeResult = (outcome, errorMessage); break;
+                    case "Brainfuck": brainfuckResult = (outcome, errorMessage); break;
                 }
             }
 
-            if (bytecodeResult == "NotExecuted" &&
-                brainfuckResult == "NotExecuted")
+            if (bytecodeResult.Outcome == "NotExecuted" &&
+                brainfuckResult.Outcome == "NotExecuted")
             { continue; }
 
             static string? TranslateOutcome(string? outcome) => outcome switch
@@ -645,13 +650,34 @@ public static class Utils
                 _ => outcome,
             };
 
-            bytecodeResult = TranslateOutcome(bytecodeResult);
-            brainfuckResult = TranslateOutcome(brainfuckResult);
+            bytecodeResult.Outcome = TranslateOutcome(bytecodeResult.Outcome);
+            brainfuckResult.Outcome = TranslateOutcome(brainfuckResult.Outcome);
 
             string translatedName = $"https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/{serialNumber.ToString().PadLeft(2, '0')}.{LanguageConstants.LanguageExtension}";
             translatedName = $"[{serialNumber}]({translatedName})";
 
-            file.WriteLine($"| {translatedName} | {bytecodeResult} | {brainfuckResult} |");
+            file.Write("| ");
+            file.Write(translatedName);
+            file.Write(" | ");
+
+            file.Write(bytecodeResult.Outcome);
+            if (bytecodeResult.ErrorMessage is not null)
+            {
+                file.Write(' ');
+                file.Write(bytecodeResult.ErrorMessage);
+            }
+
+            file.Write(" | ");
+
+            file.Write(brainfuckResult.Outcome);
+            if (brainfuckResult.ErrorMessage is not null)
+            {
+                file.Write(' ');
+                file.Write(brainfuckResult.ErrorMessage);
+            }
+
+            file.Write(" |");
+            file.WriteLine();
         }
     }
 }
@@ -673,7 +699,7 @@ public readonly struct MainResult : IResult
     {
         StdOutput = stdOut;
         StdError = stdErr;
-        ExitCode = interpreter.Memory[interpreter.Registers.StackPointer - BytecodeProcessor.StackDirection].Int;
+        ExitCode = interpreter.GetData(interpreter.Registers.StackPointer - (1 * BytecodeProcessor.StackDirection)).Int;
         Heap = ImmutableCollectionsMarshal.AsImmutableArray(interpreter.Memory);
     }
 }

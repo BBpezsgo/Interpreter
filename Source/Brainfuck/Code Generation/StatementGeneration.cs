@@ -5,7 +5,6 @@ namespace LanguageCore.Brainfuck.Generator;
 using Compiler;
 using Parser;
 using Parser.Statement;
-using Runtime;
 using Tokenizing;
 
 public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
@@ -240,29 +239,30 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         CompileSetter(variable, value);
     }
 
-    void GenerateCodeForSetter(Field field, StatementWithValue value)
+    void GenerateCodeForSetter(Field statementToSet, StatementWithValue value)
     {
-        GeneralType prevType = FindStatementType(field.PrevStatement);
-        GeneralType type = FindStatementType(field);
+        GeneralType prevType = FindStatementType(statementToSet.PrevStatement);
+        GeneralType type = FindStatementType(statementToSet);
         GeneralType valueType = FindStatementType(value);
 
         if (prevType is PointerType pointerType)
         {
-            using DebugInfoBlock debugBlock = DebugBlock(new Position(field, value));
+            using DebugInfoBlock debugBlock = DebugBlock(new Position(statementToSet, value));
             if (pointerType.To is not StructType structPointerType)
-            { throw new CompilerException($"Could not get the field offsets of type {pointerType}", field.PrevStatement, CurrentFile); }
+            { throw new CompilerException($"Could not get the field offsets of type {pointerType}", statementToSet.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.GetField(field.Identifier.Content, out CompiledField? fieldDefinition, out int fieldOffset))
-            { throw new CompilerException($"Could not get the field offset of field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
+            if (!structPointerType.GetField(statementToSet.Identifier.Content, out CompiledField? fieldDefinition, out int fieldOffset))
+            { throw new CompilerException($"Could not get the field offset of field \"{statementToSet.Identifier}\"", statementToSet.Identifier, CurrentFile); }
 
-            field.Reference = fieldDefinition;
-            field.CompiledType = fieldDefinition.Type;
+            statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
+            statementToSet.Reference = fieldDefinition;
+            statementToSet.CompiledType = fieldDefinition.Type;
 
             if (type.Size != valueType.Size)
             { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
 
             int _pointerAddress = Stack.NextAddress;
-            GenerateCodeForStatement(field.PrevStatement);
+            GenerateCodeForStatement(statementToSet.PrevStatement);
 
             Code.AddValue(_pointerAddress, fieldOffset);
 
@@ -277,8 +277,24 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             return;
         }
 
-        if (!TryGetAddress(field, out int address, out int size))
-        { throw new CompilerException($"Failed to get field address", field, CurrentFile); }
+        if (prevType is not StructType)
+        { throw new NotImplementedException(); }
+
+        if (type != valueType)
+        { throw new CompilerException($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, CurrentFile); }
+
+        if (!TryGetAddress(statementToSet, out int address, out int size))
+        {
+            StatementWithValue? dereferencePointer = NeedDerefernce(statementToSet);
+            if (dereferencePointer is not null)
+            {
+                int offset = GetDataOffset(statementToSet, dereferencePointer);
+                CompileDereferencedSetter(dereferencePointer, offset, value);
+                return;
+            }
+
+            throw new CompilerException($"Failed to get field address", statementToSet, CurrentFile);
+        }
 
         if (size != valueType.Size)
         { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
@@ -399,42 +415,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
     }
 
-    void GenerateCodeForSetter(Pointer statement, StatementWithValue value)
-    {
-        int pointerAddress = Stack.NextAddress;
-        GenerateCodeForStatement(statement.PrevStatement);
-
-        /*
-        {
-            using StackAddress checkResultAddress = Stack.PushVirtual(1);
-            {
-                using StackAddress maxSizeAddress = Stack.Push(GeneratorSettings.HeapSize);
-                using StackAddress pointerAddressCopy = Stack.PushVirtual(1);
-                {
-                    Code.CopyValue(pointerAddress, pointerAddressCopy);
-
-                    Code.LOGIC_MT(pointerAddressCopy, maxSizeAddress, checkResultAddress, checkResultAddress + 1, checkResultAddress + 2);
-                }
-
-                using (Code.ConditionalBlock(this, checkResultAddress))
-                { Code.OUT_STRING(checkResultAddress, "\nOut of memory range\n"); }
-            }
-        }
-        */
-
-        GeneralType valueType = FindStatementType(value);
-
-        if (valueType.Size != 1)
-        { throw new CompilerException($"size 1 bruh allowed on heap thingy", value, CurrentFile); }
-
-        int valueAddress = Stack.NextAddress;
-        GenerateCodeForStatement(value);
-
-        Heap.Set(pointerAddress, valueAddress);
-
-        Stack.PopVirtual();
-        Stack.PopVirtual();
-    }
+    void GenerateCodeForSetter(Pointer statement, StatementWithValue value) => CompileDereferencedSetter(statement.PrevStatement, 0, value);
 
     void CompileSetter(int address, StatementWithValue value)
     {
@@ -461,6 +442,45 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
             using (Code.Block(this, $"Store computed value (from {Stack.LastAddress}) to {address}"))
             { Stack.PopAndStore(address); }
         }
+    }
+
+    void CompileDereferencedSetter(StatementWithValue dereference, int offset, StatementWithValue value)
+    {
+        int pointerAddress = Stack.NextAddress;
+        GenerateCodeForStatement(dereference);
+
+        /*
+        {
+            using StackAddress checkResultAddress = Stack.PushVirtual(1);
+            {
+                using StackAddress maxSizeAddress = Stack.Push(GeneratorSettings.HeapSize);
+                using StackAddress pointerAddressCopy = Stack.PushVirtual(1);
+                {
+                    Code.CopyValue(pointerAddress, pointerAddressCopy);
+
+                    Code.LOGIC_MT(pointerAddressCopy, maxSizeAddress, checkResultAddress, checkResultAddress + 1, checkResultAddress + 2);
+                }
+
+                using (Code.ConditionalBlock(this, checkResultAddress))
+                { Code.OUT_STRING(checkResultAddress, "\nOut of memory range\n"); }
+            }
+        }
+        */
+
+        Code.AddValue(pointerAddress, offset);
+
+        GeneralType valueType = FindStatementType(value);
+
+        if (valueType.Size != 1)
+        { throw new CompilerException($"size 1 bruh allowed on heap thingy", value, CurrentFile); }
+
+        int valueAddress = Stack.NextAddress;
+        GenerateCodeForStatement(value);
+
+        Heap.Set(pointerAddress, valueAddress);
+
+        Stack.PopVirtual();
+        Stack.PopVirtual();
     }
 
     void GenerateCodeForSetter(IndexCall statement, StatementWithValue value)
@@ -2148,7 +2168,24 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
         }
 
         if (!TryGetAddress(field, out int address, out int size))
-        { throw new CompilerException($"Failed to get field memory address", field, CurrentFile); }
+        {
+            StatementWithValue? dereferencePointer = NeedDerefernce(field);
+            if (dereferencePointer is not null)
+            {
+                int offset = GetDataOffset(field, dereferencePointer);
+                using (Code.Block(this, $"Load field {field} (dereferenced from {dereferencePointer} + {offset})"))
+                {
+                    int pointerAddress = Stack.NextAddress;
+                    GenerateCodeForStatement(dereferencePointer);
+                    Code.AddValue(pointerAddress, offset);
+                    Heap.Get(pointerAddress, pointerAddress);
+
+                    return;
+                }
+            }
+
+            throw new CompilerException($"Failed to get field memory address", field, CurrentFile);
+        }
 
         if (size <= 0)
         { throw new CompilerException($"Can't load field \"{field}\" because it's size is {size} (bruh)", field, CurrentFile); }

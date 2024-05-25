@@ -2,7 +2,7 @@
 
 public class InterpreterDebuggabble : Interpreter
 {
-    public InterpreterDebuggabble(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation) : base(handleErrors, settings, program, debugInformation)
+    public InterpreterDebuggabble(bool throwExceptions, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation) : base(throwExceptions, settings, program, debugInformation)
     { }
 
     public int AbsoluteBreakpoint { get; set; } = int.MinValue;

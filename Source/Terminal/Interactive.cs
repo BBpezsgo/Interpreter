@@ -713,7 +713,7 @@ public class Interactive
 
             BBLangGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, MainGeneratorSettings.Default);
 
-            interpreter = new(true, BytecodeInterpreterSettings.Default, generated.Code, generated.DebugInfo);
+            interpreter = new(false, BytecodeInterpreterSettings.Default, generated.Code, generated.DebugInfo);
 
             interpreter.OnStdOut += OnInterpreterStandardOut;
             interpreter.OnStdError += OnInterpreterStandardError;

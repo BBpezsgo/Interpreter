@@ -1,4 +1,6 @@
 ﻿using System.IO;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace LanguageCore;
 
@@ -13,6 +15,16 @@ public interface IDuplicatable<T> : ICloneable
 public static class Utils
 {
     public static Uri AssemblyFile => new(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, Process.GetCurrentProcess().ProcessName + ".exe"), UriKind.Absolute);
+
+    /// <exception cref="ArgumentOutOfRangeException"/>
+    public static unsafe void Write<T>(this Span<byte> buffer, in T value) where T : unmanaged => MemoryMarshal.Write(buffer, in value);
+    /// <exception cref="ArgumentOutOfRangeException"/>
+    public static unsafe T Read<T>(this Span<byte> buffer) where T : unmanaged => MemoryMarshal.Read<T>(buffer);
+
+    public static unsafe Span<byte> ToBytes<T>(this T v) where T : unmanaged => new(Unsafe.AsPointer(ref v), sizeof(T));
+    public static unsafe T To<T>(this Span<byte> v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }
+    public static unsafe T To<T>(this ReadOnlySpan<byte> v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }
+    public static unsafe T To<T>(this ImmutableArray<byte> v) where T : unmanaged { fixed (byte* ptr = v.AsSpan()) return *(T*)ptr; }
 
     public static T Max<T>(T a, T b)
         where T : IComparisonOperators<T, T, bool>

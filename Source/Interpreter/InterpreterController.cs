@@ -62,9 +62,9 @@ public class Interpreter
 
     TimeSleep CurrentSleep;
 
-    public Interpreter(bool handleErrors, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation)
+    public Interpreter(bool throwExceptions, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation)
     {
-        ThrowExceptions = !handleErrors;
+        ThrowExceptions = throwExceptions;
         DebugInformation = debugInformation;
 
         BytecodeInterpreter = new BytecodeProcessor(program, GenerateExternalFunctions().ToFrozenDictionary(), settings);
@@ -204,7 +204,7 @@ public class Interpreter
         }
         catch (Exception error)
         {
-            OnOutput?.Invoke(this, $"Internal Exception: {error.Message}", LogType.Error);
+            OnOutput?.Invoke(this, $"Internal Exception: {new RuntimeException(error.Message, error, BytecodeInterpreter.GetContext())}", LogType.Error);
 
             if (ThrowExceptions) throw;
             else BytecodeInterpreter.Registers.CodePointer = BytecodeInterpreter.Code.Length;

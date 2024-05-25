@@ -455,6 +455,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         throw new NotImplementedException();
     }
 
+    protected override ValueAddress GetBaseAddress(Identifier variable)
+    {
+        if (GetConstant(variable.Content, out _))
+        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
+
+        if (!GetVariable(CompiledVariables, variable.Content, out Variable variable_))
+        { throw new CompilerException($"Variable \"{variable}\" not found", variable, CurrentFile); }
+
+        return new ValueAddress(variable_.Address, AddressingMode.Absolute);
+    }
+
     static bool GetVariable(IReadOnlyList<Variable> variables, string name, out Variable variable)
     {
         for (int i = variables.Count - 1; i >= 0; i--)
@@ -540,7 +551,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     #region TryGetAddress
 
-    bool TryGetAddress(Statement? statement, out int address, out int size)
+    bool TryGetAddress(Statement? statement, out int address, out int size, StatementWithValue? until = null)
     {
         if (statement is null)
         {
@@ -549,22 +560,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
             return false;
         }
 
-        if (statement is IndexCall index)
-        { return TryGetAddress(index, out address, out size); }
-
-        if (statement is Pointer pointer)
-        { return TryGetAddress(pointer, out address, out size); }
-
-        if (statement is Identifier identifier)
-        { return TryGetAddress(identifier, out address, out size); }
-
-        if (statement is Field field)
-        { return TryGetAddress(field, out address, out size); }
-
-        throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);
+        return statement switch
+        {
+            IndexCall index => TryGetAddress(index, out address, out size, until),
+            Pointer pointer => TryGetAddress(pointer, out address, out size, until),
+            Identifier identifier => TryGetAddress(identifier, out address, out size, until),
+            Field field => TryGetAddress(field, out address, out size, until),
+            _ => throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile),
+        };
     }
 
-    bool TryGetAddress(IndexCall index, out int address, out int size)
+    bool TryGetAddress(IndexCall index, out int address, out int size, StatementWithValue? until)
     {
         if (index.PrevStatement is not Identifier arrayIdentifier)
         { throw new CompilerException($"This must be an identifier", index.PrevStatement, CurrentFile); }
@@ -592,13 +598,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         throw new CompilerException($"Variable is not an array", arrayIdentifier, CurrentFile);
     }
 
-    bool TryGetAddress(Field field, out int address, out int size)
+    bool TryGetAddress(Field field, out int address, out int size, StatementWithValue? until)
     {
         GeneralType type = FindStatementType(field.PrevStatement);
 
         if (type is StructType structType)
         {
-            if (!TryGetAddress(field.PrevStatement, out int prevAddress, out _))
+            if (!TryGetAddress(field.PrevStatement, out int prevAddress, out _, until))
             {
                 address = default;
                 size = default;
@@ -620,7 +626,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         return false;
     }
 
-    bool TryGetAddress(Pointer pointer, out int address, out int size)
+    bool TryGetAddress(Pointer pointer, out int address, out int size, StatementWithValue? until)
     {
         if (!TryCompute(pointer.PrevStatement, out CompiledValue addressToSet))
         { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.PrevStatement, CurrentFile); }
@@ -630,11 +636,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
         address = addressToSet.Byte;
         size = 1;
-
         return true;
     }
 
-    bool TryGetAddress(Identifier identifier, out int address, out int size)
+    bool TryGetAddress(Identifier identifier, out int address, out int size, StatementWithValue? until)
     {
         if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, identifier.Content, out Variable variable))
         { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
@@ -728,6 +733,23 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         };
     }
 
+    protected override int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null)
+    {
+        if (indexCall.PrevStatement == until) return 0;
+
+        GeneralType prevType = FindStatementType(indexCall.PrevStatement);
+
+        if (prevType is not ArrayType arrayType)
+        { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
+
+        if (!TryCompute(indexCall.Index, out CompiledValue index))
+        { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
+
+        int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
+        int offset = (int)index * 2 * arrayType.Of.Size;
+        return prevOffset + offset;
+    }
+    
     public static BrainfuckGeneratorResult Generate(
         CompilerResult compilerResult,
         BrainfuckGeneratorSettings brainfuckSettings,

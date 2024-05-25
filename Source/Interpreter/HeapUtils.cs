@@ -25,6 +25,29 @@ public static class HeapUtils
         return used;
     }
 
+    public static int GetUsedSize(ReadOnlySpan<byte> heap)
+    {
+        int used = 0;
+
+        int endlessSafe = heap.Length;
+        int i = 0;
+        int blockIndex = 0;
+        while (i + 1 < 127)
+        {
+            (int blockSize, bool blockIsUsed) = HeapImplementation.GetHeader(heap[i]);
+
+            if (blockIsUsed)
+            { used += blockSize; }
+
+            i += blockSize + 1;
+            blockIndex++;
+
+            if (endlessSafe-- < 0) throw new EndlessLoopException();
+        }
+
+        return used;
+    }
+
     public static string? GetString(ReadOnlySpan<RuntimeValue> heap, int pointer)
     {
         if (pointer == 0)
@@ -32,6 +55,16 @@ public static class HeapUtils
         StringBuilder result = new();
         for (int i = pointer; heap[i].Int != 0; i++)
         { result.Append(heap[i].Char); }
+        return result.ToString();
+    }
+
+    public static string? GetString(ReadOnlySpan<byte> heap, int pointer)
+    {
+        if (pointer == 0)
+        { return null; }
+        StringBuilder result = new();
+        for (int i = pointer; heap[i] != 0; i += sizeof(char))
+        { result.Append((char)heap[i]); }
         return result.ToString();
     }
 }

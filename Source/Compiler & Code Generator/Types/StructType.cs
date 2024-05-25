@@ -27,18 +27,37 @@ public class StructType : GeneralType,
         }
     }
 
-    public IEnumerable<KeyValuePair<CompiledField, int>> Fields
+    public override int SizeBytes
     {
         get
         {
+            int size = 0;
+            foreach (CompiledField field in Struct.Fields)
+            {
+                GeneralType fieldType = field.Type;
+                fieldType = ReplaceType(fieldType);
+                size += fieldType.SizeBytes;
+            }
+            return size;
+        }
+    }
+
+    public ImmutableDictionary<CompiledField, int> Fields
+    {
+        get
+        {
+            Dictionary<CompiledField, int> result = new(Struct.Fields.Length);
+            
             int offset = 0;
             foreach (CompiledField field in Struct.Fields)
             {
-                yield return new KeyValuePair<CompiledField, int>(field, offset);
+                result.Add(field, offset);
                 GeneralType fieldType = field.Type;
                 fieldType = ReplaceType(fieldType);
                 offset += fieldType.Size;
             }
+
+            return result.ToImmutableDictionary();
         }
     }
 

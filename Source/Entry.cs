@@ -128,7 +128,7 @@ public static class Entry
                     Console.WriteLine($" ===== HEAP ===== ");
                     Console.WriteLine();
 
-                    if (interpreter.BytecodeInterpreter.Memory[0].Int != 0)
+                    if (interpreter.BytecodeInterpreter.GetData(0).Int != 0)
                     {
                         int endlessSafe = interpreter.BytecodeInterpreter.Memory.Length;
                         int i = 0;
@@ -152,7 +152,7 @@ public static class Entry
                                 for (int j = i + 1; j < (blockSize + i + 1); j++)
                                 {
                                     Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Write(interpreter.BytecodeInterpreter.Memory[j].Int);
+                                    Console.Write(interpreter.BytecodeInterpreter.GetData(j).Int);
                                     Console.Write(" ");
                                 }
                                 Console.WriteLine();
@@ -192,15 +192,19 @@ public static class Entry
 
                 if (arguments.ConsoleGUI)
                 {
-                    InterpreterDebuggabble _interpreter = new(true, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
+                    InterpreterDebuggabble _interpreter = new(false, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
                     interpreter = _interpreter;
 
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     { throw new PlatformNotSupportedException("Console rendering is only supported on Windows"); }
 
-                    Console.WriteLine();
-                    Console.Write("Press any key to start executing");
-                    Console.ReadKey();
+                    // if (pauseBeforeRun)
+                    // {
+                    //     Console.WriteLine();
+                    //     Console.Write("Press any key to start executing");
+                    //     Console.ReadKey();
+                    // }
+
                     Console.ResetColor();
                     Console.Clear();
 
@@ -221,7 +225,7 @@ public static class Entry
                 }
                 else
                 {
-                    interpreter = new(true, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
+                    interpreter = new(arguments.ThrowErrors, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
 
                     interpreter.OnStdOut += (sender, data) => Console.Out.Write(char.ToString(data));
                     interpreter.OnStdError += (sender, data) => Console.Error.Write(char.ToString(data));

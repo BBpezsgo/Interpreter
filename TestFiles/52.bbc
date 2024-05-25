@@ -1,0 +1,30 @@
+struct A
+{
+  int a;
+  int b;
+}
+
+struct B
+{
+  A a;
+  A b;
+}
+
+struct C
+{
+  B a;
+  B b;
+}
+
+C c;
+
+c.a.a.a = 111;
+c.a.a.b = 112;
+c.a.b.a = 121;
+c.a.b.b = 122;
+c.b.a.a = 211;
+c.b.a.b = 212;
+c.b.b.a = 221;
+c.b.b.b = 222;
+
+return c.a.b.a;

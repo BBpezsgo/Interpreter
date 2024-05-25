@@ -9,6 +9,7 @@ public class PointerType : GeneralType,
     public GeneralType To { get; }
 
     public override int Size => 1;
+    public override int SizeBytes => 4;
 
     public PointerType(PointerType other)
     {

@@ -14,7 +14,7 @@ public class CompiledFunction : FunctionDefinition,
     ICompiledFunction,
     IHaveInstructionOffset
 {
-    public int InstructionOffset { get; set; } = -1;
+    public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
 
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }

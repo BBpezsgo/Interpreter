@@ -1,5 +1,6 @@
 # Test Results
-[![](https://img.shields.io/badge/Passing-251-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-0-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-8-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=259&f=0&s=98)](#)
+[![](https://img.shields.io/badge/Passing-259-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-0-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-98-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -45,10 +46,14 @@
 | [40](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/40.bbc) | ✅ | ✅ |
 | [41](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/41.bbc) | ✅ | ✅ |
 | [42](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/42.bbc) | ✅ | ✅ |
-| [43](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/43.bbc) | ✅ | ✖ |
+| [43](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/43.bbc) | ✅ | ✖ Function pointers are not supported |
 | [44](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/44.bbc) | ✅ | ✅ |
 | [45](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/45.bbc) | ✅ | ✅ |
 | [47](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/47.bbc) | ✅ | ✅ |
 | [48](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/48.bbc) | ✅ | ✅ |
-| [49](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/49.bbc) | ✅ | ✖ |
-| [50](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/50.bbc) | ✅ | ✖ |
+| [49](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/49.bbc) | ✅ | ✖ Floats not supported |
+| [50](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/50.bbc) | ✅ | ✖ Floats not supported |
+| [51](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/51.bbc) | ✅ | ✅ |
+| [52](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/52.bbc) | ✅ | ✅ |
+| [53](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/53.bbc) | ✅ | ✅ |
+| [54](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/54.bbc) | ✅ | ✅ |

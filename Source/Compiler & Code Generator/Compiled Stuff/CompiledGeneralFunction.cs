@@ -6,7 +6,7 @@ using Parser.Statement;
 public class CompiledGeneralFunction : GeneralFunctionDefinition,
     ISameCheck,
     ISameCheck<CompiledGeneralFunction>,
-    IReferenceable<Statement>,
+    IReferenceable<Statement?>,
     IDuplicatable<CompiledGeneralFunction>,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
@@ -14,12 +14,12 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
     IHaveInstructionOffset,
     ICompiledFunction
 {
-    public int InstructionOffset { get; set; } = -1;
+    public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
 
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct Context { get; }
-    public List<Reference<Statement>> References { get; }
+    public List<Reference<Statement?>> References { get; }
 
     public bool ReturnSomething => Type != BasicType.Void;
     IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
@@ -30,7 +30,7 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
         this.Context = context;
-        this.References = new List<Reference<Statement>>();
+        this.References = new List<Reference<Statement?>>();
     }
 
     public CompiledGeneralFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledGeneralFunction other) : base(other)
@@ -38,7 +38,7 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
         this.Type = type;
         this.ParameterTypes = parameterTypes.ToImmutableArray();
         this.Context = other.Context;
-        this.References = new List<Reference<Statement>>(other.References);
+        this.References = new List<Reference<Statement?>>(other.References);
     }
 
     public bool IsSame(CompiledGeneralFunction other)

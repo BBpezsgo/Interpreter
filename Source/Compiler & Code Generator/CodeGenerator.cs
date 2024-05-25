@@ -1483,15 +1483,17 @@ public abstract class CodeGenerator
         return new ValueAddress(address.Address + currentOffset, address.AddressingMode, address.IsReference, address.InHeap);
     }
 
-    protected int GetDataOffset(StatementWithValue value) => value switch
+    protected int GetDataOffset(StatementWithValue value, StatementWithValue? until = null) => value switch
     {
-        IndexCall v => GetDataOffset(v),
-        Field v => GetDataOffset(v),
+        IndexCall v => GetDataOffset(v, until),
+        Field v => GetDataOffset(v, until),
         Identifier => 0,
         _ => throw new NotImplementedException()
     };
-    protected int GetDataOffset(Field field)
+    protected int GetDataOffset(Field field, StatementWithValue? until = null)
     {
+        if (field.PrevStatement == until) return 0;
+
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
         if (prevType is not StructType structType)
@@ -1500,23 +1502,10 @@ public abstract class CodeGenerator
         if (!structType.GetField(field.Identifier.Content, out _, out int fieldOffset))
         { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
 
-        int prevOffset = GetDataOffset(field.PrevStatement);
+        int prevOffset = GetDataOffset(field.PrevStatement, until);
         return prevOffset + fieldOffset;
     }
-    protected int GetDataOffset(IndexCall indexCall)
-    {
-        GeneralType prevType = FindStatementType(indexCall.PrevStatement);
-
-        if (prevType is not ArrayType arrayType)
-        { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
-
-        if (!TryCompute(indexCall.Index, out CompiledValue index))
-        { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
-
-        int prevOffset = GetDataOffset(indexCall.PrevStatement);
-        int offset = (int)index * arrayType.Of.Size;
-        return prevOffset + offset;
-    }
+    protected abstract int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null);
 
     protected ValueAddress GetBaseAddress(StatementWithValue statement) => statement switch
     {
@@ -1528,22 +1517,7 @@ public abstract class CodeGenerator
     protected abstract ValueAddress GetBaseAddress(CompiledParameter parameter);
     protected abstract ValueAddress GetBaseAddress(CompiledParameter parameter, int offset);
     protected abstract ValueAddress GetGlobalVariableAddress(CompiledVariable variable);
-    protected ValueAddress GetBaseAddress(Identifier variable)
-    {
-        if (GetConstant(variable.Content, out _))
-        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
-
-        if (GetParameter(variable.Content, out CompiledParameter? parameter))
-        { return GetBaseAddress(parameter); }
-
-        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
-        { return new ValueAddress(localVariable); }
-
-        if (GetGlobalVariable(variable.Content, variable.OriginalFile, out CompiledVariable? globalVariable, out _))
-        { return GetGlobalVariableAddress(globalVariable); }
-
-        throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
-    }
+    protected abstract ValueAddress GetBaseAddress(Identifier variable);
     protected ValueAddress GetBaseAddress(Field statement)
     {
         ValueAddress address = GetBaseAddress(statement.PrevStatement);
@@ -1557,19 +1531,27 @@ public abstract class CodeGenerator
         return new ValueAddress(address.Address, address.AddressingMode, address.IsReference, inHeap);
     }
 
-    protected bool IsItInHeap(StatementWithValue value) => value switch
+    protected StatementWithValue? NeedDerefernce(StatementWithValue value) => value switch
     {
-        Identifier => false,
-        Field field => IsItInHeap(field),
-        IndexCall indexCall => IsItInHeap(indexCall),
+        Identifier => null,
+        Field v => NeedDerefernce(v),
+        IndexCall v => NeedDerefernce(v),
         _ => throw new NotImplementedException()
     };
+    protected StatementWithValue? NeedDerefernce(IndexCall indexCall)
+    {
+        if (FindStatementType(indexCall.PrevStatement) is PointerType)
+        { return indexCall.PrevStatement; }
 
-    protected bool IsItInHeap(IndexCall indexCall)
-        => IsItInHeap(indexCall.PrevStatement) || FindStatementType(indexCall.PrevStatement) is PointerType;
+        return NeedDerefernce(indexCall.PrevStatement);
+    }
+    protected StatementWithValue? NeedDerefernce(Field field)
+    {
+        if (FindStatementType(field.PrevStatement) is PointerType)
+        { return field.PrevStatement; }
 
-    protected bool IsItInHeap(Field field)
-        => IsItInHeap(field.PrevStatement) || FindStatementType(field.PrevStatement) is PointerType;
+        return NeedDerefernce(field.PrevStatement);
+    }
 
     #endregion
 
@@ -1608,8 +1590,7 @@ public abstract class CodeGenerator
         BasicType.Integer => new CompiledValue((int)0),
         BasicType.Float => new CompiledValue((float)0f),
         BasicType.Char => new CompiledValue((char)'\0'),
-
-        _ => throw new NotImplementedException($"Initial value for type \"{type}\" isn't implemented"),
+        _ => throw new NotImplementedException($"Type {type} can't have value"),
     };
 
     protected static bool GetInitialValue(GeneralType type, out CompiledValue value)
@@ -1635,7 +1616,7 @@ public abstract class CodeGenerator
     {
         GenericType => throw new NotImplementedException($"Initial value for type arguments is bruh moment"),
         StructType => throw new NotImplementedException($"Initial value for structs is not implemented"),
-        FunctionType => new CompiledValue(int.MaxValue),
+        FunctionType => new CompiledValue(0),
         BuiltinType builtinType => GetInitialValue(builtinType.Type),
         PointerType => new CompiledValue(0),
         _ => throw new NotImplementedException(),
@@ -1665,17 +1646,14 @@ public abstract class CodeGenerator
 
         return OnGotStatementType(anyCall, functionType.ReturnType);
     }
-    protected GeneralType FindStatementType(KeywordCall keywordCall)
+    protected GeneralType FindStatementType(KeywordCall keywordCall) => keywordCall.Identifier.Content switch
     {
-        return keywordCall.Identifier.Content switch
-        {
-            StatementKeywords.Return => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-            StatementKeywords.Throw => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-            StatementKeywords.Break => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-            StatementKeywords.Delete => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-            _ => throw new CompilerException($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile)
-        };
-    }
+        StatementKeywords.Return => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
+        StatementKeywords.Throw => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
+        StatementKeywords.Break => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
+        StatementKeywords.Delete => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
+        _ => throw new CompilerException($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile)
+    };
     protected GeneralType FindStatementType(IndexCall index)
     {
         GeneralType prevType = FindStatementType(index.PrevStatement);

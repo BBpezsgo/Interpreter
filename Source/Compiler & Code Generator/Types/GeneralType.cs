@@ -1,7 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
 using Parser;
-using Runtime;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public abstract class GeneralType :
@@ -13,6 +12,7 @@ public abstract class GeneralType :
     public bool CanBeBuiltin => this is BuiltinType or PointerType;
 
     public abstract int Size { get; }
+    public abstract int SizeBytes { get; }
 
     public static GeneralType From(GeneralType other) => other switch
     {

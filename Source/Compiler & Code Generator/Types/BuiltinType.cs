@@ -1,7 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
 using Parser;
-using Runtime;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class BuiltinType : GeneralType,
@@ -22,6 +21,16 @@ public class BuiltinType : GeneralType,
     };
 
     public override int Size => 1;
+    public override int SizeBytes => Type switch
+    {
+        BasicType.Void => throw new InternalException($"Type {this} does not have a size"),
+        BasicType.Any => throw new InternalException($"Type {this} does not have a size"),
+        BasicType.Byte => 1,
+        BasicType.Char => 2,
+        BasicType.Integer => 4,
+        BasicType.Float => 4,
+        _ => throw new UnreachableException(),
+    };
 
     public BuiltinType(BuiltinType other)
     {

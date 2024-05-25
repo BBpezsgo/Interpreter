@@ -105,7 +105,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = Call(allocator.InstructionOffset);
 
-        if (allocator.InstructionOffset == -1)
+        if (allocator.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, size, allocator, CurrentFile)); }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
@@ -155,11 +155,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         Stack<ParameterCleanupItem> parameterCleanup;
 
-        int returnValueSize = 0;
         if (deallocator.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            returnValueSize = GenerateInitialValue(deallocator.Type);
+            GenerateInitialValue(deallocator.Type);
             AddComment($"}}");
         }
 
@@ -169,13 +168,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = Call(deallocator.InstructionOffset);
 
-        if (deallocator.InstructionOffset == -1)
+        if (deallocator.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, value, deallocator, CurrentFile)); }
 
         if (deallocator.ReturnSomething)
         {
             AddComment($" Clear return value:");
-            for (int i = 0; i < returnValueSize; i++)
+            for (int i = 0; i < deallocator.Type.Size; i++)
             { AddInstruction(Opcode.Pop); }
         }
 
@@ -223,7 +222,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = Call(deallocator.InstructionOffset);
 
-        if (deallocator.InstructionOffset == -1)
+        if (deallocator.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, position, deallocator, CurrentFile)); }
 
         if (deallocator.ReturnSomething)
@@ -242,33 +241,43 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateDestructor(GeneralType deallocateableType, Position position)
     {
-        if (deallocateableType is not PointerType deallocateablePointerType)
-        {
-            AnalysisCollection?.Warnings.Add(new Warning($"Deallocation only working on pointers or pointer so I skip this", position, CurrentFile));
-            return;
-        }
-        ImmutableArray<GeneralType> argumentTypes = ImmutableArray.Create<GeneralType>(deallocateablePointerType);
+        ImmutableArray<GeneralType> argumentTypes = ImmutableArray.Create<GeneralType>(deallocateableType);
+        FunctionQueryResult<CompiledGeneralFunction>? result;
 
-        if (!GetGeneralFunction(deallocateablePointerType.To, argumentTypes, BuiltinFunctionIdentifiers.Destructor, CurrentFile, out FunctionQueryResult<CompiledGeneralFunction>? result, out WillBeCompilerException? error, AddCompilable))
+        if (deallocateableType is PointerType deallocateablePointerType)
         {
-            AddComment($"Pointer value should be already there");
-            GenerateDeallocator(deallocateableType, position);
-            AddComment("}");
-
-            if (deallocateablePointerType.To is not BuiltinType)
+            if (!GetGeneralFunction(deallocateablePointerType.To, argumentTypes, BuiltinFunctionIdentifiers.Destructor, CurrentFile, out result, out WillBeCompilerException? error, AddCompilable))
             {
-                AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deallocateablePointerType}\" not found", position, CurrentFile));
-                AnalysisCollection?.Warnings.Add(error.InstantiateWarning(position, CurrentFile));
-            }
+                AddComment($"Pointer value should be already there");
+                GenerateDeallocator(deallocateableType, position);
+                AddComment("}");
 
-            return;
+                if (deallocateablePointerType.To is not BuiltinType)
+                {
+                    AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deallocateableType}\" not found", position, CurrentFile));
+                    AnalysisCollection?.Warnings.Add(error.InstantiateWarning(position, CurrentFile));
+                }
+
+                return;
+            }
+        }
+        else
+        {
+            if (!GetGeneralFunction(deallocateableType, argumentTypes, BuiltinFunctionIdentifiers.Destructor, CurrentFile, out result, out WillBeCompilerException? error, AddCompilable))
+            {
+                AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deallocateableType}\" not found", position, CurrentFile));
+                AnalysisCollection?.Warnings.Add(error.InstantiateWarning(position, CurrentFile));
+                return;
+            }
         }
 
         CompiledGeneralFunction? destructor = result.Function;
 
+        destructor.References.Add(new Reference<Statement?>(null));
+
         if (!destructor.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"Destructor for type \"{deallocateablePointerType}\" function cannot be called due to its protection level", position, CurrentFile));
+            AnalysisCollection?.Errors.Add(new LanguageError($"Destructor for type \"{deallocateableType}\" function cannot be called due to its protection level", position, CurrentFile));
             AddComment("}");
             return;
         }
@@ -279,12 +288,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = Call(destructor.InstructionOffset);
 
-        if (destructor.InstructionOffset == -1)
+        if (destructor.InstructionOffset == InvalidFunctionAddress)
         { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, position, destructor, CurrentFile)); }
 
         AddComment(" Clear Param0:");
 
-        GenerateDeallocator(deallocateableType, position);
+        if (deallocateableType is PointerType)
+        {
+            GenerateDeallocator(deallocateableType, position);
+        }
+        else
+        {
+            for (int i = 0; i < deallocateableType.Size; i++)
+            { AddInstruction(Opcode.Pop); }
+        }
 
         AddComment("}");
     }
@@ -514,11 +531,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         AddComment($"Call {compiledFunction.ToReadable()} {{");
 
-        int returnValueSize = 0;
         if (compiledFunction.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            returnValueSize = GenerateInitialValue(compiledFunction.Type);
+            GenerateInitialValue(compiledFunction.Type);
             AddComment($"}}");
         }
 
@@ -536,12 +552,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (saveValue)
             {
                 AddComment($" Store return value:");
-                StackStore(new ValueAddress(returnValueOffset, AddressingMode.BasePointerRelative), returnValueSize);
+                StackStore(new ValueAddress(returnValueOffset, AddressingMode.BasePointerRelative), compiledFunction.Type.Size);
             }
             else
             {
                 AddComment($" Clear return value:");
-                for (int i = 0; i < returnValueSize; i++)
+                for (int i = 0; i < compiledFunction.Type.Size; i++)
                 { AddInstruction(Opcode.Pop); }
             }
         }
@@ -594,11 +610,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         Stack<ParameterCleanupItem> parameterCleanup;
 
-        int returnValueSize = 0;
         if (compiledFunction.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            returnValueSize = GenerateInitialValue(compiledFunction.Type);
+            GenerateInitialValue(compiledFunction.Type);
             AddComment($"}}");
         }
 
@@ -608,7 +623,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = Call(compiledFunction.InstructionOffset);
 
-        if (compiledFunction.InstructionOffset == -1)
+        if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, functionCall, compiledFunction, CurrentFile)); }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
@@ -616,7 +631,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
         {
             AddComment(" Clear Return Value:");
-            for (int i = 0; i < returnValueSize; i++)
+            for (int i = 0; i < compiledFunction.Type.Size; i++)
             { AddInstruction(Opcode.Pop); }
         }
 
@@ -712,11 +727,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment($"Call (runtime) {functionType} {{");
 
-        int returnValueSize = 0;
         if (functionType.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            returnValueSize = GenerateInitialValue(functionType.ReturnType);
+            GenerateInitialValue(functionType.ReturnType);
             AddComment($"}}");
         }
 
@@ -731,7 +745,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (functionType.ReturnSomething && !anyCall.SaveValue)
         {
             AddComment(" Clear Return Value:");
-            for (int i = 0; i < returnValueSize; i++)
+            for (int i = 0; i < functionType.ReturnType.Size; i++)
             { AddInstruction(Opcode.Pop); }
         }
 
@@ -781,7 +795,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment($"Call {operatorDefinition.Identifier} {{");
 
-            int returnValueSize = GenerateInitialValue(operatorDefinition.Type);
+            GenerateInitialValue(operatorDefinition.Type);
 
             Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(@operator.Arguments, operatorDefinition);
 
@@ -789,7 +803,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             int jumpInstruction = Call(operatorDefinition.InstructionOffset);
 
-            if (operatorDefinition.InstructionOffset == -1)
+            if (operatorDefinition.InstructionOffset == InvalidFunctionAddress)
             { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, CurrentFile)); }
 
             GenerateCodeForParameterCleanup(parameterCleanup);
@@ -797,7 +811,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (!@operator.SaveValue)
             {
                 AddComment(" Clear Return Value:");
-                for (int i = 0; i < returnValueSize; i++)
+                for (int i = 0; i < operatorDefinition.Type.Size; i++)
                 { AddInstruction(Opcode.Pop); }
             }
 
@@ -814,7 +828,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BitWidth rightBitWidth = GetBitWidth(rightType);
             BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
 
-            int jumpInstruction = -1;
+            int jumpInstruction = InvalidFunctionAddress;
 
             GenerateCodeForStatement(@operator.Left);
 
@@ -822,13 +836,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 rightType == BasicType.Float)
             {
                 AddInstruction(Opcode.FTo,
-                    Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection),
-                    Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection));
+                    (InstructionOperand)StackTop,
+                    (InstructionOperand)StackTop);
             }
 
             if (@operator.Operator.Content == BinaryOperatorCall.LogicalAND)
             {
-                StackLoad(new ValueAddress(-1, AddressingMode.StackPointerRelative));
+                StackLoad(StackTop);
 
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
@@ -840,7 +854,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else if (@operator.Operator.Content == BinaryOperatorCall.LogicalOR)
             {
-                StackLoad(new ValueAddress(-1, AddressingMode.StackPointerRelative));
+                StackLoad(StackTop);
 
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
@@ -858,8 +872,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 rightType != BasicType.Float)
             {
                 AddInstruction(Opcode.FTo,
-                    Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection),
-                    Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection));
+                    (InstructionOperand)StackTop,
+                    (InstructionOperand)StackTop);
             }
 
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
@@ -974,7 +988,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
             }
 
-            if (jumpInstruction != -1)
+            if (jumpInstruction != InvalidFunctionAddress)
             { GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction; }
         }
         else if (@operator.Operator.Content == "=")
@@ -1028,7 +1042,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment($"Call {operatorDefinition.Identifier} {{");
 
-            int returnValueSize = GenerateInitialValue(operatorDefinition.Type);
+            GenerateInitialValue(operatorDefinition.Type);
 
             Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(@operator.Arguments, operatorDefinition);
 
@@ -1036,7 +1050,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             int jumpInstruction = Call(operatorDefinition.InstructionOffset);
 
-            if (operatorDefinition.InstructionOffset == -1)
+            if (operatorDefinition.InstructionOffset == InvalidFunctionAddress)
             { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, CurrentFile)); }
 
             GenerateCodeForParameterCleanup(parameterCleanup);
@@ -1044,7 +1058,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (!@operator.SaveValue)
             {
                 AddComment(" Clear Return Value:");
-                for (int i = 0; i < returnValueSize; i++)
+                for (int i = 0; i < operatorDefinition.Type.Size; i++)
                 { AddInstruction(Opcode.Pop); }
             }
 
@@ -1130,7 +1144,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             // Save pointer
-            AddInstruction(Opcode.Move, reg.Register, Register.StackPointer.ToPtr(-1 * BytecodeProcessor.StackDirection));
+            AddInstruction(Opcode.Move, reg.Register, (InstructionOperand)StackTop);
 
             for (int i = 0; i < literal.Length; i++)
             {
@@ -1201,7 +1215,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             variable.Reference = compiledFunction;
             OnGotStatementType(variable, new FunctionType(compiledFunction));
 
-            if (compiledFunction.InstructionOffset == -1)
+            if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
             { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction, CurrentFile)); }
 
             AddInstruction(Opcode.Push, compiledFunction.InstructionOffset);
@@ -1509,7 +1523,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    AddInstruction(Opcode.Move, reg.Register, Register.StackPointer.ToPtr(-1));
+                    AddInstruction(Opcode.Move, reg.Register, (InstructionOperand)StackTop);
 
                     for (int offset = 0; offset < pointerType.To.Size; offset++)
                     {
@@ -1563,7 +1577,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         for (int i = 0; i < newInstanceType.Size; i++)
         {
-            AddInstruction(Opcode.Push, Register.StackPointer.ToPtr(-newInstanceType.Size * BytecodeProcessor.StackDirection));
+            AddInstruction(Opcode.Push, (InstructionOperand)(StackTop + 1 - newInstanceType.Size));
         }
 
         parameterCleanup = GenerateCodeForArguments(constructorCall.Arguments, compiledFunction, 1);
@@ -1573,7 +1587,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = Call(compiledFunction.InstructionOffset);
 
-        if (compiledFunction.InstructionOffset == -1)
+        if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
         { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructor>(jumpInstruction, false, constructorCall, compiledFunction, CurrentFile)); }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
@@ -1645,20 +1659,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     }
         // }
 
-        if (IsItInHeap(field))
+        StatementWithValue? dereference = NeedDerefernce(field);
+
+        if (dereference is null)
         {
-            int offset = GetDataOffset(field);
-            ValueAddress pointerOffset = GetBaseAddress(field);
+            ValueAddress offset = GetDataAddress(field);
+            StackLoad(offset, compiledField.Type.Size);
+        }
+        else
+        {
+            int offset = GetDataOffset(field, dereference);
+            ValueAddress pointerOffset = GetBaseAddress(dereference);
             for (int i = 0; i < type.Size; i++)
             {
                 AddComment($"{i}:");
                 HeapLoad(pointerOffset, offset + i);
             }
-        }
-        else
-        {
-            ValueAddress offset = GetDataAddress(field);
-            StackLoad(offset, compiledField.Type.Size);
         }
     }
     void GenerateCodeForStatement(IndexCall index)
@@ -1969,7 +1985,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (item.ShouldDeallocate)
             {
-                if (item.SizeOnStack != 1) throw new InternalException();
                 if (item.Type is null) throw new InternalException();
                 GenerateDestructor(item.Type, position);
             }
@@ -2078,11 +2093,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
     {
-        statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
-
-        GeneralType valueType = FindStatementType(value);
-
         GeneralType prevType = FindStatementType(statementToSet.PrevStatement);
+        GeneralType type = FindStatementType(statementToSet);
+        GeneralType valueType = FindStatementType(value);
 
         if (prevType is PointerType pointerType)
         {
@@ -2092,6 +2105,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (!structType.GetField(statementToSet.Identifier.Content, out CompiledField? fieldDefinition, out int fieldOffset))
             { throw new CompilerException($"Failed to get the field offset for \"{statementToSet.Identifier}\" in type {pointerType.To}", statementToSet.Identifier, CurrentFile); }
 
+            statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
             statementToSet.Reference = fieldDefinition;
             statementToSet.CompiledType = statementToSet.CompiledType;
             fieldDefinition.References.Add(new Reference<Statement>(statementToSet, CurrentFile, CurrentContext));
@@ -2099,7 +2113,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
             GenerateCodeForStatement(value);
-            ValueAddress pointerAddress = new(-(valueType.Size + 1), AddressingMode.StackPointerRelative);
+            ValueAddress pointerAddress = StackTop - valueType.Size;
             HeapStore(pointerAddress, fieldOffset);
 
             AddInstruction(Opcode.Pop);
@@ -2109,23 +2123,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (prevType is not StructType)
         { throw new NotImplementedException(); }
 
-        GeneralType type = FindStatementType(statementToSet);
-
         if (type != valueType)
         { throw new CompilerException($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, CurrentFile); }
 
         GenerateCodeForStatement(value);
 
-        if (IsItInHeap(statementToSet))
-        {
-            int offset = GetDataOffset(statementToSet);
-            ValueAddress pointerOffset = GetBaseAddress(statementToSet);
-            HeapStore(pointerOffset, offset);
-        }
-        else
+        StatementWithValue? dereference = NeedDerefernce(statementToSet);
+
+        if (dereference is null)
         {
             ValueAddress offset = GetDataAddress(statementToSet);
             StackStore(offset, valueType.Size);
+        }
+        else
+        {
+            int offset = GetDataOffset(statementToSet, dereference);
+            HeapStore(dereference, offset);
         }
     }
     void GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value)
@@ -2365,7 +2378,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             AddComment($"Initial value {{");
 
-            size = GenerateInitialValue(compiledVariable.Type);
+            size = compiledVariable.Type.Size;
+            GenerateInitialValue(compiledVariable.Type);
 
             if (size <= 0)
             { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
@@ -2469,7 +2483,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             AddComment($"Initial value {{");
 
-            size = GenerateInitialValue(compiledVariable.Type);
+            size = compiledVariable.Type.Size;
+            GenerateInitialValue(compiledVariable.Type);
 
             if (size <= 0)
             { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
@@ -2890,11 +2905,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                AddInstruction(Opcode.Move, reg.Register, Register.StackPointer);
-
-                AddInstruction(Opcode.MathAdd, reg.Register, -1 * BytecodeProcessor.StackDirection);
-
-                AddInstruction(Opcode.Push, reg.Register);
+                if (false)
+                {
+                    AddInstruction(Opcode.Push, Register.StackPointer);
+                }
+                else
+                {
+                    AddInstruction(Opcode.Move, reg.Register, Register.StackPointer);
+                    AddInstruction(Opcode.MathAdd, reg.Register, -1 * BytecodeProcessor.StackDirection);
+                    AddInstruction(Opcode.Push, reg.Register);
+                }
             }
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()

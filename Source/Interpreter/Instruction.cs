@@ -153,6 +153,19 @@ public readonly struct InstructionOperand
     };
     public static implicit operator InstructionOperand(int value) => new(new RuntimeValue(value), InstructionOperandType.Immediate32);
     public static implicit operator InstructionOperand(Register register) => new((int)register, InstructionOperandType.Register);
+    public static explicit operator InstructionOperand(ValueAddress address)
+    {
+        if (address.InHeap) throw new NotImplementedException();
+        if (address.IsReference) throw new NotImplementedException();
+        return address.AddressingMode switch
+        {
+            AddressingMode.Absolute => new InstructionOperand(new RuntimeValue(address.Address), InstructionOperandType.Pointer),
+            AddressingMode.Runtime => throw new NotImplementedException(),
+            AddressingMode.BasePointerRelative => Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
+            AddressingMode.StackPointerRelative => Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
+            _ => throw new UnreachableException(),
+        };
+    }
 }
 
 [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]

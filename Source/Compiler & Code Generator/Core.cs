@@ -12,12 +12,33 @@ public readonly struct ValueAddress
     public readonly bool IsReference;
     public readonly bool InHeap;
 
-    public ValueAddress(int address, AddressingMode addressingMode, bool isReference = false, bool inHeap = false)
+    public ValueAddress(int address, AddressingMode addressingMode)
+    {
+        Address = address;
+        AddressingMode = addressingMode;
+        IsReference = false;
+        InHeap = false;
+    }
+
+    public ValueAddress(int address, AddressingMode addressingMode, bool isReference)
+    {
+        Address = address;
+        AddressingMode = addressingMode;
+        IsReference = isReference;
+        InHeap = false;
+    }
+
+    public ValueAddress(int address, AddressingMode addressingMode, bool isReference, bool inHeap)
     {
         Address = address;
         AddressingMode = addressingMode;
         IsReference = isReference;
         InHeap = inHeap;
+
+        if (inHeap)
+        {
+            throw null!;
+        }
     }
 
     public ValueAddress(CompiledVariable variable)
@@ -37,6 +58,7 @@ public readonly struct ValueAddress
     }
 
     public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.AddressingMode, address.IsReference, address.InHeap);
+    public static ValueAddress operator -(ValueAddress address, int offset) => new(address.Address - offset, address.AddressingMode, address.IsReference, address.InHeap);
 
     public override string ToString()
     {
@@ -59,7 +81,7 @@ public readonly struct ValueAddress
                 result.Append(" (SR)");
                 break;
             default:
-                break;
+                throw new UnreachableException();
         }
 
         if (IsReference)

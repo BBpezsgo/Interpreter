@@ -37,7 +37,7 @@ public struct BytecodeInterpreterSettings
 
 public class BytecodeProcessor
 {
-    public static readonly int StackDirection = -1;
+    public static readonly int StackDirection = -4;
     public const int StackSize = 256;
 
     Instruction CurrentInstruction => Code[Registers.CodePointer];
@@ -91,7 +91,7 @@ public class BytecodeProcessor
         externalFunctions.SetInterpreter(this);
     }
 
-    RuntimeContext GetContext() => new(
+    public RuntimeContext GetContext() => new(
         Registers,
         ImmutableCollectionsMarshal.AsImmutableArray(Memory),
         Code
@@ -117,10 +117,6 @@ public class BytecodeProcessor
         {
             error.Context = GetContext();
             throw;
-        }
-        catch (Exception error)
-        {
-            throw new RuntimeException(error.Message, error, GetContext());
         }
 
         return true;
@@ -220,18 +216,24 @@ public class BytecodeProcessor
         }
     }
 
+    // public void SetData<T>(int ptr, in T data) where T : unmanaged => MemoryMarshal.Write(Memory.AsSpan()[ptr..], in data);
+    // public T GetData<T>(int ptr) where T : unmanaged => MemoryMarshal.Read<T>(Memory[ptr..]);
+
+    public void SetData(int ptr, RuntimeValue data) => Memory[ptr] = data;
+    public RuntimeValue GetData(int ptr) => Memory[ptr];
+
     RuntimeValue GetData(InstructionOperand operand) => operand.Type switch
     {
         InstructionOperandType.Immediate8 => operand.Value,
         InstructionOperandType.Immediate16 => operand.Value,
         InstructionOperandType.Immediate32 => operand.Value,
-        InstructionOperandType.Pointer => Memory[operand.Value.Int],
-        InstructionOperandType.PointerBP => Memory[Registers.BasePointer + operand.Value.Int],
-        InstructionOperandType.PointerSP => Memory[Registers.StackPointer + operand.Value.Int],
-        InstructionOperandType.PointerEAX => Memory[Registers.EAX + operand.Value.Int],
-        InstructionOperandType.PointerEBX => Memory[Registers.EBX + operand.Value.Int],
-        InstructionOperandType.PointerECX => Memory[Registers.ECX + operand.Value.Int],
-        InstructionOperandType.PointerEDX => Memory[Registers.EDX + operand.Value.Int],
+        InstructionOperandType.Pointer => GetData(operand.Value.Int),
+        InstructionOperandType.PointerBP => GetData(Registers.BasePointer + operand.Value.Int),
+        InstructionOperandType.PointerSP => GetData(Registers.StackPointer + operand.Value.Int),
+        InstructionOperandType.PointerEAX => GetData(Registers.EAX + operand.Value.Int),
+        InstructionOperandType.PointerEBX => GetData(Registers.EBX + operand.Value.Int),
+        InstructionOperandType.PointerECX => GetData(Registers.ECX + operand.Value.Int),
+        InstructionOperandType.PointerEDX => GetData(Registers.EDX + operand.Value.Int),
         InstructionOperandType.Register => operand.Value.Int switch
         {
             RegisterIds.CodePointer => new RuntimeValue(Registers.CodePointer),
@@ -267,25 +269,25 @@ public class BytecodeProcessor
             case InstructionOperandType.Immediate32:
                 throw new RuntimeException($"Can't set an immediate value");
             case InstructionOperandType.Pointer:
-                Memory[operand.Value.Int] = value;
+                SetData(operand.Value.Int, value);
                 break;
             case InstructionOperandType.PointerBP:
-                Memory[Registers.BasePointer + operand.Value.Int] = value;
+                SetData(Registers.BasePointer + operand.Value.Int, value);
                 break;
             case InstructionOperandType.PointerSP:
-                Memory[Registers.StackPointer + operand.Value.Int] = value;
+                SetData(Registers.StackPointer + operand.Value.Int, value);
                 break;
             case InstructionOperandType.PointerEAX:
-                Memory[Registers.EAX + operand.Value.Int] = value;
+                SetData(Registers.EAX + operand.Value.Int, value);
                 break;
             case InstructionOperandType.PointerEBX:
-                Memory[Registers.EBX + operand.Value.Int] = value;
+                SetData(Registers.EBX + operand.Value.Int, value);
                 break;
             case InstructionOperandType.PointerECX:
-                Memory[Registers.ECX + operand.Value.Int] = value;
+                SetData(Registers.ECX + operand.Value.Int, value);
                 break;
             case InstructionOperandType.PointerEDX:
-                Memory[Registers.EDX + operand.Value.Int] = value;
+                SetData(Registers.EDX + operand.Value.Int, value);
                 break;
             case InstructionOperandType.Register:
                 switch (operand.Value.Int)
@@ -359,7 +361,7 @@ public class BytecodeProcessor
         if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
 
-        Memory[Registers.StackPointer] = data;
+        SetData(Registers.StackPointer, data);
         Registers.StackPointer += StackDirection;
     }
 
@@ -369,7 +371,8 @@ public class BytecodeProcessor
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
 
         Registers.StackPointer -= StackDirection;
-        return Memory[Registers.StackPointer];
+        RuntimeValue data = Memory[Registers.StackPointer];
+        return data;
     }
 
     #endregion

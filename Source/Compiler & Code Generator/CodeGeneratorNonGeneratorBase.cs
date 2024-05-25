@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser.Statement;
+
+namespace LanguageCore.Compiler;
 
 public class CodeGeneratorNonGeneratorBase : CodeGenerator
 {
@@ -7,5 +9,7 @@ public class CodeGeneratorNonGeneratorBase : CodeGenerator
 
     protected override ValueAddress GetBaseAddress(CompiledParameter parameter) => throw new NotImplementedException();
     protected override ValueAddress GetBaseAddress(CompiledParameter parameter, int offset) => throw new NotImplementedException();
+    protected override ValueAddress GetBaseAddress(Identifier variable) => throw new NotImplementedException();
+    protected override int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null) => throw new NotImplementedException();
     protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable) => throw new NotImplementedException();
 }

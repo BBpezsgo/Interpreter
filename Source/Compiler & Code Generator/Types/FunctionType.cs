@@ -12,6 +12,7 @@ public class FunctionType : GeneralType,
     public bool ReturnSomething => ReturnType != BasicType.Void;
 
     public override int Size => 1;
+    public override int SizeBytes => 4;
 
     public FunctionType(CompiledFunction function)
     {

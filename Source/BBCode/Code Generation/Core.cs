@@ -95,34 +95,6 @@ class RegisterUsage
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
-    /*
-     *      
-     *      === Stack Structure ===
-     *      
-     *        -- ENTRY --
-     *      
-     *        ? ... pointers ... (external function cache) > ExternalFunctionsCache.Count
-     *      
-     *        ? ... variables ... (global variables)
-     *        
-     *        -- CALL --
-     *      
-     *   -5    return value
-     *      
-     *   -4    ? parameter "this"    \ ParametersSize()
-     *   -3    ? ... parameters ...  /
-     *      
-     *   -2    saved code pointer
-     *   -1    saved base pointer
-     *   
-     *   >> 
-     *   
-     *   0    return flag
-     *   
-     *   1    ? ... variables ... (locals)
-     *   
-     */
-
     #region Fields
 
     readonly ImmutableDictionary<int, ExternalFunctionBase> ExternalFunctions;
@@ -172,15 +144,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         foreach (UndefinedOffset<TFunction> item in undefinedOffsets)
         {
-            if (item.Called.InstructionOffset == -1)
+            if (item.Called.InstructionOffset == InvalidFunctionAddress)
             {
                 if (item.Called is Parser.GeneralFunctionDefinition generalFunction)
                 {
                     throw generalFunction.Identifier.Content switch
                     {
-                        BuiltinFunctionIdentifiers.Destructor => new InternalException($"Destructor for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
-                        BuiltinFunctionIdentifiers.IndexerGet => new InternalException($"Index getter for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
-                        BuiltinFunctionIdentifiers.IndexerSet => new InternalException($"Index setter for \"{generalFunction.Context}\" does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        BuiltinFunctionIdentifiers.Destructor => new InternalException($"Destructor for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        BuiltinFunctionIdentifiers.IndexerGet => new InternalException($"Index getter for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        BuiltinFunctionIdentifiers.IndexerSet => new InternalException($"Index setter for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CurrentFile),
                         _ => new NotImplementedException(),
                     };
                 }

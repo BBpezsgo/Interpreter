@@ -63,34 +63,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.Return);
     }
 
-    int GenerateInitialValue(GeneralType type)
+    void GenerateInitialValue(GeneralType type)
     {
         if (type is StructType structType)
         {
-            ImmutableDictionary<string, GeneralType>? typeParameters = structType.TypeArguments;
-            int size = 0;
             foreach (CompiledField field in structType.Struct.Fields)
             {
                 if (field.Type is GenericType genericType &&
-                    typeParameters is not null &&
-                    typeParameters.TryGetValue(genericType.Identifier, out GeneralType? yeah))
-                { size += GenerateInitialValue(yeah); }
+                    structType.TypeArguments.TryGetValue(genericType.Identifier, out GeneralType? typeArgument))
+                { GenerateInitialValue(typeArgument); }
                 else
-                { size += GenerateInitialValue(field.Type); }
+                { GenerateInitialValue(field.Type); }
             }
-            return size;
+            return;
         }
 
         if (type is ArrayType arrayType)
         {
-            int size = 0;
             for (int i = 0; i < arrayType.Length; i++)
-            { size += GenerateInitialValue(arrayType.Of); }
-            return size;
+            { GenerateInitialValue(arrayType.Of); }
+            return;
         }
 
         AddInstruction(Opcode.Push, GetInitialValue(type));
-        return 1;
     }
 
     #endregion
@@ -99,6 +94,40 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
         => new ValueAddress(variable.MemoryAddress, AddressingMode.Absolute) + 3;
+
+    protected override ValueAddress GetBaseAddress(Identifier variable)
+    {
+        if (GetConstant(variable.Content, out _))
+        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
+
+        if (GetParameter(variable.Content, out CompiledParameter? parameter))
+        { return GetBaseAddress(parameter); }
+
+        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+        { return new ValueAddress(localVariable); }
+
+        if (GetGlobalVariable(variable.Content, variable.OriginalFile, out CompiledVariable? globalVariable, out _))
+        { return GetGlobalVariableAddress(globalVariable); }
+
+        throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
+    }
+
+    protected override int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null)
+    {
+        if (indexCall.PrevStatement == until) return 0;
+
+        GeneralType prevType = FindStatementType(indexCall.PrevStatement);
+
+        if (prevType is not ArrayType arrayType)
+        { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
+
+        if (!TryCompute(indexCall.Index, out CompiledValue index))
+        { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
+
+        int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
+        int offset = (int)index * arrayType.Of.Size;
+        return prevOffset + offset;
+    }
 
     void StackStore(ValueAddress address, int size)
     {
@@ -140,11 +169,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     if (BytecodeProcessor.StackDirection > 0)
                     {
-                        AddInstruction(Opcode.MathAdd, reg.Register, address.Address);
+                        AddInstruction(Opcode.MathAdd, reg.Register, address.Address * BytecodeProcessor.StackDirection);
                     }
                     else
                     {
-                        AddInstruction(Opcode.MathSub, reg.Register, address.Address);
+                        AddInstruction(Opcode.MathSub, reg.Register, address.Address * -BytecodeProcessor.StackDirection);
                     }
 
                     AddInstruction(Opcode.Push, reg.Register.ToPtr());
@@ -193,11 +222,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     if (BytecodeProcessor.StackDirection > 0)
                     {
-                        AddInstruction(Opcode.MathAdd, reg.Register, address.Address);
+                        AddInstruction(Opcode.MathAdd, reg.Register, address.Address * BytecodeProcessor.StackDirection);
                     }
                     else
                     {
-                        AddInstruction(Opcode.MathSub, reg.Register, address.Address);
+                        AddInstruction(Opcode.MathSub, reg.Register, address.Address * -BytecodeProcessor.StackDirection);
                     }
 
                     AddInstruction(Opcode.PopTo, reg.Register.ToPtr());
@@ -221,7 +250,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!Settings.CheckNullPointers) return;
         AddComment($"Check for pointer zero {{");
         if (preservePointer)
-        { StackLoad(new ValueAddress(-1, AddressingMode.StackPointerRelative)); }
+        { AddInstruction(Opcode.Push, (InstructionOperand)StackTop); }
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
@@ -269,6 +298,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
+    void HeapStore(StatementWithValue pointer, int offset, string nullExceptionMessage = "null pointer")
+    {
+        if (FindStatementType(pointer) is not PointerType)
+        { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
+
+        GenerateCodeForStatement(pointer);
+
+        CheckPointerNull(exceptionMessage: nullExceptionMessage);
+
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddInstruction(Opcode.PopTo, reg.Register);
+            AddInstruction(Opcode.PopTo, reg.Register.ToPtr(offset));
+        }
+    }
+
     #endregion
 
     #region Addressing Helpers
@@ -281,16 +326,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public ValueAddress GetReturnValueAddress(GeneralType returnType)
         => new(-(ParametersSize + TagsBeforeBasePointer + returnType.Size), AddressingMode.BasePointerRelative);
 
-    public static ValueAddress SavedBasePointerAddress => new(SavedBasePointerOffset, AddressingMode.BasePointerRelative);
-    public static ValueAddress SavedCodePointerAddress => new(SavedCodePointerOffset, AddressingMode.BasePointerRelative);
     public static ValueAddress AbsoluteGlobalAddress => new(AbsoluteGlobalOffset, AddressingMode.BasePointerRelative);
     public static ValueAddress ReturnFlagAddress => new(ReturnFlagOffset, AddressingMode.BasePointerRelative);
-
-    public const int SavedBasePointerOffset = -1;
-    public const int SavedCodePointerOffset = -3;
-    public const int AbsoluteGlobalOffset = -2;
+    public static ValueAddress StackTop => new(-1, AddressingMode.StackPointerRelative);
 
     public const int ReturnFlagOffset = 0;
+    public const int SavedBasePointerOffset = -1;
+    public const int AbsoluteGlobalOffset = -2;
+    public const int SavedCodePointerOffset = -3;
+
+    public const int InvalidFunctionAddress = int.MinValue;
 
     int ParametersSize
     {

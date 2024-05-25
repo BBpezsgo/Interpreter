@@ -1,7 +1,7 @@
 ﻿namespace LanguageCore;
 
 using Compiler;
-using LanguageCore.Parser;
+using Parser;
 using Runtime;
 using Tokenizing;
 
@@ -43,17 +43,6 @@ public static class Extensions
     };
 
     /// <exception cref="NotImplementedException"/>
-    public static BitWidth ToBitWidth(this BasicType v) => v switch
-    {
-        BasicType.Byte => BitWidth._8,
-        BasicType.Char => BitWidth._16,
-        BasicType.Integer => BitWidth._32,
-        BasicType.Void => throw new NotImplementedException(),
-        BasicType.Float => BitWidth._32,
-        _ => throw new UnreachableException(),
-    };
-
-    /// <exception cref="NotImplementedException"/>
     public static BasicType Convert(this RuntimeType v) => v switch
     {
         RuntimeType.Byte => BasicType.Byte,
@@ -61,17 +50,6 @@ public static class Extensions
         RuntimeType.Single => BasicType.Float,
         RuntimeType.Char => BasicType.Char,
         RuntimeType.Null => throw new NotImplementedException(),
-        _ => throw new UnreachableException(),
-    };
-
-    /// <exception cref="NotImplementedException"/>
-    public static RuntimeType Convert(this BasicType v) => v switch
-    {
-        BasicType.Byte => RuntimeType.Byte,
-        BasicType.Integer => RuntimeType.Integer,
-        BasicType.Float => RuntimeType.Single,
-        BasicType.Char => RuntimeType.Char,
-        BasicType.Void => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
 }

@@ -8,7 +8,7 @@ public class CompiledParameterConstant : ParameterDefinition,
     public CompiledValue Value { get; }
 
     public new string Identifier => base.Identifier.Content;
-    public bool IsExport => false;
+    public bool IsExported => false;
 
     public CompiledParameterConstant(CompiledValue value, ParameterDefinition declaration) : base(declaration)
     {

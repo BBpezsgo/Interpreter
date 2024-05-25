@@ -125,7 +125,7 @@ public abstract class GeneralType :
             return result;
         }
 
-        if (!typeFinder.Invoke(type.Identifier, type.OriginalFile, out result))
+        if (!typeFinder.Invoke(type.Identifier, type.File, out result))
         { throw new CompilerException($"Can't parse \"{type}\" to {nameof(GeneralType)}", type, uri); }
 
         if (result is StructType resultStructType &&
@@ -134,11 +134,11 @@ public abstract class GeneralType :
             if (type.TypeArguments.HasValue)
             {
                 IEnumerable<GeneralType> typeParameters = GeneralType.FromArray(type.TypeArguments.Value, typeFinder, constComputer, uri);
-                result = new StructType(resultStructType.Struct, type.OriginalFile, typeParameters.ToImmutableList());
+                result = new StructType(resultStructType.Struct, type.File, typeParameters.ToImmutableList());
             }
             else
             {
-                result = new StructType(resultStructType.Struct, type.OriginalFile);
+                result = new StructType(resultStructType.Struct, type.File);
             }
         }
         else
@@ -341,7 +341,7 @@ public abstract class GeneralType :
                         { return null; }
                     }
 
-                    return new StructType(structType.Struct, structType.OriginalFile, structTypeParameterValues);
+                    return new StructType(structType.Struct, structType.File, structTypeParameterValues);
                 }
 
                 break;

@@ -54,7 +54,7 @@ public class CompiledConstructor : ConstructorDefinition,
     {
         StringBuilder result = new();
 
-        if (IsExport)
+        if (IsExported)
         { result.Append("export "); }
         result.Append(Type);
         result.Append(Parameters.ToString(ParameterTypes));

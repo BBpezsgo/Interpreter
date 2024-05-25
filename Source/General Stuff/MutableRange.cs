@@ -16,6 +16,7 @@ public struct MutableRange<T> :
         Start = both;
         End = both;
     }
+
     public MutableRange(T start, T end)
     {
         Start = start;

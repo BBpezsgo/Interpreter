@@ -61,7 +61,7 @@ public class CompiledFunction : FunctionDefinition,
     public override string ToString()
     {
         StringBuilder result = new();
-        if (IsExport)
+        if (IsExported)
         { result.Append("export "); }
 
         result.Append(this.Type.ToString());

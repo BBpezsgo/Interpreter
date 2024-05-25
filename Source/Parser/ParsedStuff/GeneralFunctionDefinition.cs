@@ -43,7 +43,7 @@ public class GeneralFunctionDefinition : FunctionThingDefinition,
     public override string ToString()
     {
         StringBuilder result = new();
-        if (IsExport)
+        if (IsExported)
         { result.Append("export "); }
         result.Append(Identifier.Content);
 

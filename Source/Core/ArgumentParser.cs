@@ -218,11 +218,6 @@ public static class ArgumentParser
                     continue;
                 }
 
-                if (_args.TryConsume(out _, "--dont-normalize-args", "-nna"))
-                {
-                    continue;
-                }
-
                 if (_args.TryConsume(out _, "--no-nullcheck", "-nn"))
                 {
                     result.MainGeneratorSettings.CheckNullPointers = false;
@@ -390,7 +385,6 @@ public static class ArgumentParser
 
     public static bool Parse(out ProgramArguments settings, params string[] args)
     {
-        settings = ProgramArguments.Default;
         ProgramArguments? _settings = ArgumentParser.Parse(args);
         if (_settings.HasValue)
         {
@@ -399,6 +393,7 @@ public static class ArgumentParser
         }
         else
         {
+            settings = ProgramArguments.Default;
             return false;
         }
     }
@@ -407,9 +402,6 @@ public static class ArgumentParser
     {
         if (args.Length == 0)
         { return ProgramArguments.Default; }
-
-        if (!args.Contains("--dont-normalize-args") && !args.Contains("-nna"))
-        { args = ArgumentNormalizer.NormalizeArgs(args); }
 
         try
         {

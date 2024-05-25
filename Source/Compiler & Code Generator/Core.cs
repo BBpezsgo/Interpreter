@@ -10,14 +10,12 @@ public readonly struct ValueAddress
     public readonly int Address;
     public readonly AddressingMode AddressingMode;
     public readonly bool IsReference;
-    public readonly bool InHeap;
 
     public ValueAddress(int address, AddressingMode addressingMode)
     {
         Address = address;
         AddressingMode = addressingMode;
         IsReference = false;
-        InHeap = false;
     }
 
     public ValueAddress(int address, AddressingMode addressingMode, bool isReference)
@@ -25,75 +23,51 @@ public readonly struct ValueAddress
         Address = address;
         AddressingMode = addressingMode;
         IsReference = isReference;
-        InHeap = false;
-    }
-
-    public ValueAddress(int address, AddressingMode addressingMode, bool isReference, bool inHeap)
-    {
-        Address = address;
-        AddressingMode = addressingMode;
-        IsReference = isReference;
-        InHeap = inHeap;
-
-        if (inHeap)
-        {
-            throw null!;
-        }
     }
 
     public ValueAddress(CompiledVariable variable)
     {
         Address = variable.MemoryAddress;
-        AddressingMode = AddressingMode.BasePointerRelative;
+        AddressingMode = AddressingMode.PointerBP;
         IsReference = false;
-        InHeap = false;
     }
 
     public ValueAddress(CompiledParameter parameter, int address)
     {
         Address = address;
-        AddressingMode = AddressingMode.BasePointerRelative;
+        AddressingMode = AddressingMode.PointerBP;
         IsReference = parameter.IsRef;
-        InHeap = false;
     }
 
-    public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.AddressingMode, address.IsReference, address.InHeap);
-    public static ValueAddress operator -(ValueAddress address, int offset) => new(address.Address - offset, address.AddressingMode, address.IsReference, address.InHeap);
+    public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.AddressingMode, address.IsReference);
+    public static ValueAddress operator -(ValueAddress address, int offset) => new(address.Address - offset, address.AddressingMode, address.IsReference);
 
     public override string ToString()
     {
         StringBuilder result = new();
-        result.Append('(');
-        result.Append(Address);
+
+        result.Append('*');
 
         switch (AddressingMode)
         {
-            case AddressingMode.Absolute:
-                result.Append(" (ABS)");
+            case AddressingMode.Pointer:
+                result.Append($"[{Address}]");
                 break;
-            case AddressingMode.Runtime:
-                result.Append(" (RNT)");
+            case AddressingMode.PointerBP:
+                result.Append($"[BP+{Address}]");
                 break;
-            case AddressingMode.BasePointerRelative:
-                result.Append(" (BPR)");
-                break;
-            case AddressingMode.StackPointerRelative:
-                result.Append(" (SR)");
+            case AddressingMode.PointerSP:
+                result.Append($"[SP+{Address}]");
                 break;
             default:
                 throw new UnreachableException();
         }
 
-        if (IsReference)
-        { result.Append(" | IsRef"); }
-        if (InHeap)
-        { result.Append(" | InHeap"); }
-        result.Append(')');
         return result.ToString();
     }
     string GetDebuggerDisplay() => ToString();
 
-    public ValueAddress ToUnreferenced() => new(Address, AddressingMode, false, InHeap);
+    public ValueAddress ToUnreferenced() => new(Address, AddressingMode);
 }
 
 readonly struct UndefinedOffset<TFunction>
@@ -145,13 +119,6 @@ public readonly struct Reference<TSource>
     public TSource Source { get; }
     public Uri? SourceFile { get; }
     public ISameCheck? SourceContext { get; }
-
-    public Reference(TSource source, Reference reference)
-    {
-        Source = source;
-        SourceFile = reference.SourceFile;
-        SourceContext = reference.SourceContext;
-    }
 
     public Reference(TSource source, Uri? sourceFile = null, ISameCheck? sourceContext = null)
     {

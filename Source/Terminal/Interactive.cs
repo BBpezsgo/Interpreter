@@ -86,7 +86,6 @@ class InteractiveCompiler
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),
         Enumerable.Empty<UsingDefinition>(),
-        Enumerable.Empty<CompileTag>(),
         Statement != null ? [Statement] :
         Enumerable.Empty<Statement>(),
         Enumerable.Empty<Token>(),
@@ -633,17 +632,18 @@ public class Interactive
         */
     }
 
-    static string ColorizeSource(string source, IReadOnlyList<Token>? tokens, int cursorPosition = -1)
+    static string ColorizeSource(string source, ImmutableArray<Token> tokens, int cursorPosition = -1)
     {
-        if (tokens == null) return source;
+        if (tokens.IsDefaultOrEmpty) return source;
 
         AnsiBuilder result = new(source.Length);
 
         Color GetColorAt(int i)
         {
-            for (int j = 0; j < tokens.Count; j++)
+            for (int j = 0; j < tokens.Length; j++)
             {
-                if (tokens[j].Position.AbsoluteRange.Contains(i))
+                Range<int> range = tokens[j].Position.AbsoluteRange;
+                if (range.Start <= i && range.End > i)
                 {
                     return tokens[j].AnalyzedType switch
                     {
@@ -717,7 +717,6 @@ public class Interactive
 
             interpreter.OnStdOut += OnInterpreterStandardOut;
             interpreter.OnStdError += OnInterpreterStandardError;
-            interpreter.OnOutput += OnInterpreterOutput;
             interpreter.OnNeedInput += OnInterpreterNeedInput;
 
             while (!interpreter.BytecodeInterpreter.IsDone)
@@ -770,14 +769,13 @@ public class Interactive
             return;
         }
 
-        if (interpreter.BytecodeInterpreter.Memory.Length > 0)
         {
-            RuntimeValue exitCode = interpreter.BytecodeInterpreter.Memory[interpreter.BytecodeInterpreter.Registers.StackPointer - 1];
+            int exitCode = interpreter.BytecodeInterpreter.GetData(interpreter.BytecodeInterpreter.Registers.StackPointer - (1 * BytecodeProcessor.StackDirection)).Int;
 
             AnsiBuilder output = new();
 
             output.ForegroundColor = InteractiveColors.LiteralNumber;
-            output.Append(exitCode.Int);
+            output.Append(exitCode);
 
             output.ResetStyle();
 
@@ -787,20 +785,12 @@ public class Interactive
                 output.ToString(),
                 CurrentSession.InterpreterStandardOutput.ToString()
             ));
+
+            ShouldRender = true;
         }
-        else
-        {
-            CurrentSession.InterpreterStandardOutput.ResetStyle();
-            Sessions.Add(new InteractiveSession(
-                ColorizeSource(source, CompilerCache.Tokens),
-                string.Empty,
-                CurrentSession.InterpreterStandardOutput.ToString()));
-        }
-        ShouldRender = true;
     }
 
     void OnInterpreterNeedInput(Interpreter sender) { throw new NotImplementedException(); }
-    void OnInterpreterOutput(Interpreter sender, string message, LogType logType) { }
     void OnInterpreterStandardError(Interpreter sender, char data)
     {
         CurrentSession.InterpreterStandardOutput.ForegroundColor = InteractiveColors.Error;

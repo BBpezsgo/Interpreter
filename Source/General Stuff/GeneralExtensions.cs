@@ -81,12 +81,6 @@ public static class GeneralExtensions
         collection.AddRange(newValues.AsSpan());
     }
 
-    public static void Set<T>(this List<T> collection, ReadOnlySpan<T> newValues)
-    {
-        collection.Clear();
-        collection.AddRange(newValues);
-    }
-
     public static bool Contains(this StringBuilder stringBuilder, char value)
     {
         foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())

@@ -711,7 +711,7 @@ public abstract class CodeGenerator
     {
         string identifier = functionCallStatement.Identifier.Content;
         ImmutableArray<GeneralType> argumentTypes = FindStatementTypes(functionCallStatement.MethodArguments);
-        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(identifier, argumentTypes, functionCallStatement.OriginalFile, null, addCompilable);
+        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(identifier, argumentTypes, functionCallStatement.File, null, addCompilable);
         return GetFunction(
             query,
             out result,
@@ -1441,120 +1441,6 @@ public abstract class CodeGenerator
 
     protected static BitWidth GetBitWidth(PointerType _) => BitWidth._32;
 
-    #region Addressing Helpers
-
-    protected ValueAddress GetDataAddress(StatementWithValue value) => value switch
-    {
-        IndexCall v => GetDataAddress(v),
-        Identifier v => GetDataAddress(v),
-        Field v => GetDataAddress(v),
-        _ => throw new NotImplementedException()
-    };
-    protected ValueAddress GetDataAddress(Identifier variable)
-    {
-        if (GetConstant(variable.Content, out _))
-        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
-
-        if (GetParameter(variable.Content, out CompiledParameter? parameter))
-        { return GetBaseAddress(parameter); }
-
-        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
-        { return new ValueAddress(localVariable); }
-
-        if (GetGlobalVariable(variable.Content, variable.OriginalFile, out CompiledVariable? globalVariable, out _))
-        { return GetGlobalVariableAddress(globalVariable); }
-
-        throw new CompilerException($"Local symbol \"{variable.Content}\" not found", variable, CurrentFile);
-    }
-    protected ValueAddress GetDataAddress(Field field)
-    {
-        ValueAddress address = GetBaseAddress(field);
-        if (address.IsReference)
-        { throw new NotImplementedException(); }
-        int offset = GetDataOffset(field);
-        return new ValueAddress(address.Address + offset, address.AddressingMode, address.IsReference, address.InHeap);
-    }
-    protected ValueAddress GetDataAddress(IndexCall indexCall)
-    {
-        ValueAddress address = GetBaseAddress(indexCall.PrevStatement);
-        if (address.IsReference)
-        { throw new NotImplementedException(); }
-        int currentOffset = GetDataOffset(indexCall);
-        return new ValueAddress(address.Address + currentOffset, address.AddressingMode, address.IsReference, address.InHeap);
-    }
-
-    protected int GetDataOffset(StatementWithValue value, StatementWithValue? until = null) => value switch
-    {
-        IndexCall v => GetDataOffset(v, until),
-        Field v => GetDataOffset(v, until),
-        Identifier => 0,
-        _ => throw new NotImplementedException()
-    };
-    protected int GetDataOffset(Field field, StatementWithValue? until = null)
-    {
-        if (field.PrevStatement == until) return 0;
-
-        GeneralType prevType = FindStatementType(field.PrevStatement);
-
-        if (prevType is not StructType structType)
-        { throw new NotImplementedException(); }
-
-        if (!structType.GetField(field.Identifier.Content, out _, out int fieldOffset))
-        { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
-
-        int prevOffset = GetDataOffset(field.PrevStatement, until);
-        return prevOffset + fieldOffset;
-    }
-    protected abstract int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null);
-
-    protected ValueAddress GetBaseAddress(StatementWithValue statement) => statement switch
-    {
-        Identifier v => GetBaseAddress(v),
-        Field v => GetBaseAddress(v),
-        IndexCall v => GetBaseAddress(v),
-        _ => throw new NotImplementedException()
-    };
-    protected abstract ValueAddress GetBaseAddress(CompiledParameter parameter);
-    protected abstract ValueAddress GetBaseAddress(CompiledParameter parameter, int offset);
-    protected abstract ValueAddress GetGlobalVariableAddress(CompiledVariable variable);
-    protected abstract ValueAddress GetBaseAddress(Identifier variable);
-    protected ValueAddress GetBaseAddress(Field statement)
-    {
-        ValueAddress address = GetBaseAddress(statement.PrevStatement);
-        bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement) is PointerType;
-        return new ValueAddress(address.Address, address.AddressingMode, address.IsReference, inHeap);
-    }
-    protected ValueAddress GetBaseAddress(IndexCall statement)
-    {
-        ValueAddress address = GetBaseAddress(statement.PrevStatement);
-        bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement) is PointerType;
-        return new ValueAddress(address.Address, address.AddressingMode, address.IsReference, inHeap);
-    }
-
-    protected StatementWithValue? NeedDerefernce(StatementWithValue value) => value switch
-    {
-        Identifier => null,
-        Field v => NeedDerefernce(v),
-        IndexCall v => NeedDerefernce(v),
-        _ => throw new NotImplementedException()
-    };
-    protected StatementWithValue? NeedDerefernce(IndexCall indexCall)
-    {
-        if (FindStatementType(indexCall.PrevStatement) is PointerType)
-        { return indexCall.PrevStatement; }
-
-        return NeedDerefernce(indexCall.PrevStatement);
-    }
-    protected StatementWithValue? NeedDerefernce(Field field)
-    {
-        if (FindStatementType(field.PrevStatement) is PointerType)
-        { return field.PrevStatement; }
-
-        return NeedDerefernce(field.PrevStatement);
-    }
-
-    #endregion
-
     protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset)
     {
         if (LanguageConstants.KeywordList.Contains(newVariable.Identifier.Content))
@@ -1661,8 +1547,8 @@ public abstract class CodeGenerator
         if (prevType is ArrayType arrayType)
         { return OnGotStatementType(index, arrayType.Of); }
 
-        // TODO: (index.PrevStatement as IReferenceableTo)?.OriginalFile can be null
-        if (!GetIndexGetter(prevType, (index.PrevStatement as IReferenceableTo)?.OriginalFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundException))
+        // TODO: (index.PrevStatement as IInFile)?.OriginalFile can be null
+        if (!GetIndexGetter(prevType, (index.PrevStatement as IInFile)?.File, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundException))
         { }
 
         CompiledFunction? indexer = result?.Function;
@@ -1692,7 +1578,7 @@ public abstract class CodeGenerator
 
     protected GeneralType FindStatementType(BinaryOperatorCall @operator, GeneralType? expectedType)
     {
-        if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? _result, out _))
+        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? _result, out _))
         {
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             return OnGotStatementType(@operator, _result.Function.Type);
@@ -1825,7 +1711,7 @@ public abstract class CodeGenerator
     }
     protected GeneralType FindStatementType(UnaryOperatorCall @operator, GeneralType? expectedType)
     {
-        if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? result_, out _))
+        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result_, out _))
         {
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             return OnGotStatementType(@operator, result_.Function.Type);
@@ -1898,7 +1784,7 @@ public abstract class CodeGenerator
                 identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                 identifier.Reference = variable;
             }
-            else if (GetGlobalVariable(identifier.Content, identifier.OriginalFile, out CompiledVariable? globalVariable, out _))
+            else if (GetGlobalVariable(identifier.Content, identifier.File, out CompiledVariable? globalVariable, out _))
             {
                 identifier.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                 identifier.Reference = globalVariable;
@@ -1919,7 +1805,7 @@ public abstract class CodeGenerator
             { return _type; }
         }
 
-        if (FindType(identifier.Token, identifier.OriginalFile, out GeneralType? result))
+        if (FindType(identifier.Token, identifier.File, out GeneralType? result))
         { return OnGotStatementType(identifier, result); }
 
         throw new CompilerException($"Symbol \"{identifier.Content}\" not found", identifier, CurrentFile);
@@ -1948,7 +1834,7 @@ public abstract class CodeGenerator
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
         // TODO: constructorCall.OriginalFile can be null
-        if (GetConstructor(type, parameters, constructorCall.OriginalFile, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound))
+        if (GetConstructor(type, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound))
         {
             constructorCall.Type.SetAnalyzedType(result.Function.Type);
             return OnGotStatementType(constructorCall, result.Function.Type);
@@ -2130,7 +2016,7 @@ public abstract class CodeGenerator
             op: operatorCall.Operator,
             left: InlineMacro(operatorCall.Left, parameters),
             right: InlineMacro(operatorCall.Right, parameters),
-            file: operatorCall.OriginalFile)
+            file: operatorCall.File)
         {
             SurroundingBracelet = operatorCall.SurroundingBracelet,
             SaveValue = operatorCall.SaveValue,
@@ -2141,7 +2027,7 @@ public abstract class CodeGenerator
         => new(
             op: operatorCall.Operator,
             left: InlineMacro(operatorCall.Left, parameters),
-            file: operatorCall.OriginalFile)
+            file: operatorCall.File)
         {
             SurroundingBracelet = operatorCall.SurroundingBracelet,
             SaveValue = operatorCall.SaveValue,
@@ -2163,7 +2049,7 @@ public abstract class CodeGenerator
         StatementWithValue? prevStatement = functionCall.PrevStatement;
         if (prevStatement != null)
         { prevStatement = InlineMacro(prevStatement, parameters); }
-        return new FunctionCall(prevStatement, functionCall.Identifier, _parameters, functionCall.Brackets, functionCall.OriginalFile);
+        return new FunctionCall(prevStatement, functionCall.Identifier, _parameters, functionCall.Brackets, functionCall.File);
     }
 
     static AnyCall InlineMacro(AnyCall anyCall, Dictionary<string, StatementWithValue> parameters)
@@ -2172,7 +2058,7 @@ public abstract class CodeGenerator
             parameters: InlineMacro(anyCall.Arguments, parameters),
             commas: anyCall.Commas,
             brackets: anyCall.Brackets,
-            file: anyCall.OriginalFile)
+            file: anyCall.File)
         {
             SaveValue = anyCall.SaveValue,
             Semicolon = anyCall.Semicolon,
@@ -2184,7 +2070,7 @@ public abstract class CodeGenerator
             typeName: constructorCall.Type,
             arguments: InlineMacro(constructorCall.Arguments, parameters),
             brackets: constructorCall.Brackets,
-            file: constructorCall.OriginalFile)
+            file: constructorCall.File)
         {
             SaveValue = constructorCall.SaveValue,
             Semicolon = constructorCall.Semicolon,
@@ -2441,7 +2327,7 @@ public abstract class CodeGenerator
             @operator: statement.Operator,
             left: statement.Left,
             right: InlineMacro(statement.Right, parameters),
-            file: statement.OriginalFile)
+            file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2458,7 +2344,7 @@ public abstract class CodeGenerator
         inlined = new ShortOperatorCall(
              op: statement.Operator,
              left: statement.Left,
-             file: statement.OriginalFile)
+             file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2476,7 +2362,7 @@ public abstract class CodeGenerator
             @operator: statement.Operator,
             left: statement.Left,
             right: InlineMacro(statement.Right, parameters),
-            file: statement.OriginalFile)
+            file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2542,7 +2428,7 @@ public abstract class CodeGenerator
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
             fieldName: statement.Identifier,
-            file: statement.OriginalFile)
+            file: statement.File)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
@@ -2553,7 +2439,7 @@ public abstract class CodeGenerator
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
             indexStatement: InlineMacro(statement.Index, parameters),
             brackets: statement.Brackets,
-            file: statement.OriginalFile)
+            file: statement.File)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
@@ -2822,7 +2708,7 @@ public abstract class CodeGenerator
         { return true; }
 
         // TODO: @operator.OriginalFile can be null
-        if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? result, out _))
+        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
             if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&
                 TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
@@ -2889,7 +2775,7 @@ public abstract class CodeGenerator
         { return true; }
 
         // TODO: @operator.OriginalFile can be null
-        if (GetOperator(@operator, @operator.OriginalFile, out FunctionQueryResult<CompiledOperator>? result, out _))
+        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
             if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&
                 TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
@@ -3012,7 +2898,7 @@ public abstract class CodeGenerator
                     functionCall.Identifier,
                     Literal.CreateAnonymous(parameters, functionCall.MethodArguments),
                     functionCall.Brackets,
-                    functionCall.OriginalFile)
+                    functionCall.File)
                 {
                     SaveValue = functionCall.SaveValue,
                     Semicolon = functionCall.Semicolon,

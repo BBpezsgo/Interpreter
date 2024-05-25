@@ -21,7 +21,7 @@ public class StructDefinition :
     public ImmutableArray<FunctionDefinition> Operators { get; }
     public ImmutableArray<ConstructorDefinition> Constructors { get; }
 
-    public bool IsExport => Modifiers.Contains(ProtectionKeywords.Export);
+    public bool IsExported => Modifiers.Contains(ProtectionKeywords.Export);
     public virtual Position Position => new(Identifier, BracketStart, BracketEnd);
 
     public StructDefinition(StructDefinition other)

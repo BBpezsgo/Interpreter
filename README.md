@@ -79,8 +79,6 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 - `--no-pause|-np` With this option, the program exits at the end of execution without printing "Press any key to exit" and doesn't wait for any key press.
 
-- `--dont-normalize-args|nna` With this option, it will not normalizes the arguments and will use as passed to the program.
-
 ## Hello World:
 ```cs
 using "https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/StandardLibrary/System.bbc";

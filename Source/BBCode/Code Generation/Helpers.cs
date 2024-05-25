@@ -92,10 +92,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Memory Helpers
 
-    protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
-        => new ValueAddress(variable.MemoryAddress, AddressingMode.Absolute) + 3;
-
-    protected override ValueAddress GetBaseAddress(Identifier variable)
+    ValueAddress GetDataAddress(StatementWithValue value) => value switch
+    {
+        IndexCall v => GetDataAddress(v),
+        Identifier v => GetDataAddress(v),
+        Field v => GetDataAddress(v),
+        _ => throw new NotImplementedException()
+    };
+    ValueAddress GetDataAddress(Identifier variable)
     {
         if (GetConstant(variable.Content, out _))
         { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
@@ -106,13 +110,51 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (GetVariable(variable.Content, out CompiledVariable? localVariable))
         { return new ValueAddress(localVariable); }
 
-        if (GetGlobalVariable(variable.Content, variable.OriginalFile, out CompiledVariable? globalVariable, out _))
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out _))
         { return GetGlobalVariableAddress(globalVariable); }
 
-        throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
+        throw new CompilerException($"Local symbol \"{variable.Content}\" not found", variable, CurrentFile);
+    }
+    ValueAddress GetDataAddress(Field field)
+    {
+        ValueAddress address = GetBaseAddress(field);
+        if (address.IsReference)
+        { throw new NotImplementedException(); }
+        int offset = GetDataOffset(field);
+        return address + offset;
+    }
+    ValueAddress GetDataAddress(IndexCall indexCall)
+    {
+        ValueAddress address = GetBaseAddress(indexCall.PrevStatement);
+        if (address.IsReference)
+        { throw new NotImplementedException(); }
+        int currentOffset = GetDataOffset(indexCall);
+        return address + currentOffset;
     }
 
-    protected override int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null)
+    int GetDataOffset(StatementWithValue value, StatementWithValue? until = null) => value switch
+    {
+        IndexCall v => GetDataOffset(v, until),
+        Field v => GetDataOffset(v, until),
+        Identifier => 0,
+        _ => throw new NotImplementedException()
+    };
+    int GetDataOffset(Field field, StatementWithValue? until = null)
+    {
+        if (field.PrevStatement == until) return 0;
+
+        GeneralType prevType = FindStatementType(field.PrevStatement);
+
+        if (prevType is not StructType structType)
+        { throw new NotImplementedException(); }
+
+        if (!structType.GetField(field.Identifier.Content, out _, out int fieldOffset))
+        { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
+
+        int prevOffset = GetDataOffset(field.PrevStatement, until);
+        return prevOffset + fieldOffset;
+    }
+    int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null)
     {
         if (indexCall.PrevStatement == until) return 0;
 
@@ -127,6 +169,76 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
         int offset = (int)index * arrayType.Of.Size;
         return prevOffset + offset;
+    }
+
+    ValueAddress GetBaseAddress(StatementWithValue statement) => statement switch
+    {
+        Identifier v => GetBaseAddress(v),
+        Field v => GetBaseAddress(v),
+        IndexCall v => GetBaseAddress(v),
+        _ => throw new NotImplementedException()
+    };
+    ValueAddress GetBaseAddress(CompiledParameter parameter)
+    {
+        int address = -(ParametersSizeBefore(parameter.Index) + TagsBeforeBasePointer);
+        return new ValueAddress(parameter, address);
+    }
+    ValueAddress GetBaseAddress(CompiledParameter parameter, int offset)
+    {
+        int address = -(ParametersSizeBefore(parameter.Index) - offset + TagsBeforeBasePointer);
+        return new ValueAddress(parameter, address);
+    }
+    static ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
+        => new ValueAddress(variable.MemoryAddress, AddressingMode.Pointer) + 3;
+    ValueAddress GetBaseAddress(Identifier variable)
+    {
+        if (GetConstant(variable.Content, out _))
+        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
+
+        if (GetParameter(variable.Content, out CompiledParameter? parameter))
+        { return GetBaseAddress(parameter); }
+
+        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+        { return new ValueAddress(localVariable); }
+
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out _))
+        { return GetGlobalVariableAddress(globalVariable); }
+
+        throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
+    }
+    ValueAddress GetBaseAddress(Field statement)
+    {
+        ValueAddress address = GetBaseAddress(statement.PrevStatement);
+        if (FindStatementType(statement.PrevStatement) is PointerType) throw null!;
+        return address;
+    }
+    ValueAddress GetBaseAddress(IndexCall statement)
+    {
+        ValueAddress address = GetBaseAddress(statement.PrevStatement);
+        if (FindStatementType(statement.PrevStatement) is PointerType) throw null!;
+        return address;
+    }
+
+    StatementWithValue? NeedDerefernce(StatementWithValue value) => value switch
+    {
+        Identifier => null,
+        Field v => NeedDerefernce(v),
+        IndexCall v => NeedDerefernce(v),
+        _ => throw new NotImplementedException()
+    };
+    StatementWithValue? NeedDerefernce(IndexCall indexCall)
+    {
+        if (FindStatementType(indexCall.PrevStatement) is PointerType)
+        { return indexCall.PrevStatement; }
+
+        return NeedDerefernce(indexCall.PrevStatement);
+    }
+    StatementWithValue? NeedDerefernce(Field field)
+    {
+        if (FindStatementType(field.PrevStatement) is PointerType)
+        { return field.PrevStatement; }
+
+        return NeedDerefernce(field.PrevStatement);
     }
 
     void StackStore(ValueAddress address, int size)
@@ -154,14 +266,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (address.InHeap)
-        {
-            throw new NotImplementedException();
-        }
-
         switch (address.AddressingMode)
         {
-            case AddressingMode.Absolute:
+            case AddressingMode.Pointer:
                 StackLoad(AbsoluteGlobalAddress);
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
@@ -179,17 +286,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     AddInstruction(Opcode.Push, reg.Register.ToPtr());
                 }
                 break;
-            case AddressingMode.BasePointerRelative:
+            case AddressingMode.PointerBP:
                 AddInstruction(Opcode.Push, Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
                 break;
 
-            case AddressingMode.StackPointerRelative:
+            case AddressingMode.PointerSP:
                 AddInstruction(Opcode.Push, Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
                 break;
 
-            case AddressingMode.Runtime:
-                AddInstruction(Opcode.Push, new InstructionOperand(address.Address, InstructionOperandType.Pointer));
-                break;
             default: throw new UnreachableException();
         }
     }
@@ -207,14 +311,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (address.InHeap)
-        {
-            throw new NotImplementedException();
-        }
-
         switch (address.AddressingMode)
         {
-            case AddressingMode.Absolute:
+            case AddressingMode.Pointer:
                 StackLoad(AbsoluteGlobalAddress);
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
@@ -232,14 +331,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     AddInstruction(Opcode.PopTo, reg.Register.ToPtr());
                 }
                 break;
-            case AddressingMode.BasePointerRelative:
+            case AddressingMode.PointerBP:
                 AddInstruction(Opcode.PopTo, Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
                 break;
-            case AddressingMode.StackPointerRelative:
+            case AddressingMode.PointerSP:
                 AddInstruction(Opcode.PopTo, Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection));
-                break;
-            case AddressingMode.Runtime:
-                AddInstruction(Opcode.PopTo, new InstructionOperand(address.Address, InstructionOperandType.Pointer));
                 break;
             default: throw new UnreachableException();
         }
@@ -274,7 +370,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void HeapLoad(ValueAddress pointerAddress, int offset, string nullExceptionMessage = "null pointer")
     {
-        StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.AddressingMode, pointerAddress.IsReference));
+        StackLoad(pointerAddress);
 
         CheckPointerNull(exceptionMessage: nullExceptionMessage);
 
@@ -287,7 +383,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void HeapStore(ValueAddress pointerAddress, int offset, string nullExceptionMessage = "null pointer")
     {
-        StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.AddressingMode, pointerAddress.IsReference));
+        StackLoad(pointerAddress);
 
         CheckPointerNull(exceptionMessage: nullExceptionMessage);
 
@@ -324,11 +420,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly Stack<int> TagCount;
 
     public ValueAddress GetReturnValueAddress(GeneralType returnType)
-        => new(-(ParametersSize + TagsBeforeBasePointer + returnType.Size), AddressingMode.BasePointerRelative);
+        => new(-(ParametersSize + TagsBeforeBasePointer + returnType.Size), AddressingMode.PointerBP);
 
-    public static ValueAddress AbsoluteGlobalAddress => new(AbsoluteGlobalOffset, AddressingMode.BasePointerRelative);
-    public static ValueAddress ReturnFlagAddress => new(ReturnFlagOffset, AddressingMode.BasePointerRelative);
-    public static ValueAddress StackTop => new(-1, AddressingMode.StackPointerRelative);
+    public static ValueAddress AbsoluteGlobalAddress => new(AbsoluteGlobalOffset, AddressingMode.PointerBP);
+    public static ValueAddress ReturnFlagAddress => new(ReturnFlagOffset, AddressingMode.PointerBP);
+    public static ValueAddress StackTop => new(-1, AddressingMode.PointerSP);
 
     public const int ReturnFlagOffset = 0;
     public const int SavedBasePointerOffset = -1;
@@ -363,17 +459,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
 
         return sum;
-    }
-
-    protected override ValueAddress GetBaseAddress(CompiledParameter parameter)
-    {
-        int address = -(ParametersSizeBefore(parameter.Index) + TagsBeforeBasePointer);
-        return new ValueAddress(parameter, address);
-    }
-    protected override ValueAddress GetBaseAddress(CompiledParameter parameter, int offset)
-    {
-        int address = -(ParametersSizeBefore(parameter.Index) - offset + TagsBeforeBasePointer);
-        return new ValueAddress(parameter, address);
     }
 
     #endregion

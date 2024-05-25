@@ -4,29 +4,9 @@ using Compiler;
 
 public enum AddressingMode : byte
 {
-    /// <summary>
-    /// <c>Parameter</c>
-    /// </summary>
-    Absolute,
-
-    /// <summary>
-    /// <c>Pop()</c>
-    /// </summary>
-    Runtime,
-
-    /// <summary>
-    /// <b>Only for stack!</b>
-    /// <br/>
-    /// <c>BasePointer + Parameter</c>
-    /// </summary>
-    BasePointerRelative,
-
-    /// <summary>
-    /// <b>Only for stack!</b>
-    /// <br/>
-    /// <c>StackPointer + Parameter</c>
-    /// </summary>
-    StackPointerRelative,
+    Pointer,
+    PointerBP,
+    PointerSP,
 }
 
 public enum BitWidth : byte
@@ -155,14 +135,12 @@ public readonly struct InstructionOperand
     public static implicit operator InstructionOperand(Register register) => new((int)register, InstructionOperandType.Register);
     public static explicit operator InstructionOperand(ValueAddress address)
     {
-        if (address.InHeap) throw new NotImplementedException();
         if (address.IsReference) throw new NotImplementedException();
         return address.AddressingMode switch
         {
-            AddressingMode.Absolute => new InstructionOperand(new RuntimeValue(address.Address), InstructionOperandType.Pointer),
-            AddressingMode.Runtime => throw new NotImplementedException(),
-            AddressingMode.BasePointerRelative => Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
-            AddressingMode.StackPointerRelative => Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
+            AddressingMode.Pointer => new InstructionOperand(new RuntimeValue(address.Address), InstructionOperandType.Pointer),
+            AddressingMode.PointerBP => Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
+            AddressingMode.PointerSP => Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
             _ => throw new UnreachableException(),
         };
     }

@@ -364,7 +364,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (returnValueType is not BuiltinType)
                     { throw new CompilerException($"Exit code must be a built-in type (not {returnValueType})", returnValue, CurrentFile); }
 
-                    StackStore(new ValueAddress(AbsoluteGlobalOffset, AddressingMode.BasePointerRelative, true));
+                    StackStore(new ValueAddress(AbsoluteGlobalOffset, AddressingMode.PointerBP, true));
                 }
             }
 
@@ -552,7 +552,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (saveValue)
             {
                 AddComment($" Store return value:");
-                StackStore(new ValueAddress(returnValueOffset, AddressingMode.BasePointerRelative), compiledFunction.Type.Size);
+                StackStore(new ValueAddress(returnValueOffset, AddressingMode.PointerBP), compiledFunction.Type.Size);
             }
             else
             {
@@ -572,7 +572,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         compiledFunction.References.Add((functionCall, CurrentFile, CurrentContext));
         OnGotStatementType(functionCall, compiledFunction.Type);
 
-        if (!compiledFunction.CanUse(functionCall.OriginalFile ?? CurrentFile))
+        if (!compiledFunction.CanUse(functionCall.File ?? CurrentFile))
         {
             AnalysisCollection?.Errors.Add(new LanguageError($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
             return;
@@ -689,8 +689,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (anyCall.PrevStatement is IReferenceableTo _ref1)
             { _ref1.Reference = functionCall.Reference; }
-            else
-            { anyCall.Reference = functionCall.Reference; }
+            anyCall.Reference = functionCall.Reference;
             return;
         }
 
@@ -1196,7 +1195,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetGlobalVariable(variable.Content, variable.OriginalFile, out CompiledVariable? globalVariable, out _))
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out _))
         {
             variable.Token.AnalyzedType = TokenAnalyzedType.VariableName;
             variable.Reference = globalVariable;
@@ -1726,10 +1725,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     switch (address.AddressingMode)
                     {
-                        case AddressingMode.Absolute:
-                        case AddressingMode.Runtime:
+                        case AddressingMode.Pointer:
                             throw new NotImplementedException();
-                        case AddressingMode.BasePointerRelative:
+                        case AddressingMode.PointerBP:
                             AddInstruction(Opcode.MathAdd, reg1.Register, Register.BasePointer);
                             break;
                         default:
@@ -1802,7 +1800,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet),
                 ImmutableArray.Create(index.Index),
                 index.Brackets,
-                index.OriginalFile
+                index.File
             ), result.Function);
     }
     void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
@@ -1813,9 +1811,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (modifier.Equals(ModifierKeywords.Ref))
         {
             ValueAddress address = GetDataAddress(statement);
-
-            if (address.InHeap)
-            { throw new CompilerException($"This value is stored in the heap and not in the stack", statement, CurrentFile); }
 
             if (address.IsReference)
             {
@@ -1829,11 +1824,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     switch (address.AddressingMode)
                     {
-                        case AddressingMode.Absolute:
+                        case AddressingMode.Pointer:
                             break;
-                        case AddressingMode.Runtime:
-                            throw new NotImplementedException();
-                        case AddressingMode.BasePointerRelative:
+                        case AddressingMode.PointerBP:
                             AddInstruction(Opcode.MathAdd, reg.Register, Register.BasePointer);
                             break;
                         default:
@@ -2072,7 +2065,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             StackStore(new ValueAddress(variable), variable.Type.Size);
         }
-        else if (GetGlobalVariable(statementToSet.Content, statementToSet.OriginalFile, out CompiledVariable? globalVariable, out _))
+        else if (GetGlobalVariable(statementToSet.Content, statementToSet.File, out CompiledVariable? globalVariable, out _))
         {
             statementToSet.Token.AnalyzedType = TokenAnalyzedType.VariableName;
             statementToSet.CompiledType = globalVariable.Type;
@@ -2224,7 +2217,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerSet),
             ImmutableArray.Create<StatementWithValue>(statementToSet.Index, value),
             statementToSet.Brackets,
-            statementToSet.OriginalFile
+            statementToSet.File
         ), result.Function);
     }
     void GenerateCodeForValueSetter(Pointer statementToSet, StatementWithValue value)
@@ -2724,7 +2717,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     case CompileLevel.Minimal: continue;
                     case CompileLevel.Exported:
-                        if (!function.IsExport) continue;
+                        if (!function.IsExported) continue;
                         break;
                 }
             }

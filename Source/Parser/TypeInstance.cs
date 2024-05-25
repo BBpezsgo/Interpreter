@@ -169,12 +169,12 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>,
         .Union(TypeArguments);
 
     public object? Reference { get; set; }
-    public Uri OriginalFile { get; }
+    public Uri File { get; }
 
     public TypeInstanceSimple(Token identifier, Uri file, IEnumerable<TypeInstance>? typeArguments = null) : base()
     {
         this.Identifier = identifier;
-        this.OriginalFile = file;
+        this.File = file;
         this.TypeArguments = typeArguments?.ToImmutableArray();
     }
 

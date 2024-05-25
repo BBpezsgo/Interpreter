@@ -11,7 +11,7 @@ public class GenericType : GeneralType,
 {
     public string Identifier { get; }
     public Token? Definition { get; }
-    public Uri OriginalFile { get; }
+    public Uri File { get; }
 
     public override int Size
     {
@@ -35,21 +35,21 @@ public class GenericType : GeneralType,
     {
         Identifier = other.Identifier;
         Definition = other.Definition;
-        OriginalFile = other.OriginalFile;
+        File = other.File;
     }
 
     public GenericType(string identifier, Uri originalFile)
     {
         Identifier = identifier;
         Definition = null;
-        OriginalFile = originalFile;
+        File = originalFile;
     }
 
     public GenericType(Token definition, Uri originalFile)
     {
         Identifier = definition.Content;
         Definition = definition;
-        OriginalFile = originalFile;
+        File = originalFile;
     }
 
     public override bool Equals(object? other) => Equals(other as GenericType);

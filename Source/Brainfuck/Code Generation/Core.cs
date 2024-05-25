@@ -69,52 +69,9 @@ public struct BrainfuckGeneratorSettings
     }
 }
 
-public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, IBrainfuckGenerator
+public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenerator
 {
     const string ReturnVariableName = "@return";
-
-    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    struct Variable :
-        IIdentifiable<string>,
-        IHaveCompiledType,
-        IInFile
-    {
-        public readonly string Name;
-        public readonly int Address;
-        public readonly Uri File;
-
-        public readonly bool HaveToClean;
-        public readonly bool DeallocateOnClean;
-
-        public readonly GeneralType Type;
-        public readonly int Size;
-
-        public bool IsDiscarded;
-        public bool IsInitialized;
-
-        readonly string IIdentifiable<string>.Identifier => Name;
-        readonly GeneralType IHaveCompiledType.Type => Type;
-        readonly Uri IInFile.File => File;
-
-        public Variable(string name, Uri file, int address, bool haveToClean, bool deallocateOnClean, GeneralType type)
-            : this(name, file, address, haveToClean, deallocateOnClean, type, type.Size) { }
-        public Variable(string name, Uri file, int address, bool haveToClean, bool deallocateOnClean, GeneralType type, int size)
-        {
-            Name = name;
-            Address = address;
-            File = file;
-
-            HaveToClean = haveToClean;
-            DeallocateOnClean = deallocateOnClean;
-
-            Type = type;
-            IsDiscarded = false;
-            Size = size;
-            IsInitialized = false;
-        }
-
-        readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.Size} bytes at {Address})";
-    }
 
     readonly struct DebugInfoBlock : IDisposable
     {
@@ -201,7 +158,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     readonly struct GeneratorSnapshot
     {
-        public readonly ImmutableArray<Variable> Variables;
+        public readonly ImmutableArray<BrainfuckVariable> Variables;
         public readonly ImmutableArray<int> VariableCleanupStack;
         public readonly ImmutableArray<ControlFlowBlock> Returns;
         public readonly ImmutableArray<ControlFlowBlock> Breaks;
@@ -283,7 +240,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     {
         public ImmutableDictionary<string, GeneralType>? SavedTypeArguments { get; init; }
         public ImmutableArray<ControlFlowBlock> SavedBreaks { get; init; }
-        public ImmutableArray<Variable> SavedVariables { get; init; }
+        public ImmutableArray<BrainfuckVariable> SavedVariables { get; init; }
         public Uri? SavedFile { get; init; }
         public ImmutableArray<IConstant> SavedConstants { get; init; }
     }
@@ -295,7 +252,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
     HeapCodeHelper Heap;
     CodeHelper IBrainfuckGenerator.Code => Code;
 
-    new readonly Stack<Variable> CompiledVariables;
+    new readonly Stack<BrainfuckVariable> CompiledVariables;
 
     readonly Stack<int> VariableCleanupStack;
 
@@ -320,7 +277,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         AnalysisCollection? analysisCollection,
         PrintCallback? print) : base(compilerResult, analysisCollection, print)
     {
-        CompiledVariables = new Stack<Variable>();
+        CompiledVariables = new Stack<BrainfuckVariable>();
         Code = new CodeHelper()
         {
             AddSmallComments = brainfuckSettings.GenerateSmallComments,
@@ -356,14 +313,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         ImmutableArray<ControlFlowBlock> savedBreaks = Breaks.ToImmutableArray();
         Breaks.Clear();
 
-        ImmutableArray<Variable> savedVariables = CompiledVariables.ToImmutableArray();
+        ImmutableArray<BrainfuckVariable> savedVariables = CompiledVariables.ToImmutableArray();
         CompiledVariables.Clear();
 
         if (CurrentMacro.Count == 1)
         {
             CompiledVariables.PushRange(savedVariables);
             for (int i = 0; i < CompiledVariables.Count; i++)
-            { CompiledVariables[i] = new Variable(CompiledVariables[i].Name, CompiledVariables[i].File, CompiledVariables[i].Address, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size); }
+            { CompiledVariables[i] = new BrainfuckVariable(CompiledVariables[i].Name, CompiledVariables[i].File, CompiledVariables[i].Address, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size); }
         }
 
         Uri? savedFile = CurrentFile;
@@ -434,7 +391,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
     protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
-        if (CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, symbolName, out Variable variable))
+        if (GetVariable(symbolName, out BrainfuckVariable? variable))
         {
             type = variable.Type;
             return true;
@@ -450,132 +407,84 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         return false;
     }
 
-    protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
+    #region Addressing Helpers
+
+    int GetDataOffset(StatementWithValue value, StatementWithValue? until = null) => value switch
     {
-        throw new NotImplementedException();
+        IndexCall v => GetDataOffset(v, until),
+        Field v => GetDataOffset(v, until),
+        Identifier => 0,
+        _ => throw new NotImplementedException()
+    };
+    int GetDataOffset(Field field, StatementWithValue? until = null)
+    {
+        if (field.PrevStatement == until) return 0;
+
+        GeneralType prevType = FindStatementType(field.PrevStatement);
+
+        if (prevType is not StructType structType)
+        { throw new NotImplementedException(); }
+
+        if (!structType.GetField(field.Identifier.Content, out _, out int fieldOffset))
+        { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
+
+        int prevOffset = GetDataOffset(field.PrevStatement, until);
+        return prevOffset + fieldOffset;
+    }
+    int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null)
+    {
+        if (indexCall.PrevStatement == until) return 0;
+
+        GeneralType prevType = FindStatementType(indexCall.PrevStatement);
+
+        if (prevType is not ArrayType arrayType)
+        { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
+
+        if (!TryCompute(indexCall.Index, out CompiledValue index))
+        { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
+
+        int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
+        int offset = (int)index * 2 * arrayType.Of.Size;
+        return prevOffset + offset;
     }
 
-    protected override ValueAddress GetBaseAddress(Identifier variable)
+    StatementWithValue? NeedDerefernce(StatementWithValue value) => value switch
     {
-        if (GetConstant(variable.Content, out _))
-        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
+        Identifier => null,
+        Field v => NeedDerefernce(v),
+        IndexCall v => NeedDerefernce(v),
+        _ => throw new NotImplementedException()
+    };
+    StatementWithValue? NeedDerefernce(IndexCall indexCall)
+    {
+        if (FindStatementType(indexCall.PrevStatement) is PointerType)
+        { return indexCall.PrevStatement; }
 
-        if (!GetVariable(CompiledVariables, variable.Content, out Variable variable_))
-        { throw new CompilerException($"Variable \"{variable}\" not found", variable, CurrentFile); }
+        return NeedDerefernce(indexCall.PrevStatement);
+    }
+    StatementWithValue? NeedDerefernce(Field field)
+    {
+        if (FindStatementType(field.PrevStatement) is PointerType)
+        { return field.PrevStatement; }
 
-        return new ValueAddress(variable_.Address, AddressingMode.Absolute);
+        return NeedDerefernce(field.PrevStatement);
     }
 
-    static bool GetVariable(IReadOnlyList<Variable> variables, string name, out Variable variable)
+#pragma warning disable IDE0060 // Remove unused parameter
+    bool TryGetAddress(Statement statement, out int address, out int size, StatementWithValue? until = null) => statement switch
     {
-        for (int i = variables.Count - 1; i >= 0; i--)
-        {
-            if (variables[i].Name == name)
-            {
-                variable = variables[i];
-                return true;
-            }
-        }
-        variable = default;
-        return false;
-    }
-
-    static void DiscardVariable(Stack<Variable> variables, string name)
-    {
-        for (int i = 0; i < variables.Count; i++)
-        {
-            if (variables[i].Name != name) continue;
-            Variable v = variables[i];
-            v.IsDiscarded = true;
-            variables[i] = v;
-            return;
-        }
-    }
-    static void UndiscardVariable(Stack<Variable> variables, string name)
-    {
-        for (int i = 0; i < variables.Count; i++)
-        {
-            if (variables[i].Name != name) continue;
-            Variable v = variables[i];
-            v.IsDiscarded = false;
-            variables[i] = v;
-            return;
-        }
-    }
-
-    void CleanupVariables(int n)
-    {
-        if (n == 0) return;
-        using (Code.Block(this, $"Clean up variables ({n})"))
-        {
-            for (int i = 0; i < n; i++)
-            {
-                Variable variable = CompiledVariables.Last;
-
-                if (!variable.HaveToClean)
-                {
-                    CompiledVariables.Pop();
-                    continue;
-                }
-
-                if (variable.DeallocateOnClean &&
-                    variable.Type is PointerType)
-                {
-                    GenerateDestructor(new Identifier(Tokenizing.Token.CreateAnonymous(variable.Name), variable.File));
-                }
-
-                CompiledVariables.Pop();
-                Stack.Pop();
-            }
-        }
-    }
-
-    int VariableUses(Statement statement, Variable variable)
-    {
-        int usages = 0;
-
-        foreach (Statement _statement in statement.GetStatementsRecursively(true))
-        {
-            if (_statement is not Identifier identifier)
-            { continue; }
-            if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, identifier.Content, out Variable _variable))
-            { continue; }
-            if (_variable.Name != variable.Name)
-            { continue; }
-
-            usages++;
-        }
-
-        return usages;
-    }
-
-    #region TryGetAddress
-
-    bool TryGetAddress(Statement? statement, out int address, out int size, StatementWithValue? until = null)
-    {
-        if (statement is null)
-        {
-            address = 0;
-            size = 0;
-            return false;
-        }
-
-        return statement switch
-        {
-            IndexCall index => TryGetAddress(index, out address, out size, until),
-            Pointer pointer => TryGetAddress(pointer, out address, out size, until),
-            Identifier identifier => TryGetAddress(identifier, out address, out size, until),
-            Field field => TryGetAddress(field, out address, out size, until),
-            _ => throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile),
-        };
-    }
-
+        IndexCall index => TryGetAddress(index, out address, out size, until),
+        Pointer pointer => TryGetAddress(pointer, out address, out size, until),
+        Identifier identifier => TryGetAddress(identifier, out address, out size, until),
+        Field field => TryGetAddress(field, out address, out size, until),
+        _ => throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile),
+    };
     bool TryGetAddress(IndexCall index, out int address, out int size, StatementWithValue? until)
     {
         if (index.PrevStatement is not Identifier arrayIdentifier)
         { throw new CompilerException($"This must be an identifier", index.PrevStatement, CurrentFile); }
 
-        if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, arrayIdentifier.Content, out Variable variable))
+        if (!GetVariable(arrayIdentifier.Content, out BrainfuckVariable? variable))
         { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, CurrentFile); }
 
         if (variable.Type is ArrayType arrayType)
@@ -597,7 +506,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
 
         throw new CompilerException($"Variable is not an array", arrayIdentifier, CurrentFile);
     }
-
     bool TryGetAddress(Field field, out int address, out int size, StatementWithValue? until)
     {
         GeneralType type = FindStatementType(field.PrevStatement);
@@ -625,7 +533,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         size = default;
         return false;
     }
-
     bool TryGetAddress(Pointer pointer, out int address, out int size, StatementWithValue? until)
     {
         if (!TryCompute(pointer.PrevStatement, out CompiledValue addressToSet))
@@ -638,18 +545,103 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         size = 1;
         return true;
     }
-
     bool TryGetAddress(Identifier identifier, out int address, out int size, StatementWithValue? until)
     {
-        if (!CodeGeneratorForBrainfuck.GetVariable(CompiledVariables, identifier.Content, out Variable variable))
+        if (!GetVariable(identifier.Content, out BrainfuckVariable? variable))
         { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
         address = variable.Address;
         size = variable.Size;
         return true;
     }
+#pragma warning restore IDE0060 // Remove unused parameter
 
     #endregion
+
+    bool GetVariable(string name, [NotNullWhen(true)] out BrainfuckVariable? variable) => GetVariable(CompiledVariables, name, out variable);
+    static bool GetVariable(Stack<BrainfuckVariable> variables, string name, [NotNullWhen(true)] out BrainfuckVariable? variable)
+    {
+        for (int i = variables.Count - 1; i >= 0; i--)
+        {
+            if (variables[i].Name == name)
+            {
+                variable = variables[i];
+                return true;
+            }
+        }
+
+        variable = null;
+        return false;
+    }
+
+    static void DiscardVariable(Stack<BrainfuckVariable> variables, string name)
+    {
+        for (int i = 0; i < variables.Count; i++)
+        {
+            if (variables[i].Name != name) continue;
+            BrainfuckVariable v = variables[i];
+            v.IsDiscarded = true;
+            variables[i] = v;
+            return;
+        }
+    }
+    static void UndiscardVariable(Stack<BrainfuckVariable> variables, string name)
+    {
+        for (int i = 0; i < variables.Count; i++)
+        {
+            if (variables[i].Name != name) continue;
+            BrainfuckVariable v = variables[i];
+            v.IsDiscarded = false;
+            variables[i] = v;
+            return;
+        }
+    }
+
+    void CleanupVariables(int n)
+    {
+        if (n == 0) return;
+        using (Code.Block(this, $"Clean up variables ({n})"))
+        {
+            for (int i = 0; i < n; i++)
+            {
+                BrainfuckVariable variable = CompiledVariables.Last;
+
+                if (!variable.HaveToClean)
+                {
+                    CompiledVariables.Pop();
+                    continue;
+                }
+
+                if (variable.DeallocateOnClean &&
+                    variable.Type is PointerType)
+                {
+                    GenerateDestructor(new Identifier(Tokenizing.Token.CreateAnonymous(variable.Name), variable.File));
+                }
+
+                CompiledVariables.Pop();
+                Stack.Pop();
+            }
+        }
+    }
+
+    int VariableUses(Statement statement, BrainfuckVariable variable)
+    {
+        int usages = 0;
+
+        foreach (Statement _statement in statement.GetStatementsRecursively(true))
+        {
+            if (_statement is not Identifier identifier)
+            { continue; }
+            if (!GetVariable(identifier.Content, out BrainfuckVariable? _variable))
+            { continue; }
+            if (_variable.Name != variable.Name)
+            { continue; }
+
+            usages++;
+        }
+
+        return usages;
+    }
 
     void GenerateTopLevelStatements(ImmutableArray<Statement> statements, Uri file, bool isImported)
     {
@@ -658,7 +650,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         CurrentFile = file;
 
         if (!isImported)
-        { CompiledVariables.Add(new Variable(ReturnVariableName, file, Stack.PushVirtual(1), false, false, new BuiltinType(BasicType.Integer))); }
+        { CompiledVariables.Add(new BrainfuckVariable(ReturnVariableName, file, Stack.PushVirtual(1), false, false, new BuiltinType(BasicType.Integer))); }
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(statements)); }
@@ -733,23 +725,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase, 
         };
     }
 
-    protected override int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null)
-    {
-        if (indexCall.PrevStatement == until) return 0;
-
-        GeneralType prevType = FindStatementType(indexCall.PrevStatement);
-
-        if (prevType is not ArrayType arrayType)
-        { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
-
-        if (!TryCompute(indexCall.Index, out CompiledValue index))
-        { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
-
-        int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
-        int offset = (int)index * 2 * arrayType.Of.Size;
-        return prevOffset + offset;
-    }
-    
     public static BrainfuckGeneratorResult Generate(
         CompilerResult compilerResult,
         BrainfuckGeneratorSettings brainfuckSettings,

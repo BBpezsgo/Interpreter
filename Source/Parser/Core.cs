@@ -6,16 +6,11 @@ public static class ExportableExtensions
 {
     public static bool CanUse(this IExportable self, Uri? sourceFile)
     {
-        if (self.IsExport) return true;
+        if (self.IsExported) return true;
         if (sourceFile == null) return true;
         if (sourceFile == self.File) return true;
         return false;
     }
-}
-
-public interface IMaybeInFile
-{
-    public Uri? File { get; }
 }
 
 public interface IInFile
@@ -25,12 +20,27 @@ public interface IInFile
 
 public interface IExportable : IInFile
 {
-    public bool IsExport { get; }
+    public bool IsExported { get; }
 }
 
 public interface IHaveType
 {
     public TypeInstance Type { get; }
+}
+
+public interface IReferenceableTo<TReference> : IInFile, IReferenceableTo
+{
+    public new TReference? Reference { get; set; }
+    object? IReferenceableTo.Reference
+    {
+        get => Reference;
+        set => Reference = (TReference?)value;
+    }
+}
+
+public interface IReferenceableTo : IInFile
+{
+    public object? Reference { get; set; }
 }
 
 public enum LiteralType
@@ -41,23 +51,15 @@ public enum LiteralType
     Char,
 }
 
-public struct UsingAnalysis
-{
-    public string Path;
-    public bool Found;
-    public double ParseTime;
-}
-
 public readonly struct ParserResult
 {
-    public readonly LanguageError[] Errors;
+    public readonly ImmutableArray<LanguageError> Errors;
 
     public readonly ImmutableArray<FunctionDefinition> Functions;
     public readonly ImmutableArray<FunctionDefinition> Operators;
     public readonly ImmutableArray<StructDefinition> Structs;
 
     public readonly ImmutableArray<UsingDefinition> Usings;
-    public readonly List<UsingAnalysis> UsingsAnalytics;
 
     public readonly ImmutableArray<Statement.Statement> TopLevelStatements;
 
@@ -87,13 +89,12 @@ public readonly struct ParserResult
         IEnumerable<Token> originalTokens,
         IEnumerable<Token> tokens)
     {
-        Errors = errors.ToArray();
+        Errors = errors.ToImmutableArray();
 
         Functions = functions.ToImmutableArray();
         Operators = operators.ToImmutableArray();
         Structs = structs.ToImmutableArray();
         Usings = usings.ToImmutableArray();
-        UsingsAnalytics = new();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
         OriginalTokens = originalTokens.ToImmutableArray();
         Tokens = tokens.ToImmutableArray();

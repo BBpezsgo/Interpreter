@@ -19,6 +19,7 @@ public readonly struct Range<T> :
         Start = both;
         End = both;
     }
+
     public Range(T start, T end)
     {
         Start = start;

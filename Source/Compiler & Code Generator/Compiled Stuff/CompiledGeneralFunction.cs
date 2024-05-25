@@ -59,7 +59,7 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
     {
         StringBuilder result = new();
 
-        if (IsExport)
+        if (IsExported)
         { result.Append("export "); }
 
         result.Append(this.Identifier.Content);

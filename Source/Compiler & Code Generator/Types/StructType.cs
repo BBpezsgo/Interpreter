@@ -10,7 +10,7 @@ public class StructType : GeneralType,
 {
     public CompiledStruct Struct { get; }
     public ImmutableDictionary<string, GeneralType> TypeArguments { get; }
-    public Uri OriginalFile { get; }
+    public Uri File { get; }
 
     public override int Size
     {
@@ -71,7 +71,7 @@ public class StructType : GeneralType,
     {
         Struct = other.Struct;
         TypeArguments = other.TypeArguments;
-        OriginalFile = other.OriginalFile;
+        File = other.File;
     }
 
     public StructType(CompiledStruct @struct, Uri originalFile)
@@ -85,7 +85,7 @@ public class StructType : GeneralType,
         }
         else
         { TypeArguments = ImmutableDictionary<string, GeneralType>.Empty; }
-        OriginalFile = originalFile;
+        File = originalFile;
     }
 
     public StructType(CompiledStruct @struct, Uri originalFile, IReadOnlyList<GeneralType> typeArguments)
@@ -105,7 +105,7 @@ public class StructType : GeneralType,
         }
         else
         { TypeArguments = ImmutableDictionary<string, GeneralType>.Empty; }
-        OriginalFile = originalFile;
+        File = originalFile;
     }
 
     public bool GetField(string name, [NotNullWhen(true)] out CompiledField? field, [NotNullWhen(true)] out int offset)

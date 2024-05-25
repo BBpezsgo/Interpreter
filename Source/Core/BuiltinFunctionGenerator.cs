@@ -2,39 +2,26 @@
 
 using Compiler;
 
-[Flags]
-public enum ExternalFunctionCheckFlags : byte
-{
-    None = 0,
-    CheckParamLength = 1,
-}
-
 public abstract class ExternalFunctionBase : ISimpleReadable
 {
-    public const ExternalFunctionCheckFlags DefaultFlags = ExternalFunctionCheckFlags.CheckParamLength;
-
     public ImmutableArray<RuntimeType> Parameters { get; }
     public string? Name { get; }
     public int Id { get; }
     public bool ReturnSomething { get; }
-    public ExternalFunctionCheckFlags Flags { get; }
-
-    public bool CheckParameterLength => ((byte)Flags & (byte)ExternalFunctionCheckFlags.CheckParamLength) != 0;
 
     public BytecodeProcessor? BytecodeInterpreter { get; set; }
 
-    protected ExternalFunctionBase(int id, string? name, IEnumerable<RuntimeType> parameters, bool returnSomething, ExternalFunctionCheckFlags flags)
+    protected ExternalFunctionBase(int id, string? name, IEnumerable<RuntimeType> parameters, bool returnSomething)
     {
         Id = id;
         Name = name;
         Parameters = parameters.ToImmutableArray();
         ReturnSomething = returnSomething;
-        Flags = flags;
     }
 
     protected void BeforeCallback(ImmutableArray<RuntimeValue> parameters)
     {
-        if (CheckParameterLength && parameters.Length != Parameters.Length)
+        if (parameters.Length != Parameters.Length)
         { throw new RuntimeException($"Wrong number of parameters passed to external function {Name} ({parameters.Length}): expected {Parameters.Length}"); }
     }
 
@@ -58,8 +45,8 @@ public class ExternalFunctionSimple : ExternalFunctionBase
     protected Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback;
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionSimple(Action<BytecodeProcessor, ImmutableArray<RuntimeValue>> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
-        : base(id, name, parameters, false, flags)
+    public ExternalFunctionSimple(Action<BytecodeProcessor, ImmutableArray<RuntimeValue>> callback, int id, string? name, IEnumerable<RuntimeType> parameters)
+        : base(id, name, parameters, false)
     {
         this.callback = (sender, v) =>
         {
@@ -69,8 +56,8 @@ public class ExternalFunctionSimple : ExternalFunctionBase
     }
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionSimple(Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
-        : base(id, name, parameters, true, flags)
+    public ExternalFunctionSimple(Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback, int id, string? name, IEnumerable<RuntimeType> parameters)
+        : base(id, name, parameters, true)
     {
         this.callback = callback;
     }
@@ -95,8 +82,8 @@ public class ExternalFunctionManaged : ExternalFunctionBase
     readonly Func<ImmutableArray<RuntimeValue>, RuntimeValue> callback;
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionManaged(Action<ImmutableArray<RuntimeValue>, ExternalFunctionManaged> callback, int id, string? name, IEnumerable<RuntimeType> parameters, ExternalFunctionCheckFlags flags)
-             : base(id, name, parameters, true, flags)
+    public ExternalFunctionManaged(Action<ImmutableArray<RuntimeValue>, ExternalFunctionManaged> callback, int id, string? name, IEnumerable<RuntimeType> parameters)
+             : base(id, name, parameters, true)
     {
         this.callback = new Func<ImmutableArray<RuntimeValue>, RuntimeValue>((p) =>
         {
@@ -158,23 +145,23 @@ public static unsafe class ExternalFunctionGenerator
 
     #region AddExternalFunction()
 
-    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<ImmutableArray<RuntimeValue>, ExternalFunctionManaged> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
-        => functions.AddExternalFunction(new ExternalFunctionManaged(callback, functions.GenerateId(name), name, parameterTypes, flags));
+    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<ImmutableArray<RuntimeValue>, ExternalFunctionManaged> callback)
+        => functions.AddExternalFunction(new ExternalFunctionManaged(callback, functions.GenerateId(name), name, parameterTypes));
 
-    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<ImmutableArray<RuntimeValue>, ExternalFunctionManaged> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
-        => functions.AddExternalFunction(new ExternalFunctionManaged(callback, id, name, parameterTypes, flags));
+    public static void AddManagedExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<ImmutableArray<RuntimeValue>, ExternalFunctionManaged> callback)
+        => functions.AddExternalFunction(new ExternalFunctionManaged(callback, id, name, parameterTypes));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
-        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, id, name, parameterTypes, flags));
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback)
+        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, id, name, parameterTypes));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
-        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, functions.GenerateId(name), name, parameterTypes, flags));
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Func<BytecodeProcessor, ImmutableArray<RuntimeValue>, RuntimeValue> callback)
+        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, functions.GenerateId(name), name, parameterTypes));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<BytecodeProcessor, ImmutableArray<RuntimeValue>> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
-        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, id, name, parameterTypes, flags));
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<BytecodeProcessor, ImmutableArray<RuntimeValue>> callback)
+        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, id, name, parameterTypes));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<BytecodeProcessor, ImmutableArray<RuntimeValue>> callback, ExternalFunctionCheckFlags flags = ExternalFunctionBase.DefaultFlags)
-        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, functions.GenerateId(name), name, parameterTypes, flags));
+    public static void AddSimpleExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, Action<BytecodeProcessor, ImmutableArray<RuntimeValue>> callback)
+        => functions.AddExternalFunction(new ExternalFunctionSimple(callback, functions.GenerateId(name), name, parameterTypes));
 
     static void AddExternalFunction(this Dictionary<int, ExternalFunctionBase> functions, ExternalFunctionBase function)
     {

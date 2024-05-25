@@ -99,7 +99,6 @@ public sealed class Parser
     readonly List<FunctionDefinition> Operators = new();
     readonly Dictionary<string, StructDefinition> Structs = new();
     readonly List<UsingDefinition> Usings = new();
-    readonly List<CompileTag> Hashes = new();
     readonly List<Statement.Statement> TopLevelStatements = new();
     // === ===
 
@@ -162,7 +161,6 @@ public sealed class Parser
             Operators,
             Structs.Values,
             Usings,
-            Hashes,
             TopLevelStatements,
             OriginalTokens,
             Tokens);
@@ -180,56 +178,6 @@ public sealed class Parser
     }
 
     #region Parse top level
-
-    bool ExpectHash([NotNullWhen(true)] out CompileTag? hashStatement)
-    {
-        hashStatement = null;
-
-        if (!ExpectOperator("#", out Token? hashT))
-        { return false; }
-
-        hashT.AnalyzedType = TokenAnalyzedType.CompileTag;
-
-        if (!ExpectIdentifier(out Token? hashName))
-        { throw new SyntaxException($"There should be an identifier (after \"#\"), but you wrote {CurrentToken?.TokenType} \"{CurrentToken?.Content}\"", hashT, File); }
-
-        hashName.AnalyzedType = TokenAnalyzedType.CompileTag;
-
-        List<Literal> parameters = new();
-        int endlessSafe = 50;
-        Token? semicolon;
-        while (!ExpectOperator(";", out semicolon))
-        {
-            if (!ExpectLiteral(out Literal? parameter))
-            {
-                if (CurrentToken is null)
-                {
-                    throw new SyntaxException($"There should be a literal or \";\", but you wrote nothing", PreviousToken?.Position.After(), File);
-                }
-                else
-                {
-                    throw new SyntaxException($"There should be a literal or \";\", but you wrote {CurrentToken.TokenType} \"{CurrentToken.Content}\"", CurrentToken.Position, File);
-                }
-            }
-
-            parameter.ValueToken.AnalyzedType = TokenAnalyzedType.CompileTagParameter;
-            parameters.Add(parameter);
-
-            if (ExpectOperator(";", out semicolon))
-            { break; }
-
-            endlessSafe--;
-            if (endlessSafe <= 0)
-            { throw new EndlessLoopException(); }
-        }
-
-        hashStatement = new CompileTag(hashT, hashName, parameters.ToArray(), File)
-        {
-            Semicolon = semicolon,
-        };
-
-        return true;
-    }
 
     bool ExpectUsing([NotNullWhen(true)] out UsingDefinition? usingDefinition)
     {
@@ -289,9 +237,7 @@ public sealed class Parser
     {
         while (true)
         {
-            if (ExpectHash(out CompileTag? hashStatement))
-            { Hashes.Add(hashStatement); }
-            else if (ExpectUsing(out UsingDefinition? usingDefinition))
+            if (ExpectUsing(out UsingDefinition? usingDefinition))
             { Usings.Add(usingDefinition); }
             else
             { break; }

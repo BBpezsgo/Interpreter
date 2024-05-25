@@ -1,5 +1,4 @@
-﻿using LanguageCore.Parser.Statement;
-using LanguageCore.Tokenizing;
+﻿using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser;
 
@@ -59,7 +58,6 @@ public readonly struct ParserResult
 
     public readonly ImmutableArray<UsingDefinition> Usings;
     public readonly List<UsingAnalysis> UsingsAnalytics;
-    public readonly ImmutableArray<CompileTag> Hashes;
 
     public readonly ImmutableArray<Statement.Statement> TopLevelStatements;
 
@@ -74,7 +72,6 @@ public readonly struct ParserResult
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),
         Enumerable.Empty<UsingDefinition>(),
-        Enumerable.Empty<CompileTag>(),
         Enumerable.Empty<Statement.Statement>(),
         Enumerable.Empty<Token>(),
         Enumerable.Empty<Token>())
@@ -86,7 +83,6 @@ public readonly struct ParserResult
         IEnumerable<FunctionDefinition> operators,
         IEnumerable<StructDefinition> structs,
         IEnumerable<UsingDefinition> usings,
-        IEnumerable<Statement.CompileTag> hashes,
         IEnumerable<Statement.Statement> topLevelStatements,
         IEnumerable<Token> originalTokens,
         IEnumerable<Token> tokens)
@@ -98,7 +94,6 @@ public readonly struct ParserResult
         Structs = structs.ToImmutableArray();
         Usings = usings.ToImmutableArray();
         UsingsAnalytics = new();
-        Hashes = hashes.ToImmutableArray();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
         OriginalTokens = originalTokens.ToImmutableArray();
         Tokens = tokens.ToImmutableArray();

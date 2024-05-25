@@ -19,7 +19,6 @@ public readonly struct CompilerResult
     public readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
 
     public readonly ImmutableArray<CompiledStruct> Structs;
-    public readonly ImmutableArray<CompileTag> Hashes;
 
     public readonly ImmutableArray<(ImmutableArray<Statement> Statements, Uri File)> TopLevelStatements;
 
@@ -136,7 +135,6 @@ public readonly struct CompilerResult
         Enumerable.Empty<CompiledConstructor>(),
         Enumerable.Empty<KeyValuePair<int, ExternalFunctionBase>>(),
         Enumerable.Empty<CompiledStruct>(),
-        Enumerable.Empty<CompileTag>(),
         Enumerable.Empty<(ImmutableArray<Statement>, Uri)>(),
         file);
 
@@ -148,7 +146,6 @@ public readonly struct CompilerResult
         IEnumerable<CompiledConstructor> constructors,
         IEnumerable<KeyValuePair<int, ExternalFunctionBase>> externalFunctions,
         IEnumerable<CompiledStruct> structs,
-        IEnumerable<CompileTag> hashes,
         IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
         Uri file)
     {
@@ -159,7 +156,6 @@ public readonly struct CompilerResult
         Constructors = constructors.ToImmutableArray();
         ExternalFunctions = externalFunctions.ToDictionary();
         Structs = structs.ToImmutableArray();
-        Hashes = hashes.ToImmutableArray();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
         File = file;
     }
@@ -254,8 +250,6 @@ public sealed class Compiler
     readonly List<(ImmutableArray<Statement> Statements, Uri File)> TopLevelStatements = new();
 
     readonly Stack<ImmutableArray<Token>> GenericParameters = new();
-
-    readonly List<CompileTag> Tags = new();
 
     readonly CompilerSettings Settings;
     readonly TokenizerSettings? TokenizerSettings;
@@ -558,7 +552,6 @@ public sealed class Compiler
         Functions.AddRange(collectedAST.ParserResult.Functions);
         Operators.AddRange(collectedAST.ParserResult.Operators);
         Structs.AddRange(collectedAST.ParserResult.Structs);
-        Tags.AddRange(collectedAST.ParserResult.Hashes);
     }
 
     CompilerResult CompileMainFile(Uri file, FileParser? fileParser)
@@ -584,7 +577,6 @@ public sealed class Compiler
             CompiledConstructors,
             ExternalFunctions,
             CompiledStructs,
-            Tags,
             TopLevelStatements,
             file);
     }
@@ -608,72 +600,8 @@ public sealed class Compiler
             CompiledConstructors,
             ExternalFunctions,
             CompiledStructs,
-            Tags,
             TopLevelStatements,
             file);
-    }
-
-    void CompileTag(CompileTag tag)
-    {
-        switch (tag.Identifier.Content)
-        {
-            case "bf":
-            {
-                if (tag.Arguments.Length < 2)
-                { AnalysisCollection?.Errors.Add(new LanguageError($"Compile tag \"{tag.Identifier}\" requires minimum 2 parameter", tag.Identifier, tag.File)); break; }
-                string name = tag.Arguments[0].Value;
-
-                if (ExternalFunctions.TryGet(name, out _, out _)) break;
-
-                string[] bfParams = new string[tag.Arguments.Length - 1];
-                for (int i = 1; i < tag.Arguments.Length; i++)
-                { bfParams[i - 1] = tag.Arguments[i].Value; }
-
-                BasicType[] parameterTypes = new BasicType[bfParams.Length];
-                for (int i = 0; i < bfParams.Length; i++)
-                {
-                    if (TypeKeywords.BasicTypes.TryGetValue(bfParams[i], out BasicType paramType))
-                    {
-                        parameterTypes[i] = paramType;
-
-                        if (paramType == BasicType.Void && i > 0)
-                        {
-                            AnalysisCollection?.Errors.Add(new LanguageError($"Invalid type \"{bfParams[i]}\"", tag.Arguments[i + 1], tag.File));
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        AnalysisCollection?.Errors.Add(new LanguageError($"Unknown type \"{bfParams[i]}\"", tag.Arguments[i + 1], tag.File));
-                        return;
-                    }
-                }
-
-                BasicType returnType = parameterTypes[0];
-                List<BasicType> x = parameterTypes.ToList();
-                x.RemoveAt(0);
-                ImmutableArray<RuntimeType> pTypes = x.Select(v => v.Convert()).ToImmutableArray();
-
-                if (returnType == BasicType.Void)
-                {
-                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, ImmutableArray<RuntimeValue> p) =>
-                        Output.LogDebug($"{name}({string.Join(", ", p)})")
-                    );
-                }
-                else
-                {
-                    ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, ImmutableArray<RuntimeValue> p) =>
-                    {
-                        Output.LogDebug($"{name}({string.Join(", ", p)})");
-                        return default;
-                    });
-                }
-            }
-            break;
-            default:
-                AnalysisCollection?.Warnings.Add(new Warning($"Hash \"{tag.Identifier}\" does not exists, so this is ignored", tag.Identifier, tag.File));
-                break;
-        }
     }
 
     void CompileInternal()
@@ -706,11 +634,6 @@ public sealed class Compiler
             { return true; }
 
             return false;
-        }
-
-        foreach (CompileTag tag in Tags)
-        {
-            CompileTag(tag);
         }
 
         foreach (StructDefinition @struct in Structs)

@@ -250,44 +250,6 @@ public class LinkedElse : LinkedIfThing
     }
 }
 
-public class CompileTag : Statement, IInFile
-{
-    public Token Operator { get; }
-    public Token Identifier { get; }
-    public ImmutableArray<Literal> Arguments { get; }
-    public Uri File { get; }
-
-    public override Position Position =>
-        new Position(Operator, Identifier)
-        .Union(Arguments);
-
-    public CompileTag(
-        Token hashToken,
-        Token hashName,
-        IEnumerable<Literal> arguments,
-        Uri file)
-    {
-        Operator = hashToken;
-        Identifier = hashName;
-        Arguments = arguments.ToImmutableArray();
-        File = file;
-    }
-
-    public override string ToString()
-        => $"{Operator}{Identifier}{(Arguments.Length > 0 ? string.Join<Literal>(' ', Arguments) : string.Empty)}{Semicolon}";
-
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
-    {
-        if (includeThis) yield return this;
-
-        foreach (Literal argument in Arguments)
-        {
-            foreach (Statement statement in argument.GetStatementsRecursively(true))
-            { yield return statement; }
-        }
-    }
-}
-
 public class LiteralList : StatementWithValue
 {
     public TokenPair Brackets { get; }

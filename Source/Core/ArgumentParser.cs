@@ -324,7 +324,7 @@ public static class ArgumentParser
                     if (!_args.TryConsume(out int value))
                     { throw new ArgumentException($"Expected int value after argument \"{arg}\""); }
 
-                    result.BytecodeInterpreterSettings.StackMaxSize = value;
+                    result.BytecodeInterpreterSettings.StackSize = value;
                     result.BrainfuckGeneratorSettings.StackSize = value;
 
                     continue;

@@ -249,7 +249,7 @@ public static class Utils
     public static BytecodeInterpreterSettings BytecodeInterpreterSettings => new()
     {
         HeapSize = HeapSize,
-        StackMaxSize = BytecodeInterpreterSettings.Default.StackMaxSize,
+        StackSize = BytecodeInterpreterSettings.Default.StackSize,
     };
 
     public static byte[] GenerateBrainfuckMemory(int length)
@@ -313,7 +313,7 @@ public static class Utils
             Interpreter interpreter = new(true, new BytecodeInterpreterSettings()
             {
                 HeapSize = HeapSize,
-                StackMaxSize = BytecodeInterpreterSettings.Default.StackMaxSize,
+                StackSize = BytecodeInterpreterSettings.Default.StackSize,
             }, code.Code, code.DebugInfo);
 
             InputBuffer inputBuffer = new(input);

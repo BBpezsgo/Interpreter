@@ -188,20 +188,32 @@ public partial class InterpreterElement
             b.ForegroundColor = CharColor.Silver;
         }
 
-        int nextEmpty;
-        if (interval.Size() == 0)
-        {
-            nextEmpty = Interpreter.BytecodeInterpreter.Registers.StackPointer;
-        }
-        else
-        {
-            if (isReversed)
-            { nextEmpty = enumerator.Last() - 1; }
-            else
-            { nextEmpty = enumerator.Last() + 1; }
-        }
+        const int EmptyCount = 1;
 
-        DrawElement(nextEmpty, default, savedBasePointers);
+        for (int i = 1; i <= EmptyCount; i++)
+        {
+            int nextEmpty;
+            if (interval.Size() == 0)
+            {
+                if (isReversed)
+                { nextEmpty = Interpreter.BytecodeInterpreter.Registers.StackPointer - (i - 1); }
+                else
+                { nextEmpty = Interpreter.BytecodeInterpreter.Registers.StackPointer + (i - 1); }
+            }
+            else
+            {
+                if (isReversed)
+                { nextEmpty = enumerator.Last() - i; }
+                else
+                { nextEmpty = enumerator.Last() + i; }
+            }
+
+            DrawElement(nextEmpty, Interpreter.BytecodeInterpreter.Memory[nextEmpty], savedBasePointers);
+
+            b.BackgroundColor = CharColor.Black;
+            b.FinishLine();
+            b.ForegroundColor = CharColor.Silver;
+        }
 
         StackScrollBar.Draw(b);
     }

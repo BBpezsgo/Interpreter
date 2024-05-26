@@ -29,9 +29,9 @@ public partial class InterpreterElement
             {
                 case Opcode.Move:
                 {
-                    if (Interpreter.BytecodeInterpreter.GetPointer(instruction.Operand1, out int dstPtr))
+                    if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out int dstPtr))
                     { storeIndicators.Add(dstPtr); }
-                    if (Interpreter.BytecodeInterpreter.GetPointer(instruction.Operand2, out int srcPtr))
+                    if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand2, out int srcPtr))
                     { loadIndicators.Add(srcPtr); }
                     break;
                 }

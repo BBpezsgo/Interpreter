@@ -90,35 +90,35 @@ public readonly struct InstructionOperand
         InstructionOperandType.Immediate16 => Value.ToString(),
         InstructionOperandType.Immediate32 => Value.ToString(),
         InstructionOperandType.Pointer => $"[{Value}]",
-        InstructionOperandType.Register => Value.Int switch
+        InstructionOperandType.Register => (Register)Value.Int switch
         {
-            RegisterIds.CodePointer => "CP",
-            RegisterIds.StackPointer => "SP",
-            RegisterIds.BasePointer => "BP",
-            RegisterIds.EAX => "EAX",
-            RegisterIds.AX => "AX",
-            RegisterIds.AH => "AH",
-            RegisterIds.AL => "AL",
-            RegisterIds.EBX => "EBX",
-            RegisterIds.BX => "BX",
-            RegisterIds.BH => "BH",
-            RegisterIds.BL => "BL",
-            RegisterIds.ECX => "ECX",
-            RegisterIds.CX => "CX",
-            RegisterIds.CH => "CH",
-            RegisterIds.CL => "CL",
-            RegisterIds.EDX => "EDX",
-            RegisterIds.DX => "DX",
-            RegisterIds.DH => "DH",
-            RegisterIds.DL => "DL",
+            Register.CodePointer => "CP",
+            Register.StackPointer => "SP",
+            Register.BasePointer => "BP",
+            Register.EAX => "EAX",
+            Register.AX => "AX",
+            Register.AH => "AH",
+            Register.AL => "AL",
+            Register.EBX => "EBX",
+            Register.BX => "BX",
+            Register.BH => "BH",
+            Register.BL => "BL",
+            Register.ECX => "ECX",
+            Register.CX => "CX",
+            Register.CH => "CH",
+            Register.CL => "CL",
+            Register.EDX => "EDX",
+            Register.DX => "DX",
+            Register.DH => "DH",
+            Register.DL => "DL",
             _ => throw new UnreachableException(),
         },
-        InstructionOperandType.PointerBP => "[BP]",
-        InstructionOperandType.PointerSP => "[SP]",
-        InstructionOperandType.PointerEAX => "[EAX]",
-        InstructionOperandType.PointerEBX => "[EBX]",
-        InstructionOperandType.PointerECX => "[ECX]",
-        InstructionOperandType.PointerEDX => "[EDX]",
+        InstructionOperandType.PointerBP => $"[BP{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
+        InstructionOperandType.PointerSP => $"[SP{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
+        InstructionOperandType.PointerEAX => $"[EAX{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
+        InstructionOperandType.PointerEBX => $"[EBX{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
+        InstructionOperandType.PointerECX => $"[ECX{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
+        InstructionOperandType.PointerEDX => $"[EDX{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
         _ => throw new UnreachableException(),
     };
 
@@ -201,64 +201,4 @@ public readonly struct Instruction
 
         return result.ToString();
     }
-}
-
-public static class RegisterExtensions
-{
-    public static InstructionOperand ToPtr(this Register register, int offset = 0) => register switch
-    {
-        Register.StackPointer => new InstructionOperand(offset, InstructionOperandType.PointerSP),
-        Register.BasePointer => new InstructionOperand(offset, InstructionOperandType.PointerBP),
-        Register.EAX => new InstructionOperand(offset, InstructionOperandType.PointerEAX),
-        Register.EBX => new InstructionOperand(offset, InstructionOperandType.PointerEBX),
-        Register.ECX => new InstructionOperand(offset, InstructionOperandType.PointerECX),
-        Register.EDX => new InstructionOperand(offset, InstructionOperandType.PointerEDX),
-        _ => throw new NotImplementedException(),
-    };
-}
-
-public static class OpcodeExtensions
-{
-    public static int ParameterCount(this Opcode opcode) => opcode switch
-    {
-        Opcode.NOP => 0,
-        Opcode.Push => 1,
-        Opcode.Pop => 0,
-        Opcode.PopTo => 1,
-        Opcode.Exit => 0,
-        Opcode.Call => 1,
-        Opcode.Return => 0,
-        Opcode.JumpIfEqual => 1,
-        Opcode.JumpIfNotEqual => 1,
-        Opcode.JumpIfGreater => 1,
-        Opcode.JumpIfGreaterOrEqual => 1,
-        Opcode.JumpIfLess => 1,
-        Opcode.JumpIfLessOrEqual => 1,
-        Opcode.Jump => 1,
-        Opcode.CallExternal => 1,
-        Opcode.Throw => 1,
-        Opcode.Compare => 2,
-        Opcode.LogicOR => 2,
-        Opcode.LogicAND => 2,
-        Opcode.BitsAND => 2,
-        Opcode.BitsOR => 2,
-        Opcode.BitsXOR => 2,
-        Opcode.BitsNOT => 1,
-        Opcode.BitsShiftLeft => 2,
-        Opcode.BitsShiftRight => 2,
-        Opcode.MathAdd => 2,
-        Opcode.MathSub => 2,
-        Opcode.MathMult => 2,
-        Opcode.MathDiv => 2,
-        Opcode.MathMod => 2,
-        Opcode.FMathAdd => 2,
-        Opcode.FMathSub => 2,
-        Opcode.FMathMult => 2,
-        Opcode.FMathDiv => 2,
-        Opcode.FMathMod => 2,
-        Opcode.Move => 2,
-        Opcode.FTo => 1,
-        Opcode.FFrom => 1,
-        _ => throw new UnreachableException(),
-    };
 }

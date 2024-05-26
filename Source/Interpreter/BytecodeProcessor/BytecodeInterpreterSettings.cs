@@ -1,0 +1,13 @@
+﻿namespace LanguageCore.Runtime;
+
+public struct BytecodeInterpreterSettings
+{
+    public int StackSize;
+    public int HeapSize;
+
+    public static BytecodeInterpreterSettings Default => new()
+    {
+        StackSize = 256,
+        HeapSize = 2048,
+    };
+}

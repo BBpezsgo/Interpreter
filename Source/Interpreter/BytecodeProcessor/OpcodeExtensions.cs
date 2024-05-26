@@ -1,0 +1,47 @@
+﻿namespace LanguageCore.Runtime;
+
+public static class OpcodeExtensions
+{
+    public static int ParameterCount(this Opcode opcode) => opcode switch
+    {
+        Opcode.NOP => 0,
+        Opcode.Push => 1,
+        Opcode.Pop => 0,
+        Opcode.PopTo => 1,
+        Opcode.Exit => 0,
+        Opcode.Call => 1,
+        Opcode.Return => 0,
+        Opcode.JumpIfEqual => 1,
+        Opcode.JumpIfNotEqual => 1,
+        Opcode.JumpIfGreater => 1,
+        Opcode.JumpIfGreaterOrEqual => 1,
+        Opcode.JumpIfLess => 1,
+        Opcode.JumpIfLessOrEqual => 1,
+        Opcode.Jump => 1,
+        Opcode.CallExternal => 1,
+        Opcode.Throw => 1,
+        Opcode.Compare => 2,
+        Opcode.LogicOR => 2,
+        Opcode.LogicAND => 2,
+        Opcode.BitsAND => 2,
+        Opcode.BitsOR => 2,
+        Opcode.BitsXOR => 2,
+        Opcode.BitsNOT => 1,
+        Opcode.BitsShiftLeft => 2,
+        Opcode.BitsShiftRight => 2,
+        Opcode.MathAdd => 2,
+        Opcode.MathSub => 2,
+        Opcode.MathMult => 2,
+        Opcode.MathDiv => 2,
+        Opcode.MathMod => 2,
+        Opcode.FMathAdd => 2,
+        Opcode.FMathSub => 2,
+        Opcode.FMathMult => 2,
+        Opcode.FMathDiv => 2,
+        Opcode.FMathMod => 2,
+        Opcode.Move => 2,
+        Opcode.FTo => 1,
+        Opcode.FFrom => 1,
+        _ => throw new UnreachableException(),
+    };
+}

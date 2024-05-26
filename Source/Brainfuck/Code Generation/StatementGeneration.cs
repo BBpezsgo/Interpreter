@@ -2743,7 +2743,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugFunctionBlock<CompiledFunction> debugFunction = FunctionBlock(function, typeArguments);
 
-        if (function.Attributes.HasAttribute(AttributeConstants.ExternalIdentifier, ExternalFunctionNames.StdOut))
+        if (function.ExternalFunctionName == ExternalFunctionNames.StdOut)
         {
             bool canPrint = true;
 
@@ -2764,7 +2764,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
         }
 
-        if (function.Attributes.HasAttribute(AttributeConstants.ExternalIdentifier, ExternalFunctionNames.StdIn))
+        if (function.ExternalFunctionName == ExternalFunctionNames.StdIn)
         {
             int address = Stack.PushVirtual(1);
             Code.SetPointer(address);
@@ -2877,7 +2877,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
 
-        if (function.Attributes.HasAttribute("StandardOutput"))
+        if (function.ExternalFunctionName == ExternalFunctionNames.StdOut)
         {
             bool canPrint = true;
 
@@ -2898,7 +2898,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
         }
 
-        if (function.Attributes.HasAttribute("StandardInput"))
+        if (function.ExternalFunctionName == ExternalFunctionNames.StdIn)
         {
             int address = Stack.PushVirtual(1);
             Code.SetPointer(address);

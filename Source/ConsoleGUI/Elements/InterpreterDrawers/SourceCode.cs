@@ -151,81 +151,81 @@ public partial class InterpreterElement
                         b.AddText(']');
                         break;
                     case InstructionOperandType.Register:
-                        switch (operand.Value.Int)
+                        switch ((Register)operand.Value.Int)
                         {
-                            case RegisterIds.CodePointer:
+                            case Register.CodePointer:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("CP");
                                 break;
-                            case RegisterIds.StackPointer:
+                            case Register.StackPointer:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("SP");
                                 break;
-                            case RegisterIds.BasePointer:
+                            case Register.BasePointer:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("BP");
                                 break;
-                            case RegisterIds.EAX:
+                            case Register.EAX:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("EAX");
                                 break;
-                            case RegisterIds.AX:
+                            case Register.AX:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("AX");
                                 break;
-                            case RegisterIds.AH:
+                            case Register.AH:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("AH");
                                 break;
-                            case RegisterIds.AL:
+                            case Register.AL:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("AL");
                                 break;
-                            case RegisterIds.EBX:
+                            case Register.EBX:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("EBX");
                                 break;
-                            case RegisterIds.BX:
+                            case Register.BX:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("BX");
                                 break;
-                            case RegisterIds.BH:
+                            case Register.BH:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("BH");
                                 break;
-                            case RegisterIds.BL:
+                            case Register.BL:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("BL");
                                 break;
-                            case RegisterIds.ECX:
+                            case Register.ECX:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("ECX");
                                 break;
-                            case RegisterIds.CX:
+                            case Register.CX:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("CX");
                                 break;
-                            case RegisterIds.CH:
+                            case Register.CH:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("CH");
                                 break;
-                            case RegisterIds.CL:
+                            case Register.CL:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("CL");
                                 break;
-                            case RegisterIds.EDX:
+                            case Register.EDX:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("EDX");
                                 break;
-                            case RegisterIds.DX:
+                            case Register.DX:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("DX");
                                 break;
-                            case RegisterIds.DH:
+                            case Register.DH:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("DH");
                                 break;
-                            case RegisterIds.DL:
+                            case Register.DL:
                                 b.ForegroundColor = CharColor.White;
                                 b.AddText("DL");
                                 break;
@@ -237,6 +237,17 @@ public partial class InterpreterElement
                         b.AddText('[');
                         b.ForegroundColor = CharColor.White;
                         b.AddText("BP");
+                        if (operand.Value.Int > 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText('+');
+                            b.AddText(operand.Value.Int.ToString());
+                        }
+                        else if (operand.Value.Int < 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText(operand.Value.Int.ToString());
+                        }
                         b.ForegroundColor = CharColor.Gray;
                         b.AddText(']');
                         break;
@@ -245,6 +256,17 @@ public partial class InterpreterElement
                         b.AddText('[');
                         b.ForegroundColor = CharColor.White;
                         b.AddText("SP");
+                        if (operand.Value.Int > 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText('+');
+                            b.AddText(operand.Value.Int.ToString());
+                        }
+                        else if (operand.Value.Int < 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText(operand.Value.Int.ToString());
+                        }
                         b.ForegroundColor = CharColor.Gray;
                         b.AddText(']');
                         break;
@@ -253,6 +275,17 @@ public partial class InterpreterElement
                         b.AddText('[');
                         b.ForegroundColor = CharColor.White;
                         b.AddText("EAX");
+                        if (operand.Value.Int > 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText('+');
+                            b.AddText(operand.Value.Int.ToString());
+                        }
+                        else if (operand.Value.Int < 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText(operand.Value.Int.ToString());
+                        }
                         b.ForegroundColor = CharColor.Gray;
                         b.AddText(']');
                         break;
@@ -261,6 +294,17 @@ public partial class InterpreterElement
                         b.AddText('[');
                         b.ForegroundColor = CharColor.White;
                         b.AddText("EBX");
+                        if (operand.Value.Int > 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText('+');
+                            b.AddText(operand.Value.Int.ToString());
+                        }
+                        else if (operand.Value.Int < 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText(operand.Value.Int.ToString());
+                        }
                         b.ForegroundColor = CharColor.Gray;
                         b.AddText(']');
                         break;
@@ -269,6 +313,17 @@ public partial class InterpreterElement
                         b.AddText('[');
                         b.ForegroundColor = CharColor.White;
                         b.AddText("ECX");
+                        if (operand.Value.Int > 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText('+');
+                            b.AddText(operand.Value.Int.ToString());
+                        }
+                        else if (operand.Value.Int < 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText(operand.Value.Int.ToString());
+                        }
                         b.ForegroundColor = CharColor.Gray;
                         b.AddText(']');
                         break;
@@ -277,6 +332,17 @@ public partial class InterpreterElement
                         b.AddText('[');
                         b.ForegroundColor = CharColor.White;
                         b.AddText("EDX");
+                        if (operand.Value.Int > 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText('+');
+                            b.AddText(operand.Value.Int.ToString());
+                        }
+                        else if (operand.Value.Int < 0)
+                        {
+                            b.ForegroundColor = CharColor.BrightCyan;
+                            b.AddText(operand.Value.Int.ToString());
+                        }
                         b.ForegroundColor = CharColor.Gray;
                         b.AddText(']');
                         break;

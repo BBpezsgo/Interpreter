@@ -135,7 +135,6 @@ export inline void PrintLine(int message)
 //
 
 [External("stdin")]
-[StandardInput]
 char StdIn();
 
 export char ReadKey()

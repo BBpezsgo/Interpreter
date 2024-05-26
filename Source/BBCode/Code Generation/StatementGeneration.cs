@@ -357,6 +357,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 if (InFunction)
                 {
+                    AddComment(" Set return value:");
                     StackStore(GetReturnValueAddress(returnValueType), returnValueType.Size);
                 }
                 else
@@ -364,6 +365,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (returnValueType is not BuiltinType)
                     { throw new CompilerException($"Exit code must be a built-in type (not {returnValueType})", returnValue, CurrentFile); }
 
+                    AddComment(" Set exit code:");
                     StackStore(new ValueAddress(AbsoluteGlobalOffset, AddressingMode.PointerBP, true));
                 }
             }
@@ -2584,6 +2586,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int instructionStart = GeneratedCode.Count;
 
         CanReturn = true;
+        AddComment("Return flag");
         AddInstruction(Opcode.Push, new CompiledValue(false));
         TagCount[^1]++;
 
@@ -2671,6 +2674,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         OnScopeExit(function.Block.Brackets.End.Position);
 
+        AddComment("Pop return flag");
         AddInstruction(Opcode.Pop);
         TagCount[^1]--;
 
@@ -2788,6 +2792,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("TopLevelStatements {");
 
+        AddComment("Create stack frame");
         AddInstruction(Opcode.Push, Register.BasePointer);
         AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
@@ -2806,6 +2811,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions.Push(new List<int>());
 
         CanReturn = true;
+        AddComment("Return flag");
         AddInstruction(Opcode.Push, new CompiledValue(false));
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
@@ -2833,11 +2839,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CleanupVariables(CleanupStack.Pop(), statements[^1].Position.NextLine());
 
         CanReturn = false;
+        AddComment("Pop return flag");
         AddInstruction(Opcode.Pop);
         TagCount.Last--;
 
         TagCount.Pop();
 
+        AddComment("Pop stack frame");
         AddInstruction(Opcode.PopTo, Register.BasePointer);
 
         AddComment("}");
@@ -2889,12 +2897,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             // Exit code
 
-            AddComment("Push exit code:");
+            AddComment("Push exit code");
             AddInstruction(Opcode.Push, new CompiledValue(0));
         }
 
         {
             // Absolute global offset
+
+            AddComment("Abs global address");
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
@@ -2938,6 +2948,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CurrentFile = null;
         }
 
+        AddComment("Pop abs global address");
         AddInstruction(Opcode.Pop); // Pop abs global offset
 
         AddInstruction(Opcode.Exit); // Exit code already there

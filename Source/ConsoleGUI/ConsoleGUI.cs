@@ -1,4 +1,5 @@
 ﻿using System.Runtime.Versioning;
+using Win32;
 using Win32.Console;
 
 namespace ConsoleGUI;
@@ -168,18 +169,18 @@ internal sealed class ConsoleGUI : ConsoleRenderer, IDisposable
 
         ConsoleListener.Start();
 
-        Clear();
+        this.Clear();
         RefreshElementsSize(true);
         RefreshConsole();
     }
 
-    void RefreshElementsSize(bool Force = false)
+    void RefreshElementsSize(bool force = false)
     {
-        if (ResizeElements || Force)
+        if (ResizeElements || force)
         {
             RefreshBufferSize();
 
-            Clear();
+            this.Clear();
 
             ResizeElements = false;
             foreach (Element Element in Elements) Element.RefreshSize();
@@ -213,7 +214,7 @@ internal sealed class ConsoleGUI : ConsoleRenderer, IDisposable
     {
         NextRefreshConsole = false;
 
-        Fill(new ConsoleChar((char)0x2591, CharColor.Gray, CharColor.Black));
+        this.Fill(new ConsoleChar((char)0x2591, CharColor.Gray, CharColor.Black));
 
         try
         {
@@ -255,7 +256,7 @@ internal sealed class ConsoleGUI : ConsoleRenderer, IDisposable
         {
             for (int y = element.Rect.Top; y <= element.Rect.Bottom; y++)
             {
-                if (!IsVisible(x, y)) continue;
+                if (!this.IsVisible(x, y)) continue;
 
                 this[x, y] = isFilled ? element.DrawContent(x, y) : element.DrawContentWithBorders(x, y);
             }

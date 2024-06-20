@@ -11,7 +11,7 @@ public partial class InterpreterBase
 {
     protected struct RendererContext
     {
-        public Renderer<ConsoleChar>? Renderer;
+        public ConsoleRenderer? Renderer;
         public Queue<byte>? InputBuffer;
         public string? OutputBuffer;
         public int CodeDisplayPosition;
@@ -184,7 +184,7 @@ public partial class InterpreterBase<TCode> : IDisposable
 
     int StartToken;
     [SupportedOSPlatform("windows")]
-    void DrawOriginalCode(Renderer<ConsoleChar> renderer, SmallRect rect)
+    void DrawOriginalCode(ConsoleRenderer renderer, SmallRect rect)
     {
         renderer.Clear(rect);
         rect.Top = Math.Max(rect.Top, (short)0);
@@ -296,10 +296,10 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     [SupportedOSPlatform("windows")]
-    protected abstract void DrawCode(Renderer<ConsoleChar> renderer, Range<int> range, int x, int y, int width);
+    protected abstract void DrawCode(ConsoleRenderer renderer, Range<int> range, int x, int y, int width);
 
     [SupportedOSPlatform("windows")]
-    void DrawMemory(Renderer<ConsoleChar> renderer, Range<int> range, SmallRect rect)
+    void DrawMemory(ConsoleRenderer renderer, Range<int> range, SmallRect rect)
     {
         renderer.Clear(rect);
 
@@ -400,7 +400,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     [SupportedOSPlatform("windows")]
-    static void DrawOutput(Renderer<ConsoleChar> renderer, string text, SmallRect rect)
+    static void DrawOutput(ConsoleRenderer renderer, string text, SmallRect rect)
     {
         int x = rect.X;
         int y = rect.Y;
@@ -434,7 +434,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     [SupportedOSPlatform("windows")]
-    void DrawStackTrace(Renderer<ConsoleChar> renderer, SmallRect rect)
+    void DrawStackTrace(ConsoleRenderer renderer, SmallRect rect)
     {
         if (DebugInfo == null)
         { return; }

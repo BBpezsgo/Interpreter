@@ -23,6 +23,31 @@ public static class Utils
     public static unsafe T To<T>(this ReadOnlySpan<byte> v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }
     public static unsafe T To<T>(this ImmutableArray<byte> v) where T : unmanaged { fixed (byte* ptr = v.AsSpan()) return *(T*)ptr; }
 
+    /// <summary>
+    /// Source: <see href="https://stackoverflow.com/questions/3855956/check-if-an-executable-exists-in-the-windows-path"/>
+    /// </summary>
+    public static bool GetFullPath(string fileName, [NotNullWhen(true)] out string? fullPath) => (fullPath = GetFullPath(fileName)) is not null;
+    /// <summary>
+    /// Source: <see href="https://stackoverflow.com/questions/3855956/check-if-an-executable-exists-in-the-windows-path"/>
+    /// </summary>
+    public static string? GetFullPath(string fileName)
+    {
+        if (File.Exists(fileName))
+        { return Path.GetFullPath(fileName); }
+
+        string? values = Environment.GetEnvironmentVariable("PATH");
+        if (values is null) return null;
+
+        foreach (string path in values.Split(Path.PathSeparator))
+        {
+            string fullPath = Path.Combine(path, fileName);
+            if (File.Exists(fullPath))
+            { return fullPath; }
+        }
+
+        return null;
+    }
+
     public static T Max<T>(T a, T b)
         where T : IComparisonOperators<T, T, bool>
         => a > b ? a : b;

@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.ASM;
+﻿using LanguageCore.Runtime;
+
+namespace LanguageCore.ASM;
 
 public class TextSectionBuilder : SectionBuilder
 {
@@ -76,6 +78,39 @@ public class TextSectionBuilder : SectionBuilder
         _ => throw new UnreachableException(),
     }).ToUpperInvariant();
 
+    public static string StringifyInstruction(Runtime.Opcode instruction) => (instruction switch
+    {
+        Runtime.Opcode.Move => "mov",
+        Runtime.Opcode.Push => "push",
+        Runtime.Opcode.Pop => "pop",
+        Runtime.Opcode.PopTo => "pop",
+
+        Runtime.Opcode.MathAdd => "add",
+        Runtime.Opcode.MathSub => "sub",
+        Runtime.Opcode.Compare => "cmp",
+        Runtime.Opcode.MathMult => "mul",
+        Runtime.Opcode.MathDiv => "div",
+        Runtime.Opcode.BitsAND => "and",
+        Runtime.Opcode.BitsXOR => "xor",
+        Runtime.Opcode.BitsOR => "or",
+        Runtime.Opcode.BitsShiftRight => "shr",
+        Runtime.Opcode.BitsShiftLeft => "shl",
+
+        Runtime.Opcode.Call => "call",
+        Runtime.Opcode.Return => "ret",
+        Runtime.Opcode.Exit => "hlt",
+
+        Runtime.Opcode.Jump => "jmp",
+        Runtime.Opcode.JumpIfEqual => "je",
+        Runtime.Opcode.JumpIfNotEqual => "jne",
+        Runtime.Opcode.JumpIfGreaterOrEqual => "jge",
+        Runtime.Opcode.JumpIfGreater => "jg",
+        Runtime.Opcode.JumpIfLessOrEqual => "jle",
+        Runtime.Opcode.JumpIfLess => "jl",
+
+        _ => throw new UnreachableException(),
+    }).ToUpperInvariant();
+
     void AppendInstructionNoEOL(OpCode keyword)
     {
         AppendText(' ', Indent);
@@ -124,6 +159,27 @@ public class TextSectionBuilder : SectionBuilder
     {
         AppendText(' ', Indent);
         AppendText(instruction.ToString());
+        AppendText(EOL);
+    }
+
+    public void AppendInstruction(Runtime.Instruction instruction)
+    {
+        AppendText(' ', Indent);
+
+        int paramCount = instruction.Opcode.ParameterCount();
+
+        AppendText(StringifyInstruction(instruction.Opcode));
+        if (paramCount <= 1)
+        {
+            Builder.Append(' ');
+            AppendText(instruction.Operand1.ToString());
+        }
+        if (paramCount <= 2)
+        {
+            Builder.Append(' ');
+            AppendText(instruction.Operand2.ToString());
+        }
+
         AppendText(EOL);
     }
 

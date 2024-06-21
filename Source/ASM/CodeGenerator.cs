@@ -68,6 +68,162 @@ public class CodeGeneratorForAsm : CodeGenerator
 
     #region Memory Helpers
 
+    ValueAddress GetDataAddress(StatementWithValue value) => value switch
+    {
+        IndexCall v => GetDataAddress(v),
+        Identifier v => GetDataAddress(v),
+        Field v => GetDataAddress(v),
+        _ => throw new NotImplementedException()
+    };
+    ValueAddress GetDataAddress(Identifier variable)
+    {
+        if (GetConstant(variable.Content, out _))
+        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
+
+        if (GetParameter(variable.Content, out CompiledParameter? parameter))
+        { return GetParameterAddress(parameter); }
+
+        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+        { return new ValueAddress(localVariable); }
+
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out _))
+        { return GetGlobalVariableAddress(globalVariable); }
+
+        throw new CompilerException($"Local symbol \"{variable.Content}\" not found", variable, CurrentFile);
+    }
+    ValueAddress GetDataAddress(Field field)
+    {
+        ValueAddress address = GetBaseAddress(field);
+        if (address.IsReference)
+        { throw new NotImplementedException(); }
+        int offset = GetDataOffset(field);
+        return address + offset;
+    }
+    ValueAddress GetDataAddress(IndexCall indexCall)
+    {
+        ValueAddress address = GetBaseAddress(indexCall.PrevStatement);
+        if (address.IsReference)
+        { throw new NotImplementedException(); }
+        int currentOffset = GetDataOffset(indexCall);
+        return address + currentOffset;
+    }
+
+    int GetDataOffset(StatementWithValue value, StatementWithValue? until = null) => value switch
+    {
+        IndexCall v => GetDataOffset(v, until),
+        Field v => GetDataOffset(v, until),
+        Identifier => 0,
+        _ => throw new NotImplementedException()
+    };
+    int GetDataOffset(Field field, StatementWithValue? until = null)
+    {
+        if (field.PrevStatement == until) return 0;
+
+        GeneralType prevType = FindStatementType(field.PrevStatement);
+
+        if (prevType is not StructType structType)
+        { throw new NotImplementedException(); }
+
+        if (!structType.GetField(field.Identifier.Content, out _, out int fieldOffset))
+        { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
+
+        int prevOffset = GetDataOffset(field.PrevStatement, until);
+        return prevOffset + fieldOffset;
+    }
+    int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null)
+    {
+        if (indexCall.PrevStatement == until) return 0;
+
+        GeneralType prevType = FindStatementType(indexCall.PrevStatement);
+
+        if (prevType is not ArrayType arrayType)
+        { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
+
+        if (!TryCompute(indexCall.Index, out CompiledValue index))
+        { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
+
+        int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
+        int offset = (int)index * arrayType.Of.Size;
+        return prevOffset + offset;
+    }
+
+    static ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
+        => new ValueAddress(variable.MemoryAddress, AddressingMode.Pointer) + 3;
+    public ValueAddress GetReturnValueAddress(GeneralType returnType)
+        => new(-(ParametersSize + 0 + returnType.Size) + BytecodeProcessor.StackPointerOffset, AddressingMode.PointerBP);
+    ValueAddress GetParameterAddress(CompiledParameter parameter)
+    {
+        int address = -(ParametersSizeBefore(parameter.Index) + 0) + BytecodeProcessor.StackPointerOffset;
+        return new ValueAddress(parameter, address);
+    }
+    ValueAddress GetParameterAddress(CompiledParameter parameter, int offset)
+    {
+        int address = -(ParametersSizeBefore(parameter.Index) - offset + 0) + BytecodeProcessor.StackPointerOffset;
+        return new ValueAddress(parameter, address);
+    }
+
+    ValueAddress GetBaseAddress(StatementWithValue statement) => statement switch
+    {
+        Identifier v => GetBaseAddress(v),
+        Field v => GetBaseAddress(v),
+        IndexCall v => GetBaseAddress(v),
+        _ => throw new NotImplementedException()
+    };
+    ValueAddress GetBaseAddress(Identifier variable)
+    {
+        if (GetConstant(variable.Content, out _))
+        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
+
+        if (GetParameter(variable.Content, out CompiledParameter? parameter))
+        { return GetParameterAddress(parameter); }
+
+        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+        { return new ValueAddress(localVariable); }
+
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out _))
+        { return GetGlobalVariableAddress(globalVariable); }
+
+        throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
+    }
+    ValueAddress GetBaseAddress(Field statement)
+    {
+        ValueAddress address = GetBaseAddress(statement.PrevStatement);
+        if (FindStatementType(statement.PrevStatement) is PointerType) throw null!;
+        return address;
+    }
+    ValueAddress GetBaseAddress(IndexCall statement)
+    {
+        ValueAddress address = GetBaseAddress(statement.PrevStatement);
+        if (FindStatementType(statement.PrevStatement) is PointerType) throw null!;
+        return address;
+    }
+
+    StatementWithValue? NeedDerefernce(StatementWithValue value) => value switch
+    {
+        Identifier => null,
+        Field v => NeedDerefernce(v),
+        IndexCall v => NeedDerefernce(v),
+        _ => throw new NotImplementedException()
+    };
+    StatementWithValue? NeedDerefernce(IndexCall indexCall)
+    {
+        if (FindStatementType(indexCall.PrevStatement) is PointerType)
+        { return indexCall.PrevStatement; }
+
+        return NeedDerefernce(indexCall.PrevStatement);
+    }
+    StatementWithValue? NeedDerefernce(Field field)
+    {
+        if (FindStatementType(field.PrevStatement) is PointerType)
+        { return field.PrevStatement; }
+
+        return NeedDerefernce(field.PrevStatement);
+    }
+
+    #endregion
+
+    #region Memory Helpers
+
     protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
         if (base.GetLocalSymbolType(symbolName, out type)) return true;
@@ -110,11 +266,6 @@ public class CodeGeneratorForAsm : CodeGenerator
         return false;
     }
 
-    protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
-    {
-        throw new NotImplementedException();
-    }
-
     bool TryGetFunctionLabel(CompiledFunction function, [NotNullWhen(true)] out string? label)
     {
         for (int i = 0; i < FunctionLabels.Count; i++)
@@ -147,39 +298,31 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             switch (address.AddressingMode)
             {
-                case AddressingMode.Absolute:
-                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, InstructionOperand.Pointer((address.Address + 1) * IntSize));
-                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
-                    return;
-                case AddressingMode.Runtime:
-                    throw new NotImplementedException();
-                case AddressingMode.BasePointerRelative:
+                case AddressingMode.Pointer:
+                throw new NotImplementedException();
+                case AddressingMode.PointerBP:
                     Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, InstructionOperand.Pointer(Intel.Register.BP, (Math.Abs(address.Address) + 1) * IntSize * Math.Sign(address.Address)));
                     Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                     return;
-                case AddressingMode.StackPointerRelative:
+                case AddressingMode.PointerSP:
                     throw new NotImplementedException();
                 default: throw new UnreachableException();
             }
         }
 
-        if (address.InHeap)
-        { throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly"); }
-
         switch (address.AddressingMode)
         {
-            case AddressingMode.Absolute:
-            case AddressingMode.BasePointerRelative:
+            case AddressingMode.PointerBP:
                 Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, InstructionOperand.Pointer(Intel.Register.BP, (address.Address + 1) * IntSize * -1));
                 Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                 break;
 
-            case AddressingMode.StackPointerRelative:
+            case AddressingMode.PointerSP:
                 Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, Intel.Register.AX, InstructionOperand.Pointer(Intel.Register.SP, (address.Address + 1) * IntSize));
                 Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, Intel.Register.AX);
                 throw new NotImplementedException();
 
-            case AddressingMode.Runtime:
+            case AddressingMode.Pointer:
                 throw new NotImplementedException();
             default: throw new UnreachableException();
         }
@@ -190,34 +333,26 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             switch (address.AddressingMode)
             {
-                case AddressingMode.Absolute:
-                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, InstructionOperand.Pointer((address.Address + 1) * IntSize), Intel.Register.AX);
-                    return;
-                case AddressingMode.Runtime:
+                case AddressingMode.Pointer:
                     throw new NotImplementedException();
-                case AddressingMode.BasePointerRelative:
+                case AddressingMode.PointerBP:
                     Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
                     Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, InstructionOperand.Pointer(Intel.Register.BP, (Math.Abs(address.Address) + 1) * IntSize * Math.Sign(address.Address)), Intel.Register.AX);
                     return;
-                case AddressingMode.StackPointerRelative:
+                case AddressingMode.PointerSP:
                     throw new NotImplementedException();
                 default: throw new UnreachableException();
             }
         }
 
-        if (address.InHeap)
-        { throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly"); }
-
         switch (address.AddressingMode)
         {
-            case AddressingMode.Absolute:
-            case AddressingMode.BasePointerRelative:
+            case AddressingMode.PointerBP:
                 Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Pop, Intel.Register.AX);
                 Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, InstructionOperand.Pointer(Intel.Register.BP, (address.Address + 1) * IntSize * -1), Intel.Register.AX);
                 break;
-            case AddressingMode.StackPointerRelative:
-            case AddressingMode.Runtime:
+            case AddressingMode.PointerSP:
+            case AddressingMode.Pointer:
                 throw new NotImplementedException();
             default: throw new UnreachableException();
         }
@@ -256,17 +391,6 @@ public class CodeGeneratorForAsm : CodeGenerator
     }
 
     public int ReturnValueOffset => -(ParametersSize + 3);
-
-    protected override ValueAddress GetBaseAddress(CompiledParameter parameter)
-    {
-        int offset = -(2 + ParametersSizeBefore(parameter.Index));
-        return new ValueAddress(parameter, offset);
-    }
-    protected override ValueAddress GetBaseAddress(CompiledParameter parameter, int offset)
-    {
-        int _offset = -(2 + ParametersSizeBefore(parameter.Index) - offset);
-        return new ValueAddress(parameter, _offset);
-    }
 
     #endregion
 
@@ -341,7 +465,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         int size;
 
-        if (TryCompute(newVariable.InitialValue, out DataItem computedInitialValue))
+        if (TryCompute(newVariable.InitialValue, out CompiledValue computedInitialValue))
         {
             size = 1;
 
@@ -414,7 +538,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
             GenerateCodeForStatement(value);
 
-            ValueAddress offset = GetBaseAddress(parameter);
+            ValueAddress offset = GetParameterAddress(parameter);
             StackStore(offset);
             return;
         }
@@ -431,14 +555,14 @@ public class CodeGeneratorForAsm : CodeGenerator
 
         if (TryGetRegister(statement.Token.Content, out Intel.Register dstRegister, out BuiltinType? dstRegisterType))
         {
-            if (TryCompute(value, out DataItem _value))
+            if (TryCompute(value, out CompiledValue _value))
             {
                 if (dstRegisterType == BasicType.Byte &&
-                    !DataItem.TryShrinkTo8bit(ref _value))
+                    !CompiledValue.TryShrinkTo8bit(ref _value))
                 { throw new CompilerException($"Can't set constant value {_value} to an 8bit register", value, CurrentFile); }
 
                 if (dstRegisterType == BasicType.Char &&
-                    !DataItem.TryShrinkTo16bit(ref _value))
+                    !CompiledValue.TryShrinkTo16bit(ref _value))
                 { throw new CompilerException($"Can't set constant value {_value} to an 16bit register", value, CurrentFile); }
 
                 Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, dstRegister, (InstructionOperand)_value);
@@ -477,7 +601,7 @@ public class CodeGeneratorForAsm : CodeGenerator
             string destinationRegisterName = _identifier.Content[1..];
             if (Enum.TryParse<Intel.Register>(destinationRegisterName, out Intel.Register destinationRegister))
             {
-                if (TryCompute(value, out DataItem _value))
+                if (TryCompute(value, out CompiledValue _value))
                 {
                     Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Move, InstructionOperand.Pointer(destinationRegister, 0), (InstructionOperand)_value);
                     return;
@@ -529,9 +653,9 @@ public class CodeGeneratorForAsm : CodeGenerator
             parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
         }
 
-        for (int i = 0; i < functionCall.Parameters.Length; i++)
+        for (int i = 0; i < functionCall.Arguments.Length; i++)
         {
-            StatementWithValue passedParameter = functionCall.Parameters[i];
+            StatementWithValue passedParameter = functionCall.Arguments[i];
             GeneralType passedParameterType = FindStatementType(passedParameter);
             ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsExtension ? (i + 1) : i];
             // GeneralType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
@@ -572,9 +696,9 @@ public class CodeGeneratorForAsm : CodeGenerator
             parameterCleanup.Push((passedParameterType.Size, false, passedParameterType));
         }
 
-        for (int i = 0; i < functionCall.Parameters.Length; i++)
+        for (int i = 0; i < functionCall.Arguments.Length; i++)
         {
-            StatementWithValue passedParameter = functionCall.Parameters[i];
+            StatementWithValue passedParameter = functionCall.Arguments[i];
             GeneralType passedParameterType = FindStatementType(passedParameter);
 
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
@@ -620,15 +744,15 @@ public class CodeGeneratorForAsm : CodeGenerator
             return;
         }
 
-        if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
-        { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+        if (functionCall.MethodArguments.Length != compiledFunction.ParameterCount)
+        { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodArguments.Length}", functionCall, CurrentFile); }
 
         if (functionCall.IsMethodCall != compiledFunction.IsExtension)
         { throw new CompilerException($"You called the {(compiledFunction.IsExtension ? "method" : "function")} \"{functionCall.Identifier}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
 
         if (compiledFunction.Attributes.HasAttribute(AttributeConstants.ExternalIdentifier, ExternalFunctionNames.StdOut))
         {
-            StatementWithValue valueToPrint = functionCall.Parameters[0];
+            StatementWithValue valueToPrint = functionCall.Arguments[0];
             GeneralType valueToPrintType = FindStatementType(valueToPrint);
 
             if (valueToPrintType == BasicType.Char &&
@@ -641,7 +765,7 @@ public class CodeGeneratorForAsm : CodeGenerator
 
                 Builder.CodeBuilder.Call_stdcall("_GetStdHandle@4", 4, -11);
 
-                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.LoadEA, Intel.Register.BX, (InstructionOperand)new ValueAddress(0, AddressingMode.BasePointerRelative));
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.LoadEA, Intel.Register.BX, (InstructionOperand)new ValueAddress(0, AddressingMode.PointerBP));
 
                 Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20,
                     Intel.Register.AX,
@@ -663,11 +787,11 @@ public class CodeGeneratorForAsm : CodeGenerator
                 Builder.CodeBuilder.Call_stdcall("_GetStdHandle@4", 4, -11);
 
                 Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
-                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.LoadEA, Intel.Register.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackPointerRelative));
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.LoadEA, Intel.Register.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.PointerSP));
 
                 Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20,
                     Intel.Register.AX,
-                    (InstructionOperand)new ValueAddress(-2, AddressingMode.StackPointerRelative),
+                    (InstructionOperand)new ValueAddress(-2, AddressingMode.PointerSP),
                     1,
                     Intel.Register.BX,
                     0);
@@ -686,7 +810,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 Builder.CodeBuilder.Call_stdcall("_GetStdHandle@4", 4, -11);
 
                 Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, 0);
-                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.LoadEA, Intel.Register.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.StackPointerRelative));
+                Builder.CodeBuilder.AppendInstruction(ASM.OpCode.LoadEA, Intel.Register.BX, (InstructionOperand)new ValueAddress(-1, AddressingMode.PointerSP));
 
                 Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20,
                     Intel.Register.AX,
@@ -780,9 +904,6 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             ValueAddress address = GetDataAddress(statement);
 
-            if (address.InHeap)
-            { throw new CompilerException($"This value is stored in the heap and not in the stack", statement, CurrentFile); }
-
             if (address.IsReference)
             {
                 StackLoad(address);
@@ -822,7 +943,7 @@ public class CodeGeneratorForAsm : CodeGenerator
                 indexCall.Index,
             },
             indexCall.Brackets,
-            indexCall.OriginalFile));
+            indexCall.File));
     }
     void GenerateCodeForStatement(IfContainer @if)
     {
@@ -901,18 +1022,18 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             case StatementKeywords.Return:
             {
-                if (statement.Parameters.Length > 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {statement.Parameters.Length}", statement, CurrentFile); }
+                if (statement.Arguments.Length > 1)
+                { throw new CompilerException($"Wrong number of arguments passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {statement.Arguments.Length}", statement, CurrentFile); }
 
-                if (statement.Parameters.Length == 1)
+                if (statement.Arguments.Length == 1)
                 {
-                    StatementWithValue returnValue = statement.Parameters[0];
+                    StatementWithValue returnValue = statement.Arguments[0];
                     GeneralType returnValueType = FindStatementType(returnValue);
 
                     GenerateCodeForStatement(returnValue);
 
                     int offset = ReturnValueOffset;
-                    StackStore(new ValueAddress(offset, AddressingMode.BasePointerRelative), returnValueType.Size);
+                    StackStore(new ValueAddress(offset, AddressingMode.PointerBP), returnValueType.Size);
                 }
 
                 if (InFunction)
@@ -925,8 +1046,8 @@ public class CodeGeneratorForAsm : CodeGenerator
 
             case StatementKeywords.Break:
             {
-                if (statement.Parameters.Length != 0)
-                { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Break}\": required {0}, passed {statement.Parameters.Length}", statement, CurrentFile); }
+                if (statement.Arguments.Length != 0)
+                { throw new CompilerException($"Wrong number of arguments passed to \"{StatementKeywords.Break}\": required {0}, passed {statement.Arguments.Length}", statement, CurrentFile); }
 
                 throw new NotImplementedException();
             }
@@ -1078,7 +1199,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             statement.Token.AnalyzedType = TokenAnalyzedType.ConstantName;
             statement.Reference = constant;
-            Builder.CodeBuilder.AppendInstruction(ASM.OpCode.Push, (InstructionOperand)constant.Value);
+            Builder.CodeBuilder.AppendInstruction(OpCode.Push, (InstructionOperand)constant.Value);
             return;
         }
 
@@ -1086,7 +1207,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             if (statement.Content != StatementKeywords.This)
             { statement.Token.AnalyzedType = TokenAnalyzedType.ParameterName; }
-            ValueAddress address = GetBaseAddress(compiledParameter);
+            ValueAddress address = GetParameterAddress(compiledParameter);
             StackLoad(address, compiledParameter.Type.Size);
             return;
         }
@@ -1152,7 +1273,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             throw new NotImplementedException();
         }
-        else if (LanguageOperators.BinaryOperatorsOld.TryGetValue(statement.Operator.Content, out Opcode opcode))
+        else if (LanguageOperators.BinaryOperators.TryGetValue(statement.Operator.Content, out string? opcode))
         {
             GenerateCodeForStatement(statement.Left);
             GenerateCodeForStatement(statement.Right);
@@ -1396,7 +1517,7 @@ public class CodeGeneratorForAsm : CodeGenerator
         {
             throw new NotImplementedException();
         }
-        else if (LanguageOperators.UnaryOperatorsOld.TryGetValue(statement.Operator.Content, out Opcode opcode))
+        else if (LanguageOperators.UnaryOperators.TryGetValue(statement.Operator.Content, out _))
         {
             GenerateCodeForStatement(statement.Left);
 
@@ -1492,15 +1613,15 @@ public class CodeGeneratorForAsm : CodeGenerator
             if (statement is KeywordCall keywordCall &&
                 keywordCall.Identifier.Equals(StatementKeywords.Return))
             {
-                if (keywordCall.Parameters.Length is not 0 and not 1)
-                { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {keywordCall.Parameters.Length})", keywordCall, CurrentFile); }
+                if (keywordCall.Arguments.Length is not 0 and not 1)
+                { throw new CompilerException($"Wrong number of arguments passed to instruction \"return\" (required 0 or 1, passed {keywordCall.Arguments.Length})", keywordCall, CurrentFile); }
 
-                if (keywordCall.Parameters.Length == 1)
+                if (keywordCall.Arguments.Length == 1)
                 {
                     if (Is16Bits)
                     { throw new NotSupportedException("Not", keywordCall, CurrentFile); }
 
-                    GenerateCodeForStatement(keywordCall.Parameters[0]);
+                    GenerateCodeForStatement(keywordCall.Arguments[0]);
                     hasExited = true;
                     Builder.CodeBuilder.Call_stdcall("_ExitProcess@4");
                     break;

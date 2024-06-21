@@ -28,8 +28,9 @@ public class DataSectionBuilder : SectionBuilder
         AppendText(' ', Indent);
         AppendTextLine($"{label}:");
         AppendText(' ', Indent + IndentIncrement);
-        if (Utils.Escape(ref data))
-        { AppendTextLine($"db `{data}`, 0"); }
+        string escaped = data.Escape();
+        if (escaped != data)
+        { AppendTextLine($"db `{escaped}`, 0"); }
         else
         { AppendTextLine($"db \"{data}\", 0"); }
         return label;

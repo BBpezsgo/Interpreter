@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.ASM;
+﻿using LanguageCore.Compiler;
+
+namespace LanguageCore.ASM;
 
 public enum InstructionOperandType
 {
@@ -73,15 +75,16 @@ public readonly struct InstructionOperand : IEquatable<InstructionOperand>
 
     public static explicit operator InstructionOperand(Compiler.ValueAddress v)
     {
-        if (v.IsReference || v.InHeap)
+        if (v.IsReference)
         { throw new NotImplementedException(); }
 
         return v.AddressingMode switch
         {
-            Runtime.AddressingMode.BasePointerRelative => new InstructionOperand(InstructionOperandType.IndexedAddress, (ushort)Intel.Register.BP, (ushort)(v.Address * 4)),
-            Runtime.AddressingMode.StackPointerRelative => new InstructionOperand(InstructionOperandType.IndexedAddress, (ushort)Intel.Register.SP, (ushort)(v.Address * 4)),
+            Runtime.AddressingMode.PointerBP => new InstructionOperand(InstructionOperandType.IndexedAddress, (ushort)Intel.Register.BP, (ushort)(v.Address * 4)),
+            Runtime.AddressingMode.PointerSP => new InstructionOperand(InstructionOperandType.IndexedAddress, (ushort)Intel.Register.SP, (ushort)(v.Address * 4)),
             _ => throw new UnreachableException(),
         };
     }
-    public static explicit operator InstructionOperand(Runtime.DataItem v) => new(InstructionOperandType.Immediate, checked((ushort)v));
+    public static explicit operator InstructionOperand(Runtime.RuntimeValue v) => new(InstructionOperandType.Immediate, v.Char);
+    public static explicit operator InstructionOperand(CompiledValue v) => new(InstructionOperandType.Immediate, v.Char);
 }

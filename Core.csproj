@@ -27,15 +27,12 @@
   <ItemGroup>
     <Compile Remove="out\**" />
     <Compile Remove="Scripts\BuildJob\**" />
-    <Compile Remove="Source\ASM\**" />
     <Compile Remove="Tests\**" />
     <EmbeddedResource Remove="out\**" />
     <EmbeddedResource Remove="Scripts\BuildJob\**" />
-    <EmbeddedResource Remove="Source\ASM\**" />
     <EmbeddedResource Remove="Tests\**" />
     <None Remove="out\**" />
     <None Remove="Scripts\BuildJob\**" />
-    <None Remove="Source\ASM\**" />
     <None Remove="Tests\**" />
   </ItemGroup>
 
@@ -49,6 +46,7 @@
     <Compile Remove="ConsoleGUI.cs" />
     <Compile Remove="Core.cs" />
     <Compile Remove="SomeTests.cs" />
+    <Compile Remove="Source\ASM\CodeGenerator.cs" />
     <Compile Remove="Source\CompileIntoFile.cs" />
   </ItemGroup>
 

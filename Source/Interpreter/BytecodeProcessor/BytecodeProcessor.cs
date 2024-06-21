@@ -5,6 +5,7 @@ namespace LanguageCore.Runtime;
 public partial class BytecodeProcessor
 {
     public static readonly int StackDirection = -1;
+    public const int StackPointerOffset = 1;
 
     Instruction CurrentInstruction => Code[Registers.CodePointer];
     public bool IsDone => Registers.CodePointer >= Code.Length;
@@ -312,8 +313,8 @@ public partial class BytecodeProcessor
         if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
 
-        SetData(Registers.StackPointer, data);
         Registers.StackPointer += StackDirection;
+        SetData(Registers.StackPointer, data);
     }
 
     RuntimeValue Pop()
@@ -321,8 +322,8 @@ public partial class BytecodeProcessor
         if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
 
-        Registers.StackPointer -= StackDirection;
         RuntimeValue data = Memory[Registers.StackPointer];
+        Registers.StackPointer -= StackDirection;
         return data;
     }
 }

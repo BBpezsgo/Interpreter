@@ -399,7 +399,7 @@ public partial class BytecodeProcessor
         RuntimeValue[] parameters = new RuntimeValue[function.Parameters.Length];
         for (int i = 0; i < function.Parameters.Length; i++)
         {
-            parameters[parameters.Length - 1 - i] = Memory[Registers.StackPointer - ((1 + i) * StackDirection)];
+            parameters[parameters.Length - 1 - i] = Memory[Registers.StackPointer - (((1 + i) * StackDirection) + StackPointerOffset)];
         }
 
         if (function is ExternalFunctionManaged managedFunction)

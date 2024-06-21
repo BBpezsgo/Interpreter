@@ -105,7 +105,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
 
         if (GetParameter(variable.Content, out CompiledParameter? parameter))
-        { return GetBaseAddress(parameter); }
+        { return GetParameterAddress(parameter); }
 
         if (GetVariable(variable.Content, out CompiledVariable? localVariable))
         { return new ValueAddress(localVariable); }
@@ -171,6 +171,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return prevOffset + offset;
     }
 
+    static ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
+        => new ValueAddress(variable.MemoryAddress, AddressingMode.Pointer) + 3;
+    public ValueAddress GetReturnValueAddress(GeneralType returnType)
+        => new(-(ParametersSize + TagsBeforeBasePointer + returnType.Size) + BytecodeProcessor.StackPointerOffset, AddressingMode.PointerBP);
+    ValueAddress GetParameterAddress(CompiledParameter parameter)
+    {
+        int address = -(ParametersSizeBefore(parameter.Index) + TagsBeforeBasePointer) + BytecodeProcessor.StackPointerOffset;
+        return new ValueAddress(parameter, address);
+    }
+    ValueAddress GetParameterAddress(CompiledParameter parameter, int offset)
+    {
+        int address = -(ParametersSizeBefore(parameter.Index) - offset + TagsBeforeBasePointer) + BytecodeProcessor.StackPointerOffset;
+        return new ValueAddress(parameter, address);
+    }
+
     ValueAddress GetBaseAddress(StatementWithValue statement) => statement switch
     {
         Identifier v => GetBaseAddress(v),
@@ -178,25 +193,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         IndexCall v => GetBaseAddress(v),
         _ => throw new NotImplementedException()
     };
-    ValueAddress GetBaseAddress(CompiledParameter parameter)
-    {
-        int address = -(ParametersSizeBefore(parameter.Index) + TagsBeforeBasePointer);
-        return new ValueAddress(parameter, address);
-    }
-    ValueAddress GetBaseAddress(CompiledParameter parameter, int offset)
-    {
-        int address = -(ParametersSizeBefore(parameter.Index) - offset + TagsBeforeBasePointer);
-        return new ValueAddress(parameter, address);
-    }
-    static ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
-        => new ValueAddress(variable.MemoryAddress, AddressingMode.Pointer) + 3;
     ValueAddress GetBaseAddress(Identifier variable)
     {
         if (GetConstant(variable.Content, out _))
         { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
 
         if (GetParameter(variable.Content, out CompiledParameter? parameter))
-        { return GetBaseAddress(parameter); }
+        { return GetParameterAddress(parameter); }
 
         if (GetVariable(variable.Content, out CompiledVariable? localVariable))
         { return new ValueAddress(localVariable); }
@@ -275,13 +278,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     AddInstruction(Opcode.PopTo, reg.Register);
 
                     if (BytecodeProcessor.StackDirection > 0)
-                    {
-                        AddInstruction(Opcode.MathAdd, reg.Register, address.Address * BytecodeProcessor.StackDirection);
-                    }
+                    { AddInstruction(Opcode.MathAdd, reg.Register, address.Address * BytecodeProcessor.StackDirection); }
                     else
-                    {
-                        AddInstruction(Opcode.MathSub, reg.Register, address.Address * -BytecodeProcessor.StackDirection);
-                    }
+                    { AddInstruction(Opcode.MathSub, reg.Register, address.Address * -BytecodeProcessor.StackDirection); }
 
                     AddInstruction(Opcode.Push, reg.Register.ToPtr());
                 }
@@ -320,13 +319,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     AddInstruction(Opcode.PopTo, reg.Register);
 
                     if (BytecodeProcessor.StackDirection > 0)
-                    {
-                        AddInstruction(Opcode.MathAdd, reg.Register, address.Address * BytecodeProcessor.StackDirection);
-                    }
+                    { AddInstruction(Opcode.MathAdd, reg.Register, address.Address * BytecodeProcessor.StackDirection); }
                     else
-                    {
-                        AddInstruction(Opcode.MathSub, reg.Register, address.Address * -BytecodeProcessor.StackDirection);
-                    }
+                    { AddInstruction(Opcode.MathSub, reg.Register, address.Address * -BytecodeProcessor.StackDirection); }
 
                     AddInstruction(Opcode.PopTo, reg.Register.ToPtr());
                 }
@@ -341,7 +336,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void CheckPointerNull(bool preservePointer = true, string exceptionMessage = "null pointer")
+    void CheckPointerNull(bool preservePointer = true)
     {
         if (!Settings.CheckNullPointers) return;
         AddComment($"Check for pointer zero {{");
@@ -357,7 +352,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = GeneratedCode.Count - 1;
 
-        GenerateCodeForLiteralString(exceptionMessage);
+        GenerateCodeForLiteralString("null pointer");
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             AddInstruction(Opcode.PopTo, reg.Register);
@@ -368,11 +363,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment($"}}");
     }
 
-    void HeapLoad(ValueAddress pointerAddress, int offset, string nullExceptionMessage = "null pointer")
+    void HeapLoad(ValueAddress pointerAddress, int offset)
     {
         StackLoad(pointerAddress);
 
-        CheckPointerNull(exceptionMessage: nullExceptionMessage);
+        CheckPointerNull();
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
@@ -381,11 +376,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void HeapStore(ValueAddress pointerAddress, int offset, string nullExceptionMessage = "null pointer")
+    void HeapStore(ValueAddress pointerAddress, int offset)
     {
         StackLoad(pointerAddress);
 
-        CheckPointerNull(exceptionMessage: nullExceptionMessage);
+        CheckPointerNull();
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
@@ -394,14 +389,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void HeapStore(StatementWithValue pointer, int offset, string nullExceptionMessage = "null pointer")
+    void HeapStore(StatementWithValue pointer, int offset)
     {
         if (FindStatementType(pointer) is not PointerType)
         { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
 
         GenerateCodeForStatement(pointer);
 
-        CheckPointerNull(exceptionMessage: nullExceptionMessage);
+        CheckPointerNull();
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
@@ -419,17 +414,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
     /// <summary>Stuff after BasePointer but before any variables</summary>
     readonly Stack<int> TagCount;
 
-    public ValueAddress GetReturnValueAddress(GeneralType returnType)
-        => new(-(ParametersSize + TagsBeforeBasePointer + returnType.Size), AddressingMode.PointerBP);
-
     public static ValueAddress AbsoluteGlobalAddress => new(AbsoluteGlobalOffset, AddressingMode.PointerBP);
     public static ValueAddress ReturnFlagAddress => new(ReturnFlagOffset, AddressingMode.PointerBP);
-    public static ValueAddress StackTop => new(-1, AddressingMode.PointerSP);
+    public static ValueAddress StackTop => new(-1 + BytecodeProcessor.StackPointerOffset, AddressingMode.PointerSP);
 
-    public const int ReturnFlagOffset = 0;
-    public const int SavedBasePointerOffset = -1;
-    public const int AbsoluteGlobalOffset = -2;
-    public const int SavedCodePointerOffset = -3;
+    public const int ReturnFlagOffset = 0 + BytecodeProcessor.StackPointerOffset;
+    public const int SavedBasePointerOffset = -1 + BytecodeProcessor.StackPointerOffset;
+    public const int AbsoluteGlobalOffset = -2 + BytecodeProcessor.StackPointerOffset;
+    public const int SavedCodePointerOffset = -3 + BytecodeProcessor.StackPointerOffset;
 
     public const int InvalidFunctionAddress = int.MinValue;
 

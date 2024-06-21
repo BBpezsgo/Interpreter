@@ -1180,7 +1180,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             variable.Reference = param;
             OnGotStatementType(variable, param.Type);
 
-            ValueAddress address = GetBaseAddress(param);
+            ValueAddress address = GetParameterAddress(param);
 
             StackLoad(address, param.Type.Size);
 
@@ -1699,7 +1699,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (param.Type != arrayType)
                     { throw new NotImplementedException(); }
 
-                    ValueAddress offset = GetBaseAddress(param, (int)computedIndexData * arrayType.Of.Size);
+                    ValueAddress offset = GetParameterAddress(param, (int)computedIndexData * arrayType.Of.Size);
                     StackLoad(offset);
 
                     throw new NotImplementedException();
@@ -2049,7 +2049,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(value);
 
-            ValueAddress address = GetBaseAddress(parameter);
+            ValueAddress address = GetParameterAddress(parameter);
 
             StackStore(address);
         }
@@ -2108,8 +2108,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
             GenerateCodeForStatement(value);
-            ValueAddress pointerAddress = StackTop - valueType.Size;
-            HeapStore(pointerAddress, fieldOffset);
+            HeapStore(StackTop - valueType.Size, fieldOffset);
 
             AddInstruction(Opcode.Pop);
             return;
@@ -2311,7 +2310,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        int offset = TagCount.Last + VariablesSize;
+        int offset = TagCount.Last + VariablesSize + BytecodeProcessor.StackPointerOffset;
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
@@ -2418,7 +2417,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-        int offset = TagCount.LastOrDefault + GlobalVariablesSize;
+        int offset = TagCount.LastOrDefault + GlobalVariablesSize + BytecodeProcessor.StackPointerOffset;
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
@@ -2648,7 +2647,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             StackElementInformation debugInfo = new()
             {
-                Address = GetBaseAddress(p).Address * BytecodeProcessor.StackDirection,
+                Address = GetParameterAddress(p).Address * BytecodeProcessor.StackDirection,
                 Kind = StackElementKind.Parameter,
                 BasePointerRelative = true,
                 Size = p.Type.Size,
@@ -2899,6 +2898,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment("Push exit code");
             AddInstruction(Opcode.Push, new CompiledValue(0));
+
+            CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
+            {
+                Address = 0 * BytecodeProcessor.StackDirection,
+                BasePointerRelative = false,
+                Kind = StackElementKind.Internal,
+                Size = 1,
+                Tag = "Exit Code",
+                Type = StackElementType.Value,
+            });
         }
 
         {

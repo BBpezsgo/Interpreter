@@ -59,7 +59,7 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout)] public void Test52() => Utils.GetTest(52).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test53() => Utils.GetTest(53).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test54() => Utils.GetTest(54).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test55() => Utils.GetTest(55).DoBrainfuck();
+    [TestMethod, Timeout(Timeout), Ignore("External functions not supported")] public void Test55() => Utils.GetTest(55).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test56() => Utils.GetTest(56).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test57() => Utils.GetTest(57).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test58() => Utils.GetTest(58).DoBrainfuck();

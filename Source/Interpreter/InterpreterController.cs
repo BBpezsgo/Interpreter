@@ -147,22 +147,23 @@ public class Interpreter
 
     static void AddRuntimeExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
     {
-        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, (ImmutableArray<RuntimeValue> parameters, ExternalFunctionManaged function) => { });
-        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, (char @char) => { });
-        externalFunctions.AddExternalFunction("console-set", (char @char, int x, int y) => { });
-        externalFunctions.AddExternalFunction("console-clear", () => { });
-        externalFunctions.AddExternalFunction("stderr", (char @char) => { });
-        externalFunctions.AddExternalFunction("sleep", (int t) => { });
+        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, static (ImmutableArray<RuntimeValue> parameters, ExternalFunctionManaged function) => { });
+        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, static (char @char) => { });
+        externalFunctions.AddExternalFunction("console-set", static (char @char, int x, int y) => { });
+        externalFunctions.AddExternalFunction("console-clear", static () => { });
+        externalFunctions.AddExternalFunction("stderr", static (char @char) => { });
+        externalFunctions.AddExternalFunction("sleep", static (int t) => { });
     }
 
     static void AddStaticExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
     {
-        externalFunctions.AddExternalFunction("utc-time", () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
-        externalFunctions.AddExternalFunction("local-time", () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
-        externalFunctions.AddExternalFunction("utc-date-day", () => (int)DateTime.Now.DayOfYear);
-        externalFunctions.AddExternalFunction("local-date-day", () => (int)DateTime.Now.DayOfYear);
-        externalFunctions.AddExternalFunction("utc-date-year", () => (int)DateTime.Now.Year);
-        externalFunctions.AddExternalFunction("local-date-year", () => (int)DateTime.Now.Year);
+        externalFunctions.AddExternalFunction("utc-time", static () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
+        externalFunctions.AddExternalFunction("local-time", static () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
+        externalFunctions.AddExternalFunction("utc-date-day", static () => (int)DateTime.Now.DayOfYear);
+        externalFunctions.AddExternalFunction("local-date-day", static () => (int)DateTime.Now.DayOfYear);
+        externalFunctions.AddExternalFunction("utc-date-year", static () => (int)DateTime.Now.Year);
+        externalFunctions.AddExternalFunction("local-date-year", static () => (int)DateTime.Now.Year);
+        externalFunctions.AddExternalFunction("test", static (int a, int b, int c, int d) => { if (a != 1 || b != 2 || c != 3 || d != 4) throw null!; });
     }
 
     /// <exception cref="UserException"/>

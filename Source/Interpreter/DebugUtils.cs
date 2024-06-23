@@ -8,8 +8,8 @@ public static class DebugUtils
 
     static bool CanTraceCallsWith(ImmutableArray<RuntimeValue> stack, int basePointer)
     {
-        int savedCodePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * BytecodeProcessor.StackDirection);
-        int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * BytecodeProcessor.StackDirection);
+        int savedCodePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedCodePointerOffset);
+        int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset);
 
         if (savedCodePointerAddress < 0 || savedCodePointerAddress >= stack.Length) return false;
         if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Length) return false;
@@ -19,7 +19,7 @@ public static class DebugUtils
 
     static bool CanTraceBPsWith(ImmutableArray<RuntimeValue> stack, int basePointer)
     {
-        int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * BytecodeProcessor.StackDirection);
+        int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset);
 
         if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Length) return false;
 
@@ -30,8 +30,8 @@ public static class DebugUtils
     {
         if (!CanTraceCallsWith(stack, basePointer)) return;
 
-        int savedCodePointer = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * BytecodeProcessor.StackDirection)].Int;
-        int savedBasePointer = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * BytecodeProcessor.StackDirection)].Int;
+        int savedCodePointer = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedCodePointerOffset)].Int;
+        int savedBasePointer = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset)].Int;
 
         if (savedBasePointer == basePointer || callTrace.Contains(savedCodePointer)) return;
 
@@ -44,7 +44,7 @@ public static class DebugUtils
     {
         if (!CanTraceBPsWith(stack, basePointer)) return;
 
-        int newBasePointer = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * BytecodeProcessor.StackDirection)].Int;
+        int newBasePointer = stack[basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset)].Int;
 
         result.Add(newBasePointer);
 
@@ -85,8 +85,8 @@ public static class DebugUtils
 
     static bool CanTraceCallsWith(ImmutableArray<byte> stack, int basePointer)
     {
-        int savedCodePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * BytecodeProcessor.StackDirection);
-        int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * BytecodeProcessor.StackDirection);
+        int savedCodePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedCodePointerOffset);
+        int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset);
 
         if (savedCodePointerAddress < 0 || savedCodePointerAddress >= stack.Length) return false;
         if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Length) return false;
@@ -96,7 +96,7 @@ public static class DebugUtils
 
     static bool CanTraceBPsWith(ImmutableArray<byte> stack, int basePointer)
     {
-        int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * BytecodeProcessor.StackDirection);
+        int savedBasePointerAddress = basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset);
 
         if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Length) return false;
 
@@ -107,8 +107,8 @@ public static class DebugUtils
     {
         if (!CanTraceCallsWith(stack, basePointer)) return;
 
-        int savedCodePointer = stack.AsSpan()[(basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset * BytecodeProcessor.StackDirection))..].To<int>();
-        int savedBasePointer = stack.AsSpan()[(basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * BytecodeProcessor.StackDirection))..].To<int>();
+        int savedCodePointer = stack.AsSpan()[(basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedCodePointerOffset))..].To<int>();
+        int savedBasePointer = stack.AsSpan()[(basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset))..].To<int>();
 
         if (savedBasePointer == basePointer || callTrace.Contains(savedCodePointer)) return;
 
@@ -121,7 +121,7 @@ public static class DebugUtils
     {
         if (!CanTraceBPsWith(stack, basePointer)) return;
 
-        int newBasePointer = stack.AsSpan()[(basePointer + (BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset * BytecodeProcessor.StackDirection))..].To<int>();
+        int newBasePointer = stack.AsSpan()[(basePointer + (BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset))..].To<int>();
 
         result.Add(newBasePointer);
 

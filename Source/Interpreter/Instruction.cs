@@ -11,9 +11,9 @@ public enum AddressingMode : byte
 
 public enum BitWidth : byte
 {
-    _8,
-    _16,
-    _32,
+    _8 = 1,
+    _16 = 2,
+    _32 = 4,
 }
 
 public enum InstructionOperandType : byte
@@ -22,17 +22,35 @@ public enum InstructionOperandType : byte
     Immediate16,
     Immediate32,
 
-    Pointer,
+    Pointer8,
+    Pointer16,
+    Pointer32,
 
     Register,
 
-    PointerBP,
-    PointerSP,
+    PointerBP8,
+    PointerBP16,
+    PointerBP32,
 
-    PointerEAX,
-    PointerEBX,
-    PointerECX,
-    PointerEDX,
+    PointerSP8,
+    PointerSP16,
+    PointerSP32,
+
+    PointerEAX8,
+    PointerEAX16,
+    PointerEAX32,
+
+    PointerEBX8,
+    PointerEBX16,
+    PointerEBX32,
+
+    PointerECX8,
+    PointerECX16,
+    PointerECX32,
+
+    PointerEDX8,
+    PointerEDX16,
+    PointerEDX32,
 }
 
 public readonly struct InstructionOperand
@@ -45,36 +63,28 @@ public readonly struct InstructionOperand
         InstructionOperandType.Immediate8 => BitWidth._8,
         InstructionOperandType.Immediate16 => BitWidth._16,
         InstructionOperandType.Immediate32 => BitWidth._32,
-        InstructionOperandType.Pointer => BitWidth._32,
-        InstructionOperandType.Register => (Register)Value.Int switch
-        {
-            Register.CodePointer => BitWidth._32,
-            Register.StackPointer => BitWidth._32,
-            Register.BasePointer => BitWidth._32,
-            Register.EAX => BitWidth._32,
-            Register.AX => BitWidth._16,
-            Register.AH => BitWidth._8,
-            Register.AL => BitWidth._8,
-            Register.EBX => BitWidth._32,
-            Register.BX => BitWidth._16,
-            Register.BH => BitWidth._8,
-            Register.BL => BitWidth._8,
-            Register.ECX => BitWidth._32,
-            Register.CX => BitWidth._16,
-            Register.CH => BitWidth._8,
-            Register.CL => BitWidth._8,
-            Register.EDX => BitWidth._32,
-            Register.DX => BitWidth._16,
-            Register.DH => BitWidth._8,
-            Register.DL => BitWidth._8,
-            _ => throw new UnreachableException(),
-        },
-        InstructionOperandType.PointerBP => BitWidth._32,
-        InstructionOperandType.PointerSP => BitWidth._32,
-        InstructionOperandType.PointerEAX => BitWidth._32,
-        InstructionOperandType.PointerEBX => BitWidth._32,
-        InstructionOperandType.PointerECX => BitWidth._32,
-        InstructionOperandType.PointerEDX => BitWidth._32,
+        InstructionOperandType.Register => ((Register)Value.Int).BitWidth(),
+        InstructionOperandType.Pointer8 => BitWidth._32,
+        InstructionOperandType.Pointer16 => BitWidth._32,
+        InstructionOperandType.Pointer32 => BitWidth._32,
+        InstructionOperandType.PointerBP8 => BitWidth._32,
+        InstructionOperandType.PointerBP16 => BitWidth._32,
+        InstructionOperandType.PointerBP32 => BitWidth._32,
+        InstructionOperandType.PointerSP8 => BitWidth._32,
+        InstructionOperandType.PointerSP16 => BitWidth._32,
+        InstructionOperandType.PointerSP32 => BitWidth._32,
+        InstructionOperandType.PointerEAX8 => BitWidth._32,
+        InstructionOperandType.PointerEAX16 => BitWidth._32,
+        InstructionOperandType.PointerEAX32 => BitWidth._32,
+        InstructionOperandType.PointerEBX8 => BitWidth._32,
+        InstructionOperandType.PointerEBX16 => BitWidth._32,
+        InstructionOperandType.PointerEBX32 => BitWidth._32,
+        InstructionOperandType.PointerECX8 => BitWidth._32,
+        InstructionOperandType.PointerECX16 => BitWidth._32,
+        InstructionOperandType.PointerECX32 => BitWidth._32,
+        InstructionOperandType.PointerEDX8 => BitWidth._32,
+        InstructionOperandType.PointerEDX16 => BitWidth._32,
+        InstructionOperandType.PointerEDX32 => BitWidth._32,
         _ => throw new UnreachableException(),
     };
 
@@ -84,12 +94,16 @@ public readonly struct InstructionOperand
         Type = type;
     }
 
+    static string? PointerOffsetString(int offset) => offset == 0 ? null : offset > 0 ? $"+{offset}" : $"-{offset}";
+
     public override string ToString() => Type switch
     {
         InstructionOperandType.Immediate8 => Value.ToString(),
         InstructionOperandType.Immediate16 => Value.ToString(),
         InstructionOperandType.Immediate32 => Value.ToString(),
-        InstructionOperandType.Pointer => $"[{Value}]",
+        InstructionOperandType.Pointer8 => $"BYTE [{Value}]",
+        InstructionOperandType.Pointer16 => $"WORD [{Value}]",
+        InstructionOperandType.Pointer32 => $"DWORD [{Value}]",
         InstructionOperandType.Register => (Register)Value.Int switch
         {
             Register.CodePointer => "CP",
@@ -113,12 +127,24 @@ public readonly struct InstructionOperand
             Register.DL => "DL",
             _ => throw new UnreachableException(),
         },
-        InstructionOperandType.PointerBP => $"[BP{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
-        InstructionOperandType.PointerSP => $"[SP{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
-        InstructionOperandType.PointerEAX => $"[EAX{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
-        InstructionOperandType.PointerEBX => $"[EBX{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
-        InstructionOperandType.PointerECX => $"[ECX{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
-        InstructionOperandType.PointerEDX => $"[EDX{(Value.Int == 0 ? null : Value.Int > 0 ? $"+{Value.Int}" : $"-{Value.Int}")}]",
+        InstructionOperandType.PointerBP8 => $"BYTE [BP{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerBP16 => $"WORD [BP{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerBP32 => $"DWORD [BP{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerSP8 => $"BYTE [SP{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerSP16 => $"WORD [SP{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerSP32 => $"DWORD [SP{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerEAX8 => $"BYTE [EAX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerEAX16 => $"WORD [EAX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerEAX32 => $"DWORD [EAX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerEBX8 => $"BYTE [EBX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerEBX16 => $"WORD [EBX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerEBX32 => $"DWORD [EBX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerECX8 => $"BYTE [ECX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerECX16 => $"WORD [ECX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerECX32 => $"DWORD [ECX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerEDX8 => $"BYTE [EDX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerEDX16 => $"WORD [EDX{PointerOffsetString(Value.Int)}]",
+        InstructionOperandType.PointerEDX32 => $"DWORD [EDX{PointerOffsetString(Value.Int)}]",
         _ => throw new UnreachableException(),
     };
 
@@ -138,7 +164,7 @@ public readonly struct InstructionOperand
         if (address.IsReference) throw new NotImplementedException();
         return address.AddressingMode switch
         {
-            AddressingMode.Pointer => new InstructionOperand(new RuntimeValue(address.Address), InstructionOperandType.Pointer),
+            AddressingMode.Pointer => new InstructionOperand(new RuntimeValue(address.Address), InstructionOperandType.Pointer32),
             AddressingMode.PointerBP => Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
             AddressingMode.PointerSP => Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
             _ => throw new UnreachableException(),

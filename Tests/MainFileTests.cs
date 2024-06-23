@@ -57,7 +57,7 @@ public class MainFileTests
     [TestMethod] public void Test52() => Utils.GetTest(52).DoMain();
     [TestMethod] public void Test53() => Utils.GetTest(53).DoMain();
     [TestMethod] public void Test54() => Utils.GetTest(54).DoMain();
-    [TestMethod, Ignore("Not implemented")] public void Test55() => Utils.GetTest(55).DoMain();
+    [TestMethod] public void Test55() => Utils.GetTest(55).DoMain();
     [TestMethod, Ignore("Not implemented")] public void Test56() => Utils.GetTest(56).DoMain();
     [TestMethod, Ignore("Not implemented")] public void Test57() => Utils.GetTest(57).DoMain();
     [TestMethod, Ignore("Not implemented")] public void Test58() => Utils.GetTest(58).DoMain();

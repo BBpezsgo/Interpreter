@@ -1362,6 +1362,9 @@ public abstract class CodeGenerator
         if (destination.Size != valueType.Size)
         { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.Size}) value to {destination} (size of {destination.Size})", value, CurrentFile); }
 
+        if (destination.SizeBytes != valueType.SizeBytes)
+        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.SizeBytes} bytes) value to {destination} (size of {destination.SizeBytes} bytes)", value, CurrentFile); }
+
         if (destination is PointerType &&
             valueType == BasicType.Integer)
         { return; }
@@ -1401,6 +1404,9 @@ public abstract class CodeGenerator
 
         if (destination.Size != valueType.Size)
         { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.Size}) value to {destination} (size of {destination.Size})", valuePosition, CurrentFile); }
+
+        if (destination.SizeBytes != valueType.SizeBytes)
+        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.SizeBytes} bytes) value to {destination} (size of {destination.SizeBytes} bytes)", valuePosition, CurrentFile); }
 
         if (destination is PointerType)
         { return; }
@@ -2844,7 +2850,12 @@ public abstract class CodeGenerator
             StatementWithValue param0 = keywordCall.Arguments[0];
             GeneralType param0Type = FindStatementType(param0);
 
-            value = new CompiledValue(param0Type.Size);
+            value = this switch
+            {
+                Brainfuck.Generator.CodeGeneratorForBrainfuck => new CompiledValue(param0Type.Size),
+                BBLang.Generator.CodeGeneratorForMain => new CompiledValue(param0Type.SizeBytes),
+                _ => throw new NotImplementedException(),
+            };
             return true;
         }
 
@@ -2875,7 +2886,12 @@ public abstract class CodeGenerator
             StatementWithValue param0 = functionCall.Arguments[0];
             GeneralType param0Type = FindStatementType(param0);
 
-            value = new CompiledValue(param0Type.Size);
+            value = this switch
+            {
+                Brainfuck.Generator.CodeGeneratorForBrainfuck => new CompiledValue(param0Type.Size),
+                BBLang.Generator.CodeGeneratorForMain => new CompiledValue(param0Type.SizeBytes),
+                _ => throw new NotImplementedException(),
+            };
             return true;
         }
 

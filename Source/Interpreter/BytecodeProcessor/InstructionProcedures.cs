@@ -27,14 +27,14 @@ public partial class BytecodeProcessor
     {
         int relativeAddress = GetData(CurrentInstruction.Operand1).Int;
 
-        Push(new RuntimeValue(Registers.CodePointer));
+        Push(Registers.CodePointer, Register.CodePointer.BitWidth());
 
         Step(relativeAddress);
     }
 
     void RETURN()
     {
-        RuntimeValue codePointer = Pop();
+        RuntimeValue codePointer = Pop(BitWidth._32);
 
         Registers.CodePointer = codePointer.Int;
     }
@@ -350,9 +350,9 @@ public partial class BytecodeProcessor
         Step();
     }
 
-    void POP_VALUE()
+    void POP_VALUE(BitWidth size)
     {
-        Pop();
+        Pop(size);
 
         Step();
     }
@@ -399,12 +399,13 @@ public partial class BytecodeProcessor
         RuntimeValue[] parameters = new RuntimeValue[function.Parameters.Length];
         for (int i = 0; i < function.Parameters.Length; i++)
         {
-            parameters[parameters.Length - 1 - i] = Memory[Registers.StackPointer - (((1 + i) * StackDirection) + StackPointerOffset)];
+            int memoryOffset = i * StackDirection;
+            parameters[^(i + 1)] = Memory[Registers.StackPointer - memoryOffset];
         }
 
         if (function is ExternalFunctionManaged managedFunction)
         {
-            managedFunction.OnReturn = Push;
+            managedFunction.OnReturn = (v) => Push(v);
             managedFunction.Callback(ImmutableArray.Create(parameters));
         }
         else if (function is ExternalFunctionSimple simpleFunction)

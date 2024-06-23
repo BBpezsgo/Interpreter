@@ -59,7 +59,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void Return()
     {
         AddInstruction(Opcode.PopTo, Register.BasePointer);
-        AddInstruction(Opcode.Pop); // Pop AbsoluteGlobalOffset
+        AddInstruction(Opcode.Pop32); // Pop AbsoluteGlobalOffset
         AddInstruction(Opcode.Return);
     }
 
@@ -167,14 +167,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
 
         int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
-        int offset = (int)index * arrayType.Of.Size;
+        int offset = (int)index * arrayType.Of.SizeBytes;
         return prevOffset + offset;
     }
 
     static ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
         => new ValueAddress(variable.MemoryAddress, AddressingMode.Pointer) + 3;
     public ValueAddress GetReturnValueAddress(GeneralType returnType)
-        => new(-(ParametersSize + TagsBeforeBasePointer + returnType.Size) + BytecodeProcessor.StackPointerOffset, AddressingMode.PointerBP);
+        => new(-(ParametersSize + TagsBeforeBasePointer + returnType.SizeBytes) + BytecodeProcessor.StackPointerOffset, AddressingMode.PointerBP);
     ValueAddress GetParameterAddress(CompiledParameter parameter)
     {
         int address = -(ParametersSizeBefore(parameter.Index) + TagsBeforeBasePointer) + BytecodeProcessor.StackPointerOffset;
@@ -418,12 +418,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public static ValueAddress ReturnFlagAddress => new(ReturnFlagOffset, AddressingMode.PointerBP);
     public static ValueAddress StackTop => new(-1 + BytecodeProcessor.StackPointerOffset, AddressingMode.PointerSP);
 
-    public const int ReturnFlagOffset = 0 + BytecodeProcessor.StackPointerOffset;
-    public const int SavedBasePointerOffset = -1 + BytecodeProcessor.StackPointerOffset;
-    public const int AbsoluteGlobalOffset = -2 + BytecodeProcessor.StackPointerOffset;
-    public const int SavedCodePointerOffset = -3 + BytecodeProcessor.StackPointerOffset;
+    public static int ReturnFlagOffset => 0 + BytecodeProcessor.StackPointerOffset;
+    public static int SavedBasePointerOffset => -1 + BytecodeProcessor.StackPointerOffset;
+    public static int AbsoluteGlobalOffset => -2 + BytecodeProcessor.StackPointerOffset;
+    public static int SavedCodePointerOffset => -3 + BytecodeProcessor.StackPointerOffset;
 
-    public const int InvalidFunctionAddress = int.MinValue;
+    public static int ScaledReturnFlagOffset => ReturnFlagOffset * BytecodeProcessor.StackDirection;
+    public static int ScaledSavedBasePointerOffset => SavedBasePointerOffset * BytecodeProcessor.StackDirection;
+    public static int ScaledAbsoluteGlobalOffset => AbsoluteGlobalOffset * BytecodeProcessor.StackDirection;
+    public static int ScaledSavedCodePointerOffset => SavedCodePointerOffset * BytecodeProcessor.StackDirection;
+
+    public static int InvalidFunctionAddress => int.MinValue;
 
     int ParametersSize
     {
@@ -433,7 +438,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             for (int i = 0; i < CompiledParameters.Count; i++)
             {
-                sum += CompiledParameters[i].Type.Size;
+                sum += CompiledParameters[i].Type.SizeBytes;
             }
 
             return sum;
@@ -447,7 +452,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (CompiledParameters[i].Index < beforeThis) continue;
 
-            sum += CompiledParameters[i].Type.Size;
+            sum += CompiledParameters[i].Type.SizeBytes;
         }
 
         return sum;

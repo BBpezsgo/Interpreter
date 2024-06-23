@@ -1,0 +1,4 @@
+[External("test")]
+void Test(int a, int b, int c, int d);
+
+Test(1, 2, 3, 4);

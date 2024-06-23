@@ -4,8 +4,9 @@ namespace LanguageCore.Runtime;
 
 public partial class BytecodeProcessor
 {
-    public static readonly int StackDirection = -1;
-    public const int StackPointerOffset = 1;
+    public static int StackDirection => -1;
+    public static int StackPointerOffset => 1;
+    public static int PointerSize => 1;
 
     Instruction CurrentInstruction => Code[Registers.CodePointer];
     public bool IsDone => Registers.CodePointer >= Code.Length;
@@ -85,7 +86,9 @@ public partial class BytecodeProcessor
             case Opcode.Exit: EXIT(); break;
 
             case Opcode.Push: PUSH_VALUE(); break;
-            case Opcode.Pop: POP_VALUE(); break;
+            case Opcode.Pop8: POP_VALUE(BitWidth._32); break;
+            case Opcode.Pop16: POP_VALUE(BitWidth._32); break;
+            case Opcode.Pop32: POP_VALUE(BitWidth._32); break;
             case Opcode.PopTo: POP_TO_VALUE(); break;
 
             case Opcode.Jump: JUMP_BY(); break;
@@ -141,25 +144,39 @@ public partial class BytecodeProcessor
     {
         switch (operand.Type)
         {
-            case InstructionOperandType.Pointer:
+            case InstructionOperandType.Pointer8:
+            case InstructionOperandType.Pointer16:
+            case InstructionOperandType.Pointer32:
                 address = operand.Value.Int;
                 return true;
-            case InstructionOperandType.PointerBP:
+            case InstructionOperandType.PointerBP8:
+            case InstructionOperandType.PointerBP16:
+            case InstructionOperandType.PointerBP32:
                 address = Registers.BasePointer + operand.Value.Int;
                 return true;
-            case InstructionOperandType.PointerSP:
+            case InstructionOperandType.PointerSP8:
+            case InstructionOperandType.PointerSP16:
+            case InstructionOperandType.PointerSP32:
                 address = Registers.StackPointer + operand.Value.Int;
                 return true;
-            case InstructionOperandType.PointerEAX:
+            case InstructionOperandType.PointerEAX8:
+            case InstructionOperandType.PointerEAX16:
+            case InstructionOperandType.PointerEAX32:
                 address = Registers.EAX + operand.Value.Int;
                 return true;
-            case InstructionOperandType.PointerEBX:
+            case InstructionOperandType.PointerEBX8:
+            case InstructionOperandType.PointerEBX16:
+            case InstructionOperandType.PointerEBX32:
                 address = Registers.EBX + operand.Value.Int;
                 return true;
-            case InstructionOperandType.PointerECX:
+            case InstructionOperandType.PointerECX8:
+            case InstructionOperandType.PointerECX16:
+            case InstructionOperandType.PointerECX32:
                 address = Registers.ECX + operand.Value.Int;
                 return true;
-            case InstructionOperandType.PointerEDX:
+            case InstructionOperandType.PointerEDX8:
+            case InstructionOperandType.PointerEDX16:
+            case InstructionOperandType.PointerEDX32:
                 address = Registers.EDX + operand.Value.Int;
                 return true;
             default:
@@ -174,18 +191,69 @@ public partial class BytecodeProcessor
     public void SetData(int ptr, RuntimeValue data) => Memory[ptr] = data;
     public RuntimeValue GetData(int ptr) => Memory[ptr];
 
+    public void SetData8(int ptr, RuntimeValue data)
+    {
+        Memory[ptr + 0] = data.Byte0;
+    }
+    public RuntimeValue GetData8(int ptr) => new(
+        Memory[ptr + 0].Byte0,
+        default,
+        default,
+        default
+    );
+
+    public void SetData16(int ptr, RuntimeValue data)
+    {
+        Memory[ptr + 0] = data.Byte0;
+        Memory[ptr + 1] = data.Byte1;
+    }
+    public RuntimeValue GetData16(int ptr) => new(
+        Memory[ptr + 0].Byte0,
+        Memory[ptr + 1].Byte0,
+        default,
+        default
+    );
+
+    public void SetData32(int ptr, RuntimeValue data)
+    {
+        Memory[ptr + 0] = data.Byte0;
+        Memory[ptr + 1] = data.Byte0;
+        Memory[ptr + 2] = data.Byte0;
+        Memory[ptr + 3] = data.Byte0;
+    }
+    public RuntimeValue GetData32(int ptr) => new(
+         Memory[ptr + 0].Byte0,
+         Memory[ptr + 1].Byte0,
+         Memory[ptr + 2].Byte0,
+         Memory[ptr + 3].Byte0
+     );
+
     RuntimeValue GetData(InstructionOperand operand) => operand.Type switch
     {
         InstructionOperandType.Immediate8 => operand.Value,
         InstructionOperandType.Immediate16 => operand.Value,
         InstructionOperandType.Immediate32 => operand.Value,
-        InstructionOperandType.Pointer => GetData(operand.Value.Int),
-        InstructionOperandType.PointerBP => GetData(Registers.BasePointer + operand.Value.Int),
-        InstructionOperandType.PointerSP => GetData(Registers.StackPointer + operand.Value.Int),
-        InstructionOperandType.PointerEAX => GetData(Registers.EAX + operand.Value.Int),
-        InstructionOperandType.PointerEBX => GetData(Registers.EBX + operand.Value.Int),
-        InstructionOperandType.PointerECX => GetData(Registers.ECX + operand.Value.Int),
-        InstructionOperandType.PointerEDX => GetData(Registers.EDX + operand.Value.Int),
+        InstructionOperandType.Pointer8 => GetData(operand.Value.Int),
+        InstructionOperandType.Pointer16 => GetData(operand.Value.Int),
+        InstructionOperandType.Pointer32 => GetData(operand.Value.Int),
+        InstructionOperandType.PointerBP8 => GetData(Registers.BasePointer + operand.Value.Int),
+        InstructionOperandType.PointerBP16 => GetData(Registers.BasePointer + operand.Value.Int),
+        InstructionOperandType.PointerBP32 => GetData(Registers.BasePointer + operand.Value.Int),
+        InstructionOperandType.PointerSP8 => GetData(Registers.StackPointer + operand.Value.Int),
+        InstructionOperandType.PointerSP16 => GetData(Registers.StackPointer + operand.Value.Int),
+        InstructionOperandType.PointerSP32 => GetData(Registers.StackPointer + operand.Value.Int),
+        InstructionOperandType.PointerEAX8 => GetData(Registers.EAX + operand.Value.Int),
+        InstructionOperandType.PointerEAX16 => GetData(Registers.EAX + operand.Value.Int),
+        InstructionOperandType.PointerEAX32 => GetData(Registers.EAX + operand.Value.Int),
+        InstructionOperandType.PointerEBX8 => GetData(Registers.EBX + operand.Value.Int),
+        InstructionOperandType.PointerEBX16 => GetData(Registers.EBX + operand.Value.Int),
+        InstructionOperandType.PointerEBX32 => GetData(Registers.EBX + operand.Value.Int),
+        InstructionOperandType.PointerECX8 => GetData(Registers.ECX + operand.Value.Int),
+        InstructionOperandType.PointerECX16 => GetData(Registers.ECX + operand.Value.Int),
+        InstructionOperandType.PointerECX32 => GetData(Registers.ECX + operand.Value.Int),
+        InstructionOperandType.PointerEDX8 => GetData(Registers.EDX + operand.Value.Int),
+        InstructionOperandType.PointerEDX16 => GetData(Registers.EDX + operand.Value.Int),
+        InstructionOperandType.PointerEDX32 => GetData(Registers.EDX + operand.Value.Int),
         InstructionOperandType.Register => (Register)operand.Value.Int switch
         {
             Register.CodePointer => new RuntimeValue(Registers.CodePointer),
@@ -220,27 +288,27 @@ public partial class BytecodeProcessor
             case InstructionOperandType.Immediate16:
             case InstructionOperandType.Immediate32:
                 throw new RuntimeException($"Can't set an immediate value");
-            case InstructionOperandType.Pointer:
-                SetData(operand.Value.Int, value);
-                break;
-            case InstructionOperandType.PointerBP:
-                SetData(Registers.BasePointer + operand.Value.Int, value);
-                break;
-            case InstructionOperandType.PointerSP:
-                SetData(Registers.StackPointer + operand.Value.Int, value);
-                break;
-            case InstructionOperandType.PointerEAX:
-                SetData(Registers.EAX + operand.Value.Int, value);
-                break;
-            case InstructionOperandType.PointerEBX:
-                SetData(Registers.EBX + operand.Value.Int, value);
-                break;
-            case InstructionOperandType.PointerECX:
-                SetData(Registers.ECX + operand.Value.Int, value);
-                break;
-            case InstructionOperandType.PointerEDX:
-                SetData(Registers.EDX + operand.Value.Int, value);
-                break;
+            case InstructionOperandType.Pointer8: SetData(operand.Value.Int, value); break;
+            case InstructionOperandType.Pointer16: SetData(operand.Value.Int, value); break;
+            case InstructionOperandType.Pointer32: SetData(operand.Value.Int, value); break;
+            case InstructionOperandType.PointerBP8: SetData(Registers.BasePointer + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerBP16: SetData(Registers.BasePointer + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerBP32: SetData(Registers.BasePointer + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerSP8: SetData(Registers.StackPointer + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerSP16: SetData(Registers.StackPointer + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerSP32: SetData(Registers.StackPointer + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerEAX8: SetData(Registers.EAX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerEAX16: SetData(Registers.EAX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerEAX32: SetData(Registers.EAX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerEBX8: SetData(Registers.EBX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerEBX16: SetData(Registers.EBX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerEBX32: SetData(Registers.EBX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerECX8: SetData(Registers.ECX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerECX16: SetData(Registers.ECX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerECX32: SetData(Registers.ECX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerEDX8: SetData(Registers.EDX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerEDX16: SetData(Registers.EDX + operand.Value.Int, value); break;
+            case InstructionOperandType.PointerEDX32: SetData(Registers.EDX + operand.Value.Int, value); break;
             case InstructionOperandType.Register:
                 switch ((Register)operand.Value.Int)
                 {
@@ -308,7 +376,7 @@ public partial class BytecodeProcessor
         }
     }
 
-    void Push(RuntimeValue data)
+    void Push(RuntimeValue data, BitWidth size = BitWidth._32)
     {
         if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
@@ -317,12 +385,12 @@ public partial class BytecodeProcessor
         SetData(Registers.StackPointer, data);
     }
 
-    RuntimeValue Pop()
+    RuntimeValue Pop(BitWidth size = BitWidth._32)
     {
         if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
 
-        RuntimeValue data = Memory[Registers.StackPointer];
+        RuntimeValue data = GetData(Registers.StackPointer);
         Registers.StackPointer -= StackDirection;
         return data;
     }

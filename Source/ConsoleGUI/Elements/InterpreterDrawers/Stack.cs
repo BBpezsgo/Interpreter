@@ -17,7 +17,9 @@ public partial class InterpreterElement
         }
 
         if (instruction.Opcode is
-            Opcode.Pop or
+            Opcode.Pop8 or
+            Opcode.Pop16 or
+            Opcode.Pop32 or
             Opcode.PopTo)
         {
             loadIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer + (BytecodeProcessor.StackDirection * (BytecodeProcessor.StackPointerOffset - 1)));

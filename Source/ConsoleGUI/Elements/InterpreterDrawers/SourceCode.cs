@@ -132,6 +132,32 @@ public partial class InterpreterElement
 
             int operandCount = instruction.Opcode.ParameterCount();
 
+            void WritePointerOperand(string size, string? @base, int offset)
+            {
+                b.ForegroundColor = CharColor.Gray;
+                b.AddText(size);
+                b.AddText(' ');
+                b.AddText('[');
+                if (@base != null)
+                {
+                    b.ForegroundColor = CharColor.White;
+                    b.AddText(@base);
+                }
+                if (offset > 0)
+                {
+                    b.ForegroundColor = CharColor.BrightCyan;
+                    b.AddText('+');
+                    b.AddText(offset.ToString());
+                }
+                else if (offset < 0)
+                {
+                    b.ForegroundColor = CharColor.BrightCyan;
+                    b.AddText(offset.ToString());
+                }
+                b.ForegroundColor = CharColor.Gray;
+                b.AddText(']');
+            }
+
             void WriteOperand(InstructionOperand operand)
             {
                 switch (operand.Type)
@@ -142,14 +168,9 @@ public partial class InterpreterElement
                         b.ForegroundColor = CharColor.BrightCyan;
                         b.AddText(operand.Value.ToString());
                         break;
-                    case InstructionOperandType.Pointer:
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText('[');
-                        b.ForegroundColor = CharColor.BrightCyan;
-                        b.AddText(operand.Value.ToString());
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText(']');
-                        break;
+                    case InstructionOperandType.Pointer8: WritePointerOperand("BYTE", null, operand.Value.Int); break;
+                    case InstructionOperandType.Pointer16: WritePointerOperand("WORD", null, operand.Value.Int); break;
+                    case InstructionOperandType.Pointer32: WritePointerOperand("DWORD", null, operand.Value.Int); break;
                     case InstructionOperandType.Register:
                         switch ((Register)operand.Value.Int)
                         {
@@ -232,120 +253,24 @@ public partial class InterpreterElement
                             default: throw new UnreachableException();
                         }
                         break;
-                    case InstructionOperandType.PointerBP:
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText('[');
-                        b.ForegroundColor = CharColor.White;
-                        b.AddText("BP");
-                        if (operand.Value.Int > 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText('+');
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        else if (operand.Value.Int < 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText(']');
-                        break;
-                    case InstructionOperandType.PointerSP:
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText('[');
-                        b.ForegroundColor = CharColor.White;
-                        b.AddText("SP");
-                        if (operand.Value.Int > 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText('+');
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        else if (operand.Value.Int < 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText(']');
-                        break;
-                    case InstructionOperandType.PointerEAX:
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText('[');
-                        b.ForegroundColor = CharColor.White;
-                        b.AddText("EAX");
-                        if (operand.Value.Int > 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText('+');
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        else if (operand.Value.Int < 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText(']');
-                        break;
-                    case InstructionOperandType.PointerEBX:
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText('[');
-                        b.ForegroundColor = CharColor.White;
-                        b.AddText("EBX");
-                        if (operand.Value.Int > 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText('+');
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        else if (operand.Value.Int < 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText(']');
-                        break;
-                    case InstructionOperandType.PointerECX:
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText('[');
-                        b.ForegroundColor = CharColor.White;
-                        b.AddText("ECX");
-                        if (operand.Value.Int > 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText('+');
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        else if (operand.Value.Int < 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText(']');
-                        break;
-                    case InstructionOperandType.PointerEDX:
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText('[');
-                        b.ForegroundColor = CharColor.White;
-                        b.AddText("EDX");
-                        if (operand.Value.Int > 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText('+');
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        else if (operand.Value.Int < 0)
-                        {
-                            b.ForegroundColor = CharColor.BrightCyan;
-                            b.AddText(operand.Value.Int.ToString());
-                        }
-                        b.ForegroundColor = CharColor.Gray;
-                        b.AddText(']');
-                        break;
+                    case InstructionOperandType.PointerBP8: WritePointerOperand("BYTE", "BP", operand.Value.Int); break;
+                    case InstructionOperandType.PointerBP16: WritePointerOperand("WORD", "BP", operand.Value.Int); break;
+                    case InstructionOperandType.PointerBP32: WritePointerOperand("DWORD", "BP", operand.Value.Int); break;
+                    case InstructionOperandType.PointerSP8: WritePointerOperand("BYTE", "sP", operand.Value.Int); break;
+                    case InstructionOperandType.PointerSP16: WritePointerOperand("WORD", "sP", operand.Value.Int); break;
+                    case InstructionOperandType.PointerSP32: WritePointerOperand("DWORD", "sP", operand.Value.Int); break;
+                    case InstructionOperandType.PointerEAX8: WritePointerOperand("BYTE", "EAX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerEAX16: WritePointerOperand("WORD", "EAX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerEAX32: WritePointerOperand("DWORD", "EAX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerEBX8: WritePointerOperand("BYTE", "EBX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerEBX16: WritePointerOperand("WORD", "EBX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerEBX32: WritePointerOperand("DWORD", "EBX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerECX8: WritePointerOperand("BYTE", "ECX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerECX16: WritePointerOperand("WORD", "ECX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerECX32: WritePointerOperand("DWORD", "ECX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerEDX8: WritePointerOperand("BYTE", "EDX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerEDX16: WritePointerOperand("WORD", "EDX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerEDX32: WritePointerOperand("DWORD", "EDX", operand.Value.Int); break;
                 }
             }
 

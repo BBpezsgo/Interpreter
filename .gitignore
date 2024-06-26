@@ -2,6 +2,7 @@
 bin
 obj
 *.user
+*.xcf
 
 /Tests/Program.cs
 /Diagsessions

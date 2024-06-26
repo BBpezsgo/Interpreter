@@ -47,21 +47,42 @@ public readonly struct ValueAddress
         StringBuilder result = new();
 
         result.Append('*');
+        result.Append('[');
 
         switch (AddressingMode)
         {
             case AddressingMode.Pointer:
-                result.Append($"[{Address}]");
+                result.Append(Address);
                 break;
             case AddressingMode.PointerBP:
-                result.Append($"[BP+{Address}]");
+                result.Append("BP");
+                if (Address > 0)
+                {
+                    result.Append('+');
+                    result.Append(Address);
+                }
+                else
+                {
+                    result.Append(Address);
+                }
                 break;
             case AddressingMode.PointerSP:
-                result.Append($"[SP+{Address}]");
+                result.Append("SP+");
+                if (Address > 0)
+                {
+                    result.Append('+');
+                    result.Append(Address);
+                }
+                else
+                {
+                    result.Append(Address);
+                }
                 break;
             default:
                 throw new UnreachableException();
         }
+
+        result.Append(']');
 
         return result.ToString();
     }

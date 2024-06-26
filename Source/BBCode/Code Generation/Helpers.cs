@@ -172,18 +172,44 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
 
     static ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
-        => new ValueAddress(variable.MemoryAddress, AddressingMode.Pointer) + 3;
+        =>
+        new ValueAddress(variable.MemoryAddress, AddressingMode.Pointer) // Return flag + SP offset + Variable offset
+        + ExitCodeType.SizeBytes // Exit code
+        + AbsGlobalAddressSize // Abs global address
+        + BasePointerSize; // Saved BP
+                                         // The abs global address will be added to this and then dereferenced
+
     public ValueAddress GetReturnValueAddress(GeneralType returnType)
-        => new(-(ParametersSize + TagsBeforeBasePointer + returnType.SizeBytes) + BytecodeProcessor.StackPointerOffset, AddressingMode.PointerBP);
+        => new(
+            0 // We start at the saved base pointer
+            - ParametersSize // Offset by the parameters
+            - StackFrameTags // Offset by the stack frame stuff
+            - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
+            + BytecodeProcessor.StackPointerOffset
+
+            , AddressingMode.PointerBP);
+
     ValueAddress GetParameterAddress(CompiledParameter parameter)
     {
-        int address = -(ParametersSizeBefore(parameter.Index) + TagsBeforeBasePointer) + BytecodeProcessor.StackPointerOffset;
-        return new ValueAddress(parameter, address);
+        return new ValueAddress(
+            0 // We start at the saved base pointer
+            - ParametersSizeBefore(parameter.Index) // ???
+            - StackFrameTags // Offset by the stack frame stuff
+            + BytecodeProcessor.StackPointerOffset
+
+            , AddressingMode.PointerBP, parameter.IsRef);
     }
+
     ValueAddress GetParameterAddress(CompiledParameter parameter, int offset)
     {
-        int address = -(ParametersSizeBefore(parameter.Index) - offset + TagsBeforeBasePointer) + BytecodeProcessor.StackPointerOffset;
-        return new ValueAddress(parameter, address);
+        return new ValueAddress(
+            0 // We start at the saved base pointer
+            - ParametersSizeBefore(parameter.Index) // ???
+            + offset
+            - StackFrameTags // Offset by the stack frame stuff
+            + BytecodeProcessor.StackPointerOffset
+
+            , AddressingMode.PointerBP, parameter.IsRef);
     }
 
     ValueAddress GetBaseAddress(StatementWithValue statement) => statement switch
@@ -409,26 +435,39 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Addressing Helpers
 
-    public const int TagsBeforeBasePointer = 3;
-
-    /// <summary>Stuff after BasePointer but before any variables</summary>
-    readonly Stack<int> TagCount;
+    /// <summary>
+    /// (<c>Saved BP</c> +) <c>Abs global address</c> + <c>Saved CP</c>
+    /// </summary>
+    public static int StackFrameTags => BasePointerSize + AbsGlobalAddressSize + CodePointerSize;
 
     public static ValueAddress AbsoluteGlobalAddress => new(AbsoluteGlobalOffset, AddressingMode.PointerBP);
     public static ValueAddress ReturnFlagAddress => new(ReturnFlagOffset, AddressingMode.PointerBP);
     public static ValueAddress StackTop => new(-1 + BytecodeProcessor.StackPointerOffset, AddressingMode.PointerSP);
 
-    public static int ReturnFlagOffset => 0 + BytecodeProcessor.StackPointerOffset;
-    public static int SavedBasePointerOffset => -1 + BytecodeProcessor.StackPointerOffset;
-    public static int AbsoluteGlobalOffset => -2 + BytecodeProcessor.StackPointerOffset;
-    public static int SavedCodePointerOffset => -3 + BytecodeProcessor.StackPointerOffset;
+    public const int ReturnFlagOffset = 0 + BytecodeProcessor.StackPointerOffset;
+    public const int SavedBasePointerOffset = -1 + BytecodeProcessor.StackPointerOffset;
+    public const int AbsoluteGlobalOffset = -2 + BytecodeProcessor.StackPointerOffset;
+    public const int SavedCodePointerOffset = -3 + BytecodeProcessor.StackPointerOffset;
 
-    public static int ScaledReturnFlagOffset => ReturnFlagOffset * BytecodeProcessor.StackDirection;
-    public static int ScaledSavedBasePointerOffset => SavedBasePointerOffset * BytecodeProcessor.StackDirection;
-    public static int ScaledAbsoluteGlobalOffset => AbsoluteGlobalOffset * BytecodeProcessor.StackDirection;
-    public static int ScaledSavedCodePointerOffset => SavedCodePointerOffset * BytecodeProcessor.StackDirection;
+    public static readonly BuiltinType ReturnFlagType = new(BasicType.Byte);
+    public static readonly BuiltinType ExitCodeType = new(BasicType.Integer);
 
-    public static int InvalidFunctionAddress => int.MinValue;
+    public static readonly GeneralType AbsGlobalAddressType = new PointerType(new BuiltinType(BasicType.Integer));
+    public static readonly GeneralType StackPointerType = new PointerType(new BuiltinType(BasicType.Integer));
+    public static readonly GeneralType CodePointerType = new PointerType(new BuiltinType(BasicType.Integer));
+    public static readonly GeneralType BasePointerType = new PointerType(new BuiltinType(BasicType.Integer));
+
+    public const int AbsGlobalAddressSize = BytecodeProcessor.PointerSize;
+    public const int StackPointerSize = BytecodeProcessor.PointerSize;
+    public const int CodePointerSize = BytecodeProcessor.PointerSize;
+    public const int BasePointerSize = BytecodeProcessor.PointerSize;
+
+    public const int ScaledReturnFlagOffset = ReturnFlagOffset * BytecodeProcessor.StackDirection;
+    public const int ScaledSavedBasePointerOffset = SavedBasePointerOffset * BytecodeProcessor.StackDirection;
+    public const int ScaledAbsoluteGlobalOffset = AbsoluteGlobalOffset * BytecodeProcessor.StackDirection;
+    public const int ScaledSavedCodePointerOffset = SavedCodePointerOffset * BytecodeProcessor.StackDirection;
+
+    public const int InvalidFunctionAddress = int.MinValue;
 
     int ParametersSize
     {
@@ -436,23 +475,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             int sum = 0;
 
-            for (int i = 0; i < CompiledParameters.Count; i++)
-            {
-                sum += CompiledParameters[i].Type.SizeBytes;
-            }
+            foreach (CompiledParameter parameter in CompiledParameters)
+            { sum += parameter.Type.SizeBytes; }
 
             return sum;
         }
     }
+
     int ParametersSizeBefore(int beforeThis)
     {
         int sum = 0;
 
-        for (int i = 0; i < CompiledParameters.Count; i++)
+        foreach (CompiledParameter parameter in CompiledParameters)
         {
-            if (CompiledParameters[i].Index < beforeThis) continue;
-
-            sum += CompiledParameters[i].Type.SizeBytes;
+            if (parameter.Index < beforeThis) continue;
+            sum += parameter.Type.SizeBytes;
         }
 
         return sum;

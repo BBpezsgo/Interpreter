@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.Runtime;
+﻿using LanguageCore.Compiler;
+
+namespace LanguageCore.Runtime;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public struct SourceCodeLocation
@@ -22,17 +24,10 @@ public enum StackElementKind
     Parameter,
 }
 
-public enum StackElementType
-{
-    Value,
-    HeapPointer,
-    StackPointer,
-}
-
 public struct StackElementInformation
 {
     public StackElementKind Kind;
-    public StackElementType Type;
+    public GeneralType Type;
     public string Tag;
 
     public int Address;

@@ -2319,7 +2319,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        int offset = TagCount.Last + VariablesSize + BytecodeProcessor.StackPointerOffset;
+        int offset = VariablesSize + ReturnFlagType.SizeBytes + BytecodeProcessor.StackPointerOffset;
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
@@ -2330,12 +2330,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Address = offset * BytecodeProcessor.StackDirection,
             BasePointerRelative = true,
             Size = compiledVariable.Type.SizeBytes,
+            Type = compiledVariable.Type
         };
-
-        if (compiledVariable.Type is PointerType)
-        { debugInfo.Type = StackElementType.HeapPointer; }
-        else
-        { debugInfo.Type = StackElementType.Value; }
         newVariable.CompiledType = compiledVariable.Type;
 
         CurrentScopeDebug.Last.Stack.Add(debugInfo);
@@ -2426,23 +2422,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-        int offset = TagCount.LastOrDefault + GlobalVariablesSize + BytecodeProcessor.StackPointerOffset;
+        // TODO: handle tags, originally TagCount.LastOrDefault
+        int offset = GlobalVariablesSize + BytecodeProcessor.StackPointerOffset;
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
-        StackElementInformation debugInfo = new()
-        {
-            Kind = StackElementKind.Variable,
-            Tag = compiledVariable.Identifier.Content,
-            Address = offset * BytecodeProcessor.StackDirection,
-            BasePointerRelative = false,
-            Size = compiledVariable.Type.SizeBytes,
-        };
-
-        if (compiledVariable.Type is PointerType)
-        { debugInfo.Type = StackElementType.HeapPointer; }
-        else
-        { debugInfo.Type = StackElementType.Value; }
         newVariable.CompiledType = compiledVariable.Type;
 
         CompiledGlobalVariables.Add(compiledVariable);
@@ -2581,8 +2565,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CurrentContext = function as ISameCheck;
         InFunction = true;
 
-        TagCount.Push(0);
-
         CompiledParameters.Clear();
         CompiledVariables.Clear();
         ReturnInstructions.Clear();
@@ -2596,7 +2578,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CanReturn = true;
         AddComment("Return flag");
         AddInstruction(Opcode.Push, new CompiledValue(false));
-        TagCount[^1]++;
 
         OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.File));
 
@@ -2609,7 +2590,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Kind = StackElementKind.Internal,
                 Size = returnType.Type.SizeBytes,
                 Tag = "Return Value",
-                Type = StackElementType.Value,
+                Type = returnType.Type,
             });
         }
 
@@ -2618,36 +2599,39 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Address = ScaledReturnFlagOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
-            Size = 1,
+            Size = ReturnFlagType.SizeBytes,
             Tag = "Return Flag",
-            Type = StackElementType.Value,
+            Type = ReturnFlagType,
         });
+
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = ScaledSavedBasePointerOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
-            Size = BytecodeProcessor.PointerSize,
+            Size = BasePointerSize,
             Tag = "Saved BasePointer",
-            Type = StackElementType.Value,
+            Type = BasePointerType,
         });
+
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = ScaledSavedCodePointerOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
-            Size = BytecodeProcessor.PointerSize,
+            Size = CodePointerSize,
             Tag = "Saved CodePointer",
-            Type = StackElementType.Value,
+            Type = CodePointerType,
         });
+
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = ScaledAbsoluteGlobalOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
-            Size = BytecodeProcessor.PointerSize,
+            Size = AbsGlobalAddressSize,
             Tag = "Absolute Global Offset",
-            Type = StackElementType.Value,
+            Type = AbsGlobalAddressType,
         });
 
         for (int i = 0; i < CompiledParameters.Count; i++)
@@ -2659,15 +2643,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Address = GetParameterAddress(p).Address * BytecodeProcessor.StackDirection,
                 Kind = StackElementKind.Parameter,
                 BasePointerRelative = true,
-                Size = p.Type.SizeBytes,
+                Size = p.IsRef ? BytecodeProcessor.PointerSize : p.Type.SizeBytes,
                 Tag = p.Identifier.Content,
+                Type = p.IsRef ? new PointerType(p.Type) : p.Type,
             };
-            if (p.IsRef)
-            { debugInfo.Type = StackElementType.StackPointer; }
-            else if (p.Type is PointerType)
-            { debugInfo.Type = StackElementType.HeapPointer; }
-            else
-            { debugInfo.Type = StackElementType.Value; }
             CurrentScopeDebug.Last.Stack.Add(debugInfo);
         }
 
@@ -2684,7 +2663,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Pop return flag");
         AddInstruction(Opcode.Pop8);
-        TagCount[^1]--;
 
         AddComment("Return");
         Return();
@@ -2707,8 +2685,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledParameters.Clear();
         CompiledVariables.Clear();
         ReturnInstructions.Clear();
-
-        TagCount.Pop();
 
         CurrentContext = null;
         InFunction = false;
@@ -2777,7 +2753,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GeneralType parameterType = GeneralType.From(parameters[i].Type, FindType);
             parameters[i].Type.SetAnalyzedType(parameterType);
 
-            CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));
+            CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.StackFrameTags), parameterType, parameters[i]));
 
             paramsSize += parameterType.SizeBytes;
         }
@@ -2809,13 +2785,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Address = ScaledSavedBasePointerOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
-            Size = BytecodeProcessor.PointerSize,
+            Size = BasePointerSize,
             Tag = "Saved BasePointer",
-            Type = StackElementType.Value,
+            Type = BasePointerType,
         });
 
         CurrentContext = null;
-        TagCount.Push(0);
         ReturnInstructions.Push(new List<int>());
 
         CanReturn = true;
@@ -2826,11 +2801,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Address = ScaledReturnFlagOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
-            Size = 1,
+            Size = ReturnFlagType.SizeBytes,
             Tag = "Return Flag",
-            Type = StackElementType.Value,
+            Type = ReturnFlagType,
         });
-        TagCount.Last++;
 
         AddComment("Variables");
         CleanupStack.Push(GenerateCodeForLocalVariable(statements));
@@ -2849,9 +2823,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CanReturn = false;
         AddComment("Pop return flag");
         AddInstruction(Opcode.Pop8);
-        TagCount.Last--;
-
-        TagCount.Pop();
 
         AddComment("Pop stack frame");
         AddInstruction(Opcode.PopTo, Register.BasePointer);
@@ -2913,9 +2884,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Address = 0 * BytecodeProcessor.StackDirection,
                 BasePointerRelative = false,
                 Kind = StackElementKind.Internal,
-                Size = BytecodeProcessor.PointerSize,
+                Size = ExitCodeType.SizeBytes,
                 Tag = "Exit Code",
-                Type = StackElementType.Value,
+                Type = ExitCodeType,
             });
         }
 
@@ -2943,9 +2914,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Address = ScaledAbsoluteGlobalOffset,
                 BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
-                Size = BytecodeProcessor.PointerSize,
+                Size = AbsGlobalAddressSize,
                 Tag = "Absolute Global Offset",
-                Type = StackElementType.Value,
+                Type = AbsGlobalAddressType,
             });
         }
 
@@ -2971,10 +2942,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddInstruction(Opcode.Exit); // Exit code already there
 
+        foreach (CompiledVariable variable in CompiledGlobalVariables)
         {
-            ScopeInformation scope = CurrentScopeDebug.Pop();
-            scope.Location.Instructions.End = GeneratedCode.Count - 1;
-            DebugInfo?.ScopeInformation.Add(scope);
+            CurrentScopeDebug.LastRef.Stack.Add(new StackElementInformation()
+            {
+                Address = GetGlobalVariableAddress(variable).Address * BytecodeProcessor.StackDirection,
+                BasePointerRelative = false,
+                Kind = StackElementKind.Variable,
+                Size = variable.Type.SizeBytes,
+                Tag = variable.Identifier.Content,
+                Type = variable.Type,
+            });
         }
 
         while (true)
@@ -2998,6 +2976,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         SetUndefinedFunctionOffsets(UndefinedConstructorOffsets);
         SetUndefinedFunctionOffsets(UndefinedOperatorFunctionOffsets);
         SetUndefinedFunctionOffsets(UndefinedGeneralFunctionOffsets);
+
+        {
+            ScopeInformation scope = CurrentScopeDebug.Pop();
+            scope.Location.Instructions.End = GeneratedCode.Count - 1;
+            DebugInfo?.ScopeInformation.Add(scope);
+        }
 
         Print?.Invoke("Code generated", LogType.Debug);
 

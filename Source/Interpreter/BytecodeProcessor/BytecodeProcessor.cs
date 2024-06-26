@@ -4,9 +4,9 @@ namespace LanguageCore.Runtime;
 
 public partial class BytecodeProcessor
 {
-    public static int StackDirection => -1;
-    public static int StackPointerOffset => 1;
-    public static int PointerSize => 1;
+    public const int StackDirection = -1;
+    public const int StackPointerOffset = 1;
+    public const int PointerSize = 1;
 
     Instruction CurrentInstruction => Code[Registers.CodePointer];
     public bool IsDone => Registers.CodePointer >= Code.Length;

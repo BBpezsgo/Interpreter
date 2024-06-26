@@ -4,6 +4,7 @@ using Win32.Console;
 namespace ConsoleGUI;
 
 using LanguageCore;
+using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
 public partial class InterpreterElement
@@ -116,57 +117,148 @@ public partial class InterpreterElement
             }
         }
 
+        void DrawType(GeneralType type)
+        {
+            switch (type)
+            {
+                case ArrayType v:
+                    DrawType(v.Of);
+
+                    b.ForegroundColor = CharColor.Gray;
+                    b.AddText('[');
+
+                    b.ForegroundColor = CharColor.Silver;
+                    b.AddText(v.Length.ToString());
+
+                    b.ForegroundColor = CharColor.Gray;
+                    b.AddText(']');
+
+                    break;
+                case BuiltinType v:
+                    b.ForegroundColor = CharColor.BrightBlue;
+                    b.AddText(v.ToString());
+
+                    break;
+                case FunctionType v:
+                    DrawType(v.ReturnType);
+
+                    b.ForegroundColor = CharColor.Gray;
+                    b.AddText('(');
+
+                    for (int i = 0; i < v.Parameters.Length; i++)
+                    {
+                        if (i > 0)
+                        {
+                            b.ForegroundColor = CharColor.Gray;
+                            b.AddText(", ");
+                        }
+
+                        DrawType(v.Parameters[i]);
+                    }
+
+                    b.ForegroundColor = CharColor.Gray;
+                    b.AddText(')');
+
+                    break;
+                case GenericType v:
+                    b.ForegroundColor = CharColor.Gray;
+                    b.AddText(v.ToString());
+
+                    break;
+                case PointerType v:
+                    DrawType(v.To);
+
+                    b.ForegroundColor = CharColor.Silver;
+                    b.AddText('*');
+
+                    break;
+                case StructType v:
+                    b.ForegroundColor = CharColor.BrightGreen;
+                    b.AddText(v.Struct.Identifier.Content);
+
+                    if (!v.TypeArguments.IsEmpty)
+                    {
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddChar('<');
+                        b.AddText(string.Join(", ", v.TypeArguments.Values));
+                        b.AddChar('>');
+                    }
+                    else if (v.Struct.Template is not null)
+                    {
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddChar('<');
+                        b.AddText(string.Join(", ", v.Struct.Template.Parameters));
+                        b.AddChar('>');
+                    }
+
+                    break;
+                default:
+                    b.ForegroundColor = CharColor.Gray;
+                    b.AddText(type.ToString());
+                    break;
+            }
+        }
+
         void DrawElementWInfo(int address, RuntimeValue item, ReadOnlySpan<int> savedBasePointers, StackElementInformation info)
         {
             Range<int> range = info.GetRange(Interpreter.BytecodeInterpreter.Registers.BasePointer, Interpreter.BytecodeInterpreter.StackStart);
 
-            if (info.Kind is
-                StackElementKind.Variable or
-                StackElementKind.Parameter or
-                StackElementKind.Internal)
+            if (range.Start == range.End)
             {
-                if (range.Start == range.End)
-                {
-                    b.ForegroundColor = CharColor.Silver;
+                b.ForegroundColor = CharColor.Silver;
 
-                    DrawElement(address, item, savedBasePointers);
-
-                    b.ForegroundColor = CharColor.Gray;
-                    b.AddText($" ({info.Kind}) {info.Tag}");
-                }
-                else if (range.Start == address)
-                {
-                    b.ForegroundColor = CharColor.Gray;
-                    b.AddText($" ({info.Kind}) {info.Tag} {{");
-
-                    b.BackgroundColor = CharColor.Black;
-                    b.FinishLine();
-                    b.ForegroundColor = CharColor.Silver;
-
-                    DrawElement(address, item, savedBasePointers);
-                }
-                else if (range.End == address)
-                {
-                    DrawElement(address, item, savedBasePointers);
-
-                    b.BackgroundColor = CharColor.Black;
-                    b.FinishLine();
-                    b.ForegroundColor = CharColor.Gray;
-                    b.AddText(' ');
-                    b.AddText('}');
-                }
-                else
-                {
-                    DrawElement(address, item, savedBasePointers);
-                }
-            }
-            else if (info.Kind == StackElementKind.Internal)
-            {
                 DrawElement(address, item, savedBasePointers);
 
                 b.ForegroundColor = CharColor.Gray;
+                b.AddText($" ({info.Kind}) ");
+
+                DrawType(info.Type);
+
+                b.ForegroundColor = info.Kind switch
+                {
+                    StackElementKind.Internal => CharColor.Gray,
+                    StackElementKind.Variable => CharColor.Silver,
+                    StackElementKind.Parameter => CharColor.Silver,
+                    _ => throw new UnreachableException(),
+                };
                 b.AddText(' ');
                 b.AddText(info.Tag);
+            }
+            else if (range.Start == address)
+            {
+                b.ForegroundColor = CharColor.Gray;
+                b.AddText($" ({info.Kind}) ");
+
+                DrawType(info.Type);
+
+                b.ForegroundColor = info.Kind switch
+                {
+                    StackElementKind.Internal => CharColor.Gray,
+                    StackElementKind.Variable => CharColor.Silver,
+                    StackElementKind.Parameter => CharColor.Silver,
+                    _ => throw new UnreachableException(),
+                };
+                b.AddText(' ');
+                b.AddText(info.Tag);
+
+                b.ForegroundColor = CharColor.Gray;
+                b.AddText(" {");
+
+                b.BackgroundColor = CharColor.Black;
+                b.FinishLine();
+                b.ForegroundColor = CharColor.Silver;
+
+                DrawElement(address, item, savedBasePointers);
+            }
+            else if (range.End == address)
+            {
+                DrawElement(address, item, savedBasePointers);
+
+                b.BackgroundColor = CharColor.Black;
+                b.FinishLine();
+                b.ForegroundColor = CharColor.Gray;
+                b.AddText(' ');
+                b.AddText('}');
             }
             else
             {

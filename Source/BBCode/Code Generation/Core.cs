@@ -134,7 +134,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         UndefinedOperatorFunctionOffsets = new List<UndefinedOffset<CompiledOperator>>();
         UndefinedGeneralFunctionOffsets = new List<UndefinedOffset<CompiledGeneralFunction>>();
         UndefinedConstructorOffsets = new List<UndefinedOffset<CompiledConstructor>>();
-        TagCount = new Stack<int>();
         Settings = settings;
         Registers = new RegisterUsage();
     }

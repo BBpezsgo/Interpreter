@@ -14,7 +14,7 @@ public partial class InterpreterElement
         if (instruction.Opcode is
             Opcode.Push)
         {
-            storeIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer + (BytecodeProcessor.StackDirection * BytecodeProcessor.StackPointerOffset));
+            storeIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer + (BytecodeProcessor.StackDirection * 1 /* Stack pointer offset (???) */));
         }
 
         if (instruction.Opcode is
@@ -23,7 +23,7 @@ public partial class InterpreterElement
             Opcode.Pop32 or
             Opcode.PopTo)
         {
-            loadIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer + (BytecodeProcessor.StackDirection * (BytecodeProcessor.StackPointerOffset - 1)));
+            loadIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer + (BytecodeProcessor.StackDirection * (1 /* Stack pointer offset (???) */ - 1)));
         }
     }
 

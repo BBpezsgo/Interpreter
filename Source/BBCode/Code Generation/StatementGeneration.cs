@@ -545,6 +545,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
+        // TODO: what is this -1
         int returnValueOffset = -1;
 
         Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(parameters, compiledFunction);
@@ -1587,6 +1588,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         for (int i = 0; i < newInstanceType.SizeBytes; i++)
         {
+            // TODO: what is this + 1
             AddInstruction(Opcode.Push, (InstructionOperand)(StackTop + 1 - newInstanceType.SizeBytes));
         }
 
@@ -2319,7 +2321,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        int offset = VariablesSize + ReturnFlagType.SizeBytes + BytecodeProcessor.StackPointerOffset;
+        int offset = VariablesSize + ReturnFlagType.SizeBytes + 1 /* Stack pointer offset (???) */;
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
@@ -2423,7 +2425,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
         // TODO: handle tags, originally TagCount.LastOrDefault
-        int offset = GlobalVariablesSize + BytecodeProcessor.StackPointerOffset;
+        int offset = GlobalVariablesSize + 1 /* Stack pointer offset (???) */;
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
@@ -2753,6 +2755,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GeneralType parameterType = GeneralType.From(parameters[i].Type, FindType);
             parameters[i].Type.SetAnalyzedType(parameterType);
 
+            // TODO: what is this + 1
             CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.StackFrameTags), parameterType, parameters[i]));
 
             paramsSize += parameterType.SizeBytes;
@@ -2904,7 +2907,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 else
                 {
                     AddInstruction(Opcode.Move, reg.Register, Register.StackPointer);
-                    AddInstruction(Opcode.MathAdd, reg.Register, -1 * BytecodeProcessor.StackDirection);
+                    AddInstruction(Opcode.MathAdd, reg.Register, -ExitCodeType.SizeBytes * BytecodeProcessor.StackDirection);
                     AddInstruction(Opcode.Push, reg.Register);
                 }
             }

@@ -5,7 +5,6 @@ namespace LanguageCore.Runtime;
 public partial class BytecodeProcessor
 {
     public const int StackDirection = -1;
-    public const int StackPointerOffset = 1;
     public const int PointerSize = 1;
 
     Instruction CurrentInstruction => Code[Registers.CodePointer];
@@ -73,6 +72,10 @@ public partial class BytecodeProcessor
             error.Context = GetContext();
             throw;
         }
+        catch (Exception error)
+        {
+            throw new RuntimeException("Internal", error, GetContext());
+        }
 
         return true;
     }
@@ -89,7 +92,7 @@ public partial class BytecodeProcessor
             case Opcode.Pop8: POP_VALUE(BitWidth._32); break;
             case Opcode.Pop16: POP_VALUE(BitWidth._32); break;
             case Opcode.Pop32: POP_VALUE(BitWidth._32); break;
-            case Opcode.PopTo: POP_TO_VALUE(); break;
+            case Opcode.PopTo: POP_TO_VALUE(BitWidth._32); break;
 
             case Opcode.Jump: JUMP_BY(); break;
             case Opcode.Throw: THROW(); break;

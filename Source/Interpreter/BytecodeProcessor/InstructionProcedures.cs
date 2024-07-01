@@ -345,7 +345,7 @@ public partial class BytecodeProcessor
     void PUSH_VALUE()
     {
         RuntimeValue v = GetData(CurrentInstruction.Operand1);
-        Push(v);
+        Push(v, CurrentInstruction.Operand1.BitWidth);
 
         Step();
     }
@@ -357,9 +357,9 @@ public partial class BytecodeProcessor
         Step();
     }
 
-    void POP_TO_VALUE()
+    void POP_TO_VALUE(BitWidth size)
     {
-        RuntimeValue v = Pop();
+        RuntimeValue v = Pop(size);
         SetData(CurrentInstruction.Operand1, v);
 
         Step();

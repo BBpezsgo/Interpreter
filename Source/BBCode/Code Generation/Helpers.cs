@@ -185,7 +185,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             - ParametersSize // Offset by the parameters
             - StackFrameTags // Offset by the stack frame stuff
             - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
-            + BytecodeProcessor.StackPointerOffset
+            + 1 // Stack pointer offset (???)
 
             , AddressingMode.PointerBP);
 
@@ -195,7 +195,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             0 // We start at the saved base pointer
             - ParametersSizeBefore(parameter.Index) // ???
             - StackFrameTags // Offset by the stack frame stuff
-            + BytecodeProcessor.StackPointerOffset
+            + 1 // Stack pointer offset (???)
 
             , AddressingMode.PointerBP, parameter.IsRef);
     }
@@ -207,7 +207,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             - ParametersSizeBefore(parameter.Index) // ???
             + offset
             - StackFrameTags // Offset by the stack frame stuff
-            + BytecodeProcessor.StackPointerOffset
+            + 1 // Stack pointer offset (???)
 
             , AddressingMode.PointerBP, parameter.IsRef);
     }
@@ -435,23 +435,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Addressing Helpers
 
-    /// <summary>
-    /// (<c>Saved BP</c> +) <c>Abs global address</c> + <c>Saved CP</c>
-    /// </summary>
-    public static int StackFrameTags => BasePointerSize + AbsGlobalAddressSize + CodePointerSize;
-
-    public static ValueAddress AbsoluteGlobalAddress => new(AbsoluteGlobalOffset, AddressingMode.PointerBP);
-    public static ValueAddress ReturnFlagAddress => new(ReturnFlagOffset, AddressingMode.PointerBP);
-    public static ValueAddress StackTop => new(-1 + BytecodeProcessor.StackPointerOffset, AddressingMode.PointerSP);
-
-    public const int ReturnFlagOffset = 0 + BytecodeProcessor.StackPointerOffset;
-    public const int SavedBasePointerOffset = -1 + BytecodeProcessor.StackPointerOffset;
-    public const int AbsoluteGlobalOffset = -2 + BytecodeProcessor.StackPointerOffset;
-    public const int SavedCodePointerOffset = -3 + BytecodeProcessor.StackPointerOffset;
-
     public static readonly BuiltinType ReturnFlagType = new(BasicType.Byte);
     public static readonly BuiltinType ExitCodeType = new(BasicType.Integer);
-
     public static readonly GeneralType AbsGlobalAddressType = new PointerType(new BuiltinType(BasicType.Integer));
     public static readonly GeneralType StackPointerType = new PointerType(new BuiltinType(BasicType.Integer));
     public static readonly GeneralType CodePointerType = new PointerType(new BuiltinType(BasicType.Integer));
@@ -462,10 +447,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public const int CodePointerSize = BytecodeProcessor.PointerSize;
     public const int BasePointerSize = BytecodeProcessor.PointerSize;
 
-    public const int ScaledReturnFlagOffset = ReturnFlagOffset * BytecodeProcessor.StackDirection;
-    public const int ScaledSavedBasePointerOffset = SavedBasePointerOffset * BytecodeProcessor.StackDirection;
-    public const int ScaledAbsoluteGlobalOffset = AbsoluteGlobalOffset * BytecodeProcessor.StackDirection;
-    public const int ScaledSavedCodePointerOffset = SavedCodePointerOffset * BytecodeProcessor.StackDirection;
+    /// <summary>
+    /// (<c>Saved BP</c> +) <c>Abs global address</c> + <c>Saved CP</c>
+    /// </summary>
+    public static int StackFrameTags => BasePointerSize + AbsGlobalAddressSize + CodePointerSize;
+
+    public static ValueAddress AbsoluteGlobalAddress => new(AbsoluteGlobalOffset, AddressingMode.PointerBP);
+    public static ValueAddress ReturnFlagAddress => new(ReturnFlagOffset, AddressingMode.PointerBP);
+    public static ValueAddress StackTop => new(0, AddressingMode.PointerSP);
+
+    public static int ReturnFlagOffset => BasePointerSize;
+    public static int AbsoluteGlobalOffset => -ExitCodeType.SizeBytes;
+    public static int SavedBasePointerOffset => 0;
+    public static int SavedCodePointerOffset => -AbsGlobalAddressSize + -CodePointerSize;
+
+    public static int ScaledReturnFlagOffset => ReturnFlagOffset * BytecodeProcessor.StackDirection;
+    public static int ScaledSavedBasePointerOffset => SavedBasePointerOffset * BytecodeProcessor.StackDirection;
+    public static int ScaledAbsoluteGlobalOffset => AbsoluteGlobalOffset * BytecodeProcessor.StackDirection;
+    public static int ScaledSavedCodePointerOffset => SavedCodePointerOffset * BytecodeProcessor.StackDirection;
 
     public const int InvalidFunctionAddress = int.MinValue;
 

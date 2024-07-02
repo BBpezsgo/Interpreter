@@ -2417,6 +2417,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     #endregion
 
     #region GenerateCodeForGlobalVariable
+    /*
 
     CleanupItem GenerateCodeForGlobalVariable(VariableDeclaration newVariable)
     {
@@ -2425,7 +2426,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
         // TODO: handle tags, originally TagCount.LastOrDefault
-        int offset = GlobalVariablesSize + 1 /* Stack pointer offset (???) */;
+        int offset = GlobalVariablesSize + 1; // 1 = Stack pointer offset (???)
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
@@ -2503,6 +2504,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
+    */
     #endregion
 
     #region GenerateCodeFor...
@@ -2900,16 +2902,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                if (false)
-                {
-                    AddInstruction(Opcode.Push, Register.StackPointer);
-                }
-                else
-                {
-                    AddInstruction(Opcode.Move, reg.Register, Register.StackPointer);
-                    AddInstruction(Opcode.MathAdd, reg.Register, -ExitCodeType.SizeBytes * BytecodeProcessor.StackDirection);
-                    AddInstruction(Opcode.Push, reg.Register);
-                }
+                AddInstruction(Opcode.Push, Register.StackPointer);
             }
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()

@@ -174,10 +174,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
     static ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
         =>
         new ValueAddress(variable.MemoryAddress, AddressingMode.Pointer) // Return flag + SP offset + Variable offset
-        + ExitCodeType.SizeBytes // Exit code
         + AbsGlobalAddressSize // Abs global address
         + BasePointerSize; // Saved BP
-                                         // The abs global address will be added to this and then dereferenced
+                           // The abs global address will be added to this and then dereferenced
 
     public ValueAddress GetReturnValueAddress(GeneralType returnType)
         => new(

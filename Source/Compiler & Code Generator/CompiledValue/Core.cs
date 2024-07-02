@@ -47,7 +47,7 @@ public readonly partial struct CompiledValue
     { _integer = value; }
     public CompiledValue(ushort value) : this(RuntimeType.Char)
     { _integer = value; }
-    public CompiledValue(bool value) : this(value ? 1 : 0)
+    public CompiledValue(bool value) : this((byte)(value ? 1 : 0))
     { }
 
     #endregion

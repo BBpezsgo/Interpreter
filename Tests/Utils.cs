@@ -699,7 +699,7 @@ public readonly struct MainResult : IResult
     {
         StdOutput = stdOut;
         StdError = stdErr;
-        ExitCode = interpreter.GetData(interpreter.Registers.StackPointer - (1 * BytecodeProcessor.StackDirection)).Int;
+        ExitCode = interpreter.GetData(interpreter.Registers.StackPointer).Int;
         Heap = ImmutableCollectionsMarshal.AsImmutableArray(interpreter.Memory);
     }
 }

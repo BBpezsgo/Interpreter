@@ -25,10 +25,10 @@ public class BuiltinType : GeneralType,
     {
         BasicType.Void => throw new InternalException($"Type {this} does not have a size"),
         BasicType.Any => throw new InternalException($"Type {this} does not have a size"),
-        BasicType.Byte =>           1, // 1,
-        BasicType.Char =>           1, // 2,
-        BasicType.Integer =>        1, // 4,
-        BasicType.Float =>          1, // 4,
+        BasicType.Byte => Runtime.BytecodeProcessor.RealStack ? 1 : 1,
+        BasicType.Char => Runtime.BytecodeProcessor.RealStack ? 2 : 1,
+        BasicType.Integer => Runtime.BytecodeProcessor.RealStack ? 4 : 1,
+        BasicType.Float => Runtime.BytecodeProcessor.RealStack ? 4 : 1,
         _ => throw new UnreachableException(),
     };
 

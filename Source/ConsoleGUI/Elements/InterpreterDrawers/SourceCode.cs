@@ -163,8 +163,20 @@ public partial class InterpreterElement
                 switch (operand.Type)
                 {
                     case InstructionOperandType.Immediate8:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText("BYTE ");
+                        b.ForegroundColor = CharColor.BrightCyan;
+                        b.AddText(operand.Value.ToString());
+                        break;
                     case InstructionOperandType.Immediate16:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText("WORD ");
+                        b.ForegroundColor = CharColor.BrightCyan;
+                        b.AddText(operand.Value.ToString());
+                        break;
                     case InstructionOperandType.Immediate32:
+                        b.ForegroundColor = CharColor.Gray;
+                        b.AddText("DWORD ");
                         b.ForegroundColor = CharColor.BrightCyan;
                         b.AddText(operand.Value.ToString());
                         break;
@@ -256,9 +268,9 @@ public partial class InterpreterElement
                     case InstructionOperandType.PointerBP8: WritePointerOperand("BYTE", "BP", operand.Value.Int); break;
                     case InstructionOperandType.PointerBP16: WritePointerOperand("WORD", "BP", operand.Value.Int); break;
                     case InstructionOperandType.PointerBP32: WritePointerOperand("DWORD", "BP", operand.Value.Int); break;
-                    case InstructionOperandType.PointerSP8: WritePointerOperand("BYTE", "sP", operand.Value.Int); break;
-                    case InstructionOperandType.PointerSP16: WritePointerOperand("WORD", "sP", operand.Value.Int); break;
-                    case InstructionOperandType.PointerSP32: WritePointerOperand("DWORD", "sP", operand.Value.Int); break;
+                    case InstructionOperandType.PointerSP8: WritePointerOperand("BYTE", "SP", operand.Value.Int); break;
+                    case InstructionOperandType.PointerSP16: WritePointerOperand("WORD", "SP", operand.Value.Int); break;
+                    case InstructionOperandType.PointerSP32: WritePointerOperand("DWORD", "SP", operand.Value.Int); break;
                     case InstructionOperandType.PointerEAX8: WritePointerOperand("BYTE", "EAX", operand.Value.Int); break;
                     case InstructionOperandType.PointerEAX16: WritePointerOperand("WORD", "EAX", operand.Value.Int); break;
                     case InstructionOperandType.PointerEAX32: WritePointerOperand("DWORD", "EAX", operand.Value.Int); break;

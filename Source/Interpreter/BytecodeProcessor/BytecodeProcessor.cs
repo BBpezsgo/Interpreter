@@ -5,7 +5,8 @@ namespace LanguageCore.Runtime;
 public partial class BytecodeProcessor
 {
     public const int StackDirection = -1;
-    public const int PointerSize = 1;
+    public const int PointerSize = RealStack ? 4 : 1;
+    public const bool RealStack = false;
 
     Instruction CurrentInstruction => Code[Registers.CodePointer];
     public bool IsDone => Registers.CodePointer >= Code.Length;
@@ -22,7 +23,7 @@ public partial class BytecodeProcessor
         if (StackDirection > 0)
         { return new ArraySegment<RuntimeValue>(Memory)[StackStart..Registers.StackPointer]; }
         else
-        { return new ArraySegment<RuntimeValue>(Memory)[(Registers.StackPointer + 1)..].Reverse(); }
+        { return new ArraySegment<RuntimeValue>(Memory)[Registers.StackPointer..].Reverse(); }
     }
 
     public Range<int> GetStackInterval(out bool isReversed)
@@ -40,7 +41,7 @@ public partial class BytecodeProcessor
 
         Memory = new RuntimeValue[settings.HeapSize + settings.StackSize];
 
-        Registers.StackPointer = StackStart;
+        Registers.StackPointer = StackStart - StackDirection;
 
         externalFunctions.SetInterpreter(this);
     }
@@ -89,9 +90,9 @@ public partial class BytecodeProcessor
             case Opcode.Exit: EXIT(); break;
 
             case Opcode.Push: PUSH_VALUE(); break;
-            case Opcode.Pop8: POP_VALUE(BitWidth._32); break;
-            case Opcode.Pop16: POP_VALUE(BitWidth._32); break;
-            case Opcode.Pop32: POP_VALUE(BitWidth._32); break;
+            case Opcode.Pop8: POP_VALUE(RealStack ? BitWidth._8 : BitWidth._32); break;
+            case Opcode.Pop16: POP_VALUE(RealStack ? BitWidth._16 : BitWidth._32); break;
+            case Opcode.Pop32: POP_VALUE(RealStack ? BitWidth._32 : BitWidth._32); break;
             case Opcode.PopTo: POP_TO_VALUE(BitWidth._32); break;
 
             case Opcode.Jump: JUMP_BY(); break;
@@ -381,11 +382,11 @@ public partial class BytecodeProcessor
 
     void Push(RuntimeValue data, BitWidth size = BitWidth._32)
     {
+        Registers.StackPointer += (RealStack ? (int)size : 1) * StackDirection;
+        SetData(Registers.StackPointer, data);
+
         if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
-
-        Registers.StackPointer += StackDirection;
-        SetData(Registers.StackPointer, data);
     }
 
     RuntimeValue Pop(BitWidth size = BitWidth._32)
@@ -394,7 +395,7 @@ public partial class BytecodeProcessor
         if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
 
         RuntimeValue data = GetData(Registers.StackPointer);
-        Registers.StackPointer -= StackDirection;
+        Registers.StackPointer -= (RealStack ? (int)size : 1) * StackDirection;
         return data;
     }
 }

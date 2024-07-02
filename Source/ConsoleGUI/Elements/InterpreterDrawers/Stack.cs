@@ -7,23 +7,89 @@ using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
+readonly struct DataMovement
+{
+    public readonly int Address;
+    public readonly int Size;
+
+    public DataMovement(int address, int size)
+    {
+        Address = address;
+        Size = size;
+    }
+
+    public bool Contains(int address) => address >= Address && address < Address + Size;
+}
+
 public partial class InterpreterElement
 {
-    void GetDataMovementIndicators(Instruction instruction, List<int> loadIndicators, List<int> storeIndicators)
+    void GetDataMovementIndicators(Instruction instruction, List<DataMovement> loadIndicators, List<DataMovement> storeIndicators)
     {
-        if (instruction.Opcode is
-            Opcode.Push)
+        switch (instruction.Opcode)
         {
-            storeIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer + (BytecodeProcessor.StackDirection * 1 /* Stack pointer offset (???) */));
-        }
+            case Opcode.Push:
+            {
+                int size = BytecodeProcessor.RealStack ? (int)instruction.Operand1.BitWidth : 1;
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer + (size * BytecodeProcessor.StackDirection);
+                storeIndicators.Add(new DataMovement(address, size));
 
-        if (instruction.Opcode is
-            Opcode.Pop8 or
-            Opcode.Pop16 or
-            Opcode.Pop32 or
-            Opcode.PopTo)
-        {
-            loadIndicators.Add(Interpreter.BytecodeInterpreter.Registers.StackPointer + (BytecodeProcessor.StackDirection * (1 /* Stack pointer offset (???) */ - 1)));
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                {
+                    loadIndicators.Add(new DataMovement(address, size));
+                }
+
+                return;
+            }
+            case Opcode.Pop8:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 1 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+                return;
+            }
+            case Opcode.Pop16:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 2 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+                return;
+            }
+            case Opcode.Pop32:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 4 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+                return;
+            }
+            case Opcode.PopTo:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 4 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                {
+                    storeIndicators.Add(new DataMovement(address, size));
+                }
+
+                return;
+            }
+            case Opcode.Move:
+            {
+                const int size = BytecodeProcessor.RealStack ? 4 : 1;
+
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand2, out int address))
+                {
+                    storeIndicators.Add(new DataMovement(address, size));
+                }
+
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                {
+                    loadIndicators.Add(new DataMovement(address, size));
+                }
+
+                return;
+            }
         }
     }
 
@@ -46,8 +112,8 @@ public partial class InterpreterElement
 
         ReadOnlySpan<int> savedBasePointers = DebugUtils.TraceBasePointers(ImmutableCollectionsMarshal.AsImmutableArray(Interpreter.BytecodeInterpreter.Memory), Interpreter.BytecodeInterpreter.Registers.BasePointer);
 
-        List<int> loadIndicators = new();
-        List<int> storeIndicators = new();
+        List<DataMovement> loadIndicators = new();
+        List<DataMovement> storeIndicators = new();
 
         if (Interpreter.NextInstruction.HasValue)
         { GetDataMovementIndicators(Interpreter.NextInstruction.Value, loadIndicators, storeIndicators); }
@@ -66,37 +132,63 @@ public partial class InterpreterElement
                 b.AddText('►');
                 b.ForegroundColor = CharColor.Silver;
             }
+            else if (Interpreter.BytecodeInterpreter.Registers.StackPointer == address)
+            {
+                b.ForegroundColor = CharColor.Yellow;
+                b.AddText('►');
+                b.ForegroundColor = CharColor.Silver;
+            }
             else
             {
                 b.ForegroundColor = CharColor.Silver;
                 b.AddText(' ');
             }
 
-            bool loadIndicatorShown = false;
+            bool dataMovementShown = false;
             for (int i = loadIndicators.Count - 1; i >= 0; i--)
             {
-                if (loadIndicators[i] != address) continue;
-                b.ForegroundColor = CharColor.BrightRed;
-                b.AddText('○');
-                b.ForegroundColor = CharColor.Silver;
-                loadIndicators.RemoveAt(i);
-                loadIndicatorShown = true;
-                break;
+                if (loadIndicators[i].Address == address)
+                {
+                    b.ForegroundColor = CharColor.BrightRed;
+                    b.AddText('○');
+                    b.ForegroundColor = CharColor.Silver;
+                    dataMovementShown = true;
+                    break;
+                }
+                else if (loadIndicators[i].Contains(address))
+                {
+                    b.ForegroundColor = CharColor.BrightRed;
+                    b.AddText('|');
+                    b.ForegroundColor = CharColor.Silver;
+                    dataMovementShown = true;
+                    break;
+                }
             }
 
-            bool storeIndicatorShown = false;
-            for (int i = storeIndicators.Count - 1; i >= 0; i--)
+            if (!dataMovementShown)
             {
-                if (storeIndicators[i] != address) continue;
-                b.ForegroundColor = CharColor.BrightRed;
-                b.AddText('●');
-                b.ForegroundColor = CharColor.Silver;
-                storeIndicators.RemoveAt(i);
-                storeIndicatorShown = true;
-                break;
+                for (int i = storeIndicators.Count - 1; i >= 0; i--)
+                {
+                    if (storeIndicators[i].Address == address)
+                    {
+                        b.ForegroundColor = CharColor.BrightRed;
+                        b.AddText('●');
+                        b.ForegroundColor = CharColor.Silver;
+                        dataMovementShown = true;
+                        break;
+                    }
+                    else if (storeIndicators[i].Contains(address))
+                    {
+                        b.ForegroundColor = CharColor.BrightRed;
+                        b.AddText('|');
+                        b.ForegroundColor = CharColor.Silver;
+                        dataMovementShown = true;
+                        break;
+                    }
+                }
             }
 
-            if (!loadIndicatorShown && !storeIndicatorShown)
+            if (!dataMovementShown)
             { b.AddText(' '); }
 
             b.AddText(address.ToString());
@@ -288,7 +380,7 @@ public partial class InterpreterElement
             b.ForegroundColor = CharColor.Silver;
         }
 
-        const int EmptyCount = 2;
+        const int EmptyCount = 32;
 
         for (int i = 1; i <= EmptyCount; i++)
         {

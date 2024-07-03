@@ -397,10 +397,19 @@ public partial class BytecodeProcessor
         { throw new RuntimeException($"Undefined external function {functionId}"); }
 
         RuntimeValue[] parameters = new RuntimeValue[function.Parameters.Length];
+        int currentMemoryOffset = 0;
         for (int i = 0; i < function.Parameters.Length; i++)
         {
-            int memoryOffset = i * StackDirection;
-            parameters[^(i + 1)] = Memory[Registers.StackPointer - memoryOffset];
+            parameters[^(i + 1)] = Memory[Registers.StackPointer - currentMemoryOffset];
+            currentMemoryOffset += (function.Parameters[i] switch
+            {
+                Compiler.RuntimeType.Null => throw new NotImplementedException(),
+                Compiler.RuntimeType.Byte => RealStack ? 1 : 1,
+                Compiler.RuntimeType.Char => RealStack ? 2 : 1,
+                Compiler.RuntimeType.Integer => RealStack ? 4 : 1,
+                Compiler.RuntimeType.Single => RealStack ? 4 : 1,
+                _ => throw new UnreachableException(),
+            }) * StackDirection;
         }
 
         if (function is ExternalFunctionManaged managedFunction)

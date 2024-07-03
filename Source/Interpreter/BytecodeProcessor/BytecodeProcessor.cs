@@ -6,7 +6,7 @@ public partial class BytecodeProcessor
 {
     public const int StackDirection = -1;
     public const int PointerSize = RealStack ? 4 : 1;
-    public const bool RealStack = false;
+    public const bool RealStack = true;
 
     Instruction CurrentInstruction => Code[Registers.CodePointer];
     public bool IsDone => Registers.CodePointer >= Code.Length;
@@ -93,7 +93,9 @@ public partial class BytecodeProcessor
             case Opcode.Pop8: POP_VALUE(RealStack ? BitWidth._8 : BitWidth._32); break;
             case Opcode.Pop16: POP_VALUE(RealStack ? BitWidth._16 : BitWidth._32); break;
             case Opcode.Pop32: POP_VALUE(RealStack ? BitWidth._32 : BitWidth._32); break;
-            case Opcode.PopTo: POP_TO_VALUE(BitWidth._32); break;
+            case Opcode.PopTo8: POP_TO_VALUE(RealStack ? BitWidth._8 : BitWidth._32); break;
+            case Opcode.PopTo16: POP_TO_VALUE(RealStack ? BitWidth._16 : BitWidth._32); break;
+            case Opcode.PopTo32: POP_TO_VALUE(RealStack ? BitWidth._32 : BitWidth._32); break;
 
             case Opcode.Jump: JUMP_BY(); break;
             case Opcode.Throw: THROW(); break;
@@ -194,43 +196,6 @@ public partial class BytecodeProcessor
 
     public void SetData(int ptr, RuntimeValue data) => Memory[ptr] = data;
     public RuntimeValue GetData(int ptr) => Memory[ptr];
-
-    public void SetData8(int ptr, RuntimeValue data)
-    {
-        Memory[ptr + 0] = data.Byte0;
-    }
-    public RuntimeValue GetData8(int ptr) => new(
-        Memory[ptr + 0].Byte0,
-        default,
-        default,
-        default
-    );
-
-    public void SetData16(int ptr, RuntimeValue data)
-    {
-        Memory[ptr + 0] = data.Byte0;
-        Memory[ptr + 1] = data.Byte1;
-    }
-    public RuntimeValue GetData16(int ptr) => new(
-        Memory[ptr + 0].Byte0,
-        Memory[ptr + 1].Byte0,
-        default,
-        default
-    );
-
-    public void SetData32(int ptr, RuntimeValue data)
-    {
-        Memory[ptr + 0] = data.Byte0;
-        Memory[ptr + 1] = data.Byte0;
-        Memory[ptr + 2] = data.Byte0;
-        Memory[ptr + 3] = data.Byte0;
-    }
-    public RuntimeValue GetData32(int ptr) => new(
-         Memory[ptr + 0].Byte0,
-         Memory[ptr + 1].Byte0,
-         Memory[ptr + 2].Byte0,
-         Memory[ptr + 3].Byte0
-     );
 
     RuntimeValue GetData(InstructionOperand operand) => operand.Type switch
     {

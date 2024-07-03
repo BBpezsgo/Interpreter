@@ -32,7 +32,7 @@ export char* ToString(this int number)
     
 	int v = number;
 
-	int isNegative = v < 0;
+	byte isNegative = v < 0;
 	if (isNegative)
 	{ v = 0 - v; }
     
@@ -68,7 +68,7 @@ export inline int ParseInt(temp char* v)
     if (v.IsNullOrEmpty())
     { return 0; }
 
-    int isNegative = (v[0] == '-');
+    byte isNegative = (v[0] == '-');
     int start;
     int result;
     

@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
+using Runtime;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -9,7 +10,8 @@ public class PointerType : GeneralType,
     public GeneralType To { get; }
 
     public override int Size => 1;
-    public override int SizeBytes => Runtime.BytecodeProcessor.PointerSize;
+    public override int SizeBytes => BytecodeProcessor.PointerSize;
+    public override BitWidth BitWidth => BitWidth._32;
 
     public PointerType(PointerType other)
     {

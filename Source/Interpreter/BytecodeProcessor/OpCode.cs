@@ -34,7 +34,19 @@ public enum Opcode : byte
     /// <paramref name="DST"/> = Pop()
     /// </code>
     /// </summary>
-    PopTo,
+    PopTo8,
+    /// <summary>
+    /// <code>
+    /// <paramref name="DST"/> = Pop()
+    /// </code>
+    /// </summary>
+    PopTo16,
+    /// <summary>
+    /// <code>
+    /// <paramref name="DST"/> = Pop()
+    /// </code>
+    /// </summary>
+    PopTo32,
     #endregion
 
     #region === FLOW CONTROL ===

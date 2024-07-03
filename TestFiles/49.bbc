@@ -1,1 +1,1 @@
-return (3.5f + 3.5f) == 7f;
+return ((3.5f + 3.5f) == 7f) as int;

@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
+using LanguageCore.Runtime;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -11,6 +12,7 @@ public class ArrayType : GeneralType,
 
     public override int Size => Length * Of.Size;
     public override int SizeBytes => Length * Of.SizeBytes;
+    public override BitWidth BitWidth => throw new InvalidOperationException();
 
     public ArrayType(ArrayType other)
     {

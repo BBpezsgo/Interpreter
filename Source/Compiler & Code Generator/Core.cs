@@ -10,6 +10,7 @@ public readonly struct ValueAddress
     public readonly int Address;
     public readonly AddressingMode AddressingMode;
     public readonly bool IsReference;
+    public readonly BitWidth DataSize;
 
     public ValueAddress(int address, AddressingMode addressingMode)
     {

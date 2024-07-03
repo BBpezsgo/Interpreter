@@ -85,7 +85,9 @@ public class TextSectionBuilder : SectionBuilder
         Runtime.Opcode.Pop8 => "pop",
         Runtime.Opcode.Pop16 => "pop",
         Runtime.Opcode.Pop32 => "pop",
-        Runtime.Opcode.PopTo => "pop",
+        Runtime.Opcode.PopTo8 => "pop",
+        Runtime.Opcode.PopTo16 => "pop",
+        Runtime.Opcode.PopTo32 => "pop",
 
         Runtime.Opcode.MathAdd => "add",
         Runtime.Opcode.MathSub => "sub",

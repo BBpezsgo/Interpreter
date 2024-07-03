@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
+using Runtime;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -25,11 +26,19 @@ public class BuiltinType : GeneralType,
     {
         BasicType.Void => throw new InternalException($"Type {this} does not have a size"),
         BasicType.Any => throw new InternalException($"Type {this} does not have a size"),
-        BasicType.Byte => Runtime.BytecodeProcessor.RealStack ? 1 : 1,
-        BasicType.Char => Runtime.BytecodeProcessor.RealStack ? 2 : 1,
-        BasicType.Integer => Runtime.BytecodeProcessor.RealStack ? 4 : 1,
-        BasicType.Float => Runtime.BytecodeProcessor.RealStack ? 4 : 1,
+        BasicType.Byte => BytecodeProcessor.RealStack ? 1 : 1,
+        BasicType.Char => BytecodeProcessor.RealStack ? 2 : 1,
+        BasicType.Integer => BytecodeProcessor.RealStack ? 4 : 1,
+        BasicType.Float => BytecodeProcessor.RealStack ? 4 : 1,
         _ => throw new UnreachableException(),
+    };
+
+    public override BitWidth BitWidth => SizeBytes switch
+    {
+        1 => BitWidth._8,
+        2 => BitWidth._16,
+        4 => BitWidth._32,
+        _ => throw new NotImplementedException(),
     };
 
     public BuiltinType(BuiltinType other)

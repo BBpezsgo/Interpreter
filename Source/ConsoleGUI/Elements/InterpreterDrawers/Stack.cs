@@ -61,7 +61,33 @@ public partial class InterpreterElement
                 loadIndicators.Add(new DataMovement(address, size));
                 return;
             }
-            case Opcode.PopTo:
+            case Opcode.PopTo8:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 1 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                {
+                    storeIndicators.Add(new DataMovement(address, size));
+                }
+
+                return;
+            }
+            case Opcode.PopTo16:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 2 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                {
+                    storeIndicators.Add(new DataMovement(address, size));
+                }
+
+                return;
+            }
+            case Opcode.PopTo32:
             {
                 int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
                 const int size = BytecodeProcessor.RealStack ? 4 : 1;
@@ -399,6 +425,9 @@ public partial class InterpreterElement
                 else
                 { nextEmpty = enumerator.Last() + i; }
             }
+
+            if (nextEmpty < 0 || nextEmpty >= Interpreter.BytecodeInterpreter.Memory.Length)
+            { break; }
 
             RuntimeValue item = Interpreter.BytecodeInterpreter.Memory[nextEmpty];
 

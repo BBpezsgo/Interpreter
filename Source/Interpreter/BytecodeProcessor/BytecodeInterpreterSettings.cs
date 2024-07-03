@@ -7,7 +7,7 @@ public struct BytecodeInterpreterSettings
 
     public static BytecodeInterpreterSettings Default => new()
     {
-        StackSize = 256,
+        StackSize = 2048,
         HeapSize = 2048,
     };
 }

@@ -38,7 +38,9 @@ public partial class InterpreterElement
 
             switch (instruction.Opcode)
             {
-                case Opcode.PopTo:
+                case Opcode.PopTo8:
+                case Opcode.PopTo16:
+                case Opcode.PopTo32:
                     HandleDestinationOperand(instruction.Operand1);
                     break;
                 case Opcode.Call:

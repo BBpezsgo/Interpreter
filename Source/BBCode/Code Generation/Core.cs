@@ -114,7 +114,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     readonly RegisterUsage Registers;
 
-    bool CanReturn;
+    GeneralType? CurrentReturnType;
+    [MemberNotNullWhen(true, nameof(CurrentReturnType))]
+    bool CanReturn => CurrentReturnType is not null;
 
     readonly Stack<ScopeInformation> CurrentScopeDebug = new();
     CompileLevel CompileLevel => Settings.CompileLevel;

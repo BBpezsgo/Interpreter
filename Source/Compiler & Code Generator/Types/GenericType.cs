@@ -1,8 +1,8 @@
 ﻿namespace LanguageCore.Compiler;
 
-using Parser.Statement;
 using Tokenizing;
 using Parser;
+using Runtime;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class GenericType : GeneralType,
@@ -24,6 +24,8 @@ public class GenericType : GeneralType,
         [DoesNotReturn]
         get => throw new InternalException($"Can not get the size of a generic type");
     }
+
+    public override BitWidth BitWidth => throw new InvalidOperationException($"Can not get the size of a generic type");
 
     Token? IReferenceableTo<Token>.Reference
     {

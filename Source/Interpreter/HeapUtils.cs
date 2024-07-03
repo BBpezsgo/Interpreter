@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.Runtime;
+﻿using System.Runtime.CompilerServices;
+
+namespace LanguageCore.Runtime;
 
 public static class HeapUtils
 {
@@ -53,7 +55,7 @@ public static class HeapUtils
         if (pointer == 0)
         { return null; }
         StringBuilder result = new();
-        for (int i = pointer; heap[i].Int != 0; i++)
+        for (int i = pointer; heap[i].Int != 0; i += BytecodeProcessor.RealStack ? sizeof(char) : 1)
         { result.Append(heap[i].Char); }
         return result.ToString();
     }

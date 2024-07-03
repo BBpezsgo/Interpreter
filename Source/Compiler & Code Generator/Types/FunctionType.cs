@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
+using Runtime;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -12,7 +13,8 @@ public class FunctionType : GeneralType,
     public bool ReturnSomething => ReturnType != BasicType.Void;
 
     public override int Size => 1;
-    public override int SizeBytes => Runtime.BytecodeProcessor.PointerSize;
+    public override int SizeBytes => BytecodeProcessor.PointerSize;
+    public override BitWidth BitWidth => BitWidth._32;
 
     public FunctionType(CompiledFunction function)
     {

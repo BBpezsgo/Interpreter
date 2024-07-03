@@ -1,7 +1,7 @@
 ﻿namespace LanguageCore.Compiler;
 
-using LanguageCore.Parser.Statement;
 using Parser;
+using Runtime;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class StructType : GeneralType,
@@ -42,23 +42,20 @@ public class StructType : GeneralType,
         }
     }
 
-    public ImmutableDictionary<CompiledField, int> Fields
+    public ImmutableDictionary<CompiledField, int> GetFields(bool sizeInBytes)
     {
-        get
-        {
-            Dictionary<CompiledField, int> result = new(Struct.Fields.Length);
-            
-            int offset = 0;
-            foreach (CompiledField field in Struct.Fields)
-            {
-                result.Add(field, offset);
-                GeneralType fieldType = field.Type;
-                fieldType = ReplaceType(fieldType);
-                offset += fieldType.Size;
-            }
+        Dictionary<CompiledField, int> result = new(Struct.Fields.Length);
 
-            return result.ToImmutableDictionary();
+        int offset = 0;
+        foreach (CompiledField field in Struct.Fields)
+        {
+            result.Add(field, offset);
+            GeneralType fieldType = field.Type;
+            fieldType = ReplaceType(fieldType);
+            offset += sizeInBytes ? fieldType.SizeBytes : fieldType.Size;
         }
+
+        return result.ToImmutableDictionary();
     }
 
     CompiledStruct? IReferenceableTo<CompiledStruct>.Reference
@@ -66,6 +63,8 @@ public class StructType : GeneralType,
         get => Struct;
         set => throw null!;
     }
+
+    public override BitWidth BitWidth => throw new InvalidOperationException();
 
     public StructType(StructType other)
     {
@@ -108,7 +107,7 @@ public class StructType : GeneralType,
         File = originalFile;
     }
 
-    public bool GetField(string name, [NotNullWhen(true)] out CompiledField? field, [NotNullWhen(true)] out int offset)
+    public bool GetField(string name, bool offsetInBytes, [NotNullWhen(true)] out CompiledField? field, [NotNullWhen(true)] out int offset)
     {
         offset = 0;
         field = null;
@@ -124,7 +123,7 @@ public class StructType : GeneralType,
             GeneralType fieldType = _field.Type;
             fieldType = ReplaceType(fieldType);
 
-            offset += fieldType.Size;
+            offset += offsetInBytes ? fieldType.SizeBytes : fieldType.Size;
         }
 
         return false;

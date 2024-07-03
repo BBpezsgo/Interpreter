@@ -121,7 +121,7 @@ public sealed partial class InterpreterElement : WindowElement
         };
         stackPanel.OnBeforeDraw += StackElement_OnBeforeDraw;
 
-        StackScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Registers.StackPointer - Interpreter.BytecodeInterpreter.StackStart + 30), stackPanel);
+        StackScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Registers.StackPointer + (30 * BytecodeProcessor.StackDirection)), stackPanel);
 
         stackPanel.OnMouseEventInvoked += StackScrollBar.FeedEvent;
         stackPanel.OnKeyEventInvoked += StackScrollBar.FeedEvent;

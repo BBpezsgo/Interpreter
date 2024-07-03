@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Compiler;
 
+using Runtime;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -13,6 +14,8 @@ public abstract class GeneralType :
 
     public abstract int Size { get; }
     public abstract int SizeBytes { get; }
+    /// <exception cref="InvalidOperationException"/>
+    public abstract BitWidth BitWidth { get; }
 
     public static GeneralType From(GeneralType other) => other switch
     {

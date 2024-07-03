@@ -72,6 +72,8 @@ public abstract class CodeGenerator
     protected readonly PrintCallback? Print;
     protected readonly AnalysisCollection? AnalysisCollection;
 
+    public static readonly BuiltinType BooleanType = new(BasicType.Byte);
+
     #endregion
 
     #region Private Fields
@@ -1392,6 +1394,13 @@ public abstract class CodeGenerator
             { return; }
         }
 
+        {
+            if (destination is PointerType destPointerType &&
+                valueType is PointerType &&
+                destPointerType.To == BasicType.Any)
+            { return; }
+        }
+
         throw new CompilerException($"Can not set a {valueType} type value to the {destination} type", value, CurrentFile);
     }
 
@@ -1518,7 +1527,8 @@ public abstract class CodeGenerator
 
     #region FindStatementType()
 
-    protected virtual GeneralType OnGotStatementType(StatementWithValue statement, GeneralType type)
+    protected virtual TType OnGotStatementType<TType>(StatementWithValue statement, TType type)
+        where TType : GeneralType
     {
         statement.CompiledType = type;
         return type;
@@ -1538,7 +1548,7 @@ public abstract class CodeGenerator
 
         return OnGotStatementType(anyCall, functionType.ReturnType);
     }
-    protected GeneralType FindStatementType(KeywordCall keywordCall) => keywordCall.Identifier.Content switch
+    protected BuiltinType FindStatementType(KeywordCall keywordCall) => keywordCall.Identifier.Content switch
     {
         StatementKeywords.Return => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
         StatementKeywords.Throw => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
@@ -1621,7 +1631,7 @@ public abstract class CodeGenerator
                     BinaryOperatorCall.CompGEQ or
                     BinaryOperatorCall.CompEQ or
                     BinaryOperatorCall.CompNEQ
-                        => new BuiltinType(isFloat ? BasicType.Float : BasicType.Integer),
+                        => BooleanType,
 
                     BinaryOperatorCall.LogicalOR or
                     BinaryOperatorCall.LogicalAND or
@@ -1728,23 +1738,15 @@ public abstract class CodeGenerator
         if (!leftType.CanBeBuiltin || leftType == BasicType.Void)
         { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content}", @operator.Operator, CurrentFile); }
 
-        CompiledValue leftValue = GetInitialValue(leftType);
-
-        CompiledValue predictedValue = @operator.Operator.Content switch
+        BuiltinType result = @operator.Operator.Content switch
         {
-            UnaryOperatorCall.LogicalNOT => !leftValue,
+            UnaryOperatorCall.LogicalNOT => BooleanType,
 
             _ => throw new CompilerException($"Unknown operator {@operator.Operator.Content}", @operator.Operator, CurrentFile),
         };
 
-        BuiltinType result = new(predictedValue.Type);
-
-        if (expectedType is not null)
-        {
-            if (result == BasicType.Integer &&
-                expectedType is PointerType)
-            { return OnGotStatementType(@operator, expectedType); }
-        }
+        if (expectedType is PointerType && result == BasicType.Integer)
+        { return OnGotStatementType(@operator, expectedType); }
 
         return OnGotStatementType(@operator, result);
     }
@@ -1816,7 +1818,7 @@ public abstract class CodeGenerator
 
         throw new CompilerException($"Symbol \"{identifier.Content}\" not found", identifier, CurrentFile);
     }
-    protected GeneralType FindStatementType(AddressGetter addressGetter)
+    protected PointerType FindStatementType(AddressGetter addressGetter)
     {
         GeneralType to = FindStatementType(addressGetter.PrevStatement);
         return OnGotStatementType(addressGetter, new PointerType(to));
@@ -1839,7 +1841,6 @@ public abstract class CodeGenerator
         GeneralType type = GeneralType.From(constructorCall.Type, FindType);
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
-        // TODO: constructorCall.OriginalFile can be null
         if (GetConstructor(type, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound))
         {
             constructorCall.Type.SetAnalyzedType(result.Function.Type);
@@ -2713,7 +2714,6 @@ public abstract class CodeGenerator
         if (context.TryGetValue(@operator, out value))
         { return true; }
 
-        // TODO: @operator.OriginalFile can be null
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
             if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&
@@ -2780,7 +2780,6 @@ public abstract class CodeGenerator
         if (context.TryGetValue(@operator, out value))
         { return true; }
 
-        // TODO: @operator.OriginalFile can be null
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
             if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&

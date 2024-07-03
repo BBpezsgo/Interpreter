@@ -425,7 +425,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         if (prevType is not StructType structType)
         { throw new NotImplementedException(); }
 
-        if (!structType.GetField(field.Identifier.Content, out _, out int fieldOffset))
+        if (!structType.GetField(field.Identifier.Content, false, out _, out int fieldOffset))
         { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
 
         int prevOffset = GetDataOffset(field.PrevStatement, until);
@@ -519,7 +519,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
                 return false;
             }
 
-            if (!structType.GetField(field.Identifier.Content, out _, out int fieldOffset))
+            if (!structType.GetField(field.Identifier.Content, false, out _, out int fieldOffset))
             { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
 
             GeneralType fieldType = FindStatementType(field);

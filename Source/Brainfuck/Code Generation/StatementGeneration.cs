@@ -251,7 +251,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (pointerType.To is not StructType structPointerType)
             { throw new CompilerException($"Could not get the field offsets of type {pointerType}", statementToSet.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.GetField(statementToSet.Identifier.Content, out CompiledField? fieldDefinition, out int fieldOffset))
+            if (!structPointerType.GetField(statementToSet.Identifier.Content, false, out CompiledField? fieldDefinition, out int fieldOffset))
             { throw new CompilerException($"Could not get the field offset of field \"{statementToSet.Identifier}\"", statementToSet.Identifier, CurrentFile); }
 
             statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
@@ -2091,7 +2091,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 int address = Stack.PushVirtual(structType.Size);
 
-                foreach ((CompiledField field, int offset) in structType.Fields)
+                foreach ((CompiledField field, int offset) in structType.GetFields(false))
                 {
                     if (field.Type is not BuiltinType builtinType)
                     { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.File); }
@@ -2147,7 +2147,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (pointerType.To is not StructType structPointerType)
             { throw new CompilerException($"Could not get the field offsets of type {prevType}", field.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.GetField(field.Identifier.Content, out CompiledField? fieldDefinition, out int fieldOffset))
+            if (!structPointerType.GetField(field.Identifier.Content, false, out CompiledField? fieldDefinition, out int fieldOffset))
             { throw new CompilerException($"Could not get the field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
 
             field.Reference = fieldDefinition;

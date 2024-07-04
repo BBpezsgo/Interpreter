@@ -43,8 +43,7 @@
 | [37](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/37.bbc) | ✅ | ✅ |
 | [38](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/38.bbc) | ✅ | ✅ |
 | [39](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/39.bbc) | ✅ | ✅ |
-| [40](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/40.bbc) | ❌ Test method Tests.MainFileTests.Test40 threw exception: 
-LanguageCore.Runtime.UserException: null pointer | ✅ |
+| [40](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/40.bbc) | ❌ Test method Tests.MainFileTests.Test40 threw exception:   LanguageCore.Runtime.UserException: null pointer | ✅ |
 | [41](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/41.bbc) | ✅ | ✅ |
 | [42](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/42.bbc) | ✅ | ✅ |
 | [43](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/43.bbc) | ✅ | ✖ Function pointers are not supported |
@@ -54,19 +53,13 @@ LanguageCore.Runtime.UserException: null pointer | ✅ |
 | [48](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/48.bbc) | ✅ | ✅ |
 | [49](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/49.bbc) | ✅ | ✖ Floats not supported |
 | [50](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/50.bbc) | ✅ | ✖ Floats not supported |
-| [51](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/51.bbc) | ❌ Exit code isn't what is expected:
-Expected: 15
-Actual: 0 | ✅ |
+| [51](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/51.bbc) | ❌ Exit code isn't what is expected:  Expected: 15  Actual: 0 | ✅ |
 | [52](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/52.bbc) | ✅ | ✅ |
 | [53](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/53.bbc) | ✅ | ✅ |
-| [54](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/54.bbc) | ❌ Test method Tests.MainFileTests.Test54 threw exception: 
-LanguageCore.Runtime.UserException: null pointer | ✅ |
+| [54](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/54.bbc) | ❌ Test method Tests.MainFileTests.Test54 threw exception:   LanguageCore.Runtime.UserException: null pointer | ✅ |
 | [55](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/55.bbc) | ✅ | ✖ External functions not supported |
 | [56](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/56.bbc) | ✅ | ✅ |
 | [57](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/57.bbc) | ✅ | ✅ |
 | [58](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/58.bbc) | ✅ | ✅ |
 | [59](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/59.bbc) | ✅ | ✖ Arrays with big element size not implemented |
-| [60](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/60.bbc) | ❌ Exit code isn't what is expected:
-Expected: 55
-Actual: 0 | ❌ Test method Tests.BrainfuckFileTests.Test60 threw exception: 
-System.InvalidOperationException: Stack is empty |
+| [60](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/60.bbc) | ❌ Exit code isn't what is expected:  Expected: 55  Actual: 0 | ❌ Test method Tests.BrainfuckFileTests.Test60 threw exception:   System.InvalidOperationException: Stack is empty |

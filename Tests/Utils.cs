@@ -664,7 +664,7 @@ public static class Utils
             if (bytecodeResult.ErrorMessage is not null)
             {
                 file.Write(' ');
-                file.Write(bytecodeResult.ErrorMessage);
+                file.Write(bytecodeResult.ErrorMessage.Replace('\r', ' ').Replace('\n', ' '));
             }
 
             file.Write(" | ");
@@ -673,7 +673,7 @@ public static class Utils
             if (brainfuckResult.ErrorMessage is not null)
             {
                 file.Write(' ');
-                file.Write(brainfuckResult.ErrorMessage);
+                file.Write(brainfuckResult.ErrorMessage.Replace('\r', ' ').Replace('\n', ' '));
             }
 
             file.Write(" |");

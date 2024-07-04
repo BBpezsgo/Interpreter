@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore;
 
+[ExcludeFromCodeCoverage]
 public sealed class ProcessRuntimeException : Exception
 {
     public uint ExitCode { get; }

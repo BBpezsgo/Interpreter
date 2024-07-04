@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore;
 
+[ExcludeFromCodeCoverage]
 public sealed class Warning : NotExceptionBut
 {
     public Warning(string message, Position position, Uri? uri) : base(message, position, uri) { }

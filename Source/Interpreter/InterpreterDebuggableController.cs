@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Runtime;
 
+[ExcludeFromCodeCoverage]
 public class InterpreterDebuggabble : Interpreter
 {
     public InterpreterDebuggabble(bool throwExceptions, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation) : base(throwExceptions, settings, program, debugInformation)

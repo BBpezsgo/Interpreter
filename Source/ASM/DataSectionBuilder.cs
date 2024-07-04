@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public class DataSectionBuilder : SectionBuilder
 {
     readonly List<string> DataLabels;

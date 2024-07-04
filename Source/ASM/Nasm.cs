@@ -2,6 +2,7 @@
 
 namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public class NasmException : Exception
 {
     public readonly string? File;
@@ -73,6 +74,7 @@ public class NasmException : Exception
     }
 }
 
+[ExcludeFromCodeCoverage]
 public static class Nasm
 {
     /// <exception cref="ProcessNotStartedException"/>

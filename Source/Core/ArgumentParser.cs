@@ -2,6 +2,7 @@
 
 using Runtime;
 
+[ExcludeFromCodeCoverage]
 public struct ProgramArguments
 {
     [MemberNotNullWhen(false, nameof(File))]
@@ -64,6 +65,7 @@ public enum PrintFlags
     Heap = 0x08,
 }
 
+[ExcludeFromCodeCoverage]
 public static class ArgumentNormalizer
 {
     enum NormalizerState
@@ -125,6 +127,7 @@ public static class ArgumentNormalizer
     }
 }
 
+[ExcludeFromCodeCoverage]
 public static class ArgumentParser
 {
     class ArgumentsSource

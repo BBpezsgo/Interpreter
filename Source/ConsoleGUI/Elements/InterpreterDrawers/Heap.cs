@@ -1,6 +1,7 @@
 ﻿using Win32.Console;
 
 namespace ConsoleGUI;
+
 using LanguageCore.Runtime;
 
 public partial class InterpreterElement

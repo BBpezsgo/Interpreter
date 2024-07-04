@@ -4,6 +4,7 @@ using Win32.Console;
 
 namespace ConsoleGUI;
 
+[ExcludeFromCodeCoverage]
 [SupportedOSPlatform("windows")]
 public class Element : IMainThreadThing
 {

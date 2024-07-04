@@ -107,6 +107,7 @@ enum Mode : byte
 }
 
 [StructLayout(LayoutKind.Explicit)]
+[ExcludeFromCodeCoverage]
 struct Registers
 {
     [FieldOffset(0)] public ushort AX;
@@ -190,6 +191,7 @@ public enum Register : byte
 }
 
 [StructLayout(LayoutKind.Explicit)]
+[ExcludeFromCodeCoverage]
 readonly struct Instruction
 {
     [FieldOffset(0)] readonly byte _1;
@@ -213,6 +215,7 @@ readonly struct Instruction
     public byte HighData => _6;
 }
 
+[ExcludeFromCodeCoverage]
 static class Extensions
 {
     public static void Set(ref this Flags v, Flags flag, bool value)
@@ -330,6 +333,7 @@ static class Extensions
     }
 }
 
+[ExcludeFromCodeCoverage]
 public unsafe struct I8086
 {
     public bool IsHalted;

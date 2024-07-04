@@ -1,0 +1,24 @@
+using System.Memory;
+
+struct A
+{
+	byte _isPtr;
+	int _a;
+	
+	A*(int a)
+	{
+		this._isPtr = 1;
+		this._a = a;
+	}
+	
+	A(int a)
+	{
+		this._isPtr = 0;
+		this._a = a;
+	}
+}
+
+A* a = new A*(55);
+A b = new A(66);
+
+return ((a._isPtr as int) * a._a) + ((b._isPtr as int) * b._a);

@@ -61,10 +61,10 @@ public class MainFileTests
     [TestMethod, Timeout(Timeout)] public void Test54() => Utils.GetTest(54).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test55() => Utils.GetTest(55).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test56() => Utils.GetTest(56).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test57() => Utils.GetTest(57).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test58() => Utils.GetTest(58).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test59() => Utils.GetTest(59).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test60() => Utils.GetTest(60).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test57() => Utils.GetTest(57).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test58() => Utils.GetTest(58).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test59() => Utils.GetTest(59).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test60() => Utils.GetTest(60).DoMain();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test61() => Utils.GetTest(61).DoMain();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test62() => Utils.GetTest(62).DoMain();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test63() => Utils.GetTest(63).DoMain();

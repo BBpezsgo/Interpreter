@@ -14,6 +14,7 @@ interface IJump
     public void Tick();
 }
 
+[ExcludeFromCodeCoverage]
 class InstructionCountJump : IJump
 {
     public bool IsPaused { get; set; }
@@ -46,6 +47,7 @@ class InstructionCountJump : IJump
     public override string ToString() => (Count - Current).ToString();
 }
 
+[ExcludeFromCodeCoverage]
 class BreakPointJump : IJump
 {
     public bool IsPaused { get; set; }
@@ -74,6 +76,7 @@ class BreakPointJump : IJump
 }
 
 [SupportedOSPlatform("windows")]
+[ExcludeFromCodeCoverage]
 public sealed partial class InterpreterElement : WindowElement
 {
     readonly InterpreterDebuggabble Interpreter;

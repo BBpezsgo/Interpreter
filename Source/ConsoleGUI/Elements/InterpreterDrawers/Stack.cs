@@ -7,6 +7,7 @@ using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
+[ExcludeFromCodeCoverage]
 readonly struct DataMovement
 {
     public readonly int Address;

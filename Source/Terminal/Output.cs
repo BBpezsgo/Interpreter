@@ -2,6 +2,7 @@
 
 public delegate void PrintCallback(string message, LogType logType);
 
+[ExcludeFromCodeCoverage]
 public static class Output
 {
     static ProgramArguments arguments;

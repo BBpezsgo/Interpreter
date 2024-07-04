@@ -1755,16 +1755,49 @@ public abstract class CodeGenerator
         switch (literal.Type)
         {
             case LiteralType.Integer:
-                if (expectedType == BasicType.Byte &&
-                    int.TryParse(literal.Value, out int value) &&
-                    value >= byte.MinValue && value <= byte.MaxValue)
-                { return OnGotStatementType(literal, new BuiltinType(BasicType.Byte)); }
+                if (expectedType is not null)
+                {
+                    if (expectedType == BasicType.Byte)
+                    {
+                        if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
+                        {
+                            return OnGotStatementType(literal, new BuiltinType(BasicType.Byte));
+                        }
+                    }
+                    else if (expectedType == BasicType.Char)
+                    {
+                        if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
+                        {
+                            return OnGotStatementType(literal, new BuiltinType(BasicType.Char));
+                        }
+                    }
+                    else if (expectedType == BasicType.Float)
+                    {
+                        return OnGotStatementType(literal, new BuiltinType(BasicType.Float));
+                    }
+                }
+
                 return OnGotStatementType(literal, new BuiltinType(BasicType.Integer));
             case LiteralType.Float:
                 return OnGotStatementType(literal, new BuiltinType(BasicType.Float));
             case LiteralType.String:
                 return OnGotStatementType(literal, new PointerType(new BuiltinType(BasicType.Char)));
             case LiteralType.Char:
+                if (expectedType is not null)
+                {
+                    if (expectedType == BasicType.Byte)
+                    {
+                        if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
+                        {
+                            return OnGotStatementType(literal, new BuiltinType(BasicType.Byte));
+                        }
+                    }
+                    else if (expectedType == BasicType.Float)
+                    {
+                        return OnGotStatementType(literal, new BuiltinType(BasicType.Float));
+                    }
+                }
+
                 return OnGotStatementType(literal, new BuiltinType(BasicType.Char));
             default:
                 throw new UnreachableException($"Unknown literal type {literal.Type}");

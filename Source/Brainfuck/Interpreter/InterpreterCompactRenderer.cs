@@ -7,6 +7,7 @@ namespace LanguageCore.Brainfuck;
 public partial class InterpreterCompact
 {
     [SupportedOSPlatform("windows")]
+    [ExcludeFromCodeCoverage]
     protected override void DrawCode(ConsoleRenderer renderer, Range<int> range, int x, int y, int width)
     {
         for (int i = range.Start; i <= range.End; i++)

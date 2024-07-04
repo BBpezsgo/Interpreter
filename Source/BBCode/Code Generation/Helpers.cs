@@ -188,18 +188,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             , AddressingMode.PointerBP);
 
-    ValueAddress GetParameterAddress(CompiledParameter parameter)
-    {
-        return new ValueAddress(
-            0 // We start at the saved base pointer
-            - ParametersSizeBefore(parameter.Index) // ???
-            - StackFrameTags // Offset by the stack frame stuff
-            + 1 // Stack pointer offset (???)
-
-            , AddressingMode.PointerBP, parameter.IsRef);
-    }
-
-    ValueAddress GetParameterAddress(CompiledParameter parameter, int offset)
+    ValueAddress GetParameterAddress(CompiledParameter parameter, int offset = 0)
     {
         return new ValueAddress(
             0 // We start at the saved base pointer
@@ -265,6 +254,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (FindStatementType(field.PrevStatement) is PointerType)
         { return field.PrevStatement; }
+
+        if (field.PrevStatement is Identifier identifier)
+        {
+            if (GetParameter(identifier.Content, out CompiledParameter? prevParameter))
+            {
+                if (prevParameter.IsRef)
+                {
+                    return field.PrevStatement;
+                }
+            }
+            else if (GetVariable(identifier.Content, out CompiledVariable? prevVariable))
+            {
+
+            }
+            else if (GetGlobalVariable(identifier.Content, identifier.File, out CompiledVariable? prevGlobalVariable, out _))
+            {
+
+            }
+        }
 
         return NeedDerefernce(field.PrevStatement);
     }
@@ -436,25 +444,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment($"}}");
     }
 
-    void HeapLoad(ValueAddress pointerAddress, int offset, BitWidth size)
-    {
-        StackLoad(pointerAddress, BitWidth._32);
-
-        CheckPointerNull();
-
-        using (RegisterUsage.Auto reg = Registers.GetFree())
-        {
-            PopTo(reg.Get(BitWidth._32));
-            AddInstruction(Opcode.Push, reg.Get(BitWidth._32).ToPtr(offset, size));
-        }
-    }
-
     void HeapLoad(StatementWithValue pointer, int offset, int size)
     {
         if (FindStatementType(pointer) is not PointerType pointerType)
         { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
 
-        GenerateCodeForStatement(pointer);
+        GenerateCodeForStatement(pointer, resolveReference: false);
 
         CheckPointerNull();
 
@@ -481,10 +476,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void HeapStore(StatementWithValue pointer, int offset, int size)
     {
-        if (FindStatementType(pointer) is not PointerType pointerType)
-        { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
+        // if (FindStatementType(pointer) is not PointerType pointerType)
+        // { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
 
-        GenerateCodeForStatement(pointer);
+        GenerateCodeForStatement(pointer, resolveReference: false);
 
         CheckPointerNull();
 

@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore;
 
+[ExcludeFromCodeCoverage]
 public class InternalException : LanguageException
 {
     public InternalException() : base(string.Empty, Position.UnknownPosition, null) { }

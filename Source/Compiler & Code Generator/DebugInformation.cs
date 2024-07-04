@@ -2,6 +2,7 @@
 
 namespace LanguageCore.Runtime;
 
+[ExcludeFromCodeCoverage]
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public struct SourceCodeLocation
 {
@@ -24,6 +25,7 @@ public enum StackElementKind
     Parameter,
 }
 
+[ExcludeFromCodeCoverage]
 public struct StackElementInformation
 {
     public StackElementKind Kind;
@@ -47,12 +49,14 @@ public struct StackElementInformation
     }
 }
 
+[ExcludeFromCodeCoverage]
 public struct ScopeInformation
 {
     public SourceCodeLocation Location;
     public List<StackElementInformation> Stack;
 }
 
+[ExcludeFromCodeCoverage]
 public readonly struct CollectedScopeInfo
 {
     public readonly ImmutableArray<StackElementInformation> Stack;
@@ -83,6 +87,7 @@ public readonly struct CollectedScopeInfo
     }
 }
 
+[ExcludeFromCodeCoverage]
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public struct FunctionInformation
 {
@@ -127,6 +132,7 @@ public struct FunctionInformation
     }
 }
 
+[ExcludeFromCodeCoverage]
 public class DebugInformation : IDuplicatable<DebugInformation>
 {
     public readonly List<SourceCodeLocation> SourceCodeLocations;

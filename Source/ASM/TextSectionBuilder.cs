@@ -2,6 +2,7 @@
 
 namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public class TextSectionBuilder : SectionBuilder
 {
     readonly List<string> Labels;

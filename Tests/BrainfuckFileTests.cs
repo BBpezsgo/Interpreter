@@ -60,11 +60,11 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout)] public void Test53() => Utils.GetTest(53).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test54() => Utils.GetTest(54).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("External functions not supported")] public void Test55() => Utils.GetTest(55).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test56() => Utils.GetTest(56).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test57() => Utils.GetTest(57).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test58() => Utils.GetTest(58).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test59() => Utils.GetTest(59).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test60() => Utils.GetTest(60).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test56() => Utils.GetTest(56).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test57() => Utils.GetTest(57).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test58() => Utils.GetTest(58).DoBrainfuck();
+    [TestMethod, Timeout(Timeout), Ignore("Arrays with big element size not implemented")] public void Test59() => Utils.GetTest(59).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test60() => Utils.GetTest(60).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test61() => Utils.GetTest(61).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test62() => Utils.GetTest(62).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test63() => Utils.GetTest(63).DoBrainfuck();

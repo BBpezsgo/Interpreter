@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public static class Registers
 {
     /*

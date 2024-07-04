@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore;
 
+[ExcludeFromCodeCoverage]
 public static class ConsoleProgress
 {
     public static bool IsEnabled { get; private set; }
@@ -8,6 +9,7 @@ public static class ConsoleProgress
     public static void SetProgramArguments(ProgramArguments arguments) => IsEnabled = arguments.ShowProgress;
 }
 
+[ExcludeFromCodeCoverage]
 public readonly struct ConsoleSpinner
 {
     const double Speed = 5d;
@@ -24,6 +26,7 @@ public readonly struct ConsoleSpinner
     }
 }
 
+[ExcludeFromCodeCoverage]
 public struct ConsoleProgressBar : IDisposable
 {
     readonly int _line;
@@ -108,6 +111,7 @@ public struct ConsoleProgressBar : IDisposable
     }
 }
 
+[ExcludeFromCodeCoverage]
 public struct ConsoleProgressLabel : IDisposable
 {
     public string Label { get; set; }

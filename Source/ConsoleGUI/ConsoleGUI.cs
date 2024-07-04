@@ -7,6 +7,7 @@ namespace ConsoleGUI;
 internal delegate void MainThreadTimerCallback();
 internal delegate void MainThreadEventCallback<T>(T e);
 
+[ExcludeFromCodeCoverage]
 internal static class MainThreadExtensions
 {
     public static void Tick(this IMainThreadThing[] mainThreadThings, double deltaTime)
@@ -21,6 +22,7 @@ public interface IMainThreadThing
     public void Tick(double deltaTime);
 }
 
+[ExcludeFromCodeCoverage]
 internal sealed class MainThreadTimer : IMainThreadThing
 {
     double Timer;
@@ -53,6 +55,7 @@ internal sealed class MainThreadTimer : IMainThreadThing
     }
 }
 
+[ExcludeFromCodeCoverage]
 internal sealed class MainThreadEvents<T> : IMainThreadThing
 {
     readonly Queue<T> EventQueue;
@@ -84,6 +87,7 @@ internal sealed class MainThreadEvents<T> : IMainThreadThing
     public void Add(T parameter) => EventQueue.Enqueue(parameter);
 }
 
+[ExcludeFromCodeCoverage]
 [SupportedOSPlatform("windows")]
 internal sealed class ConsoleGUI : ConsoleRenderer, IDisposable
 {

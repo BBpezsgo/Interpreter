@@ -34,6 +34,7 @@ public class PreparationInstruction
         Operand2 = operand2;
     }
 
+    [ExcludeFromCodeCoverage]
     public override string ToString()
     {
         StringBuilder result = new();

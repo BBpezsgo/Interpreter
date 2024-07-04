@@ -33,13 +33,6 @@ public readonly struct ValueAddress
         IsReference = false;
     }
 
-    public ValueAddress(CompiledParameter parameter, int address)
-    {
-        Address = address;
-        AddressingMode = AddressingMode.PointerBP;
-        IsReference = parameter.IsRef;
-    }
-
     public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.AddressingMode, address.IsReference);
     public static ValueAddress operator -(ValueAddress address, int offset) => new(address.Address - offset, address.AddressingMode, address.IsReference);
 

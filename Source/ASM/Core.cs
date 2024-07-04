@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public class ProcessException : Exception
 {
     readonly string processName;
@@ -18,6 +19,7 @@ public class ProcessException : Exception
     }
 }
 
+[ExcludeFromCodeCoverage]
 public class ProcessNotStartedException : Exception
 {
     readonly string processName;

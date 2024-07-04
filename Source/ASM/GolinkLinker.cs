@@ -2,12 +2,14 @@
 
 namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public class GolinkLinkerException : Exception
 {
     public GolinkLinkerException(string message, Exception? inner) : base(message, inner)
     { }
 }
 
+[ExcludeFromCodeCoverage]
 public static class GolinkLinker
 {
     /// <exception cref="ProcessException"/>

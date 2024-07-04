@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace LanguageCore.Runtime;
+﻿namespace LanguageCore.Runtime;
 
 public static class HeapUtils
 {
@@ -71,6 +69,7 @@ public static class HeapUtils
     }
 }
 
+[ExcludeFromCodeCoverage]
 public static class HeapImplementation
 {
     const int BlockSizeMask = 0b_0000_0000_0000_0000_1111_1111_1111_1111;

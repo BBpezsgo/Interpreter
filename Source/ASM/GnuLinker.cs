@@ -2,12 +2,14 @@
 
 namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public class GnuLinkerException : Exception
 {
     public GnuLinkerException(string message, Exception? inner) : base(message, inner)
     { }
 }
 
+[ExcludeFromCodeCoverage]
 public static class GnuLinker
 {
     /// <exception cref="ProcessException"/>

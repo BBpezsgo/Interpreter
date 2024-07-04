@@ -2,6 +2,7 @@
 
 namespace LanguageCore.Runtime;
 
+[ExcludeFromCodeCoverage]
 public static class DebugUtils
 {
     #region Old

@@ -1,0 +1,9 @@
+int[5] list;
+
+list[0] = 22;
+list[1] = 33;
+list[2] = 44;
+list[3] = 55;
+list[4] = 66;
+
+return list[3] + list.Length;

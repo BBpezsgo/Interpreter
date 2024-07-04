@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore;
 
+[ExcludeFromCodeCoverage]
 public abstract class NotExceptionBut : IDiagnostics
 {
     public string Message { get; }

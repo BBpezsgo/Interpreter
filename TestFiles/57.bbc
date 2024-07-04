@@ -1,0 +1,17 @@
+struct A
+{
+	int _a;
+	byte _b;
+	int _c;
+}
+
+A a;
+A b;
+
+a._a = 44;
+a._b = 33;
+a._c = 22;
+
+b = a;
+
+return b._c;

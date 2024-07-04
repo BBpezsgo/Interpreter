@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore;
 
+[ExcludeFromCodeCoverage]
 public class AnalysisCollection
 {
     public readonly List<LanguageError> Errors;

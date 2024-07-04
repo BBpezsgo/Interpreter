@@ -1104,14 +1104,41 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile); }
     }
     void GenerateCodeForStatement(Assignment setter) => GenerateCodeForValueSetter(setter.Left, setter.Right);
-    void GenerateCodeForStatement(LiteralStatement literal)
+    void GenerateCodeForStatement(LiteralStatement literal, GeneralType? expectedType = null)
     {
         switch (literal.Type)
         {
             case LiteralType.Integer:
             {
-                OnGotStatementType(literal, new BuiltinType(BasicType.Integer));
+                if (expectedType is not null)
+                {
+                    if (expectedType == BasicType.Byte)
+                    {
+                        if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
+                        {
+                            OnGotStatementType(literal, new BuiltinType(BasicType.Byte));
+                            AddInstruction(Opcode.Push, new CompiledValue((byte)literal.GetInt()));
+                            return;
+                        }
+                    }
+                    else if (expectedType == BasicType.Char)
+                    {
+                        if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
+                        {
+                            OnGotStatementType(literal, new BuiltinType(BasicType.Char));
+                            AddInstruction(Opcode.Push, new CompiledValue((ushort)literal.GetInt()));
+                            return;
+                        }
+                    }
+                    else if (expectedType == BasicType.Float)
+                    {
+                        OnGotStatementType(literal, new BuiltinType(BasicType.Float));
+                        AddInstruction(Opcode.Push, new CompiledValue((float)literal.GetInt()));
+                        return;
+                    }
+                }
 
+                OnGotStatementType(literal, new BuiltinType(BasicType.Integer));
                 AddInstruction(Opcode.Push, new CompiledValue(literal.GetInt()));
                 break;
             }
@@ -1131,9 +1158,28 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             case LiteralType.Char:
             {
-                OnGotStatementType(literal, new BuiltinType(BasicType.Char));
-
                 if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, CurrentFile);
+
+                if (expectedType is not null)
+                {
+                    if (expectedType == BasicType.Byte)
+                    {
+                        if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
+                        {
+                            OnGotStatementType(literal, new BuiltinType(BasicType.Byte));
+                            AddInstruction(Opcode.Push, new CompiledValue((byte)literal.Value[0]));
+                            return;
+                        }
+                    }
+                    else if (expectedType == BasicType.Float)
+                    {
+                        OnGotStatementType(literal, new BuiltinType(BasicType.Float));
+                        AddInstruction(Opcode.Push, new CompiledValue((float)literal.Value[0]));
+                        return;
+                    }
+                }
+
+                OnGotStatementType(literal, new BuiltinType(BasicType.Char));
                 AddInstruction(Opcode.Push, new CompiledValue(literal.Value[0]));
                 break;
             }
@@ -1173,7 +1219,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("}");
     }
 
-    void GenerateCodeForStatement(Identifier variable, GeneralType? expectedType = null)
+    void GenerateCodeForStatement(Identifier variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         if (GetConstant(variable.Content, out IConstant? constant))
         {
@@ -1195,7 +1241,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             ValueAddress address = GetParameterAddress(param);
 
-            StackLoad(address, param.Type.SizeBytes);
+            if (param.IsRef && !resolveReference)
+            { StackLoad(address.ToUnreferenced(), BytecodeProcessor.PointerSize); }
+            else
+            { StackLoad(address, param.Type.SizeBytes); }
 
             return;
         }
@@ -1601,14 +1650,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType newInstanceType = FindStatementType(newInstance);
         GenerateCodeForStatement(newInstance);
 
-        for (int i = 0; i < newInstanceType.SizeBytes; i++)
-        {
-            // TODO: what is this + 1
-            AddInstruction(Opcode.Push, (InstructionOperand)(StackTop + 1 - newInstanceType.SizeBytes));
-        }
+        AddComment(" Pass arguments (\"this\" is already passed):");
 
         parameterCleanup = GenerateCodeForArguments(constructorCall.Arguments, compiledFunction, 1);
-        parameterCleanup.Insert(0, (newInstanceType.SizeBytes, false, newInstanceType, newInstance.Position));
 
         AddComment(" .:");
 
@@ -1987,7 +2031,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         OnScopeExit(block.Brackets.End.Position);
     }
 
-    void GenerateCodeForStatement(Statement statement, GeneralType? expectedType = null)
+    void GenerateCodeForStatement(Statement statement, GeneralType? expectedType = null, bool resolveReference = true)
     {
         int startInstruction = GeneratedCode.Count;
 
@@ -1999,8 +2043,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case BinaryOperatorCall v: GenerateCodeForStatement(v); break;
             case UnaryOperatorCall v: GenerateCodeForStatement(v); break;
             case AnyAssignment v: GenerateCodeForStatement(v.ToAssignment()); break;
-            case LiteralStatement v: GenerateCodeForStatement(v); break;
-            case Identifier v: GenerateCodeForStatement(v, expectedType); break;
+            case LiteralStatement v: GenerateCodeForStatement(v, expectedType); break;
+            case Identifier v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
             case AddressGetter v: GenerateCodeForStatement(v); break;
             case Pointer v: GenerateCodeForStatement(v); break;
             case WhileLoop v: GenerateCodeForStatement(v); break;
@@ -2164,7 +2208,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         GeneralType prevType = FindStatementType(statementToSet.PrevStatement);
         GeneralType type = FindStatementType(statementToSet);
-        GeneralType valueType = FindStatementType(value);
+        GeneralType valueType = FindStatementType(value, type);
 
         if (prevType is PointerType pointerType)
         {
@@ -2179,13 +2223,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             statementToSet.CompiledType = statementToSet.CompiledType;
             fieldDefinition.References.Add(new Reference<Statement>(statementToSet, CurrentFile, CurrentContext));
 
-            GenerateCodeForStatement(statementToSet.PrevStatement);
-
-            GenerateCodeForStatement(value);
-            // TODO: this
-            HeapStore(StackTop - valueType.SizeBytes, fieldOffset, BitWidth._32);
-
-            Pop(BitWidth._32);
+            GenerateCodeForStatement(value, type);
+            HeapStore(statementToSet.PrevStatement, fieldOffset, valueType.SizeBytes);
             return;
         }
 
@@ -2195,7 +2234,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (type != valueType)
         { throw new CompilerException($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, CurrentFile); }
 
-        GenerateCodeForStatement(value);
+        GenerateCodeForStatement(value, type);
 
         StatementWithValue? dereference = NeedDerefernce(statementToSet);
 

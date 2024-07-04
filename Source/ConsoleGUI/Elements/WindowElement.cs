@@ -4,6 +4,7 @@ using Point = System.Drawing.Point;
 
 namespace ConsoleGUI;
 
+[ExcludeFromCodeCoverage]
 [SupportedOSPlatform("windows")]
 public class WindowElement : Element
 {

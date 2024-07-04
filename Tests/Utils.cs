@@ -227,7 +227,7 @@ public static class Utils
 
     const string TestFilesPath = $@"{TestConstants.TheProjectPath}\TestFiles\";
 
-    const int TestCount = 56;
+    const int TestCount = 60;
     static readonly int TestFileNameWidth = (int)Math.Floor(Math.Log10(TestCount)) + 1;
 
     public static LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckGeneratorSettings => new(LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default)

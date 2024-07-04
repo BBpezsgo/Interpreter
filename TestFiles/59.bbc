@@ -1,0 +1,22 @@
+struct A
+{
+	byte _a;
+	int _b;
+}
+
+A[3] list;
+A a;
+
+a._a = 22;
+a._b = 33;
+list[0] = a;
+
+a._a = 44;
+a._b = 55;
+list[1] = a;
+
+a._a = 66;
+a._b = 77;
+list[2] = a;
+
+return list[1]._b;

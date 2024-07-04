@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public readonly struct IndentBlock : IDisposable
 {
     readonly SectionBuilder Builder;

@@ -15,6 +15,7 @@ public enum InstructionOperandType
     Label,
 }
 
+[ExcludeFromCodeCoverage]
 public readonly struct InstructionOperand : IEquatable<InstructionOperand>
 {
     public readonly InstructionOperandType Type;

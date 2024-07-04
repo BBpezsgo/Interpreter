@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public class AssemblyCode
 {
     public static readonly string[] ReservedWords = new string[] {

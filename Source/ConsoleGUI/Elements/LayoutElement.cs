@@ -4,6 +4,7 @@ using Win32.Console;
 
 namespace ConsoleGUI;
 
+[ExcludeFromCodeCoverage]
 [SupportedOSPlatform("windows")]
 public class LayoutElement : Element, IElementWithSubelements, IInlineLayoutElement
 {
@@ -34,6 +35,7 @@ public class LayoutElement : Element, IElementWithSubelements, IInlineLayoutElem
     }
 }
 
+[ExcludeFromCodeCoverage]
 [SupportedOSPlatform("windows")]
 public class VerticalLayoutElement : LayoutElement
 {
@@ -97,6 +99,7 @@ public class VerticalLayoutElement : LayoutElement
     }
 }
 
+[ExcludeFromCodeCoverage]
 [SupportedOSPlatform("windows")]
 public class HorizontalLayoutElement : LayoutElement
 {

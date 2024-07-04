@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore;
 
+[ExcludeFromCodeCoverage]
 public class WillBeCompilerException
 {
     public string Message { get; }

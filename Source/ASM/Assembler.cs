@@ -2,6 +2,7 @@
 
 namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public static class Assembler
 {
     public static void Assemble(string asmSourceCode, string outputFile, bool saveAsmFile = false)

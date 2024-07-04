@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore;
 
+[ExcludeFromCodeCoverage]
 public class LanguageException : Exception, IDiagnostics
 {
     public Position Position { get; protected set; }

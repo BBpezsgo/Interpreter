@@ -23,6 +23,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     bool _isDisposed;
     protected RendererContext _rendererContext;
 
+    [ExcludeFromCodeCoverage]
     void Dispose(bool _)
     {
         if (_isDisposed) return;
@@ -30,7 +31,9 @@ public partial class InterpreterBase<TCode> : IDisposable
         ConsoleListener.Stop();
         _isDisposed = true;
     }
+    [ExcludeFromCodeCoverage]
     ~InterpreterBase() { Dispose(false); }
+    [ExcludeFromCodeCoverage]
     void IDisposable.Dispose()
     {
         Dispose(true);
@@ -38,6 +41,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     [SupportedOSPlatform("windows")]
+    [ExcludeFromCodeCoverage]
     public void RunWithUI(bool autoTick = true, int wait = 0)
     {
         SetupUI();
@@ -86,6 +90,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     [SupportedOSPlatform("windows")]
+    [ExcludeFromCodeCoverage]
     void SetupUI()
     {
         _rendererContext.Renderer ??= new ConsoleRenderer((short)Console.WindowWidth, (short)Console.WindowHeight);
@@ -118,6 +123,7 @@ public partial class InterpreterBase<TCode> : IDisposable
 
     /// <exception cref="NullReferenceException"/>
     [SupportedOSPlatform("windows")]
+    [ExcludeFromCodeCoverage]
     public void Draw()
     {
         if (_rendererContext.Renderer is null)
@@ -184,6 +190,7 @@ public partial class InterpreterBase<TCode> : IDisposable
 
     int StartToken;
     [SupportedOSPlatform("windows")]
+    [ExcludeFromCodeCoverage]
     void DrawOriginalCode(ConsoleRenderer renderer, SmallRect rect)
     {
         renderer.Clear(rect);
@@ -296,9 +303,11 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     [SupportedOSPlatform("windows")]
+    [ExcludeFromCodeCoverage]
     protected abstract void DrawCode(ConsoleRenderer renderer, Range<int> range, int x, int y, int width);
 
     [SupportedOSPlatform("windows")]
+    [ExcludeFromCodeCoverage]
     void DrawMemory(ConsoleRenderer renderer, Range<int> range, SmallRect rect)
     {
         renderer.Clear(rect);
@@ -400,6 +409,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     [SupportedOSPlatform("windows")]
+    [ExcludeFromCodeCoverage]
     static void DrawOutput(ConsoleRenderer renderer, string text, SmallRect rect)
     {
         int x = rect.X;
@@ -434,6 +444,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     [SupportedOSPlatform("windows")]
+    [ExcludeFromCodeCoverage]
     void DrawStackTrace(ConsoleRenderer renderer, SmallRect rect)
     {
         if (DebugInfo == null)

@@ -96,6 +96,7 @@ public readonly struct InstructionOperand
 
     static string? PointerOffsetString(int offset) => offset == 0 ? null : offset > 0 ? $"+{offset}" : $"-{offset}";
 
+    [ExcludeFromCodeCoverage]
     public override string ToString() => Type switch
     {
         InstructionOperandType.Immediate8 => Value.ToString(),
@@ -205,6 +206,7 @@ public readonly struct Instruction
         Operand2 = other.Operand2;
     }
 
+    [ExcludeFromCodeCoverage]
     public override string ToString()
     {
         StringBuilder result = new();

@@ -2,6 +2,7 @@
 
 using Runtime;
 
+[ExcludeFromCodeCoverage]
 public static class ConverterForAsm
 {
     public static string Convert(ReadOnlySpan<Instruction> instructions)

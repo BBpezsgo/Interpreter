@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace LanguageCore.ASM;
 
+[ExcludeFromCodeCoverage]
 public readonly struct Instruction
 {
     public readonly OpCode OpCode;

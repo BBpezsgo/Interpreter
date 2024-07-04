@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore;
 
+[ExcludeFromCodeCoverage]
 public sealed class LanguageError : LanguageException
 {
 #if DEBUG

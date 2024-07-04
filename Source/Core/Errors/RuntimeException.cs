@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Runtime;
 
+[ExcludeFromCodeCoverage]
 public class RuntimeException : LanguageException
 {
     public RuntimeContext? Context;

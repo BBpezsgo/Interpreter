@@ -11,6 +11,7 @@ using Compiler;
 using Runtime;
 using Tokenizing;
 
+[ExcludeFromCodeCoverage]
 public static class Entry
 {
     /// <exception cref="NotSupportedException"/>

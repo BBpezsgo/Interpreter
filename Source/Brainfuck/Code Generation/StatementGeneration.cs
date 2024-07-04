@@ -243,7 +243,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         GeneralType prevType = FindStatementType(statementToSet.PrevStatement);
         GeneralType type = FindStatementType(statementToSet);
-        GeneralType valueType = FindStatementType(value);
+        GeneralType valueType = FindStatementType(value, type);
 
         if (prevType is PointerType pointerType)
         {

@@ -13,3 +13,4 @@ obj
 /TestFiles/test.bbc
 /Source/ASM/i8086/Builds/build.bat
 /Source/ASM/i8086/Builds/run.bat
+/Tests/TestResults

@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Parser;
 
+[ExcludeFromCodeCoverage]
 public sealed class SyntaxException : LanguageException
 {
     public SyntaxException(string message, Position position, Uri? uri) : base(message, position, uri) { }

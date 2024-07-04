@@ -1,6 +1,7 @@
 ﻿namespace LanguageCore.ASM;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+[ExcludeFromCodeCoverage]
 public class SectionBuilder
 {
     public const string EOL = "\r\n";

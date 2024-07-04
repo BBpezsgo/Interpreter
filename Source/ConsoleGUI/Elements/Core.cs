@@ -4,6 +4,7 @@ using Win32.Console;
 
 namespace ConsoleGUI;
 
+[ExcludeFromCodeCoverage]
 public class DrawBuffer
 {
     static readonly ImmutableArray<(int x, int y, char character)> LineSegments = ImmutableArray.Create<(int, int, char)>(
@@ -294,6 +295,7 @@ public enum InlineLayoutSizeMode
     Stretchy,
 }
 
+[ExcludeFromCodeCoverage]
 public class InlineLayout
 {
     public InlineLayoutSizeMode SizeMode;
@@ -328,6 +330,7 @@ public enum Side
     Left,
 }
 
+[ExcludeFromCodeCoverage]
 public static class Extensions
 {
     [SupportedOSPlatform("windows")]
@@ -490,6 +493,7 @@ public static class Extensions
     public static ConsoleChar Details(this char v) => new(v, CharColor.Silver, CharColor.Black);
 }
 
+[ExcludeFromCodeCoverage]
 public static class Utils
 {
     public static int GetIndex(int x, int y, int width) => x + (y * width);

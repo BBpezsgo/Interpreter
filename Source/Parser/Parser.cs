@@ -449,6 +449,12 @@ public sealed class Parser
         if (!ExpectIdentifier(out Token? possibleNameT))
         { CurrentTokenIndex = parseStart; return false; }
 
+        if (possibleNameT.Content is
+            not BuiltinFunctionIdentifiers.IndexerGet and
+            not BuiltinFunctionIdentifiers.IndexerSet and
+            not BuiltinFunctionIdentifiers.Destructor)
+        { CurrentTokenIndex = parseStart; return false; }
+
         if (!ExpectOperator("(", out Token? bracketStart))
         { CurrentTokenIndex = parseStart; return false; }
 
@@ -593,11 +599,7 @@ public sealed class Parser
         Token? bracketEnd;
         while (!ExpectOperator("}", out bracketEnd))
         {
-            if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
-            {
-                operators.Add(operatorDefinition);
-            }
-            else if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition))
+            if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition))
             {
                 methods.Add(methodDefinition);
             }
@@ -608,6 +610,10 @@ public sealed class Parser
             else if (ExpectConstructorDefinition(out ConstructorDefinition? constructorDefinition))
             {
                 constructors.Add(constructorDefinition);
+            }
+            else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
+            {
+                operators.Add(operatorDefinition);
             }
             else if (ExpectField(out FieldDefinition? field))
             {
@@ -1881,7 +1887,7 @@ public sealed class Parser
             {
                 if (!flags.HasFlag(AllowedType.FunctionPointer))
                 {
-                    CurrentTokenIndex = afterIdentifier;
+                    CurrentTokenIndex--;
                     goto End;
                 }
 

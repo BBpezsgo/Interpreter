@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace LanguageCore.ASM.emu8086;
+﻿namespace LanguageCore.ASM.emu8086;
 
 /*
 < THE SYMBOL TABLE >  test.com  --  emu8086 assembler version: 4.08 
@@ -18,6 +12,7 @@ T_F_PRINT_CHAR_P         	00113     	-1        	LABEL     	(NOSEG)
 < END >
  */
 
+[ExcludeFromCodeCoverage]
 public class Symbols
 {
     public readonly struct Symbol

@@ -2,7 +2,7 @@
 
 public static class RegisterExtensions
 {
-    public static InstructionOperand ToPtr(this Register register, int offset = 0, BitWidth dataSize = Runtime.BitWidth._32) => register switch
+    public static InstructionOperand ToPtr(this Register register, int offset, BitWidth dataSize) => register switch
     {
         Register.StackPointer => new InstructionOperand(offset, dataSize switch
         {

@@ -35,7 +35,7 @@ public partial struct CompiledValue :
 
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public object ToType(Type conversionType)
+    public object Cast(Type conversionType)
     {
         if (conversionType == typeof(byte)) return (byte)this;
         if (conversionType == typeof(sbyte)) return (sbyte)(byte)this;
@@ -70,9 +70,89 @@ public partial struct CompiledValue :
         throw new InvalidCastException($"Can't cast {Type} to {conversionType}");
     }
 
+    public readonly bool TryCast(GeneralType type, out CompiledValue value)
+    {
+        value = default;
+        return type switch
+        {
+            BuiltinType builtinType => TryCast(builtinType, out value),
+            _ => false
+        };
+    }
+
+    public readonly bool TryCast(BuiltinType type, out CompiledValue value)
+    {
+        value = default;
+        switch (type.Type)
+        {
+            case BasicType.Byte:
+                switch (Type)
+                {
+                    case RuntimeType.Integer:
+                        if (Int is >= byte.MinValue and <= byte.MaxValue)
+                        {
+                            value = new CompiledValue((byte)this);
+                            return true;
+                        }
+                        return false;
+                    case RuntimeType.Char:
+                        if ((ushort)Char is >= byte.MinValue and <= byte.MaxValue)
+                        {
+                            value = new CompiledValue((byte)this);
+                            return true;
+                        }
+                        return false;
+                    case RuntimeType.Byte:
+                        value = this;
+                        return true;
+                    default: return false;
+                }
+            case BasicType.Integer:
+                switch (Type)
+                {
+                    case RuntimeType.Integer:
+                        value = this;
+                        return true;
+                    case RuntimeType.Char:
+                        value = new CompiledValue((int)this);
+                        return true;
+                    case RuntimeType.Byte:
+                        value = new CompiledValue((int)this);
+                        return true;
+                    default: return false;
+                }
+            case BasicType.Float:
+                if (Type == RuntimeType.Single)
+                {
+                    value = this;
+                    return true;
+                }
+                return false;
+            case BasicType.Char:
+                switch (Type)
+                {
+                    case RuntimeType.Integer:
+                        if (Int is >= ushort.MinValue and <= ushort.MaxValue)
+                        {
+                            value = new CompiledValue((char)this);
+                            return true;
+                        }
+                        return false;
+                    case RuntimeType.Char:
+                        value = this;
+                        return true;
+                    case RuntimeType.Byte:
+                        value = new CompiledValue((char)this);
+                        return true;
+                    default: return false;
+                }
+            default: return false;
+        }
+    }
+
     /// <inheritdoc/>
     /// <exception cref="InvalidCastException"/>
-    public T ToType<T>() => (T)ToType(typeof(T));
+    public T Cast<T>() => (T)Cast(typeof(T));
 
     public static bool TryCast(ref CompiledValue value, RuntimeType targetType)
     {

@@ -4,85 +4,75 @@ using Parser;
 using Parser.Statement;
 using Runtime;
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+public abstract class Address;
+
+public class AddressOffset : Address
+{
+    public Address Base { get; }
+    public int Offset { get; }
+
+    public AddressOffset(Register register, int offset)
+    {
+        Base = new AddressRegisterPointer(register);
+        Offset = offset;
+    }
+
+    public AddressOffset(Address @base, int offset)
+    {
+        if (@base is AddressOffset baseAddressOffset)
+        {
+            Base = baseAddressOffset.Base;
+            Offset = baseAddressOffset.Offset + offset;
+        }
+        else
+        {
+            Base = @base;
+            Offset = offset;
+        }
+    }
+
+    public override string ToString() => Offset switch
+    {
+        > 0 => $"{Base} + {Offset}",
+        < 0 => $"{Base} - {-Offset}",
+        _ => $"{Base}"
+    };
+}
+
+public class AddressRuntimePointer : Address
+{
+    public Address PointerAddress { get; }
+
+    public AddressRuntimePointer(Address pointerAddress)
+    {
+        PointerAddress = pointerAddress;
+    }
+
+    public override string ToString() => $"*[{PointerAddress}]";
+}
+
+public class AddressRegisterPointer : Address
+{
+    public Register Register { get; }
+
+    public AddressRegisterPointer(Register register)
+    {
+        Register = register;
+    }
+
+    public override string ToString() => $"{Register}";
+}
+
 public readonly struct ValueAddress
 {
-    public readonly int Address;
-    public readonly AddressingMode AddressingMode;
-    public readonly bool IsReference;
+    public readonly Address Address;
     public readonly BitWidth DataSize;
 
-    public ValueAddress(int address, AddressingMode addressingMode)
+    public ValueAddress(Address address, BitWidth dataSize)
     {
         Address = address;
-        AddressingMode = addressingMode;
-        IsReference = false;
+        DataSize = dataSize;
     }
-
-    public ValueAddress(int address, AddressingMode addressingMode, bool isReference)
-    {
-        Address = address;
-        AddressingMode = addressingMode;
-        IsReference = isReference;
-    }
-
-    public ValueAddress(CompiledVariable variable)
-    {
-        Address = variable.MemoryAddress;
-        AddressingMode = AddressingMode.PointerBP;
-        IsReference = false;
-    }
-
-    public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.AddressingMode, address.IsReference);
-    public static ValueAddress operator -(ValueAddress address, int offset) => new(address.Address - offset, address.AddressingMode, address.IsReference);
-
-    public override string ToString()
-    {
-        StringBuilder result = new();
-
-        result.Append('*');
-        result.Append('[');
-
-        switch (AddressingMode)
-        {
-            case AddressingMode.Pointer:
-                result.Append(Address);
-                break;
-            case AddressingMode.PointerBP:
-                result.Append("BP");
-                if (Address > 0)
-                {
-                    result.Append('+');
-                    result.Append(Address);
-                }
-                else
-                {
-                    result.Append(Address);
-                }
-                break;
-            case AddressingMode.PointerSP:
-                result.Append("SP+");
-                if (Address > 0)
-                {
-                    result.Append('+');
-                    result.Append(Address);
-                }
-                else
-                {
-                    result.Append(Address);
-                }
-                break;
-            default:
-                throw new UnreachableException();
-        }
-
-        result.Append(']');
-
-        return result.ToString();
-    }
-    string GetDebuggerDisplay() => ToString();
-
-    public ValueAddress ToUnreferenced() => new(Address, AddressingMode);
 }
 
 readonly struct UndefinedOffset<TFunction>

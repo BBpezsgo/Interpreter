@@ -112,7 +112,8 @@ public static class LanguageOperators
 {
     public static HashSet<string> UnaryOperators { get; } = new HashSet<string>()
     {
-        "!",
+        UnaryOperatorCall.LogicalNOT,
+        UnaryOperatorCall.BinaryNOT,
     };
 
     public static HashSet<string> BinaryOperators { get; } = new HashSet<string>()

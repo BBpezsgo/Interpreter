@@ -1,10 +1,10 @@
-void Func(ref int v)
+void Func(int* v)
 {
-	v += 7;
+	*v += 7;
 }
 
 int a = 3;
 
-Func(ref a);
+Func(&a);
 
 return a;

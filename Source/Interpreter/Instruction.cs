@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Runtime;
 
+using System.Threading;
 using Compiler;
 
 public enum AddressingMode : byte
@@ -94,6 +95,37 @@ public readonly struct InstructionOperand
         Type = type;
     }
 
+    public InstructionOperand(int value)
+    {
+        Value = new RuntimeValue(value);
+        Type = InstructionOperandType.Immediate32;
+    }
+    public InstructionOperand(byte value)
+    {
+        Value = new RuntimeValue(value);
+        Type = InstructionOperandType.Immediate8;
+    }
+    public InstructionOperand(float value)
+    {
+        Value = new RuntimeValue(value);
+        Type = InstructionOperandType.Immediate32;
+    }
+    public InstructionOperand(char value)
+    {
+        Value = new RuntimeValue(value);
+        Type = InstructionOperandType.Immediate16;
+    }
+    public InstructionOperand(ushort value)
+    {
+        Value = new RuntimeValue(value);
+        Type = InstructionOperandType.Immediate16;
+    }
+    public InstructionOperand(bool value)
+    {
+        Value = new RuntimeValue(value);
+        Type = InstructionOperandType.Immediate8;
+    }
+
     static string? PointerOffsetString(int offset) => offset == 0 ? null : offset > 0 ? $"+{offset}" : $"-{offset}";
 
     [ExcludeFromCodeCoverage]
@@ -160,17 +192,18 @@ public readonly struct InstructionOperand
     };
     public static implicit operator InstructionOperand(int value) => new(new RuntimeValue(value), InstructionOperandType.Immediate32);
     public static implicit operator InstructionOperand(Register register) => new((int)register, InstructionOperandType.Register);
-    public static explicit operator InstructionOperand(ValueAddress address)
+    public static explicit operator InstructionOperand(AddressRegisterPointer address) => address.Register.ToPtr(0, BitWidth._32);
+    public static explicit operator InstructionOperand(AddressOffset address) => address.Base switch
     {
-        if (address.IsReference) throw new NotImplementedException();
-        return address.AddressingMode switch
-        {
-            AddressingMode.Pointer => new InstructionOperand(new RuntimeValue(address.Address), InstructionOperandType.Pointer32),
-            AddressingMode.PointerBP => Register.BasePointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
-            AddressingMode.PointerSP => Register.StackPointer.ToPtr(address.Address * BytecodeProcessor.StackDirection),
-            _ => throw new UnreachableException(),
-        };
-    }
+        AddressRegisterPointer registerPointer => registerPointer.Register.ToPtr(address.Offset * BytecodeProcessor.StackDirection, BitWidth._32),
+        _ => throw new NotImplementedException()
+    };
+    public static explicit operator InstructionOperand(Address address) => address switch
+    {
+        AddressRegisterPointer registerPointer => (InstructionOperand)registerPointer,
+        AddressOffset addressOffset => (InstructionOperand)addressOffset,
+        _ => throw new NotImplementedException()
+    };
 }
 
 [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]

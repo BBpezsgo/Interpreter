@@ -18,7 +18,7 @@ struct A
 	}
 }
 
-A* a = new A*(55);
+temp A* a = new A*(55);
 A b = new A(66);
 
 return ((a._isPtr as int) * a._a) + ((b._isPtr as int) * b._a);

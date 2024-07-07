@@ -1,76 +1,67 @@
 #if BRAINFUCK
-const int MaxHeapSize = 126;
+const byte MaxHeapSize = 0b_0_1111111;
 #else
-const int MaxHeapSize = 126;
+const byte MaxHeapSize = 0b_0_1111111;
 *0 = MaxHeapSize;
 #endif
 
-void GetHeader(int* ptr, ref int size, ref int allocated)
+export void GetHeader(byte* ptr, byte* size, byte* allocated)
 {
-    int value = *ptr;
-    if (value >= (MaxHeapSize + 1)) // value & 0b_1000_0000
+    byte value = *ptr;
+    if (value >= 0b_1_0000000) // value & 0b_1_0000000
     {
-        value -= (MaxHeapSize + 1); // value &= ~0b_1000_0000
-
-        size = value;
-        allocated = 1;
+        *size = value - 0b_1_0000000; // value & ~(0b_1_0000000 as byte)
+        *allocated = 1;
     }
     else
     {
-        size = value;
-        allocated = 0;
+        *size = value;
+        *allocated = 0;
     }
 }
 
-void SetHeader(int* ptr, int size, int allocated)
+export void SetHeader(byte* ptr, byte size, byte allocated)
 {
-    int value = size;
+    if (size > MaxHeapSize)
+    { throw "What"; }
+
+    byte value = size;
+
     if (allocated)
-    { value += (MaxHeapSize + 1); } // value |= 0b_1000_0000
+    {
+        value += 0b_1_0000000; // value |= 0b_1_0000000 as byte
+    }
+    
     *ptr = value;
 }
 
-int JoinFreeBlocks()
+byte JoinFreeBlocks()
 {
-    int* headerPointer = 0;
-    int prevBlockSize = 0;
-    while (headerPointer < (MaxHeapSize + 1))
+    byte* headerPointer = 0;
+    byte prevBlockSize = 0 as byte;
+    while (headerPointer < MaxHeapSize)
     {
-        int blockSize;
-        int blockUsed;
-        GetHeader(headerPointer, ref blockSize, ref blockUsed);
-        
-        // Print(headerPointer as int);
-        // Print(": { size: ");
-        // Print(blockSize);
-        // Print(" used: ");
-        // Print(blockUsed);
-        // PrintLine(" }");
+        byte blockSize;
+        byte blockUsed;
+        GetHeader(headerPointer, &blockSize, &blockUsed);
 
         // This is a free block that is not at the beginning of the heap
         if (headerPointer != 0 && blockUsed == 0)
         {
-            int* prevOffset = headerPointer - prevBlockSize - 1;
+            byte* prevOffset = headerPointer - (prevBlockSize as int) - 1;
 
-            int d;
-            int prevBlockUsed;
-            GetHeader(prevOffset, ref d, ref prevBlockUsed);
+            byte d;
+            byte prevBlockUsed;
+            GetHeader(prevOffset, &d, &prevBlockUsed);
 
             // The previous block is also free
             if (prevBlockUsed == 0)
             {
-                // Print("Set ");
-                // Print(prevOffset as int);
-                // Print(" to { size: ");
-                // Print(blockSize + prevBlockSize + 1);
-                // Print(" }");
-                // PrintLine();
-
                 // Update the previous block's header
-                SetHeader(prevOffset, blockSize + prevBlockSize + 1, 0);
+                SetHeader(prevOffset, (blockSize + prevBlockSize + 1) as byte, 0 as byte);
                 // Remove the current block's header
-                *headerPointer = 0;
-                return 1;
+                *headerPointer = 0 as byte;
+                return 1 as byte;
             }
         }
 
@@ -85,32 +76,19 @@ int JoinFreeBlocks()
 export any* Alloc(int sizeNeed)
 {
     if (sizeNeed == 0)
-    { sizeNeed++; }
-    
-    // Print("Allocating ");
-    // Print(sizeNeed);
-    // Print(" ...");
-    // PrintLine();
+    {
+        throw "What";
+    }
 
-    int* headerPointer = 0;
+    byte* headerPointer;
     while (1)
     {
         if (headerPointer >= MaxHeapSize) { throw "Out of memory"; }
 
-        int blockSize;
-        int blockUsed;
-        GetHeader(headerPointer, ref blockSize, ref blockUsed);
-        int* dataPointer = headerPointer + 1;
-        
-        // Print("Block #");
-        // Print(headerPointer as int);
-        // Print(": ");
-        // Print("Size: ");
-        // Print(blockSize);
-        // Print("  Used: ");
-        // Print(blockUsed);
-        // PrintLine();
-        // PrintLine(dataPointer as int);
+        byte blockSize;
+        byte blockUsed;
+        GetHeader(headerPointer, &blockSize, &blockUsed);
+        byte* dataPointer = (headerPointer + 1) as byte*;
 
         if (blockUsed == 0)
         {
@@ -118,42 +96,33 @@ export any* Alloc(int sizeNeed)
             if (blockSize == sizeNeed)
             {
                 // Update the current block's header
-                SetHeader(headerPointer, sizeNeed, 1);
-                
-                // PrintLine("Perfect match");
-                // Print("Returning ");
-                // PrintLine(dataPointer as int);
+                SetHeader(headerPointer, sizeNeed as byte, 1 as byte);
 
                 return dataPointer;
             }
-            
+
             // If the block's size is larger than needed
             if (blockSize > sizeNeed)
             {
-                // PrintLine("Found a big block ...");
-
                 // Update the current block's header
-                SetHeader(headerPointer, sizeNeed, 1);
-                
-                int* nextHeaderPointer = dataPointer + sizeNeed;
+                SetHeader(headerPointer, sizeNeed as byte, 1 as byte);
+
+                byte* nextHeaderPointer = (dataPointer + sizeNeed) as byte*;
 
                 // Calculate remaining size
-                int _remainingSize = blockSize - sizeNeed - 1;
-                    
+                byte _remainingSize = blockSize - (sizeNeed as byte) - 1;
+
                 // If a larger block is allocated than needed
                 if (_remainingSize >= 0)
                 {
                     // Update the next block's header
-                    SetHeader(nextHeaderPointer, _remainingSize, 0);
+                    SetHeader(nextHeaderPointer, _remainingSize, 0 as byte);
                 }
-                
-                // Print("Returning ");
-                // PrintLine(dataPointer as int);
-                
+
                 return dataPointer;
             }
         }
-        
+
         headerPointer += blockSize + 1;
     }
 }
@@ -161,25 +130,17 @@ export any* Alloc(int sizeNeed)
 [Builtin("free")]
 export void Dealloc(any* ptr)
 {
-    int* position = ptr as int*;
-    // Print("Deallocate ");
-    // Print(position - 1);
-    // PrintLine();
+    byte* position = ptr as byte*;
 
-    int size;
-    int allocated;
+    byte size;
+    byte allocated;
 
-    GetHeader((ptr - 1) as int*, ref size, ref allocated);
-    
+    GetHeader((ptr - 1) as byte*, &size, &allocated);
+
     if (allocated == 0)
-    {
-        // PrintLine("Not allocated");
-        return;
-    }
+    { return; }
 
-    // Print("Size: ");
-    // PrintLine(size);
-    SetHeader((ptr - 1) as int*, size, 0);
+    SetHeader((ptr - 1) as byte*, size, 0 as byte);
 
     // *(ptr - 1) = 0;
 
@@ -190,6 +151,5 @@ export void Dealloc(any* ptr)
         position++;
     }
 
-    // JoinFreeBlocks();
     while (JoinFreeBlocks()) { }
 }

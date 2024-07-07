@@ -1294,7 +1294,7 @@ public sealed class Parser
         return false;
     }
 
-    bool ExpectExpression([NotNullWhen(true)] out StatementWithValue? result)
+    bool ExpectUnaryOperatorCall([NotNullWhen(true)] out UnaryOperatorCall? result)
     {
         result = null;
 
@@ -1307,6 +1307,19 @@ public sealed class Parser
             return true;
         }
 
+        return false;
+    }
+
+    bool ExpectExpression([NotNullWhen(true)] out StatementWithValue? result)
+    {
+        result = null;
+
+        if (ExpectUnaryOperatorCall(out UnaryOperatorCall? unaryOperatorCall))
+        {
+            result = unaryOperatorCall;
+            return true;
+        }
+
         if (!ExpectModifiedOrOneValue(out StatementWithValue? leftStatement, GeneralStatementModifiers.AsSpan())) return false;
 
         while (true)
@@ -1314,20 +1327,23 @@ public sealed class Parser
             if (!ExpectOperator(BinaryOperators, out Token? binaryOperator)) break;
 
             if (!ExpectModifiedOrOneValue(out StatementWithValue? rightStatement, GeneralStatementModifiers.AsSpan()))
-            { throw new SyntaxException($"Expected value after operator \"{binaryOperator}\" (not \"{CurrentToken}\")", binaryOperator.Position.After(), File); }
+            {
+                if (!ExpectUnaryOperatorCall(out UnaryOperatorCall? rightUnaryOperatorCall))
+                { throw new SyntaxException($"Expected value after operator \"{binaryOperator}\" (not \"{CurrentToken}\")", binaryOperator.Position.After(), File); }
+                else
+                { rightStatement = rightUnaryOperatorCall; }
+            }
 
             int rightSidePrecedence = OperatorPrecedence(binaryOperator.Content);
 
             BinaryOperatorCall? rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
             if (rightmostStatement != null)
             {
-                BinaryOperatorCall operatorCall = new(binaryOperator, rightmostStatement.Right, rightStatement, File);
-                rightmostStatement.Right = operatorCall;
+                rightmostStatement.Right = new BinaryOperatorCall(binaryOperator, rightmostStatement.Right, rightStatement, File);
             }
             else
             {
-                BinaryOperatorCall operatorCall = new(binaryOperator, leftStatement, rightStatement, File);
-                leftStatement = operatorCall;
+                leftStatement = new BinaryOperatorCall(binaryOperator, leftStatement, rightStatement, File);
             }
         }
 

@@ -6,6 +6,21 @@ using Win32.Console;
 
 namespace ConsoleGUI;
 
+[ExcludeFromCodeCoverage]
+readonly struct DataMovement
+{
+    public readonly int Address;
+    public readonly int Size;
+
+    public DataMovement(int address, int size)
+    {
+        Address = address;
+        Size = size;
+    }
+
+    public bool Contains(int address) => address >= Address && address < Address + Size;
+}
+
 interface IJump
 {
     public bool IsPaused { get; set; }
@@ -191,6 +206,95 @@ public sealed partial class InterpreterElement : WindowElement
         Interpreter.OnNeedInput += (_) => ConsolePanel.BeginRead();
 
         ConsolePanel.OnInput += Interpreter.OnInput;
+    }
+
+    void GetDataMovementIndicators(Instruction instruction, List<DataMovement> loadIndicators, List<DataMovement> storeIndicators)
+    {
+        switch (instruction.Opcode)
+        {
+            case Opcode.Push:
+            {
+                int size = BytecodeProcessor.RealStack ? (int)instruction.Operand1.BitWidth : 1;
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer + (size * BytecodeProcessor.StackDirection);
+                storeIndicators.Add(new DataMovement(address, size));
+
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                {
+                    loadIndicators.Add(new DataMovement(address, size));
+                }
+
+                return;
+            }
+            case Opcode.Pop8:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 1 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+                return;
+            }
+            case Opcode.Pop16:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 2 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+                return;
+            }
+            case Opcode.Pop32:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 4 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+                return;
+            }
+            case Opcode.PopTo8:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 1 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                { storeIndicators.Add(new DataMovement(address, size)); }
+
+                return;
+            }
+            case Opcode.PopTo16:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 2 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                { storeIndicators.Add(new DataMovement(address, size)); }
+
+                return;
+            }
+            case Opcode.PopTo32:
+            {
+                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                const int size = BytecodeProcessor.RealStack ? 4 : 1;
+                loadIndicators.Add(new DataMovement(address, size));
+
+                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                { storeIndicators.Add(new DataMovement(address, size)); }
+
+                return;
+            }
+            case Opcode.Move:
+            {
+                if (instruction.Operand1.BitWidth == instruction.Operand2.BitWidth)
+                {
+                    int size = BytecodeProcessor.RealStack ? (int)instruction.Operand1.BitWidth : 1;
+
+                    if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand2, out int address))
+                    { loadIndicators.Add(new DataMovement(address, size)); }
+
+                    if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                    { storeIndicators.Add(new DataMovement(address, size)); }
+                }
+
+                return;
+            }
+        }
     }
 
     void OnInterpreterTimer()

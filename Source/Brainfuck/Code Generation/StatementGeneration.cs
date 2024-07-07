@@ -138,10 +138,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     int PrecompileVariable(Stack<BrainfuckVariable> variables, string name, GeneralType type, Uri file, StatementWithValue? initialValue, bool deallocateOnClean)
     {
-        if (GetVariable(variables, name, out _))
+        if (GetVariable(variables, name, out _, out _))
         { return 0; }
-
-        // FunctionThingDefinition? scope = (CurrentMacro.Count == 0) ? null : CurrentMacro[^1];
 
         if (initialValue != null)
         {
@@ -167,7 +165,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         int size = Snippets.ARRAY_SIZE(arraySize);
 
                         int address = Stack.PushVirtual(size);
-                        variables.Push(new BrainfuckVariable(name, file, address, true, deallocateOnClean, type, size)
+                        variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type, size)
                         {
                             IsInitialized = true
                         });
@@ -183,13 +181,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
                     int address = Stack.PushVirtual(size);
-                    variables.Push(new BrainfuckVariable(name, file, address, true, deallocateOnClean, type, size));
+                    variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type, size));
                 }
             }
             else
             {
                 int address = Stack.PushVirtual(type.Size);
-                variables.Push(new BrainfuckVariable(name, file, address, true, deallocateOnClean, type));
+                variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type));
             }
         }
         else
@@ -201,12 +199,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 int size = Snippets.ARRAY_SIZE(arraySize);
 
                 int address = Stack.PushVirtual(size);
-                variables.Push(new BrainfuckVariable(name, file, address, true, deallocateOnClean, type, size));
+                variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type, size));
             }
             else
             {
                 int address = Stack.PushVirtual(type.Size);
-                variables.Push(new BrainfuckVariable(name, file, address, true, deallocateOnClean, type));
+                variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type));
             }
         }
 
@@ -233,10 +231,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (GetConstant(statement.Content, out _))
         { throw new CompilerException($"This is a constant so you can not modify it's value", statement, CurrentFile); }
 
-        if (!GetVariable(statement.Content, out BrainfuckVariable? variable))
-        { throw new CompilerException($"Variable \"{statement}\" not found", statement, CurrentFile); }
+        if (!GetVariable(statement.Content, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
+        { throw notFoundError.Instantiate(statement, CurrentFile); }
 
-        CompileSetter(variable, value);
+        GenerateCodeForSetter(variable, value);
     }
 
     void GenerateCodeForSetter(Field statementToSet, StatementWithValue value)
@@ -302,11 +300,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CompileSetter(address, value);
     }
 
-    void CompileSetter(BrainfuckVariable variable, StatementWithValue value)
+    void GenerateCodeForSetter(BrainfuckVariable variable, StatementWithValue value)
     {
         if (AllowOtherOptimizations &&
             value is Identifier _identifier &&
-            GetVariable(_identifier.Content, out BrainfuckVariable? valueVariable))
+            GetVariable(_identifier.Content, out BrainfuckVariable? valueVariable, out _))
         {
             if (variable.Address == valueVariable.Address)
             {
@@ -345,6 +343,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (AllowPrecomputing && TryCompute(value, out CompiledValue constantValue))
             {
+                if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
+                { constantValue = castedValue; }
+
                 AssignTypeCheck(variable.Type, constantValue, value);
 
                 Code.SetValue(variable.Address, constantValue);
@@ -415,7 +416,28 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
     }
 
-    void GenerateCodeForSetter(Pointer statement, StatementWithValue value) => CompileDereferencedSetter(statement.PrevStatement, 0, value);
+    void GenerateCodeForSetter(Pointer statement, StatementWithValue value)
+    {
+        if (statement.PrevStatement is Identifier variableIdentifier)
+        {
+            if (!GetVariable(variableIdentifier.Content, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
+            { throw notFoundError.Instantiate(variableIdentifier, CurrentFile); }
+
+            if (variable.IsDiscarded)
+            { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
+
+            if (variable.Size != 1)
+            { throw new CompilerException($"Bruh", variableIdentifier, CurrentFile); }
+
+            if (variable.IsReference)
+            {
+                GenerateCodeForSetter(variable, value);
+                return;
+            }
+        }
+
+        CompileDereferencedSetter(statement.PrevStatement, 0, value);
+    }
 
     void CompileSetter(int address, StatementWithValue value)
     {
@@ -446,6 +468,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void CompileDereferencedSetter(StatementWithValue dereference, int offset, StatementWithValue value)
     {
+        GeneralType referenceType = FindStatementType(dereference);
+
+        if (referenceType is not PointerType)
+        { throw new CompilerException($"This isn't a pointer", dereference, CurrentFile); }
+
         int pointerAddress = Stack.NextAddress;
         GenerateCodeForStatement(dereference);
 
@@ -471,8 +498,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         GeneralType valueType = FindStatementType(value);
 
+        // TODO: this
         if (valueType.Size != 1)
-        { throw new CompilerException($"size 1 bruh allowed on heap thingy", value, CurrentFile); }
+        { throw new CompilerException($"This isn't supported at the moment (i don't want to implement it at the moment)", value, CurrentFile); }
+
+        // TODO: this
+        // AssignTypeCheck(pointerType.To, valueType, value);
 
         int valueAddress = Stack.NextAddress;
         GenerateCodeForStatement(value);
@@ -546,8 +577,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (statement.PrevStatement is not Identifier _variableIdentifier)
         { throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement, CurrentFile); }
 
-        if (!GetVariable(_variableIdentifier.Content, out BrainfuckVariable? variable))
-        { throw new CompilerException($"Variable \"{_variableIdentifier}\" not found", _variableIdentifier, CurrentFile); }
+        if (!GetVariable(_variableIdentifier.Content, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
+        { throw notFoundError.Instantiate(_variableIdentifier, CurrentFile); }
 
         if (variable.IsDiscarded)
         { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", _variableIdentifier, CurrentFile); }
@@ -1076,10 +1107,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (statement.Arguments.Length is 1)
                 {
-                    if (!GetVariable(ReturnVariableName, out BrainfuckVariable? returnVariable))
+                    if (!GetVariable(ReturnVariableName, out BrainfuckVariable? returnVariable, out WillBeCompilerException? notFoundError))
                     { throw new CompilerException($"Can't return value for some reason :(", statement, CurrentFile); }
 
-                    CompileSetter(returnVariable, statement.Arguments[0]);
+                    GenerateCodeForSetter(returnVariable, statement.Arguments[0]);
                 }
 
                 if (Returns.Count == 0)
@@ -1172,18 +1203,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             case "+=":
             {
-                if (statement.Left is not Identifier variableIdentifier)
+                if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
                 {
                     GenerateCodeForStatement(statement.ToAssignment());
                     return;
-                    // throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile);
                 }
 
-                if (!GetVariable(variableIdentifier.Content, out BrainfuckVariable? variable))
-                { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
-
                 if (variable.IsDiscarded)
-                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
 
                 if (variable.Size != 1)
                 { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
@@ -1193,10 +1220,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
                 {
-                    if (variable.Type is BuiltinType builtinType)
-                    { CompiledValue.TryCast(ref constantValue, builtinType.RuntimeType); }
+                    if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
+                    { constantValue = castedValue; }
 
-                    if (variable.Type != constantValue.Type)
+                    if (!variable.Type.Equals(constantValue.Type))
                     { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
 
                     Code.AddValue(variable.Address, constantValue);
@@ -1222,25 +1249,25 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             case "-=":
             {
-                if (statement.Left is not Identifier variableIdentifier)
-                { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
-
-                if (!GetVariable(variableIdentifier.Content, out BrainfuckVariable? variable))
-                { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
+                if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
+                {
+                    GenerateCodeForStatement(statement.ToAssignment());
+                    return;
+                }
 
                 if (variable.IsDiscarded)
-                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
 
                 if (variable.Size != 1)
-                { throw new CompilerException($"Bruh", variableIdentifier, CurrentFile); }
+                { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
 
                 if (statement.Right == null)
                 { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
                 if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
                 {
-                    if (variable.Type is BuiltinType builtinType)
-                    { CompiledValue.TryCast(ref constantValue, builtinType.RuntimeType); }
+                    if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
+                    { constantValue = castedValue; }
 
                     if (variable.Type != constantValue.Type)
                     { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
@@ -1269,7 +1296,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             default:
                 GenerateCodeForStatement(statement.ToAssignment());
                 break;
-                //throw new CompilerException($"Unknown compound assignment operator \'{statement.Operator}\'", statement.Operator);
         }
     }
     void GenerateCodeForStatement(ShortOperatorCall statement)
@@ -1283,57 +1309,57 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
         }
 
+        if (!AllowOtherOptimizations)
+        {
+            GenerateCodeForStatement(statement.ToAssignment());
+            return;
+        }
+
         using DebugInfoBlock debugBlock = DebugBlock(statement);
         switch (statement.Operator.Content)
         {
             case "++":
             {
-                if (AllowOtherOptimizations && statement.Left is Identifier variableIdentifier)
+                if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
                 {
-                    if (!GetVariable(variableIdentifier.Content, out BrainfuckVariable? variable))
-                    { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
-
-                    if (variable.IsDiscarded)
-                    { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
-
-                    if (variable.Size != 1)
-                    { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
-
-                    using (Code.Block(this, $"Increment variable {variable.Name} (at {variable.Address})"))
-                    {
-                        Code.AddValue(variable.Address, 1);
-                    }
-
-                    Optimizations++;
+                    GenerateCodeForStatement(statement.ToAssignment());
                     return;
                 }
 
-                GenerateCodeForStatement(statement.ToAssignment());
+                if (variable.IsDiscarded)
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
+
+                if (variable.Size != 1)
+                { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
+
+                using (Code.Block(this, $"Increment variable {variable.Name} (at {variable.Address})"))
+                {
+                    Code.AddValue(variable.Address, 1);
+                }
+
+                Optimizations++;
                 return;
             }
             case "--":
             {
-                if (AllowOtherOptimizations && statement.Left is Identifier variableIdentifier)
+                if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
                 {
-                    if (!GetVariable(variableIdentifier.Content, out BrainfuckVariable? variable))
-                    { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
-
-                    if (variable.IsDiscarded)
-                    { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
-
-                    if (variable.Size != 1)
-                    { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
-
-                    using (Code.Block(this, $"Decrement variable {variable.Name} (at {variable.Address})"))
-                    {
-                        Code.AddValue(variable.Address, -1);
-                    }
-
-                    Optimizations++;
+                    GenerateCodeForStatement(statement.ToAssignment());
                     return;
                 }
 
-                GenerateCodeForStatement(statement.ToAssignment());
+                if (variable.IsDiscarded)
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
+
+                if (variable.Size != 1)
+                { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
+
+                using (Code.Block(this, $"Decrement variable {variable.Name} (at {variable.Address})"))
+                {
+                    Code.AddValue(variable.Address, -1);
+                }
+
+                Optimizations++;
                 return;
             }
             default:
@@ -1347,13 +1373,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (statement.Modifiers.Contains(ModifierKeywords.Const))
         { return; }
 
-        if (!GetVariable(statement.Identifier.Content, out BrainfuckVariable? variable))
-        { throw new CompilerException($"Variable \"{statement.Identifier.Content}\" not found", statement.Identifier, CurrentFile); }
+        if (!GetVariable(statement.Identifier.Content, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
+        { throw notFoundError.Instantiate(statement.Identifier, CurrentFile); }
 
         if (variable.IsInitialized)
         { return; }
 
-        CompileSetter(variable, statement.InitialValue);
+        GenerateCodeForSetter(variable, statement.InitialValue);
     }
     void GenerateCodeForStatement(FunctionCall functionCall)
     {
@@ -1401,7 +1427,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
         if (instanceType is StructType structType)
-        { structType.Struct?.References.Add((constructorCall.Type, CurrentFile, CurrentMacro.Last)); }
+        { structType.Struct?.References.Add((constructorCall.Type, CurrentFile, CurrentMacro.LastOrDefault)); }
 
         if (!GetConstructor(instanceType, parameters, CurrentFile, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound))
         { throw notFound.Instantiate(constructorCall.Keyword, CurrentFile); }
@@ -1409,7 +1435,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         typeArguments ??= new Dictionary<string, GeneralType>();
 
-        constructor.References.Add((constructorCall, CurrentFile, CurrentMacro.Last));
+        constructor.References.Add((constructorCall, CurrentFile, CurrentMacro.LastOrDefault));
         OnGotStatementType(constructorCall, constructor.Type);
 
         if (!constructor.CanUse(CurrentFile))
@@ -1457,7 +1483,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
-        if (GetVariable(statement.Content, out BrainfuckVariable? variable))
+        if (GetVariable(statement.Content, out BrainfuckVariable? variable, out _))
         {
             if (variable.IsDiscarded)
             { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement, CurrentFile); }
@@ -1584,7 +1610,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         if (AllowOtherOptimizations &&
                             statement.Left is Identifier _left &&
-                            GetVariable(_left.Content, out BrainfuckVariable? left) &&
+                            GetVariable(_left.Content, out BrainfuckVariable? left, out _) &&
                             !left.IsDiscarded &&
                             TryCompute(statement.Right, out CompiledValue right) &&
                             right.Type == RuntimeType.Byte)
@@ -1798,6 +1824,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                         Stack.Pop(); // Pop rightAddress
                     }
+
                     Stack.PopVirtual(); // Pop tempLeftAddress
 
                     break;
@@ -1884,19 +1911,48 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
                 case "&":
                 {
-                    if (TryCompute(statement.Right, out CompiledValue right) && right == 1)
+                    GeneralType leftType = FindStatementType(statement.Left);
+
+                    if ((leftType == BasicType.Byte ||
+                        leftType == BasicType.Char ||
+                        leftType == BasicType.Integer) &&
+                        TryCompute(statement.Right, out CompiledValue right))
                     {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
+                        if (right == 1)
+                        {
+                            int leftAddress = Stack.NextAddress;
+                            using (Code.Block(this, "Compute left-side value"))
+                            { GenerateCodeForStatement(statement.Left); }
 
-                        using StackAddress rightAddress = Stack.Push(2);
+                            using StackAddress rightAddress = Stack.Push(2);
 
-                        using (Code.Block(this, $"Snippet MOD({leftAddress} {rightAddress})"))
-                        { Code.MATH_MOD(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+                            using (Code.Block(this, $"Snippet MOD({leftAddress} {rightAddress})"))
+                            { Code.MATH_MOD(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
-                        break;
+                            break;
+                        }
+
+                        if (right == 0b_1_0000000)
+                        {
+                            int leftAddress = Stack.NextAddress;
+                            using (Code.Block(this, "Compute left-side value"))
+                            { GenerateCodeForStatement(statement.Left); }
+
+                            using (StackAddress rightAddress = Stack.Push(0b_0_1111111))
+                            {
+                                using (Code.Block(this, $"Snippet MT({leftAddress} {rightAddress})"))
+                                { Code.LOGIC_MT(leftAddress, rightAddress, leftAddress, Stack.GetTemporaryAddress); }
+                            }
+
+                            using (Code.ConditionalBlock(this, leftAddress))
+                            {
+                                Code.SetValue(leftAddress, 0b_1_0000000);
+                            }
+
+                            break;
+                        }
                     }
+
                     throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
                 }
                 default: throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
@@ -2004,13 +2060,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForStatement(AddressGetter addressGetter)
     {
-        using DebugInfoBlock debugBlock = DebugBlock(addressGetter);
-
-        GeneralType type = FindStatementType(addressGetter.PrevStatement);
-
-        throw new CompilerException($"Type {type} isn't stored in the heap", addressGetter, CurrentFile);
-
-        // GenerateCodeForStatement(addressGetter.PrevStatement);
+        throw new CompilerException($"This is when pointers to the stack isn't work in brainfuck", addressGetter, CurrentFile);
     }
     void GenerateCodeForStatement(Pointer pointer)
     {
@@ -2087,7 +2137,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             case StructType structType:
             {
-                structType.Struct.References.Add((newInstance.Type, CurrentFile, CurrentMacro.Last));
+                structType.Struct.References.Add((newInstance.Type, CurrentFile, CurrentMacro.LastOrDefault));
 
                 int address = Stack.PushVirtual(structType.Size);
 
@@ -2211,9 +2261,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         OnGotStatementType(typeCast, targetType);
 
         if (statementType.Size != targetType.Size)
-        { throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.Size}) to {targetType} (size of {targetType.Size})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
-
-        // AnalysisCollection?.Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
+        { throw new CompilerException($"Type-cast is not supported at the moment", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
 
         GenerateCodeForStatement(typeCast.PrevStatement);
     }
@@ -2672,13 +2720,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                        if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v))
-                        { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
+                        if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
+                        { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
 
                         if (v.Type != definedType)
                         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                        compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, false, false, v.Type, v.Size));
+                        compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
                         continue;
                     }
                     case ModifierKeywords.Const:
@@ -2698,6 +2746,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     default:
                         throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
                 }
+            }
+
+            if (passed is AddressGetter addressGetter)
+            {
+                Identifier modifiedVariable = (Identifier)addressGetter.PrevStatement;
+
+                if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
+                { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
+
+                if (definedType is not PointerType pointerType ||
+                    !v.Type.Equals(pointerType.To))
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+
+                compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
+                continue;
             }
 
             if (passed is StatementWithValue value)
@@ -2800,7 +2863,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (function.ReturnSomething)
         {
             GeneralType returnType = function.Type;
-            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, returnType);
+            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, false, returnType);
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -2934,7 +2997,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (true) // always returns something
         {
             GeneralType returnType = function.Type;
-            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, returnType);
+            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, false, returnType);
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -3022,7 +3085,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (function.ReturnSomething)
         {
             GeneralType returnType = GeneralType.InsertTypeParameters(function.Type, typeArguments) ?? function.Type;
-            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, returnType);
+            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, false, returnType);
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -3116,7 +3179,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (newInstanceType != function.ParameterTypes[0])
         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {0}: Expected {function.ParameterTypes[0]}, passed {newInstanceType}", newInstance, CurrentFile); }
 
-        compiledParameters.Add(new BrainfuckVariable(function.Parameters[0].Identifier.Content, function.Parameters[0].File, newInstanceAddress, false, false, newInstanceType));
+        compiledParameters.Add(new BrainfuckVariable(function.Parameters[0].Identifier.Content, function.Parameters[0].File, newInstanceAddress, false, false, false, newInstanceType));
 
         for (int i = 1; i < function.Parameters.Count; i++)
         {
@@ -3157,13 +3220,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                        if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v))
-                        { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
+                        if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
+                        { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
 
                         if (v.Type != definedType)
                         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                        compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, false, false, v.Type, v.Size));
+                        compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
                         continue;
                     }
                     case ModifierKeywords.Const:

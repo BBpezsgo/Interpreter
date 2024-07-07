@@ -74,18 +74,6 @@ public readonly struct InstructionOperand : IEquatable<InstructionOperand>
     public static InstructionOperand Pointer(Intel.Register baseAddress, int offset) => new(InstructionOperandType.IndexedAddress, (ushort)baseAddress, checked((ushort)offset));
     public static InstructionOperand Label(string label) => new(InstructionOperandType.Label, label);
 
-    public static explicit operator InstructionOperand(Compiler.ValueAddress v)
-    {
-        if (v.IsReference)
-        { throw new NotImplementedException(); }
-
-        return v.AddressingMode switch
-        {
-            Runtime.AddressingMode.PointerBP => new InstructionOperand(InstructionOperandType.IndexedAddress, (ushort)Intel.Register.BP, (ushort)(v.Address * 4)),
-            Runtime.AddressingMode.PointerSP => new InstructionOperand(InstructionOperandType.IndexedAddress, (ushort)Intel.Register.SP, (ushort)(v.Address * 4)),
-            _ => throw new UnreachableException(),
-        };
-    }
     public static explicit operator InstructionOperand(Runtime.RuntimeValue v) => new(InstructionOperandType.Immediate, v.Char);
     public static explicit operator InstructionOperand(CompiledValue v) => new(InstructionOperandType.Immediate, v.Char);
 }

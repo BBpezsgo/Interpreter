@@ -98,27 +98,20 @@ public class CompiledFunction : FunctionDefinition,
         return new CompiledFunction(newType, newParameters, this);
     }
 
-    public static string ToReadable(string identifier, IEnumerable<string?>? parameters)
+    public static string ToReadable(string identifier, IEnumerable<string?>? parameters, string? returnType)
     {
         StringBuilder result = new();
+        if (returnType is not null)
+        {
+            result.Append(returnType);
+            result.Append(' ');
+        }
         result.Append(identifier);
         result.Append('(');
         if (parameters is null)
         { result.Append("..."); }
         else
         { result.AppendJoin(", ", parameters.Select(v => v ?? "?")); }
-        result.Append(')');
-        return result.ToString();
-    }
-
-    public static string ToReadable(string identifier, FunctionType type)
-    {
-        StringBuilder result = new();
-        result.Append(type.ReturnType);
-        result.Append(' ');
-        result.Append(identifier);
-        result.Append('(');
-        result.AppendJoin(", ", type.Parameters);
         result.Append(')');
         return result.ToString();
     }

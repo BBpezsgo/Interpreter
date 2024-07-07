@@ -11,7 +11,7 @@ public partial class InterpreterElement
         sender.ClearBuffer();
         sender.DrawBuffer.StepTo(0);
 
-        if (this.Interpreter.BytecodeInterpreter == null) return;
+        if (Interpreter.BytecodeInterpreter == null) return;
 
         DrawBuffer b = sender.DrawBuffer;
 
@@ -19,25 +19,11 @@ public partial class InterpreterElement
 
         Instruction? _instruction = Interpreter.NextInstruction;
 
-        List<int> loadIndicators = new();
-        List<int> storeIndicators = new();
+        List<DataMovement> loadIndicators = new();
+        List<DataMovement> storeIndicators = new();
 
         if (_instruction.HasValue)
-        {
-            Instruction instruction = _instruction.Value;
-
-            switch (instruction.Opcode)
-            {
-                case Opcode.Move:
-                {
-                    if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out int dstPtr))
-                    { storeIndicators.Add(dstPtr); }
-                    if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand2, out int srcPtr))
-                    { loadIndicators.Add(srcPtr); }
-                    break;
-                }
-            }
-        }
+        { GetDataMovementIndicators(_instruction.Value, loadIndicators, storeIndicators); }
 
         int nextHeader = 0;
         for (int i = 0; i < Interpreter.BytecodeInterpreter.Memory.Length; i++)
@@ -59,24 +45,42 @@ public partial class InterpreterElement
 
             for (int j = loadIndicators.Count - 1; j >= 0; j--)
             {
-                if (loadIndicators[j] != i) continue;
-                b.ForegroundColor = CharColor.BrightRed;
-                b.AddText('○');
-                b.ForegroundColor = CharColor.Silver;
-                loadIndicators.RemoveAt(j);
-                addLoadIndicator = true;
-                break;
+                if (loadIndicators[j].Address == i)
+                {
+                    b.ForegroundColor = CharColor.BrightRed;
+                    b.AddText('○');
+                    b.ForegroundColor = CharColor.Silver;
+                    addLoadIndicator = true;
+                    break;
+                }
+                else if (loadIndicators[j].Contains(i))
+                {
+                    b.ForegroundColor = CharColor.BrightRed;
+                    b.AddText('|');
+                    b.ForegroundColor = CharColor.Silver;
+                    addLoadIndicator = true;
+                    break;
+                }
             }
 
             for (int j = storeIndicators.Count - 1; j >= 0; j--)
             {
-                if (storeIndicators[j] != i) continue;
-                b.ForegroundColor = CharColor.BrightRed;
-                b.AddText('●');
-                b.ForegroundColor = CharColor.Silver;
-                storeIndicators.RemoveAt(j);
-                addStoreIndicator = true;
-                break;
+                if (storeIndicators[j].Address == i)
+                {
+                    b.ForegroundColor = CharColor.BrightRed;
+                    b.AddText('●');
+                    b.ForegroundColor = CharColor.Silver;
+                    addStoreIndicator = true;
+                    break;
+                }
+                else if (storeIndicators[j].Contains(i))
+                {
+                    b.ForegroundColor = CharColor.BrightRed;
+                    b.AddText('|');
+                    b.ForegroundColor = CharColor.Silver;
+                    addStoreIndicator = true;
+                    break;
+                }
             }
 
             int space = ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString(CultureInfo.InvariantCulture).Length;

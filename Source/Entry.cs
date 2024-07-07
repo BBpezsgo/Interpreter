@@ -129,7 +129,7 @@ public static class Entry
                     Console.WriteLine($" ===== HEAP ===== ");
                     Console.WriteLine();
 
-                    if (interpreter.BytecodeInterpreter.GetData(0).Int != 0)
+                    if (interpreter.BytecodeInterpreter.GetData(0, BitWidth._32).Int != 0)
                     {
                         int endlessSafe = interpreter.BytecodeInterpreter.Memory.Length;
                         int i = 0;
@@ -153,7 +153,7 @@ public static class Entry
                                 for (int j = i + 1; j < (blockSize + i + 1); j++)
                                 {
                                     Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Write(interpreter.BytecodeInterpreter.GetData(j).Int);
+                                    Console.Write(interpreter.BytecodeInterpreter.GetData(j, BitWidth._32).Int);
                                     Console.Write(" ");
                                 }
                                 Console.WriteLine();

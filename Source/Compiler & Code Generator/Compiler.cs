@@ -822,88 +822,31 @@ public sealed class Compiler
                     { throw new CompilerException($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File); }
                 }
 
-                if (constructor.Type is TypeInstancePointer)
+                List<ParameterDefinition> parameters = constructor.Parameters.ToList();
+                parameters.Insert(0,
+                    new ParameterDefinition(
+                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
+                        constructor.Type,
+                        Token.CreateAnonymous(StatementKeywords.This),
+                        constructor)
+                    );
+
+                ConstructorDefinition constructorWithThisParameter = new(
+                    constructor.Type,
+                    constructor.Modifiers,
+                    new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
+                    constructor.File)
                 {
-                    List<ParameterDefinition> parameters = constructor.Parameters.ToList();
-                    parameters.Insert(0,
-                        new ParameterDefinition(
-                            ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
-                            constructor.Type,
-                            Token.CreateAnonymous(StatementKeywords.This),
-                            constructor)
-                        );
+                    Block = constructor.Block,
+                    Context = constructor.Context,
+                };
 
-                    ConstructorDefinition constructorDefWithNothing = new(
-                        constructor.Type,
-                        constructor.Modifiers,
-                        new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
-                        constructor.File)
-                    {
-                        Block = constructor.Block,
-                        Context = constructor.Context,
-                    };
+                CompiledConstructor compiledConstructor = CompileConstructor(constructorWithThisParameter, compiledStruct);
 
-                    CompiledConstructor constructorWithNothing = CompileConstructor(constructorDefWithNothing, compiledStruct);
+                if (CompiledConstructors.Any(compiledConstructor.IsSame))
+                { throw new CompilerException($"Constructor \"{compiledConstructor.ToReadable()}\" already defined", constructor.Type, compiledStruct.File); }
 
-                    if (CompiledConstructors.Any(constructorWithNothing.IsSame))
-                    { throw new CompilerException($"Constructor with name '{constructorWithNothing.ToReadable()}' already defined", constructor.Type, compiledStruct.File); }
-
-                    CompiledConstructors.Add(constructorWithNothing);
-                }
-                else
-                {
-                    List<ParameterDefinition> parameters = constructor.Parameters.ToList();
-                    parameters.Insert(0,
-                        new ParameterDefinition(
-                            ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This), Token.CreateAnonymous(ModifierKeywords.Ref)),
-                            constructor.Type,
-                            Token.CreateAnonymous(StatementKeywords.This),
-                            constructor)
-                        );
-
-                    ConstructorDefinition constructorDefWithRef = new(
-                        constructor.Type,
-                        constructor.Modifiers,
-                        new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
-                        constructor.File)
-                    {
-                        Block = constructor.Block,
-                        Context = constructor.Context,
-                    };
-
-                    CompiledConstructor constructorWithRef = CompileConstructor(constructorDefWithRef, compiledStruct);
-
-                    if (CompiledConstructors.Any(constructorWithRef.IsSame))
-                    { throw new CompilerException($"Constructor with name \"{constructorWithRef.ToReadable()}\" already defined", constructor.Type, compiledStruct.File); }
-
-                    CompiledConstructors.Add(constructorWithRef);
-
-                    parameters = constructor.Parameters.ToList();
-                    parameters.Insert(0,
-                        new ParameterDefinition(
-                            ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
-                            TypeInstancePointer.CreateAnonymous(constructor.Type),
-                            Token.CreateAnonymous(StatementKeywords.This),
-                            constructor)
-                        );
-
-                    ConstructorDefinition constructorDefWithPointer = new(
-                        constructor.Type,
-                        constructor.Modifiers,
-                        new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
-                        constructor.File)
-                    {
-                        Block = constructor.Block,
-                        Context = constructor.Context,
-                    };
-
-                    CompiledConstructor constructorWithPointer = CompileConstructor(constructorDefWithPointer, compiledStruct);
-
-                    if (CompiledConstructors.Any(constructorWithPointer.IsSame))
-                    { throw new CompilerException($"Constructor with name '{constructorWithPointer.ToReadable()}' already defined", constructor.Type, compiledStruct.File); }
-
-                    CompiledConstructors.Add(constructorWithPointer);
-                }
+                CompiledConstructors.Add(compiledConstructor);
             }
 
             if (compiledStruct.Template is not null)

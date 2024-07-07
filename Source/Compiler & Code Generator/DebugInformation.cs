@@ -43,6 +43,9 @@ public struct StackElementInformation
         if (BasePointerRelative) itemStart += basePointer;
         else itemStart += absoluteOffset;
 
+        if (BytecodeProcessor.StackDirection < 0)
+        { itemStart += Size - 1; }
+
         int itemEnd = itemStart + ((Size - 1) * BytecodeProcessor.StackDirection);
 
         return new Range<int>(itemStart, itemEnd);

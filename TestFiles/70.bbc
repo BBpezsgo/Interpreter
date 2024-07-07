@@ -1,0 +1,11 @@
+using System;
+
+temp char* a = "";
+
+a = (temp a) + "a";
+
+PrintLine(a);
+
+a = (temp a) + "a";
+
+PrintLine(a);

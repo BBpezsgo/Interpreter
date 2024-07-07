@@ -8,7 +8,7 @@ obj
 /Diagsessions
 /TestFiles/*.exe
 /TestFiles/Old
-/Source/DevelopmentEntry.cs
+/DevelopmentEntry.cs
 /TestFiles/run.bat
 /TestFiles/test.bbc
 /Source/ASM/i8086/Builds/build.bat

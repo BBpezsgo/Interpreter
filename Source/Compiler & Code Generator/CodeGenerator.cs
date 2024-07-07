@@ -359,7 +359,7 @@ public abstract class CodeGenerator
         {
             string identifier = Identifier?.ToString() ?? "?";
             IEnumerable<string?>? arguments = Arguments?.Select(v => v?.ToString()) ?? (ArgumentCount.HasValue ? Enumerable.Repeat(default(string), ArgumentCount.Value) : null);
-            return CompiledFunction.ToReadable(identifier, arguments);
+            return CompiledFunction.ToReadable(identifier, arguments, ReturnType?.ToString());
         }
 
         public override string ToString() => ToReadable();
@@ -850,10 +850,7 @@ public abstract class CodeGenerator
 
         bool HandleReturnType(TFunction function)
         {
-            if (query.ReturnType != null && (
-                query.ReturnType.Equals(function.Type) ||
-                CheckTypeConversion(function.Type, query.ReturnType)
-                ))
+            if (query.ReturnType != null && !CheckTypeConversion(function.Type, query.ReturnType))
             {
                 if (perfectus < FunctionPerfectus.ReturnType)
                 {
@@ -1361,6 +1358,9 @@ public abstract class CodeGenerator
         if (destination == valueType)
         { return; }
 
+        if (destination == BasicType.Any)
+        { return; }
+
         if (destination.Size != valueType.Size)
         { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.Size}) value to {destination} (size of {destination.Size})", value, CurrentFile); }
 
@@ -1600,8 +1600,8 @@ public abstract class CodeGenerator
             return OnGotStatementType(@operator, _result.Function.Type);
         }
 
-        GeneralType leftType = FindStatementType(@operator.Left);
-        GeneralType rightType = FindStatementType(@operator.Right);
+        GeneralType leftType = FindStatementType(@operator.Left, expectedType);
+        GeneralType rightType = FindStatementType(@operator.Right, expectedType);
 
         CompilerException unknownOperator = new($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile);
 
@@ -1738,9 +1738,10 @@ public abstract class CodeGenerator
         if (!leftType.CanBeBuiltin || leftType == BasicType.Void)
         { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content}", @operator.Operator, CurrentFile); }
 
-        BuiltinType result = @operator.Operator.Content switch
+        GeneralType result = @operator.Operator.Content switch
         {
             UnaryOperatorCall.LogicalNOT => BooleanType,
+            UnaryOperatorCall.BinaryNOT => leftType,
 
             _ => throw new CompilerException($"Unknown operator {@operator.Operator.Content}", @operator.Operator, CurrentFile),
         };
@@ -1860,7 +1861,7 @@ public abstract class CodeGenerator
     {
         GeneralType to = FindStatementType(pointer.PrevStatement);
         if (to is not PointerType pointerType)
-        { return OnGotStatementType(pointer, new BuiltinType(BasicType.Integer)); }
+        { return OnGotStatementType(pointer, new BuiltinType(BasicType.Any)); }
         return OnGotStatementType(pointer, pointerType.To);
     }
     protected GeneralType FindStatementType(NewInstance newInstance)
@@ -2706,7 +2707,8 @@ public abstract class CodeGenerator
 
     public static CompiledValue Compute(string @operator, CompiledValue left, CompiledValue right) => @operator switch
     {
-        "!" => !left,
+        UnaryOperatorCall.LogicalNOT => !left,
+        UnaryOperatorCall.BinaryNOT => ~left,
 
         "+" => left + right,
         "-" => left - right,
@@ -2836,9 +2838,15 @@ public abstract class CodeGenerator
 
         string op = @operator.Operator.Content;
 
-        if (op == "!")
+        if (op == UnaryOperatorCall.LogicalNOT)
         {
             value = !leftValue;
+            return true;
+        }
+
+        if (op == UnaryOperatorCall.BinaryNOT)
+        {
+            value = ~leftValue;
             return true;
         }
 
@@ -3091,6 +3099,7 @@ public abstract class CodeGenerator
             ModifiedStatement => false,
             NewInstance => false,
             ConstructorCall => false,
+            AddressGetter => false,
             _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
     }
@@ -3149,9 +3158,15 @@ public abstract class CodeGenerator
 
         string op = @operator.Operator.Content;
 
-        if (op == "!")
+        if (op == UnaryOperatorCall.LogicalNOT)
         {
-            value = leftValue;
+            value = !leftValue;
+            return true;
+        }
+
+        if (op == UnaryOperatorCall.BinaryNOT)
+        {
+            value = ~leftValue;
             return true;
         }
 

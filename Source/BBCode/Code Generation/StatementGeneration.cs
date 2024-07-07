@@ -373,7 +373,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 else
                 {
                     AddComment(" Set exit code:");
-                    StackStore(new ValueAddress(AbsoluteGlobalOffset, AddressingMode.PointerBP, true), ExitCodeType.BitWidth);
+                    StackStore(ExitCodeAddress, ExitCodeType.BitWidth);
                 }
             }
 
@@ -458,25 +458,28 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment($" Pass {parameter}:");
 
-            bool canDeallocate = parameter.Modifiers.Contains(ModifierKeywords.Temp);
+            bool typeAllowsTemp = argumentType is PointerType;
 
-            canDeallocate = canDeallocate && argumentType is PointerType;
+            bool calleeAllowsTemp = parameter.Modifiers.Contains(ModifierKeywords.Temp);
 
-            if (StatementCanBeDeallocated(argument, out bool explicitDeallocate))
+            bool callerAllowsTemp;
+
+            if (callerAllowsTemp = StatementCanBeDeallocated(argument, out bool explicitDeallocate))
             {
-                if (explicitDeallocate && !canDeallocate)
+                if (explicitDeallocate && !calleeAllowsTemp)
                 { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", argument, CurrentFile)); }
+                if (explicitDeallocate && !typeAllowsTemp)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this type", argument, CurrentFile)); }
             }
             else
             {
                 if (explicitDeallocate)
                 { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", argument, CurrentFile)); }
-                canDeallocate = false;
             }
 
             GenerateCodeForStatement(argument, parameterType);
 
-            argumentCleanup.Push((argumentType.SizeBytes, canDeallocate, argumentType, argument.Position));
+            argumentCleanup.Push((argumentType.SizeBytes, calleeAllowsTemp && callerAllowsTemp && typeAllowsTemp, argumentType, argument.Position));
         }
 
         return argumentCleanup;
@@ -525,7 +528,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             ParameterCleanupItem passedParameter = parameterCleanup.Pop();
 
-            if (passedParameter.CanDeallocate && passedParameter.Size == BytecodeProcessor.PointerSize)
+            if (passedParameter.CanDeallocate)
             {
                 GenerateDestructor(passedParameter.Type, passedParameter.Position);
                 continue;
@@ -563,7 +566,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (saveValue)
             {
                 AddComment($" Store return value:");
-                StackStore(new ValueAddress(returnValueOffset, AddressingMode.PointerBP), compiledFunction.Type.SizeBytes);
+                StackStore(new AddressOffset(Register.BasePointer, returnValueOffset), compiledFunction.Type.SizeBytes);
             }
             else
             {
@@ -761,7 +764,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
-    void GenerateCodeForStatement(BinaryOperatorCall @operator)
+    void GenerateCodeForStatement(BinaryOperatorCall @operator, GeneralType? expectedType = null)
     {
         if (!Settings.DontOptimize && TryCompute(@operator, out CompiledValue predictedValue))
         {
@@ -831,8 +834,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             FindStatementType(@operator);
 
-            GeneralType leftType = FindStatementType(@operator.Left);
-            GeneralType rightType = FindStatementType(@operator.Right);
+            GeneralType leftType = FindStatementType(@operator.Left, expectedType);
+            GeneralType rightType = FindStatementType(@operator.Right, expectedType);
 
             BitWidth leftBitWidth = GetBitWidth(leftType);
             BitWidth rightBitWidth = GetBitWidth(rightType);
@@ -840,7 +843,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             int jumpInstruction = InvalidFunctionAddress;
 
-            GenerateCodeForStatement(@operator.Left);
+            GenerateCodeForStatement(@operator.Left, expectedType);
 
             if (leftType != BasicType.Float &&
                 rightType == BasicType.Float)
@@ -876,7 +879,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
             }
 
-            GenerateCodeForStatement(@operator.Right);
+            GenerateCodeForStatement(@operator.Right, expectedType);
 
             if (leftType == BasicType.Float &&
                 rightType != BasicType.Float)
@@ -1097,6 +1100,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     return;
                 }
+                case UnaryOperatorCall.BinaryNOT:
+                {
+                    GenerateCodeForStatement(@operator.Left);
+
+                    using (RegisterUsage.Auto reg = Registers.GetFree())
+                    {
+                        PopTo(reg.Get(bitWidth));
+                        AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
+                        AddInstruction(Opcode.Push, reg.Get(bitWidth));
+                    }
+
+                    return;
+                }
                 default: throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile);
             }
         }
@@ -1239,12 +1255,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             variable.Reference = param;
             OnGotStatementType(variable, param.Type);
 
-            ValueAddress address = GetParameterAddress(param);
+            Address address = GetParameterAddress(param);
 
-            if (param.IsRef && !resolveReference)
-            { StackLoad(address.ToUnreferenced(), BytecodeProcessor.PointerSize); }
-            else
-            { StackLoad(address, param.Type.SizeBytes); }
+            if (param.IsRef && resolveReference)
+            { address = new AddressRuntimePointer(address); }
+
+            StackLoad(address, param.Type.SizeBytes);
 
             return;
         }
@@ -1255,7 +1271,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             variable.Reference = val;
             OnGotStatementType(variable, val.Type);
 
-            StackLoad(new ValueAddress(val), val.Type.SizeBytes);
+            StackLoad(GetLocalVariableAddress(val), val.Type.SizeBytes);
             return;
         }
 
@@ -1290,40 +1306,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(AddressGetter addressGetter)
     {
-        if (addressGetter.PrevStatement is Identifier identifier)
-        {
-            GeneralType type = FindStatementType(identifier);
-
-            throw new CompilerException($"Variable \"{identifier}\" (type of {type}) is stored on the stack", addressGetter, CurrentFile);
-
-            // GenerateCodeForStatement(identifier);
-            // return;
-        }
-
-        if (addressGetter.PrevStatement is Field field)
-        {
-            // int offset = GetDataOffset(field);
-            // ValueAddress pointerOffset = GetBaseAddress(field);
-
-            throw new CompilerException($"Field \"{field}\" is on the stack", addressGetter, CurrentFile);
-
-            // StackLoad(pointerOffset);
-            // AddInstruction(Opcode.MATH_ADD, offset);
-            // return;
-        }
-
-        throw new NotImplementedException();
+        StatementWithValue statement = addressGetter.PrevStatement;
+        Address address = GetDataAddress(statement);
+        GenerateAddressResolver(address);
     }
-    void GenerateCodeForStatement(Pointer memoryAddressFinder)
+    void GenerateCodeForStatement(Pointer pointer)
     {
-        GenerateCodeForStatement(memoryAddressFinder.PrevStatement);
+        GenerateCodeForStatement(pointer.PrevStatement);
 
-        GeneralType pointerType = FindStatementType(memoryAddressFinder.PrevStatement);
+        GeneralType addressType = FindStatementType(pointer.PrevStatement);
+        if (addressType is not PointerType pointerType)
+        { throw new CompilerException($"This isn't a pointer", pointer.PrevStatement, CurrentFile); }
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(pointerType.BitWidth));
-            AddInstruction(Opcode.Push, reg.Get(pointerType.BitWidth).ToPtr());
+            StackLoad(new AddressRegisterPointer(reg.Get(pointerType.BitWidth)), pointerType.To.SizeBytes);
         }
     }
     void GenerateCodeForStatement(WhileLoop whileLoop)
@@ -1601,9 +1599,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     AddInstruction(Opcode.Move, reg.Get(BitWidth._32), (InstructionOperand)StackTop);
 
                     for (int offset = 0; offset < pointerType.To.SizeBytes; offset++)
-                    {
-                        AddInstruction(Opcode.Move, reg.Get(BitWidth._32).ToPtr(offset), 0);
-                    }
+                    { AddInstruction(Opcode.Move, reg.Get(BitWidth._32).ToPtr(offset, BitWidth._8), new InstructionOperand((byte)0)); }
                 }
 
                 break;
@@ -1699,7 +1695,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
                 PopTo(reg.Get(pointerType.BitWidth));
-                AddInstruction(Opcode.Push, reg.Get(pointerType.BitWidth).ToPtr(fieldOffset));
+                StackLoad(new AddressOffset(
+                    new AddressRegisterPointer(reg.Get(pointerType.BitWidth)),
+                    fieldOffset
+                    ), fieldDefinition.Type.SizeBytes);
             }
 
             return;
@@ -1734,7 +1733,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (dereference is null)
         {
-            ValueAddress offset = GetDataAddress(field);
+            Address offset = GetDataAddress(field);
             StackLoad(offset, compiledField.Type.SizeBytes);
         }
         else
@@ -1764,7 +1763,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (param.Type != arrayType)
                     { throw new NotImplementedException(); }
 
-                    ValueAddress offset = GetParameterAddress(param, (int)computedIndexData * arrayType.Of.SizeBytes);
+                    Address offset = GetParameterAddress(param, (int)computedIndexData * arrayType.Of.SizeBytes);
                     StackLoad(offset, arrayType.Of.SizeBytes);
 
                     throw new NotImplementedException();
@@ -1776,9 +1775,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     { throw new NotImplementedException(); }
 
                     int offset = (int)computedIndexData * arrayType.Of.SizeBytes;
-                    ValueAddress address = new(val);
+                    Address address = GetLocalVariableAddress(val);
 
-                    StackLoad(address + offset, arrayType.Of.SizeBytes);
+                    StackLoad(new AddressOffset(address, offset), arrayType.Of.SizeBytes);
 
                     return;
                 }
@@ -1787,37 +1786,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 using (RegisterUsage.Auto regPtr = Registers.GetFree())
                 {
-                    ValueAddress address = GetDataAddress(identifier);
-                    AddInstruction(Opcode.Move, regPtr.Register, address.Address * BytecodeProcessor.StackDirection);
-
-                    switch (address.AddressingMode)
-                    {
-                        case AddressingMode.Pointer:
-                            throw new NotImplementedException();
-                        case AddressingMode.PointerBP:
-                            AddInstruction(Opcode.MathAdd, regPtr.Register, Register.BasePointer);
-                            break;
-                        default:
-                            throw new UnreachableException();
-                    }
+                    Address address = GetDataAddress(identifier);
+                    GenerateAddressResolver(address);
+                    PopTo(regPtr.Get(BitWidth._32));
 
                     GenerateCodeForStatement(index.Index);
 
                     GeneralType indexType = FindStatementType(index.Index);
 
+                    if (indexType is not BuiltinType builtinType)
+                    { throw new CompilerException($"Index must be a builtin type (i.e. int) and not {indexType}", index.Index, CurrentFile); }
+
                     using (RegisterUsage.Auto regIndex = Registers.GetFree())
                     {
-                        PopTo(regIndex.Get(indexType.BitWidth));
-
-                        if (BytecodeProcessor.StackDirection > 0)
-                        { AddInstruction(Opcode.MathAdd, regPtr.Register, regIndex.Get(indexType.BitWidth)); }
-                        else
-                        { AddInstruction(Opcode.MathSub, regPtr.Register, regIndex.Get(indexType.BitWidth)); }
+                        PopTo(regIndex.Get(builtinType.BitWidth));
+                        AddInstruction(Opcode.MathMult, regIndex.Get(builtinType.BitWidth), arrayType.Of.SizeBytes);
+                        AddInstruction(Opcode.MathAdd, regPtr.Register, regIndex.Get(builtinType.BitWidth));
                     }
 
-                    int itemSize = arrayType.Of.SizeBytes;
-                    for (int i = 0; i < itemSize; i++)
-                    { AddInstruction(Opcode.Push, regPtr.Register.ToPtr(i, BitWidth._8)); }
+                    StackLoad(new AddressRegisterPointer(regPtr.Register), arrayType.Of.SizeBytes);
                 }
                 return;
             }
@@ -1854,8 +1841,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 PopTo(reg1.Register);
 
-                int size = pointerType.To.SizeBytes;
-                for (int i = size - 1; i >= 0; i--)
+                for (int i = pointerType.To.SizeBytes - 1; i >= 0; i--)
                 { AddInstruction(Opcode.Push, reg1.Register.ToPtr(i, BitWidth._8)); }
             }
 
@@ -1870,6 +1856,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 index.File
             ), result.Function);
     }
+
+    void GenerateAddressResolver(Address address)
+    {
+        switch (address)
+        {
+            case AddressRuntimePointer runtimePointer:
+                GenerateAddressResolver(runtimePointer.PointerAddress);
+                break;
+            case AddressRegisterPointer registerPointer:
+                AddInstruction(Opcode.Push, registerPointer.Register);
+                break;
+            case AddressOffset addressOffset:
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    GenerateAddressResolver(addressOffset.Base);
+                    AddInstruction(Opcode.PopTo32, reg.Get(BitWidth._32));
+                    AddInstruction(Opcode.MathAdd, reg.Get(BitWidth._32), addressOffset.Offset);
+                    AddInstruction(Opcode.Push, reg.Get(BitWidth._32));
+                }
+                break;
+            default: throw new NotImplementedException();
+        }
+    }
+
     void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
     {
         StatementWithValue statement = modifiedStatement.Statement;
@@ -1877,31 +1887,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (modifier.Equals(ModifierKeywords.Ref))
         {
-            ValueAddress address = GetDataAddress(statement);
+            throw null!;
+            Address address = GetDataAddress(statement);
 
-            if (address.IsReference)
+            // if (address is AddressRuntimePointer runtimePointer)
+            // {
+            //     StackLoad(runtimePointer.PointerAddress, BitWidth._32);
+            // }
+            // else
             {
-                StackLoad(address.ToUnreferenced(), BitWidth._32);
-            }
-            else
-            {
-                using (RegisterUsage.Auto reg = Registers.GetFree())
-                {
-                    AddInstruction(Opcode.Move, reg.Register, address.Address * BytecodeProcessor.StackDirection);
-
-                    switch (address.AddressingMode)
-                    {
-                        case AddressingMode.Pointer:
-                            break;
-                        case AddressingMode.PointerBP:
-                            AddInstruction(Opcode.MathAdd, reg.Register, Register.BasePointer);
-                            break;
-                        default:
-                            throw new UnreachableException();
-                    }
-
-                    AddInstruction(Opcode.Push, reg.Register);
-                }
+                GenerateAddressResolver(address);
             }
             return;
         }
@@ -1923,6 +1918,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
 
+        if (!Settings.DontOptimize &&
+            targetType is BuiltinType targetBuiltinType &&
+            TryComputeSimple(typeCast.PrevStatement, out CompiledValue prevValue) &&
+            CompiledValue.TryCast(ref prevValue, targetBuiltinType.RuntimeType))
+        {
+            AddInstruction(Opcode.Push, prevValue);
+            return;
+        }
+
         if (statementType.SizeBytes != targetType.SizeBytes)
         {
             if (statementType.SizeBytes < targetType.SizeBytes)
@@ -1941,7 +1945,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddComment("Save");
 
                 for (int i = 0; i < statementType.SizeBytes; i++)
-                { PopTo(Register.StackPointer.ToPtr((statementType.SizeBytes - 1) * -BytecodeProcessor.StackDirection), BitWidth._8); }
+                { PopTo(Register.StackPointer.ToPtr((statementType.SizeBytes - 1) * -BytecodeProcessor.StackDirection, BitWidth._8), BitWidth._8); }
 
                 AddComment("}");
 
@@ -1963,7 +1967,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddComment("Save");
 
                 for (int i = 0; i < targetType.SizeBytes; i++)
-                { PopTo(Register.StackPointer.ToPtr((statementType.SizeBytes - 1) * -BytecodeProcessor.StackDirection), BitWidth._8); }
+                { PopTo(Register.StackPointer.ToPtr((statementType.SizeBytes - 1) * -BytecodeProcessor.StackDirection, BitWidth._8), BitWidth._8); }
 
                 AddComment("Discard excess");
 
@@ -1977,15 +1981,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.SizeBytes}) to {targetType} (size of {targetType.SizeBytes})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile);
-        }
-
-        if (!Settings.DontOptimize &&
-            targetType is BuiltinType targetBuiltinType &&
-            TryComputeSimple(typeCast.PrevStatement, out CompiledValue prevValue) &&
-            CompiledValue.TryCast(ref prevValue, targetBuiltinType.RuntimeType))
-        {
-            AddInstruction(Opcode.Push, prevValue);
-            return;
         }
 
         GenerateCodeForStatement(typeCast.PrevStatement, targetType);
@@ -2040,7 +2035,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case LiteralList v: GenerateCodeForStatement(v); break;
             case VariableDeclaration v: GenerateCodeForStatement(v); break;
             case KeywordCall v: GenerateCodeForStatement(v); break;
-            case BinaryOperatorCall v: GenerateCodeForStatement(v); break;
+            case BinaryOperatorCall v: GenerateCodeForStatement(v, expectedType); break;
             case UnaryOperatorCall v: GenerateCodeForStatement(v); break;
             case AnyAssignment v: GenerateCodeForStatement(v.ToAssignment()); break;
             case LiteralStatement v: GenerateCodeForStatement(v, expectedType); break;
@@ -2165,9 +2160,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AssignTypeCheck(parameter.Type, valueType, value);
 
-            GenerateCodeForStatement(value);
+            GenerateCodeForStatement(value, parameter.Type);
 
-            ValueAddress address = GetParameterAddress(parameter);
+            Address address = GetParameterAddress(parameter);
+
+            if (parameter.IsRef)
+            { address = new AddressRuntimePointer(address); }
 
             StackStore(address, parameter.Type.SizeBytes);
         }
@@ -2181,9 +2179,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AssignTypeCheck(variable.Type, valueType, value);
 
-            GenerateCodeForStatement(value);
+            GenerateCodeForStatement(value, variable.Type);
 
-            StackStore(new ValueAddress(variable), variable.Type.SizeBytes);
+            StackStore(GetLocalVariableAddress(variable), variable.Type.SizeBytes);
         }
         else if (GetGlobalVariable(statementToSet.Content, statementToSet.File, out CompiledVariable? globalVariable, out _))
         {
@@ -2195,7 +2193,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AssignTypeCheck(globalVariable.Type, valueType, value);
 
-            GenerateCodeForStatement(value);
+            GenerateCodeForStatement(value, globalVariable.Type);
 
             StackStore(GetGlobalVariableAddress(globalVariable), globalVariable.Type.SizeBytes);
         }
@@ -2240,7 +2238,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (dereference is null)
         {
-            ValueAddress offset = GetDataAddress(statementToSet);
+            Address offset = GetDataAddress(statementToSet);
             StackStore(offset, valueType.SizeBytes);
         }
         else
@@ -2277,7 +2275,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     { throw new NotImplementedException(); }
 
                     int offset = (int)computedIndexData * arrayType.Of.SizeBytes;
-                    StackStore(new ValueAddress(variable) + offset, arrayType.Of.SizeBytes);
+                    StackStore(new AddressOffset(GetLocalVariableAddress(variable), offset), arrayType.Of.SizeBytes);
                     return;
                 }
             }
@@ -2316,8 +2314,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     CheckPointerNull(false);
 
-                    int valueSize = valueType.SizeBytes;
-                    for (int i = 0; i < valueSize; i++)
+                    for (int i = 0; i < valueType.SizeBytes; i++)
                     { AddInstruction(Opcode.PopTo8, regPtr.Get(BitWidth._32).ToPtr(i, BitWidth._8)); }
                 }
             }
@@ -2336,19 +2333,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForValueSetter(Pointer statementToSet, StatementWithValue value)
     {
         GeneralType targetType = FindStatementType(statementToSet);
+        GeneralType valueType = FindStatementType(value, targetType);
 
-        if (targetType.SizeBytes != BytecodeProcessor.PointerSize) throw new NotImplementedException();
+        AssignTypeCheck(targetType, valueType, value);
 
-        GenerateCodeForStatement(value);
+        GenerateCodeForStatement(value, targetType);
 
         GenerateCodeForStatement(statementToSet.PrevStatement);
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Register);
-
-            // TODO: this
-            PopTo(reg.Register.ToPtr(0, BitWidth._32), BitWidth._32);
+            PopTo(reg.Get(BitWidth._32));
+            for (int i = 0; i < valueType.SizeBytes; i++)
+            { PopTo(reg.Get(BitWidth._32).ToPtr(i, BitWidth._8), BitWidth._8); }
         }
     }
 
@@ -2423,7 +2420,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        int offset = VariablesSize + ReturnFlagType.SizeBytes + 1 /* Stack pointer offset (???) */;
+        GeneralType type;
+        if (newVariable.Type == StatementKeywords.Var)
+        {
+            if (newVariable.InitialValue == null)
+            { throw new CompilerException($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.File); }
+
+            type = FindStatementType(newVariable.InitialValue);
+        }
+        else
+        {
+            type = GeneralType.From(newVariable.Type, FindType, TryCompute);
+
+            newVariable.Type.SetAnalyzedType(type);
+            newVariable.CompiledType = type;
+        }
+
+        int offset = (VariablesSize + ReturnFlagType.SizeBytes + type.SizeBytes) * BytecodeProcessor.StackDirection;
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
@@ -2431,7 +2444,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Kind = StackElementKind.Variable,
             Tag = compiledVariable.Identifier.Content,
-            Address = offset * BytecodeProcessor.StackDirection,
+            Address = offset,
             BasePointerRelative = true,
             Size = compiledVariable.Type.SizeBytes,
             Type = compiledVariable.Type
@@ -2449,6 +2462,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!Settings.DontOptimize &&
             TryCompute(newVariable.InitialValue, out CompiledValue computedInitialValue))
         {
+            if (computedInitialValue.TryCast(compiledVariable.Type, out CompiledValue castedInitialValue))
+            { computedInitialValue = castedInitialValue; }
+
             newVariable.InitialValue.PredictedValue = computedInitialValue;
 
             AddComment($"Initial value {{");
@@ -2695,7 +2711,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
             {
-                Address = GetReturnValueAddress(returnType.Type).Address * BytecodeProcessor.StackDirection,
+                Address = GetReturnValueAddress(returnType.Type).Offset,
                 BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = returnType.Type.SizeBytes,
@@ -2716,7 +2732,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
-            Address = ScaledSavedBasePointerOffset - ((BytecodeProcessor.PointerSize - 1) * BytecodeProcessor.StackDirection),
+            Address = ScaledSavedBasePointerOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = BasePointerSize,
@@ -2726,7 +2742,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
-            Address = ScaledSavedCodePointerOffset - ((BytecodeProcessor.PointerSize - 1) * BytecodeProcessor.StackDirection),
+            Address = ScaledSavedCodePointerOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = CodePointerSize,
@@ -2736,7 +2752,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
-            Address = ScaledAbsoluteGlobalOffset - ((BytecodeProcessor.PointerSize - 1) * BytecodeProcessor.StackDirection),
+            Address = ScaledAbsoluteGlobalOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = AbsGlobalAddressSize,
@@ -2750,7 +2766,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             StackElementInformation debugInfo = new()
             {
-                Address = GetParameterAddress(p).Address * BytecodeProcessor.StackDirection,
+                Address = GetParameterAddress(p).Offset,
                 Kind = StackElementKind.Parameter,
                 BasePointerRelative = true,
                 Size = p.IsRef ? BytecodeProcessor.PointerSize : p.Type.SizeBytes,
@@ -2857,16 +2873,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void CompileParameters(ImmutableArray<ParameterDefinition> parameters)
     {
-        int paramsSize = 0;
         for (int i = 0; i < parameters.Length; i++)
         {
             GeneralType parameterType = GeneralType.From(parameters[i].Type, FindType);
             parameters[i].Type.SetAnalyzedType(parameterType);
 
-            // TODO: what is this + 1
-            CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.StackFrameTags), parameterType, parameters[i]));
-
-            paramsSize += parameterType.SizeBytes;
+            CompiledParameters.Add(new CompiledParameter(i, parameterType, parameters[i]));
         }
     }
 
@@ -2893,7 +2905,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
-            Address = ScaledSavedBasePointerOffset - ((BytecodeProcessor.PointerSize - 1) * BytecodeProcessor.StackDirection),
+            Address = ScaledSavedBasePointerOffset,
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = BasePointerSize,
@@ -2993,7 +3005,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
             {
-                Address = 0 * BytecodeProcessor.StackDirection,
+                Address = (ExitCodeType.SizeBytes - 1) * BytecodeProcessor.StackDirection,
                 BasePointerRelative = false,
                 Kind = StackElementKind.Internal,
                 Size = ExitCodeType.SizeBytes,
@@ -3014,7 +3026,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
             {
-                Address = ScaledAbsoluteGlobalOffset - ((BytecodeProcessor.PointerSize - 1) * BytecodeProcessor.StackDirection),
+                Address = ScaledAbsoluteGlobalOffset,
                 BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = AbsGlobalAddressSize,
@@ -3049,7 +3061,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             CurrentScopeDebug.LastRef.Stack.Add(new StackElementInformation()
             {
-                Address = (GetGlobalVariableAddress(variable).Address + (BytecodeProcessor.PointerSize - 1)) * BytecodeProcessor.StackDirection,
+                Address = GetGlobalVariableAddress(variable).Offset,
                 BasePointerRelative = false,
                 Kind = StackElementKind.Variable,
                 Size = variable.Type.SizeBytes,

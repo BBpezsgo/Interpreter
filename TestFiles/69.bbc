@@ -1,0 +1,11 @@
+using System.Memory;
+
+byte header;
+
+SetHeader(&header, 0b_0_1000001 as byte, 1 as byte);
+
+byte size;
+byte allocated;
+GetHeader(&header, &size, &allocated);
+
+return (size - allocated) as int;

@@ -168,10 +168,10 @@ public readonly struct ExpectedResult
     public ExpectedResult Assert(IResult other)
     {
         if (!string.Equals(StdOutput, other.StdOutput, StringComparison.Ordinal))
-        { throw new AssertFailedException($"Standard output isn't what is expected:{Environment.NewLine}Expected: \"{StdOutput.Escape()}\"{Environment.NewLine}Actual: \"{other.StdOutput.Escape()}\""); }
+        { throw new AssertFailedException($"Standard output isn't what is expected:{Environment.NewLine}Expected: \"{StdOutput.Escape()}\"{Environment.NewLine}Actual:   \"{other.StdOutput.Escape()}\""); }
 
         if (ExitCode != other.ExitCode)
-        { throw new AssertFailedException($"Exit code isn't what is expected:{Environment.NewLine}Expected: {ExitCode}{Environment.NewLine}Actual: {other.ExitCode}"); }
+        { throw new AssertFailedException($"Exit code isn't what is expected:{Environment.NewLine}Expected: {ExitCode}{Environment.NewLine}Actual:   {other.ExitCode}"); }
 
         return this;
     }
@@ -227,7 +227,7 @@ public static class Utils
 
     const string TestFilesPath = $@"{TestConstants.TheProjectPath}\TestFiles\";
 
-    const int TestCount = 60;
+    const int TestCount = 70;
     static readonly int TestFileNameWidth = (int)Math.Floor(Math.Log10(TestCount)) + 1;
 
     public static LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings BrainfuckGeneratorSettings => new(LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings.Default)
@@ -693,13 +693,13 @@ public readonly struct MainResult : IResult
     public readonly string StdOutput { get; }
     public readonly string StdError { get; }
     public readonly int ExitCode { get; }
-    public readonly ImmutableArray<RuntimeValue> Heap { get; }
+    public readonly ImmutableArray<byte> Heap { get; }
 
     public MainResult(string stdOut, string stdErr, BytecodeProcessor interpreter)
     {
         StdOutput = stdOut;
         StdError = stdErr;
-        ExitCode = interpreter.GetData(interpreter.Registers.StackPointer).Int;
+        ExitCode = interpreter.GetData(interpreter.Registers.StackPointer, BitWidth._32).Int;
         Heap = ImmutableCollectionsMarshal.AsImmutableArray(interpreter.Memory);
     }
 }

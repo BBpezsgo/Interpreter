@@ -194,7 +194,12 @@ public abstract class GeneralType :
     public abstract override int GetHashCode();
     public abstract override string ToString();
     public bool Equals(BasicType other) => this is BuiltinType builtinType && builtinType.Type == other;
-    public bool Equals(RuntimeType other) => this is BuiltinType builtinType && builtinType.RuntimeType == other;
+    public bool Equals(RuntimeType other) => this switch
+    {
+        BuiltinType builtinType => builtinType.RuntimeType == other,
+        PointerType => other == RuntimeType.Integer,
+        _ => false,
+    };
 
     /// <exception cref="NotImplementedException"/>
     public static bool TryGetTypeParameters(IEnumerable<GeneralType> definedParameters, IEnumerable<GeneralType> passedParameters, Dictionary<string, GeneralType> typeParameters)

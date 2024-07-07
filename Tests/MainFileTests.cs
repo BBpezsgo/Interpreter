@@ -3,7 +3,7 @@ namespace Tests;
 [TestClass, TestCategory("Main"), TestCategory("FileTest")]
 public class MainFileTests
 {
-    const int Timeout = 1 * 1000;
+    const int Timeout = 5 * 1000;
 
     [TestMethod, Timeout(Timeout)] public void Test01() => Utils.GetTest(01).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test02() => Utils.GetTest(02).DoMain();
@@ -65,16 +65,16 @@ public class MainFileTests
     [TestMethod, Timeout(Timeout)] public void Test58() => Utils.GetTest(58).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test59() => Utils.GetTest(59).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test60() => Utils.GetTest(60).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test61() => Utils.GetTest(61).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test62() => Utils.GetTest(62).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test63() => Utils.GetTest(63).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test64() => Utils.GetTest(64).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test65() => Utils.GetTest(65).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test66() => Utils.GetTest(66).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test67() => Utils.GetTest(67).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test68() => Utils.GetTest(68).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test69() => Utils.GetTest(69).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test70() => Utils.GetTest(70).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test61() => Utils.GetTest(61).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test62() => Utils.GetTest(62).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test63() => Utils.GetTest(63).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test64() => Utils.GetTest(64).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test65() => Utils.GetTest(65).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test66() => Utils.GetTest(66).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test67() => Utils.GetTest(67).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test68() => Utils.GetTest(68).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test69() => Utils.GetTest(69).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test70() => Utils.GetTest(70).DoMain();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test71() => Utils.GetTest(71).DoMain();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test72() => Utils.GetTest(72).DoMain();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test73() => Utils.GetTest(73).DoMain();

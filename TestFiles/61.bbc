@@ -1,0 +1,16 @@
+using System.Memory;
+
+struct A
+{
+	byte _a;
+	int _b;
+}
+
+A a;
+a._a = 33;
+a._b = 66666666;
+
+temp A* b = new A*;
+*b = a;
+
+return (b._a as int) + b._b;

@@ -12,6 +12,11 @@ public class BrainfuckVariable :
     public readonly string Name;
     public readonly int Address;
     public readonly Uri File;
+    /// <summary>
+    /// The address is already the value of the variable.
+    /// This is used for pointer dereferencing to like references.
+    /// </summary>
+    public readonly bool IsReference;
 
     public readonly bool HaveToClean;
     public readonly bool DeallocateOnClean;
@@ -26,13 +31,14 @@ public class BrainfuckVariable :
     GeneralType IHaveCompiledType.Type => Type;
     Uri IInFile.File => File;
 
-    public BrainfuckVariable(string name, Uri file, int address, bool haveToClean, bool deallocateOnClean, GeneralType type)
-        : this(name, file, address, haveToClean, deallocateOnClean, type, type.Size) { }
-    public BrainfuckVariable(string name, Uri file, int address, bool haveToClean, bool deallocateOnClean, GeneralType type, int size)
+    public BrainfuckVariable(string name, Uri file, int address, bool isReference, bool haveToClean, bool deallocateOnClean, GeneralType type)
+        : this(name, file, address, isReference, haveToClean, deallocateOnClean, type, type.Size) { }
+    public BrainfuckVariable(string name, Uri file, int address, bool isReference, bool haveToClean, bool deallocateOnClean, GeneralType type, int size)
     {
         Name = name;
         Address = address;
         File = file;
+        IsReference = isReference;
 
         HaveToClean = haveToClean;
         DeallocateOnClean = deallocateOnClean;

@@ -792,6 +792,7 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
     #region Operators
 
     public const string LogicalNOT = "!";
+    public const string BinaryNOT = "~";
 
     #endregion
 

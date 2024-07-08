@@ -4,8 +4,7 @@ using Parser;
 using Parser.Statement;
 
 public class CompiledFunction : FunctionDefinition,
-    ISameCheck,
-    ISameCheck<CompiledFunction>,
+    IDefinition<CompiledFunction>,
     IReferenceable<StatementWithValue?>,
     IDuplicatable<CompiledFunction>,
     IHaveCompiledType,
@@ -44,7 +43,7 @@ public class CompiledFunction : FunctionDefinition,
         References = new List<Reference<StatementWithValue?>>(other.References);
     }
 
-    public bool IsSame(CompiledFunction other)
+    public bool DefinitionEquals(CompiledFunction other)
     {
         if (this.Type != other.Type) return false;
         if (this.Identifier.Content != other.Identifier.Content) return false;
@@ -54,7 +53,6 @@ public class CompiledFunction : FunctionDefinition,
 
         return true;
     }
-    public bool IsSame(ISameCheck? other) => other is CompiledFunction other2 && IsSame(other2);
 
     public new CompiledFunction Duplicate() => new(Type, ParameterTypes, Context, this);
 

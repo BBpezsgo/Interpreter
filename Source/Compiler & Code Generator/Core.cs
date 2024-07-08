@@ -63,34 +63,18 @@ public class AddressRegisterPointer : Address
     public override string ToString() => $"{Register}";
 }
 
-public readonly struct ValueAddress
-{
-    public readonly Address Address;
-    public readonly BitWidth DataSize;
-
-    public ValueAddress(Address address, BitWidth dataSize)
-    {
-        Address = address;
-        DataSize = dataSize;
-    }
-}
-
 readonly struct UndefinedOffset<TFunction>
 {
     public int InstructionIndex { get; }
     public bool IsAbsoluteAddress { get; }
 
     public Position CallerPosition { get; }
+    public Uri? CallerFile { get; }
+
     public TFunction Called { get; }
 
-    public Uri? CurrentFile { get; }
-
     public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, IPositioned? caller, TFunction called, Uri? file)
-        : this(callInstructionIndex, isAbsoluteAddress, caller?.Position, called, file)
-    { }
-
-    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Position? callerPosition, TFunction called, Uri? file)
-        : this(callInstructionIndex, isAbsoluteAddress, callerPosition ?? Position.UnknownPosition, called, file)
+        : this(callInstructionIndex, isAbsoluteAddress, caller?.Position ?? Position.UnknownPosition, called, file)
     { }
 
     public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Position callerPosition, TFunction called, Uri? file)
@@ -101,39 +85,38 @@ readonly struct UndefinedOffset<TFunction>
         CallerPosition = callerPosition;
         Called = called;
 
-        CurrentFile = file;
+        CallerFile = file;
     }
+}
+
+public static class ReferenceExtensions
+{
+    public static void Add(this List<Reference> references, Uri? sourceFile) => references.Add(new Reference(sourceFile));
+    public static void Add<TSource>(this List<Reference<TSource>> references, TSource source, Uri? sourceFile = null) => references.Add(new Reference<TSource>(source, sourceFile));
 }
 
 public readonly struct Reference
 {
     public Uri? SourceFile { get; }
-    public ISameCheck? SourceContext { get; }
 
-    public Reference(Uri? sourceFile = null, ISameCheck? sourceContext = null)
+    public Reference(Uri? sourceFile = null)
     {
         SourceFile = sourceFile;
-        SourceContext = sourceContext;
     }
-
-    public static implicit operator Reference(ValueTuple<Uri?, ISameCheck?> v) => new(v.Item1, v.Item2);
 }
 
 public readonly struct Reference<TSource>
 {
     public TSource Source { get; }
     public Uri? SourceFile { get; }
-    public ISameCheck? SourceContext { get; }
 
-    public Reference(TSource source, Uri? sourceFile = null, ISameCheck? sourceContext = null)
+    public Reference(TSource source, Uri? sourceFile = null)
     {
         Source = source;
         SourceFile = sourceFile;
-        SourceContext = sourceContext;
     }
 
-    public static implicit operator Reference<TSource>(ValueTuple<TSource, Uri?, ISameCheck?> v) => new(v.Item1, v.Item2, v.Item3);
-    public static implicit operator Reference(Reference<TSource> v) => new(v.SourceFile, v.SourceContext);
+    public static implicit operator Reference(Reference<TSource> v) => new(v.SourceFile);
 }
 
 public interface IHaveInstructionOffset
@@ -145,7 +128,7 @@ public interface ICompiledFunction :
     IHaveCompiledType,
     IInFile
 {
-    public bool ReturnSomething => Type != BasicType.Void;
+    public bool ReturnSomething { get; }
     public Block? Block { get; }
     public IReadOnlyList<ParameterDefinition> Parameters { get; }
     public IReadOnlyList<GeneralType> ParameterTypes { get; }
@@ -168,15 +151,9 @@ public interface IReferenceable<TBy> : IReferenceable
     IEnumerable<Reference> IReferenceable.References => References.Select(v => (Reference)v);
 }
 
-public interface IHaveCompiledType : IProbablyHaveCompiledType
+public interface IHaveCompiledType
 {
-    public new GeneralType Type { get; }
-    GeneralType? IProbablyHaveCompiledType.Type => Type;
-}
-
-public interface IProbablyHaveCompiledType
-{
-    public GeneralType? Type { get; }
+    public GeneralType Type { get; }
 }
 
 public interface IInContext<TContext>
@@ -190,16 +167,11 @@ public enum Protection
     Public,
 }
 
-public interface ISameCheck
-{
-    public bool IsSame(object? other);
-}
+public interface IDefinition;
 
-public interface ISameCheck<TOther> : ISameCheck
+public interface IDefinition<TOther> : IDefinition
 {
-    public bool IsSame(TOther other);
-
-    bool ISameCheck.IsSame(object? other) => other is TOther _other && IsSame(_other);
+    public bool DefinitionEquals(TOther other);
 }
 
 public interface IIdentifiable<TIdentifier>

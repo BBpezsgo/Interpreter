@@ -865,13 +865,13 @@ public static class RandomExtensions
 {
     static readonly byte[] Buffer2 = new byte[2];
 
-    public static short NextInt16(this Random random)
+    public static short NextInt16(this System.Random random)
     {
         random.NextBytes(Buffer2);
         return BitConverter.ToInt16(Buffer2, 0);
     }
 
-    public static ushort NextUInt16(this Random random)
+    public static ushort NextUInt16(this System.Random random)
     {
         random.NextBytes(Buffer2);
         return BitConverter.ToUInt16(Buffer2, 0);

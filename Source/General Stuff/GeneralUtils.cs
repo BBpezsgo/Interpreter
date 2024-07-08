@@ -48,14 +48,6 @@ public static class Utils
         return null;
     }
 
-    public static T Max<T>(T a, T b)
-        where T : IComparisonOperators<T, T, bool>
-        => a > b ? a : b;
-
-    public static T Min<T>(T a, T b)
-        where T : IComparisonOperators<T, T, bool>
-        => a < b ? a : b;
-
     public static bool SequenceEquals<T1, T2>(ImmutableArray<T1> collectionA, ImmutableArray<T2> collectionB)
         where T1 : IEquatable<T2>
     {

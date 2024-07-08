@@ -1427,7 +1427,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
         if (instanceType is StructType structType)
-        { structType.Struct?.References.Add((constructorCall.Type, CurrentFile, CurrentMacro.LastOrDefault)); }
+        { structType.Struct?.References.Add(constructorCall.Type, CurrentFile); }
 
         if (!GetConstructor(instanceType, parameters, CurrentFile, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound))
         { throw notFound.Instantiate(constructorCall.Keyword, CurrentFile); }
@@ -1435,7 +1435,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         typeArguments ??= new Dictionary<string, GeneralType>();
 
-        constructor.References.Add((constructorCall, CurrentFile, CurrentMacro.LastOrDefault));
+        constructor.References.Add(constructorCall, CurrentFile);
         OnGotStatementType(constructorCall, constructor.Type);
 
         if (!constructor.CanUse(CurrentFile))
@@ -2137,7 +2137,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             case StructType structType:
             {
-                structType.Struct.References.Add((newInstance.Type, CurrentFile, CurrentMacro.LastOrDefault));
+                structType.Struct.References.Add(newInstance.Type, CurrentFile);
 
                 int address = Stack.PushVirtual(structType.Size);
 

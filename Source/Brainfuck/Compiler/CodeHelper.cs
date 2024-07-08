@@ -7,57 +7,6 @@ public interface IBrainfuckGenerator
     public CodeHelper Code { get; }
 }
 
-public readonly struct AutoPrintCodeString
-{
-    readonly StringBuilder v;
-
-    AutoPrintCodeString(StringBuilder v)
-    {
-        this.v = v;
-    }
-
-    public static implicit operator StringBuilder(AutoPrintCodeString v) => v.v;
-    public static implicit operator AutoPrintCodeString(StringBuilder v) => new(v);
-
-    public static AutoPrintCodeString operator +(AutoPrintCodeString a, char b)
-    {
-        a.v.Append(b);
-        BrainfuckCode.PrintCodeChar(b);
-        return a;
-    }
-    public static AutoPrintCodeString operator +(AutoPrintCodeString a, string b)
-    {
-        a.v.Append(b);
-        BrainfuckCode.PrintCode(b);
-        return a;
-    }
-    public static AutoPrintCodeString operator +(AutoPrintCodeString a, AutoPrintCodeString b)
-    {
-        a.v.Append(b.v);
-        return a;
-    }
-
-    public void Append(string value)
-    {
-        this.v.Append(value);
-        BrainfuckCode.PrintCode(value);
-    }
-
-    public void Append(char value)
-    {
-        this.v.Append(value);
-        BrainfuckCode.PrintCodeChar(value);
-    }
-
-    public void Append(char value, int repeatCount)
-    {
-        this.v.Append(value, repeatCount);
-        BrainfuckCode.PrintCode(new string(value, repeatCount));
-    }
-
-    public override string ToString() => v.ToString();
-}
-
 public readonly struct AutoJumpBlock : IDisposable
 {
     readonly IBrainfuckGenerator Generator;
@@ -851,7 +800,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     public CodeHelper Duplicate() => new()
     {
         _branchDepth = BranchDepth,
-        _code = new(_code.ToString()),
+        _code = new StringBuilder(_code.ToString()),
         _indent = _indent,
         _pointer = _pointer,
         AddComments = AddComments,

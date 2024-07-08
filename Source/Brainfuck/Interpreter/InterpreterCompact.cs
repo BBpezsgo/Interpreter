@@ -37,7 +37,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.PointerRight:
             {
                 _memoryPointer += instruction.Count;
-                _memoryPointerRange = Range.Union(_memoryPointerRange, _memoryPointer);
+                _memoryPointerRange = RangeUtils.Union(_memoryPointerRange, _memoryPointer);
                 _memoryPointer = (_memoryPointer + Memory.Length) % Memory.Length;
 
                 // if (_memoryPointer >= Memory.Length)
@@ -48,7 +48,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.PointerLeft:
             {
                 _memoryPointer -= instruction.Count;
-                _memoryPointerRange = Range.Union(_memoryPointerRange, _memoryPointer);
+                _memoryPointerRange = RangeUtils.Union(_memoryPointerRange, _memoryPointer);
                 _memoryPointer = (_memoryPointer + Memory.Length) % Memory.Length;
 
                 // if (_memoryPointer < 0)

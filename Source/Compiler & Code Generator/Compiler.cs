@@ -859,10 +859,10 @@ public sealed class Compiler
         Dictionary<int, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback,
-        AnalysisCollection? analysisCollection,
-        TokenizerSettings? tokenizerSettings,
-        FileParser? fileParser)
+        PrintCallback? printCallback = null,
+        AnalysisCollection? analysisCollection = null,
+        TokenizerSettings? tokenizerSettings = null,
+        FileParser? fileParser = null)
     {
         Compiler compiler = new(
             externalFunctions,
@@ -879,10 +879,10 @@ public sealed class Compiler
         Dictionary<int, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback,
-        AnalysisCollection? analysisCollection,
-        TokenizerSettings? tokenizerSettings,
-        FileParser? fileParser)
+        PrintCallback? printCallback = null,
+        AnalysisCollection? analysisCollection = null,
+        TokenizerSettings? tokenizerSettings = null,
+        FileParser? fileParser = null)
     {
         Compiler compiler = new(
             externalFunctions,

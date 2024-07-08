@@ -10,6 +10,8 @@ public class CompiledParameterConstant : ParameterDefinition,
     public new string Identifier => base.Identifier.Content;
     public bool IsExported => false;
 
+    public new GeneralType Type => new BuiltinType(Value.Type);
+
     public CompiledParameterConstant(CompiledValue value, ParameterDefinition declaration) : base(declaration)
     {
         Value = value;

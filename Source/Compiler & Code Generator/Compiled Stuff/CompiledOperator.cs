@@ -4,8 +4,7 @@ using Parser;
 using Parser.Statement;
 
 public class CompiledOperator : FunctionDefinition,
-    ISameCheck,
-    ISameCheck<CompiledOperator>,
+    IDefinition<CompiledOperator>,
     IReferenceable<StatementWithValue>,
     IDuplicatable<CompiledOperator>,
     IHaveCompiledType,
@@ -43,8 +42,7 @@ public class CompiledOperator : FunctionDefinition,
         this.References = new List<Reference<StatementWithValue>>(other.References);
     }
 
-    public bool IsSame(CompiledOperator other) => Extensions.IsSame(this, other);
-    public bool IsSame(ISameCheck? other) => other is CompiledOperator other2 && IsSame(other2);
+    public bool DefinitionEquals(CompiledOperator other) => Extensions.IsSame(this, other);
 
     public new CompiledOperator Duplicate() => new(Type, new List<GeneralType>(ParameterTypes).ToArray(), Context, this);
 

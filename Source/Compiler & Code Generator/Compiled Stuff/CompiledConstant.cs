@@ -11,6 +11,4 @@ public interface IConstant :
     public CompiledValue Value { get; }
 
     public new GeneralType Type => new BuiltinType(Value.Type);
-    GeneralType IHaveCompiledType.Type => Type;
-    GeneralType? IProbablyHaveCompiledType.Type => Type;
 }

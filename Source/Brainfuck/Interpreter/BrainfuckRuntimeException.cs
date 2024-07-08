@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Brainfuck;
 
+[ExcludeFromCodeCoverage]
 public readonly struct RuntimeContext
 {
     public readonly int MemoryPointer;
@@ -12,6 +13,7 @@ public readonly struct RuntimeContext
     }
 }
 
+[ExcludeFromCodeCoverage]
 public class BrainfuckRuntimeException : Exception
 {
     public readonly RuntimeContext RuntimeContext;

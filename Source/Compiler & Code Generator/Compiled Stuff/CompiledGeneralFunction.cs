@@ -4,8 +4,7 @@ using Parser;
 using Parser.Statement;
 
 public class CompiledGeneralFunction : GeneralFunctionDefinition,
-    ISameCheck,
-    ISameCheck<CompiledGeneralFunction>,
+    IDefinition<CompiledGeneralFunction>,
     IReferenceable<Statement?>,
     IDuplicatable<CompiledGeneralFunction>,
     IHaveCompiledType,
@@ -41,7 +40,7 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
         this.References = new List<Reference<Statement?>>(other.References);
     }
 
-    public bool IsSame(CompiledGeneralFunction other)
+    public bool DefinitionEquals(CompiledGeneralFunction other)
     {
         if (this.Type != other.Type) return false;
         if (this.Identifier.Content != other.Identifier.Content) return false;
@@ -51,7 +50,6 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
 
         return true;
     }
-    public bool IsSame(ISameCheck? other) => other is CompiledGeneralFunction other2 && IsSame(other2);
 
     public new CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, Context, this);
 

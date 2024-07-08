@@ -152,7 +152,7 @@ public partial class InterpreterBase<TCode> : IDisposable
             // _rendererContext.CodeDisplayPosition = Math.Clamp(_rendererContext.CodeDisplayPosition, center - 20, center + 20);
             int codePrintStart = Math.Max(0, _rendererContext.CodeDisplayPosition);
             int codePrintEnd = Math.Min(Code.Length - 1, _rendererContext.CodeDisplayPosition + width - 1);
-            DrawCode(_rendererContext.Renderer, (codePrintStart, codePrintEnd), 0, line++, width);
+            DrawCode(_rendererContext.Renderer, new Range<int>(codePrintStart, codePrintEnd), 0, line++, width);
         }
 
         _rendererContext.Renderer.Text(0, line++, new string('─', width), CharColor.Gray);
@@ -252,7 +252,7 @@ public partial class InterpreterBase<TCode> : IDisposable
                 currentY >= rect.Bottom)
             { return; }
 
-            bool isInside = Range.Inside(sourceLocation.SourcePosition.Range, token.Position.Range);
+            bool isInside = RangeUtils.Inside(sourceLocation.SourcePosition.Range, token.Position.Range);
 
             if (isInside &&
                 prevToken != null &&

@@ -8,8 +8,8 @@ public static class PositionExtensions
         if (a == Position.UnknownPosition) return b;
 
         return new Position(
-            Range.Union(a.Range, b.Range),
-            Range.Union(a.AbsoluteRange, b.AbsoluteRange)
+            RangeUtils.Union(a.Range, b.Range),
+            RangeUtils.Union(a.AbsoluteRange, b.AbsoluteRange)
             );
     }
 

@@ -4,7 +4,7 @@ using Parser;
 using Parser.Statement;
 
 public class CompiledConstructor : ConstructorDefinition,
-    ISameCheck<CompiledConstructor>,
+    IDefinition<CompiledConstructor>,
     IReferenceable<ConstructorCall>,
     IDuplicatable<CompiledConstructor>,
     IHaveCompiledType,
@@ -16,6 +16,7 @@ public class CompiledConstructor : ConstructorDefinition,
 {
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
 
+    public bool ReturnSomething => true;
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public new CompiledStruct Context { get; }
@@ -41,7 +42,7 @@ public class CompiledConstructor : ConstructorDefinition,
         this.References = new List<Reference<ConstructorCall>>(other.References);
     }
 
-    public bool IsSame(CompiledConstructor other)
+    public bool DefinitionEquals(CompiledConstructor other)
     {
         if (!Type.Equals(other.Type)) return false;
         if (!Utils.SequenceEquals(ParameterTypes, other.ParameterTypes)) return false;

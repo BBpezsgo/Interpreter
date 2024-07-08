@@ -276,7 +276,7 @@ public partial class InterpreterElement
 
         Range<int> interval = Interpreter.BytecodeInterpreter.GetStackInterval(out bool isReversed);
 
-        interval = Range.Intersect(interval, interval.Offset(isReversed ? -StackScrollBar.Offset : StackScrollBar.Offset));
+        interval = RangeUtils.Intersect(interval, interval.Offset(isReversed ? -StackScrollBar.Offset : StackScrollBar.Offset));
 
         IEnumerable<int> enumerator = interval.ForEach();
         if (isReversed)

@@ -64,7 +64,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!allocator.ReturnSomething)
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size, CurrentFile); }
 
-        allocator.References.Add(new Reference<StatementWithValue?>(size, CurrentFile, CurrentContext));
+        allocator.References.Add(size, CurrentFile);
 
         if (!allocator.CanUse(CurrentFile))
         {
@@ -127,7 +127,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
         CompiledFunction? deallocator = result.Function;
 
-        deallocator.References.Add(new Reference<StatementWithValue?>(value, CurrentFile, CurrentContext));
+        deallocator.References.Add(new Reference<StatementWithValue?>(value, CurrentFile));
 
         if (!deallocator.CanUse(CurrentFile))
         {
@@ -583,7 +583,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
     {
-        compiledFunction.References.Add((functionCall, CurrentFile, CurrentContext));
+        compiledFunction.References.Add(new Reference<StatementWithValue?>(functionCall, CurrentFile));
         OnGotStatementType(functionCall, compiledFunction.Type);
 
         if (!compiledFunction.CanUse(functionCall.File ?? CurrentFile))
@@ -779,7 +779,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             CompiledOperator? operatorDefinition = result.Function;
 
-            operatorDefinition.References.Add((@operator, CurrentFile, CurrentContext));
+            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, CurrentFile));
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
@@ -1026,7 +1026,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             CompiledOperator? operatorDefinition = result.Function;
 
-            operatorDefinition.References.Add((@operator, CurrentFile, CurrentContext));
+            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, CurrentFile));
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
@@ -1289,7 +1289,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             CompiledFunction? compiledFunction = result.Function;
 
-            compiledFunction.References.Add((variable, CurrentFile, CurrentContext));
+            compiledFunction.References.Add(variable, CurrentFile);
             variable.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
             variable.Reference = compiledFunction;
             OnGotStatementType(variable, new FunctionType(compiledFunction));
@@ -1607,7 +1607,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             case StructType structType:
             {
-                structType.Struct.References.Add((newObject.Type, CurrentFile, CurrentContext));
+                structType.Struct.References.Add(newObject.Type, CurrentFile);
 
                 GenerateInitialValue(structType);
                 break;
@@ -1629,7 +1629,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CompiledConstructor? compiledFunction = result.Function;
 
-        compiledFunction.References.Add((constructorCall, CurrentFile, CurrentContext));
+        compiledFunction.References.Add(constructorCall, CurrentFile);
         OnGotStatementType(constructorCall, compiledFunction.Type);
 
         if (!compiledFunction.CanUse(CurrentFile))
@@ -1686,7 +1686,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             field.CompiledType = fieldDefinition.Type;
             field.Reference = fieldDefinition;
-            fieldDefinition.References.Add(new Reference<Statement>(field, CurrentFile, CurrentContext));
+            fieldDefinition.References.Add(field, CurrentFile);
 
             GenerateCodeForStatement(field.PrevStatement);
 
@@ -1713,7 +1713,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         field.CompiledType = compiledField.Type;
         field.Reference = compiledField;
-        compiledField.References.Add(new Reference<Statement>(field, CurrentFile, CurrentContext));
+        compiledField.References.Add(field, CurrentFile);
 
         // if (CurrentContext?.Context != null)
         // {
@@ -1888,17 +1888,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (modifier.Equals(ModifierKeywords.Ref))
         {
             throw null!;
-            Address address = GetDataAddress(statement);
-
-            // if (address is AddressRuntimePointer runtimePointer)
-            // {
-            //     StackLoad(runtimePointer.PointerAddress, BitWidth._32);
-            // }
-            // else
-            {
-                GenerateAddressResolver(address);
-            }
-            return;
         }
 
         if (modifier.Equals(ModifierKeywords.Temp))
@@ -2219,7 +2208,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
             statementToSet.Reference = fieldDefinition;
             statementToSet.CompiledType = statementToSet.CompiledType;
-            fieldDefinition.References.Add(new Reference<Statement>(statementToSet, CurrentFile, CurrentContext));
+            fieldDefinition.References.Add(statementToSet, CurrentFile);
 
             GenerateCodeForStatement(value, type);
             HeapStore(statementToSet.PrevStatement, fieldOffset, valueType.SizeBytes);
@@ -2684,7 +2673,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         else
         { AddComment("null" + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }")); }
 
-        CurrentContext = function as ISameCheck;
+        CurrentContext = function as IDefinition;
         InFunction = true;
 
         CompiledParameters.Clear();

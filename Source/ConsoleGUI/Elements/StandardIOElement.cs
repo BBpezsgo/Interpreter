@@ -34,7 +34,7 @@ public class StandardIOElement : InlineElement
         IsReading = false;
     }
 
-    LanguageCore.Range<int> GetScrollBarBounds(Element element)
+    Range<int> GetScrollBarBounds(Element element)
     {
         int totalLines = 0;
         for (int i = 0; i < ConsoleTexts.Count; i++)
@@ -48,7 +48,7 @@ public class StandardIOElement : InlineElement
             }
         }
 
-        return new LanguageCore.Range<int>(0, Math.Max(1, totalLines));
+        return new Range<int>(0, Math.Max(1, totalLines));
     }
 
     public void Write(string text, byte color = CharColor.Silver)

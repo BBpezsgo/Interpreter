@@ -100,7 +100,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly ImmutableDictionary<int, ExternalFunctionBase> ExternalFunctions;
 
     readonly Stack<ImmutableArray<CleanupItem>> CleanupStack;
-    ISameCheck? CurrentContext;
+    IDefinition? CurrentContext;
 
     readonly Stack<List<int>> ReturnInstructions;
     readonly Stack<List<int>> BreakInstructions;
@@ -151,9 +151,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     throw generalFunction.Identifier.Content switch
                     {
-                        BuiltinFunctionIdentifiers.Destructor => new InternalException($"Destructor for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CurrentFile),
-                        BuiltinFunctionIdentifiers.IndexerGet => new InternalException($"Index getter for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CurrentFile),
-                        BuiltinFunctionIdentifiers.IndexerSet => new InternalException($"Index setter for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CurrentFile),
+                        BuiltinFunctionIdentifiers.Destructor => new InternalException($"Destructor for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CallerFile),
+                        BuiltinFunctionIdentifiers.IndexerGet => new InternalException($"Index getter for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CallerFile),
+                        BuiltinFunctionIdentifiers.IndexerSet => new InternalException($"Index setter for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CallerFile),
                         _ => new NotImplementedException(),
                     };
                 }
@@ -166,9 +166,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 };
 
                 if (item.Called is ISimpleReadable simpleReadable)
-                { throw new InternalException($"{thingName} {simpleReadable.ToReadable()} does not have instruction offset", item.CallerPosition, item.CurrentFile); }
+                { throw new InternalException($"{thingName} {simpleReadable.ToReadable()} does not have instruction offset", item.CallerPosition, item.CallerFile); }
 
-                throw new InternalException($"{thingName} {item.Called} does not have instruction offset", item.CallerPosition, item.CurrentFile);
+                throw new InternalException($"{thingName} {item.Called} does not have instruction offset", item.CallerPosition, item.CallerFile);
             }
 
             int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;

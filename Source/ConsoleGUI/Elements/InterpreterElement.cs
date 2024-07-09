@@ -214,7 +214,7 @@ public sealed partial class InterpreterElement : WindowElement
         {
             case Opcode.Push:
             {
-                int size = BytecodeProcessor.RealStack ? (int)instruction.Operand1.BitWidth : 1;
+                int size = (int)instruction.Operand1.BitWidth;
                 int address = Interpreter.BytecodeInterpreter.Registers.StackPointer + (size * BytecodeProcessor.StackDirection);
                 storeIndicators.Add(new DataMovement(address, size));
 
@@ -228,28 +228,28 @@ public sealed partial class InterpreterElement : WindowElement
             case Opcode.Pop8:
             {
                 int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
-                const int size = BytecodeProcessor.RealStack ? 1 : 1;
+                const int size = 1;
                 loadIndicators.Add(new DataMovement(address, size));
                 return;
             }
             case Opcode.Pop16:
             {
                 int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
-                const int size = BytecodeProcessor.RealStack ? 2 : 1;
+                const int size = 2;
                 loadIndicators.Add(new DataMovement(address, size));
                 return;
             }
             case Opcode.Pop32:
             {
                 int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
-                const int size = BytecodeProcessor.RealStack ? 4 : 1;
+                const int size = 4;
                 loadIndicators.Add(new DataMovement(address, size));
                 return;
             }
             case Opcode.PopTo8:
             {
                 int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
-                const int size = BytecodeProcessor.RealStack ? 1 : 1;
+                const int size = 1;
                 loadIndicators.Add(new DataMovement(address, size));
 
                 if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
@@ -260,7 +260,7 @@ public sealed partial class InterpreterElement : WindowElement
             case Opcode.PopTo16:
             {
                 int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
-                const int size = BytecodeProcessor.RealStack ? 2 : 1;
+                const int size = 2;
                 loadIndicators.Add(new DataMovement(address, size));
 
                 if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
@@ -271,7 +271,7 @@ public sealed partial class InterpreterElement : WindowElement
             case Opcode.PopTo32:
             {
                 int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
-                const int size = BytecodeProcessor.RealStack ? 4 : 1;
+                const int size = 4;
                 loadIndicators.Add(new DataMovement(address, size));
 
                 if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
@@ -283,7 +283,7 @@ public sealed partial class InterpreterElement : WindowElement
             {
                 if (instruction.Operand1.BitWidth == instruction.Operand2.BitWidth)
                 {
-                    int size = BytecodeProcessor.RealStack ? (int)instruction.Operand1.BitWidth : 1;
+                    int size = (int)instruction.Operand1.BitWidth;
 
                     if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand2, out int address))
                     { loadIndicators.Add(new DataMovement(address, size)); }

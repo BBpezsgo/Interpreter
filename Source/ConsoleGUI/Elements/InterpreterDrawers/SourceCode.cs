@@ -180,11 +180,11 @@ public partial class InterpreterElement
                         b.ForegroundColor = CharColor.BrightCyan;
                         b.AddText(operand.Value.ToString());
                         break;
-                    case InstructionOperandType.Pointer8: WritePointerOperand("BYTE", null, operand.Value.Int); break;
-                    case InstructionOperandType.Pointer16: WritePointerOperand("WORD", null, operand.Value.Int); break;
-                    case InstructionOperandType.Pointer32: WritePointerOperand("DWORD", null, operand.Value.Int); break;
+                    case InstructionOperandType.Pointer8: WritePointerOperand("BYTE", null, operand.Value.I32); break;
+                    case InstructionOperandType.Pointer16: WritePointerOperand("WORD", null, operand.Value.I32); break;
+                    case InstructionOperandType.Pointer32: WritePointerOperand("DWORD", null, operand.Value.I32); break;
                     case InstructionOperandType.Register:
-                        switch ((Register)operand.Value.Int)
+                        switch ((Register)operand.Value.I32)
                         {
                             case Register.CodePointer:
                                 b.ForegroundColor = CharColor.White;
@@ -265,24 +265,24 @@ public partial class InterpreterElement
                             default: throw new UnreachableException();
                         }
                         break;
-                    case InstructionOperandType.PointerBP8: WritePointerOperand("BYTE", "BP", operand.Value.Int); break;
-                    case InstructionOperandType.PointerBP16: WritePointerOperand("WORD", "BP", operand.Value.Int); break;
-                    case InstructionOperandType.PointerBP32: WritePointerOperand("DWORD", "BP", operand.Value.Int); break;
-                    case InstructionOperandType.PointerSP8: WritePointerOperand("BYTE", "SP", operand.Value.Int); break;
-                    case InstructionOperandType.PointerSP16: WritePointerOperand("WORD", "SP", operand.Value.Int); break;
-                    case InstructionOperandType.PointerSP32: WritePointerOperand("DWORD", "SP", operand.Value.Int); break;
-                    case InstructionOperandType.PointerEAX8: WritePointerOperand("BYTE", "EAX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerEAX16: WritePointerOperand("WORD", "EAX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerEAX32: WritePointerOperand("DWORD", "EAX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerEBX8: WritePointerOperand("BYTE", "EBX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerEBX16: WritePointerOperand("WORD", "EBX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerEBX32: WritePointerOperand("DWORD", "EBX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerECX8: WritePointerOperand("BYTE", "ECX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerECX16: WritePointerOperand("WORD", "ECX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerECX32: WritePointerOperand("DWORD", "ECX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerEDX8: WritePointerOperand("BYTE", "EDX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerEDX16: WritePointerOperand("WORD", "EDX", operand.Value.Int); break;
-                    case InstructionOperandType.PointerEDX32: WritePointerOperand("DWORD", "EDX", operand.Value.Int); break;
+                    case InstructionOperandType.PointerBP8: WritePointerOperand("BYTE", "BP", operand.Value.I32); break;
+                    case InstructionOperandType.PointerBP16: WritePointerOperand("WORD", "BP", operand.Value.I32); break;
+                    case InstructionOperandType.PointerBP32: WritePointerOperand("DWORD", "BP", operand.Value.I32); break;
+                    case InstructionOperandType.PointerSP8: WritePointerOperand("BYTE", "SP", operand.Value.I32); break;
+                    case InstructionOperandType.PointerSP16: WritePointerOperand("WORD", "SP", operand.Value.I32); break;
+                    case InstructionOperandType.PointerSP32: WritePointerOperand("DWORD", "SP", operand.Value.I32); break;
+                    case InstructionOperandType.PointerEAX8: WritePointerOperand("BYTE", "EAX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerEAX16: WritePointerOperand("WORD", "EAX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerEAX32: WritePointerOperand("DWORD", "EAX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerEBX8: WritePointerOperand("BYTE", "EBX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerEBX16: WritePointerOperand("WORD", "EBX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerEBX32: WritePointerOperand("DWORD", "EBX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerECX8: WritePointerOperand("BYTE", "ECX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerECX16: WritePointerOperand("WORD", "ECX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerECX32: WritePointerOperand("DWORD", "ECX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerEDX8: WritePointerOperand("BYTE", "EDX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerEDX16: WritePointerOperand("WORD", "EDX", operand.Value.I32); break;
+                    case InstructionOperandType.PointerEDX32: WritePointerOperand("DWORD", "EDX", operand.Value.I32); break;
                 }
             }
 

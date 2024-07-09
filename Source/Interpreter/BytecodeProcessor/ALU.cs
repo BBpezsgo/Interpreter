@@ -2,161 +2,99 @@
 
 public static class ALU
 {
-    public static RuntimeValue Add(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags)
+    public const byte SignBit8 = unchecked((byte)0x80);
+    public const char SignBit16 = unchecked((char)0x8000);
+    public const int SignBit32 = unchecked((int)0x80000000);
+
+    public const byte AllBit8 = unchecked((byte)0xFF);
+    public const char AllBit16 = unchecked((char)0xFFFF);
+    public const int AllBit32 = unchecked((int)0xFFFFFFFF);
+
+    public static RuntimeValue Add(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
     {
-        long _a = bitWidth switch
-        {
-            BitWidth._8 => a.Byte,
-            BitWidth._16 => a.Char,
-            BitWidth._32 => a.Int,
-            _ => throw new UnreachableException(),
-        };
-        long _b = bitWidth switch
-        {
-            BitWidth._8 => b.Byte,
-            BitWidth._16 => b.Char,
-            BitWidth._32 => b.Int,
-            _ => throw new UnreachableException(),
-        };
-        long result = _a + _b;
+        BitWidth._8 => new RuntimeValue(AddU8(a.U8, b.U8, ref flags)),
+        BitWidth._16 => new RuntimeValue(AddU16(a.U16, b.U16, ref flags)),
+        BitWidth._32 => new RuntimeValue(AddI32(a.I32, b.I32, ref flags)),
+        _ => throw new UnreachableException(),
+    };
 
-        switch (bitWidth)
-        {
-            case BitWidth._8:
-                flags.Set(Flags.Sign, unchecked((long)result & (long)0x80) != (long)0);
-                break;
-            case BitWidth._16:
-                flags.Set(Flags.Sign, unchecked((long)result & (long)0x8000) != (long)0);
-                break;
-            case BitWidth._32:
-                flags.Set(Flags.Sign, unchecked((long)result & (long)0x80000000) != (long)0);
-                break;
-        }
+    public static byte AddU8(byte a, byte b, ref Flags flags)
+    {
+        long result = a + b;
 
-        switch (bitWidth)
-        {
-            case BitWidth._8:
-                flags.Set(Flags.Zero, (result & (long)0xFF) == (long)0);
-                break;
-            case BitWidth._16:
-                flags.Set(Flags.Zero, (result & (long)0xFFFF) == (long)0);
-                break;
-            case BitWidth._32:
-                flags.Set(Flags.Zero, (result & (long)0xFFFFFFFF) == (long)0);
-                break;
-        }
+        flags.Set(Flags.Sign, unchecked(result & SignBit8) != 0);
+        flags.Set(Flags.Zero, (result & AllBit8) == 0);
+        flags.Set(Flags.Carry, result > AllBit8);
+        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit8) == SignBit8);
 
-        switch (bitWidth)
-        {
-            case BitWidth._8:
-                flags.Set(Flags.Carry, result > (long)0xFF);
-                break;
-            case BitWidth._16:
-                flags.Set(Flags.Carry, result > (long)0xFFFF);
-                break;
-            case BitWidth._32:
-                flags.Set(Flags.Carry, result > (long)0xFFFFFFFF);
-                break;
-        }
-
-        switch (bitWidth)
-        {
-            case BitWidth._8:
-                flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x80) == (long)0x80);
-                break;
-            case BitWidth._16:
-                flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x8000) == (long)0x8000);
-                break;
-            case BitWidth._32:
-                flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x80000000) == (long)0x80000000);
-                break;
-        }
-
-        return bitWidth switch
-        {
-            BitWidth._8 => new RuntimeValue(unchecked((byte)result)),
-            BitWidth._16 => new RuntimeValue(unchecked((char)result)),
-            BitWidth._32 => new RuntimeValue(unchecked((int)result)),
-            _ => throw new UnreachableException(),
-        };
+        return unchecked((byte)result);
     }
 
-    public static RuntimeValue Subtract(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags)
+    public static char AddU16(char a, char b, ref Flags flags)
     {
-        long _a = bitWidth switch
-        {
-            BitWidth._8 => a.Byte,
-            BitWidth._16 => a.Char,
-            BitWidth._32 => a.Int,
-            _ => throw new UnreachableException(),
-        };
-        long _b = bitWidth switch
-        {
-            BitWidth._8 => b.Byte,
-            BitWidth._16 => b.Char,
-            BitWidth._32 => b.Int,
-            _ => throw new UnreachableException(),
-        };
-        long result = _a - _b;
+        long result = a + b;
 
-        switch (bitWidth)
-        {
-            case BitWidth._8:
-                flags.Set(Flags.Sign, unchecked((long)result & (long)0x80) != (long)0);
-                break;
-            case BitWidth._16:
-                flags.Set(Flags.Sign, unchecked((long)result & (long)0x8000) != (long)0);
-                break;
-            case BitWidth._32:
-                flags.Set(Flags.Sign, unchecked((long)result & (long)0x80000000) != (long)0);
-                break;
-        }
+        flags.Set(Flags.Sign, unchecked(result & SignBit16) != 0);
+        flags.Set(Flags.Zero, (result & AllBit16) == 0);
+        flags.Set(Flags.Carry, result > AllBit16);
+        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit16) == SignBit16);
 
-        switch (bitWidth)
-        {
-            case BitWidth._8:
-                flags.Set(Flags.Zero, (result & (long)0xFF) == (long)0);
-                break;
-            case BitWidth._16:
-                flags.Set(Flags.Zero, (result & (long)0xFFFF) == (long)0);
-                break;
-            case BitWidth._32:
-                flags.Set(Flags.Zero, (result & (long)0xFFFFFFFF) == (long)0);
-                break;
-        }
+        return unchecked((char)result);
+    }
 
-        switch (bitWidth)
-        {
-            case BitWidth._8:
-                flags.Set(Flags.Carry, result > (long)0xFF);
-                break;
-            case BitWidth._16:
-                flags.Set(Flags.Carry, result > (long)0xFFFF);
-                break;
-            case BitWidth._32:
-                flags.Set(Flags.Carry, result > (long)0xFFFFFFFF);
-                break;
-        }
+    public static int AddI32(int a, int b, ref Flags flags)
+    {
+        long result = a + b;
 
-        // switch (bitWidth)
-        // {
-        //     case BitWidth._8:
-        //         flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x80) == (long)0x80);
-        //         break;
-        //     case BitWidth._16:
-        //         flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x8000) == (long)0x8000);
-        //         break;
-        //     case BitWidth._32:
-        //         flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x80000000) == (long)0x80000000);
-        //         break;
-        // }
+        flags.Set(Flags.Sign, unchecked(result & SignBit32) != 0);
+        flags.Set(Flags.Zero, (result & AllBit32) == 0);
+        flags.Set(Flags.Carry, result > AllBit32);
+        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit32) == SignBit32);
 
-        return bitWidth switch
-        {
-            BitWidth._8 => new RuntimeValue(unchecked((byte)result)),
-            BitWidth._16 => new RuntimeValue(unchecked((char)result)),
-            BitWidth._32 => new RuntimeValue(unchecked((int)result)),
-            _ => throw new UnreachableException(),
-        };
+        return unchecked((int)result);
+    }
+
+    public static RuntimeValue Subtract(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
+    {
+        BitWidth._8 => new RuntimeValue(SubtractU8(a.U8, b.U8, ref flags)),
+        BitWidth._16 => new RuntimeValue(SubtractU16(a.U16, b.U16, ref flags)),
+        BitWidth._32 => new RuntimeValue(SubtractI32(a.I32, b.I32, ref flags)),
+        _ => throw new UnreachableException(),
+    };
+
+    public static byte SubtractU8(byte a, byte b, ref Flags flags)
+    {
+        long result = a - b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit8) != 0);
+        flags.Set(Flags.Zero, (result & AllBit8) == 0);
+        flags.Set(Flags.Carry, result > AllBit8);
+        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit8) == (long)SignBit8);
+
+        return unchecked((byte)result);
+    }
+
+    public static char SubtractU16(char a, char b, ref Flags flags)
+    {
+        long result = a - b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit16) != 0);
+        flags.Set(Flags.Zero, (result & AllBit16) == 0);
+        flags.Set(Flags.Carry, result > AllBit16);
+        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x8000) == (long)0x8000);
+
+        return unchecked((char)result);
+    }
+
+    public static int SubtractI32(int a, int b, ref Flags flags)
+    {
+        long result = a - b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit32) != 0);
+        flags.Set(Flags.Zero, (result & AllBit32) == 0);
+        flags.Set(Flags.Carry, result > AllBit32);
+        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit32) == (long)SignBit32);
+
+        return unchecked((int)result);
     }
 }

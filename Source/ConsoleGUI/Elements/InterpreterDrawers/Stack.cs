@@ -121,7 +121,7 @@ public partial class InterpreterElement
             else
             {
                 b.ForegroundColor = CharColor.BrightCyan;
-                b.AddText(item.Int.ToString());
+                b.AddText(item.I32.ToString());
             }
         }
 

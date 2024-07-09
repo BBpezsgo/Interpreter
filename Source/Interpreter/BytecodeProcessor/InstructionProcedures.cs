@@ -18,14 +18,14 @@ public partial class BytecodeProcessor
 
     void THROW()
     {
-        int pointer = GetData(CurrentInstruction.Operand1).Int;
+        int pointer = GetData(CurrentInstruction.Operand1).I32;
         string? value = HeapUtils.GetString(Memory, pointer);
-        throw new UserException(value ?? "null");
+        throw new UserException(value ?? string.Empty);
     }
 
     void CALL()
     {
-        int relativeAddress = GetData(CurrentInstruction.Operand1).Int;
+        int relativeAddress = GetData(CurrentInstruction.Operand1).I32;
 
         Push(Registers.CodePointer, Register.CodePointer.BitWidth());
 
@@ -36,12 +36,12 @@ public partial class BytecodeProcessor
     {
         RuntimeValue codePointer = Pop(BitWidth._32);
 
-        Registers.CodePointer = codePointer.Int;
+        Registers.CodePointer = codePointer.I32;
     }
 
     void JUMP_BY()
     {
-        int relativeAddress = GetData(CurrentInstruction.Operand1).Int;
+        int relativeAddress = GetData(CurrentInstruction.Operand1).I32;
 
         Step(relativeAddress);
     }
@@ -54,7 +54,7 @@ public partial class BytecodeProcessor
     void JumpIfEqual()
     {
         if (Registers.Flags.Get(Flags.Zero))
-        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
         else
         { Step(); }
     }
@@ -62,7 +62,7 @@ public partial class BytecodeProcessor
     void JumpIfNotEqual()
     {
         if (!Registers.Flags.Get(Flags.Zero))
-        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
         else
         { Step(); }
     }
@@ -70,7 +70,7 @@ public partial class BytecodeProcessor
     void JumpIfGreater()
     {
         if ((!(Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow))) && !Registers.Flags.Get(Flags.Zero))
-        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
         else
         { Step(); }
     }
@@ -78,7 +78,7 @@ public partial class BytecodeProcessor
     void JumpIfGreaterOrEqual()
     {
         if (!(Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow)))
-        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
         else
         { Step(); }
     }
@@ -86,7 +86,7 @@ public partial class BytecodeProcessor
     void JumpIfLess()
     {
         if (Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow))
-        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
         else
         { Step(); }
     }
@@ -94,7 +94,7 @@ public partial class BytecodeProcessor
     void JumpIfLessOrEqual()
     {
         if ((Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow)) || Registers.Flags.Get(Flags.Zero))
-        { Step(GetData(CurrentInstruction.Operand1).Int); }
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
         else
         { Step(); }
     }
@@ -121,10 +121,10 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, ((dst.Int != 0) && (src.Int != 0)) ? 1 : 0);
+        SetData(CurrentInstruction.Operand1, ((dst.I32 != 0) && (src.I32 != 0)) ? 1 : 0);
 
-        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
-        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
         Registers.Flags.Set(Flags.Carry, false);
 
         Step();
@@ -134,10 +134,10 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, ((dst.Int != 0) || (src.Int != 0)) ? 1 : 0);
+        SetData(CurrentInstruction.Operand1, ((dst.I32 != 0) || (src.I32 != 0)) ? 1 : 0);
 
-        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
-        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
         Registers.Flags.Set(Flags.Carry, false);
 
         Step();
@@ -147,7 +147,7 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Int << src.Int);
+        SetData(CurrentInstruction.Operand1, dst.I32 << src.I32);
 
         Step();
     }
@@ -156,7 +156,7 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Int >> src.Int);
+        SetData(CurrentInstruction.Operand1, dst.I32 >> src.I32);
 
         Step();
     }
@@ -165,10 +165,10 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Int | src.Int);
+        SetData(CurrentInstruction.Operand1, dst.I32 | src.I32);
 
-        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
-        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
         Registers.Flags.Set(Flags.Carry, false);
 
         Step();
@@ -178,10 +178,10 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Int ^ src.Int);
+        SetData(CurrentInstruction.Operand1, dst.I32 ^ src.I32);
 
-        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
-        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
         Registers.Flags.Set(Flags.Carry, false);
 
         Step();
@@ -190,7 +190,7 @@ public partial class BytecodeProcessor
     void BitsNOT()
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        SetData(CurrentInstruction.Operand1, ~dst.Int);
+        SetData(CurrentInstruction.Operand1, ~dst.I32);
 
         Step();
     }
@@ -199,10 +199,10 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst.Int & src.Int);
+        SetData(CurrentInstruction.Operand1, dst.I32 & src.I32);
 
-        Registers.Flags.SetSign(dst.Int, CurrentInstruction.BitWidth);
-        Registers.Flags.SetZero(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
         Registers.Flags.Set(Flags.Carry, false);
 
         Step();
@@ -231,9 +231,9 @@ public partial class BytecodeProcessor
 
         dst = CurrentInstruction.BitWidth switch
         {
-            BitWidth._8 => new RuntimeValue((byte)(dst.Byte / src.Byte)),
-            BitWidth._16 => new RuntimeValue((char)(dst.Char / src.Char)),
-            BitWidth._32 => new RuntimeValue((int)(dst.Int / src.Int)),
+            BitWidth._8 => new RuntimeValue((byte)(dst.U8 / src.U8)),
+            BitWidth._16 => new RuntimeValue((char)(dst.U16 / src.U16)),
+            BitWidth._32 => new RuntimeValue((int)(dst.I32 / src.I32)),
             _ => throw new UnreachableException(),
         };
         SetData(CurrentInstruction.Operand1, dst);
@@ -260,14 +260,14 @@ public partial class BytecodeProcessor
 
         dst = CurrentInstruction.BitWidth switch
         {
-            BitWidth._8 => new RuntimeValue((byte)(dst.Byte * src.Byte)),
-            BitWidth._16 => new RuntimeValue((char)(dst.Char * src.Char)),
-            BitWidth._32 => new RuntimeValue((int)(dst.Int * src.Int)),
+            BitWidth._8 => new RuntimeValue((byte)(dst.U8 * src.U8)),
+            BitWidth._16 => new RuntimeValue((char)(dst.U16 * src.U16)),
+            BitWidth._32 => new RuntimeValue((int)(dst.I32 * src.I32)),
             _ => throw new UnreachableException(),
         };
         SetData(CurrentInstruction.Operand1, dst);
 
-        Registers.Flags.SetCarry(dst.Int, CurrentInstruction.BitWidth);
+        Registers.Flags.SetCarry(dst.I32, CurrentInstruction.BitWidth);
 
         Step();
     }
@@ -279,9 +279,9 @@ public partial class BytecodeProcessor
 
         dst = CurrentInstruction.BitWidth switch
         {
-            BitWidth._8 => new RuntimeValue((byte)(dst.Byte / src.Byte)),
-            BitWidth._16 => new RuntimeValue((char)(dst.Char / src.Char)),
-            BitWidth._32 => new RuntimeValue((int)(dst.Int / src.Int)),
+            BitWidth._8 => new RuntimeValue((byte)(dst.U8 / src.U8)),
+            BitWidth._16 => new RuntimeValue((char)(dst.U16 / src.U16)),
+            BitWidth._32 => new RuntimeValue((int)(dst.I32 / src.I32)),
             _ => throw new UnreachableException(),
         };
         SetData(CurrentInstruction.Operand1, dst);
@@ -297,7 +297,7 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single + src.Single));
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 + src.F32));
 
         Step();
     }
@@ -306,7 +306,7 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single / src.Single));
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 / src.F32));
 
         Step();
     }
@@ -315,7 +315,7 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single - src.Single));
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 - src.F32));
 
         Step();
     }
@@ -324,7 +324,7 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single * src.Single));
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 * src.F32));
 
         Step();
     }
@@ -333,7 +333,7 @@ public partial class BytecodeProcessor
     {
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.Single % src.Single));
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 % src.F32));
 
         Step();
     }
@@ -372,7 +372,7 @@ public partial class BytecodeProcessor
     void FTo()
     {
         RuntimeValue data = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue((float)data.Int));
+        SetData(CurrentInstruction.Operand1, new RuntimeValue((float)data.I32));
 
         Step();
     }
@@ -380,7 +380,7 @@ public partial class BytecodeProcessor
     void FFrom()
     {
         RuntimeValue data = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, (int)data.Single);
+        SetData(CurrentInstruction.Operand1, (int)data.F32);
 
         Step();
     }
@@ -391,42 +391,27 @@ public partial class BytecodeProcessor
 
     void CALL_EXTERNAL()
     {
-        int functionId = GetData(CurrentInstruction.Operand1).Int;
+        int functionId = GetData(CurrentInstruction.Operand1).I32;
 
         if (!ExternalFunctions.TryGetValue(functionId, out ExternalFunctionBase? function))
         { throw new RuntimeException($"Undefined external function {functionId}"); }
 
-        RuntimeValue[] parameters = new RuntimeValue[function.Parameters.Length];
-        int currentMemoryOffset = 0;
-        for (int i = 0; i < function.Parameters.Length; i++)
-        {
-            parameters[^(i + 1)] = Memory[Registers.StackPointer - currentMemoryOffset];
-            currentMemoryOffset += (function.Parameters[i] switch
-            {
-                Compiler.RuntimeType.Null => throw new NotImplementedException(),
-                Compiler.RuntimeType.Byte => RealStack ? 1 : 1,
-                Compiler.RuntimeType.Char => RealStack ? 2 : 1,
-                Compiler.RuntimeType.Integer => RealStack ? 4 : 1,
-                Compiler.RuntimeType.Single => RealStack ? 4 : 1,
-                _ => throw new UnreachableException(),
-            }) * StackDirection;
-        }
+        Span<byte> parameters = Memory.AsSpan().Slice(Registers.StackPointer, function.ParametersSize);
 
-        if (function is ExternalFunctionManaged managedFunction)
+        if (function is ExternalFunctionAsyncBlock managedFunction)
         {
-            managedFunction.OnReturn = (v) => Push(v);
-            managedFunction.Callback(ImmutableArray.Create(parameters));
+            managedFunction.Callback(parameters, Push);
         }
-        else if (function is ExternalFunctionSimple simpleFunction)
+        else if (function is ExternalFunctionSync simpleFunction)
         {
-            if (function.ReturnSomething)
+            if (function.ReturnValueSize > 0)
             {
-                RuntimeValue returnValue = simpleFunction.Call(this, ImmutableArray.Create(parameters));
+                ReadOnlySpan<byte> returnValue = simpleFunction.Callback(this, parameters);
                 Push(returnValue);
             }
             else
             {
-                simpleFunction.Call(this, ImmutableArray.Create(parameters));
+                simpleFunction.Callback(this, parameters);
             }
         }
 

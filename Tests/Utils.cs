@@ -28,9 +28,9 @@ public readonly struct TestFile
     }
 
     /// <exception cref="AssertFailedException"/>
-    public void DoMain(bool heapShouldBeEmpty = true)
+    public void DoMain(bool heapShouldBeEmpty = true, Action<Dictionary<int, ExternalFunctionBase>>? externalFunctionAdder = null)
     {
-        MainResult result = Utils.RunMain(new FileInfo(SourceFile), GetInput());
+        MainResult result = Utils.RunMain(new FileInfo(SourceFile), GetInput(), externalFunctionAdder);
         Console.Write($"ExitCode: {result.ExitCode}");
         ExpectedResult expected = GetExpectedResult();
         expected.Assert(result, heapShouldBeEmpty);
@@ -295,9 +295,11 @@ public static class Utils
         return new TestFile(sourceFile, resultFile, inputFile);
     }
 
-    public static MainResult RunMain(FileInfo file, string input)
+    public static MainResult RunMain(FileInfo file, string input, Action<Dictionary<int, ExternalFunctionBase>>? externalFunctionAdder = null)
     {
         Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
+
+        externalFunctionAdder?.Invoke(externalFunctions);
 
         AnalysisCollection analysisCollection = new();
 
@@ -308,13 +310,16 @@ public static class Utils
 
         analysisCollection.Throw();
 
-        static (Interpreter, MainResult) Execute(BBLangGeneratorResult code, string input)
+        (Interpreter, MainResult) Execute(BBLangGeneratorResult code, string input)
         {
+            Dictionary<int, ExternalFunctionBase> _externalFunctions = new();
+            externalFunctionAdder?.Invoke(_externalFunctions);
+
             Interpreter interpreter = new(true, new BytecodeInterpreterSettings()
             {
                 HeapSize = HeapSize,
                 StackSize = BytecodeInterpreterSettings.Default.StackSize,
-            }, code.Code, code.DebugInfo);
+            }, code.Code, code.DebugInfo, _externalFunctions);
 
             InputBuffer inputBuffer = new(input);
             StringBuilder stdOutput = new();
@@ -699,7 +704,7 @@ public readonly struct MainResult : IResult
     {
         StdOutput = stdOut;
         StdError = stdErr;
-        ExitCode = interpreter.GetData(interpreter.Registers.StackPointer, BitWidth._32).Int;
+        ExitCode = interpreter.GetData(interpreter.Registers.StackPointer, BitWidth._32).I32;
         Heap = ImmutableCollectionsMarshal.AsImmutableArray(interpreter.Memory);
     }
 }

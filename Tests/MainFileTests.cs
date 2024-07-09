@@ -1,3 +1,5 @@
+using LanguageCore.Runtime;
+
 namespace Tests;
 
 [TestClass, TestCategory("Main"), TestCategory("FileTest")]
@@ -59,7 +61,16 @@ public class MainFileTests
     [TestMethod, Timeout(Timeout)] public void Test52() => Utils.GetTest(52).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test53() => Utils.GetTest(53).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test54() => Utils.GetTest(54).DoMain();
-    [TestMethod, Timeout(Timeout)] public void Test55() => Utils.GetTest(55).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test55() => Utils.GetTest(55).DoMain(externalFunctionAdder: static (externalFunctions) =>
+    {
+        externalFunctions.AddExternalFunction("test", static (int a, int b, int c, int d) =>
+        {
+            Assert.AreEqual(a, 1, "parameter 0");
+            Assert.AreEqual(b, 2, "parameter 1");
+            Assert.AreEqual(c, 3, "parameter 2");
+            Assert.AreEqual(d, 4, "parameter 3");
+        });
+    });
     [TestMethod, Timeout(Timeout)] public void Test56() => Utils.GetTest(56).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test57() => Utils.GetTest(57).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test58() => Utils.GetTest(58).DoMain();

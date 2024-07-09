@@ -352,6 +352,8 @@ public sealed class Compiler
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
+        GeneralType[] parameterTypes = GeneralType.FromArray(function.Parameters, FindType).ToArray();
+
         foreach (AttributeUsage attribute in function.Attributes)
         {
             switch (attribute.Identifier.Content)
@@ -378,31 +380,13 @@ public sealed class Compiler
                         break;
                     }
 
-                    if (externalFunction.Parameters.Length != function.Parameters.Count)
-                    { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
-                    if (externalFunction.ReturnSomething != (type != BasicType.Void))
-                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.File); }
+                    if (externalFunction.ParametersSize != parameterTypes.Sum(v => v == BasicType.Void ? 0 : v.SizeBytes))
+                    { throw new CompilerException($"Wrong size of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
 
-                    for (int i = 0; i < externalFunction.Parameters.Length; i++)
-                    {
-                        RuntimeType definedParameterType = externalFunction.Parameters[i];
-                        GeneralType passedParameterType = GeneralType.From(function.Parameters[i].Type, FindType);
-                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
+                    if (externalFunction.ReturnValueSize != (type == BasicType.Void ? 0 : type.SizeBytes))
+                    { throw new CompilerException($"Wrong size of return type passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
 
-                        if (passedParameterType == definedParameterType)
-                        { continue; }
-
-                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.File);
-                    }
-
-                    if (function.Template is not null)
-                    { GenericParameters.Pop(); }
-
-                    return new CompiledFunction(
-                        type,
-                        externalFunction.Parameters.Select(v => new BuiltinType(v)).ToArray(),
-                        context,
-                        function);
+                    break;
                 }
                 case AttributeConstants.BuiltinIdentifier:
                 {
@@ -435,7 +419,7 @@ public sealed class Compiler
                     for (int i = 0; i < builtinFunction.Parameters.Length; i++)
                     {
                         GeneralType definedParameterType = builtinFunction.Parameters[i];
-                        GeneralType passedParameterType = GeneralType.From(function.Parameters[i].Type, FindType);
+                        GeneralType passedParameterType = parameterTypes[i];
                         function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                         if (passedParameterType == definedParameterType)
@@ -458,7 +442,7 @@ public sealed class Compiler
 
         CompiledFunction result = new(
             type,
-            GeneralType.FromArray(function.Parameters, FindType),
+            parameterTypes,
             context,
             function);
 
@@ -473,39 +457,27 @@ public sealed class Compiler
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
+        GeneralType[] parametersType = GeneralType.FromArray(function.Parameters, FindType).ToArray();
+
         if (function.Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out string? name, out AttributeUsage? attribute))
         {
             if (ExternalFunctions.TryGet(name, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
             {
-                if (externalFunction.Parameters.Length != function.Parameters.Count)
-                { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
-                if (externalFunction.ReturnSomething != (type != BasicType.Void))
-                { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.File); }
+                if (externalFunction.ParametersSize != parametersType.Sum(v => v == BasicType.Void ? 0 : v.SizeBytes))
+                { throw new CompilerException($"Wrong size of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
 
-                for (int i = 0; i < externalFunction.Parameters.Length; i++)
-                {
-                    if (TypeKeywords.BasicTypes.TryGetValue(function.Parameters[i].Type.ToString(), out BasicType builtinType))
-                    {
-                        if (externalFunction.Parameters[i].Convert() != builtinType)
-                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.Parameters[i]} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.File); }
-                    }
-                    else
-                    { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.Parameters[i]} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.File); }
-                }
-
-                return new CompiledOperator(
-                    type,
-                    externalFunction.Parameters.Select(v => new BuiltinType(v)).ToArray(),
-                    context,
-                    function);
+                if (externalFunction.ReturnValueSize != (type == BasicType.Void ? 0 : type.SizeBytes))
+                { throw new CompilerException($"Wrong size of return type passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
             }
-
-            AnalysisCollection?.Errors.Add(exception.InstantiateError(attribute.Identifier, function.File));
+            else
+            {
+                AnalysisCollection?.Errors.Add(exception.InstantiateError(attribute.Identifier, function.File));
+            }
         }
 
         return new CompiledOperator(
             type,
-            GeneralType.FromArray(function.Parameters, FindType),
+            parametersType,
             context,
             function);
     }

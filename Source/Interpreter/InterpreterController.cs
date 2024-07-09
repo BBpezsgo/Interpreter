@@ -56,18 +56,20 @@ public class Interpreter
     public readonly BytecodeProcessor BytecodeInterpreter;
 
     protected bool IsPaused;
-    ExternalFunctionManaged? ReturnValueConsumer;
+    ManagedExternalFunctionAsyncBlockReturnCallback? ReturnValueConsumer;
 
     readonly bool ThrowExceptions;
 
     TimeSleep CurrentSleep;
 
-    public Interpreter(bool throwExceptions, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation)
+    public Interpreter(bool throwExceptions, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation = null, IEnumerable<KeyValuePair<int, ExternalFunctionBase>>? externalFunctions = null)
     {
         ThrowExceptions = throwExceptions;
         DebugInformation = debugInformation;
 
-        BytecodeInterpreter = new BytecodeProcessor(program, GenerateExternalFunctions().ToFrozenDictionary(), settings);
+        Dictionary<int, ExternalFunctionBase> _externalFunctions = GenerateExternalFunctions();
+        if (externalFunctions is not null) _externalFunctions.AddRange(externalFunctions);
+        BytecodeInterpreter = new BytecodeProcessor(program, _externalFunctions.ToFrozenDictionary(), settings);
     }
 
     /// <summary>
@@ -81,7 +83,7 @@ public class Interpreter
     {
         if (ReturnValueConsumer != null)
         {
-            ReturnValueConsumer.OnReturn?.Invoke(new RuntimeValue(key));
+            ReturnValueConsumer?.Invoke(key.ToBytes());
             ReturnValueConsumer = null;
         }
 
@@ -94,10 +96,10 @@ public class Interpreter
 
         #region Console
 
-        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, (ImmutableArray<RuntimeValue> parameters, ExternalFunctionManaged function) =>
+        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, 0, (ReadOnlySpan<byte> parameters, ManagedExternalFunctionAsyncBlockReturnCallback callback) =>
         {
             this.IsPaused = true;
-            this.ReturnValueConsumer = function;
+            this.ReturnValueConsumer = callback;
             if (this.OnNeedInput == null)
             {
                 this.OnOutput?.Invoke(this, $"Event {OnNeedInput} does not have listeners", LogType.Warning);
@@ -107,7 +109,7 @@ public class Interpreter
             {
                 this.OnNeedInput?.Invoke(this);
             }
-        });
+        }, sizeof(char));
 
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, (char @char) => OnStdOut?.Invoke(this, @char));
 
@@ -147,7 +149,7 @@ public class Interpreter
 
     static void AddRuntimeExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
     {
-        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, ImmutableArray<RuntimeType>.Empty, static (ImmutableArray<RuntimeValue> parameters, ExternalFunctionManaged function) => { });
+        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdIn, static () => { return '\0'; });
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, static (char @char) => { });
         externalFunctions.AddExternalFunction("console-set", static (char @char, int x, int y) => { });
         externalFunctions.AddExternalFunction("console-clear", static () => { });
@@ -163,7 +165,6 @@ public class Interpreter
         externalFunctions.AddExternalFunction("local-date-day", static () => (int)DateTime.Now.DayOfYear);
         externalFunctions.AddExternalFunction("utc-date-year", static () => (int)DateTime.Now.Year);
         externalFunctions.AddExternalFunction("local-date-year", static () => (int)DateTime.Now.Year);
-        externalFunctions.AddExternalFunction("test", static (int a, int b, int c, int d) => { if (a != 1 || b != 2 || c != 3 || d != 4) throw null!; });
     }
 
     /// <exception cref="UserException"/>

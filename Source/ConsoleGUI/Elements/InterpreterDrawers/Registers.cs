@@ -26,14 +26,14 @@ public partial class InterpreterElement
             {
                 if (operand.Type != InstructionOperandType.Register)
                 { return; }
-                storeIndicators.Add((Register)operand.Value.Int);
+                storeIndicators.Add((Register)operand.Value.I32);
             }
 
             void HandleSourceOperand(InstructionOperand operand)
             {
                 if (operand.Type != InstructionOperandType.Register)
                 { return; }
-                loadIndicators.Add((Register)operand.Value.Int);
+                loadIndicators.Add((Register)operand.Value.I32);
             }
 
             switch (instruction.Opcode)

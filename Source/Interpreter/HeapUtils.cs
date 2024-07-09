@@ -53,8 +53,8 @@ public static class HeapUtils
         if (pointer == 0)
         { return null; }
         StringBuilder result = new();
-        for (int i = pointer; heap[i].Int != 0; i += BytecodeProcessor.RealStack ? sizeof(char) : 1)
-        { result.Append(heap[i].Char); }
+        for (int i = pointer; heap[i].I32 != 0; i += sizeof(char))
+        { result.Append(heap[i].U16); }
         return result.ToString();
     }
 
@@ -78,9 +78,9 @@ public static class HeapImplementation
 
     public static (byte Size, bool Allocated) GetHeader(RuntimeValue header)
     {
-        if ((header.Byte & BlockStatusMask) != 0)
-        { return ((byte)(header.Byte & ~BlockStatusMask), true); }
+        if ((header.U8 & BlockStatusMask) != 0)
+        { return ((byte)(header.U8 & ~BlockStatusMask), true); }
         else
-        { return (header.Byte, false); }
+        { return (header.U8, false); }
     }
 }

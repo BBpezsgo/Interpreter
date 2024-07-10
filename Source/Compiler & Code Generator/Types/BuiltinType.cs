@@ -7,6 +7,13 @@ using Parser;
 public class BuiltinType : GeneralType,
     IEquatable<BuiltinType>
 {
+    public static readonly BuiltinType Byte = new(BasicType.Byte);
+    public static readonly BuiltinType Char = new(BasicType.Char);
+    public static readonly BuiltinType Integer = new(BasicType.Integer);
+    public static readonly BuiltinType Float = new(BasicType.Float);
+    public static readonly BuiltinType Void = new(BasicType.Void);
+    public static readonly BuiltinType Any = new(BasicType.Any);
+
     public BasicType Type { get; }
 
     /// <exception cref="InternalException"/>

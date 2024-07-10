@@ -189,8 +189,8 @@ public static class BuiltinFunctions
 {
     public static ImmutableDictionary<string, (GeneralType ReturnValue, ImmutableArray<GeneralType> Parameters)> Prototypes { get; } = new Dictionary<string, (GeneralType ReturnValue, ImmutableArray<GeneralType> Parameters)>()
     {
-        { Allocate, (new PointerType(new BuiltinType(BasicType.Any)), ImmutableArray.Create<GeneralType>(new BuiltinType(BasicType.Integer))) },
-        { Free, (new BuiltinType(BasicType.Void), ImmutableArray.Create<GeneralType>(new PointerType(new BuiltinType(BasicType.Any)))) },
+        { Allocate, (new PointerType(BuiltinType.Any), ImmutableArray.Create<GeneralType>(BuiltinType.Integer)) },
+        { Free, (BuiltinType.Void, ImmutableArray.Create<GeneralType>(new PointerType(BuiltinType.Any))) },
     }.ToImmutableDictionary();
 
     public const string Allocate = "alloc";

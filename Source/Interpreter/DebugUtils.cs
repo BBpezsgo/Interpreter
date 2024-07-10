@@ -7,8 +7,8 @@ public static class DebugUtils
 {
     static bool CanTraceCallsWith(ImmutableArray<byte> stack, int basePointer)
     {
-        int savedCodePointerAddress = basePointer + BBLang.Generator.CodeGeneratorForMain.ScaledSavedCodePointerOffset;
-        int savedBasePointerAddress = basePointer + BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset;
+        int savedCodePointerAddress = basePointer + BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset;
+        int savedBasePointerAddress = basePointer + BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset;
 
         if (savedCodePointerAddress < 0 || savedCodePointerAddress >= stack.Length) return false;
         if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Length) return false;
@@ -18,7 +18,7 @@ public static class DebugUtils
 
     static bool CanTraceBPsWith(ImmutableArray<byte> stack, int basePointer)
     {
-        int savedBasePointerAddress = basePointer + BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset;
+        int savedBasePointerAddress = basePointer + BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset;
 
         if (savedBasePointerAddress < 0 || savedBasePointerAddress >= stack.Length) return false;
 
@@ -29,8 +29,8 @@ public static class DebugUtils
     {
         if (!CanTraceCallsWith(stack, basePointer)) return;
 
-        int savedCodePointer = stack.AsSpan()[(basePointer + BBLang.Generator.CodeGeneratorForMain.ScaledSavedCodePointerOffset)..].To<int>();
-        int savedBasePointer = stack.AsSpan()[(basePointer + BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset)..].To<int>();
+        int savedCodePointer = stack.AsSpan()[(basePointer + BBLang.Generator.CodeGeneratorForMain.SavedCodePointerOffset)..].To<int>();
+        int savedBasePointer = stack.AsSpan()[(basePointer + BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset)..].To<int>();
 
         if (savedBasePointer == basePointer || callTrace.Contains(savedCodePointer)) return;
 
@@ -43,7 +43,7 @@ public static class DebugUtils
     {
         if (!CanTraceBPsWith(stack, basePointer)) return;
 
-        int newBasePointer = stack.AsSpan()[(basePointer + BBLang.Generator.CodeGeneratorForMain.ScaledSavedBasePointerOffset)..].To<int>();
+        int newBasePointer = stack.AsSpan()[(basePointer + BBLang.Generator.CodeGeneratorForMain.SavedBasePointerOffset)..].To<int>();
 
         result.Add(newBasePointer);
 

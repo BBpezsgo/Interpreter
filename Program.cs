@@ -11,9 +11,11 @@ public static class Program
     {
 #if DEBUG
         DevelopmentEntry.Start(args);
-        return;
+#else
+        Entry.Run(args);
 #endif
 
-        Entry.Run(args);
+        Console.WriteLine("Press any key to exit ...");
+        Console.ReadKey();
     }
 }

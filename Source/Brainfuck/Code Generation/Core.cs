@@ -694,7 +694,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         CurrentFile = file;
 
         if (!isImported)
-        { CompiledVariables.Add(new BrainfuckVariable(ReturnVariableName, file, Stack.PushVirtual(1), false, false, false, new BuiltinType(BasicType.Integer))); }
+        { CompiledVariables.Add(new BrainfuckVariable(ReturnVariableName, file, Stack.PushVirtual(1), false, false, false, BuiltinType.Integer)); }
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(statements)); }

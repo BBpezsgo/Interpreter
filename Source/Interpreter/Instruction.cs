@@ -1,6 +1,5 @@
 ﻿namespace LanguageCore.Runtime;
 
-using System.Threading;
 using Compiler;
 
 public enum AddressingMode : byte
@@ -130,14 +129,14 @@ public readonly struct InstructionOperand
         Type = InstructionOperandType.Immediate8;
     }
 
-    static string? PointerOffsetString(int offset) => offset == 0 ? null : offset > 0 ? $"+{offset}" : $"-{offset}";
+    static string? PointerOffsetString(int offset) => offset == 0 ? null : offset > 0 ? $"+{offset}" : $"-{-offset}";
 
     [ExcludeFromCodeCoverage]
     public override string ToString() => Type switch
     {
-        InstructionOperandType.Immediate8 => Value.ToString(),
-        InstructionOperandType.Immediate16 => Value.ToString(),
-        InstructionOperandType.Immediate32 => Value.ToString(),
+        InstructionOperandType.Immediate8 => $"BYTE {Value}",
+        InstructionOperandType.Immediate16 => $"WORD {Value}",
+        InstructionOperandType.Immediate32 => $"DWORD {Value}",
         InstructionOperandType.Pointer8 => $"BYTE [{Value}]",
         InstructionOperandType.Pointer16 => $"WORD [{Value}]",
         InstructionOperandType.Pointer32 => $"DWORD [{Value}]",

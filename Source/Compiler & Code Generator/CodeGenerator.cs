@@ -72,7 +72,7 @@ public abstract class CodeGenerator
     protected readonly PrintCallback? Print;
     protected readonly AnalysisCollection? AnalysisCollection;
 
-    public static readonly BuiltinType BooleanType = new(BasicType.Byte);
+    public static readonly BuiltinType BooleanType = BuiltinType.Byte;
 
     #endregion
 
@@ -506,7 +506,7 @@ public abstract class CodeGenerator
         [NotNullWhen(false)] out WillBeCompilerException? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
-        ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, new BuiltinType(BasicType.Integer));
+        ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, BuiltinType.Integer);
         FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerGet, arguments, relevantFile, null, addCompilable);
         return GetFunction<CompiledFunction, Token, string>(
             GetFunctions(),
@@ -529,7 +529,7 @@ public abstract class CodeGenerator
         [NotNullWhen(false)] out WillBeCompilerException? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
-        ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, new BuiltinType(BasicType.Integer), elementType);
+        ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, BuiltinType.Integer, elementType);
         FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerSet, arguments, relevantFile, null, addCompilable);
         return GetFunction<CompiledFunction, Token, string>(
             GetFunctions(),
@@ -1427,8 +1427,8 @@ public abstract class CodeGenerator
         if (destination is BuiltinType builtinDestination &&
             valueType is BuiltinType builtinValueType)
         {
-            BitWidth destinationBitWidth = GetBitWidth(builtinDestination);
-            BitWidth valueBitWidth = GetBitWidth(builtinValueType);
+            BitWidth destinationBitWidth = builtinDestination.BitWidth;
+            BitWidth valueBitWidth = builtinValueType.BitWidth;
             if (destinationBitWidth >= valueBitWidth)
             { return; }
         }
@@ -1437,24 +1437,6 @@ public abstract class CodeGenerator
     }
 
     protected static BitWidth MaxBitWidth(BitWidth a, BitWidth b) => a > b ? a : b;
-
-    protected static BitWidth GetBitWidth(GeneralType type) => type switch
-    {
-        BuiltinType v => GetBitWidth(v),
-        PointerType v => GetBitWidth(v),
-        _ => throw new InternalException($"Invalid type {type}"),
-    };
-
-    protected static BitWidth GetBitWidth(BuiltinType type) => type.Type switch
-    {
-        BasicType.Byte => BitWidth._8,
-        BasicType.Integer => BitWidth._32,
-        BasicType.Float => BitWidth._32,
-        BasicType.Char => BitWidth._16,
-        _ => throw new InternalException($"Invalid type {type}"),
-    };
-
-    protected static BitWidth GetBitWidth(PointerType _) => BitWidth._32;
 
     protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset)
     {
@@ -1550,10 +1532,10 @@ public abstract class CodeGenerator
     }
     protected BuiltinType FindStatementType(KeywordCall keywordCall) => keywordCall.Identifier.Content switch
     {
-        StatementKeywords.Return => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-        StatementKeywords.Throw => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-        StatementKeywords.Break => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
-        StatementKeywords.Delete => OnGotStatementType(keywordCall, new BuiltinType(BasicType.Void)),
+        StatementKeywords.Return => OnGotStatementType(keywordCall, BuiltinType.Void),
+        StatementKeywords.Throw => OnGotStatementType(keywordCall, BuiltinType.Void),
+        StatementKeywords.Break => OnGotStatementType(keywordCall, BuiltinType.Void),
+        StatementKeywords.Delete => OnGotStatementType(keywordCall, BuiltinType.Void),
         _ => throw new CompilerException($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile)
     };
     protected GeneralType FindStatementType(IndexCall index)
@@ -1583,7 +1565,7 @@ public abstract class CodeGenerator
     }
     protected GeneralType FindStatementType(FunctionCall functionCall)
     {
-        if (functionCall.Identifier.Content == "sizeof") return new BuiltinType(BasicType.Integer);
+        if (functionCall.Identifier.Content == "sizeof") return BuiltinType.Integer;
 
         if (!GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundError))
         { throw notFoundError.Instantiate(functionCall, CurrentFile); }
@@ -1619,8 +1601,8 @@ public abstract class CodeGenerator
                     leftBType.Type == BasicType.Float ||
                     rightBType.Type == BasicType.Float;
 
-                BitWidth leftBitWidth = GetBitWidth(leftType);
-                BitWidth rightBitWidth = GetBitWidth(rightType);
+                BitWidth leftBitWidth = leftType.BitWidth;
+                BitWidth rightBitWidth = rightType.BitWidth;
                 BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
 
                 return @operator.Operator.Content switch
@@ -1647,7 +1629,7 @@ public abstract class CodeGenerator
                     BinaryOperatorCall.Multiplication or
                     BinaryOperatorCall.Division or
                     BinaryOperatorCall.Modulo
-                    => new BuiltinType(isFloat ? BasicType.Float : bitWidth.ToType()),
+                        => isFloat ? BuiltinType.Float : new BuiltinType(bitWidth.ToType()),
 
                     _ => throw unknownOperator,
                 };
@@ -1762,27 +1744,27 @@ public abstract class CodeGenerator
                     {
                         if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            return OnGotStatementType(literal, new BuiltinType(BasicType.Byte));
+                            return OnGotStatementType(literal, BuiltinType.Byte);
                         }
                     }
                     else if (expectedType == BasicType.Char)
                     {
                         if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
                         {
-                            return OnGotStatementType(literal, new BuiltinType(BasicType.Char));
+                            return OnGotStatementType(literal, BuiltinType.Char);
                         }
                     }
                     else if (expectedType == BasicType.Float)
                     {
-                        return OnGotStatementType(literal, new BuiltinType(BasicType.Float));
+                        return OnGotStatementType(literal, BuiltinType.Float);
                     }
                 }
 
-                return OnGotStatementType(literal, new BuiltinType(BasicType.Integer));
+                return OnGotStatementType(literal, BuiltinType.Integer);
             case LiteralType.Float:
-                return OnGotStatementType(literal, new BuiltinType(BasicType.Float));
+                return OnGotStatementType(literal, BuiltinType.Float);
             case LiteralType.String:
-                return OnGotStatementType(literal, new PointerType(new BuiltinType(BasicType.Char)));
+                return OnGotStatementType(literal, new PointerType(BuiltinType.Char));
             case LiteralType.Char:
                 if (expectedType is not null)
                 {
@@ -1790,16 +1772,16 @@ public abstract class CodeGenerator
                     {
                         if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            return OnGotStatementType(literal, new BuiltinType(BasicType.Byte));
+                            return OnGotStatementType(literal, BuiltinType.Byte);
                         }
                     }
                     else if (expectedType == BasicType.Float)
                     {
-                        return OnGotStatementType(literal, new BuiltinType(BasicType.Float));
+                        return OnGotStatementType(literal, BuiltinType.Float);
                     }
                 }
 
-                return OnGotStatementType(literal, new BuiltinType(BasicType.Char));
+                return OnGotStatementType(literal, BuiltinType.Char);
             default:
                 throw new UnreachableException($"Unknown literal type {literal.Type}");
         }
@@ -1861,7 +1843,7 @@ public abstract class CodeGenerator
     {
         GeneralType to = FindStatementType(pointer.PrevStatement);
         if (to is not PointerType pointerType)
-        { return OnGotStatementType(pointer, new BuiltinType(BasicType.Any)); }
+        { return OnGotStatementType(pointer, BuiltinType.Any); }
         return OnGotStatementType(pointer, pointerType.To);
     }
     protected GeneralType FindStatementType(NewInstance newInstance)
@@ -1890,7 +1872,7 @@ public abstract class CodeGenerator
         if (prevStatementType is ArrayType && field.Identifier.Equals("Length"))
         {
             field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
-            return OnGotStatementType(field, new BuiltinType(BasicType.Integer));
+            return OnGotStatementType(field, BuiltinType.Integer);
         }
 
         if (prevStatementType is PointerType pointerType)

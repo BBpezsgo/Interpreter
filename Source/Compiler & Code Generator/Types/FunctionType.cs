@@ -14,7 +14,7 @@ public class FunctionType : GeneralType,
 
     public override int Size => 1;
     public override int SizeBytes => BytecodeProcessor.PointerSize;
-    public override BitWidth BitWidth => BitWidth._32;
+    public override BitWidth BitWidth => BytecodeProcessor.PointerBitWidth;
 
     public FunctionType(CompiledFunction function)
     {

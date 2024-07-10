@@ -675,7 +675,7 @@ public sealed class Compiler
                         Block = method.Block,
                     };
 
-                    returnType = new BuiltinType(BasicType.Void);
+                    returnType = BuiltinType.Void;
 
                     CompiledGeneralFunction methodWithRef = CompileGeneralFunction(copy, returnType, compiledStruct);
 

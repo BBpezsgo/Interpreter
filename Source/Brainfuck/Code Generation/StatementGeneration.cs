@@ -1,4 +1,4 @@
-﻿using Ansi = Win32.Console.Ansi;
+using Ansi = Win32.Console.Ansi;
 
 namespace LanguageCore.Brainfuck.Generator;
 
@@ -499,16 +499,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType valueType = FindStatementType(value);
 
         // TODO: this
-        if (valueType.Size != 1)
-        { throw new CompilerException($"This isn't supported at the moment (i don't want to implement it at the moment)", value, CurrentFile); }
-
-        // TODO: this
         // AssignTypeCheck(pointerType.To, valueType, value);
 
         int valueAddress = Stack.NextAddress;
         GenerateCodeForStatement(value);
 
-        Heap.Set(pointerAddress, valueAddress);
+        for (int i = 0; i < valueType.Size; i++)
+        {
+            Code.AddValue(pointerAddress, i);
+            Heap.Set(pointerAddress, valueAddress);
+        }
 
         Stack.PopVirtual();
         Stack.PopVirtual();

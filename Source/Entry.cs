@@ -59,6 +59,11 @@ public static class Entry
             return;
         }
 
+        string[] additionalImports = new string[]
+        {
+            "../StandardLibrary/Primitives.bbc"
+        };
+
         switch (arguments.RunType)
         {
             case ProgramRunType.Normal:
@@ -72,7 +77,7 @@ public static class Entry
 
                 if (arguments.ThrowErrors)
                 {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null);
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
@@ -81,7 +86,7 @@ public static class Entry
                 {
                     try
                     {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null);
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
                         generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
@@ -265,7 +270,7 @@ public static class Entry
                 if (arguments.ThrowErrors)
                 {
                     tokens = AnyTokenizer.Tokenize(arguments.File, PreprocessorVariables.Brainfuck).Tokens;
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null);
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null, additionalImports);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
@@ -278,7 +283,7 @@ public static class Entry
                     try
                     {
                         tokens = AnyTokenizer.Tokenize(arguments.File, PreprocessorVariables.Brainfuck).Tokens;
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null);
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null, additionalImports);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
@@ -496,7 +501,7 @@ public static class Entry
 
                 AnalysisCollection analysisCollection = new();
 
-                CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Enumerable.Empty<string>(), Output.Log, analysisCollection, null, null);
+                CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, Enumerable.Empty<string>(), Output.Log, analysisCollection, null, null, additionalImports);
 
                 AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, new AsmGeneratorSettings()
                 {

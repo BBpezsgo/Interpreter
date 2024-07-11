@@ -1,4 +1,4 @@
-using Ansi = Win32.Console.Ansi;
+﻿using Ansi = Win32.Console.Ansi;
 
 namespace LanguageCore.Brainfuck.Generator;
 
@@ -2912,7 +2912,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.I32, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -3046,7 +3046,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.I32, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -3323,7 +3323,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Int, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.I32, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }

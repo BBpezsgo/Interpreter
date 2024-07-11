@@ -1,0 +1,16 @@
+
+#if BRAINFUCK
+
+export alias byte u8;
+export alias char u16;
+export alias int i32;
+export alias float f32;
+
+#else
+
+export alias byte u8;
+export alias char u16;
+export alias int i32;
+export alias float f32;
+
+#endif

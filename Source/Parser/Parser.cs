@@ -31,6 +31,11 @@ public sealed class Parser
         ModifierKeywords.Inline
     );
 
+    static readonly ImmutableArray<string> AliasModifiers = ImmutableArray.Create<string>
+    (
+        ProtectionKeywords.Export
+    );
+
     static readonly ImmutableArray<string> FieldModifiers = ImmutableArray.Create<string>
     (
         ProtectionKeywords.Private
@@ -99,6 +104,7 @@ public sealed class Parser
     readonly List<FunctionDefinition> Operators = new();
     readonly Dictionary<string, StructDefinition> Structs = new();
     readonly List<UsingDefinition> Usings = new();
+    readonly List<AliasDefinition> AliasDefinitions = new();
     readonly List<Statement.Statement> TopLevelStatements = new();
     // === ===
 
@@ -161,6 +167,7 @@ public sealed class Parser
             Operators,
             Structs.Values,
             Usings,
+            AliasDefinitions,
             TopLevelStatements,
             OriginalTokens,
             Tokens);
@@ -251,6 +258,8 @@ public sealed class Parser
         { Functions.Add(functionDefinition); }
         else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
         { Operators.Add(operatorDefinition); }
+        else if (ExpectAliasDefinition(out AliasDefinition? aliasDefinition))
+        { AliasDefinitions.Add(aliasDefinition); }
         else if (ExpectStatement(out Statement.Statement? statement))
         { TopLevelStatements.Add(statement); }
         else
@@ -327,6 +336,41 @@ public sealed class Parser
 
         return true;
     }
+
+    bool ExpectAliasDefinition([NotNullWhen(true)] out AliasDefinition? aliasDefinition)
+    {
+        int parseStart = CurrentTokenIndex;
+        aliasDefinition = null;
+
+        Token[] modifiers = ExpectModifiers();
+
+        if (!ExpectIdentifier(DeclarationKeywords.Alias, out Token? keyword))
+        {
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
+
+        if (!ExpectIdentifier(out Token? identifier))
+        { throw new SyntaxException($"Expected identifier after keyword \"{keyword}\"", keyword.Position.After(), File); }
+
+        if (!ExpectType(AllowedType.AnyPointer | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength | AllowedType.StackArrayWithoutLength, out TypeInstance? type))
+        { throw new SyntaxException($"Expected type after alias identifier", identifier.Position.After(), File); }
+
+        CheckModifiers(modifiers, AliasModifiers.AsSpan());
+
+        if (!ExpectOperator(";"))
+        { throw new SyntaxException($"Expected semicolon after alias definition", type.Position.After(), File); }
+
+        aliasDefinition = new AliasDefinition(
+            modifiers,
+            keyword,
+            identifier,
+            type,
+            File
+        );
+        return true;
+    }
+
 
     bool ExpectTemplateInfo([NotNullWhen(true)] out TemplateInfo? templateInfo)
     {
@@ -1849,9 +1893,6 @@ public sealed class Parser
 
             return true;
         }
-
-        if (TypeKeywords.List.Contains(possibleType.Content))
-        { possibleType.AnalyzedType = TokenAnalyzedType.Keyword; }
 
         int afterIdentifier = CurrentTokenIndex;
         bool withGenerics = false;

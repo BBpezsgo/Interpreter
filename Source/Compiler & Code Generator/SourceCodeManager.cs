@@ -178,7 +178,7 @@ public class SourceCodeManager
         return false;
     }
 
-    static IEnumerable<Uri> GetSearches(UsingDefinition @using, Uri? parent, string? basePath)
+    static IEnumerable<Uri> GetSearches(string @using, Uri? parent, string? basePath)
     {
         if (parent is not null &&
             parent.IsFile)
@@ -193,15 +193,14 @@ public class SourceCodeManager
             }
         }
 
-        string filename = @using.PathString;
-        if (!filename.EndsWith($".{LanguageConstants.LanguageExtension}", StringComparison.Ordinal)) filename += $".{LanguageConstants.LanguageExtension}";
+        if (!@using.EndsWith($".{LanguageConstants.LanguageExtension}", StringComparison.Ordinal)) @using += $".{LanguageConstants.LanguageExtension}";
 
-        if (Uri.TryCreate(parent, filename, out Uri? uri))
+        if (Uri.TryCreate(parent, @using, out Uri? uri))
         { yield return uri; }
 
         if (parent is not null &&
             basePath is not null &&
-            Uri.TryCreate(new Uri(parent, basePath), filename, out uri))
+            Uri.TryCreate(new Uri(parent, basePath), @using, out uri))
         { yield return uri; }
 
         if (parent is not null &&
@@ -216,16 +215,16 @@ public class SourceCodeManager
             { throw new InternalException($"File \"{file}\" doesn't have a directory"); }
 
             if (basePath != null)
-            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, file.Directory.FullName), filename), UriKind.Absolute); }
+            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, file.Directory.FullName), @using), UriKind.Absolute); }
 
-            yield return new Uri(Path.GetFullPath(filename, file.Directory.FullName), UriKind.Absolute);
+            yield return new Uri(Path.GetFullPath(@using, file.Directory.FullName), UriKind.Absolute);
         }
         else
         {
             if (basePath != null)
-            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, Environment.CurrentDirectory), filename), UriKind.Absolute); }
+            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, Environment.CurrentDirectory), @using), UriKind.Absolute); }
 
-            yield return new Uri(Path.GetFullPath(filename, Environment.CurrentDirectory), UriKind.Absolute);
+            yield return new Uri(Path.GetFullPath(@using, Environment.CurrentDirectory), UriKind.Absolute);
         }
     }
 
@@ -256,7 +255,7 @@ public class SourceCodeManager
         string? basePath,
         TokenizerSettings? tokenizerSettings)
     {
-        if (!FromAnywhere(@using, GetSearches(@using, parent, basePath), tokenizerSettings, out ParserResult? ast, out Uri? path))
+        if (!FromAnywhere(@using, GetSearches(@using.PathString, parent, basePath), tokenizerSettings, out ParserResult? ast, out Uri? path))
         {
             AnalysisCollection?.Errors.Add(new LanguageError($"File \"{@using.PathString}\" not found", new Position(@using.Path.As<IPositioned>().Or(@using)), parent));
             return new Dictionary<Uri, CollectedAST>();
@@ -275,10 +274,36 @@ public class SourceCodeManager
         return collectedASTs;
     }
 
+    Dictionary<Uri, CollectedAST> ProcessAdditionalImport(
+        string file,
+        Uri? parent,
+        string? basePath,
+        TokenizerSettings? tokenizerSettings)
+    {
+        if (!FromAnywhere(null, GetSearches(file, parent, basePath), tokenizerSettings, out ParserResult? ast, out Uri? uri))
+        {
+            AnalysisCollection?.Errors.Add(new LanguageError($"File \"{@file}\" not found", Position.UnknownPosition, null));
+            return new Dictionary<Uri, CollectedAST>();
+        }
+
+        if (!ast.HasValue)
+        { return new Dictionary<Uri, CollectedAST>(); }
+
+        Dictionary<Uri, CollectedAST> collectedASTs = new();
+
+        collectedASTs.Add(uri, new CollectedAST(ast.Value, uri, null));
+
+        foreach (UsingDefinition @using_ in ast.Value.Usings)
+        { collectedASTs.AddRange(ProcessFile(@using_, uri, null, tokenizerSettings)); }
+
+        return collectedASTs;
+    }
+
     ImmutableDictionary<Uri, CollectedAST> Entry(
         Uri file,
         string? basePath,
-        TokenizerSettings? tokenizerSettings)
+        TokenizerSettings? tokenizerSettings,
+        IEnumerable<string>? additionalImports)
     {
         if (!FromAnywhere(null, file, tokenizerSettings, out ParserResult? ast))
         { throw new InternalException($"File \"{file}\" not found"); }
@@ -295,6 +320,12 @@ public class SourceCodeManager
         foreach (UsingDefinition @using in ast.Value.Usings)
         { collectedASTs.AddRange(ProcessFile(@using, file, basePath, tokenizerSettings)); }
 
+        if (additionalImports is not null)
+        {
+            foreach (string additionalImport in additionalImports)
+            { collectedASTs.AddRange(ProcessAdditionalImport(additionalImport, file, basePath, tokenizerSettings)); }
+        }
+
         AnalysisCollection?.Throw();
 
         return collectedASTs.ToImmutableDictionary();
@@ -304,7 +335,8 @@ public class SourceCodeManager
         IEnumerable<UsingDefinition> usings,
         Uri? file,
         string? basePath,
-        TokenizerSettings? tokenizerSettings)
+        TokenizerSettings? tokenizerSettings,
+        IEnumerable<string>? additionalImports)
     {
         if (usings.Any())
         { Print?.Invoke("Loading used files ...", LogType.Debug); }
@@ -313,6 +345,12 @@ public class SourceCodeManager
 
         foreach (UsingDefinition @using in usings)
         { collectedASTs.AddRange(ProcessFile(@using, file, basePath, tokenizerSettings)); }
+
+        if (additionalImports is not null)
+        {
+            foreach (string additionalImport in additionalImports)
+            { collectedASTs.AddRange(ProcessAdditionalImport(additionalImport, file, basePath, tokenizerSettings)); }
+        }
 
         AnalysisCollection?.Throw();
 
@@ -327,10 +365,11 @@ public class SourceCodeManager
         AnalysisCollection? analysisCollection,
         IEnumerable<string> preprocessorVariables,
         TokenizerSettings? tokenizerSettings,
-        FileParser? fileParser)
+        FileParser? fileParser,
+        IEnumerable<string>? additionalImports)
     {
         SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables, fileParser);
-        return sourceCodeManager.Entry(usings, file, basePath, tokenizerSettings);
+        return sourceCodeManager.Entry(usings, file, basePath, tokenizerSettings, additionalImports);
     }
 
     public static ImmutableDictionary<Uri, CollectedAST> Collect(
@@ -340,10 +379,11 @@ public class SourceCodeManager
         AnalysisCollection? analysisCollection,
         IEnumerable<string> preprocessorVariables,
         TokenizerSettings? tokenizerSettings,
-        FileParser? fileParser)
+        FileParser? fileParser,
+        IEnumerable<string>? additionalImports)
     {
         SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables, fileParser);
-        return sourceCodeManager.Entry(file, basePath, tokenizerSettings);
+        return sourceCodeManager.Entry(file, basePath, tokenizerSettings, additionalImports);
     }
 
     public static ImmutableDictionary<Uri, CollectedAST> Collect(
@@ -353,9 +393,10 @@ public class SourceCodeManager
         string? basePath,
         AnalysisCollection? analysisCollection,
         TokenizerSettings? tokenizerSettings,
-        FileParser? fileParser)
+        FileParser? fileParser,
+        IEnumerable<string>? additionalImports)
     {
         SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables, fileParser);
-        return sourceCodeManager.Entry(new Uri(file.FullName, UriKind.Absolute), basePath, tokenizerSettings);
+        return sourceCodeManager.Entry(new Uri(file.FullName, UriKind.Absolute), basePath, tokenizerSettings, additionalImports);
     }
 }

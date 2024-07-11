@@ -13,6 +13,7 @@ public readonly struct CompilerResult
     public readonly ImmutableArray<CompiledGeneralFunction> GeneralFunctions;
     public readonly ImmutableArray<CompiledOperator> Operators;
     public readonly ImmutableArray<CompiledConstructor> Constructors;
+    public readonly ImmutableArray<CompiledAlias> Aliases;
 
     public readonly ImmutableDictionary<Uri, CollectedAST> Raw;
 
@@ -133,6 +134,7 @@ public readonly struct CompilerResult
         Enumerable.Empty<CompiledGeneralFunction>(),
         Enumerable.Empty<CompiledOperator>(),
         Enumerable.Empty<CompiledConstructor>(),
+        Enumerable.Empty<CompiledAlias>(),
         Enumerable.Empty<KeyValuePair<int, ExternalFunctionBase>>(),
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<(ImmutableArray<Statement>, Uri)>(),
@@ -144,6 +146,7 @@ public readonly struct CompilerResult
         IEnumerable<CompiledGeneralFunction> generalFunctions,
         IEnumerable<CompiledOperator> operators,
         IEnumerable<CompiledConstructor> constructors,
+        IEnumerable<CompiledAlias> aliases,
         IEnumerable<KeyValuePair<int, ExternalFunctionBase>> externalFunctions,
         IEnumerable<CompiledStruct> structs,
         IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
@@ -154,6 +157,7 @@ public readonly struct CompilerResult
         GeneralFunctions = generalFunctions.ToImmutableArray();
         Operators = operators.ToImmutableArray();
         Constructors = constructors.ToImmutableArray();
+        Aliases = aliases.ToImmutableArray();
         ExternalFunctions = externalFunctions.ToDictionary();
         Structs = structs.ToImmutableArray();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
@@ -242,10 +246,12 @@ public sealed class Compiler
     readonly List<CompiledConstructor> CompiledConstructors = new();
     readonly List<CompiledFunction> CompiledFunctions = new();
     readonly List<CompiledGeneralFunction> CompiledGeneralFunctions = new();
+    readonly List<CompiledAlias> CompiledAliases = new();
 
     readonly List<FunctionDefinition> Operators = new();
     readonly List<FunctionDefinition> Functions = new();
     readonly List<StructDefinition> Structs = new();
+    readonly List<AliasDefinition> AliasDefinitions = new();
 
     readonly List<(ImmutableArray<Statement> Statements, Uri File)> TopLevelStatements = new();
 
@@ -271,6 +277,12 @@ public sealed class Compiler
 
     bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
     {
+        if (CodeGenerator.GetAlias(CompiledAliases, name.Content, relevantFile, out CompiledAlias? alias, out _))
+        {
+            result = alias.Value;
+            return true;
+        }
+
         if (CodeGenerator.GetStruct(CompiledStructs, name.Content, relevantFile, out CompiledStruct? @struct, out _))
         {
             result = new StructType(@struct, relevantFile);
@@ -524,11 +536,12 @@ public sealed class Compiler
         Functions.AddRange(collectedAST.ParserResult.Functions);
         Operators.AddRange(collectedAST.ParserResult.Operators);
         Structs.AddRange(collectedAST.ParserResult.Structs);
+        AliasDefinitions.AddRange(collectedAST.ParserResult.AliasDefinitions);
     }
 
-    CompilerResult CompileMainFile(Uri file, FileParser? fileParser)
+    CompilerResult CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
     {
-        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, fileParser);
+        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, fileParser, additionalImports);
 
         foreach ((Uri file_, CollectedAST ast) in files)
         { AddAST(ast, file_ != file); }
@@ -547,6 +560,7 @@ public sealed class Compiler
             CompiledGeneralFunctions,
             CompiledOperators,
             CompiledConstructors,
+            CompiledAliases,
             ExternalFunctions,
             CompiledStructs,
             TopLevelStatements,
@@ -555,7 +569,7 @@ public sealed class Compiler
 
     CompilerResult CompileInteractiveInternal(Statement statement, ImmutableArray<UsingDefinition> usings, Uri file)
     {
-        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(usings, file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, null);
+        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(usings, file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, null, null);
 
         foreach (CollectedAST file_ in files.Values)
         { AddAST(file_); }
@@ -570,6 +584,7 @@ public sealed class Compiler
             CompiledGeneralFunctions,
             CompiledOperators,
             CompiledConstructors,
+            CompiledAliases,
             ExternalFunctions,
             CompiledStructs,
             TopLevelStatements,
@@ -605,7 +620,21 @@ public sealed class Compiler
             if (CompiledFunctions.Any(other => ThingEquality(other, thing)))
             { return true; }
 
+            if (CompiledAliases.Any(other => ThingEquality(other, thing)))
+            { return true; }
+
             return false;
+        }
+
+        foreach (AliasDefinition aliasDefinition in AliasDefinitions)
+        {
+            if (IsThingExists(@aliasDefinition))
+            { throw new CompilerException("Symbol already exists", @aliasDefinition.Identifier, @aliasDefinition.File); }
+        
+            CompiledAliases.Add(new CompiledAlias(
+                GeneralType.From(aliasDefinition.Value, FindType),
+                aliasDefinition
+            ));
         }
 
         foreach (StructDefinition @struct in Structs)
@@ -834,7 +863,8 @@ public sealed class Compiler
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null,
         TokenizerSettings? tokenizerSettings = null,
-        FileParser? fileParser = null)
+        FileParser? fileParser = null,
+        IEnumerable<string>? additionalImports = null)
     {
         Compiler compiler = new(
             externalFunctions,
@@ -843,7 +873,7 @@ public sealed class Compiler
             analysisCollection,
             preprocessorVariables,
             tokenizerSettings);
-        return compiler.CompileMainFile(file, fileParser);
+        return compiler.CompileMainFile(file, fileParser, additionalImports);
     }
 
     public static CompilerResult CompileFile(
@@ -854,7 +884,8 @@ public sealed class Compiler
         PrintCallback? printCallback = null,
         AnalysisCollection? analysisCollection = null,
         TokenizerSettings? tokenizerSettings = null,
-        FileParser? fileParser = null)
+        FileParser? fileParser = null,
+        IEnumerable<string>? additionalImports = null)
     {
         Compiler compiler = new(
             externalFunctions,
@@ -864,7 +895,7 @@ public sealed class Compiler
             preprocessorVariables,
             tokenizerSettings);
         Uri uri = new(file.FullName, UriKind.Absolute);
-        return compiler.CompileMainFile(uri, fileParser);
+        return compiler.CompileMainFile(uri, fileParser, additionalImports);
     }
 
     public static CompilerResult CompileInteractive(

@@ -97,10 +97,10 @@ public class BuiltinType : GeneralType,
     {
         BasicType.Void => TypeKeywords.Void,
         BasicType.Any => TypeKeywords.Any,
-        BasicType.Byte => TypeKeywords.Byte,
-        BasicType.Integer => TypeKeywords.Int,
-        BasicType.Float => TypeKeywords.Float,
-        BasicType.Char => TypeKeywords.Char,
+        BasicType.Byte => TypeKeywords.U8,
+        BasicType.Char => TypeKeywords.U16,
+        BasicType.Integer => TypeKeywords.I32,
+        BasicType.Float => TypeKeywords.F32,
         _ => throw new UnreachableException(),
     };
 }

@@ -221,6 +221,9 @@ public static class Utils
     public const int HeapSize = 2048;
 
     const string BasePath = "../StandardLibrary/";
+    static readonly ImmutableArray<string> AdditionalImports = ImmutableArray.Create<string>(
+        "../StandardLibrary/Primitives.bbc"
+    );
 
     public const long BaseTimeout = 2000;
     public const long BrainfuckTimeout = 5000;
@@ -303,9 +306,9 @@ public static class Utils
 
         AnalysisCollection analysisCollection = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null);
+        CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null, AdditionalImports);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
-        compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null);
+        compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null, AdditionalImports);
         BBLangGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings) { DontOptimize = true }, null, analysisCollection);
 
         analysisCollection.Throw();
@@ -373,12 +376,12 @@ public static class Utils
         byte InputCallback() => LanguageCore.Brainfuck.CharCode.GetByte(inputBuffer.Read());
 
         AnalysisCollection analysisCollection = new();
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection, null, null);
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection, null, null, AdditionalImports);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, analysisCollection);
         analysisCollection.Throw();
 
         analysisCollection = new AnalysisCollection();
-        CompilerResult compiledUnoptimized = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection, null, null);
+        CompilerResult compiledUnoptimized = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection, null, null, AdditionalImports);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generatedUnoptimized = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiledUnoptimized, new LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings(BrainfuckGeneratorSettings)
         { DontOptimize = true }, null, analysisCollection);
         analysisCollection.Throw();
@@ -427,7 +430,7 @@ public static class Utils
     {
         AnalysisCollection analysisCollection = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, Enumerable.Empty<string>(), null, analysisCollection, null, null);
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, Enumerable.Empty<string>(), null, analysisCollection, null, null, AdditionalImports);
 
         LanguageCore.ASM.Generator.AsmGeneratorResult code = LanguageCore.ASM.Generator.CodeGeneratorForAsm.Generate(compiled, new LanguageCore.ASM.Generator.AsmGeneratorSettings()
         {

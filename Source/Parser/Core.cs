@@ -58,6 +58,7 @@ public readonly struct ParserResult
     public readonly ImmutableArray<FunctionDefinition> Functions;
     public readonly ImmutableArray<FunctionDefinition> Operators;
     public readonly ImmutableArray<StructDefinition> Structs;
+    public readonly ImmutableArray<AliasDefinition> AliasDefinitions;
 
     public readonly ImmutableArray<UsingDefinition> Usings;
 
@@ -74,6 +75,7 @@ public readonly struct ParserResult
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),
         Enumerable.Empty<UsingDefinition>(),
+        Enumerable.Empty<AliasDefinition>(),
         Enumerable.Empty<Statement.Statement>(),
         Enumerable.Empty<Token>(),
         Enumerable.Empty<Token>())
@@ -85,6 +87,7 @@ public readonly struct ParserResult
         IEnumerable<FunctionDefinition> operators,
         IEnumerable<StructDefinition> structs,
         IEnumerable<UsingDefinition> usings,
+        IEnumerable<AliasDefinition> aliasDefinitions,
         IEnumerable<Statement.Statement> topLevelStatements,
         IEnumerable<Token> originalTokens,
         IEnumerable<Token> tokens)
@@ -94,6 +97,7 @@ public readonly struct ParserResult
         Functions = functions.ToImmutableArray();
         Operators = operators.ToImmutableArray();
         Structs = structs.ToImmutableArray();
+        AliasDefinitions = aliasDefinitions.ToImmutableArray();
         Usings = usings.ToImmutableArray();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
         OriginalTokens = originalTokens.ToImmutableArray();

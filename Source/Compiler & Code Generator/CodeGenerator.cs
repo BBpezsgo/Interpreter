@@ -51,6 +51,7 @@ public abstract class CodeGenerator
     protected ImmutableArray<CompiledConstructor> CompiledConstructors;
     protected ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
     protected ImmutableArray<IConstant> CompiledGlobalConstants;
+    protected ImmutableArray<CompiledAlias> CompiledAliases;
 
     protected readonly Stack<IConstant> CompiledLocalConstants;
     protected readonly Stack<int> LocalConstantsStack;
@@ -109,6 +110,7 @@ public abstract class CodeGenerator
         CompiledOperators = compilerResult.Operators;
         CompiledConstructors = compilerResult.Constructors;
         CompiledGeneralFunctions = compilerResult.GeneralFunctions;
+        CompiledAliases = compilerResult.Aliases;
 
         AnalysisCollection = analysisCollection;
         Print = print;
@@ -1189,8 +1191,130 @@ public abstract class CodeGenerator
 
     #endregion
 
+    #region GetAlias()
+
+    public enum AliasPerfectus
+    {
+        None,
+
+        /// <summary>
+        /// The identifier is good
+        /// </summary>
+        Identifier,
+
+        /// <summary>
+        /// Boundary between good and bad structs
+        /// </summary>
+        Good,
+
+        // == MATCHED --> Searching for the most relevant struct ==
+
+        /// <summary>
+        /// The struct is in the same file
+        /// </summary>
+        File,
+    }
+
+    protected bool GetAlias(
+        string aliasName,
+        Uri? relevantFile,
+
+        [NotNullWhen(true)] out CompiledAlias? result,
+        [NotNullWhen(false)] out WillBeCompilerException? error)
+        => CodeGenerator.GetAlias(
+            CompiledAliases,
+
+            aliasName,
+            relevantFile,
+
+            out result,
+            out error);
+
+    public static bool GetAlias(
+        IEnumerable<CompiledAlias> aliases,
+
+        string aliasName,
+        Uri? relevantFile,
+
+        [NotNullWhen(true)] out CompiledAlias? result,
+        [NotNullWhen(false)] out WillBeCompilerException? error)
+    {
+        CompiledAlias? result_ = default;
+        WillBeCompilerException? error_ = null;
+
+        AliasPerfectus perfectus = AliasPerfectus.None;
+
+        static AliasPerfectus Max(AliasPerfectus a, AliasPerfectus b) => a > b ? a : b;
+
+        bool HandleIdentifier(CompiledAlias _alias)
+        {
+            if (aliasName is not null &&
+                !_alias.Identifier.Equals(aliasName))
+            { return false; }
+
+            perfectus = Max(perfectus, AliasPerfectus.Identifier);
+            return true;
+        }
+
+        bool HandleFile(CompiledAlias _alias)
+        {
+            if (relevantFile is null ||
+                _alias.File != relevantFile)
+            {
+                // Not in the same file
+                return false;
+            }
+
+            if (perfectus >= AliasPerfectus.File)
+            {
+                error_ = new WillBeCompilerException($"Alias {aliasName} not found: multiple aliases matched in the same file");
+                // Debugger.Break();
+            }
+
+            perfectus = AliasPerfectus.File;
+            result_ = _alias;
+            return true;
+        }
+
+        foreach (CompiledAlias _alias in aliases)
+        {
+            if (!HandleIdentifier(_alias))
+            { continue; }
+
+            // MATCHED --> Searching for most relevant alias
+
+            if (perfectus < AliasPerfectus.Good)
+            {
+                result_ = _alias;
+                perfectus = AliasPerfectus.Good;
+            }
+
+            if (!HandleFile(_alias))
+            { continue; }
+        }
+
+        if (result_ is not null && perfectus >= AliasPerfectus.Good)
+        {
+            result = result_;
+            error = error_;
+            return true;
+        }
+
+        error = error_ ?? new WillBeCompilerException($"Alias {aliasName} not found");
+        result = null;
+        return false;
+    }
+
+    #endregion
+
     protected bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
     {
+        if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out _))
+        {
+            result = alias.Value;
+            return true;
+        }
+
         if (TypeKeywords.BasicTypes.TryGetValue(name.Content, out BasicType builtinType))
         {
             result = new BuiltinType(builtinType);

@@ -89,6 +89,7 @@ class InteractiveCompiler
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),
         Enumerable.Empty<UsingDefinition>(),
+        Enumerable.Empty<AliasDefinition>(),
         Statement != null ? [Statement] :
         Enumerable.Empty<Statement>(),
         Enumerable.Empty<Token>(),

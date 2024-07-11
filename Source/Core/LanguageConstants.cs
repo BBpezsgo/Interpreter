@@ -9,43 +9,38 @@ public static class DeclarationKeywords
     public const string Struct = "struct";
     public const string Using = "using";
     public const string Template = "template";
+    public const string Alias = "alias";
 }
 
 public static class TypeKeywords
 {
     public const string Void = "void";
     public const string Any = "any";
-    public const string Byte = "byte";
-    public const string Int = "int";
-    public const string Float = "float";
-    public const string Char = "char";
+
+    public const string U8 = "u8";
+    public const string I32 = "i32";
+    public const string F32 = "f32";
+    public const string U16 = "u16";
 
     public static ImmutableArray<string> List { get; } = ImmutableArray.Create
     (
         TypeKeywords.Void,
         TypeKeywords.Any,
-        TypeKeywords.Byte,
-        TypeKeywords.Int,
-        TypeKeywords.Float,
-        TypeKeywords.Char
+        TypeKeywords.U8,
+        TypeKeywords.U16,
+        TypeKeywords.I32,
+        TypeKeywords.F32
     );
-
-    public static ImmutableDictionary<string, RuntimeType> RuntimeTypes { get; } = new Dictionary<string, RuntimeType>()
-    {
-        { TypeKeywords.Byte, RuntimeType.Byte },
-        { TypeKeywords.Int, RuntimeType.Integer },
-        { TypeKeywords.Float, RuntimeType.Single },
-        { TypeKeywords.Char, RuntimeType.Char },
-    }.ToImmutableDictionary();
 
     public static ImmutableDictionary<string, BasicType> BasicTypes { get; } = new Dictionary<string, BasicType>()
     {
         { TypeKeywords.Void, BasicType.Void },
         { TypeKeywords.Any, BasicType.Any },
-        { TypeKeywords.Byte, BasicType.Byte },
-        { TypeKeywords.Int, BasicType.Integer },
-        { TypeKeywords.Float, BasicType.Float },
-        { TypeKeywords.Char, BasicType.Char },
+
+        { TypeKeywords.U8, BasicType.Byte },
+        { TypeKeywords.U16, BasicType.Char },
+        { TypeKeywords.I32, BasicType.Integer },
+        { TypeKeywords.F32, BasicType.Float },
     }.ToImmutableDictionary();
 }
 
@@ -93,13 +88,15 @@ public static class LanguageConstants
         DeclarationKeywords.Struct,
         DeclarationKeywords.Using,
         DeclarationKeywords.Template,
+        DeclarationKeywords.Alias,
 
         TypeKeywords.Void,
         TypeKeywords.Any,
-        TypeKeywords.Byte,
-        TypeKeywords.Int,
-        TypeKeywords.Float,
-        TypeKeywords.Char,
+
+        TypeKeywords.U8,
+        TypeKeywords.U16,
+        TypeKeywords.I32,
+        TypeKeywords.F32,
 
         ProtectionKeywords.Private,
         ProtectionKeywords.Export,

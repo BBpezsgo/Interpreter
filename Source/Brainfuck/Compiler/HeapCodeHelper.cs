@@ -173,7 +173,12 @@ public class HeapCodeHelper
     }
 
     /// <summary>
+    /// <para>
     /// <b>Pointer:</b> <see cref="OffsettedStart"/>
+    /// </para>
+    /// <para>
+    /// Does not preserve <paramref name="pointerAddress"/> nor <paramref name="valueAddress"/>
+    /// </para>
     /// </summary>
     public void Set(int pointerAddress, int valueAddress)
     {

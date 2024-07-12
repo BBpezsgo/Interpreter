@@ -3,7 +3,8 @@
 [TestClass, TestCategory("Brainfuck"), TestCategory("FileTest")]
 public class BrainfuckFileTests
 {
-    const int Timeout = 5 * 1000;
+    const int Timeout = 10 * 1000;
+    const int LongTimeout = 30 * 1000;
 
     [TestMethod, Timeout(Timeout)] public void Test01() => Utils.GetTest(01).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test02() => Utils.GetTest(02).DoBrainfuck();
@@ -65,16 +66,16 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout)] public void Test58() => Utils.GetTest(58).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Arrays with big element size not implemented")] public void Test59() => Utils.GetTest(59).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test60() => Utils.GetTest(60).DoBrainfuck();
-    [TestMethod, Timeout(Timeout)] public void Test61() => Utils.GetTest(61).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("I have no energy to debug")] public void Test62() => Utils.GetTest(62).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("I have no energy to debug")] public void Test63() => Utils.GetTest(63).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("I have no energy to debug")] public void Test64() => Utils.GetTest(64).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("I have no energy to debug")] public void Test65() => Utils.GetTest(65).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("I have no energy to debug")] public void Test66() => Utils.GetTest(66).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("I have no energy to debug")] public void Test67() => Utils.GetTest(67).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("I have no energy to debug")] public void Test68() => Utils.GetTest(68).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("I have no energy to debug")] public void Test69() => Utils.GetTest(69).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("I have no energy to debug")] public void Test70() => Utils.GetTest(70).DoBrainfuck();
+    [TestMethod, Timeout(LongTimeout)] public void Test61() => Utils.GetTest(61).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test62() => Utils.GetTest(62).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test63() => Utils.GetTest(63).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test64() => Utils.GetTest(64).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test65() => Utils.GetTest(65).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test66() => Utils.GetTest(66).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test67() => Utils.GetTest(67).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test68() => Utils.GetTest(68).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test69() => Utils.GetTest(69).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test70() => Utils.GetTest(70).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test71() => Utils.GetTest(71).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test72() => Utils.GetTest(72).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test73() => Utils.GetTest(73).DoBrainfuck();

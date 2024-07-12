@@ -59,7 +59,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.BranchStart:
             {
                 if (instruction.Count != 1)
-                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext); }
+                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext, DebugInfo); }
 
                 if (Memory[_memoryPointer] == 0)
                 {
@@ -71,13 +71,13 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                         if (Code[_codePointer].OpCode == OpCodesCompact.BranchEnd)
                         {
                             if (depth == 0) return;
-                            if (depth < 0) throw new BrainfuckRuntimeException("Wat", CurrentContext);
+                            if (depth < 0) throw new BrainfuckRuntimeException("Wat", CurrentContext, DebugInfo);
                             depth--;
                         }
                         else if (Code[_codePointer].OpCode == OpCodesCompact.BranchStart)
                         { depth++; }
                     }
-                    throw new BrainfuckRuntimeException("Unclosed bracket", CurrentContext);
+                    throw new BrainfuckRuntimeException("Unclosed bracket", CurrentContext, DebugInfo);
                 }
                 break;
             }
@@ -85,7 +85,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.BranchEnd:
             {
                 if (instruction.Count != 1)
-                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext); }
+                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext, DebugInfo); }
 
                 if (Memory[_memoryPointer] != 0)
                 {
@@ -97,13 +97,13 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                         if (Code[_codePointer].OpCode == OpCodesCompact.BranchStart)
                         {
                             if (depth == 0) return;
-                            if (depth < 0) throw new BrainfuckRuntimeException("Wat", CurrentContext);
+                            if (depth < 0) throw new BrainfuckRuntimeException("Wat", CurrentContext, DebugInfo);
                             depth--;
                         }
                         else if (Code[_codePointer].OpCode == OpCodesCompact.BranchEnd)
                         { depth++; }
                     }
-                    throw new BrainfuckRuntimeException("Unexpected closing bracket", CurrentContext);
+                    throw new BrainfuckRuntimeException("Unexpected closing bracket", CurrentContext, DebugInfo);
                 }
                 break;
             }
@@ -111,7 +111,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.Out:
             {
                 if (instruction.Count != 1)
-                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext); }
+                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext, DebugInfo); }
 
                 OnOutput?.Invoke(Memory[_memoryPointer]);
                 break;
@@ -120,7 +120,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
             case OpCodesCompact.In:
             {
                 if (instruction.Count != 1)
-                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext); }
+                { throw new BrainfuckRuntimeException($"Invalid instruction {instruction}", CurrentContext, DebugInfo); }
 
                 Memory[_memoryPointer] = OnInput?.Invoke() ?? 0;
                 break;
@@ -143,7 +143,7 @@ public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
                 break;
             }
 
-            default: throw new BrainfuckRuntimeException($"Unknown instruction {instruction}", CurrentContext);
+            default: throw new BrainfuckRuntimeException($"Unknown instruction {instruction}", CurrentContext, DebugInfo);
         }
     }
 }

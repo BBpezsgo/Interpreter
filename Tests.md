@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=279&f=1&s=77)](#)
-[![](https://img.shields.io/badge/Passing-279-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-1-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-77-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=289&f=0&s=68)](#)
+[![](https://img.shields.io/badge/Passing-289-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-0-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-68-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -63,13 +63,13 @@
 | [58](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/58.bbc) | ✅ | ✅ |
 | [59](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/59.bbc) | ✅ | ✖ Arrays with big element size not implemented |
 | [60](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/60.bbc) | ✅ | ✅ |
-| [61](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/61.bbc) | ✅ | ❌ Test method Tests.BrainfuckFileTests.Test61 threw exception:   LanguageCore.CompilerException: This isn't supported at the moment (i don't want to implement it at the moment) |
-| [62](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/62.bbc) | ✅ | ✖ I have no energy to debug |
-| [63](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/63.bbc) | ✅ | ✖ I have no energy to debug |
-| [64](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/64.bbc) | ✅ | ✖ I have no energy to debug |
-| [65](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/65.bbc) | ✅ | ✖ I have no energy to debug |
-| [66](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/66.bbc) | ✅ | ✖ I have no energy to debug |
-| [67](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/67.bbc) | ✅ | ✖ I have no energy to debug |
-| [68](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/68.bbc) | ✅ | ✖ I have no energy to debug |
-| [69](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/69.bbc) | ✅ | ✖ I have no energy to debug |
-| [70](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/70.bbc) | ✅ | ✖ I have no energy to debug |
+| [61](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/61.bbc) | ✅ | ✅ |
+| [62](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/62.bbc) | ✅ | ✅ |
+| [63](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/63.bbc) | ✅ | ✅ |
+| [64](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/64.bbc) | ✅ | ✅ |
+| [65](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/65.bbc) | ✅ | ✅ |
+| [66](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/66.bbc) | ✅ | ✅ |
+| [67](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/67.bbc) | ✅ | ✅ |
+| [68](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/68.bbc) | ✅ | ✅ |
+| [69](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/69.bbc) | ✅ | ✅ |
+| [70](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/70.bbc) | ✅ | ✅ |

@@ -177,9 +177,21 @@ public readonly struct ExpectedResult
     }
 
     /// <exception cref="AssertFailedException"/>
+    public ExpectedResult Assert(BrainfuckResult other)
+    {
+        if (!string.Equals(StdOutput, other.StdOutput, StringComparison.Ordinal))
+        { throw new AssertFailedException($"Standard output isn't what is expected:{Environment.NewLine}Expected: \"{StdOutput.Escape()}\"{Environment.NewLine}Actual:   \"{other.StdOutput.Escape()}\""); }
+
+        if (unchecked((byte)ExitCode) != other.ExitCode)
+        { throw new AssertFailedException($"Exit code isn't what is expected:{Environment.NewLine}Expected: {unchecked((byte)ExitCode)}{Environment.NewLine}Actual:   {other.ExitCode}"); }
+
+        return this;
+    }
+
+    /// <exception cref="AssertFailedException"/>
     public ExpectedResult Assert(MainResult other, bool heapShouldBeEmpty)
     {
-        Assert((IResult)other);
+        Assert(other);
 
         if (heapShouldBeEmpty && HeapUtils.GetUsedSize(other.Heap.AsSpan()) != 0)
         { throw new AssertFailedException($"Heap isn't empty"); }
@@ -190,7 +202,7 @@ public readonly struct ExpectedResult
     /// <exception cref="AssertFailedException"/>
     public ExpectedResult Assert(BrainfuckResult other, bool memoryShouldBeEmpty, int? expectedMemoryPointer)
     {
-        Assert((IResult)other);
+        Assert(other);
 
         if (memoryShouldBeEmpty)
         {
@@ -716,7 +728,8 @@ public readonly struct BrainfuckResult : IResult
 {
     public readonly string StdOutput { get; }
 
-    public readonly int ExitCode => Memory[0];
+    public readonly byte ExitCode => Memory[0];
+    int IResult.ExitCode => ExitCode;
 
     public readonly int CodePointer { get; }
     public readonly int MemoryPointer { get; }

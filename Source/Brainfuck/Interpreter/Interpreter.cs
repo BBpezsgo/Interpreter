@@ -47,13 +47,13 @@ public partial class Interpreter : InterpreterBase<OpCodes>
                         if (Code[_codePointer] == OpCodes.BranchEnd)
                         {
                             if (depth == 0) return;
-                            if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
+                            if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext, DebugInfo);
                             depth--;
                         }
                         else if (Code[_codePointer] == OpCodes.BranchStart)
                         { depth++; }
                     }
-                    throw new BrainfuckRuntimeException($"Unclosed bracket", CurrentContext);
+                    throw new BrainfuckRuntimeException($"Unclosed bracket", CurrentContext, DebugInfo);
                 }
                 break;
             case OpCodes.BranchEnd:
@@ -67,13 +67,13 @@ public partial class Interpreter : InterpreterBase<OpCodes>
                         if (Code[_codePointer] == OpCodes.BranchStart)
                         {
                             if (depth == 0) return;
-                            if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext);
+                            if (depth < 0) throw new BrainfuckRuntimeException($"Wat", CurrentContext, DebugInfo);
                             depth--;
                         }
                         else if (Code[_codePointer] == OpCodes.BranchEnd)
                         { depth++; }
                     }
-                    throw new BrainfuckRuntimeException($"Unexpected closing bracket", CurrentContext);
+                    throw new BrainfuckRuntimeException($"Unexpected closing bracket", CurrentContext, DebugInfo);
                 }
                 break;
             case OpCodes.Out:
@@ -86,7 +86,7 @@ public partial class Interpreter : InterpreterBase<OpCodes>
                 _isPaused = true;
                 break;
             default:
-                throw new BrainfuckRuntimeException($"Unknown instruction {Code[_codePointer]}", CurrentContext);
+                throw new BrainfuckRuntimeException($"Unknown instruction {Code[_codePointer]}", CurrentContext, DebugInfo);
         }
     }
 }

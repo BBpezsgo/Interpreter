@@ -41,6 +41,7 @@ public struct BrainfuckGeneratorSettings
     public bool DontOptimize;
     public bool GenerateSmallComments;
     public bool GenerateComments;
+    public bool CleanupHeap;
 
     public readonly int HeapStart => StackSize + 1;
 
@@ -54,6 +55,7 @@ public struct BrainfuckGeneratorSettings
         DontOptimize = false,
         GenerateSmallComments = false,
         GenerateComments = false,
+        CleanupHeap = true,
     };
 
     public BrainfuckGeneratorSettings(BrainfuckGeneratorSettings other)
@@ -66,6 +68,7 @@ public struct BrainfuckGeneratorSettings
         DontOptimize = other.DontOptimize;
         GenerateSmallComments = other.GenerateSmallComments;
         GenerateComments = other.GenerateComments;
+        CleanupHeap = other.CleanupHeap;
     }
 }
 
@@ -745,7 +748,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         if (Heap.IsUsed)
         {
-            Heap.Destroy();
+            if (Settings.CleanupHeap)
+            { Heap.Destroy(); }
 
             string? heapInit = Heap.LateInit();
             Code.Insert(0, heapInit);

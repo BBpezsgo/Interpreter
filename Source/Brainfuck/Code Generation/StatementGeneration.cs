@@ -470,7 +470,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         GeneralType referenceType = FindStatementType(dereference);
 
-        if (referenceType is not PointerType)
+        if (referenceType is not PointerType pointerType)
         { throw new CompilerException($"This isn't a pointer", dereference, CurrentFile); }
 
         int pointerAddress = Stack.NextAddress;
@@ -504,10 +504,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         int valueAddress = Stack.NextAddress;
         GenerateCodeForStatement(value);
 
-        for (int i = 0; i < valueType.Size; i++)
+        if (valueType.Size == 1 && AllowOtherOptimizations)
         {
-            Code.AddValue(pointerAddress, i);
             Heap.Set(pointerAddress, valueAddress);
+        }
+        else
+        {
+            using StackAddress tempPointerAddress = Stack.PushVirtual(1);
+            for (int i = 0; i < valueType.Size; i++)
+            {
+                Code.CopyValue(pointerAddress, tempPointerAddress);
+                Heap.Set(tempPointerAddress, valueAddress + i);
+                Code.AddValue(pointerAddress, 1);
+            }
         }
 
         Stack.PopVirtual();
@@ -1485,38 +1494,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (GetVariable(statement.Content, out BrainfuckVariable? variable, out _))
         {
-            if (variable.IsDiscarded)
-            { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement, CurrentFile); }
-
-            int variableSize = variable.Size;
-
-            if (variableSize <= 0)
-            { throw new CompilerException($"Can't load variable \"{variable.Name}\" because it's size is {variableSize} (bruh)", statement, CurrentFile); }
-
-            int loadTarget = Stack.PushVirtual(variableSize);
-
-            using (Code.Block(this, $"Load variable \"{variable.Name}\" (from {variable.Address}) to {loadTarget}"))
-            {
-                for (int offset = 0; offset < variableSize; offset++)
-                {
-                    int offsettedSource = variable.Address + offset;
-                    int offsettedTarget = loadTarget + offset;
-
-                    if (AllowOtherOptimizations &&
-                        VariableCanBeDiscarded != null &&
-                        VariableCanBeDiscarded == variable.Name)
-                    {
-                        Code.MoveValue(offsettedSource, offsettedTarget);
-                        DiscardVariable(CompiledVariables, variable.Name);
-                        Optimizations++;
-                    }
-                    else
-                    {
-                        Code.CopyValue(offsettedSource, offsettedTarget);
-                    }
-                }
-            }
-
+            GenerateCodeForStatement(variable, statement);
             return;
         }
 
@@ -1534,6 +1512,40 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         { throw new NotSupportedException($"Function pointers not supported by brainfuck", statement, CurrentFile); }
 
         throw new CompilerException($"Symbol \"{statement}\" not found", statement, CurrentFile);
+    }
+    void GenerateCodeForStatement(BrainfuckVariable variable, IPositioned statement)
+    {
+        if (variable.IsDiscarded)
+        { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement, CurrentFile); }
+
+        int variableSize = variable.Size;
+
+        if (variableSize <= 0)
+        { throw new CompilerException($"Can't load variable \"{variable.Name}\" because it's size is {variableSize} (bruh)", statement, CurrentFile); }
+
+        int loadTarget = Stack.PushVirtual(variableSize);
+
+        using (Code.Block(this, $"Load variable \"{variable.Name}\" (from {variable.Address}) to {loadTarget}"))
+        {
+            for (int offset = 0; offset < variableSize; offset++)
+            {
+                int offsettedSource = variable.Address + offset;
+                int offsettedTarget = loadTarget + offset;
+
+                if (AllowOtherOptimizations &&
+                    VariableCanBeDiscarded != null &&
+                    VariableCanBeDiscarded == variable.Name)
+                {
+                    Code.MoveValue(offsettedSource, offsettedTarget);
+                    DiscardVariable(CompiledVariables, variable.Name);
+                    Optimizations++;
+                }
+                else
+                {
+                    Code.CopyValue(offsettedSource, offsettedTarget);
+                }
+            }
+        }
     }
     void GenerateCodeForStatement(BinaryOperatorCall statement)
     {
@@ -2066,6 +2078,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugInfoBlock debugBlock = DebugBlock(pointer);
 
+        if (pointer.PrevStatement is Identifier variableIdentifier)
+        {
+            if (!GetVariable(variableIdentifier.Content, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
+            { throw notFoundError.Instantiate(variableIdentifier, CurrentFile); }
+
+            if (variable.Size != 1)
+            { throw new CompilerException($"Bruh", variableIdentifier, CurrentFile); }
+
+            if (variable.IsReference)
+            {
+                GenerateCodeForStatement(variable, pointer.PrevStatement);
+                return;
+            }
+        }
+
         if (TryCompute(pointer, out CompiledValue computed))
         {
             Stack.Push(computed);
@@ -2076,35 +2103,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GenerateCodeForStatement(pointer.PrevStatement);
 
         Heap.Get(pointerAddress, pointerAddress);
-
-        /*
-        if (pointer.Statement is Identifier identifier)
-        {
-            if (Constants.TryFind(identifier.Value.Content, out ConstantVariable constant))
-            {
-                if (constant.Value.Type != ValueType.Byte)
-                { throw new CompilerException($"Address value must be a byte (not {constant.Value.Type})", identifier); }
-
-                byte address = (byte)constant.Value;
-                using (Code.CommentBlock(this, $"Load value from address {address}"))
-                {
-                    this.Stack.PushVirtual(1);
-
-                    int nextAddress = Stack.NextAddress;
-
-                    using (Code.CommentBlock(this, $"Move {address} to {nextAddress} and {nextAddress + 1}"))
-                    { Code.MoveValue(address, nextAddress, nextAddress + 1); }
-
-                    using (Code.CommentBlock(this, $"Move {nextAddress + 1} to {address}"))
-                    { Code.MoveValue(nextAddress + 1, address); }
-                }
-
-                return;
-            }
-        }
-
-        throw new NotSupportedException($"Runtime pointer address not supported", pointer.Statement);
-        */
     }
     void GenerateCodeForStatement(NewInstance newInstance)
     {

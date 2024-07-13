@@ -425,7 +425,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
-        if (prevType is not StructType structType)
+        if (!prevType.Is(out StructType? structType))
         { throw new NotImplementedException(); }
 
         if (!structType.GetField(field.Identifier.Content, false, out _, out int fieldOffset))
@@ -440,7 +440,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         GeneralType prevType = FindStatementType(indexCall.PrevStatement);
 
-        if (prevType is not ArrayType arrayType)
+        if (!prevType.Is(out ArrayType? arrayType))
         { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
 
         if (!TryCompute(indexCall.Index, out CompiledValue index))
@@ -460,14 +460,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     };
     StatementWithValue? NeedDerefernce(IndexCall indexCall)
     {
-        if (FindStatementType(indexCall.PrevStatement) is PointerType)
+        if (FindStatementType(indexCall.PrevStatement).Is<PointerType>())
         { return indexCall.PrevStatement; }
 
         return NeedDerefernce(indexCall.PrevStatement);
     }
     StatementWithValue? NeedDerefernce(Field field)
     {
-        if (FindStatementType(field.PrevStatement) is PointerType)
+        if (FindStatementType(field.PrevStatement).Is<PointerType>())
         { return field.PrevStatement; }
 
         return NeedDerefernce(field.PrevStatement);
@@ -490,7 +490,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         if (!GetVariable(arrayIdentifier.Content, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
         { throw notFoundError.Instantiate(arrayIdentifier, CurrentFile); }
 
-        if (variable.Type is ArrayType arrayType)
+        if (variable.Type.Is(out ArrayType? arrayType))
         {
             size = arrayType.Of.Size;
             address = variable.Address;
@@ -513,7 +513,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     {
         GeneralType type = FindStatementType(field.PrevStatement);
 
-        if (type is StructType structType)
+        if (type.Is(out StructType? structType))
         {
             if (!TryGetAddress(field.PrevStatement, out int prevAddress, out _, until))
             {
@@ -660,7 +660,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
                 }
 
                 if (variable.DeallocateOnClean &&
-                    variable.Type is PointerType)
+                    variable.Type.Is<PointerType>())
                 {
                     GenerateDestructor(new Identifier(Tokenizing.Token.CreateAnonymous(variable.Name), variable.File));
                 }

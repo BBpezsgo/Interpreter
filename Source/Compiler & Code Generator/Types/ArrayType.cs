@@ -10,6 +10,7 @@ public class ArrayType : GeneralType,
     public GeneralType Of { get; }
     public int Length { get; }
 
+    public override GeneralType FinalValue => new ArrayType(Of.FinalValue, Length);
     public override int Size => Length * Of.Size;
     public override int SizeBytes => Length * Of.SizeBytes;
     public override BitWidth BitWidth => throw new InvalidOperationException();

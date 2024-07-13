@@ -20,7 +20,7 @@ public class CompiledOperator : FunctionDefinition,
     public new CompiledStruct? Context { get; }
     public List<Reference<StatementWithValue>> References { get; }
 
-    public bool ReturnSomething => Type != BasicType.Void;
+    public bool ReturnSomething => !Type.SameAs(BasicType.Void);
     IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
     IReadOnlyList<GeneralType> ICompiledFunction.ParameterTypes => ParameterTypes;
 

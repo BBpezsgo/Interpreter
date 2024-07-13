@@ -12,7 +12,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         GeneralType addressType = FindStatementType(address);
 
-        if (addressType is not FunctionType)
+        if (!addressType.Is<FunctionType>())
         { throw new CompilerException($"This should be a function pointer and not {addressType}", address, CurrentFile); }
 
         int returnToValueInstruction = GeneratedCode.Count;
@@ -116,7 +116,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
-        if (prevType is not StructType structType)
+        if (!prevType.Is(out StructType? structType))
         { throw new NotImplementedException(); }
 
         if (!structType.GetField(field.Identifier.Content, true, out _, out int fieldOffset))
@@ -131,7 +131,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GeneralType prevType = FindStatementType(indexCall.PrevStatement);
 
-        if (prevType is not ArrayType arrayType)
+        if (!prevType.Is(out ArrayType? arrayType))
         { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
 
         if (!TryCompute(indexCall.Index, out CompiledValue index))
@@ -209,13 +209,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
     Address GetBaseAddress(Field statement)
     {
         Address address = GetBaseAddress(statement.PrevStatement);
-        if (FindStatementType(statement.PrevStatement) is PointerType) throw null!;
+        if (FindStatementType(statement.PrevStatement).Is<PointerType>()) throw null!;
         return address;
     }
     Address GetBaseAddress(IndexCall statement)
     {
         Address address = GetBaseAddress(statement.PrevStatement);
-        if (FindStatementType(statement.PrevStatement) is PointerType) throw null!;
+        if (FindStatementType(statement.PrevStatement).Is<PointerType>()) throw null!;
         return address;
     }
 
@@ -228,14 +228,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
     };
     StatementWithValue? NeedDerefernce(IndexCall indexCall)
     {
-        if (FindStatementType(indexCall.PrevStatement) is PointerType)
+        if (FindStatementType(indexCall.PrevStatement).Is<PointerType>())
         { return indexCall.PrevStatement; }
 
         return NeedDerefernce(indexCall.PrevStatement);
     }
     StatementWithValue? NeedDerefernce(Field field)
     {
-        if (FindStatementType(field.PrevStatement) is PointerType)
+        if (FindStatementType(field.PrevStatement).Is<PointerType>())
         { return field.PrevStatement; }
 
         if (field.PrevStatement is Identifier identifier)
@@ -540,7 +540,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = GeneratedCode.Count - 1;
 
-        GenerateCodeForLiteralString("null pointer");
+        GenerateCodeForLiteralString("null pointer", false);
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(BytecodeProcessor.PointerBitWidth));
@@ -553,7 +553,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void HeapLoad(StatementWithValue pointer, int offset, int size)
     {
-        if (FindStatementType(pointer) is not PointerType pointerType)
+        if (!FindStatementType(pointer).Is(out PointerType? pointerType))
         { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
 
         GenerateCodeForStatement(pointer, resolveReference: false);
@@ -570,7 +570,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void HeapStore(StatementWithValue pointer, int offset, int size)
     {
-        if (FindStatementType(pointer) is not PointerType pointerType)
+        if (!FindStatementType(pointer).Is(out PointerType? pointerType))
         { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
 
         GenerateCodeForStatement(pointer, resolveReference: false);

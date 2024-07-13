@@ -10,12 +10,13 @@ public abstract class GeneralType :
     IEquatable<BasicType>,
     IEquatable<RuntimeType>
 {
-    public bool CanBeBuiltin => this is BuiltinType or PointerType;
-
     public abstract int Size { get; }
     public abstract int SizeBytes { get; }
     /// <exception cref="InvalidOperationException"/>
     public abstract BitWidth BitWidth { get; }
+
+    public virtual GeneralType FinalValue => this;
+    public bool CanBeBuiltin => FinalValue is BuiltinType or PointerType;
 
     public static GeneralType From(GeneralType other) => other switch
     {
@@ -25,6 +26,7 @@ public abstract class GeneralType :
         FunctionType v => new FunctionType(v),
         ArrayType v => new ArrayType(v),
         PointerType v => new PointerType(v),
+        AliasType v => new AliasType(v),
         _ => throw new NotImplementedException()
     };
 
@@ -131,7 +133,7 @@ public abstract class GeneralType :
         if (!typeFinder.Invoke(type.Identifier, type.File, out result))
         { throw new CompilerException($"Can't parse \"{type}\" to {nameof(GeneralType)}", type, uri); }
 
-        if (result is StructType resultStructType &&
+        if (result.Is(out StructType? resultStructType) &&
             resultStructType.Struct.Template is not null)
         {
             if (type.TypeArguments.HasValue)
@@ -173,6 +175,7 @@ public abstract class GeneralType :
         Uri? uri = null)
         => GeneralType.FromArray(types?.Select(v => v.Type), typeFinder, constComputer, uri);
 
+    [Obsolete]
     public static bool operator ==(GeneralType? a, GeneralType? b)
     {
         if (a is null && b is null) return true;
@@ -180,21 +183,49 @@ public abstract class GeneralType :
 
         return a.Equals(b);
     }
+    [Obsolete]
     public static bool operator !=(GeneralType? a, GeneralType? b) => !(a == b);
 
+    [Obsolete]
     public static bool operator ==([NotNullWhen(true)] GeneralType? a, RuntimeType b) => a is not null && a.Equals(b);
+    [Obsolete]
     public static bool operator !=(GeneralType? a, RuntimeType b) => !(a == b);
 
+    [Obsolete]
     public static bool operator ==([NotNullWhen(true)] GeneralType? a, BasicType b) => a is not null && a.Equals(b);
+    [Obsolete]
     public static bool operator !=(GeneralType? a, BasicType b) => !(a == b);
+
+    public bool SameAs([NotNullWhen(true)] GeneralType? other)
+    {
+        if (other is null) return false;
+        return FinalValue.Equals(other.FinalValue);
+    }
+    public bool SameAs(RuntimeType other) => FinalValue.Equals(other);
+    public bool SameAs(BasicType other) => FinalValue.Equals(other);
+
+    public bool Is<T>() where T : GeneralType => FinalValue is T;
+    public bool Is<T>([NotNullWhen(true)] out T? value) where T : GeneralType
+    {
+        if (FinalValue is T _value)
+        {
+            value = _value;
+            return true;
+        }
+        else
+        {
+            value = null;
+            return false;
+        }
+    }
 
     public abstract override bool Equals(object? obj);
     public abstract bool Equals(GeneralType? other);
     public abstract bool Equals(TypeInstance? other);
     public abstract override int GetHashCode();
     public abstract override string ToString();
-    public bool Equals(BasicType other) => this is BuiltinType builtinType && builtinType.Type == other;
-    public bool Equals(RuntimeType other) => this switch
+    public bool Equals(BasicType other) => FinalValue is BuiltinType builtinType && builtinType.Type == other;
+    public bool Equals(RuntimeType other) => FinalValue switch
     {
         BuiltinType builtinType => builtinType.RuntimeType == other,
         PointerType => other == RuntimeType.Integer,
@@ -221,18 +252,18 @@ public abstract class GeneralType :
 
     public static bool TryGetTypeParameters(GeneralType defined, GeneralType passed, Dictionary<string, GeneralType> typeParameters)
     {
-        if (passed is GenericType passedGenericType)
+        if (passed.Is(out GenericType? passedGenericType))
         {
             if (typeParameters.ContainsKey(passedGenericType.Identifier))
             { return false; }
             throw new NotImplementedException($"This should be non-generic");
         }
 
-        if (defined is GenericType definedGenericType)
+        if (defined.Is(out GenericType? definedGenericType))
         {
             if (typeParameters.TryGetValue(definedGenericType.Identifier, out GeneralType? addedTypeParameter))
             {
-                if (addedTypeParameter != passed) return false;
+                if (!addedTypeParameter.SameAs(passed)) return false;
             }
             else
             {
@@ -242,12 +273,12 @@ public abstract class GeneralType :
             return true;
         }
 
-        if (defined is PointerType definedPointerType && passed is PointerType passedPointerType)
+        if (defined.Is(out PointerType? definedPointerType) && passed.Is(out PointerType? passedPointerType))
         {
             return TryGetTypeParameters(definedPointerType.To, passedPointerType.To, typeParameters);
         }
 
-        if (defined is StructType definedStructType && passed is StructType passedStructType)
+        if (defined.Is(out StructType? definedStructType) && passed.Is(out StructType? passedStructType))
         {
             if (definedStructType.Struct.Identifier.Content != passedStructType.Struct.Identifier.Content) return false;
             if (definedStructType.Struct.Template is not null && passedStructType.Struct.Template is not null)
@@ -261,7 +292,7 @@ public abstract class GeneralType :
                     GeneralType typeParamValue = passedStructType.TypeArguments[typeParamName];
 
                     if (typeParameters.TryGetValue(typeParamName, out GeneralType? addedTypeParameter))
-                    { if (addedTypeParameter != typeParamValue) return false; }
+                    { if (!addedTypeParameter.SameAs(typeParamValue)) return false; }
                     else
                     { typeParameters.Add(typeParamName, typeParamValue); }
                 }
@@ -270,14 +301,14 @@ public abstract class GeneralType :
             }
         }
 
-        if (!defined.Equals(passed)) return false;
+        if (!defined.SameAs(passed)) return false;
 
         return true;
     }
 
     public bool AllGenericsDefined()
     {
-        switch (this)
+        switch (FinalValue)
         {
             case GenericType: return false;
             case BuiltinType: return true;
@@ -352,11 +383,18 @@ public abstract class GeneralType :
                     return new StructType(structType.Struct, structType.File, structTypeParameterValues);
                 }
 
-                break;
+                return null;
             }
-        }
 
-        return null;
+            case BuiltinType:
+                return null;
+
+            case AliasType: // TODO
+                return null;
+
+            default:
+                throw new NotImplementedException();
+        }
     }
 
     public static IEnumerable<GeneralType> InsertTypeParameters(IEnumerable<GeneralType> types, IReadOnlyDictionary<string, GeneralType> typeArguments)

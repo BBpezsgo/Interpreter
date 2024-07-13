@@ -39,7 +39,7 @@ public abstract class TypeInstance : IEquatable<TypeInstance>, IPositioned
     {
         analyzedType = default;
 
-        switch (type)
+        switch (type.FinalValue)
         {
             case StructType:
                 analyzedType = TokenAnalyzedType.Struct;
@@ -89,7 +89,7 @@ public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStack
 
     public override void SetAnalyzedType(GeneralType type)
     {
-        if (type is not ArrayType arrayType) return;
+        if (!type.Is(out ArrayType? arrayType)) return;
 
         StackArrayOf.SetAnalyzedType(arrayType.Of);
     }
@@ -131,7 +131,7 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
 
     public override void SetAnalyzedType(GeneralType type)
     {
-        if (type is not FunctionType functionType) return;
+        if (!type.Is(out FunctionType? functionType)) return;
 
         FunctionReturnType.SetAnalyzedType(functionType.ReturnType);
 
@@ -279,7 +279,7 @@ public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?
 
     public override void SetAnalyzedType(GeneralType type)
     {
-        if (type is not PointerType pointerType) return;
+        if (!type.Is(out PointerType? pointerType)) return;
         To.SetAnalyzedType(pointerType.To);
     }
 

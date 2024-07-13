@@ -33,47 +33,10 @@ public partial struct CompiledValue :
         _ => throw new UnreachableException(),
     };
 
-    /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
-    public object Cast(Type conversionType)
-    {
-        if (conversionType == typeof(byte)) return (byte)this;
-        if (conversionType == typeof(sbyte)) return (sbyte)(byte)this;
-        if (conversionType == typeof(short)) return (short)(ushort)this;
-        if (conversionType == typeof(ushort)) return (ushort)this;
-        if (conversionType == typeof(int)) return (int)this;
-        if (conversionType == typeof(uint)) return (uint)(int)this;
-        if (conversionType == typeof(long)) return (long)(int)this;
-        if (conversionType == typeof(ulong)) return (ulong)(int)this;
-        if (conversionType == typeof(float)) return (float)this;
-        if (conversionType == typeof(decimal)) return (decimal)(float)this;
-        if (conversionType == typeof(double)) return (double)(float)this;
-        if (conversionType == typeof(bool)) return (bool)this;
-        if (conversionType == typeof(char)) return (char)this;
-
-        if (conversionType == typeof(IntPtr))
-        {
-            if (IntPtr.Size == 4)
-            { return new IntPtr((int)this); }
-            else
-            { return new IntPtr((long)(int)this); }
-        }
-
-        if (conversionType == typeof(UIntPtr))
-        {
-            if (UIntPtr.Size == 4)
-            { return new UIntPtr((uint)(int)this); }
-            else
-            { return new UIntPtr((ulong)(int)this); }
-        }
-
-        throw new InvalidCastException($"Can't cast {Type} to {conversionType}");
-    }
-
     public readonly bool TryCast(GeneralType type, out CompiledValue value)
     {
         value = default;
-        return type switch
+        return type.FinalValue switch
         {
             BuiltinType builtinType => TryCast(builtinType, out value),
             _ => false
@@ -149,10 +112,6 @@ public partial struct CompiledValue :
             default: return false;
         }
     }
-
-    /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
-    public T Cast<T>() => (T)Cast(typeof(T));
 
     public static bool TryCast(ref CompiledValue value, RuntimeType targetType)
     {

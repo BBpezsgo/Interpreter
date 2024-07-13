@@ -12,6 +12,8 @@ public class StructType : GeneralType,
     public ImmutableDictionary<string, GeneralType> TypeArguments { get; }
     public Uri File { get; }
 
+    public override GeneralType FinalValue => new StructType(Struct, File, TypeArguments.Select(v => new KeyValuePair<string, GeneralType>(v.Key, v.Value.FinalValue)));
+
     public override int Size
     {
         get
@@ -65,6 +67,13 @@ public class StructType : GeneralType,
     }
 
     public override BitWidth BitWidth => throw new InvalidOperationException();
+
+    StructType(CompiledStruct @struct, Uri file, IEnumerable<KeyValuePair<string, GeneralType>> typeArguments)
+    {
+        Struct = @struct;
+        File = file;
+        TypeArguments = typeArguments.ToImmutableDictionary();
+    }
 
     public StructType(StructType other)
     {
@@ -146,7 +155,7 @@ public class StructType : GeneralType,
 
     GeneralType ReplaceType(GeneralType type)
     {
-        if (type is not GenericType genericType)
+        if (!type.Is(out GenericType? genericType))
         { return type; }
 
         if (!TypeArguments.TryGetValue(genericType.Identifier, out GeneralType? result))

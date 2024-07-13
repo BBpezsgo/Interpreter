@@ -279,7 +279,8 @@ public sealed class Compiler
     {
         if (CodeGenerator.GetAlias(CompiledAliases, name.Content, relevantFile, out CompiledAlias? alias, out _))
         {
-            result = alias.Value;
+            // HERE
+            result = new AliasType(alias.Value, alias);
             return true;
         }
 
@@ -302,7 +303,7 @@ public sealed class Compiler
             }
         }
 
-        if (CodeGenerator.GetFunction<CompiledFunction, Token, string>(
+        if (CodeGenerator.GetFunction<CompiledFunction, Token, string, GeneralType>(
             new CodeGenerator.Functions<CompiledFunction>()
             {
                 Compiled = CompiledFunctions,
@@ -311,7 +312,7 @@ public sealed class Compiler
             "function",
             null,
 
-            CodeGenerator.FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, relevantFile),
+            CodeGenerator.FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, (v, _) => v, relevantFile),
             out CodeGenerator.FunctionQueryResult<CompiledFunction>? result_,
             out _
         ))
@@ -392,10 +393,10 @@ public sealed class Compiler
                         break;
                     }
 
-                    if (externalFunction.ParametersSize != parameterTypes.Sum(v => v == BasicType.Void ? 0 : v.SizeBytes))
+                    if (externalFunction.ParametersSize != parameterTypes.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.SizeBytes))
                     { throw new CompilerException($"Wrong size of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
 
-                    if (externalFunction.ReturnValueSize != (type == BasicType.Void ? 0 : type.SizeBytes))
+                    if (externalFunction.ReturnValueSize != (type.SameAs(BasicType.Void) ? 0 : type.SizeBytes))
                     { throw new CompilerException($"Wrong size of return type passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
 
                     break;
@@ -416,7 +417,7 @@ public sealed class Compiler
 
                     string builtinName = attribute.Parameters[0].Value;
 
-                    if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out (GeneralType ReturnValue, ImmutableArray<GeneralType> Parameters) builtinFunction))
+                    if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out BuiltinFunction? builtinFunction))
                     {
                         // AnalysisCollection?.Warnings.Add(new Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
                         break;
@@ -425,19 +426,16 @@ public sealed class Compiler
                     if (builtinFunction.Parameters.Length != function.Parameters.Count)
                     { throw new CompilerException($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File); }
 
-                    if (builtinFunction.ReturnValue != type)
+                    if (!builtinFunction.Type.Invoke(type))
                     { throw new CompilerException($"Wrong type defined for function \"{builtinName}\"", function.Type, function.File); }
 
                     for (int i = 0; i < builtinFunction.Parameters.Length; i++)
                     {
-                        GeneralType definedParameterType = builtinFunction.Parameters[i];
+                        Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
                         GeneralType passedParameterType = parameterTypes[i];
                         function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
-                        if (passedParameterType == definedParameterType)
-                        { continue; }
-
-                        if (passedParameterType is PointerType && definedParameterType is PointerType)
+                        if (definedParameterType.Invoke(passedParameterType))
                         { continue; }
 
                         throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.File);
@@ -475,10 +473,10 @@ public sealed class Compiler
         {
             if (ExternalFunctions.TryGet(name, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
             {
-                if (externalFunction.ParametersSize != parametersType.Sum(v => v == BasicType.Void ? 0 : v.SizeBytes))
+                if (externalFunction.ParametersSize != parametersType.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.SizeBytes))
                 { throw new CompilerException($"Wrong size of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
 
-                if (externalFunction.ReturnValueSize != (type == BasicType.Void ? 0 : type.SizeBytes))
+                if (externalFunction.ReturnValueSize != (type.SameAs(BasicType.Void) ? 0 : type.SizeBytes))
                 { throw new CompilerException($"Wrong size of return type passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
             }
             else

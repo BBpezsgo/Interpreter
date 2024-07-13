@@ -23,7 +23,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create<StatementWithValue>(Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position));
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, FindStatementTypes(parameters), CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, parameters, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? error, AddCompilable))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, CurrentFile); }
         if (!result.Function.ReturnSomething)
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", position, CurrentFile); }
@@ -44,7 +44,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
         ImmutableArray<GeneralType> parameterTypes = FindStatementTypes(parameters);
 
-        if (deallocateableType is not PointerType deallocateablePointerType)
+        if (!deallocateableType.Is(out PointerType? deallocateablePointerType))
         {
             AnalysisCollection?.Warnings.Add(new Warning($"The \"delete\" keyword-function is only working on pointers so I skip this", value, CurrentFile));
             return;
@@ -54,7 +54,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             GenerateDeallocator(value);
 
-            if (deallocateablePointerType.To is not BuiltinType)
+            if (!deallocateablePointerType.To.Is<BuiltinType>())
             {
                 AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deallocateablePointerType}\" not found", value, CurrentFile));
                 AnalysisCollection?.Warnings.Add(error.InstantiateWarning(value, CurrentFile));
@@ -82,9 +82,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     void GenerateDeallocator(StatementWithValue value)
     {
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
-        ImmutableArray<GeneralType> parameterTypes = FindStatementTypes(parameters);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameters, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
 
         GenerateCodeForFunction(result.Function, parameters, null, value);
@@ -148,9 +147,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (initialValueType.Size != type.Size)
             { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
 
-            if (type is ArrayType arrayType)
+            if (type.Is(out ArrayType? arrayType))
             {
-                if (arrayType.Of == BasicType.Char &&
+                if (arrayType.Of.SameAs(BasicType.Char) &&
                     initialValue is Literal literal)
                 {
                     if (literal.Type != LiteralType.String)
@@ -192,7 +191,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
         else
         {
-            if (type is ArrayType arrayType)
+            if (type.Is(out ArrayType? arrayType))
             {
                 int arraySize = arrayType.Length;
 
@@ -243,10 +242,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType type = FindStatementType(statementToSet);
         GeneralType valueType = FindStatementType(value, type);
 
-        if (prevType is PointerType pointerType)
+        if (prevType.Is(out PointerType? pointerType))
         {
             using DebugInfoBlock debugBlock = DebugBlock(new Position(statementToSet, value));
-            if (pointerType.To is not StructType structPointerType)
+            if (!pointerType.To.Is(out StructType? structPointerType))
             { throw new CompilerException($"Could not get the field offsets of type {pointerType}", statementToSet.PrevStatement, CurrentFile); }
 
             if (!structPointerType.GetField(statementToSet.Identifier.Content, false, out CompiledField? fieldDefinition, out int fieldOffset))
@@ -275,10 +274,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (prevType is not StructType)
+        if (!prevType.Is<StructType>())
         { throw new NotImplementedException(); }
 
-        if (type != valueType)
+        if (!type.SameAs(valueType))
         { throw new CompilerException($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, CurrentFile); }
 
         if (!TryGetAddress(statementToSet, out int address, out int size))
@@ -359,9 +358,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GeneralType valueType = FindStatementType(value);
             int valueSize = valueType.Size;
 
-            if (variable.Type is ArrayType arrayType)
+            if (variable.Type.Is(out ArrayType? arrayType))
             {
-                if (arrayType.Of == BasicType.Char)
+                if (arrayType.Of.SameAs(BasicType.Char))
                 {
                     if (value is not Literal literal)
                     { throw new InternalException(); }
@@ -470,7 +469,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         GeneralType referenceType = FindStatementType(dereference);
 
-        if (referenceType is not PointerType pointerType)
+        if (!referenceType.Is(out PointerType? pointerType))
         { throw new CompilerException($"This isn't a pointer", dereference, CurrentFile); }
 
         int pointerAddress = Stack.NextAddress;
@@ -550,19 +549,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (prevType is PointerType pointerType)
+        if (prevType.Is(out PointerType? pointerType))
         {
             int valueAddress = Stack.NextAddress;
             GenerateCodeForStatement(value);
 
-            if (pointerType.To != valueType)
+            if (!pointerType.To.SameAs(valueType))
             { throw new CompilerException("Bruh", value, CurrentFile); }
 
             int pointerAddress = Stack.NextAddress;
             GenerateCodeForStatement(statement.PrevStatement);
 
             GeneralType indexType = FindStatementType(statement.Index);
-            if (indexType is not BuiltinType)
+            if (!indexType.Is<BuiltinType>())
             { throw new CompilerException($"Index type must be built-in (ie. \"int\") and not {indexType}", statement.Index, CurrentFile); }
             int indexAddress = Stack.NextAddress;
             GenerateCodeForStatement(statement.Index);
@@ -594,12 +593,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         using (Code.Block(this, $"Set array (variable {variable.Name}) index ({statement.Index}) (at {variable.Address}) to {value}"))
         {
-            if (variable.Type is not ArrayType arrayType)
+            if (!variable.Type.Is(out ArrayType? arrayType))
             { throw new CompilerException($"Index setter for type \"{variable.Type}\" not found", statement, CurrentFile); }
 
             GeneralType elementType = arrayType.Of;
 
-            if (elementType != valueType)
+            if (!elementType.SameAs(valueType))
             { throw new CompilerException("Bruh", value, CurrentFile); }
 
             int elementSize = elementType.Size;
@@ -625,7 +624,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     #endregion
 
     #region GenerateCodeForStatement()
-    void GenerateCodeForStatement(Statement statement)
+    void GenerateCodeForStatement(Statement statement, GeneralType? expectedType = null)
     {
         switch (statement)
         {
@@ -634,7 +633,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case IfContainer v: GenerateCodeForStatement(v.ToLinks()); break;
             case WhileLoop v: GenerateCodeForStatement(v); break;
             case ForLoop v: GenerateCodeForStatement(v); break;
-            case Literal v: GenerateCodeForStatement(v); break;
+            case Literal v: GenerateCodeForStatement(v, expectedType); break;
             case Identifier v: GenerateCodeForStatement(v); break;
             case BinaryOperatorCall v: GenerateCodeForStatement(v); break;
             case UnaryOperatorCall v: GenerateCodeForStatement(v); break;
@@ -689,7 +688,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         GeneralType arrayType = FindStatementType(indexCall.PrevStatement);
 
-        if (arrayType is ArrayType arrayType1)
+        if (arrayType.Is(out ArrayType? arrayType1))
         {
             if (!TryGetAddress(indexCall.PrevStatement, out int arrayAddress, out _))
             { throw new CompilerException($"Failed to get array address", indexCall.PrevStatement, CurrentFile); }
@@ -716,7 +715,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!GetIndexGetter(arrayType, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
         {
-            if (arrayType is not PointerType pointerType)
+            if (!arrayType.Is(out PointerType? pointerType))
             { throw new CompilerException($"Index getter \"{arrayType}[]\" not found", indexCall, CurrentFile); }
 
             int resultAddress = Stack.Push(0);
@@ -725,7 +724,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GenerateCodeForStatement(indexCall.PrevStatement);
 
             GeneralType indexType = FindStatementType(indexCall.Index);
-            if (indexType is not BuiltinType)
+            if (!indexType.Is<BuiltinType>())
             { throw new CompilerException($"Index type must be built-in (ie. \"int\") and not {indexType}", indexCall.Index, CurrentFile); }
             int indexAddress = Stack.NextAddress;
             GenerateCodeForStatement(indexCall.Index);
@@ -770,7 +769,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         {
             if (@if.Condition is TypeCast _typeCast &&
-                GeneralType.From(_typeCast.Type, FindType, TryCompute) is BuiltinType &&
+                GeneralType.From(_typeCast.Type, FindType, TryCompute).Is<BuiltinType>() &&
                 _typeCast.PrevStatement is Literal _literal &&
                 _literal.Type == LiteralType.String)
             {
@@ -1232,7 +1231,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
                     { constantValue = castedValue; }
 
-                    if (!variable.Type.Equals(constantValue.Type))
+                    if (!variable.Type.SameAs(constantValue.Type))
                     { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
 
                     Code.AddValue(variable.Address, constantValue);
@@ -1278,7 +1277,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
                     { constantValue = castedValue; }
 
-                    if (variable.Type != constantValue.Type)
+                    if (!variable.Type.SameAs(constantValue.Type))
                     { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
 
                     Code.AddValue(variable.Address, -constantValue);
@@ -1435,7 +1434,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute, constructorCall.File);
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
-        if (instanceType is StructType structType)
+        if (instanceType.Is(out StructType? structType))
         { structType.Struct?.References.Add(constructorCall.Type, CurrentFile); }
 
         if (!GetConstructor(instanceType, parameters, CurrentFile, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound))
@@ -1455,7 +1454,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         GenerateCodeForFunction(constructor, constructorCall.Arguments, typeArguments, constructorCall);
     }
-    void GenerateCodeForStatement(Literal statement)
+    void GenerateCodeForStatement(Literal statement, GeneralType? expectedType = null)
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
@@ -1479,7 +1478,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     throw new NotSupportedException($"Floats not supported by the brainfuck compiler", statement, CurrentFile);
                 case LiteralType.String:
                 {
-                    GenerateCodeForLiteralString(statement);
+                    if (expectedType is not null &&
+                        expectedType.Is(out PointerType? pointerType) &&
+                        pointerType.To.SameAs(BasicType.Char))
+                    {
+                        // TODO: not true but false
+                        GenerateCodeForLiteralString(statement, true);
+                    }
+                    else
+                    {
+                        GenerateCodeForLiteralString(statement, true);
+                    }
                     break;
                 }
 
@@ -1925,9 +1934,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     GeneralType leftType = FindStatementType(statement.Left);
 
-                    if ((leftType == BasicType.Byte ||
-                        leftType == BasicType.Char ||
-                        leftType == BasicType.Integer) &&
+                    if ((leftType.SameAs(BasicType.Byte) ||
+                        leftType.SameAs(BasicType.Char) ||
+                        leftType.SameAs(BasicType.Integer)) &&
                         TryCompute(statement.Right, out CompiledValue right))
                     {
                         if (right == 1)
@@ -2141,7 +2150,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 foreach ((CompiledField field, int offset) in structType.GetFields(false))
                 {
-                    if (field.Type is not BuiltinType builtinType)
+                    if (!field.Type.Is(out BuiltinType? builtinType))
                     { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.File); }
 
                     int offsettedAddress = address + offset;
@@ -2178,7 +2187,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
-        if (prevType is ArrayType arrayType && field.Identifier.Equals("Length"))
+        if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Equals("Length"))
         {
             Stack.Push(arrayType.Length);
             return;
@@ -2190,9 +2199,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (prevType is PointerType pointerType)
+        if (prevType.Is(out PointerType? pointerType))
         {
-            if (pointerType.To is not StructType structPointerType)
+            if (!pointerType.To.Is(out StructType? structPointerType))
             { throw new CompilerException($"Could not get the field offsets of type {prevType}", field.PrevStatement, CurrentFile); }
 
             if (!structPointerType.GetField(field.Identifier.Content, false, out CompiledField? fieldDefinition, out int fieldOffset))
@@ -2365,7 +2374,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (valueType.Size != 1)
         { throw new NotSupportedException($"Only value of size 1 (not {valueType.Size}) supported by the output printer in brainfuck", value, CurrentFile); }
 
-        if (valueType is not BuiltinType builtinType)
+        if (!valueType.Is(out BuiltinType? builtinType))
         { throw new NotSupportedException($"Only built-in types or string literals (not \"{valueType}\") supported by the output printer in brainfuck", value, CurrentFile); }
 
         using (Code.Block(this, $"Print value {value} as text"))
@@ -2414,7 +2423,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     static bool CanGenerateCodeForValuePrinter(GeneralType valueType) =>
         valueType.Size == 1 &&
-        valueType is BuiltinType;
+        valueType.Is<BuiltinType>();
 
     /*
     void CompileRawPrinter(StatementWithValue value)
@@ -2525,10 +2534,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     #endregion
 
-    int GenerateCodeForLiteralString(Literal literal)
-        => GenerateCodeForLiteralString(literal.Value, literal);
-    int GenerateCodeForLiteralString(string literal, IPositioned position)
+    int GenerateCodeForLiteralString(Literal literal, bool withBytes)
+        => GenerateCodeForLiteralString(literal.Value, literal, withBytes);
+    int GenerateCodeForLiteralString(string literal, IPositioned position, bool withBytes)
     {
+        if (!withBytes)
+        { throw new NotImplementedException(); }
+
         using DebugInfoBlock debugBlock = DebugBlock(position);
 
         using (Code.Block(this, $"Create String \"{literal}\""))
@@ -2542,7 +2554,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 for (int i = 0; i < literal.Length; i++)
                 {
                     // Prepare value
-                    int valueAddress = Stack.Push(literal[i]);
+                    int valueAddress = Stack.Push((byte)literal[i]);
                     int pointerAddressCopy = valueAddress + 1;
 
                     // Calculate pointer
@@ -2557,7 +2569,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 {
                     // Prepare value
-                    int valueAddress = Stack.Push('\0');
+                    int valueAddress = Stack.Push((byte)'\0');
                     int pointerAddressCopy = valueAddress + 1;
 
                     // Calculate pointer
@@ -2693,7 +2705,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             bool canDeallocate = defined.Modifiers.Contains(ModifierKeywords.Temp);
 
-            canDeallocate = canDeallocate && passedType is PointerType;
+            canDeallocate = canDeallocate && passedType.Is<PointerType>();
 
             if (StatementCanBeDeallocated(passed, out bool explicitDeallocate))
             {
@@ -2721,7 +2733,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
                         { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
 
-                        if (v.Type != definedType)
+                        if (!v.Type.SameAs(definedType))
                         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
                         compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
@@ -2753,23 +2765,22 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
                 { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
 
-                if (definedType is not PointerType pointerType ||
-                    !v.Type.Equals(pointerType.To))
-                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+                if (!definedType.Is(out PointerType? pointerType) ||
+                    !v.Type.SameAs(pointerType.To))
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {new PointerType(v.Type)}", passed, CurrentFile); }
 
                 compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
                 continue;
             }
 
-            if (passed is StatementWithValue value)
+            if (defined.Modifiers.Contains(ModifierKeywords.Ref))
+            { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
+
+            if (defined.Modifiers.Contains(ModifierKeywords.Const))
+            { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed, CurrentFile); }
+
             {
-                if (defined.Modifiers.Contains(ModifierKeywords.Ref))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed, CurrentFile); }
-
-                if (defined.Modifiers.Contains(ModifierKeywords.Const))
-                { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed, CurrentFile); }
-
-                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, defined.File, value, canDeallocate);
+                PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, defined.File, passed, canDeallocate);
 
                 BrainfuckVariable? compiledParameter = null;
                 foreach (BrainfuckVariable compiledParameter_ in compiledParameters)
@@ -2783,20 +2794,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (compiledParameter is null)
                 { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
-                if (compiledParameter.Type != definedType)
+                if (!compiledParameter.Type.SameAs(definedType))
                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
                 using (Code.Block(this, $"SET {defined.Identifier.Content} TO _something_"))
                 {
-                    GenerateCodeForStatement(value);
+                    GenerateCodeForStatement(passed, definedType);
 
                     using (Code.Block(this, $"STORE LAST TO {compiledParameter.Address}"))
                     { Stack.PopAndStore(compiledParameter.Address); }
                 }
-                continue;
             }
-
-            throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
         }
     }
 
@@ -2829,7 +2837,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             int address = Stack.PushVirtual(1);
             Code.SetPointer(address);
-            if (function.Type == BasicType.Void)
+            if (function.Type.SameAs(BasicType.Void))
             {
                 Code += ',';
                 Code.ClearValue(address);
@@ -2904,7 +2912,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables[i];
                     if (!variable.HaveToClean) continue;
                     if (variable.DeallocateOnClean &&
-                        variable.Type is PointerType)
+                        variable.Type.Is<PointerType>())
                     {
                         GenerateDestructor(
                             new TypeCast(
@@ -2963,7 +2971,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             int address = Stack.PushVirtual(1);
             Code.SetPointer(address);
-            if (function.Type == BasicType.Void)
+            if (function.Type.SameAs(BasicType.Void))
             {
                 Code += ',';
                 Code.ClearValue(address);
@@ -3038,7 +3046,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables[i];
                     if (!variable.HaveToClean) continue;
                     if (variable.DeallocateOnClean &&
-                        variable.Type is PointerType)
+                        variable.Type.Is<PointerType>())
                     {
                         GenerateDestructor(
                             new TypeCast(
@@ -3059,7 +3067,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables.Pop();
                     if (!variable.HaveToClean) continue;
                     if (variable.DeallocateOnClean &&
-                        variable.Type is PointerType)
+                        variable.Type.Is<PointerType>())
                     { }
                     Stack.Pop();
                 }
@@ -3125,7 +3133,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables[i];
                     if (!variable.HaveToClean) continue;
                     if (variable.DeallocateOnClean &&
-                        variable.Type is PointerType)
+                        variable.Type.Is<PointerType>())
                     {
                         GenerateDestructor(new Identifier(Token.CreateAnonymous(variable.Name), variable.File));
                     }
@@ -3174,7 +3182,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType newInstanceType = FindStatementType(newInstance);
         GenerateCodeForStatement(newInstance);
 
-        if (newInstanceType != function.ParameterTypes[0])
+        if (!newInstanceType.SameAs(function.ParameterTypes[0]))
         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {0}: Expected {function.ParameterTypes[0]}, passed {newInstanceType}", newInstance, CurrentFile); }
 
         compiledParameters.Add(new BrainfuckVariable(function.Parameters[0].Identifier.Content, function.Parameters[0].File, newInstanceAddress, false, false, false, newInstanceType));
@@ -3187,7 +3195,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GeneralType definedType = function.ParameterTypes[i];
             GeneralType passedType = FindStatementType(passed, definedType);
 
-            if (passedType != definedType)
+            if (!passedType.SameAs(definedType))
             { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
             foreach (BrainfuckVariable compiledParameter in compiledParameters)
@@ -3221,7 +3229,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
                         { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
 
-                        if (v.Type != definedType)
+                        if (!v.Type.SameAs(definedType))
                         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
                         compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
@@ -3269,7 +3277,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (compiledParameter is null)
                 { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
-                if (compiledParameter.Type != definedType)
+                if (!compiledParameter.Type.SameAs(definedType))
                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
                 using (Code.Block(this, $"SET {defined.Identifier.Content} TO _something_"))
@@ -3315,7 +3323,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables[i];
                     if (!variable.HaveToClean) continue;
                     if (variable.DeallocateOnClean &&
-                        variable.Type is PointerType)
+                        variable.Type.Is<PointerType>())
                     {
                         GenerateDestructor(
                             new TypeCast(

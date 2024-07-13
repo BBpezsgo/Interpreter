@@ -20,7 +20,7 @@ public class CompiledFunction : FunctionDefinition,
     public new CompiledStruct? Context { get; }
     public List<Reference<StatementWithValue?>> References { get; }
 
-    public bool ReturnSomething => Type != BasicType.Void;
+    public bool ReturnSomething => !Type.SameAs(BasicType.Void);
     public TypeInstance TypeToken => base.Type;
     IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
     IReadOnlyList<GeneralType> ICompiledFunction.ParameterTypes => ParameterTypes;
@@ -45,11 +45,11 @@ public class CompiledFunction : FunctionDefinition,
 
     public bool DefinitionEquals(CompiledFunction other)
     {
-        if (this.Type != other.Type) return false;
+        if (!this.Type.Equals(other.Type)) return false;
         if (this.Identifier.Content != other.Identifier.Content) return false;
         if (this.ParameterTypes.Length != other.ParameterTypes.Length) return false;
         for (int i = 0; i < this.ParameterTypes.Length; i++)
-        { if (this.ParameterTypes[i] != other.ParameterTypes[i]) return false; }
+        { if (!this.ParameterTypes[i].Equals(other.ParameterTypes[i])) return false; }
 
         return true;
     }

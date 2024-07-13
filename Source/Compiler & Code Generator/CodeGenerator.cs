@@ -120,7 +120,7 @@ public abstract class CodeGenerator
     {
         foreach (KeyValuePair<string, GeneralType> pair in arguments)
         {
-            if (pair.Value is GenericType)
+            if (pair.Value.Is<GenericType>())
             { throw new InternalException($"{pair.Value} is generic"); }
         }
     }
@@ -299,6 +299,7 @@ public abstract class CodeGenerator
         public static FunctionQuery<TFunction, TIdentifier, TArgument> Create<TFunction, TIdentifier, TArgument>(
             TIdentifier? identifier,
             ImmutableArray<TArgument>? arguments = null,
+            Func<TArgument, GeneralType?, GeneralType>? converter = null,
             Uri? relevantFile = null,
             GeneralType? returnType = null,
             Action<CompliableTemplate<TFunction>>? addCompilable = null)
@@ -308,6 +309,7 @@ public abstract class CodeGenerator
                 Identifier = identifier,
                 Arguments = arguments,
                 ArgumentCount = arguments?.Length,
+                Converter = converter,
                 RelevantFile = relevantFile,
                 ReturnType = returnType,
                 AddCompilable = addCompilable,
@@ -316,6 +318,7 @@ public abstract class CodeGenerator
         public static FunctionQuery<TFunction, TIdentifier, TArgument> Create<TFunction, TIdentifier, TArgument>(
             TIdentifier? identifier,
             ImmutableArray<TArgument> arguments,
+            Func<TArgument, GeneralType?, GeneralType> converter,
             Uri? relevantFile = null,
             GeneralType? returnType = null,
             Action<CompliableTemplate<TFunction>>? addCompilable = null)
@@ -325,6 +328,7 @@ public abstract class CodeGenerator
                 Identifier = identifier,
                 Arguments = arguments,
                 ArgumentCount = arguments.Length,
+                Converter = converter,
                 RelevantFile = relevantFile,
                 ReturnType = returnType,
                 AddCompilable = addCompilable,
@@ -356,6 +360,7 @@ public abstract class CodeGenerator
         public int? ArgumentCount { get; init; }
         public GeneralType? ReturnType { get; init; }
         public Action<CompliableTemplate<TFunction>>? AddCompilable { get; init; }
+        public Func<TArgument, GeneralType?, GeneralType> Converter { get; init; }
 
         public string ToReadable()
         {
@@ -442,6 +447,16 @@ public abstract class CodeGenerator
         PerfectReturnType,
 
         /// <summary>
+        /// All the parameter types are the same
+        /// </summary>
+        VeryPerfectParameterTypes,
+
+        /// <summary>
+        /// Return types are the same
+        /// </summary>
+        VeryPerfectReturnType,
+
+        /// <summary>
         /// Both function are in the same file
         /// </summary>
         File,
@@ -488,12 +503,12 @@ public abstract class CodeGenerator
     {
         arguments = [type, .. arguments];
 
-        return GetFunction<CompiledConstructor, GeneralType, GeneralType>(
+        return GetFunction<CompiledConstructor, GeneralType, GeneralType, GeneralType>(
             GetConstructors(),
             "constructor",
             CompiledConstructor.ToReadable(type, arguments),
 
-            FunctionQuery.Create(type, arguments, relevantFile, null, addCompilable),
+            FunctionQuery.Create(type, arguments, (v, _) => v, relevantFile, null, addCompilable),
 
             out result,
             out error
@@ -509,8 +524,8 @@ public abstract class CodeGenerator
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, BuiltinType.Integer);
-        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerGet, arguments, relevantFile, null, addCompilable);
-        return GetFunction<CompiledFunction, Token, string>(
+        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerGet, arguments, (v, _) => v, relevantFile, null, addCompilable);
+        return GetFunction<CompiledFunction, Token, string, GeneralType>(
             GetFunctions(),
             "function",
             null,
@@ -532,8 +547,8 @@ public abstract class CodeGenerator
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, BuiltinType.Integer, elementType);
-        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerSet, arguments, relevantFile, null, addCompilable);
-        return GetFunction<CompiledFunction, Token, string>(
+        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerSet, arguments, (v, _) => v, relevantFile, null, addCompilable);
+        return GetFunction<CompiledFunction, Token, string, GeneralType>(
             GetFunctions(),
             "function",
             null,
@@ -563,9 +578,45 @@ public abstract class CodeGenerator
             .Where(v => v.Function.BuiltinFunctionName == builtinName);
 
         string readable = $"[Builtin(\"{builtinName}\")] ?({string.Join(", ", arguments)})";
-        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(null as string, arguments, relevantFile, null, addCompilable);
+        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(null as string, arguments, (v, _) => v, relevantFile, null, addCompilable);
 
-        return GetFunction<CompiledFunction, Token, string>(
+        return GetFunction<CompiledFunction, Token, string, GeneralType>(
+            new Functions<CompiledFunction>()
+            {
+                Compiled = builtinCompiledFunctions,
+                Compilable = builtinCompilableFunctions,
+            },
+            "builtin function",
+            readable,
+
+            query,
+
+            out result,
+            out error
+        );
+    }
+
+    protected bool TryGetBuiltinFunction(
+        string builtinName,
+        ImmutableArray<StatementWithValue> arguments,
+        Uri? relevantFile,
+
+        [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
+        [NotNullWhen(false)] out WillBeCompilerException? error,
+        Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
+    {
+        IEnumerable<CompiledFunction> builtinCompiledFunctions =
+            CompiledFunctions
+            .Where(v => v.BuiltinFunctionName == builtinName);
+
+        IEnumerable<CompliableTemplate<CompiledFunction>> builtinCompilableFunctions =
+            compilableFunctions
+            .Where(v => v.Function.BuiltinFunctionName == builtinName);
+
+        string readable = $"[Builtin(\"{builtinName}\")] ?({string.Join(", ", arguments)})";
+        FunctionQuery<CompiledFunction, string, StatementWithValue> query = FunctionQuery.Create(null as string, arguments, FindStatementType, relevantFile, null, addCompilable);
+
+        return GetFunction<CompiledFunction, Token, string, StatementWithValue>(
             new Functions<CompiledFunction>()
             {
                 Compiled = builtinCompiledFunctions,
@@ -589,9 +640,8 @@ public abstract class CodeGenerator
         [NotNullWhen(false)] out WillBeCompilerException? error,
         Action<CompliableTemplate<CompiledOperator>>? addCompilable = null)
     {
-        ImmutableArray<GeneralType> arguments = FindStatementTypes(@operator.Arguments);
-        FunctionQuery<CompiledOperator, string, GeneralType> query = FunctionQuery.Create(@operator.Operator.Content, arguments, relevantFile, null, addCompilable);
-        return GetFunction<CompiledOperator, Token, string>(
+        FunctionQuery<CompiledOperator, string, StatementWithValue> query = FunctionQuery.Create(@operator.Operator.Content, @operator.Arguments, FindStatementType, relevantFile, null, addCompilable);
+        return GetFunction<CompiledOperator, Token, string, StatementWithValue>(
             GetOperators(),
             "operator",
             null,
@@ -611,9 +661,8 @@ public abstract class CodeGenerator
         [NotNullWhen(false)] out WillBeCompilerException? error,
         Action<CompliableTemplate<CompiledOperator>>? addCompilable = null)
     {
-        ImmutableArray<GeneralType> arguments = FindStatementTypes(@operator.Arguments);
-        FunctionQuery<CompiledOperator, string, GeneralType> query = FunctionQuery.Create(@operator.Operator.Content, arguments, relevantFile, null, addCompilable);
-        return GetFunction<CompiledOperator, Token, string>(
+        FunctionQuery<CompiledOperator, string, StatementWithValue> query = FunctionQuery.Create(@operator.Operator.Content, @operator.Arguments, FindStatementType, relevantFile, null, addCompilable);
+        return GetFunction<CompiledOperator, Token, string, StatementWithValue>(
             GetOperators(),
             "operator",
             null,
@@ -643,7 +692,7 @@ public abstract class CodeGenerator
             compilableGeneralFunctions
             .Where(v => ContextIs(v.Function, context));
 
-        return GetFunction<CompiledGeneralFunction, Token, string>(
+        return GetFunction<CompiledGeneralFunction, Token, string, GeneralType>(
             new Functions<CompiledGeneralFunction>()
             {
                 Compiled = compiledGeneralFunctionsInContext,
@@ -652,7 +701,7 @@ public abstract class CodeGenerator
             "general function",
             null,
 
-            FunctionQuery.Create(identifier, arguments, relevantFile, null, addCompilable),
+            FunctionQuery.Create(identifier, arguments, (v, _) => v, relevantFile, null, addCompilable),
 
             out result,
             out error
@@ -665,7 +714,7 @@ public abstract class CodeGenerator
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
         [NotNullWhen(false)] out WillBeCompilerException? error)
     {
-        if (type is null || type is not FunctionType functionType)
+        if (type is null || !type.Is(out FunctionType? functionType))
         {
             return GetFunction(
                 FunctionQuery.Create<CompiledFunction, string, GeneralType>(identifier),
@@ -675,7 +724,7 @@ public abstract class CodeGenerator
         }
 
         return GetFunction(
-            FunctionQuery.Create<CompiledFunction, string, GeneralType>(identifier, functionType.Parameters, null, functionType.ReturnType, null),
+            FunctionQuery.Create<CompiledFunction, string, GeneralType>(identifier, functionType.Parameters, (v, _) => v, null, functionType.ReturnType, null),
             out result,
             out error
         );
@@ -714,8 +763,7 @@ public abstract class CodeGenerator
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         string identifier = functionCallStatement.Identifier.Content;
-        ImmutableArray<GeneralType> argumentTypes = FindStatementTypes(functionCallStatement.MethodArguments);
-        FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(identifier, argumentTypes, functionCallStatement.File, null, addCompilable);
+        FunctionQuery<CompiledFunction, string, StatementWithValue> query = FunctionQuery.Create(identifier, functionCallStatement.MethodArguments, FindStatementType, functionCallStatement.File, null, addCompilable);
         return GetFunction(
             query,
             out result,
@@ -723,12 +771,13 @@ public abstract class CodeGenerator
         );
     }
 
-    protected bool GetFunction(
-        FunctionQuery<CompiledFunction, string, GeneralType> query,
+    protected bool GetFunction<TArgument>(
+        FunctionQuery<CompiledFunction, string, TArgument> query,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
         [NotNullWhen(false)] out WillBeCompilerException? error)
-        => GetFunction<CompiledFunction, Token, string>(
+        where TArgument : notnull
+        => GetFunction<CompiledFunction, Token, string, TArgument>(
             GetFunctions(),
             "function",
             null,
@@ -738,17 +787,18 @@ public abstract class CodeGenerator
             out error
         );
 
-    public static bool GetFunction<TFunction, TDefinedIdentifier, TPassedIdentifier>(
+    public static bool GetFunction<TFunction, TDefinedIdentifier, TPassedIdentifier, TArgument>(
         Functions<TFunction> functions,
         string kindName,
         string? readableName,
 
-        FunctionQuery<TFunction, TPassedIdentifier, GeneralType> query,
+        FunctionQuery<TFunction, TPassedIdentifier, TArgument> query,
 
         [NotNullWhen(true)] out FunctionQueryResult<TFunction>? result,
         [NotNullWhen(false)] out WillBeCompilerException? error)
         where TFunction : ICompiledFunction, IInFile, ITemplateable<TFunction>, ISimpleReadable, IIdentifiable<TDefinedIdentifier>
         where TDefinedIdentifier : notnull, IEquatable<TPassedIdentifier>
+        where TArgument : notnull
     {
         TFunction? result_ = default;
         Dictionary<string, GeneralType>? typeArguments = null;
@@ -764,13 +814,13 @@ public abstract class CodeGenerator
 
         static bool CheckTypeConversion(GeneralType from, GeneralType to)
         {
-            if (from.Equals(to))
+            if (from.SameAs(to))
             { return true; }
 
-            if (to is PointerType && from == BasicType.Integer)
+            if (to.Is<PointerType>() && from.SameAs(BasicType.Integer))
             { return true; }
 
-            if (to is PointerType toPtr && from is PointerType && toPtr.To == BasicType.Any)
+            if (to.Is(out PointerType? toPtr) && from.Is<PointerType>() && toPtr.To.SameAs(BasicType.Any))
             { return true; }
 
             return false;
@@ -808,10 +858,12 @@ public abstract class CodeGenerator
             if (query.Arguments.HasValue &&
                 !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (defined, passed) =>
                 {
-                    if (passed.Equals(defined))
+                    var _passed = query.Converter.Invoke(passed, null);
+
+                    if (_passed.Equals(defined))
                     { return true; }
 
-                    if (CheckTypeConversion(passed, defined))
+                    if (CheckTypeConversion(_passed, defined))
                     { return true; }
 
                     return false;
@@ -820,7 +872,7 @@ public abstract class CodeGenerator
                 if (perfectus < FunctionPerfectus.ParameterTypes)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types of {query} doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -832,19 +884,40 @@ public abstract class CodeGenerator
         bool HandlePerfectParameterTypes(TFunction function)
         {
             if (query.Arguments.HasValue &&
-                !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value))
+                !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (defined, passed) => query.Converter.Invoke(passed, null).SameAs(defined)))
             {
-                if (perfectus < FunctionPerfectus.PerfectReturnType)
+                if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return types doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types of {query} doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
 
-            if (perfectus < FunctionPerfectus.PerfectReturnType)
+            if (perfectus < FunctionPerfectus.PerfectParameterTypes)
             {
-                perfectus = Max(perfectus, FunctionPerfectus.PerfectReturnType);
+                perfectus = Max(perfectus, FunctionPerfectus.PerfectParameterTypes);
+                result_ = function;
+            }
+            return true;
+        }
+
+        bool HandleVeryPerfectParameterTypes(TFunction function)
+        {
+            if (query.Arguments.HasValue &&
+                !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (defined, passed) => query.Converter.Invoke(passed, null).Equals(defined)))
+            {
+                if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
+                {
+                    result_ = function;
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types of {query} doesn't match with {function.ToReadable()}");
+                }
+                return false;
+            }
+
+            if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
+            {
+                perfectus = Max(perfectus, FunctionPerfectus.VeryPerfectParameterTypes);
                 result_ = function;
             }
             return true;
@@ -852,12 +925,12 @@ public abstract class CodeGenerator
 
         bool HandleReturnType(TFunction function)
         {
-            if (query.ReturnType != null && !CheckTypeConversion(function.Type, query.ReturnType))
+            if (query.ReturnType is not null && !CheckTypeConversion(function.Type, query.ReturnType))
             {
                 if (perfectus < FunctionPerfectus.ReturnType)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return types doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return type of {query} doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -868,13 +941,13 @@ public abstract class CodeGenerator
 
         bool HandlePerfectReturnType(TFunction function)
         {
-            if (query.ReturnType != null &&
-                !function.Type.Equals(query.ReturnType))
+            if (query.ReturnType is not null &&
+                !function.Type.SameAs(query.ReturnType))
             {
                 if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return type of {query} doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -882,6 +955,27 @@ public abstract class CodeGenerator
             if (perfectus < FunctionPerfectus.PerfectParameterTypes)
             {
                 perfectus = Max(perfectus, FunctionPerfectus.PerfectParameterTypes);
+                result_ = function;
+            }
+            return true;
+        }
+
+        bool HandleVeryPerfectReturnType(TFunction function)
+        {
+            if (query.ReturnType is not null &&
+                !function.Type.Equals(query.ReturnType))
+            {
+                if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
+                {
+                    result_ = function;
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return type of {query} doesn't match with {function.ToReadable()}");
+                }
+                return false;
+            }
+
+            if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
+            {
+                perfectus = Max(perfectus, FunctionPerfectus.VeryPerfectParameterTypes);
                 result_ = function;
             }
             return true;
@@ -928,11 +1022,21 @@ public abstract class CodeGenerator
                 result_ = function;
                 perfectus = FunctionPerfectus.Good;
             }
+            else if (result_ is null)
+            {
+                result_ = function;
+            }
 
             if (!HandlePerfectParameterTypes(function))
             { continue; }
 
             if (!HandlePerfectReturnType(function))
+            { continue; }
+
+            if (!HandleVeryPerfectParameterTypes(function))
+            { continue; }
+
+            if (!HandleVeryPerfectReturnType(function))
             { continue; }
 
             if (!HandleFile(function))
@@ -955,7 +1059,7 @@ public abstract class CodeGenerator
 
             Dictionary<string, GeneralType> _typeArguments = new();
 
-            if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, query.Arguments.Value, _typeArguments))
+            if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, query.Arguments.Value.Select(v => query.Converter.Invoke(v, null)), _typeArguments))
             { continue; }
 
             perfectus = FunctionPerfectus.PerfectParameterTypes;
@@ -999,7 +1103,7 @@ public abstract class CodeGenerator
     #endregion
 
     static bool ContextIs(CompiledGeneralFunction function, GeneralType type) =>
-        type is StructType structType &&
+        type.Is(out StructType? structType) &&
         function.Context is not null &&
         function.Context == structType.Struct;
 
@@ -1061,7 +1165,7 @@ public abstract class CodeGenerator
             GeneralType constantType = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
             variableDeclaration.Type.SetAnalyzedType(constantType);
 
-            if (constantType is not BuiltinType builtinType)
+            if (!constantType.Is(out BuiltinType? builtinType))
             { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, variableDeclaration.File); }
 
             CompiledValue.TryCast(ref constantValue, builtinType.RuntimeType);
@@ -1311,7 +1415,8 @@ public abstract class CodeGenerator
     {
         if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out _))
         {
-            result = alias.Value;
+            // HERE
+            result = new AliasType(alias.Value, alias);
             return true;
         }
 
@@ -1336,7 +1441,7 @@ public abstract class CodeGenerator
             return true;
         }
 
-        if (GetFunction(FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, relevantFile), out FunctionQueryResult<CompiledFunction>? function, out _))
+        if (GetFunction(FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, null, relevantFile), out FunctionQueryResult<CompiledFunction>? function, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.FunctionName;
             function.Function.References.Add(new Reference<StatementWithValue?>(new Identifier(name, relevantFile), CurrentFile));
@@ -1479,10 +1584,10 @@ public abstract class CodeGenerator
 
     protected void AssignTypeCheck(GeneralType destination, GeneralType valueType, StatementWithValue value)
     {
-        if (destination == valueType)
+        if (destination.SameAs(valueType))
         { return; }
 
-        if (destination == BasicType.Any)
+        if (destination.SameAs(BasicType.Any))
         { return; }
 
         if (destination.Size != valueType.Size)
@@ -1491,11 +1596,11 @@ public abstract class CodeGenerator
         if (destination.SizeBytes != valueType.SizeBytes)
         { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.SizeBytes} bytes) value to {destination} (size of {destination.SizeBytes} bytes)", value, CurrentFile); }
 
-        if (destination is PointerType &&
-            valueType == BasicType.Integer)
+        if (destination.Is<PointerType>() &&
+            valueType.SameAs(BasicType.Integer))
         { return; }
 
-        if (destination is BuiltinType destBuiltinType &&
+        if (destination.Is(out BuiltinType? destBuiltinType) &&
             destBuiltinType.Type == BasicType.Byte &&
             TryCompute(value, out CompiledValue yeah) &&
             yeah.Type == RuntimeType.Integer)
@@ -1504,24 +1609,24 @@ public abstract class CodeGenerator
         if (value is LiteralStatement literal &&
             literal.Type == LiteralType.String)
         {
-            if (destination is ArrayType destArrayType &&
-                destArrayType.Of == BasicType.Char)
+            if (destination.Is(out ArrayType? destArrayType) &&
+                destArrayType.Of.SameAs(BasicType.Char))
             {
                 string literalValue = literal.Value;
                 if (literalValue.Length != destArrayType.Length)
-                { throw new CompilerException($"Can not set \"{literalValue}\" (length of {literalValue.Length}) value to stack array {destination} (length of {destArrayType.Length})", value, CurrentFile); }
+                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of {destArrayType.Length})", value, CurrentFile); }
                 return;
             }
 
-            if (destination is PointerType pointerType &&
-                pointerType.To == BasicType.Char)
+            if (destination.Is(out PointerType? pointerType) &&
+                pointerType.To.SameAs(BasicType.Char))
             { return; }
         }
 
         {
-            if (destination is PointerType destPointerType &&
-                valueType is PointerType &&
-                destPointerType.To == BasicType.Any)
+            if (destination.Is(out PointerType? destPointerType) &&
+                valueType.Is<PointerType>() &&
+                destPointerType.To.SameAs(BasicType.Any))
             { return; }
         }
 
@@ -1532,7 +1637,7 @@ public abstract class CodeGenerator
     {
         BuiltinType valueType = new(value.Type);
 
-        if (destination == valueType)
+        if (destination.SameAs(valueType))
         { return; }
 
         if (destination.Size != valueType.Size)
@@ -1541,15 +1646,15 @@ public abstract class CodeGenerator
         if (destination.SizeBytes != valueType.SizeBytes)
         { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.SizeBytes} bytes) value to {destination} (size of {destination.SizeBytes} bytes)", valuePosition, CurrentFile); }
 
-        if (destination is PointerType)
+        if (destination.Is<PointerType>())
         { return; }
 
-        if (destination == BasicType.Byte &&
+        if (destination.SameAs(BasicType.Byte) &&
             value.Type == RuntimeType.Integer)
         { return; }
 
-        if (destination is BuiltinType builtinDestination &&
-            valueType is BuiltinType builtinValueType)
+        if (destination.Is(out BuiltinType? builtinDestination) &&
+            valueType.Is(out BuiltinType? builtinValueType))
         {
             BitWidth destinationBitWidth = builtinDestination.BitWidth;
             BitWidth valueBitWidth = builtinValueType.BitWidth;
@@ -1602,7 +1707,7 @@ public abstract class CodeGenerator
 
     protected static bool GetInitialValue(GeneralType type, out CompiledValue value)
     {
-        switch (type)
+        switch (type.FinalValue)
         {
             case GenericType:
             case StructType:
@@ -1619,7 +1724,7 @@ public abstract class CodeGenerator
         }
     }
 
-    protected static CompiledValue GetInitialValue(GeneralType type) => type switch
+    protected static CompiledValue GetInitialValue(GeneralType type) => type.FinalValue switch
     {
         GenericType => throw new NotImplementedException($"Initial value for type arguments is bruh moment"),
         StructType => throw new NotImplementedException($"Initial value for structs is not implemented"),
@@ -1649,7 +1754,7 @@ public abstract class CodeGenerator
 
         GeneralType prevType = FindStatementType(anyCall.PrevStatement);
 
-        if (prevType is not FunctionType functionType)
+        if (!prevType.Is(out FunctionType? functionType))
         { throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile); }
 
         return OnGotStatementType(anyCall, functionType.ReturnType);
@@ -1666,26 +1771,22 @@ public abstract class CodeGenerator
     {
         GeneralType prevType = FindStatementType(index.PrevStatement);
 
-        if (prevType is ArrayType arrayType)
+        if (prevType.Is(out ArrayType? arrayType))
         { return OnGotStatementType(index, arrayType.Of); }
 
         // TODO: (index.PrevStatement as IInFile)?.OriginalFile can be null
-        if (!GetIndexGetter(prevType, (index.PrevStatement as IInFile)?.File, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundException))
-        { }
+        if (GetIndexGetter(prevType, (index.PrevStatement as IInFile)?.File, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError))
+        { return OnGotStatementType(index, indexer.Function.Type); }
 
-        CompiledFunction? indexer = result?.Function;
-
-        if (notFoundException != null) indexer = null;
-
-        if (indexer == null && prevType is PointerType pointerType)
+        if (prevType.Is(out PointerType? pointerType))
         {
+            if (!pointerType.To.Is<BuiltinType>())
+            { AnalysisCollection?.Warnings.Add(notFoundError.InstantiateWarning(index, index.File)); }
+
             return pointerType.To;
         }
 
-        if (indexer == null)
-        { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
-
-        return OnGotStatementType(index, indexer.Type);
+        throw notFoundError.Instantiate(index, index.File);
     }
     protected GeneralType FindStatementType(FunctionCall functionCall)
     {
@@ -1697,7 +1798,6 @@ public abstract class CodeGenerator
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
         return OnGotStatementType(functionCall, result.Function.Type);
     }
-
     protected GeneralType FindStatementType(BinaryOperatorCall @operator, GeneralType? expectedType)
     {
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? _result, out _))
@@ -1709,17 +1809,15 @@ public abstract class CodeGenerator
         GeneralType leftType = FindStatementType(@operator.Left, expectedType);
         GeneralType rightType = FindStatementType(@operator.Right, expectedType);
 
-        CompilerException unknownOperator = new($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile);
-
         if (!leftType.CanBeBuiltin ||
             !rightType.CanBeBuiltin ||
-            leftType == BasicType.Void ||
-            rightType == BasicType.Void)
-        { throw unknownOperator; }
+            leftType.SameAs(BasicType.Void) ||
+            rightType.SameAs(BasicType.Void))
+        { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
 
         {
-            if (leftType is BuiltinType leftBType &&
-                rightType is BuiltinType rightBType)
+            if (leftType.Is(out BuiltinType? leftBType) &&
+                rightType.Is(out BuiltinType? rightBType))
             {
                 bool isFloat =
                     leftBType.Type == BasicType.Float ||
@@ -1755,39 +1853,10 @@ public abstract class CodeGenerator
                     BinaryOperatorCall.Modulo
                         => isFloat ? BuiltinType.Float : new BuiltinType(bitWidth.ToType()),
 
-                    _ => throw unknownOperator,
+                    _ => throw (new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile)),
                 };
             }
         }
-
-        // switch (leftType)
-        // {
-        //     case BuiltinType: break;
-        //     case PointerType:
-        //         return rightType switch
-        //         {
-        //             // BuiltinType => leftType,
-        //             // PointerType => leftType,
-        //             _ => throw unknownOperator,
-        //         };
-        //     default: throw unknownOperator;
-        // }
-        // 
-        // switch (rightType)
-        // {
-        //     case BuiltinType: break;
-        //     case PointerType:
-        //         return leftType switch
-        //         {
-        //             // BuiltinType => rightType,
-        //             // PointerType => leftType,
-        //             _ => throw unknownOperator,
-        //         };
-        //     default: throw unknownOperator;
-        // }
-
-        // if (leftType is not BuiltinType || rightType is not BuiltinType)
-        // { throw unknownOperator; }
 
         CompiledValue leftValue = GetInitialValue(leftType);
         CompiledValue rightValue = GetInitialValue(rightType);
@@ -1824,8 +1893,8 @@ public abstract class CodeGenerator
 
         if (expectedType is not null)
         {
-            if (result == BasicType.Integer &&
-                expectedType is PointerType)
+            if (result.SameAs(BasicType.Integer) &&
+                expectedType.Is<PointerType>())
             { return OnGotStatementType(@operator, expectedType); }
         }
 
@@ -1841,7 +1910,7 @@ public abstract class CodeGenerator
 
         GeneralType leftType = FindStatementType(@operator.Left);
 
-        if (!leftType.CanBeBuiltin || leftType == BasicType.Void)
+        if (!leftType.CanBeBuiltin || leftType.SameAs(BasicType.Void))
         { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content}", @operator.Operator, CurrentFile); }
 
         GeneralType result = @operator.Operator.Content switch
@@ -1852,7 +1921,7 @@ public abstract class CodeGenerator
             _ => throw new CompilerException($"Unknown operator {@operator.Operator.Content}", @operator.Operator, CurrentFile),
         };
 
-        if (expectedType is PointerType && result == BasicType.Integer)
+        if (expectedType is not null && expectedType.Is<PointerType>() && result.SameAs(BasicType.Integer))
         { return OnGotStatementType(@operator, expectedType); }
 
         return OnGotStatementType(@operator, result);
@@ -1864,21 +1933,21 @@ public abstract class CodeGenerator
             case LiteralType.Integer:
                 if (expectedType is not null)
                 {
-                    if (expectedType == BasicType.Byte)
+                    if (expectedType.SameAs(BasicType.Byte))
                     {
                         if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
                         {
                             return OnGotStatementType(literal, BuiltinType.Byte);
                         }
                     }
-                    else if (expectedType == BasicType.Char)
+                    else if (expectedType.SameAs(BasicType.Char))
                     {
                         if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
                         {
                             return OnGotStatementType(literal, BuiltinType.Char);
                         }
                     }
-                    else if (expectedType == BasicType.Float)
+                    else if (expectedType.SameAs(BasicType.Float))
                     {
                         return OnGotStatementType(literal, BuiltinType.Float);
                     }
@@ -1888,18 +1957,22 @@ public abstract class CodeGenerator
             case LiteralType.Float:
                 return OnGotStatementType(literal, BuiltinType.Float);
             case LiteralType.String:
+                if (expectedType is not null &&
+                    expectedType.Is(out PointerType? pointerType) &&
+                    pointerType.To.SameAs(BasicType.Byte))
+                { return OnGotStatementType(literal, new PointerType(BuiltinType.Byte)); }
                 return OnGotStatementType(literal, new PointerType(BuiltinType.Char));
             case LiteralType.Char:
                 if (expectedType is not null)
                 {
-                    if (expectedType == BasicType.Byte)
+                    if (expectedType.SameAs(BasicType.Byte))
                     {
                         if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
                         {
                             return OnGotStatementType(literal, BuiltinType.Byte);
                         }
                     }
-                    else if (expectedType == BasicType.Float)
+                    else if (expectedType.SameAs(BasicType.Float))
                     {
                         return OnGotStatementType(literal, BuiltinType.Float);
                     }
@@ -1966,7 +2039,7 @@ public abstract class CodeGenerator
     protected GeneralType FindStatementType(Pointer pointer)
     {
         GeneralType to = FindStatementType(pointer.PrevStatement);
-        if (to is not PointerType pointerType)
+        if (!to.Is(out PointerType? pointerType))
         { return OnGotStatementType(pointer, BuiltinType.Any); }
         return OnGotStatementType(pointer, pointerType.To);
     }
@@ -1993,16 +2066,16 @@ public abstract class CodeGenerator
     {
         GeneralType prevStatementType = FindStatementType(field.PrevStatement);
 
-        if (prevStatementType is ArrayType && field.Identifier.Equals("Length"))
+        if (prevStatementType.Is<ArrayType>() && field.Identifier.Equals("Length"))
         {
             field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
             return OnGotStatementType(field, BuiltinType.Integer);
         }
 
-        if (prevStatementType is PointerType pointerType)
+        if (prevStatementType.Is(out PointerType? pointerType))
         { prevStatementType = pointerType.To; }
 
-        if (prevStatementType is StructType structType)
+        if (prevStatementType.Is(out StructType? structType))
         {
             foreach (CompiledField definedField in structType.Struct.Fields)
             {
@@ -3112,7 +3185,7 @@ public abstract class CodeGenerator
     {
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
-        if (prevType is ArrayType arrayType && field.Identifier.Equals("Length"))
+        if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Equals("Length"))
         {
             value = new CompiledValue(arrayType.Length);
             return true;
@@ -3129,7 +3202,7 @@ public abstract class CodeGenerator
         if (TryCompute(typeCast.PrevStatement, context, out value))
         {
             GeneralType type = GeneralType.From(typeCast.Type, FindType, TryCompute);
-            if (type is not BuiltinType builtinType) return false;
+            if (!type.Is(out BuiltinType? builtinType)) return false;
             if (!CompiledValue.TryCast(ref value, builtinType.RuntimeType))
             { return false; }
             return true;
@@ -3343,7 +3416,7 @@ public abstract class CodeGenerator
 
         for (int i = 0; i < parameterValues.Length; i++)
         {
-            if (!function.ParameterTypes[i].Equals(new BuiltinType(parameterValues[i].Type)))
+            if (!function.ParameterTypes[i].Equals(parameterValues[i].Type))
             {
                 Debugger.Break();
                 return false;
@@ -3354,7 +3427,7 @@ public abstract class CodeGenerator
 
         if (function.ReturnSomething)
         {
-            if (function.Type is not BuiltinType returnType)
+            if (!function.Type.Is(out BuiltinType? returnType))
             { return false; }
 
             if (function.ReturnSomething)

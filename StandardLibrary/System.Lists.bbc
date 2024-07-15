@@ -1,20 +1,21 @@
 using System;
 using System.Memory;
+using System.String;
 
 template<T>
 struct List
 {
     private int _capacity;
     private int _length;
-    private T* _ptr;
+    private T[]* _ptr;
 
     export int Length() { return this._length; }
     
     export void Clear() { this._length = 0; }
 
-    export char* ToString()
+    export string ToString()
     {
-        char* result = "";
+        string result = "";
         
         int length = this._length;
         for (int i; i < length; i++)

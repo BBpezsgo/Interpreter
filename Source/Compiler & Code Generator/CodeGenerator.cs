@@ -823,6 +823,11 @@ public abstract class CodeGenerator
             if (to.Is(out PointerType? toPtr) && from.Is<PointerType>() && toPtr.To.SameAs(BasicType.Any))
             { return true; }
 
+            if (from.Is(out PointerType? fromPtr) && to.Is(out toPtr) &&
+                fromPtr.To.Is(out ArrayType? fromPtrArray) && toPtr.To.Is(out ArrayType? toPtrArray) &&
+                !toPtrArray.Length.HasValue)
+            { return true; }
+
             return false;
         }
 
@@ -884,7 +889,18 @@ public abstract class CodeGenerator
         bool HandlePerfectParameterTypes(TFunction function)
         {
             if (query.Arguments.HasValue &&
-                !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (defined, passed) => query.Converter.Invoke(passed, null).SameAs(defined)))
+                !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (defined, passed) => {
+                    GeneralType _passed = query.Converter.Invoke(passed, null);
+                    if (_passed.SameAs(defined))
+                    { return true; }
+
+                    if (_passed.Is(out PointerType? fromPtr) && defined.Is(out PointerType? toPtr) &&
+                        fromPtr.To.Is(out ArrayType? fromPtrArray) && toPtr.To.Is(out ArrayType? toPtrArray) &&
+                        !toPtrArray.Length.HasValue)
+                    { return true; }
+
+                    return false;
+                }))
             {
                 if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                 {
@@ -1613,14 +1629,19 @@ public abstract class CodeGenerator
                 destArrayType.Of.SameAs(BasicType.Char))
             {
                 string literalValue = literal.Value;
-                if (literalValue.Length != destArrayType.Length)
-                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of {destArrayType.Length})", value, CurrentFile); }
+                if (!destArrayType.Length.HasValue || literalValue.Length != destArrayType.Length.Value)
+                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of {destArrayType.Length.Value})", value, CurrentFile); }
                 return;
             }
 
             if (destination.Is(out PointerType? pointerType) &&
-                pointerType.To.SameAs(BasicType.Char))
-            { return; }
+                pointerType.To.Is(out ArrayType? arrayType) &&
+                arrayType.Of.SameAs(BasicType.Char))
+            {
+                if (arrayType.Length.HasValue && arrayType.Length.Value != literal.Value.Length)
+                { throw new CompilerException($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array {destination} (length of {arrayType.Length.Value})", value, CurrentFile); }
+                return;
+            }
         }
 
         {
@@ -1771,19 +1792,20 @@ public abstract class CodeGenerator
     {
         GeneralType prevType = FindStatementType(index.PrevStatement);
 
-        if (prevType.Is(out ArrayType? arrayType))
-        { return OnGotStatementType(index, arrayType.Of); }
-
         // TODO: (index.PrevStatement as IInFile)?.OriginalFile can be null
         if (GetIndexGetter(prevType, (index.PrevStatement as IInFile)?.File, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError))
         { return OnGotStatementType(index, indexer.Function.Type); }
 
-        if (prevType.Is(out PointerType? pointerType))
+        if (prevType.Is(out ArrayType? arrayType))
+        { return OnGotStatementType(index, arrayType.Of); }
+
+        if (prevType.Is(out PointerType? pointerType) &&
+            pointerType.To.Is(out arrayType))
         {
-            if (!pointerType.To.Is<BuiltinType>())
+            if (!arrayType.Of.Is<BuiltinType>())
             { AnalysisCollection?.Warnings.Add(notFoundError.InstantiateWarning(index, index.File)); }
 
-            return pointerType.To;
+            return arrayType.Of;
         }
 
         throw notFoundError.Instantiate(index, index.File);
@@ -1959,9 +1981,10 @@ public abstract class CodeGenerator
             case LiteralType.String:
                 if (expectedType is not null &&
                     expectedType.Is(out PointerType? pointerType) &&
-                    pointerType.To.SameAs(BasicType.Byte))
-                { return OnGotStatementType(literal, new PointerType(BuiltinType.Byte)); }
-                return OnGotStatementType(literal, new PointerType(BuiltinType.Char));
+                    pointerType.To.Is(out ArrayType? arrayType) &&
+                    arrayType.Of.SameAs(BasicType.Byte))
+                { return OnGotStatementType(literal, expectedType); }
+                return OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, literal.Value.Length)));
             case LiteralType.Char:
                 if (expectedType is not null)
                 {
@@ -3185,9 +3208,16 @@ public abstract class CodeGenerator
     {
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
-        if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Equals("Length"))
+        if (prevType.Is(out ArrayType? arrayType) &&
+            field.Identifier.Equals("Length"))
         {
-            value = new CompiledValue(arrayType.Length);
+            if (!arrayType.Length.HasValue)
+            {
+                value = CompiledValue.Null;
+                return false;
+            }
+
+            value = new CompiledValue(arrayType.Length.Value);
             return true;
         }
 

@@ -353,7 +353,7 @@ public sealed class Parser
         if (!ExpectIdentifier(out Token? identifier))
         { throw new SyntaxException($"Expected identifier after keyword \"{keyword}\"", keyword.Position.After(), File); }
 
-        if (!ExpectType(AllowedType.AnyPointer | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength | AllowedType.StackArrayWithoutLength, out TypeInstance? type))
+        if (!ExpectType(AllowedType.AnyPointer | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength | AllowedType.StackArrayWithoutLength | AllowedType.StackArrayWithoutLength, out TypeInstance? type))
         { throw new SyntaxException($"Expected type after alias identifier", identifier.Position.After(), File); }
 
         CheckModifiers(modifiers, AliasModifiers.AsSpan());
@@ -1088,7 +1088,7 @@ public sealed class Parser
         while (ExpectIdentifier(out Token? modifier, VariableModifiers.AsSpan()))
         { modifiers.Add(modifier); }
 
-        if (!ExpectType(AllowedType.Implicit | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength | AllowedType.AnyPointer, out TypeInstance? possibleType))
+        if (!ExpectType(AllowedType.Implicit | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength | AllowedType.StackArrayWithoutLength | AllowedType.AnyPointer, out TypeInstance? possibleType))
         { CurrentTokenIndex = startTokenIndex; return false; }
 
         if (!ExpectIdentifier(out Token? possibleVariableName))
@@ -1687,7 +1687,7 @@ public sealed class Parser
 
         Token[] modifiers = ExpectModifiers();
 
-        if (!ExpectType(AllowedType.Implicit | AllowedType.StackArrayWithLength | AllowedType.AnyPointer, out TypeInstance? possibleType))
+        if (!ExpectType(AllowedType.Implicit | AllowedType.StackArrayWithLength | AllowedType.StackArrayWithoutLength | AllowedType.AnyPointer, out TypeInstance? possibleType))
         { CurrentTokenIndex = startTokenIndex; return false; }
 
         if (!ExpectIdentifier(out Token? possibleVariableName))

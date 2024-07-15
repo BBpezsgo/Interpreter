@@ -154,12 +154,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (literal.Type != LiteralType.String)
                     { throw new NotSupportedException($"Only string literals supported", literal, CurrentFile); }
-                    if (literal.Value.Length != arrayType.Length)
-                    { throw new CompilerException($"Literal length {literal.Value.Length} must be equal to the stack array length {arrayType.Length}", literal, CurrentFile); }
+                    if (literal.Value.Length != arrayType.Length.Value)
+                    { throw new CompilerException($"Literal length {literal.Value.Length} must be equal to the stack array length {arrayType.Length.Value}", literal, CurrentFile); }
 
                     using (DebugBlock(initialValue))
                     {
-                        int arraySize = arrayType.Length;
+                        int arraySize = arrayType.Length.Value;
 
                         int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -175,7 +175,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
                 else
                 {
-                    int arraySize = arrayType.Length;
+                    int arraySize = arrayType.Length.Value;
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -193,7 +193,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (type.Is(out ArrayType? arrayType))
             {
-                int arraySize = arrayType.Length;
+                int arraySize = arrayType.Length.Value;
 
                 int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -366,10 +366,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     { throw new InternalException(); }
                     if (literal.Type != LiteralType.String)
                     { throw new InternalException(); }
-                    if (literal.Value.Length != arrayType.Length)
+                    if (literal.Value.Length != arrayType.Length.Value)
                     { throw new InternalException(); }
 
-                    int arraySize = arrayType.Length;
+                    int arraySize = arrayType.Length.Value;
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -549,12 +549,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (prevType.Is(out PointerType? pointerType))
+        if (prevType.Is(out PointerType? pointerType) &&
+            pointerType.To.Is(out ArrayType? arrayType))
         {
             int valueAddress = Stack.NextAddress;
             GenerateCodeForStatement(value);
 
-            if (!pointerType.To.SameAs(valueType))
+            if (!arrayType.Of.SameAs(valueType))
             { throw new CompilerException("Bruh", value, CurrentFile); }
 
             int pointerAddress = Stack.NextAddress;
@@ -566,9 +567,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             int indexAddress = Stack.NextAddress;
             GenerateCodeForStatement(statement.Index);
 
-            if (pointerType.To.Size != 1)
+            if (arrayType.Of.Size != 1)
             {
-                using StackAddress multiplierAddress = Stack.Push(pointerType.To.Size);
+                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.Size);
                 Code.MULTIPLY(indexAddress, multiplierAddress, Stack.GetTemporaryAddress);
             }
 
@@ -593,7 +594,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         using (Code.Block(this, $"Set array (variable {variable.Name}) index ({statement.Index}) (at {variable.Address}) to {value}"))
         {
-            if (!variable.Type.Is(out ArrayType? arrayType))
+            if (!variable.Type.Is(out arrayType))
             { throw new CompilerException($"Index setter for type \"{variable.Type}\" not found", statement, CurrentFile); }
 
             GeneralType elementType = arrayType.Of;
@@ -686,14 +687,29 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugInfoBlock debugBlock = DebugBlock(indexCall);
 
-        GeneralType arrayType = FindStatementType(indexCall.PrevStatement);
+        GeneralType type = FindStatementType(indexCall.PrevStatement);
 
-        if (arrayType.Is(out ArrayType? arrayType1))
+        if (GetIndexGetter(type, CurrentFile, out FunctionQueryResult<CompiledFunction>? indexer, out var notFoundError, AddCompilable))
+        {
+            if (!indexer.Function.CanUse(CurrentFile))
+            {
+                AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{indexer.Function.ToReadable()}\" cannot be called due to its protection level", indexCall, CurrentFile));
+                return;
+            }
+
+            GenerateCodeForFunction(indexer.Function, ImmutableArray.Create(indexCall.PrevStatement, indexCall.Index), indexer.TypeArguments, indexCall);
+
+            if (!indexCall.SaveValue && indexer.Function.ReturnSomething)
+            { Stack.Pop(); }
+            return;
+        }
+
+        if (type.Is(out ArrayType? arrayType))
         {
             if (!TryGetAddress(indexCall.PrevStatement, out int arrayAddress, out _))
             { throw new CompilerException($"Failed to get array address", indexCall.PrevStatement, CurrentFile); }
 
-            GeneralType elementType = arrayType1.Of;
+            GeneralType elementType = arrayType.Of;
 
             int elementSize = elementType.Size;
 
@@ -713,11 +729,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (!GetIndexGetter(arrayType, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
+        if (type.Is(out PointerType? pointerType) &&
+            pointerType.To.Is(out arrayType))
         {
-            if (!arrayType.Is(out PointerType? pointerType))
-            { throw new CompilerException($"Index getter \"{arrayType}[]\" not found", indexCall, CurrentFile); }
-
             int resultAddress = Stack.Push(0);
 
             int pointerAddress = Stack.NextAddress;
@@ -730,7 +744,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GenerateCodeForStatement(indexCall.Index);
 
             {
-                using StackAddress multiplierAddress = Stack.Push(pointerType.To.Size);
+                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.Size);
                 Code.MULTIPLY(indexAddress, multiplierAddress, Stack.GetTemporaryAddress);
             }
 
@@ -739,22 +753,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             Heap.Get(pointerAddress, resultAddress);
 
             Stack.Pop(); // pointerAddress
-
             return;
         }
 
-        (CompiledFunction? indexer, Dictionary<string, GeneralType>? typeArguments) = result;
-
-        if (!indexer.CanUse(CurrentFile))
-        {
-            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", indexCall, CurrentFile));
-            return;
-        }
-
-        GenerateCodeForFunction(indexer, ImmutableArray.Create(indexCall.PrevStatement, indexCall.Index), typeArguments, indexCall);
-
-        if (!indexCall.SaveValue && indexer.ReturnSomething)
-        { Stack.Pop(); }
+        throw new CompilerException($"Index getter \"{type}[]\" not found", indexCall, CurrentFile);
     }
     void GenerateCodeForStatement(LinkedIf @if, bool linked = false)
     {
@@ -2189,7 +2191,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Equals("Length"))
         {
-            Stack.Push(arrayType.Length);
+            Stack.Push(arrayType.Length.Value);
             return;
         }
 

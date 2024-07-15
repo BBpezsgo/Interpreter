@@ -1,6 +1,6 @@
 using System;
 
-temp char* a = "";
+temp string a = "";
 
 a = (temp a) + "a";
 

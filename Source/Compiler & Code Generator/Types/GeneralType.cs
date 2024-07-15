@@ -54,25 +54,27 @@ public abstract class GeneralType :
         ComputeValue? constComputer = null,
         Uri? uri = null)
     {
-        CompiledValue stackArraySize;
+        CompiledValue? stackArraySize = default;
 
-        if (type.StackArraySize is null)
-        { throw new NotImplementedException(); }
-
-        if (constComputer is not null)
+        if (type.StackArraySize is not null)
         {
-            if (!constComputer.Invoke(type.StackArraySize, out stackArraySize))
-            { throw new CompilerException("Failed to compute array size value", type.StackArraySize, uri); }
-        }
-        else
-        {
-            if (!CodeGenerator.TryComputeSimple(type.StackArraySize, out stackArraySize))
-            { throw new CompilerException("Can't compute array size value", type.StackArraySize, uri); }
+            if (constComputer is not null)
+            {
+                if (!constComputer.Invoke(type.StackArraySize, out CompiledValue _stackArraySize))
+                { throw new CompilerException("Failed to compute array size value", type.StackArraySize, uri); }
+                stackArraySize = _stackArraySize;
+            }
+            else
+            {
+                if (!CodeGenerator.TryComputeSimple(type.StackArraySize, out CompiledValue _stackArraySize))
+                { throw new CompilerException("Can't compute array size value", type.StackArraySize, uri); }
+                stackArraySize = _stackArraySize;
+            }
         }
 
         GeneralType? of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer, uri);
 
-        int size = (int)stackArraySize;
+        int? size = (int?)stackArraySize;
 
         ArrayType result = new(of, size);
         type.SetAnalyzedType(result);

@@ -3,12 +3,12 @@ using System.String;
 using System.Memory;
 using System.Math;
 
-export char* ToString(this byte number)
+export string ToString(this byte number)
 {
 	if (number == 0)
     { return "0"; }
 
-	char* result = "";
+	string result = "";
 
 	byte v = number;
 
@@ -19,13 +19,13 @@ export char* ToString(this byte number)
 		v = v / 10;
 	}
 
-	char* reversed = result.Reverse();
+	string reversed = result.Reverse();
 	delete result;
 
 	return reversed;
 }
 
-export char* ToString(this int number)
+export string ToString(this int number)
 {
 	if (number == 0)
     { return "0"; }
@@ -40,7 +40,7 @@ export char* ToString(this int number)
     if (isNegative)
     { numberLength++; }
 
-	char* result = Alloc(numberLength) as char*;
+	string result = Alloc(numberLength) as string;
     result[numberLength - 1] = '\0';
 
     if (isNegative)
@@ -63,7 +63,7 @@ export char* ToString(this int number)
 [External("sleep")]
 export void Sleep(int ms);
 
-export inline int ParseInt(temp char* v)
+export inline int ParseInt(temp string v)
 {
     if (v.IsNullOrEmpty())
     { return 0; }
@@ -88,7 +88,7 @@ export inline int ParseInt(temp char* v)
     return result;
 }
 
-export inline byte ParseByte(temp char* v)
+export inline byte ParseByte(temp string v)
 {
     if (v.IsNullOrEmpty())
     { return 0; }

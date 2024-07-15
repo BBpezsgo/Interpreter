@@ -1,6 +1,6 @@
 using System;
 
-temp char* builder = "";
+temp string builder = "";
 
 PrintLine(builder);
 

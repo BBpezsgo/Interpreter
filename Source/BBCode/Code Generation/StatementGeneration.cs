@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.BBLang.Generator;
 
+using System.Net;
 using Compiler;
 using Parser;
 using Parser.Statement;
@@ -1165,14 +1166,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 if (expectedType is not null &&
                     expectedType.Is(out PointerType? pointerType) &&
-                    pointerType.To.SameAs(BasicType.Byte))
+                    pointerType.To.Is(out ArrayType? arrayType) &&
+                    arrayType.Of.SameAs(BasicType.Byte))
                 {
-                    OnGotStatementType(literal, new PointerType(BuiltinType.Byte));
+                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Byte, literal.Value.Length)));
                     GenerateCodeForLiteralString(literal.Value, true);
                 }
                 else
                 {
-                    OnGotStatementType(literal, new PointerType(BuiltinType.Char));
+                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, literal.Value.Length)));
                     GenerateCodeForLiteralString(literal.Value, false);
                 }
                 break;
@@ -1685,10 +1687,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Equals("Length"))
         {
-            OnGotStatementType(field, BuiltinType.Integer);
-            field.PredictedValue = arrayType.Length;
+            if (!arrayType.Length.HasValue)
+            { throw new CompilerException("Array type's length isn't defined", field, field.File); }
 
-            AddInstruction(Opcode.Push, arrayType.Length);
+            OnGotStatementType(field, BuiltinType.Integer);
+            field.PredictedValue = arrayType.Length.Value;
+
+            AddInstruction(Opcode.Push, arrayType.Length.Value);
             return;
         }
 
@@ -1760,9 +1765,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(IndexCall index)
     {
-        GeneralType prevType = FindStatementType(index.PrevStatement);
+        GeneralType type = FindStatementType(index.PrevStatement);
 
-        if (prevType.Is(out ArrayType? arrayType))
+        if (GetIndexGetter(type, index.File, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError, AddCompilable))
+        {
+            GenerateCodeForFunctionCall_Function(new FunctionCall(
+                    index.PrevStatement,
+                    Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet),
+                    ImmutableArray.Create(index.Index),
+                    index.Brackets,
+                    index.File
+                ), indexer.Function);
+            return;
+        }
+
+        if (type.Is(out ArrayType? arrayType))
         {
             if (index.PrevStatement is not Identifier identifier)
             { throw new NotSupportedException($"Only variables/parameters supported by now", index.PrevStatement, CurrentFile); }
@@ -1771,7 +1788,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 index.Index.PredictedValue = computedIndexData;
 
-                if (computedIndexData < 0 || computedIndexData >= arrayType.Length)
+                if (computedIndexData < 0 || (arrayType.Length.HasValue && computedIndexData >= arrayType.Length.Value))
                 { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", index.Index, CurrentFile)); }
 
                 if (GetParameter(identifier.Content, out CompiledParameter? param))
@@ -1828,11 +1845,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (!GetIndexGetter(prevType, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
+        if (type.Is(out PointerType? pointerType) && pointerType.To.Is(out arrayType))
         {
-            if (!prevType.Is(out PointerType? pointerType))
-            { throw new CompilerException($"Index getter \"{prevType}[]\" not found", index, CurrentFile); }
-
             GenerateCodeForStatement(index.PrevStatement);
 
             GeneralType indexType = FindStatementType(index.Index);
@@ -1843,7 +1857,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto reg1 = Registers.GetFree())
             {
                 PopTo(reg1.Register);
-                AddInstruction(Opcode.MathMult, reg1.Register, pointerType.To.SizeBytes);
+                AddInstruction(Opcode.MathMult, reg1.Register, arrayType.Of.SizeBytes);
 
                 using (RegisterUsage.Auto reg2 = Registers.GetFree())
                 {
@@ -1857,19 +1871,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 PopTo(reg1.Register);
 
-                PushFrom(new AddressRegisterPointer(reg1.Register), pointerType.To.SizeBytes);
+                PushFrom(new AddressRegisterPointer(reg1.Register), arrayType.Of.SizeBytes);
             }
-
+            
             return;
         }
 
-        GenerateCodeForFunctionCall_Function(new FunctionCall(
-                index.PrevStatement,
-                Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet),
-                ImmutableArray.Create(index.Index),
-                index.Brackets,
-                index.File
-            ), result.Function);
+        throw new CompilerException($"Index getter \"{type}[]\" not found", index, CurrentFile);
     }
 
     void GenerateAddressResolver(Address address)
@@ -2247,10 +2255,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value)
     {
-        GeneralType prevType = FindStatementType(statementToSet.PrevStatement);
+        GeneralType type = FindStatementType(statementToSet.PrevStatement);
         GeneralType valueType = FindStatementType(value);
 
-        if (prevType.Is(out ArrayType? arrayType))
+        if (GetIndexSetter(type, valueType, CurrentFile, out FunctionQueryResult<CompiledFunction>? indexer, out _, AddCompilable))
+        {
+            GenerateCodeForFunctionCall_Function(new FunctionCall(
+                statementToSet.PrevStatement,
+                Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerSet),
+                ImmutableArray.Create<StatementWithValue>(statementToSet.Index, value),
+                statementToSet.Brackets,
+                statementToSet.File
+            ), indexer.Function);
+            return;
+        }
+
+        if (type.Is(out ArrayType? arrayType))
         {
             if (statementToSet.PrevStatement is not Identifier identifier)
             { throw new NotSupportedException($"Only variables/parameters supported by now", statementToSet.PrevStatement, CurrentFile); }
@@ -2259,7 +2279,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 statementToSet.Index.PredictedValue = computedIndexData;
 
-                if (computedIndexData < 0 || computedIndexData >= arrayType.Length)
+                if (computedIndexData < 0 || (arrayType.Length.HasValue && computedIndexData >= arrayType.Length.Value))
                 { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", statementToSet.Index, CurrentFile)); }
 
                 GenerateCodeForStatement(value);
@@ -2281,12 +2301,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (!GetIndexSetter(prevType, valueType, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
+        if (type.Is(out PointerType? pointerType) && pointerType.To.Is(out arrayType))
         {
-            if (!prevType.Is(out PointerType? pointerType))
-            { throw new CompilerException($"Index setter \"{prevType}[...] = {valueType}\" not found", statementToSet, CurrentFile); }
-
-            AssignTypeCheck(pointerType.To, valueType, value);
+            AssignTypeCheck(arrayType.Of, valueType, value);
 
             GenerateCodeForStatement(value);
 
@@ -2300,7 +2317,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto regIndex = Registers.GetFree())
             {
                 PopTo(regIndex.Get(indexType.BitWidth));
-                AddInstruction(Opcode.MathMult, regIndex.Get(indexType.BitWidth), pointerType.To.SizeBytes);
+                AddInstruction(Opcode.MathMult, regIndex.Get(indexType.BitWidth), arrayType.Of.SizeBytes);
 
                 using (RegisterUsage.Auto regPtr = Registers.GetFree())
                 {
@@ -2318,14 +2335,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             return;
         }
-
-        GenerateCodeForFunctionCall_Function(new FunctionCall(
-            statementToSet.PrevStatement,
-            Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerSet),
-            ImmutableArray.Create<StatementWithValue>(statementToSet.Index, value),
-            statementToSet.Brackets,
-            statementToSet.File
-        ), result.Function);
     }
     void GenerateCodeForValueSetter(Pointer statementToSet, StatementWithValue value)
     {
@@ -2479,7 +2488,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             arrayType.Of.SameAs(BasicType.Char) &&
             newVariable.InitialValue is LiteralStatement literalStatement &&
             literalStatement.Type == LiteralType.String &&
-            literalStatement.Value.Length == arrayType.Length)
+            arrayType.Length.HasValue &&
+            literalStatement.Value.Length == arrayType.Length.Value)
         {
             size = arrayType.SizeBytes;
             compiledVariable.IsInitialized = true;

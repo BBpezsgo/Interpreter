@@ -1,8 +1,8 @@
 using System;
 
-char* GetStuff()
+string GetStuff()
 {
-	char* builder = "";
+	string builder = "";
 	builder = (temp builder) + "a";
 	builder = (temp builder) + "b";
 	builder = (temp builder) + "c";

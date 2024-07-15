@@ -56,7 +56,7 @@ export inline void Print(int message)
     }
 }
 
-export inline void Print(temp char* message)
+export inline void Print(temp string message)
 {
     for (int i = 0; message[i]; i++)
     {
@@ -112,7 +112,7 @@ export inline void PrintLine()
     Print('\n');
 }
 
-export inline void PrintLine(temp char* message)
+export inline void PrintLine(temp string message)
 {
     Print(message);
     PrintLine();
@@ -144,9 +144,9 @@ export char ReadKey()
     return in;
 }
 
-export char* ReadLine()
+export string ReadLine()
 {
-    char* result = "";
+    string result = "";
     while (1)
     {
         char inpChar = ReadKey();

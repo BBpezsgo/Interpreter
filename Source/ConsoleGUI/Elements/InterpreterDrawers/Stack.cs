@@ -136,7 +136,7 @@ public partial class InterpreterElement
                     b.AddText('[');
 
                     b.ForegroundColor = CharColor.Silver;
-                    b.AddText(v.Length.ToString());
+                    b.AddText(v.Length.Value.ToString());
 
                     b.ForegroundColor = CharColor.Gray;
                     b.AddText(']');

@@ -8,11 +8,11 @@ public class ArrayType : GeneralType,
     IEquatable<ArrayType>
 {
     public GeneralType Of { get; }
-    public int Length { get; }
+    public int? Length { get; }
 
     public override GeneralType FinalValue => new ArrayType(Of.FinalValue, Length);
-    public override int Size => Length * Of.Size;
-    public override int SizeBytes => Length * Of.SizeBytes;
+    public override int Size => Length.HasValue ? Length.Value * Of.Size : throw new InvalidOperationException("Array type's length isn't defined");
+    public override int SizeBytes => Length.HasValue ? Length.Value * Of.SizeBytes : throw new InvalidOperationException("Array type's length isn't defined");
     public override BitWidth BitWidth => throw new InvalidOperationException();
 
     public ArrayType(ArrayType other)
@@ -21,7 +21,7 @@ public class ArrayType : GeneralType,
         Length = other.Length;
     }
 
-    public ArrayType(GeneralType of, int size)
+    public ArrayType(GeneralType of, int? size)
     {
         Of = of;
         Length = size;

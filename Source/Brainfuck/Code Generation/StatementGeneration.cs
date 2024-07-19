@@ -934,15 +934,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (Returns.Count > 0)
                     {
-                        Code.CopyValue(Returns.Last.FlagAddress, tempAddress);
-                        Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
-                        using (Code.ConditionalBlock(this, tempAddress))
-                        { Code.SetValue(conditionAddress, 0); }
+                        if (Returns.Last.FlagAddress.HasValue)
+                        {
+                            Code.CopyValue(Returns.Last.FlagAddress.Value, tempAddress);
+                            Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
+                            using (Code.ConditionalBlock(this, tempAddress))
+                            { Code.SetValue(conditionAddress, 0); }
+                        }
                     }
 
                     if (Breaks.Count > 0)
                     {
-                        Code.CopyValue(Breaks.Last.FlagAddress, tempAddress);
+                        if (!Breaks.Last.FlagAddress.HasValue)
+                        { throw new InternalException($"Unexpected conditional jump in the depths", CurrentFile); }
+
+                        Code.CopyValue(Breaks.Last.FlagAddress.Value, tempAddress);
                         Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
                         using (Code.ConditionalBlock(this, tempAddress))
                         { Code.SetValue(conditionAddress, 0); }
@@ -1074,15 +1080,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (Returns.Count > 0)
                     {
-                        Code.CopyValue(Returns.Last.FlagAddress, tempAddress);
-                        Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
-                        using (Code.ConditionalBlock(this, tempAddress))
-                        { Code.SetValue(conditionAddress, 0); }
+                        if (Returns.Last.FlagAddress.HasValue)
+                        {
+                            Code.CopyValue(Returns.Last.FlagAddress.Value, tempAddress);
+                            Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
+                            using (Code.ConditionalBlock(this, tempAddress))
+                            { Code.SetValue(conditionAddress, 0); }
+                        }
                     }
 
                     if (Breaks.Count > 0)
                     {
-                        Code.CopyValue(Breaks.Last.FlagAddress, tempAddress);
+                        if (!Breaks.Last.FlagAddress.HasValue)
+                        { throw new InternalException($"Unexpected conditional jump in the depths", CurrentFile); }
+
+                        Code.CopyValue(Breaks.Last.FlagAddress.Value, tempAddress);
                         Code.LOGIC_NOT(tempAddress, Stack.GetTemporaryAddress);
                         using (Code.ConditionalBlock(this, tempAddress))
                         { Code.SetValue(conditionAddress, 0); }
@@ -1126,7 +1138,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (Returns.Count == 0)
                 { throw new CompilerException($"Can't return for some reason :(", statement.Identifier, CurrentFile); }
 
-                Code.SetValue(Returns.Last.FlagAddress, 0);
+                if (Returns.Last.FlagAddress.HasValue)
+                { Code.SetValue(Returns.Last.FlagAddress.Value, 0); }
 
                 Code.SetPointer(Stack.NextAddress);
                 Code.ClearCurrent();
@@ -1148,7 +1161,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (Breaks.Count == 0)
                 { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, CurrentFile); }
 
-                Code.SetValue(Breaks.Last.FlagAddress, 0);
+                if (!Breaks.Last.FlagAddress.HasValue)
+                { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, CurrentFile); }
+
+                Code.SetValue(Breaks.Last.FlagAddress.Value, 0);
 
                 Code.SetPointer(Stack.NextAddress);
                 Code.ClearCurrent();
@@ -2899,11 +2915,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (returnBlock is not null)
             {
-                using (Code.Block(this, $"Finish \"return\" block"))
+                returnBlock = Returns.Pop();
+                if (returnBlock.Value.FlagAddress.HasValue)
                 {
-                    if (Returns.Pop().FlagAddress != Stack.LastAddress)
-                    { throw new InternalException(string.Empty, function.Block, function.File); }
-                    Stack.Pop();
+                    using (Code.Block(this, $"Finish \"return\" block"))
+                    {
+                        if (returnBlock.Value.FlagAddress.Value != Stack.LastAddress)
+                        { throw new InternalException(string.Empty, function.Block, function.File); }
+                        Stack.Pop();
+                    }
                 }
             }
 
@@ -3031,11 +3051,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (returnBlock is not null)
         {
-            using (DebugBlock(function.Block.Brackets.End))
+            returnBlock = Returns.Pop();
+            if (returnBlock.Value.FlagAddress.HasValue)
             {
-                if (Returns.Pop().FlagAddress != Stack.LastAddress)
-                { throw new InternalException(string.Empty, function.Block, function.File); }
-                Stack.Pop();
+                using (DebugBlock(function.Block.Brackets.End))
+                {
+                    if (returnBlock.Value.FlagAddress.Value != Stack.LastAddress)
+                    { throw new InternalException(string.Empty, function.Block, function.File); }
+                    Stack.Pop();
+                }
             }
         }
 
@@ -3121,9 +3145,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (returnBlock is not null)
         {
-            if (Returns.Pop().FlagAddress != Stack.LastAddress)
-            { throw new InternalException(); }
-            Stack.Pop();
+            returnBlock = Returns.Pop();
+            if (returnBlock.Value.FlagAddress.HasValue)
+            {
+                if (returnBlock.Value.FlagAddress.Value != Stack.LastAddress)
+                { throw new InternalException(); }
+                Stack.Pop();   
+            }
         }
 
         using (Code.Block(this, $"Clean up function variables ({CompiledVariables.Count})"))
@@ -3307,12 +3335,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (returnBlock is not null)
         {
-            using (DebugBlock(function.Block.Brackets.End))
-            using (Code.Block(this, $"Finish \"return\" block"))
+            returnBlock = Returns.Pop();
+            if (returnBlock.Value.FlagAddress.HasValue)
             {
-                if (Returns.Pop().FlagAddress != Stack.LastAddress)
-                { throw new InternalException(string.Empty, function.Block, function.File); }
-                Stack.Pop();
+                using (DebugBlock(function.Block.Brackets.End))
+                using (Code.Block(this, $"Finish \"return\" block"))
+                {
+                    if (returnBlock.Value.FlagAddress.Value != Stack.LastAddress)
+                    { throw new InternalException(string.Empty, function.Block, function.File); }
+                    Stack.Pop();
+                }
             }
         }
 
@@ -3404,11 +3436,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             Code.CommentLine($"Pointer: {Code.Pointer}");
         }
 
-        if (!popFlag) return;
+        if (!popFlag || !block.FlagAddress.HasValue) return;
 
         using (Code.Block(this, $"Finish \"{kind}\" block"))
         {
-            if (block.FlagAddress != Stack.LastAddress)
+            if (block.FlagAddress.Value != Stack.LastAddress)
             { throw new InternalException(); }
             Stack.Pop();
         }
@@ -3417,10 +3449,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     void ContinueControlFlowStatements(Stack<ControlFlowBlock> controlFlowBlocks, string kind)
     {
         if (controlFlowBlocks.Count == 0) return;
+        // TODO: think about it
+        if (!controlFlowBlocks.Last.FlagAddress.HasValue) return;
 
         using (Code.Block(this, $"Continue \"{kind}\" statements"))
         {
-            Code.CopyValue(controlFlowBlocks.Last.FlagAddress, Stack.NextAddress);
+            if (!controlFlowBlocks.Last.FlagAddress.HasValue)
+            { throw new InternalException($"Unexpected conditional jump continuation in the depths", CurrentFile); }
+
+            Code.CopyValue(controlFlowBlocks.Last.FlagAddress.Value, Stack.NextAddress);
             Code.JumpStart(Stack.NextAddress);
             controlFlowBlocks.Last.PendingJumps.Last++;
         }
@@ -3428,20 +3465,29 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     ControlFlowBlock? BeginReturnBlock(IPositioned? positioned, ControlFlowUsage usage)
     {
-        if ((usage & ControlFlowUsage.AnyReturn) == ControlFlowUsage.None)
+        if (usage.HasFlag(ControlFlowUsage.ConditionalReturn) || !AllowOtherOptimizations)
         {
-            Code.CommentLine("Doesn't begin \"return\" block");
-            return null;
+            using (DebugBlock(positioned))
+            using (Code.Block(this, $"Begin conditional return block (depth: {Returns.Count} (now its one more))"))
+            {
+                int flagAddress = Stack.Push(1);
+                Code.CommentLine($"Return flag is at {flagAddress}");
+                ControlFlowBlock block = new(flagAddress);
+                Returns.Push(block);
+                return block;
+            }
         }
-
-        using (DebugBlock(positioned))
-        using (Code.Block(this, $"Begin \"return\" block (depth: {Returns.Count} (now its one more))"))
+        else if (usage.HasFlag(ControlFlowUsage.Return))
         {
-            int flagAddress = Stack.Push(1);
-            Code.CommentLine($"Return flag is at {flagAddress}");
-            ControlFlowBlock block = new(flagAddress);
+            Code.CommentLine($"Begin simple return block (depth: {Returns.Count} (now its one more))");
+            ControlFlowBlock block = new(null);
             Returns.Push(block);
             return block;
+        }
+        else
+        {
+            Code.CommentLine($"Doesn't begin return block (usage: {usage})");
+            return null;
         }
     }
 

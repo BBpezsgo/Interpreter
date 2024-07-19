@@ -565,9 +565,18 @@ public sealed class Compiler
             file);
     }
 
-    CompilerResult CompileInteractiveInternal(Statement statement, ImmutableArray<UsingDefinition> usings, Uri file)
+    CompilerResult CompileInteractiveInternal(Statement statement, Uri file)
     {
-        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(usings, file, PrintCallback, Settings.BasePath, AnalysisCollection, PreprocessorVariables, TokenizerSettings, null, null);
+        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(
+            file,
+            PrintCallback,
+            Settings.BasePath,
+            AnalysisCollection,
+            PreprocessorVariables,
+            TokenizerSettings,
+            null,
+            [ "System" ]
+        );
 
         foreach (CollectedAST file_ in files.Values)
         { AddAST(file_); }
@@ -874,33 +883,10 @@ public sealed class Compiler
         return compiler.CompileMainFile(file, fileParser, additionalImports);
     }
 
-    public static CompilerResult CompileFile(
-        FileInfo file,
-        Dictionary<int, ExternalFunctionBase>? externalFunctions,
-        CompilerSettings settings,
-        IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback = null,
-        AnalysisCollection? analysisCollection = null,
-        TokenizerSettings? tokenizerSettings = null,
-        FileParser? fileParser = null,
-        IEnumerable<string>? additionalImports = null)
-    {
-        Compiler compiler = new(
-            externalFunctions,
-            printCallback,
-            settings,
-            analysisCollection,
-            preprocessorVariables,
-            tokenizerSettings);
-        Uri uri = new(file.FullName, UriKind.Absolute);
-        return compiler.CompileMainFile(uri, fileParser, additionalImports);
-    }
-
     public static CompilerResult CompileInteractive(
         Statement statement,
         Dictionary<int, ExternalFunctionBase>? externalFunctions,
         CompilerSettings settings,
-        ImmutableArray<UsingDefinition> usings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,
         AnalysisCollection? analysisCollection,
@@ -914,6 +900,6 @@ public sealed class Compiler
             analysisCollection,
             preprocessorVariables,
             tokenizerSettings);
-        return compiler.CompileInteractiveInternal(statement, usings, file);
+        return compiler.CompileInteractiveInternal(statement, file);
     }
 }

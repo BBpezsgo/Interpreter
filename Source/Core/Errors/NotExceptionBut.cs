@@ -18,7 +18,7 @@ public abstract class NotExceptionBut : IDiagnostics
     {
         if (File == null) return null;
         if (!File.IsFile) return null;
-        return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(File.LocalPath));
+        return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(File.AbsolutePath));
     }
 
     public override string ToString()

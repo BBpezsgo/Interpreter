@@ -95,4 +95,11 @@ public static class Utils
     }
 
     public static bool PowerOf2(int n) => n != 0 && (n & (n - 1)) == 0;
+
+    public static Uri ToFileUri(string path) => new UriBuilder()
+    {
+        Host = null,
+        Scheme = Uri.UriSchemeFile,
+        Path = path,
+    }.Uri;
 }

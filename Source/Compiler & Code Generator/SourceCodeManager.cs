@@ -124,7 +124,7 @@ public class SourceCodeManager
         TokenizerResult tokens = StreamTokenizer.Tokenize(path, PreprocessorVariables, tokenizerSettings);
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
 
-        ast = Parser.Parse(tokens.Tokens, new Uri(path, UriKind.Absolute));
+        ast = Parser.Parse(tokens.Tokens, Utils.ToFileUri(path));
         AnalysisCollection?.Errors.AddRange(ast.Errors);
 
         return true;
@@ -139,7 +139,7 @@ public class SourceCodeManager
         if (@using is not null)
         {
             if (uri.IsFile)
-            { @using.CompiledUri = uri.LocalPath; }
+            { @using.CompiledUri = uri.AbsolutePath; }
             else
             { @using.CompiledUri = uri.ToString(); }
         }
@@ -158,7 +158,7 @@ public class SourceCodeManager
 
         if (uri.IsFile)
         {
-            if (FromFile(uri.LocalPath, tokenizerSettings, out ParserResult ast2))
+            if (FromFile(uri.AbsolutePath, tokenizerSettings, out ParserResult ast2))
             {
                 ast = ast2;
                 AlreadyLoadedCodes.Add(uri, new CollectedAST(ast2, uri, @using));
@@ -183,7 +183,7 @@ public class SourceCodeManager
         if (parent is not null &&
             parent.IsFile)
         {
-            FileInfo file = new(parent.LocalPath);
+            FileInfo file = new(parent.AbsolutePath);
             JsonDocument? config = LoadConfigFile(file.Directory?.FullName);
             if (config != null &&
                 config.RootElement.TryGetProperty("base", out JsonElement v))
@@ -209,7 +209,7 @@ public class SourceCodeManager
 
         if (parent != null)
         {
-            FileInfo file = new(parent.LocalPath);
+            FileInfo file = new(parent.AbsolutePath);
 
             if (file.Directory is null)
             { throw new InternalException($"File \"{file}\" doesn't have a directory"); }
@@ -329,47 +329,6 @@ public class SourceCodeManager
         AnalysisCollection?.Throw();
 
         return collectedASTs.ToImmutableDictionary();
-    }
-
-    ImmutableDictionary<Uri, CollectedAST> Entry(
-        IEnumerable<UsingDefinition> usings,
-        Uri? file,
-        string? basePath,
-        TokenizerSettings? tokenizerSettings,
-        IEnumerable<string>? additionalImports)
-    {
-        if (usings.Any())
-        { Print?.Invoke("Loading used files ...", LogType.Debug); }
-
-        Dictionary<Uri, CollectedAST> collectedASTs = new();
-
-        foreach (UsingDefinition @using in usings)
-        { collectedASTs.AddRange(ProcessFile(@using, file, basePath, tokenizerSettings)); }
-
-        if (additionalImports is not null)
-        {
-            foreach (string additionalImport in additionalImports)
-            { collectedASTs.AddRange(ProcessAdditionalImport(additionalImport, file, basePath, tokenizerSettings)); }
-        }
-
-        AnalysisCollection?.Throw();
-
-        return collectedASTs.ToImmutableDictionary();
-    }
-
-    public static ImmutableDictionary<Uri, CollectedAST> Collect(
-        IEnumerable<UsingDefinition> usings,
-        Uri? file,
-        PrintCallback? printCallback,
-        string? basePath,
-        AnalysisCollection? analysisCollection,
-        IEnumerable<string> preprocessorVariables,
-        TokenizerSettings? tokenizerSettings,
-        FileParser? fileParser,
-        IEnumerable<string>? additionalImports)
-    {
-        SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables, fileParser);
-        return sourceCodeManager.Entry(usings, file, basePath, tokenizerSettings, additionalImports);
     }
 
     public static ImmutableDictionary<Uri, CollectedAST> Collect(

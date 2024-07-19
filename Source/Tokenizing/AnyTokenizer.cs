@@ -22,7 +22,7 @@ public static class AnyTokenizer
     public static TokenizerResult Tokenize(Uri uri, IEnumerable<string>? preprocessorVariables = null, TokenizerSettings? settings = null)
     {
         if (uri.IsFile)
-        { return StreamTokenizer.Tokenize(uri.LocalPath, preprocessorVariables, settings); }
+        { return StreamTokenizer.Tokenize(uri.AbsolutePath, preprocessorVariables, settings); }
         else
         {
             using HttpClient client = new();

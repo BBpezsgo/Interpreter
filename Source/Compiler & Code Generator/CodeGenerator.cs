@@ -28,11 +28,11 @@ public abstract class CodeGenerator
 
     public readonly struct ControlFlowBlock
     {
-        public int FlagAddress { get; }
+        public int? FlagAddress { get; }
         public Stack<int> PendingJumps { get; }
         public Stack<bool> Doings { get; }
 
-        public ControlFlowBlock(int flagAddress)
+        public ControlFlowBlock(int? flagAddress)
         {
             FlagAddress = flagAddress;
             PendingJumps = new Stack<int>();
@@ -1630,7 +1630,7 @@ public abstract class CodeGenerator
             {
                 string literalValue = literal.Value;
                 if (!destArrayType.Length.HasValue || literalValue.Length != destArrayType.Length.Value)
-                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of {destArrayType.Length.Value})", value, CurrentFile); }
+                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of {destArrayType.Length?.ToString() ?? "null"})", value, CurrentFile); }
                 return;
             }
 
@@ -2741,11 +2741,8 @@ public abstract class CodeGenerator
     public enum ControlFlowUsage
     {
         None = 0x0,
-
         Return = 0x1,
         ConditionalReturn = 0x2,
-        AnyReturn = Return | ConditionalReturn,
-
         Break = 0x4,
     }
 

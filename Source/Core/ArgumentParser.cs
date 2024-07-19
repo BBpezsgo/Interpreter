@@ -374,7 +374,10 @@ public static class ArgumentParser
 
         if (args.Length > 0)
         {
-            if (!Uri.TryCreate(args[^1], UriKind.RelativeOrAbsolute, out Uri? file))
+            Uri? file;
+            if (System.IO.File.Exists(args[^1]))
+            { file = Utils.ToFileUri(args[^1]); }
+            else if (!Uri.TryCreate(args[^1], UriKind.RelativeOrAbsolute, out file))
             { throw new ArgumentException($"Invalid uri \"{args[^1]}\""); }
             result.File = file;
         }

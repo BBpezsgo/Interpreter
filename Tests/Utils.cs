@@ -30,7 +30,7 @@ public readonly struct TestFile
     /// <exception cref="AssertFailedException"/>
     public void DoMain(bool heapShouldBeEmpty = true, Action<Dictionary<int, ExternalFunctionBase>>? externalFunctionAdder = null)
     {
-        MainResult result = Utils.RunMain(new FileInfo(SourceFile), GetInput(), externalFunctionAdder);
+        MainResult result = Utils.RunMain(LanguageCore.Utils.ToFileUri(SourceFile), GetInput(), externalFunctionAdder);
         Console.Write($"ExitCode: {result.ExitCode}");
         ExpectedResult expected = GetExpectedResult();
         expected.Assert(result, heapShouldBeEmpty);
@@ -39,7 +39,7 @@ public readonly struct TestFile
     /// <exception cref="AssertFailedException"/>
     public void DoBrainfuck(bool memoryShouldBeEmpty = true, int? expectedMemoryPointer = 0)
     {
-        (BrainfuckResult result, BrainfuckResult resultCompact, BrainfuckResult resultUnoptimized) = Utils.RunBrainfuck(new FileInfo(SourceFile), GetInput());
+        (BrainfuckResult result, BrainfuckResult resultCompact, BrainfuckResult resultUnoptimized) = Utils.RunBrainfuck(LanguageCore.Utils.ToFileUri(SourceFile), GetInput());
 
         if (result.StdOutput != resultCompact.StdOutput) throw new AssertFailedException($"Compacted brainfuck code made different result (stdout)");
         if (result.MemoryPointer != resultCompact.MemoryPointer) throw new AssertFailedException($"Compacted brainfuck code made different result (memory pointer)");
@@ -240,7 +240,7 @@ public static class Utils
     public const long BaseTimeout = 2000;
     public const long BrainfuckTimeout = 5000;
 
-    const string TestFilesPath = $@"{TestConstants.TheProjectPath}\TestFiles\";
+    const string TestFilesPath = $"{TestConstants.TheProjectPath}/TestFiles/";
 
     const int TestCount = 70;
     static readonly int TestFileNameWidth = (int)Math.Floor(Math.Log10(TestCount)) + 1;
@@ -310,7 +310,7 @@ public static class Utils
         return new TestFile(sourceFile, resultFile, inputFile);
     }
 
-    public static MainResult RunMain(FileInfo file, string input, Action<Dictionary<int, ExternalFunctionBase>>? externalFunctionAdder = null)
+    public static MainResult RunMain(Uri file, string input, Action<Dictionary<int, ExternalFunctionBase>>? externalFunctionAdder = null)
     {
         Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
 
@@ -375,7 +375,7 @@ public static class Utils
         return result;
     }
 
-    public static (BrainfuckResult Normal, BrainfuckResult Compact, BrainfuckResult Unioptimized) RunBrainfuck(FileInfo file, string input)
+    public static (BrainfuckResult Normal, BrainfuckResult Compact, BrainfuckResult Unioptimized) RunBrainfuck(Uri file, string input)
     {
         BrainfuckResult resultNormal;
         BrainfuckResult resultCompact;

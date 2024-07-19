@@ -131,8 +131,7 @@ class InteractiveCompiler
             Compiled = Compiler.CompileInteractive(
                 parsed2,
                 externalFunctions,
-                new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
-                [UsingDefinition.CreateAnonymous("System")],
+                new CompilerSettings() { BasePath = "/home/BB/Projects/BBLang/Core/StandardLibrary/" },
                 PreprocessorVariables.Interactive,
                 null,
                 null,
@@ -176,8 +175,7 @@ class InteractiveCompiler
             Compiled = Compiler.CompileInteractive(
                 parsed2,
                 externalFunctions,
-                new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
-                [UsingDefinition.CreateAnonymous("System")],
+                new CompilerSettings() { BasePath = "/home/BB/Projects/BBLang/Core/StandardLibrary/" },
                 PreprocessorVariables.Interactive,
                 null,
                 null,

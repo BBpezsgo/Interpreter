@@ -243,11 +243,6 @@ public static class Minifier
 
     static bool CorrectInitializationAddresses(ref Span<char> result, DebugInformation? debugInformation)
     {
-        return false;
-
-        // TODO: fix this, failed test: 61
-
-        /*
         PredictedNumber<int> alreadyThere = 0;
         int initializationStarted = -1;
 
@@ -318,6 +313,5 @@ public static class Minifier
         }
 
         return false;
-        */
     }
 }

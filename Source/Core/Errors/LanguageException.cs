@@ -33,7 +33,7 @@ public class LanguageException : Exception, IDiagnostics
     {
         if (File == null) return null;
         if (!File.IsFile) return null;
-        return GetArrows(Position, System.IO.File.ReadAllText(File.LocalPath));
+        return GetArrows(Position, System.IO.File.ReadAllText(File.AbsolutePath));
     }
 
     public static string? GetArrows(Position position, string text)

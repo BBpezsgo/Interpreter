@@ -94,6 +94,22 @@ public static class Utils
         return !e2.MoveNext();
     }
 
+    public static bool SequenceEquals<T1, T2>(IEnumerable<T1> collectionA, IEnumerable<T2> collectionB, Func<int, T1, T2, bool> checker)
+    {
+        using IEnumerator<T1> e1 = collectionA.GetEnumerator();
+        using IEnumerator<T2> e2 = collectionB.GetEnumerator();
+
+        int i = 0;
+
+        while (e1.MoveNext())
+        {
+            if (!(e2.MoveNext() && checker.Invoke(i++, e1.Current, e2.Current)))
+            { return false; }
+        }
+
+        return !e2.MoveNext();
+    }
+
     public static bool PowerOf2(int n) => n != 0 && (n & (n - 1)) == 0;
 
     public static Uri ToFileUri(string path) => new UriBuilder()

@@ -28,18 +28,18 @@ public class CompiledConstructor : ConstructorDefinition,
 
     public CompiledConstructor(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
     {
-        this.Type = type;
-        this.ParameterTypes = parameterTypes.ToImmutableArray();
-        this.Context = context;
-        this.References = new List<Reference<ConstructorCall>>();
+        Type = type;
+        ParameterTypes = parameterTypes.ToImmutableArray();
+        Context = context;
+        References = new List<Reference<ConstructorCall>>();
     }
 
     public CompiledConstructor(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledConstructor other) : base(other)
     {
-        this.Type = type;
-        this.ParameterTypes = parameterTypes.ToImmutableArray();
-        this.Context = other.Context;
-        this.References = new List<Reference<ConstructorCall>>(other.References);
+        Type = type;
+        ParameterTypes = parameterTypes.ToImmutableArray();
+        Context = other.Context;
+        References = new List<Reference<ConstructorCall>>(other.References);
     }
 
     public bool DefinitionEquals(CompiledConstructor other)

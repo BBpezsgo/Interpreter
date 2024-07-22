@@ -9,7 +9,6 @@ public class PointerType : GeneralType,
 {
     public GeneralType To { get; }
 
-    public override GeneralType FinalValue => new PointerType(To.FinalValue);
     public override int Size => 1;
     public override int SizeBytes => BytecodeProcessor.PointerSize;
     public override BitWidth BitWidth => BytecodeProcessor.PointerBitWidth;

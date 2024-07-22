@@ -8,35 +8,24 @@ public class AliasType : GeneralType,
     IEquatable<AliasType>
 {
     public GeneralType Value { get; }
-    public CompiledAlias? Definition { get; }
+    public CompiledAlias Definition { get; }
 
     public override GeneralType FinalValue => Value is AliasType aliasType ? aliasType.FinalValue : Value;
-    public string Identifier => _identifier ?? Definition!.Identifier.Content;
+    public string Identifier => Definition.Identifier.Content;
     public override int Size => Value.Size;
     public override int SizeBytes => Value.SizeBytes;
     public override BitWidth BitWidth => Value.BitWidth;
-
-    readonly string? _identifier;
 
     public AliasType(AliasType other)
     {
         Value = other.Value;
         Definition = other.Definition;
-        _identifier = other._identifier;
     }
 
     public AliasType(GeneralType value, CompiledAlias definition)
     {
         Value = value;
         Definition = definition;
-        _identifier = null;
-    }
-
-    public AliasType(GeneralType value, string identifier)
-    {
-        Value = value;
-        Definition = null;
-        _identifier = identifier;
     }
 
     public override bool Equals(object? other) => Equals(other as AliasType);

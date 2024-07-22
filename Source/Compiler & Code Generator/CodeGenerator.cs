@@ -517,13 +517,14 @@ public abstract class CodeGenerator
 
     protected bool GetIndexGetter(
         GeneralType prevType,
+        GeneralType indexType,
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
         [NotNullWhen(false)] out WillBeCompilerException? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
-        ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, BuiltinType.Integer);
+        ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, indexType);
         FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerGet, arguments, (v, _) => v, relevantFile, null, addCompilable);
         return GetFunction<CompiledFunction, Token, string, GeneralType>(
             GetFunctions(),
@@ -540,13 +541,14 @@ public abstract class CodeGenerator
     protected bool GetIndexSetter(
         GeneralType prevType,
         GeneralType elementType,
+        GeneralType indexType,
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
         [NotNullWhen(false)] out WillBeCompilerException? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
-        ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, BuiltinType.Integer, elementType);
+        ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, indexType, elementType);
         FunctionQuery<CompiledFunction, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerSet, arguments, (v, _) => v, relevantFile, null, addCompilable);
         return GetFunction<CompiledFunction, Token, string, GeneralType>(
             GetFunctions(),
@@ -803,7 +805,6 @@ public abstract class CodeGenerator
         TFunction? result_ = default;
         Dictionary<string, GeneralType>? typeArguments = null;
         WillBeCompilerException? error_ = null;
-        readableName ??= query.ToReadable();
 
         string kindNameLower = kindName.ToLowerInvariant();
         string kindNameCapital = char.ToUpperInvariant(kindName[0]) + kindName[1..];
@@ -849,7 +850,7 @@ public abstract class CodeGenerator
                 if (perfectus < FunctionPerfectus.ParameterCount)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: wrong number of parameters passed to {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: wrong number of parameters passed to {function.ToReadable()}");
                 }
                 return false;
             }
@@ -860,26 +861,41 @@ public abstract class CodeGenerator
 
         bool HandleParameterTypes(TFunction function)
         {
-            if (query.Arguments.HasValue &&
-                !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (defined, passed) =>
-                {
-                    var _passed = query.Converter.Invoke(passed, null);
-
-                    if (_passed.Equals(defined))
-                    { return true; }
-
-                    if (CheckTypeConversion(_passed, defined))
-                    { return true; }
-
-                    return false;
-                }))
+            if (query.Arguments.HasValue)
             {
-                if (perfectus < FunctionPerfectus.ParameterTypes)
+                GeneralType[] _checkedParameterTypes = new GeneralType[query.Arguments.Value.Length];
+                if (!Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (i, defined, passed) =>
+                    {
+                        GeneralType _passed = query.Converter.Invoke(passed, defined);
+
+                        _checkedParameterTypes[i] = _passed;
+
+                        if (_passed.Equals(defined))
+                        { return true; }
+
+                        if (CheckTypeConversion(_passed, defined))
+                        { return true; }
+
+                        return false;
+                    }))
                 {
-                    result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types of {query} doesn't match with {function.ToReadable()}");
+                    if (perfectus < FunctionPerfectus.ParameterTypes)
+                    {
+                        result_ = function;
+                        FunctionQuery<TFunction, TPassedIdentifier, GeneralType> checkedQuery = new()
+                        {
+                            AddCompilable = query.AddCompilable,
+                            ArgumentCount = query.ArgumentCount,
+                            Arguments = _checkedParameterTypes.ToImmutableArray(),
+                            Converter = (v, _) => v,
+                            Identifier = query.Identifier,
+                            RelevantFile = query.RelevantFile,
+                            ReturnType = query.ReturnType,
+                        };
+                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of {checkedQuery.ToReadable()} doesn't match with {function.ToReadable()}");
+                    }
+                    return false;
                 }
-                return false;
             }
 
             perfectus = Max(perfectus, FunctionPerfectus.ParameterTypes);
@@ -888,9 +904,15 @@ public abstract class CodeGenerator
 
         bool HandlePerfectParameterTypes(TFunction function)
         {
-            if (query.Arguments.HasValue &&
-                !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (defined, passed) => {
-                    GeneralType _passed = query.Converter.Invoke(passed, null);
+            if (query.Arguments.HasValue)
+            {
+                GeneralType[] _checkedParameterTypes = new GeneralType[query.Arguments.Value.Length];
+                if (!Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (i, defined, passed) =>
+                {
+                    GeneralType _passed = query.Converter.Invoke(passed, defined);
+
+                    _checkedParameterTypes[i] = _passed;
+
                     if (_passed.SameAs(defined))
                     { return true; }
 
@@ -901,13 +923,24 @@ public abstract class CodeGenerator
 
                     return false;
                 }))
-            {
-                if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                 {
-                    result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types of {query} doesn't match with {function.ToReadable()}");
+                    if (perfectus < FunctionPerfectus.PerfectParameterTypes)
+                    {
+                        result_ = function;
+                        FunctionQuery<TFunction, TPassedIdentifier, GeneralType> checkedQuery = new()
+                        {
+                            AddCompilable = query.AddCompilable,
+                            ArgumentCount = query.ArgumentCount,
+                            Arguments = _checkedParameterTypes.ToImmutableArray(),
+                            Converter = (v, _) => v,
+                            Identifier = query.Identifier,
+                            RelevantFile = query.RelevantFile,
+                            ReturnType = query.ReturnType,
+                        };
+                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of {checkedQuery.ToReadable()} doesn't match with {function.ToReadable()}");
+                    }
+                    return false;
                 }
-                return false;
             }
 
             if (perfectus < FunctionPerfectus.PerfectParameterTypes)
@@ -920,15 +953,33 @@ public abstract class CodeGenerator
 
         bool HandleVeryPerfectParameterTypes(TFunction function)
         {
-            if (query.Arguments.HasValue &&
-                !Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (defined, passed) => query.Converter.Invoke(passed, null).Equals(defined)))
+            if (query.Arguments.HasValue)
             {
-                if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
+                GeneralType[] _checkedParameterTypes = new GeneralType[query.Arguments.Value.Length];
+                if (!Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (i, defined, passed) =>
                 {
-                    result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: parameter types of {query} doesn't match with {function.ToReadable()}");
+                    GeneralType _passed = query.Converter.Invoke(passed, null);
+                    _checkedParameterTypes[i] = _passed;
+                    return _passed.Equals(defined);
+                }))
+                {
+                    if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
+                    {
+                        result_ = function;
+                        FunctionQuery<TFunction, TPassedIdentifier, GeneralType> checkedQuery = new()
+                        {
+                            AddCompilable = query.AddCompilable,
+                            ArgumentCount = query.ArgumentCount,
+                            Arguments = _checkedParameterTypes.ToImmutableArray(),
+                            Converter = (v, _) => v,
+                            Identifier = query.Identifier,
+                            RelevantFile = query.RelevantFile,
+                            ReturnType = query.ReturnType,
+                        };
+                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of {checkedQuery.ToReadable()} doesn't match with {function.ToReadable()}");
+                    }
+                    return false;
                 }
-                return false;
             }
 
             if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
@@ -946,7 +997,7 @@ public abstract class CodeGenerator
                 if (perfectus < FunctionPerfectus.ReturnType)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return type of {query} doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of {query} doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -963,7 +1014,7 @@ public abstract class CodeGenerator
                 if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return type of {query} doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of {query} doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -984,7 +1035,7 @@ public abstract class CodeGenerator
                 if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: return type of {query} doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of {query} doesn't match with {function.ToReadable()}");
                 }
                 return false;
             }
@@ -1008,7 +1059,7 @@ public abstract class CodeGenerator
 
             if (perfectus >= FunctionPerfectus.File)
             {
-                error_ = new WillBeCompilerException($"{kindNameCapital} {readableName} not found: multiple {kindNameLower}s matched in the same file");
+                error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: multiple {kindNameLower}s matched in the same file");
                 // Debugger.Break();
             }
 
@@ -1111,7 +1162,7 @@ public abstract class CodeGenerator
             return true;
         }
 
-        error = error_ ?? new WillBeCompilerException($"{kindNameCapital} {readableName} not found");
+        error = error_ ?? new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found");
         result = null;
         return false;
     }
@@ -1674,11 +1725,11 @@ public abstract class CodeGenerator
             value.Type == RuntimeType.Integer)
         { return; }
 
-        if (destination.Is(out BuiltinType? builtinDestination) &&
-            valueType.Is(out BuiltinType? builtinValueType))
+        if (destination.Is<BuiltinType>() &&
+            valueType.Is<BuiltinType>())
         {
-            BitWidth destinationBitWidth = builtinDestination.BitWidth;
-            BitWidth valueBitWidth = builtinValueType.BitWidth;
+            BitWidth destinationBitWidth = destination.BitWidth;
+            BitWidth valueBitWidth = valueType.BitWidth;
             if (destinationBitWidth >= valueBitWidth)
             { return; }
         }
@@ -1757,6 +1808,55 @@ public abstract class CodeGenerator
 
     #endregion
 
+    protected bool GetLiteralType(LiteralType literal, [NotNullWhen(true)] out GeneralType? type)
+    {
+        static LiteralType ParseLiteralType(AttributeUsage attribute)
+        {
+            if (!attribute.TryGetValue(out string? literalTypeName))
+            { throw new CompilerException($"Attribute \"{attribute.Identifier}\" needs one string argument", attribute, null); }
+            return literalTypeName switch
+            {
+                "char" => LiteralType.Char,
+                "integer" => LiteralType.Integer,
+                "float" => LiteralType.Float,
+                "string" => LiteralType.String,
+                _ => throw new CompilerException($"Invalid literal type \"${literalTypeName}\"", attribute.Parameters[0], null),
+            };
+        }
+
+        type = null;
+
+        foreach (CompiledAlias alias in CompiledAliases)
+        {
+            if (alias.Attributes.TryGetAttribute("UsedByLiteral", out AttributeUsage? attribute))
+            {
+                LiteralType literalType = ParseLiteralType(attribute);
+                if (literalType == literal)
+                {
+                    if (type is not null)
+                    { throw new CompilerException($"Multiple type definitions defined with attribute [{"UsedByLiteral"}(${attribute.Parameters[0].Value})]", attribute, alias.File); }
+                    type = new AliasType(alias.Value, alias);
+                }
+            }
+        }
+
+        foreach (CompiledStruct @struct in CompiledStructs)
+        {
+            if (@struct.Attributes.TryGetAttribute("UsedByLiteral", out AttributeUsage? attribute))
+            {
+                LiteralType literalType = ParseLiteralType(attribute);
+                if (literalType == literal)
+                {
+                    if (type is not null)
+                    { throw new CompilerException($"Multiple type definitions defined with attribute [{"UsedByLiteral"}(${attribute.Parameters[0].Value})]", attribute, @struct.File); }
+                    type = new StructType(@struct, @struct.File);
+                }
+            }
+        }
+
+        return type is not null;
+    }
+
     #region FindStatementType()
 
     protected virtual TType OnGotStatementType<TType>(StatementWithValue statement, TType type)
@@ -1791,9 +1891,10 @@ public abstract class CodeGenerator
     protected GeneralType FindStatementType(IndexCall index)
     {
         GeneralType prevType = FindStatementType(index.PrevStatement);
+        GeneralType indexType = FindStatementType(index.Index);
 
         // TODO: (index.PrevStatement as IInFile)?.OriginalFile can be null
-        if (GetIndexGetter(prevType, (index.PrevStatement as IInFile)?.File, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError))
+        if (GetIndexGetter(prevType, indexType, (index.PrevStatement as IInFile)?.File, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError))
         { return OnGotStatementType(index, indexer.Function.Type); }
 
         if (prevType.Is(out ArrayType? arrayType))
@@ -1812,7 +1913,14 @@ public abstract class CodeGenerator
     }
     protected GeneralType FindStatementType(FunctionCall functionCall)
     {
-        if (functionCall.Identifier.Content == "sizeof") return BuiltinType.Integer;
+        if (functionCall.Identifier.Content == "sizeof")
+        {
+            if (GetLiteralType(LiteralType.Integer, out var integerType))
+            { return integerType; }
+
+            AnalysisCollection?.Warnings.Add(new Warning($"No type defined for integer literals, using the default i32", functionCall, CurrentFile));
+            return BuiltinType.Integer;
+        }
 
         if (!GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundError))
         { throw notFoundError.Instantiate(functionCall, CurrentFile); }
@@ -1959,24 +2067,33 @@ public abstract class CodeGenerator
                     {
                         if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            return OnGotStatementType(literal, BuiltinType.Byte);
+                            return OnGotStatementType(literal, expectedType);
                         }
                     }
                     else if (expectedType.SameAs(BasicType.Char))
                     {
                         if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
                         {
-                            return OnGotStatementType(literal, BuiltinType.Char);
+                            return OnGotStatementType(literal, expectedType);
                         }
                     }
                     else if (expectedType.SameAs(BasicType.Float))
                     {
-                        return OnGotStatementType(literal, BuiltinType.Float);
+                        return OnGotStatementType(literal, expectedType);
                     }
                 }
 
+                if (GetLiteralType(literal.Type, out GeneralType? literalType))
+                { return literalType; }
+
+                AnalysisCollection?.Warnings.Add(new Warning($"No type defined for integer literals, using the default i32", literal, CurrentFile));
                 return OnGotStatementType(literal, BuiltinType.Integer);
             case LiteralType.Float:
+
+                if (GetLiteralType(literal.Type, out literalType))
+                { return literalType; }
+
+                AnalysisCollection?.Warnings.Add(new Warning($"No type defined for float literals, using the default f32", literal, CurrentFile));
                 return OnGotStatementType(literal, BuiltinType.Float);
             case LiteralType.String:
                 if (expectedType is not null &&
@@ -1984,6 +2101,11 @@ public abstract class CodeGenerator
                     pointerType.To.Is(out ArrayType? arrayType) &&
                     arrayType.Of.SameAs(BasicType.Byte))
                 { return OnGotStatementType(literal, expectedType); }
+
+                if (GetLiteralType(literal.Type, out literalType))
+                { return literalType; }
+
+                AnalysisCollection?.Warnings.Add(new Warning($"No type defined for string literals, using the default u16[]*", literal, CurrentFile));
                 return OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, literal.Value.Length)));
             case LiteralType.Char:
                 if (expectedType is not null)
@@ -1992,15 +2114,19 @@ public abstract class CodeGenerator
                     {
                         if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            return OnGotStatementType(literal, BuiltinType.Byte);
+                            return OnGotStatementType(literal, expectedType);
                         }
                     }
                     else if (expectedType.SameAs(BasicType.Float))
                     {
-                        return OnGotStatementType(literal, BuiltinType.Float);
+                        return OnGotStatementType(literal, expectedType);
                     }
                 }
 
+                if (GetLiteralType(literal.Type, out literalType))
+                { return literalType; }
+
+                AnalysisCollection?.Warnings.Add(new Warning($"No type defined for character literals, using the default u16", literal, CurrentFile));
                 return OnGotStatementType(literal, BuiltinType.Char);
             default:
                 throw new UnreachableException($"Unknown literal type {literal.Type}");
@@ -2326,70 +2452,70 @@ public abstract class CodeGenerator
         switch (statement)
         {
             case Block v:
-            {
-                if (InlineMacro(v, parameters, out Block? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out Block? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case StatementWithValue v:
-            {
-                inlined = InlineMacro(v, parameters);
-                return true;
-            }
+                {
+                    inlined = InlineMacro(v, parameters);
+                    return true;
+                }
 
             case ForLoop v:
-            {
-                if (InlineMacro(v, parameters, out ForLoop? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out ForLoop? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case IfContainer v:
-            {
-                if (InlineMacro(v, parameters, out IfContainer? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out IfContainer? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case AnyAssignment v:
-            {
-                if (InlineMacro(v, parameters, out AnyAssignment? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out AnyAssignment? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case VariableDeclaration v:
-            {
-                if (InlineMacro(v, parameters, out VariableDeclaration? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out VariableDeclaration? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case WhileLoop v:
-            {
-                if (InlineMacro(v, parameters, out WhileLoop? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out WhileLoop? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             default: throw new NotImplementedException(statement.GetType().ToString());
         }
@@ -2527,32 +2653,32 @@ public abstract class CodeGenerator
         switch (statement)
         {
             case Assignment v:
-            {
-                if (InlineMacro(v, parameters, out Assignment? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out Assignment? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             case ShortOperatorCall v:
-            {
-                if (InlineMacro(v, parameters, out ShortOperatorCall? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out ShortOperatorCall? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             case CompoundAssignment v:
-            {
-                if (InlineMacro(v, parameters, out CompoundAssignment? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out CompoundAssignment? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             default: throw new UnreachableException();
         }
 
@@ -2777,15 +2903,15 @@ public abstract class CodeGenerator
         switch (statement.Identifier.Content)
         {
             case StatementKeywords.Return:
-            {
-                if (inDepth) return ControlFlowUsage.ConditionalReturn;
-                else return ControlFlowUsage.Return;
-            }
+                {
+                    if (inDepth) return ControlFlowUsage.ConditionalReturn;
+                    else return ControlFlowUsage.Return;
+                }
 
             case StatementKeywords.Break:
-            {
-                return ControlFlowUsage.Break;
-            }
+                {
+                    return ControlFlowUsage.Break;
+                }
 
             case StatementKeywords.Delete:
             case StatementKeywords.Throw:
@@ -2797,12 +2923,43 @@ public abstract class CodeGenerator
 
     #endregion
 
+    protected abstract class RuntimeStatement
+        : IPositioned
+    {
+        public abstract Position Position { get; }
+    }
+
+    protected abstract class RuntimeStatement<TOriginal> : RuntimeStatement
+        where TOriginal : Statement
+    {
+        public TOriginal Original { get; }
+
+        public override Position Position => Original.Position;
+
+        protected RuntimeStatement(TOriginal original)
+        {
+            Original = original;
+        }
+    }
+
+    protected class RuntimeFunctionCall : RuntimeStatement<FunctionCall>
+    {
+        public CompiledFunction Function { get; }
+        public ImmutableArray<CompiledValue> Parameters { get; }
+        
+        public RuntimeFunctionCall(CompiledFunction function, ImmutableArray<CompiledValue> parameters, FunctionCall original) : base(original)
+        {
+            Function = function;
+            Parameters = parameters;
+        }
+    }
+
     protected class EvaluationContext
     {
         readonly Dictionary<StatementWithValue, CompiledValue> _values;
         readonly Stack<Stack<Dictionary<string, CompiledValue>>>? _frames;
 
-        public readonly List<Statement> RuntimeStatements;
+        public readonly List<RuntimeStatement> RuntimeStatements;
         public Dictionary<string, CompiledValue>? LastScope => _frames?.Last.Last;
         public bool IsReturning;
         public bool IsBreaking;
@@ -2823,7 +2980,7 @@ public abstract class CodeGenerator
             else
             { _frames = null; }
 
-            RuntimeStatements = new List<Statement>();
+            RuntimeStatements = new List<RuntimeStatement>();
         }
 
         public bool TryGetValue(StatementWithValue statement, out CompiledValue value)
@@ -2951,7 +3108,7 @@ public abstract class CodeGenerator
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
             if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&
-                TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
+                TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -2980,23 +3137,23 @@ public abstract class CodeGenerator
         switch (op)
         {
             case "&&":
-            {
-                if (!(bool)leftValue)
                 {
-                    value = new CompiledValue(false);
-                    return true;
+                    if (!(bool)leftValue)
+                    {
+                        value = new CompiledValue(false);
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             case "||":
-            {
-                if ((bool)leftValue)
                 {
-                    value = new CompiledValue(true);
-                    return true;
+                    if ((bool)leftValue)
+                    {
+                        value = new CompiledValue(true);
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             default:
                 if (context is not null &&
                     context.TryGetValue(@operator, out value))
@@ -3017,7 +3174,7 @@ public abstract class CodeGenerator
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
             if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&
-                TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
+                TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -3148,22 +3305,12 @@ public abstract class CodeGenerator
                 !functionCall.SaveValue &&
                 TryCompute(functionCall.MethodArguments, context, out ImmutableArray<CompiledValue> parameters))
             {
-                FunctionCall newFunctionCall = new(
-                    null,
-                    functionCall.Identifier,
-                    Literal.CreateAnonymous(parameters, functionCall.MethodArguments),
-                    functionCall.Brackets,
-                    functionCall.File)
-                {
-                    SaveValue = functionCall.SaveValue,
-                    Semicolon = functionCall.Semicolon,
-                };
-                context.RuntimeStatements.Add(newFunctionCall);
+                context.RuntimeStatements.Add(new RuntimeFunctionCall(function, parameters, functionCall));
                 value = CompiledValue.Null;
                 return true;
             }
 
-            if (TryEvaluate(function, functionCall.MethodArguments, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
+            if (TryEvaluate(function, functionCall.MethodArguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -3329,23 +3476,23 @@ public abstract class CodeGenerator
         switch (op)
         {
             case "&&":
-            {
-                if (!leftValue)
                 {
-                    value = new CompiledValue(false);
-                    return true;
+                    if (!leftValue)
+                    {
+                        value = new CompiledValue(false);
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             case "||":
-            {
-                if (leftValue)
                 {
-                    value = new CompiledValue(true);
-                    return true;
+                    if (leftValue)
+                    {
+                        value = new CompiledValue(true);
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             default:
                 value = CompiledValue.Null;
                 return false;
@@ -3408,7 +3555,7 @@ public abstract class CodeGenerator
         };
     }
 
-    protected bool TryEvaluate(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+    protected bool TryEvaluate(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement[]? runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
@@ -3433,7 +3580,7 @@ public abstract class CodeGenerator
 
         return false;
     }
-    bool TryEvaluate(ICompiledFunction function, ImmutableArray<CompiledValue> parameterValues, out CompiledValue? value, [NotNullWhen(true)] out Statement[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunction function, ImmutableArray<CompiledValue> parameterValues, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement[]? runtimeStatements)
     {
         value = null;
         runtimeStatements = null;
@@ -3445,7 +3592,7 @@ public abstract class CodeGenerator
         {
             if (!function.ParameterTypes[i].Equals(parameterValues[i].Type))
             {
-                Debugger.Break();
+                // Debugger.Break();
                 return false;
             }
         }
@@ -3566,40 +3713,40 @@ public abstract class CodeGenerator
             switch (_branch)
             {
                 case IfBranch branch:
-                {
-                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
-                    { return false; }
+                    {
+                        if (!TryCompute(branch.Condition, context, out CompiledValue condition))
+                        { return false; }
 
-                    if (!condition)
-                    { continue; }
+                        if (!condition)
+                        { continue; }
 
-                    if (!TryEvaluate(branch.Block, context))
-                    { return false; }
+                        if (!TryEvaluate(branch.Block, context))
+                        { return false; }
 
-                    return true;
-                }
+                        return true;
+                    }
 
                 case ElseIfBranch branch:
-                {
-                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
-                    { return false; }
+                    {
+                        if (!TryCompute(branch.Condition, context, out CompiledValue condition))
+                        { return false; }
 
-                    if (!condition)
-                    { continue; }
+                        if (!condition)
+                        { continue; }
 
-                    if (!TryEvaluate(branch.Block, context))
-                    { return false; }
+                        if (!TryEvaluate(branch.Block, context))
+                        { return false; }
 
-                    return true;
-                }
+                        return true;
+                    }
 
                 case ElseBranch branch:
-                {
-                    if (!TryEvaluate(branch.Block, context))
-                    { return false; }
+                    {
+                        if (!TryEvaluate(branch.Block, context))
+                        { return false; }
 
-                    return true;
-                }
+                        return true;
+                    }
 
                 default: throw new UnreachableException();
             }

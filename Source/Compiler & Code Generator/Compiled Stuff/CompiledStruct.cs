@@ -11,35 +11,18 @@ public class CompiledStruct : StructDefinition,
 
     public CompiledStruct(IEnumerable<CompiledField> fields, StructDefinition definition) : base(definition)
     {
-        this.Fields = fields.ToImmutableArray();
+        Fields = fields.ToImmutableArray();
         foreach (CompiledField field in fields) field.Context = this;
 
-        this.References = new List<Reference<TypeInstance>>();
+        References = new List<Reference<TypeInstance>>();
     }
 
     public CompiledStruct(IEnumerable<CompiledField> fields, CompiledStruct other) : base(other)
     {
-        this.Fields = fields.ToImmutableArray();
+        Fields = fields.ToImmutableArray();
         foreach (CompiledField field in fields) field.Context = this;
 
-        this.References = new List<Reference<TypeInstance>>(other.References);
-    }
-
-    public bool GetField(string name, [NotNullWhen(true)] out CompiledField? compiledField)
-    {
-        compiledField = null;
-
-        foreach (CompiledField _field in Fields)
-        {
-            if (_field.Identifier.Content != name) continue;
-
-            if (compiledField is not null)
-            { return false; }
-
-            compiledField = _field;
-        }
-
-        return compiledField is not null;
+        References = new List<Reference<TypeInstance>>(other.References);
     }
 
     public CompiledStruct Duplicate() => new(Fields, this);
@@ -64,13 +47,13 @@ public class CompiledStruct : StructDefinition,
         StringBuilder result = new();
         result.Append("struct ");
 
-        result.Append(this.Identifier.Content);
+        result.Append(Identifier.Content);
 
         if (Template is null)
         { return result.ToString(); }
 
         result.Append('<');
-        result.AppendJoin(", ", this.Template.Parameters);
+        result.AppendJoin(", ", Template.Parameters);
         result.Append('>');
         return result.ToString();
     }

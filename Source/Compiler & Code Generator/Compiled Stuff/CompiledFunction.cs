@@ -45,11 +45,11 @@ public class CompiledFunction : FunctionDefinition,
 
     public bool DefinitionEquals(CompiledFunction other)
     {
-        if (!this.Type.Equals(other.Type)) return false;
-        if (this.Identifier.Content != other.Identifier.Content) return false;
-        if (this.ParameterTypes.Length != other.ParameterTypes.Length) return false;
-        for (int i = 0; i < this.ParameterTypes.Length; i++)
-        { if (!this.ParameterTypes[i].Equals(other.ParameterTypes[i])) return false; }
+        if (!Type.Equals(other.Type)) return false;
+        if (Identifier.Content != other.Identifier.Content) return false;
+        if (ParameterTypes.Length != other.ParameterTypes.Length) return false;
+        for (int i = 0; i < ParameterTypes.Length; i++)
+        { if (!ParameterTypes[i].Equals(other.ParameterTypes[i])) return false; }
 
         return true;
     }
@@ -62,13 +62,13 @@ public class CompiledFunction : FunctionDefinition,
         if (IsExported)
         { result.Append("export "); }
 
-        result.Append(this.Type.ToString());
+        result.Append(Type.ToString());
         result.Append(' ');
 
-        result.Append(this.Identifier.Content);
+        result.Append(Identifier.Content);
 
         result.Append('(');
-        if (this.ParameterTypes.Length > 0)
+        if (ParameterTypes.Length > 0)
         {
             for (int i = 0; i < ParameterTypes.Length; i++)
             {

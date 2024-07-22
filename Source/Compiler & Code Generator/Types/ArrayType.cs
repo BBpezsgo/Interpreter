@@ -10,7 +10,6 @@ public class ArrayType : GeneralType,
     public GeneralType Of { get; }
     public int? Length { get; }
 
-    public override GeneralType FinalValue => new ArrayType(Of.FinalValue, Length);
     public override int Size => Length.HasValue ? Length.Value * Of.Size : throw new InvalidOperationException("Array type's length isn't defined");
     public override int SizeBytes => Length.HasValue ? Length.Value * Of.SizeBytes : throw new InvalidOperationException("Array type's length isn't defined");
     public override BitWidth BitWidth => throw new InvalidOperationException();

@@ -469,7 +469,8 @@ public sealed class Compiler
 
         GeneralType[] parametersType = GeneralType.FromArray(function.Parameters, FindType).ToArray();
 
-        if (function.Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out string? name, out AttributeUsage? attribute))
+        if (function.Attributes.TryGetAttribute(AttributeConstants.ExternalIdentifier, out AttributeUsage? attribute) &&
+            attribute.TryGetValue(out string? name))
         {
             if (ExternalFunctions.TryGet(name, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
             {

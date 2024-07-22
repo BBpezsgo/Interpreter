@@ -15,7 +15,7 @@ public static class Program
         Entry.Run(args);
 #endif
 
-        Console.WriteLine("Press any key to exit ...");
+        Console.WriteLine("Press any key to continue ...");
         Console.ReadKey();
     }
 }

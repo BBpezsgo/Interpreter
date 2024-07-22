@@ -2,17 +2,25 @@
 #if BRAINFUCK
 
 export alias byte u8;
-export alias char u16;
-export alias int i32;
+[UsedByLiteral("char")]
+export alias char u8;
+[UsedByLiteral("integer")]
+export alias int u8;
+[UsedByLiteral("float")]
 export alias float f32;
+[UsedByLiteral("string")]
 export alias string char[]*;
 
 #else
 
 export alias byte u8;
+[UsedByLiteral("char")]
 export alias char u16;
+[UsedByLiteral("integer")]
 export alias int i32;
+[UsedByLiteral("float")]
 export alias float f32;
+[UsedByLiteral("string")]
 export alias string char[]*;
 
 #endif

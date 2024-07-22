@@ -342,6 +342,8 @@ public sealed class Parser
         int parseStart = CurrentTokenIndex;
         aliasDefinition = null;
 
+        AttributeUsage[] attributes = ExpectAttributes();
+
         Token[] modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier(DeclarationKeywords.Alias, out Token? keyword))
@@ -362,6 +364,7 @@ public sealed class Parser
         { throw new SyntaxException($"Expected semicolon after alias definition", type.Position.After(), File); }
 
         aliasDefinition = new AliasDefinition(
+            attributes,
             modifiers,
             keyword,
             identifier,

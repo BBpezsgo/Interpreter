@@ -52,16 +52,6 @@ public readonly partial struct CompiledValue
 
     #endregion
 
-    public object? GetValue() => Type switch
-    {
-        RuntimeType.Null => null,
-        RuntimeType.Byte => Byte,
-        RuntimeType.Integer => Int,
-        RuntimeType.Single => Single,
-        RuntimeType.Char => Char,
-        _ => throw new UnreachableException(),
-    };
-
     public string GetDebuggerDisplay() => Type switch
     {
         RuntimeType.Null => "null",
@@ -79,63 +69,6 @@ public readonly partial struct CompiledValue
         RuntimeType.Single => HashCode.Combine(Type, Single),
         RuntimeType.Char => HashCode.Combine(Type, Char),
         _ => throw new UnreachableException(),
-    };
-
-    public void DebugPrint()
-    {
-        ConsoleColor savedFgColor = Console.ForegroundColor;
-        ConsoleColor savedBgColor = Console.BackgroundColor;
-
-        switch (Type)
-        {
-            case RuntimeType.Byte:
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write(Byte);
-                break;
-            case RuntimeType.Integer:
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write(Int);
-                break;
-            case RuntimeType.Single:
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write(Single);
-                break;
-            case RuntimeType.Char:
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"\'{Char.Escape()}\'");
-                break;
-            case RuntimeType.Null:
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write("null");
-                break;
-            default: throw new UnreachableException();
-        }
-
-        Console.ResetColor();
-        Console.ForegroundColor = savedFgColor;
-        Console.BackgroundColor = savedBgColor;
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static CompiledValue GetValue(object value) => value switch
-    {
-        byte v => new CompiledValue(v),
-        int v => new CompiledValue(v),
-        float v => new CompiledValue(v),
-        bool v => new CompiledValue(v),
-        char v => new CompiledValue(v),
-        _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(CompiledValue)}"),
-    };
-
-    /// <exception cref="NotImplementedException"/>
-    public static CompiledValue GetValue<T>(T value) where T : notnull => value switch
-    {
-        byte v => new CompiledValue(v),
-        int v => new CompiledValue(v),
-        float v => new CompiledValue(v),
-        bool v => new CompiledValue(v),
-        char v => new CompiledValue(v),
-        _ => throw new NotImplementedException($"Cannot convert {value.GetType()} to {typeof(CompiledValue)}"),
     };
 
     public static bool TryShrinkTo8bit(ref CompiledValue value)

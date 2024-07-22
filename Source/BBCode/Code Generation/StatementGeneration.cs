@@ -74,7 +74,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (TryEvaluate(allocator, parameters, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
+        if (TryEvaluate(allocator, parameters, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -136,7 +136,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (TryEvaluate(deallocator, parameters, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
+        if (TryEvaluate(deallocator, parameters, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -683,7 +683,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             anyCall.Reference = compiledFunction;
 
             if (!Settings.DontOptimize &&
-                TryEvaluate(compiledFunction, functionCall.MethodArguments, out CompiledValue? returnValue, out Statement[]? runtimeStatements) &&
+                TryEvaluate(compiledFunction, functionCall.MethodArguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -1082,34 +1082,34 @@ public partial class CodeGeneratorForMain : CodeGenerator
             switch (@operator.Operator.Content)
             {
                 case UnaryOperatorCall.LogicalNOT:
-                {
-                    GenerateCodeForStatement(@operator.Left);
-
-                    using (RegisterUsage.Auto reg = Registers.GetFree())
                     {
-                        PopTo(reg.Get(bitWidth));
-                        AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
-                        AddInstruction(Opcode.JumpIfEqual, 3);
-                        AddInstruction(Opcode.Push, false);
-                        AddInstruction(Opcode.Jump, 2);
-                        AddInstruction(Opcode.Push, true);
-                    }
+                        GenerateCodeForStatement(@operator.Left);
 
-                    return;
-                }
+                        using (RegisterUsage.Auto reg = Registers.GetFree())
+                        {
+                            PopTo(reg.Get(bitWidth));
+                            AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
+                            AddInstruction(Opcode.JumpIfEqual, 3);
+                            AddInstruction(Opcode.Push, false);
+                            AddInstruction(Opcode.Jump, 2);
+                            AddInstruction(Opcode.Push, true);
+                        }
+
+                        return;
+                    }
                 case UnaryOperatorCall.BinaryNOT:
-                {
-                    GenerateCodeForStatement(@operator.Left);
-
-                    using (RegisterUsage.Auto reg = Registers.GetFree())
                     {
-                        PopTo(reg.Get(bitWidth));
-                        AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
-                        AddInstruction(Opcode.Push, reg.Get(bitWidth));
-                    }
+                        GenerateCodeForStatement(@operator.Left);
 
-                    return;
-                }
+                        using (RegisterUsage.Auto reg = Registers.GetFree())
+                        {
+                            PopTo(reg.Get(bitWidth));
+                            AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
+                            AddInstruction(Opcode.Push, reg.Get(bitWidth));
+                        }
+
+                        return;
+                    }
                 default: throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile);
             }
         }
@@ -1122,90 +1122,90 @@ public partial class CodeGeneratorForMain : CodeGenerator
         switch (literal.Type)
         {
             case LiteralType.Integer:
-            {
-                if (expectedType is not null)
                 {
-                    if (expectedType.SameAs(BasicType.Byte))
+                    if (expectedType is not null)
                     {
-                        if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
+                        if (expectedType.SameAs(BasicType.Byte))
                         {
-                            OnGotStatementType(literal, BuiltinType.Byte);
-                            AddInstruction(Opcode.Push, new CompiledValue((byte)literal.GetInt()));
+                            if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
+                            {
+                                OnGotStatementType(literal, BuiltinType.Byte);
+                                AddInstruction(Opcode.Push, new CompiledValue((byte)literal.GetInt()));
+                                return;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.Char))
+                        {
+                            if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
+                            {
+                                OnGotStatementType(literal, BuiltinType.Char);
+                                AddInstruction(Opcode.Push, new CompiledValue((ushort)literal.GetInt()));
+                                return;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.Float))
+                        {
+                            OnGotStatementType(literal, BuiltinType.Float);
+                            AddInstruction(Opcode.Push, new CompiledValue((float)literal.GetInt()));
                             return;
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.Char))
-                    {
-                        if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.Char);
-                            AddInstruction(Opcode.Push, new CompiledValue((ushort)literal.GetInt()));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.Float))
-                    {
-                        OnGotStatementType(literal, BuiltinType.Float);
-                        AddInstruction(Opcode.Push, new CompiledValue((float)literal.GetInt()));
-                        return;
-                    }
-                }
 
-                OnGotStatementType(literal, BuiltinType.Integer);
-                AddInstruction(Opcode.Push, new CompiledValue(literal.GetInt()));
-                break;
-            }
+                    OnGotStatementType(literal, BuiltinType.Integer);
+                    AddInstruction(Opcode.Push, new CompiledValue(literal.GetInt()));
+                    break;
+                }
             case LiteralType.Float:
-            {
-                OnGotStatementType(literal, BuiltinType.Float);
+                {
+                    OnGotStatementType(literal, BuiltinType.Float);
 
-                AddInstruction(Opcode.Push, new CompiledValue(literal.GetFloat()));
-                break;
-            }
+                    AddInstruction(Opcode.Push, new CompiledValue(literal.GetFloat()));
+                    break;
+                }
             case LiteralType.String:
-            {
-                if (expectedType is not null &&
-                    expectedType.Is(out PointerType? pointerType) &&
-                    pointerType.To.Is(out ArrayType? arrayType) &&
-                    arrayType.Of.SameAs(BasicType.Byte))
                 {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Byte, literal.Value.Length)));
-                    GenerateCodeForLiteralString(literal.Value, true);
-                }
-                else
-                {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, literal.Value.Length)));
-                    GenerateCodeForLiteralString(literal.Value, false);
-                }
-                break;
-            }
-            case LiteralType.Char:
-            {
-                if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, CurrentFile);
-
-                if (expectedType is not null)
-                {
-                    if (expectedType.SameAs(BasicType.Byte))
+                    if (expectedType is not null &&
+                        expectedType.Is(out PointerType? pointerType) &&
+                        pointerType.To.Is(out ArrayType? arrayType) &&
+                        arrayType.Of.SameAs(BasicType.Byte))
                     {
-                        if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
+                        OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Byte, literal.Value.Length)));
+                        GenerateCodeForLiteralString(literal.Value, true);
+                    }
+                    else
+                    {
+                        OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, literal.Value.Length)));
+                        GenerateCodeForLiteralString(literal.Value, false);
+                    }
+                    break;
+                }
+            case LiteralType.Char:
+                {
+                    if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, CurrentFile);
+
+                    if (expectedType is not null)
+                    {
+                        if (expectedType.SameAs(BasicType.Byte))
                         {
-                            OnGotStatementType(literal, BuiltinType.Byte);
-                            AddInstruction(Opcode.Push, new CompiledValue((byte)literal.Value[0]));
+                            if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
+                            {
+                                OnGotStatementType(literal, BuiltinType.Byte);
+                                AddInstruction(Opcode.Push, new CompiledValue((byte)literal.Value[0]));
+                                return;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.Float))
+                        {
+                            OnGotStatementType(literal, BuiltinType.Float);
+                            AddInstruction(Opcode.Push, new CompiledValue((float)literal.Value[0]));
                             return;
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.Float))
-                    {
-                        OnGotStatementType(literal, BuiltinType.Float);
-                        AddInstruction(Opcode.Push, new CompiledValue((float)literal.Value[0]));
-                        return;
-                    }
-                }
 
-                OnGotStatementType(literal, BuiltinType.Char);
-                AddInstruction(Opcode.Push, new CompiledValue(literal.Value[0]));
-                break;
-            }
+                    OnGotStatementType(literal, BuiltinType.Char);
+                    AddInstruction(Opcode.Push, new CompiledValue(literal.Value[0]));
+                    break;
+                }
             default: throw new UnreachableException();
         }
     }
@@ -1610,27 +1610,27 @@ public partial class CodeGeneratorForMain : CodeGenerator
         switch (instanceType)
         {
             case PointerType pointerType:
-            {
-                GenerateAllocator(LiteralStatement.CreateAnonymous(pointerType.To.SizeBytes, newObject.Type));
-
-                using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth), (InstructionOperand)StackTop);
+                    GenerateAllocator(LiteralStatement.CreateAnonymous(pointerType.To.SizeBytes, newObject.Type));
 
-                    for (int offset = 0; offset < pointerType.To.SizeBytes; offset++)
-                    { AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(offset, BitWidth._8), new InstructionOperand((byte)0)); }
+                    using (RegisterUsage.Auto reg = Registers.GetFree())
+                    {
+                        AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth), (InstructionOperand)StackTop);
+
+                        for (int offset = 0; offset < pointerType.To.SizeBytes; offset++)
+                        { AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(offset, BitWidth._8), new InstructionOperand((byte)0)); }
+                    }
+
+                    break;
                 }
 
-                break;
-            }
-
             case StructType structType:
-            {
-                structType.Struct.References.Add(newObject.Type, CurrentFile);
+                {
+                    structType.Struct.References.Add(newObject.Type, CurrentFile);
 
-                StackAlloc(structType.SizeBytes);
-                break;
-            }
+                    StackAlloc(structType.SizeBytes);
+                    break;
+                }
 
             default:
                 throw new CompilerException($"Unknown type definition {instanceType}", newObject.Type, CurrentFile);
@@ -1765,9 +1765,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(IndexCall index)
     {
-        GeneralType type = FindStatementType(index.PrevStatement);
+        GeneralType prevType = FindStatementType(index.PrevStatement);
+        GeneralType indexType = FindStatementType(index.Index);
 
-        if (GetIndexGetter(type, index.File, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError, AddCompilable))
+        if (GetIndexGetter(prevType, indexType, index.File, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError, AddCompilable))
         {
             GenerateCodeForFunctionCall_Function(new FunctionCall(
                     index.PrevStatement,
@@ -1779,7 +1780,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (type.Is(out ArrayType? arrayType))
+        if (prevType.Is(out ArrayType? arrayType))
         {
             if (index.PrevStatement is not Identifier identifier)
             { throw new NotSupportedException($"Only variables/parameters supported by now", index.PrevStatement, CurrentFile); }
@@ -1825,16 +1826,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     GenerateCodeForStatement(index.Index);
 
-                    GeneralType indexType = FindStatementType(index.Index);
-
-                    if (!indexType.Is(out BuiltinType? builtinType))
+                    if (!indexType.Is<BuiltinType>())
                     { throw new CompilerException($"Index must be a builtin type (i.e. int) and not {indexType}", index.Index, CurrentFile); }
 
                     using (RegisterUsage.Auto regIndex = Registers.GetFree())
                     {
-                        PopTo(regIndex.Get(builtinType.BitWidth));
-                        AddInstruction(Opcode.MathMult, regIndex.Get(builtinType.BitWidth), arrayType.Of.SizeBytes);
-                        AddInstruction(Opcode.MathAdd, regPtr.Register, regIndex.Get(builtinType.BitWidth));
+                        PopTo(regIndex.Get(indexType.BitWidth));
+                        AddInstruction(Opcode.MathMult, regIndex.Get(indexType.BitWidth), arrayType.Of.SizeBytes);
+                        AddInstruction(Opcode.MathAdd, regPtr.Register, regIndex.Get(indexType.BitWidth));
                     }
 
                     PushFrom(new AddressRegisterPointer(regPtr.Register), arrayType.Of.SizeBytes);
@@ -1845,13 +1844,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (type.Is(out PointerType? pointerType) && pointerType.To.Is(out arrayType))
+        if (prevType.Is(out PointerType? pointerType) && pointerType.To.Is(out arrayType))
         {
             GenerateCodeForStatement(index.PrevStatement);
 
-            GeneralType indexType = FindStatementType(index.Index);
             if (!indexType.Is<BuiltinType>())
             { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", index.Index, CurrentFile); }
+
             GenerateCodeForStatement(index.Index);
 
             using (RegisterUsage.Auto reg1 = Registers.GetFree())
@@ -1873,11 +1872,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 PushFrom(new AddressRegisterPointer(reg1.Register), arrayType.Of.SizeBytes);
             }
-            
+
             return;
         }
 
-        throw new CompilerException($"Index getter \"{type}[]\" not found", index, CurrentFile);
+        throw new CompilerException($"Index getter for type {prevType} not found", index, CurrentFile);
     }
 
     void GenerateAddressResolver(Address address)
@@ -2255,10 +2254,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value)
     {
-        GeneralType type = FindStatementType(statementToSet.PrevStatement);
+        GeneralType prevType = FindStatementType(statementToSet.PrevStatement);
+        GeneralType indexType = FindStatementType(statementToSet.Index);
         GeneralType valueType = FindStatementType(value);
 
-        if (GetIndexSetter(type, valueType, CurrentFile, out FunctionQueryResult<CompiledFunction>? indexer, out _, AddCompilable))
+        if (GetIndexSetter(prevType, valueType, indexType, CurrentFile, out FunctionQueryResult<CompiledFunction>? indexer, out _, AddCompilable))
         {
             GenerateCodeForFunctionCall_Function(new FunctionCall(
                 statementToSet.PrevStatement,
@@ -2270,7 +2270,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (type.Is(out ArrayType? arrayType))
+        if (prevType.Is(out ArrayType? arrayType))
         {
             if (statementToSet.PrevStatement is not Identifier identifier)
             { throw new NotSupportedException($"Only variables/parameters supported by now", statementToSet.PrevStatement, CurrentFile); }
@@ -2301,7 +2301,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             throw new NotImplementedException();
         }
 
-        if (type.Is(out PointerType? pointerType) && pointerType.To.Is(out arrayType))
+        if (prevType.Is(out PointerType? pointerType) && pointerType.To.Is(out arrayType))
         {
             AssignTypeCheck(arrayType.Of, valueType, value);
 
@@ -2309,9 +2309,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
-            GeneralType indexType = FindStatementType(statementToSet.Index);
             if (!indexType.Is<BuiltinType>())
             { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", statementToSet.Index, CurrentFile); }
+
             GenerateCodeForStatement(statementToSet.Index);
 
             using (RegisterUsage.Auto regIndex = Registers.GetFree())

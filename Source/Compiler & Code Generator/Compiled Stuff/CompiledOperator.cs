@@ -26,20 +26,18 @@ public class CompiledOperator : FunctionDefinition,
 
     public CompiledOperator(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
-        this.Type = type;
-        this.ParameterTypes = parameterTypes.ToImmutableArray();
-
-        this.Context = context;
-        this.References = new List<Reference<StatementWithValue>>();
+        Type = type;
+        ParameterTypes = parameterTypes.ToImmutableArray();
+        Context = context;
+        References = new List<Reference<StatementWithValue>>();
     }
 
     public CompiledOperator(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledOperator other) : base(other)
     {
-        this.Type = type;
-        this.ParameterTypes = parameterTypes.ToImmutableArray();
-
-        this.Context = other.Context;
-        this.References = new List<Reference<StatementWithValue>>(other.References);
+        Type = type;
+        ParameterTypes = parameterTypes.ToImmutableArray();
+        Context = other.Context;
+        References = new List<Reference<StatementWithValue>>(other.References);
     }
 
     public bool DefinitionEquals(CompiledOperator other) => Extensions.IsSame(this, other);

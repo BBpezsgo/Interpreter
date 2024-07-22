@@ -26,27 +26,27 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
 
     public CompiledGeneralFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
     {
-        this.Type = type;
-        this.ParameterTypes = parameterTypes.ToImmutableArray();
-        this.Context = context;
-        this.References = new List<Reference<Statement?>>();
+        Type = type;
+        ParameterTypes = parameterTypes.ToImmutableArray();
+        Context = context;
+        References = new List<Reference<Statement?>>();
     }
 
     public CompiledGeneralFunction(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledGeneralFunction other) : base(other)
     {
-        this.Type = type;
-        this.ParameterTypes = parameterTypes.ToImmutableArray();
-        this.Context = other.Context;
-        this.References = new List<Reference<Statement?>>(other.References);
+        Type = type;
+        ParameterTypes = parameterTypes.ToImmutableArray();
+        Context = other.Context;
+        References = new List<Reference<Statement?>>(other.References);
     }
 
     public bool DefinitionEquals(CompiledGeneralFunction other)
     {
-        if (!this.Type.Equals(other.Type)) return false;
-        if (this.Identifier.Content != other.Identifier.Content) return false;
-        if (this.ParameterTypes.Length != other.ParameterTypes.Length) return false;
-        for (int i = 0; i < this.ParameterTypes.Length; i++)
-        { if (!this.ParameterTypes[i].Equals(other.ParameterTypes[i])) return false; }
+        if (!Type.Equals(other.Type)) return false;
+        if (Identifier.Content != other.Identifier.Content) return false;
+        if (ParameterTypes.Length != other.ParameterTypes.Length) return false;
+        for (int i = 0; i < ParameterTypes.Length; i++)
+        { if (!ParameterTypes[i].Equals(other.ParameterTypes[i])) return false; }
 
         return true;
     }
@@ -60,10 +60,10 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
         if (IsExported)
         { result.Append("export "); }
 
-        result.Append(this.Identifier.Content);
+        result.Append(Identifier.Content);
 
         result.Append('(');
-        if (this.ParameterTypes.Length > 0)
+        if (ParameterTypes.Length > 0)
         {
             for (int i = 0; i < ParameterTypes.Length; i++)
             {

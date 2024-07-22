@@ -11,7 +11,6 @@ public class FunctionType : GeneralType,
     public GeneralType ReturnType { get; }
     public ImmutableArray<GeneralType> Parameters { get; }
 
-    public override GeneralType FinalValue => new FunctionType(ReturnType.FinalValue, Parameters.Select(v => v.FinalValue));
     public bool ReturnSomething => !ReturnType.SameAs(BasicType.Void);
     public override int Size => 1;
     public override int SizeBytes => BytecodeProcessor.PointerSize;

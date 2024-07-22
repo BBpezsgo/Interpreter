@@ -18,12 +18,12 @@ public class FunctionDefinition : FunctionThingDefinition,
     public override Position Position => base.Position.Union(Type);
 
     [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
-    public bool IsExternal => Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out _);
-    public string? ExternalFunctionName => Attributes.TryGetAttribute<string>(AttributeConstants.ExternalIdentifier, out string? name) ? name : null;
+    public bool IsExternal => Attributes.TryGetAttribute(AttributeConstants.ExternalIdentifier, out _);
+    public string? ExternalFunctionName => Attributes.TryGetAttribute(AttributeConstants.ExternalIdentifier, out AttributeUsage? attribute) && attribute.TryGetValue(out string? name) ? name : null;
 
     [MemberNotNullWhen(true, nameof(BuiltinFunctionName))]
-    public bool IsBuiltin => Attributes.TryGetAttribute<string>(AttributeConstants.BuiltinIdentifier, out _);
-    public string? BuiltinFunctionName => Attributes.TryGetAttribute<string>(AttributeConstants.BuiltinIdentifier, out string? name) ? name : null;
+    public bool IsBuiltin => Attributes.TryGetAttribute(AttributeConstants.BuiltinIdentifier, out _);
+    public string? BuiltinFunctionName => Attributes.TryGetAttribute(AttributeConstants.BuiltinIdentifier, out AttributeUsage? attribute) && attribute.TryGetValue(out string? name) ? name : null;
 
     public override bool IsTemplate
     {

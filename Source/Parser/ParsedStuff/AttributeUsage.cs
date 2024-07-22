@@ -50,47 +50,37 @@ public class AttributeUsage :
         return true;
     }
 
-    public bool TryGetValue(int index, out string value)
+    public bool TryGetValue<T0>([NotNullWhen(true)] out T0? param0)
     {
-        value = string.Empty;
-        if (Parameters.Length <= index) return false;
-        if (Parameters[index].Type == LiteralType.String)
-        {
-            value = Parameters[index].Value;
-        }
-        return true;
+        param0 = default;
+        if (Parameters.Length != 1) return false;
+        return TryGetValue(0, out param0);
     }
 
-    public bool TryGetValue(int index, out int value)
+    public bool TryGetValue<T0, T1>(
+        [NotNullWhen(true)] out T0? param0,
+        [NotNullWhen(true)] out T1? param1)
     {
-        value = 0;
-        if (Parameters.Length <= index) return false;
-        if (Parameters[index].Type == LiteralType.Integer)
-        {
-            value = Parameters[index].GetInt();
-        }
-        return true;
+        param0 = default;
+        param1 = default;
+        if (Parameters.Length != 2) return false;
+        return
+            TryGetValue(0, out param0) &&
+            TryGetValue(1, out param1);
     }
 
-    public bool TryGetValue(int index, out float value)
+    public bool TryGetValue<T0, T1, T2>(
+        [NotNullWhen(true)] out T0? param0,
+        [NotNullWhen(true)] out T1? param1,
+        [NotNullWhen(true)] out T2? param2)
     {
-        value = 0;
-        if (Parameters.Length <= index) return false;
-        if (Parameters[index].Type == LiteralType.Float)
-        {
-            value = Parameters[index].GetFloat();
-        }
-        return true;
-    }
-
-    public bool TryGetValue(int index, out char value)
-    {
-        value = default;
-        if (Parameters.Length <= index) return false;
-        if (Parameters[index].Type == LiteralType.Char)
-        {
-            value = Parameters[index].Value[0];
-        }
-        return true;
+        param0 = default;
+        param1 = default;
+        param2 = default;
+        if (Parameters.Length != 3) return false;
+        return
+            TryGetValue(0, out param0) &&
+            TryGetValue(1, out param1) &&
+            TryGetValue(2, out param2);
     }
 }

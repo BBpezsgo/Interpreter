@@ -174,7 +174,7 @@ public class StackCodeHelper
         {
             _code.CRASH(address, "Stack overflow");
             WillOverflow = true;
-            Debugger.Break();
+            // Debugger.Break();
         }
 
         _stack.Push(size);

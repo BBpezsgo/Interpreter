@@ -12,8 +12,6 @@ public class StructType : GeneralType,
     public ImmutableDictionary<string, GeneralType> TypeArguments { get; }
     public Uri File { get; }
 
-    public override GeneralType FinalValue => new StructType(Struct, File, TypeArguments.Select(v => new KeyValuePair<string, GeneralType>(v.Key, v.Value.FinalValue)));
-
     public override int Size
     {
         get

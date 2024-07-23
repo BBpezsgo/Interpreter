@@ -30,58 +30,44 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 **Brainfuck:**
 
-- - `--brainfuck|-bf` Compiles and executes the code with a brainfuck interpreter.
+- `--help|-h` Prints some information about the program
+
+- `--brainfuck|-b` Compiles and executes the code with a brainfuck interpreter
 > [!WARNING]
 > Expect buggy behavior and missing features!
 
-**Logging:**
-- `--hide-debug|-hd` Hides debug logs
+- `--console-gui|-c` Launch the debugger screen (only avaliable on Windows) [More info](https://github.com/BBpezsgo/Interpreter/wiki/Debugger)
 
-- `--hide-info|-hi` Hides information logs
+- `--output|-o file` Writes the generated code to the specified file (this option only works for brainfuck)
 
-- `--hide-warning|--hide-warnings|-hw` Hides warning logs
+- `--throw-errors|-t` Whenever an exception occurs, the program crashes. This is useful when debugging the compiler.
 
-- `--show-progress|-sp` Prints some progress bars and labels during compilation.
+- `--hide|-d w;i;d` Hides the specified log levels (w: Warning, i: Information, d: Debug)
 
-- `--print-heap|-ph` Prints the HEAP. (only works with brainfuck)
+- `--print|-p w;i;d` Prints the specified informations (i: Instructions, m: Memory, p: Compilation progress)
 
-**Code Generator:**
-- `--print-instructions|-pi [final;commented;simplified;f;c;s]` Prints the generated instructions. For brainfuck, you can also specify which formats you want to see the generated code in:
+- `--basepath directory` Sets the path where source files will be searched for `using` statements
 
-  - `final|f` Prints the final instructions.
-  - `commented|c` Prints the instructions with generated comments.
-  - `simplified|s` Prints the simplified form of the instructions.
+- `--dont-optimize` Disable all optimization
 
-- `--no-nullcheck|-nn` Disables the check for null pointers (and throw runtime exceptions) when accessing something by a pointer (accessing a field, calling a method, etc.).
+- `--no-debug-info` Do not generate any debug information (if you compiling into brainfuck, generating debug informations will take a lots of time)
 
-- `--dont-optimize|-do` Disables basic optimization.
+- `--stack-size size` Specifies the stack size
 
-- `--no-debug-info|-ndi` Disables the generation of debug informations (if you compiling into brainfuck, generating debug informations will take a lots of time).
-
-- `--output|-o <file path>` Specified the output file path where the generated code will be saved. This option only works for brainfuck.
-
-- `--basepath|-bp <folder path>` Sets the path where .dll ([read more](https://github.com/BBpezsgo/Interpreter/wiki/Advanced-Topics#importing-dll-files)) and other source files will be searched for `using` statements.
-
-**Runtime:**
-- `--stack-size|-ss <size>` Sets the interpreter's stack size (only valid for the default mode).
-
-- `--heap-size|-hs <size>` Specifies the HEAP size (only valid for the default and brainfuck modes).
+- `--heap-size size` Specifies the HEAP size
 > [!NOTE]
 > For brainfuck, if you specify zero, the HEAP will not be initialized, and wherever you try to access it, it will not compile.
 
 > [!NOTE]
 > Because of how HEAP represented in brainfuck, its size can't be larger than 126.
 
-- `--console-gui|-cg` I use this mode for debugging. [More info](https://github.com/BBpezsgo/Interpreter/wiki/Debugger)
+- `--no-nullcheck` Do not generate null-checks when dereferencing a pointer
 
-**Other:**
-- `--throw-errors|-te` With this option, the program crashes on any exception and lets the .NET runtime handle them.
-
-- `--no-pause|-np` With this option, the program exits at the end of execution without printing "Press any key to exit" and doesn't wait for any key press.
+- `--no-pause` Do not pause when finished
 
 ## Hello World:
 ```cs
-using "https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/StandardLibrary/System.bbc";
+using "https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/StandardLibrary/System.Console.bbc";
 
 PrintLine("hello, world");
 ```
@@ -94,28 +80,32 @@ This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/window
 If you want to download the project and build it, there is how to do that:
 1. Download this repository
 2. Download the [Win32-Stuff](https://github.com/BBpezsgo/Win32-Stuff) repository
-3. Extract the .zip files
-4. Remove all `-main` suffixes
+3. Download the [Maths](https://github.com/BBpezsgo/Math) repository
+4. Extract the .zip files
+5. Remove all `-main` suffixes
 
 Now the folder structure should look like this:
 ```
 ./Interpreter/Core.csproj
 ./Win32-Stuff/Win32.csproj
+./Math/Math.csproj
 ```
 
-5. Open `./Interpreter/Core.csproj` in a **text editor**
-6. In the `ProjectReference` tags, replace `..\..` with `..` (so it will point to the existing projects you downloaded)
+6. Open `./Interpreter/Core.csproj` in a **text editor**
+7. In the `ProjectReference` tags, replace all `..\..` with `..` (so it will point to the existing projects you downloaded)
 
 ### Method 1: Building with Visual Studio:
 
-7. Open `./Interpreter/Core.csproj` in Visual Studio
-8. Add the `./Win32-Stuff/Win32.csproj` project to the solution
-9. Now you can build it with the "Build" button
+8. Open `./Interpreter/Core.csproj` in Visual Studio
+9. Add the `./Win32-Stuff/Win32.csproj` project to the solution
+10. Add the `./Math/Math.csproj` project to the solution
+
+Now you can build it with the "Build" button
 
 ### Method 2: Building with .NET CLI:
 
-7. Open the `./Interpreter` folder
+8. Open the `./Interpreter` folder
 
-8. Now you can use the .NET CLI to build (`dotnet build`) or run (`dotnet run`) the project
+11. Now you can use the .NET CLI to build (`dotnet build`) or run (`dotnet run`) the project
 
 ## [Tests](https://github.com/BBpezsgo/Interpreter/blob/master/Tests.md)

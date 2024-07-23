@@ -39,9 +39,7 @@ public static class Entry
 
         if (pauseAtEnd)
         {
-            Console.WriteLine();
-            Console.WriteLine();
-            Console.WriteLine("Press any key to exit");
+            Console.Write("Press any key to continue...");
             Console.ReadKey();
         }
     }

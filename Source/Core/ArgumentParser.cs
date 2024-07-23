@@ -73,58 +73,6 @@ public static class ArgumentNormalizer
         None,
         String,
     }
-
-    public static string[] NormalizeArgs(params string[] args) => NormalizeArgs(string.Join(' ', args));
-    public static string[] NormalizeArgs(string args)
-    {
-        List<string> result = new();
-
-        NormalizerState state = NormalizerState.None;
-        StringBuilder currentArg = new();
-
-        void FinishArgument()
-        {
-            state = NormalizerState.None;
-
-            if (currentArg.Length == 0) return;
-
-            result.Add(currentArg.ToString());
-            currentArg.Clear();
-        }
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            char c = args[i];
-
-            switch (c)
-            {
-                case '"':
-                    if (state == NormalizerState.String)
-                    {
-                        FinishArgument();
-                        break;
-                    }
-                    state = NormalizerState.String;
-                    break;
-                case '\t':
-                case ' ':
-                    if (state == NormalizerState.String)
-                    {
-                        currentArg.Append(c);
-                        break;
-                    }
-                    FinishArgument();
-                    break;
-                default:
-                    currentArg.Append(c);
-                    break;
-            }
-        }
-
-        FinishArgument();
-
-        return result.ToArray();
-    }
 }
 
 [ExcludeFromCodeCoverage]
@@ -203,182 +151,213 @@ public static class ArgumentParser
         }
     }
 
-    static ProgramArguments ParseInternal(string[] args)
+    static readonly OptionSpecification[] OptionSpecifications = new OptionSpecification[]
     {
-        ProgramArguments result = ProgramArguments.Default;
-        ArgumentsSource _args = new(args);
-#pragma warning disable IDE0018 // Inline variable declaration
-        string? arg;
-#pragma warning restore IDE0018
-
-        if (args.Length > 1)
+        new()
         {
-            while (_args.Has)
+            LongName = "help",
+            ShortName = 'h',
+            Help = "Prints this",
+        },
+        new()
+        {
+            LongName = "brainfuck",
+            ShortName = 'b',
+            Help = "Compiles and executes the code with a brainfuck interpreter",
+        },
+        new()
+        {
+            LongName = "console-gui",
+            ShortName = 'c',
+            Help = "Launch the debugger screen (only avaliable on Windows)",
+        },
+        new()
+        {
+            LongName = "output",
+            ShortName = 'o',
+            Arguments = new (string Name, string Description)[]
             {
-                if (_args.TryConsume(out _, "--show-progress", "-sp"))
-                {
-                    result.ShowProgress = true;
-                    continue;
-                }
+                ("filename", "Path to the file to write the output to"),
+            },
+            Help = "Writes the generated code to the specified file (this option only works for brainfuck)",
+        },
+        new()
+        {
+            LongName = "throw-errors",
+            ShortName = 't',
+            Help = "Whenever an exception occurs, the program crashes. This is useful when debugging the compiler.",
+        },
+        new()
+        {
+            LongName = "hide",
+            ShortName = 'd',
+            Arguments = new (string Name, string Description)[]
+            {
+                ("w;i;d", "The logging levels to hide (w: Warning, i: Information, d: Debug)")
+            },
+            Help = "Hides the specified log levels",
+        },
+        new()
+        {
+            LongName = "print",
+            ShortName = 'p',
+            Arguments = new (string Name, string Description)[]
+            {
+                ("i;m;p", "The information to print (i: Instructions, m: Memory, p: Compilation progress)")
+            },
+            Help = "Prints the specified informations",
+        },
+        new()
+        {
+            LongName = "basepath",
+            Arguments = new (string Name, string Description)[]
+            {
+                ("directory", "Path to the directory")
+            },
+            Help = $"Sets the path where source files will be searched for \"${DeclarationKeywords.Using}\"",
+        },
+        new()
+        {
+            LongName = "dont-optimize",
+            Help = "Disable all optimization",
+        },
+        new()
+        {
+            LongName = "no-debug-info",
+            Help = "Do not generate any debug information (if you compiling into brainfuck, generating debug informations will take a lots of time)",
+        },
+        new()
+        {
+            LongName = "stack-size",
+            Arguments = new (string Name, string Description)[]
+            {
+                ("size", "Size in bytes")
+            },
+            Help = "Specifies the stack size",
+        },
+        new()
+        {
+            LongName = "heap-size",
+            Arguments = new (string Name, string Description)[]
+            {
+                ("size", "Size in bytes")
+            },
+            Help = "Specifies the HEAP size",
+        },
+        new()
+        {
+            LongName = "no-nullcheck",
+            Help = "Do not generate null-checks when dereferencing a pointer",
+        },
+        new()
+        {
+            LongName = "no-pause",
+            Help = "Do not pause when finished",
+        },
+    };
 
-                if (_args.TryConsume(out _, "--no-nullcheck", "-nn"))
-                {
-                    result.MainGeneratorSettings.CheckNullPointers = false;
-                    continue;
-                }
+    static ProgramArguments? ParseInternal(string[] args)
+    {
+        (List<Option> options, List<string> arguments) = CommandLineParser.Parse(args, OptionSpecifications);
 
-                if (_args.TryConsume(out _, "--no-pause", "-np"))
-                {
-                    result.DoNotPause = true;
-                    continue;
-                }
+        ProgramArguments result = ProgramArguments.Default;
 
-                if (_args.TryConsume(out arg, "--heap-size", "-hs"))
-                {
-                    if (!_args.TryConsume(out int heapSize))
-                    { throw new ArgumentException($"Expected number value after argument \"{arg}\""); }
-
-                    result.BytecodeInterpreterSettings.HeapSize = heapSize;
-                    result.BrainfuckGeneratorSettings.HeapSize = heapSize;
-
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--brainfuck", "-bf"))
-                {
+        foreach (Option option in options)
+        {
+            switch (option.Name)
+            {
+                case "help":
+                    CommandLineParser.PrintHelp(OptionSpecifications, new (string Name, string Help)[]
+                    {
+                        ("file", "Path to the source file to compile and execute")
+                    });
+                    return null;
+                case "brainfuck":
                     if (result.RunType != ProgramRunType.Normal)
-                    { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.Brainfuck}"); }
+                    { throw new ArgumentException($"Run type already defined ({result.RunType}), but you tried to set it to {ProgramRunType.Brainfuck}"); }
 
                     result.RunType = ProgramRunType.Brainfuck;
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--asm"))
-                {
-                    if (result.RunType != ProgramRunType.Normal)
-                    { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.ASM}"); }
-
-                    result.RunType = ProgramRunType.ASM;
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--console-gui", "-cg"))
-                {
+                    break;
+                case "console-gui":
                     result.ConsoleGUI = true;
-                    continue;
-                }
-
-                if (_args.TryConsume(out arg, "--basepath", "-bp"))
-                {
-                    if (!_args.TryConsume(out result.CompilerSettings.BasePath))
-                    { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
-
-                    continue;
-                }
-
-                if (_args.TryConsume(out arg, "--output", "-o"))
-                {
-                    if (!_args.TryConsume(out result.OutputFile))
-                    { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
-
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--throw-errors", "-te"))
-                {
+                    break;
+                case "output":
+                    result.OutputFile = option.Arguments[0];
+                    break;
+                case "throw-errors":
                     result.ThrowErrors = true;
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--hide-debug", "-hd"))
-                {
-                    result.LogFlags &= ~LogType.Debug;
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--hide-warning", "--hide-warnings", "-hw"))
-                {
-                    result.LogFlags &= ~LogType.Warning;
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--hide-info", "-hi"))
-                {
-                    result.LogFlags &= ~LogType.Normal;
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--dont-optimize", "-do"))
-                {
-                    result.MainGeneratorSettings.DontOptimize = true;
-                    result.BrainfuckGeneratorSettings.DontOptimize = true;
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--no-debug-info", "-ndi"))
-                {
-                    result.MainGeneratorSettings.GenerateDebugInstructions = false;
-                    result.BrainfuckGeneratorSettings.GenerateDebugInformation = false;
-                    continue;
-                }
-
-                if (_args.TryConsume(out arg, "--stack-size", "-ss"))
-                {
-                    if (!_args.TryConsume(out int value))
-                    { throw new ArgumentException($"Expected int value after argument \"{arg}\""); }
-
-                    result.BytecodeInterpreterSettings.StackSize = value;
-                    result.BrainfuckGeneratorSettings.StackSize = value;
-
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--print-heap", "-ph"))
-                {
-                    result.PrintFlags |= PrintFlags.Heap;
-                    continue;
-                }
-
-                if (_args.TryConsume(out _, "--print-instructions", "-pi"))
-                {
-                    foreach (string flag in _args.TryConsumeAll(
-                        "final", "commented", "simplified",
-                        "f", "c", "s"))
+                    break;
+                case "hide":
+                    foreach (char hide in option.Arguments[0])
                     {
-                        switch (flag)
+                        result.LogFlags &= hide switch
                         {
-                            case "final":
-                            case "f":
+                            'w' => ~LogType.Warning,
+                            'i' => ~LogType.Normal,
+                            'd' => ~LogType.Debug,
+                            _ => throw new ArgumentException($"Unknown log flag '{hide}'"),
+                        };
+                    }
+                    break;
+                case "print":
+                    foreach (char print in option.Arguments[0])
+                    {
+                        switch (print)
+                        {
+                            case 'i':
+                                result.MainGeneratorSettings.PrintInstructions = true;
                                 result.PrintFlags |= PrintFlags.Final;
                                 break;
-                            case "commented":
-                            case "c":
-                                result.PrintFlags |= PrintFlags.Commented;
+                            case 'm':
+                                result.PrintFlags |= PrintFlags.Heap;
                                 break;
-                            case "simplified":
-                            case "s":
-                                result.PrintFlags |= PrintFlags.Simplified;
+                            case 'p':
+                                result.ShowProgress = true;
+                                result.BrainfuckGeneratorSettings.ShowProgress = true;
                                 break;
+                            default:
+                                throw new ArgumentException($"Unknown print flag '{print}'");
                         }
                     }
-
-                    if (result.PrintFlags == PrintFlags.None)
-                    { result.PrintFlags = PrintFlags.Final; }
-                    result.MainGeneratorSettings.PrintInstructions = true;
-                    continue;
-                }
-
-                throw new ArgumentException($"Unknown argument \"{_args.Current}\"");
+                    break;
+                case "basepath":
+                    result.CompilerSettings.BasePath = option.Arguments[0];
+                    break;
+                case "dont-optimize":
+                    result.BrainfuckGeneratorSettings.DontOptimize = true;
+                    result.MainGeneratorSettings.DontOptimize = true;
+                    break;
+                case "no-debug-info":
+                    result.BrainfuckGeneratorSettings.GenerateDebugInformation = false;
+                    result.MainGeneratorSettings.GenerateComments = false;
+                    result.MainGeneratorSettings.GenerateDebugInstructions = false;
+                    break;
+                case "stack-size":
+                    result.BrainfuckGeneratorSettings.StackSize = int.Parse(option.Arguments[0]);
+                    result.BytecodeInterpreterSettings.StackSize = int.Parse(option.Arguments[0]);
+                    break;
+                case "heap-size":
+                    result.BrainfuckGeneratorSettings.HeapSize = int.Parse(option.Arguments[0]);
+                    result.BytecodeInterpreterSettings.HeapSize = int.Parse(option.Arguments[0]);
+                    break;
+                case "no-nullcheck":
+                    result.MainGeneratorSettings.CheckNullPointers = false;
+                    break;
+                case "no-pause":
+                    result.DoNotPause = true;
+                    break;
+                default:
+                    throw new ArgumentException($"Unknown option --\"${option.Name}\"");
             }
         }
 
-        if (args.Length > 0)
+        if (arguments.Count == 1)
         {
             Uri? file;
-            if (System.IO.File.Exists(args[^1]))
-            { file = Utils.ToFileUri(args[^1]); }
-            else if (!Uri.TryCreate(args[^1], UriKind.RelativeOrAbsolute, out file))
-            { throw new ArgumentException($"Invalid uri \"{args[^1]}\""); }
+            if (System.IO.File.Exists(arguments[0]))
+            { file = Utils.ToFileUri(arguments[0]); }
+            else if (!Uri.TryCreate(arguments[0], UriKind.RelativeOrAbsolute, out file))
+            { throw new ArgumentException($"Invalid uri \"{arguments[0]}\""); }
             result.File = file;
         }
         else

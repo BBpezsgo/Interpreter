@@ -14,8 +14,5 @@ public static class Program
 #else
         Entry.Run(args);
 #endif
-
-        Console.WriteLine("Press any key to continue ...");
-        Console.ReadKey();
     }
 }

@@ -3,34 +3,36 @@ using System.String;
 using System.Memory;
 using System.Math;
 
-export string ToString(this byte number)
+export string ToString(this u8 number)
 {
 	if (number == 0)
     { return "0"; }
 
-	string result = "";
+	u8 v = number;
 
-	byte v = number;
+    int numberLength = Log10(v) + 2;
 
+	string result = new char[numberLength]*;
+    result[numberLength - 1] = '\0';
+
+    int i = numberLength - 2;
 	while (v > 0)
 	{
-        byte rem = v % 10;
-        result = (temp result) + ((rem + 48) as char);
+        u8 rem = v % 10;
+        result[i] = (rem as char) + '0';
 		v = v / 10;
+        i--;
 	}
 
-	string reversed = result.Reverse();
-	delete result;
-
-	return reversed;
+	return result;
 }
 
-export string ToString(this int number)
+export string ToString(this i32 number)
 {
 	if (number == 0)
     { return "0"; }
     
-	int v = number;
+	i32 v = number;
 
 	byte isNegative = v < 0;
 	if (isNegative)
@@ -40,7 +42,7 @@ export string ToString(this int number)
     if (isNegative)
     { numberLength++; }
 
-	string result = Alloc(numberLength) as string;
+	string result = new char[numberLength]*;
     result[numberLength - 1] = '\0';
 
     if (isNegative)
@@ -51,8 +53,8 @@ export string ToString(this int number)
     int i = numberLength - 2;
 	while (v > 0)
 	{
-        int rem = v % 10;
-        result[i] = ((rem + 48) as char);
+        i32 rem = v % 10;
+        result[i] = (rem as char) + '0';
 		v = v / 10;
         i--;
 	}

@@ -222,7 +222,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     StatementWithValue? NeedDerefernce(StatementWithValue value) => value switch
     {
         Identifier => null,
-        Field v => NeedDerefernce(v),
+        Field v => NeedDereference(v),
         IndexCall v => NeedDerefernce(v),
         _ => throw new NotImplementedException()
     };
@@ -233,7 +233,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         return NeedDerefernce(indexCall.PrevStatement);
     }
-    StatementWithValue? NeedDerefernce(Field field)
+    StatementWithValue? NeedDereference(Field field)
     {
         if (FindStatementType(field.PrevStatement).Is<PointerType>())
         { return field.PrevStatement; }

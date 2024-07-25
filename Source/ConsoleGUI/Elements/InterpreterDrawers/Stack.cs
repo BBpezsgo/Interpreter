@@ -135,10 +135,15 @@ public partial class InterpreterElement
                     b.ForegroundColor = CharColor.Gray;
                     b.AddText('[');
 
-                    if (v.Length.HasValue)
+                    if (v.ComputedLength.HasValue)
                     {
                         b.ForegroundColor = CharColor.Silver;
-                        b.AddText(v.Length.Value.ToString());
+                        b.AddText(v.ComputedLength.Value.ToString());
+                    }
+                    else if (v.Length is not null)
+                    {
+                        b.ForegroundColor = CharColor.Silver;
+                        b.AddText('?');
                     }
 
                     b.ForegroundColor = CharColor.Gray;

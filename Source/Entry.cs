@@ -123,6 +123,20 @@ public static class Entry
 
                 Console.ResetColor();
 
+                if (arguments.OutputFile is not null)
+                {
+                    Console.WriteLine($"Writing to \"{arguments.OutputFile}\" ...");
+                    File.WriteAllText(arguments.OutputFile, null);
+                    using (FileStream stream = File.OpenWrite(arguments.OutputFile))
+                    using (StreamWriter writer = new(stream))
+                    {
+                        foreach (Instruction instruction in generatedCode.Code)
+                        {
+                            writer.WriteLine(instruction.ToString());
+                        }
+                    }
+                }
+
                 Runtime.Interpreter interpreter;
 
                 static void PrintStuff(Runtime.Interpreter interpreter)
@@ -156,7 +170,7 @@ public static class Entry
                                 for (int j = i + 1; j < (blockSize + i + 1); j++)
                                 {
                                     Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Write(interpreter.BytecodeInterpreter.GetData(j, BitWidth._32).I32);
+                                    Console.Write(interpreter.BytecodeInterpreter.GetData(j, BitWidth._8).U8);
                                     Console.Write(" ");
                                 }
                                 Console.WriteLine();

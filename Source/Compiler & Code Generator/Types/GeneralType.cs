@@ -60,23 +60,19 @@ public abstract class GeneralType :
         {
             if (constComputer is not null)
             {
-                if (!constComputer.Invoke(type.StackArraySize, out CompiledValue _stackArraySize))
-                { throw new CompilerException("Failed to compute array size value", type.StackArraySize, uri); }
-                stackArraySize = _stackArraySize;
+                if (constComputer.Invoke(type.StackArraySize, out CompiledValue _stackArraySize))
+                { stackArraySize = _stackArraySize; }
             }
             else
             {
-                if (!CodeGenerator.TryComputeSimple(type.StackArraySize, out CompiledValue _stackArraySize))
-                { throw new CompilerException("Can't compute array size value", type.StackArraySize, uri); }
-                stackArraySize = _stackArraySize;
+                if (CodeGenerator.TryComputeSimple(type.StackArraySize, out CompiledValue _stackArraySize))
+                { stackArraySize = _stackArraySize; }
             }
         }
 
         GeneralType? of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer, uri);
 
-        int? size = (int?)stackArraySize;
-
-        ArrayType result = new(of, size);
+        ArrayType result = new(of, type.StackArraySize, (int?)stackArraySize);
         type.SetAnalyzedType(result);
 
         return result;
@@ -361,7 +357,7 @@ public abstract class GeneralType :
             {
                 GeneralType? stackArrayOf = InsertTypeParameters(arrayType.Of, typeArguments);
                 if (stackArrayOf is null) return null;
-                return new ArrayType(stackArrayOf, arrayType.Length);
+                return new ArrayType(stackArrayOf, arrayType.Length, arrayType.ComputedLength);
             }
 
             case StructType structType:

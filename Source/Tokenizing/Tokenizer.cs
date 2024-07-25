@@ -243,7 +243,7 @@ public abstract partial class Tokenizer
     /// <exception cref="TokenizerException"/>
     protected void ProcessCharacter(char currChar, int offsetTotal)
     {
-        Again:
+    Again:
 
         if (CurrentToken.TokenType == PreparationTokenType.STRING_UnicodeCharacter)
         {
@@ -387,12 +387,13 @@ public abstract partial class Tokenizer
             {
                 CurrentToken.Content.Append(currChar switch
                 {
-                    'n' => "\n",
-                    'r' => "\r",
-                    't' => "\t",
-                    '\\' => "\\",
-                    '"' => "\"",
-                    '0' => "\0",
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    '\\' => '\\',
+                    '"' => '\"',
+                    '0' => '\0',
+                    'e' => '\u001b',
                     _ => throw new TokenizerException($"I don't know this escape sequence: \\{currChar}", GetCurrentPosition(offsetTotal), File),
                 });
                 CurrentToken.TokenType = PreparationTokenType.LiteralString;
@@ -730,7 +731,7 @@ public abstract partial class Tokenizer
             }
         }
 
-        FinishCharacter:
+    FinishCharacter:
         CurrentColumn++;
         if (currChar is '\n')
         {
@@ -812,7 +813,7 @@ public abstract partial class Tokenizer
 
         Tokens.Add(CurrentToken.Instantiate());
 
-        Finish:
+    Finish:
         CurrentToken.TokenType = PreparationTokenType.Whitespace;
         CurrentToken.Content.Clear();
 

@@ -1,0 +1,5 @@
+using System.Console;
+
+PrintLine(temp 0.ToString());
+PrintLine(temp 1.ToString());
+PrintLine(temp 255.ToString());

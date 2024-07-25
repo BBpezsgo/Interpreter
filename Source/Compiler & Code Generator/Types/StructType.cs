@@ -151,7 +151,7 @@ public class StructType : GeneralType,
         return false;
     }
 
-    GeneralType ReplaceType(GeneralType type)
+    public GeneralType ReplaceType(GeneralType type)
     {
         if (!type.Is(out GenericType? genericType))
         { return type; }

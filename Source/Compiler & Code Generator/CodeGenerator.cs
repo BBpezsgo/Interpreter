@@ -826,7 +826,7 @@ public abstract class CodeGenerator
 
             if (from.Is(out PointerType? fromPtr) && to.Is(out toPtr) &&
                 fromPtr.To.Is(out ArrayType? fromPtrArray) && toPtr.To.Is(out ArrayType? toPtrArray) &&
-                !toPtrArray.Length.HasValue)
+                toPtrArray.Length is null)
             { return true; }
 
             return false;
@@ -918,7 +918,7 @@ public abstract class CodeGenerator
 
                     if (_passed.Is(out PointerType? fromPtr) && defined.Is(out PointerType? toPtr) &&
                         fromPtr.To.Is(out ArrayType? fromPtrArray) && toPtr.To.Is(out ArrayType? toPtrArray) &&
-                        !toPtrArray.Length.HasValue)
+                        toPtrArray.Length is null)
                     { return true; }
 
                     return false;
@@ -1478,54 +1478,6 @@ public abstract class CodeGenerator
 
     #endregion
 
-    protected bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
-    {
-        if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out _))
-        {
-            // HERE
-            result = new AliasType(alias.Value, alias);
-            return true;
-        }
-
-        if (TypeKeywords.BasicTypes.TryGetValue(name.Content, out BasicType builtinType))
-        {
-            result = new BuiltinType(builtinType);
-            return true;
-        }
-
-        if (GetStruct(name.Content, relevantFile, out CompiledStruct? @struct, out _))
-        {
-            name.AnalyzedType = TokenAnalyzedType.Struct;
-            @struct.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), CurrentFile));
-
-            result = new StructType(@struct, relevantFile);
-            return true;
-        }
-
-        if (TypeArguments.TryGetValue(name.Content, out GeneralType? typeArgument))
-        {
-            result = typeArgument;
-            return true;
-        }
-
-        if (GetFunction(FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, null, relevantFile), out FunctionQueryResult<CompiledFunction>? function, out _))
-        {
-            name.AnalyzedType = TokenAnalyzedType.FunctionName;
-            function.Function.References.Add(new Reference<StatementWithValue?>(new Identifier(name, relevantFile), CurrentFile));
-            result = new FunctionType(function.Function);
-            return true;
-        }
-
-        if (GetGlobalVariable(name.Content, relevantFile, out CompiledVariable? globalVariable, out _))
-        {
-            result = globalVariable.Type;
-            return true;
-        }
-
-        result = null;
-        return false;
-    }
-
     public enum GlobalVariablePerfectus
     {
         None,
@@ -1680,7 +1632,11 @@ public abstract class CodeGenerator
                 destArrayType.Of.SameAs(BasicType.Char))
             {
                 string literalValue = literal.Value;
-                if (!destArrayType.Length.HasValue || literalValue.Length != destArrayType.Length.Value)
+                if (destArrayType.Length is null)
+                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (without length)", value, CurrentFile); }
+                if (!destArrayType.ComputedLength.HasValue)
+                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of <runtime value>)", value, CurrentFile); }
+                if (literalValue.Length != destArrayType.ComputedLength.Value)
                 { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of {destArrayType.Length?.ToString() ?? "null"})", value, CurrentFile); }
                 return;
             }
@@ -1689,8 +1645,13 @@ public abstract class CodeGenerator
                 pointerType.To.Is(out ArrayType? arrayType) &&
                 arrayType.Of.SameAs(BasicType.Char))
             {
-                if (arrayType.Length.HasValue && arrayType.Length.Value != literal.Value.Length)
-                { throw new CompilerException($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array {destination} (length of {arrayType.Length.Value})", value, CurrentFile); }
+                if (arrayType.Length is not null)
+                {
+                    if (!arrayType.ComputedLength.HasValue)
+                    { throw new CompilerException($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array {destination} (length of <runtime value>)", value, CurrentFile); }
+                    if (literal.Value.Length != arrayType.ComputedLength.Value)
+                    { throw new CompilerException($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array {destination} (length of {arrayType.Length?.ToString() ?? "null"})", value, CurrentFile); }
+                }
                 return;
             }
         }
@@ -1700,6 +1661,24 @@ public abstract class CodeGenerator
                 valueType.Is<PointerType>() &&
                 destPointerType.To.SameAs(BasicType.Any))
             { return; }
+        }
+
+        {
+            if (destination.Is(out PointerType? dstPointer) &&
+                valueType.Is(out PointerType? srcPointer))
+            {
+                if (dstPointer.To.Is(out ArrayType? dstArray) &&
+                    srcPointer.To.Is(out ArrayType? srcArray))
+                {
+                    if (dstArray.ComputedLength.HasValue &&
+                        srcArray.ComputedLength.HasValue &&
+                        dstArray.ComputedLength.Value != srcArray.ComputedLength.Value)
+                    { throw new CompilerException($"Can not set an array pointer with length of {dstArray.ComputedLength.Value} to an array pointer with length of {srcArray.ComputedLength.Value}", value, CurrentFile); }
+
+                    if (dstArray.Length is null)
+                    { return; }
+                }
+            }
         }
 
         throw new CompilerException($"Can not set a {valueType} type value to the {destination} type", value, CurrentFile);
@@ -1766,7 +1745,7 @@ public abstract class CodeGenerator
         return new CompiledVariable(memoryOffset, type, newVariable);
     }
 
-    #region GetInitialValue()
+    #region Initial Value
 
     protected static CompiledValue GetInitialValue(BasicType type) => type switch
     {
@@ -1807,6 +1786,56 @@ public abstract class CodeGenerator
     };
 
     #endregion
+
+    #region Find Type
+
+    protected bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
+    {
+        if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out _))
+        {
+            // HERE
+            result = new AliasType(alias.Value, alias);
+            return true;
+        }
+
+        if (TypeKeywords.BasicTypes.TryGetValue(name.Content, out BasicType builtinType))
+        {
+            result = new BuiltinType(builtinType);
+            return true;
+        }
+
+        if (GetStruct(name.Content, relevantFile, out CompiledStruct? @struct, out _))
+        {
+            name.AnalyzedType = TokenAnalyzedType.Struct;
+            @struct.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), CurrentFile));
+
+            result = new StructType(@struct, relevantFile);
+            return true;
+        }
+
+        if (TypeArguments.TryGetValue(name.Content, out GeneralType? typeArgument))
+        {
+            result = typeArgument;
+            return true;
+        }
+
+        if (GetFunction(FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, null, relevantFile), out FunctionQueryResult<CompiledFunction>? function, out _))
+        {
+            name.AnalyzedType = TokenAnalyzedType.FunctionName;
+            function.Function.References.Add(new Reference<StatementWithValue?>(new Identifier(name, relevantFile), CurrentFile));
+            result = new FunctionType(function.Function);
+            return true;
+        }
+
+        if (GetGlobalVariable(name.Content, relevantFile, out CompiledVariable? globalVariable, out _))
+        {
+            result = globalVariable.Type;
+            return true;
+        }
+
+        result = null;
+        return false;
+    }
 
     protected bool GetLiteralType(LiteralType literal, [NotNullWhen(true)] out GeneralType? type)
     {
@@ -1856,8 +1885,6 @@ public abstract class CodeGenerator
 
         return type is not null;
     }
-
-    #region FindStatementType()
 
     protected virtual TType OnGotStatementType<TType>(StatementWithValue statement, TType type)
         where TType : GeneralType
@@ -2106,7 +2133,7 @@ public abstract class CodeGenerator
                 { return literalType; }
 
                 AnalysisCollection?.Warnings.Add(new Warning($"No type defined for string literals, using the default u16[]*", literal, CurrentFile));
-                return OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, literal.Value.Length)));
+                return OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, Literal.CreateAnonymous(literal.Value.Length, literal), literal.Value.Length)));
             case LiteralType.Char:
                 if (expectedType is not null)
                 {
@@ -2314,7 +2341,7 @@ public abstract class CodeGenerator
 
     #endregion
 
-    #region InlineMacro()
+    #region Inlining
 
     static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
         => statements.Select(statement => InlineMacro(statement, parameters));
@@ -2445,6 +2472,33 @@ public abstract class CodeGenerator
             Semicolon = constructorCall.Semicolon,
         };
 
+    static NewInstance InlineMacro(NewInstance newInstance, Dictionary<string, StatementWithValue> parameters)
+        => new(
+            keyword: newInstance.Keyword,
+            typeName: newInstance.Type)
+        {
+            SaveValue = newInstance.SaveValue,
+            Semicolon = newInstance.Semicolon,
+        };
+
+    static TypeInstance InlineMacro(TypeInstance type, Dictionary<string, StatementWithValue> parameters) => type switch
+    {
+        TypeInstanceFunction v => new TypeInstanceFunction(
+            InlineMacro(v.FunctionReturnType, parameters),
+            v.FunctionParameterTypes.Select(p => InlineMacro(p, parameters))
+        ),
+        TypeInstancePointer v => new TypeInstancePointer(
+            InlineMacro(v.To, parameters),
+            v.Operator
+        ),
+        TypeInstanceSimple v => v,
+        TypeInstanceStackArray v => new TypeInstanceStackArray(
+            InlineMacro(v.StackArrayOf, parameters),
+            InlineMacro(v.StackArraySize, parameters)
+        ),
+        _ => throw new NotImplementedException(),
+    };
+
     static bool InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
         inlined = null;
@@ -2452,70 +2506,70 @@ public abstract class CodeGenerator
         switch (statement)
         {
             case Block v:
+            {
+                if (InlineMacro(v, parameters, out Block? inlined_))
                 {
-                    if (InlineMacro(v, parameters, out Block? inlined_))
-                    {
-                        inlined = inlined_;
-                        return true;
-                    }
-                    break;
-                }
-
-            case StatementWithValue v:
-                {
-                    inlined = InlineMacro(v, parameters);
+                    inlined = inlined_;
                     return true;
                 }
+                break;
+            }
+
+            case StatementWithValue v:
+            {
+                inlined = InlineMacro(v, parameters);
+                return true;
+            }
 
             case ForLoop v:
+            {
+                if (InlineMacro(v, parameters, out ForLoop? inlined_))
                 {
-                    if (InlineMacro(v, parameters, out ForLoop? inlined_))
-                    {
-                        inlined = inlined_;
-                        return true;
-                    }
-                    break;
+                    inlined = inlined_;
+                    return true;
                 }
+                break;
+            }
 
             case IfContainer v:
+            {
+                if (InlineMacro(v, parameters, out IfContainer? inlined_))
                 {
-                    if (InlineMacro(v, parameters, out IfContainer? inlined_))
-                    {
-                        inlined = inlined_;
-                        return true;
-                    }
-                    break;
+                    inlined = inlined_;
+                    return true;
                 }
+                break;
+            }
 
             case AnyAssignment v:
+            {
+                if (InlineMacro(v, parameters, out AnyAssignment? inlined_))
                 {
-                    if (InlineMacro(v, parameters, out AnyAssignment? inlined_))
-                    {
-                        inlined = inlined_;
-                        return true;
-                    }
-                    break;
+                    inlined = inlined_;
+                    return true;
                 }
+                break;
+            }
 
             case VariableDeclaration v:
+            {
+                if (InlineMacro(v, parameters, out VariableDeclaration? inlined_))
                 {
-                    if (InlineMacro(v, parameters, out VariableDeclaration? inlined_))
-                    {
-                        inlined = inlined_;
-                        return true;
-                    }
-                    break;
+                    inlined = inlined_;
+                    return true;
                 }
+                break;
+            }
 
             case WhileLoop v:
+            {
+                if (InlineMacro(v, parameters, out WhileLoop? inlined_))
                 {
-                    if (InlineMacro(v, parameters, out WhileLoop? inlined_))
-                    {
-                        inlined = inlined_;
-                        return true;
-                    }
-                    break;
+                    inlined = inlined_;
+                    return true;
                 }
+                break;
+            }
 
             default: throw new NotImplementedException(statement.GetType().ToString());
         }
@@ -2653,32 +2707,32 @@ public abstract class CodeGenerator
         switch (statement)
         {
             case Assignment v:
+            {
+                if (InlineMacro(v, parameters, out Assignment? inlined_))
                 {
-                    if (InlineMacro(v, parameters, out Assignment? inlined_))
-                    {
-                        inlined = inlined_;
-                        return true;
-                    }
-                    break;
+                    inlined = inlined_;
+                    return true;
                 }
+                break;
+            }
             case ShortOperatorCall v:
+            {
+                if (InlineMacro(v, parameters, out ShortOperatorCall? inlined_))
                 {
-                    if (InlineMacro(v, parameters, out ShortOperatorCall? inlined_))
-                    {
-                        inlined = inlined_;
-                        return true;
-                    }
-                    break;
+                    inlined = inlined_;
+                    return true;
                 }
+                break;
+            }
             case CompoundAssignment v:
+            {
+                if (InlineMacro(v, parameters, out CompoundAssignment? inlined_))
                 {
-                    if (InlineMacro(v, parameters, out CompoundAssignment? inlined_))
-                    {
-                        inlined = inlined_;
-                        return true;
-                    }
-                    break;
+                    inlined = inlined_;
+                    return true;
                 }
+                break;
+            }
             default: throw new UnreachableException();
         }
 
@@ -2856,6 +2910,7 @@ public abstract class CodeGenerator
         ModifiedStatement v => InlineMacro(v, parameters),
         TypeStatement v => v,
         ConstructorCall v => InlineMacro(v, parameters),
+        NewInstance v => InlineMacro(v, parameters),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 
@@ -2903,15 +2958,15 @@ public abstract class CodeGenerator
         switch (statement.Identifier.Content)
         {
             case StatementKeywords.Return:
-                {
-                    if (inDepth) return ControlFlowUsage.ConditionalReturn;
-                    else return ControlFlowUsage.Return;
-                }
+            {
+                if (inDepth) return ControlFlowUsage.ConditionalReturn;
+                else return ControlFlowUsage.Return;
+            }
 
             case StatementKeywords.Break:
-                {
-                    return ControlFlowUsage.Break;
-                }
+            {
+                return ControlFlowUsage.Break;
+            }
 
             case StatementKeywords.Delete:
             case StatementKeywords.Throw:
@@ -2922,6 +2977,8 @@ public abstract class CodeGenerator
     }
 
     #endregion
+
+    #region Compile Time Evaluation
 
     protected abstract class RuntimeStatement
         : IPositioned
@@ -2946,7 +3003,7 @@ public abstract class CodeGenerator
     {
         public CompiledFunction Function { get; }
         public ImmutableArray<CompiledValue> Parameters { get; }
-        
+
         public RuntimeFunctionCall(CompiledFunction function, ImmutableArray<CompiledValue> parameters, FunctionCall original) : base(original)
         {
             Function = function;
@@ -3059,8 +3116,6 @@ public abstract class CodeGenerator
         }
     }
 
-    #region TryCompute()
-
     public static CompiledValue Compute(string @operator, CompiledValue left, CompiledValue right) => @operator switch
     {
         UnaryOperatorCall.LogicalNOT => !left,
@@ -3137,23 +3192,23 @@ public abstract class CodeGenerator
         switch (op)
         {
             case "&&":
+            {
+                if (!(bool)leftValue)
                 {
-                    if (!(bool)leftValue)
-                    {
-                        value = new CompiledValue(false);
-                        return true;
-                    }
-                    break;
+                    value = new CompiledValue(false);
+                    return true;
                 }
+                break;
+            }
             case "||":
+            {
+                if ((bool)leftValue)
                 {
-                    if ((bool)leftValue)
-                    {
-                        value = new CompiledValue(true);
-                        return true;
-                    }
-                    break;
+                    value = new CompiledValue(true);
+                    return true;
                 }
+                break;
+            }
             default:
                 if (context is not null &&
                     context.TryGetValue(@operator, out value))
@@ -3279,15 +3334,22 @@ public abstract class CodeGenerator
                 return false;
             }
 
-            StatementWithValue param0 = functionCall.Arguments[0];
-            GeneralType param0Type = FindStatementType(param0);
+            StatementWithValue param = functionCall.Arguments[0];
+            GeneralType paramType;
+            if (param is TypeStatement typeStatement)
+            { paramType = GeneralType.From(typeStatement.Type, FindType, TryCompute); }
+            else if (param is CompiledTypeStatement compiledTypeStatement)
+            { paramType = compiledTypeStatement.Type; }
+            else
+            { paramType = FindStatementType(param); }
 
-            value = this switch
+            if (!FindSize(paramType, out int size))
             {
-                Brainfuck.Generator.CodeGeneratorForBrainfuck => new CompiledValue(param0Type.Size),
-                BBLang.Generator.CodeGeneratorForMain => new CompiledValue(param0Type.SizeBytes),
-                _ => throw new NotImplementedException(),
-            };
+                value = CompiledValue.Null;
+                return false;
+            }
+
+            value = new CompiledValue(size);
             return true;
         }
 
@@ -3355,13 +3417,13 @@ public abstract class CodeGenerator
         if (prevType.Is(out ArrayType? arrayType) &&
             field.Identifier.Equals("Length"))
         {
-            if (!arrayType.Length.HasValue)
+            if (!arrayType.ComputedLength.HasValue)
             {
                 value = CompiledValue.Null;
                 return false;
             }
 
-            value = new CompiledValue(arrayType.Length.Value);
+            value = new CompiledValue(arrayType.ComputedLength.Value);
             return true;
         }
 
@@ -3476,23 +3538,23 @@ public abstract class CodeGenerator
         switch (op)
         {
             case "&&":
+            {
+                if (!leftValue)
                 {
-                    if (!leftValue)
-                    {
-                        value = new CompiledValue(false);
-                        return true;
-                    }
-                    break;
+                    value = new CompiledValue(false);
+                    return true;
                 }
+                break;
+            }
             case "||":
+            {
+                if (leftValue)
                 {
-                    if (leftValue)
-                    {
-                        value = new CompiledValue(true);
-                        return true;
-                    }
-                    break;
+                    value = new CompiledValue(true);
+                    return true;
                 }
+                break;
+            }
             default:
                 value = CompiledValue.Null;
                 return false;
@@ -3713,40 +3775,40 @@ public abstract class CodeGenerator
             switch (_branch)
             {
                 case IfBranch branch:
-                    {
-                        if (!TryCompute(branch.Condition, context, out CompiledValue condition))
-                        { return false; }
+                {
+                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
+                    { return false; }
 
-                        if (!condition)
-                        { continue; }
+                    if (!condition)
+                    { continue; }
 
-                        if (!TryEvaluate(branch.Block, context))
-                        { return false; }
+                    if (!TryEvaluate(branch.Block, context))
+                    { return false; }
 
-                        return true;
-                    }
+                    return true;
+                }
 
                 case ElseIfBranch branch:
-                    {
-                        if (!TryCompute(branch.Condition, context, out CompiledValue condition))
-                        { return false; }
+                {
+                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
+                    { return false; }
 
-                        if (!condition)
-                        { continue; }
+                    if (!condition)
+                    { continue; }
 
-                        if (!TryEvaluate(branch.Block, context))
-                        { return false; }
+                    if (!TryEvaluate(branch.Block, context))
+                    { return false; }
 
-                        return true;
-                    }
+                    return true;
+                }
 
                 case ElseBranch branch:
-                    {
-                        if (!TryEvaluate(branch.Block, context))
-                        { return false; }
+                {
+                    if (!TryEvaluate(branch.Block, context))
+                    { return false; }
 
-                        return true;
-                    }
+                    return true;
+                }
 
                 default: throw new UnreachableException();
             }
@@ -3865,6 +3927,8 @@ public abstract class CodeGenerator
 
     #endregion
 
+    #region Loop Unrolling
+
     protected bool IsUnrollable(ForLoop loop)
     {
         string iteratorVariable = loop.VariableDeclaration.Identifier.Content;
@@ -3969,4 +4033,71 @@ public abstract class CodeGenerator
 
         return statements.ToImmutable();
     }
+
+    #endregion
+
+    #region Find Size
+
+    protected bool FindSize(GeneralType type, out int size) => type switch
+    {
+        PointerType v => FindSize(v, out size),
+        ArrayType v => FindSize(v, out size),
+        FunctionType v => FindSize(v, out size),
+        StructType v => FindSize(v, out size),
+        GenericType v => FindSize(v, out size),
+        BuiltinType v => FindSize(v, out size),
+        AliasType v => FindSize(v, out size),
+        _ => throw new NotImplementedException(),
+    };
+
+    protected abstract bool FindSize(PointerType type, out int size);
+
+    protected virtual bool FindSize(ArrayType type, out int size)
+    {
+        size = default;
+
+        if (type.Length is null) return false;
+        if (!FindSize(type.Of, out int elementSize)) return false;
+        if (!TryCompute(type.Length, out var sizeValue)) return false;
+
+        size = elementSize * (int)sizeValue;
+        return true;
+    }
+
+    protected abstract bool FindSize(FunctionType type, out int size);
+
+    protected virtual bool FindSize(StructType type, out int size)
+    {
+        size = 0;
+
+        foreach (CompiledField field in type.Struct.Fields)
+        {
+            GeneralType fieldType = type.ReplaceType(field.Type);
+            if (!FindSize(fieldType, out int fieldSize)) return false;
+            size += fieldSize;
+        }
+
+        return true;
+    }
+
+    protected virtual bool FindSize(GenericType type, out int size) => throw new InvalidOperationException($"Generic type doesn't have a size");
+
+    protected virtual bool FindSize(BuiltinType type, out int size)
+    {
+        size = type.Type switch
+        {
+            BasicType.Void => throw new InternalException($"Type {type} does not have a size"),
+            BasicType.Any => throw new InternalException($"Type {type} does not have a size"),
+            BasicType.Byte => 1,
+            BasicType.Char => 2,
+            BasicType.Integer => 4,
+            BasicType.Float => 4,
+            _ => throw new UnreachableException(),
+        };
+        return true;
+    }
+
+    protected virtual bool FindSize(AliasType type, out int size) => FindSize(type.Value, out size);
+
+    #endregion
 }

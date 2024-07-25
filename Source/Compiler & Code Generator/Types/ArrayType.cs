@@ -1,6 +1,7 @@
 ﻿namespace LanguageCore.Compiler;
 
-using LanguageCore.Runtime;
+using Parser.Statement;
+using Runtime;
 using Parser;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -8,10 +9,11 @@ public class ArrayType : GeneralType,
     IEquatable<ArrayType>
 {
     public GeneralType Of { get; }
-    public int? Length { get; }
+    public StatementWithValue? Length { get; }
+    public int? ComputedLength { get; }
 
-    public override int Size => Length.HasValue ? Length.Value * Of.Size : throw new InvalidOperationException("Array type's length isn't defined");
-    public override int SizeBytes => Length.HasValue ? Length.Value * Of.SizeBytes : throw new InvalidOperationException("Array type's length isn't defined");
+    public override int Size => ComputedLength.HasValue ? ComputedLength.Value * Of.Size : throw new InvalidOperationException("Array type's length isn't defined");
+    public override int SizeBytes => ComputedLength.HasValue ? ComputedLength.Value * Of.SizeBytes : throw new InvalidOperationException("Array type's length isn't defined");
     public override BitWidth BitWidth => throw new InvalidOperationException();
 
     public ArrayType(ArrayType other)
@@ -20,10 +22,11 @@ public class ArrayType : GeneralType,
         Length = other.Length;
     }
 
-    public ArrayType(GeneralType of, int? size)
+    public ArrayType(GeneralType of, StatementWithValue? length, int? computedLength)
     {
         Of = of;
-        Length = size;
+        Length = length;
+        ComputedLength = computedLength;
     }
 
     public override bool Equals(object? other) => Equals(other as ArrayType);
@@ -32,7 +35,24 @@ public class ArrayType : GeneralType,
     {
         if (other is null) return false;
         if (!Of.Equals(other.Of)) return false;
-        if (!Length.Equals(other.Length)) return false;
+        if (Length is not null)
+        {
+            if (other.Length is null) return false;
+            if (ComputedLength.HasValue)
+            {
+                if (!other.ComputedLength.HasValue) return false;
+                if (ComputedLength.Value != other.ComputedLength.Value) return false;
+            }
+            else
+            {
+                if (other.ComputedLength.HasValue) return false;
+            }
+        }
+        else
+        {
+            if (other.Length is not null) return false;
+            if (other.ComputedLength.HasValue) return false;
+        }
         return true;
     }
     public override bool Equals(TypeInstance? other)

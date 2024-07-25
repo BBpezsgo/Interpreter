@@ -383,6 +383,38 @@ public class TypeStatement : StatementWithValue
     }
 }
 
+public class CompiledTypeStatement : StatementWithValue
+{
+    public Token Keyword { get; }
+    public GeneralType Type { get; }
+
+    public override Position Position => new(Keyword);
+
+    public CompiledTypeStatement(Token keyword, GeneralType type)
+    {
+        Keyword = keyword;
+        Type = type;
+    }
+
+    public override string ToString()
+    {
+        StringBuilder result = new();
+
+        result.Append(SurroundingBracelet?.Start);
+
+        result.Append(Type);
+
+        result.Append(SurroundingBracelet?.End);
+        result.Append(Semicolon);
+
+        return result.ToString();
+    }
+    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    {
+        if (includeThis) yield return this;
+    }
+}
+
 public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledFunction>
 {
     /// <summary>

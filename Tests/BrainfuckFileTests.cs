@@ -76,7 +76,7 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout)] public void Test68() => Utils.GetTest(68).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test69() => Utils.GetTest(69).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test70() => Utils.GetTest(70).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test71() => Utils.GetTest(71).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test71() => Utils.GetTest(71).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test72() => Utils.GetTest(72).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test73() => Utils.GetTest(73).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test74() => Utils.GetTest(74).DoBrainfuck();

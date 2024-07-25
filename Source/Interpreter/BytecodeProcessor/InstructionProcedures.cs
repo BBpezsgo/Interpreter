@@ -279,9 +279,9 @@ public partial class BytecodeProcessor
 
         dst = CurrentInstruction.BitWidth switch
         {
-            BitWidth._8 => new RuntimeValue((byte)(dst.U8 / src.U8)),
-            BitWidth._16 => new RuntimeValue((char)(dst.U16 / src.U16)),
-            BitWidth._32 => new RuntimeValue((int)(dst.I32 / src.I32)),
+            BitWidth._8 => new RuntimeValue((byte)(dst.U8 % src.U8)),
+            BitWidth._16 => new RuntimeValue((char)(dst.U16 % src.U16)),
+            BitWidth._32 => new RuntimeValue((int)(dst.I32 % src.I32)),
             _ => throw new UnreachableException(),
         };
         SetData(CurrentInstruction.Operand1, dst);

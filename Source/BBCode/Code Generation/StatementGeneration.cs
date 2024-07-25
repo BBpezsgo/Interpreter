@@ -61,6 +61,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, parameters, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? error, AddCompilable))
         { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found: {error}", size, CurrentFile); }
+
         CompiledFunction? allocator = result.Function;
 
         if (!allocator.ReturnSomething)
@@ -309,6 +310,91 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
+
+    #region Find Size
+
+    protected override bool FindSize(PointerType type, out int size)
+    {
+        size = BytecodeProcessor.PointerSize;
+        return true;
+    }
+
+    protected override bool FindSize(FunctionType type, out int size)
+    {
+        size = BytecodeProcessor.PointerSize;
+        return true;
+    }
+
+    #endregion
+
+    #region Generate Size
+
+    void GenerateSize(GeneralType type, Register result)
+    {
+        switch (type)
+        {
+            case PointerType v: GenerateSize(v, result); break;
+            case ArrayType v: GenerateSize(v, result); break;
+            case FunctionType v: GenerateSize(v, result); break;
+            case StructType v: GenerateSize(v, result); break;
+            case GenericType v: GenerateSize(v, result); break;
+            case BuiltinType v: GenerateSize(v, result); break;
+            case AliasType v: GenerateSize(v, result); break;
+            default: throw new NotImplementedException();
+        };
+    }
+
+    void GenerateSize(PointerType type, Register result)
+    {
+        AddInstruction(Opcode.MathAdd, result, BytecodeProcessor.PointerSize);
+    }
+    void GenerateSize(ArrayType type, Register result)
+    {
+        if (FindSize(type, out int size))
+        {
+            AddInstruction(Opcode.MathAdd, result, size);
+            return;
+        }
+        if (type.Length is null)
+        { throw new CompilerException($"Array type doesn't have a size", null, CurrentFile); }
+
+        GeneralType lengthType = FindStatementType(type.Length);
+        if (!lengthType.Is(out BuiltinType? lengthBuiltinType))
+        { throw new CompilerException($"Array length must be a builtin type and not {lengthType}", type.Length, CurrentFile); }
+        if (lengthBuiltinType.BitWidth != BitWidth._32)
+        { throw new CompilerException($"Array length must be a 32 bit integer and not {lengthType}", type.Length, CurrentFile); }
+
+        if (!FindSize(type.Of, out int elementSize))
+        { throw new NotImplementedException(); }
+
+        GenerateCodeForStatement(type.Length);
+        using (RegisterUsage.Auto lengthRegister = Registers.GetFree())
+        {
+            AddInstruction(Opcode.PopTo32, lengthRegister.Get(BitWidth._32));
+            AddInstruction(Opcode.MathMult, lengthRegister.Get(BitWidth._32), elementSize);
+            AddInstruction(Opcode.MathAdd, result, lengthRegister.Get(BitWidth._32));
+        }
+    }
+    void GenerateSize(FunctionType type, Register result)
+    {
+        AddInstruction(Opcode.MathAdd, result, BytecodeProcessor.PointerSize);
+    }
+    void GenerateSize(StructType type, Register result)
+    {
+        if (!FindSize(type, out int size))
+        { throw new NotImplementedException(); }
+        AddInstruction(Opcode.MathAdd, result, size);
+    }
+    void GenerateSize(GenericType type, Register result) => throw new InvalidOperationException($"Generic type doesn't have a size");
+    void GenerateSize(BuiltinType type, Register result)
+    {
+        if (!FindSize(type, out int size))
+        { throw new NotImplementedException(); }
+        AddInstruction(Opcode.MathAdd, result, size);
+    }
+    void GenerateSize(AliasType type, Register result) => GenerateSize(type.Value, result);
+
+    #endregion
 
     #region GenerateCodeForStatement
 
@@ -592,18 +678,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (functionCall.MethodArguments.Length != compiledFunction.ParameterCount)
         { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodArguments.Length}", functionCall, CurrentFile); }
 
-        if (compiledFunction.BuiltinFunctionName == BuiltinFunctions.Allocate)
-        {
-            GenerateAllocator(functionCall.Arguments[0]);
-            return;
-        }
-
-        if (compiledFunction.BuiltinFunctionName == BuiltinFunctions.Free)
-        {
-            GenerateDeallocator(functionCall.Arguments[0]);
-            return;
-        }
-
         if (compiledFunction.IsExternal)
         {
             if (!ExternalFunctions.TryGet(compiledFunction.ExternalFunctionName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
@@ -662,13 +736,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GeneralType paramType;
             if (param is TypeStatement typeStatement)
             { paramType = GeneralType.From(typeStatement.Type, FindType, TryCompute); }
+            else if (param is CompiledTypeStatement compiledTypeStatement)
+            { paramType = compiledTypeStatement.Type; }
             else
             { paramType = FindStatementType(param); }
 
             OnGotStatementType(anyCall, BuiltinType.Integer);
-            anyCall.PredictedValue = paramType.SizeBytes;
 
-            AddInstruction(Opcode.Push, paramType.SizeBytes);
+            if (FindSize(paramType, out int size))
+            {
+                AddInstruction(Opcode.Push, size);
+                anyCall.PredictedValue = size;
+            }
+            else
+            {
+                using RegisterUsage.Auto reg = Registers.GetFree();
+                AddInstruction(Opcode.Move, reg.Get(BitWidth._32), 0);
+                GenerateSize(paramType, reg.Get(BitWidth._32));
+                AddInstruction(Opcode.Push, reg.Get(BitWidth._32));
+            }
 
             return;
         }
@@ -1082,34 +1168,34 @@ public partial class CodeGeneratorForMain : CodeGenerator
             switch (@operator.Operator.Content)
             {
                 case UnaryOperatorCall.LogicalNOT:
+                {
+                    GenerateCodeForStatement(@operator.Left);
+
+                    using (RegisterUsage.Auto reg = Registers.GetFree())
                     {
-                        GenerateCodeForStatement(@operator.Left);
-
-                        using (RegisterUsage.Auto reg = Registers.GetFree())
-                        {
-                            PopTo(reg.Get(bitWidth));
-                            AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
-                            AddInstruction(Opcode.JumpIfEqual, 3);
-                            AddInstruction(Opcode.Push, false);
-                            AddInstruction(Opcode.Jump, 2);
-                            AddInstruction(Opcode.Push, true);
-                        }
-
-                        return;
+                        PopTo(reg.Get(bitWidth));
+                        AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
+                        AddInstruction(Opcode.JumpIfEqual, 3);
+                        AddInstruction(Opcode.Push, false);
+                        AddInstruction(Opcode.Jump, 2);
+                        AddInstruction(Opcode.Push, true);
                     }
+
+                    return;
+                }
                 case UnaryOperatorCall.BinaryNOT:
+                {
+                    GenerateCodeForStatement(@operator.Left);
+
+                    using (RegisterUsage.Auto reg = Registers.GetFree())
                     {
-                        GenerateCodeForStatement(@operator.Left);
-
-                        using (RegisterUsage.Auto reg = Registers.GetFree())
-                        {
-                            PopTo(reg.Get(bitWidth));
-                            AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
-                            AddInstruction(Opcode.Push, reg.Get(bitWidth));
-                        }
-
-                        return;
+                        PopTo(reg.Get(bitWidth));
+                        AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
+                        AddInstruction(Opcode.Push, reg.Get(bitWidth));
                     }
+
+                    return;
+                }
                 default: throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile);
             }
         }
@@ -1122,90 +1208,90 @@ public partial class CodeGeneratorForMain : CodeGenerator
         switch (literal.Type)
         {
             case LiteralType.Integer:
+            {
+                if (expectedType is not null)
                 {
-                    if (expectedType is not null)
+                    if (expectedType.SameAs(BasicType.Byte))
                     {
-                        if (expectedType.SameAs(BasicType.Byte))
+                        if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
-                            {
-                                OnGotStatementType(literal, BuiltinType.Byte);
-                                AddInstruction(Opcode.Push, new CompiledValue((byte)literal.GetInt()));
-                                return;
-                            }
-                        }
-                        else if (expectedType.SameAs(BasicType.Char))
-                        {
-                            if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
-                            {
-                                OnGotStatementType(literal, BuiltinType.Char);
-                                AddInstruction(Opcode.Push, new CompiledValue((ushort)literal.GetInt()));
-                                return;
-                            }
-                        }
-                        else if (expectedType.SameAs(BasicType.Float))
-                        {
-                            OnGotStatementType(literal, BuiltinType.Float);
-                            AddInstruction(Opcode.Push, new CompiledValue((float)literal.GetInt()));
+                            OnGotStatementType(literal, BuiltinType.Byte);
+                            AddInstruction(Opcode.Push, new CompiledValue((byte)literal.GetInt()));
                             return;
                         }
                     }
-
-                    OnGotStatementType(literal, BuiltinType.Integer);
-                    AddInstruction(Opcode.Push, new CompiledValue(literal.GetInt()));
-                    break;
+                    else if (expectedType.SameAs(BasicType.Char))
+                    {
+                        if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
+                        {
+                            OnGotStatementType(literal, BuiltinType.Char);
+                            AddInstruction(Opcode.Push, new CompiledValue((ushort)literal.GetInt()));
+                            return;
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.Float))
+                    {
+                        OnGotStatementType(literal, BuiltinType.Float);
+                        AddInstruction(Opcode.Push, new CompiledValue((float)literal.GetInt()));
+                        return;
+                    }
                 }
+
+                OnGotStatementType(literal, BuiltinType.Integer);
+                AddInstruction(Opcode.Push, new CompiledValue(literal.GetInt()));
+                break;
+            }
             case LiteralType.Float:
-                {
-                    OnGotStatementType(literal, BuiltinType.Float);
+            {
+                OnGotStatementType(literal, BuiltinType.Float);
 
-                    AddInstruction(Opcode.Push, new CompiledValue(literal.GetFloat()));
-                    break;
-                }
+                AddInstruction(Opcode.Push, new CompiledValue(literal.GetFloat()));
+                break;
+            }
             case LiteralType.String:
+            {
+                if (expectedType is not null &&
+                    expectedType.Is(out PointerType? pointerType) &&
+                    pointerType.To.Is(out ArrayType? arrayType) &&
+                    arrayType.Of.SameAs(BasicType.Byte))
                 {
-                    if (expectedType is not null &&
-                        expectedType.Is(out PointerType? pointerType) &&
-                        pointerType.To.Is(out ArrayType? arrayType) &&
-                        arrayType.Of.SameAs(BasicType.Byte))
-                    {
-                        OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Byte, literal.Value.Length)));
-                        GenerateCodeForLiteralString(literal.Value, true);
-                    }
-                    else
-                    {
-                        OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, literal.Value.Length)));
-                        GenerateCodeForLiteralString(literal.Value, false);
-                    }
-                    break;
+                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Byte, LiteralStatement.CreateAnonymous(literal.Value.Length, literal), literal.Value.Length)));
+                    GenerateCodeForLiteralString(literal.Value, true);
                 }
-            case LiteralType.Char:
+                else
                 {
-                    if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, CurrentFile);
+                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, LiteralStatement.CreateAnonymous(literal.Value.Length, literal), literal.Value.Length)));
+                    GenerateCodeForLiteralString(literal.Value, false);
+                }
+                break;
+            }
+            case LiteralType.Char:
+            {
+                if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, CurrentFile);
 
-                    if (expectedType is not null)
+                if (expectedType is not null)
+                {
+                    if (expectedType.SameAs(BasicType.Byte))
                     {
-                        if (expectedType.SameAs(BasicType.Byte))
+                        if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
-                            {
-                                OnGotStatementType(literal, BuiltinType.Byte);
-                                AddInstruction(Opcode.Push, new CompiledValue((byte)literal.Value[0]));
-                                return;
-                            }
-                        }
-                        else if (expectedType.SameAs(BasicType.Float))
-                        {
-                            OnGotStatementType(literal, BuiltinType.Float);
-                            AddInstruction(Opcode.Push, new CompiledValue((float)literal.Value[0]));
+                            OnGotStatementType(literal, BuiltinType.Byte);
+                            AddInstruction(Opcode.Push, new CompiledValue((byte)literal.Value[0]));
                             return;
                         }
                     }
-
-                    OnGotStatementType(literal, BuiltinType.Char);
-                    AddInstruction(Opcode.Push, new CompiledValue(literal.Value[0]));
-                    break;
+                    else if (expectedType.SameAs(BasicType.Float))
+                    {
+                        OnGotStatementType(literal, BuiltinType.Float);
+                        AddInstruction(Opcode.Push, new CompiledValue((float)literal.Value[0]));
+                        return;
+                    }
                 }
+
+                OnGotStatementType(literal, BuiltinType.Char);
+                AddInstruction(Opcode.Push, new CompiledValue(literal.Value[0]));
+                break;
+            }
             default: throw new UnreachableException();
         }
     }
@@ -1610,27 +1696,32 @@ public partial class CodeGeneratorForMain : CodeGenerator
         switch (instanceType)
         {
             case PointerType pointerType:
-                {
-                    GenerateAllocator(LiteralStatement.CreateAnonymous(pointerType.To.SizeBytes, newObject.Type));
+            {
+                GenerateAllocator(new AnyCall(
+                    new Identifier(Token.CreateAnonymous("sizeof"), CurrentFile),
+                    [new CompiledTypeStatement(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To)],
+                    [],
+                    TokenPair.CreateAnonymous(Position.UnknownPosition, "(", ")"),
+                    CurrentFile));
 
-                    using (RegisterUsage.Auto reg = Registers.GetFree())
-                    {
-                        AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth), (InstructionOperand)StackTop);
+                // using (RegisterUsage.Auto reg = Registers.GetFree())
+                // {
+                //     AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth), (InstructionOperand)StackTop);
+                // 
+                //      for (int offset = 0; offset < pointerType.To.SizeBytes; offset++)
+                //   { AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(offset, BitWidth._8), new InstructionOperand((byte)0)); }
+                // }
 
-                        for (int offset = 0; offset < pointerType.To.SizeBytes; offset++)
-                        { AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(offset, BitWidth._8), new InstructionOperand((byte)0)); }
-                    }
-
-                    break;
-                }
+                break;
+            }
 
             case StructType structType:
-                {
-                    structType.Struct.References.Add(newObject.Type, CurrentFile);
+            {
+                structType.Struct.References.Add(newObject.Type, CurrentFile);
 
-                    StackAlloc(structType.SizeBytes);
-                    break;
-                }
+                StackAlloc(structType.SizeBytes);
+                break;
+            }
 
             default:
                 throw new CompilerException($"Unknown type definition {instanceType}", newObject.Type, CurrentFile);
@@ -1687,13 +1778,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Equals("Length"))
         {
-            if (!arrayType.Length.HasValue)
+            if (arrayType.Length is null)
             { throw new CompilerException("Array type's length isn't defined", field, field.File); }
 
-            OnGotStatementType(field, BuiltinType.Integer);
-            field.PredictedValue = arrayType.Length.Value;
+            if (!arrayType.ComputedLength.HasValue)
+            { throw new CompilerException("I will eventually implement this", field, field.File); }
 
-            AddInstruction(Opcode.Push, arrayType.Length.Value);
+            OnGotStatementType(field, BuiltinType.Integer);
+            field.PredictedValue = arrayType.ComputedLength.Value;
+
+            AddInstruction(Opcode.Push, arrayType.ComputedLength.Value);
             return;
         }
 
@@ -1750,7 +1844,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     }
         // }
 
-        StatementWithValue? dereference = NeedDerefernce(field);
+        StatementWithValue? dereference = NeedDereference(field);
 
         if (dereference is null)
         {
@@ -1789,7 +1883,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 index.Index.PredictedValue = computedIndexData;
 
-                if (computedIndexData < 0 || (arrayType.Length.HasValue && computedIndexData >= arrayType.Length.Value))
+                if (computedIndexData < 0 || (arrayType.ComputedLength.HasValue && computedIndexData >= arrayType.ComputedLength.Value))
                 { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", index.Index, CurrentFile)); }
 
                 if (GetParameter(identifier.Content, out CompiledParameter? param))
@@ -2239,7 +2333,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GenerateCodeForStatement(value, type);
 
-        StatementWithValue? dereference = NeedDerefernce(statementToSet);
+        StatementWithValue? dereference = NeedDereference(statementToSet);
 
         if (dereference is null)
         {
@@ -2279,7 +2373,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 statementToSet.Index.PredictedValue = computedIndexData;
 
-                if (computedIndexData < 0 || (arrayType.Length.HasValue && computedIndexData >= arrayType.Length.Value))
+                if (computedIndexData < 0 || (arrayType.ComputedLength.HasValue && computedIndexData >= arrayType.ComputedLength.Value))
                 { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", statementToSet.Index, CurrentFile)); }
 
                 GenerateCodeForStatement(value);
@@ -2488,8 +2582,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             arrayType.Of.SameAs(BasicType.Char) &&
             newVariable.InitialValue is LiteralStatement literalStatement &&
             literalStatement.Type == LiteralType.String &&
-            arrayType.Length.HasValue &&
-            literalStatement.Value.Length == arrayType.Length.Value)
+            arrayType.ComputedLength.HasValue &&
+            literalStatement.Value.Length == arrayType.ComputedLength.Value)
         {
             size = arrayType.SizeBytes;
             compiledVariable.IsInitialized = true;

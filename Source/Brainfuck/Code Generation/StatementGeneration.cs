@@ -37,6 +37,24 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GenerateCodeForFunction(result.Function, parameters, null, position);
     }
 
+    void GenerateAllocator(StatementWithValue size)
+    {
+        ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create<StatementWithValue>(size);
+
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, parameters, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? error, AddCompilable))
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", size, CurrentFile); }
+        if (!result.Function.ReturnSomething)
+        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size, CurrentFile); }
+
+        if (!result.Function.CanUse(CurrentFile))
+        {
+            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{result.Function.ToReadable()}\" cannot be called due to its protection level", size, CurrentFile));
+            return;
+        }
+
+        GenerateCodeForFunction(result.Function, parameters, null, size);
+    }
+
     void GenerateDestructor(StatementWithValue value)
     {
         GeneralType deallocateableType = FindStatementType(value);
@@ -154,12 +172,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (literal.Type != LiteralType.String)
                     { throw new NotSupportedException($"Only string literals supported", literal, CurrentFile); }
-                    if (literal.Value.Length != arrayType.Length.Value)
-                    { throw new CompilerException($"Literal length {literal.Value.Length} must be equal to the stack array length {arrayType.Length.Value}", literal, CurrentFile); }
+                    if (arrayType.Length is not null)
+                    {
+                        if (!arrayType.ComputedLength.HasValue)
+                        { throw new CompilerException($"Literal length {literal.Value.Length} must be equal to the stack array length <runtime value>", literal, CurrentFile); }
+                        if (literal.Value.Length != arrayType.ComputedLength.Value)
+                        { throw new CompilerException($"Literal length {literal.Value.Length} must be equal to the stack array length {arrayType.ComputedLength.Value}", literal, CurrentFile); }
+                    }
 
                     using (DebugBlock(initialValue))
                     {
-                        int arraySize = arrayType.Length.Value;
+                        int arraySize = literal.Value.Length;
 
                         int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -175,7 +198,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
                 else
                 {
-                    int arraySize = arrayType.Length.Value;
+                    if (!arrayType.ComputedLength.HasValue)
+                    { throw new CompilerException($"This aint supported", null, null); }
+
+                    int arraySize = arrayType.ComputedLength.Value;
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -193,7 +219,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (type.Is(out ArrayType? arrayType))
             {
-                int arraySize = arrayType.Length.Value;
+                if (!arrayType.ComputedLength.HasValue)
+                { throw new CompilerException($"This aint supported", null, null); }
+
+                int arraySize = arrayType.ComputedLength.Value;
 
                 int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -209,6 +238,112 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         return 1;
     }
+    #endregion
+
+    #region Find Size
+
+    protected override bool FindSize(PointerType type, out int size)
+    {
+        size = 1;
+        return true;
+    }
+
+    protected override bool FindSize(FunctionType type, out int size)
+    {
+        size = 1;
+        return true;
+    }
+
+    protected override bool FindSize(ArrayType type, out int size)
+    {
+        size = default;
+        if (type.Length is null) return false;
+        if (!TryCompute(type.Length, out CompiledValue lengthValue)) return false;
+
+        size = Snippets.ARRAY_SIZE((int)lengthValue);
+        return true;
+    }
+
+    protected override bool FindSize(BuiltinType type, out int size)
+    {
+        size = type.Type switch
+        {
+            BasicType.Void => throw new InternalException($"Type {type} does not have a size"),
+            BasicType.Any => throw new InternalException($"Type {type} does not have a size"),
+            BasicType.Byte => 1,
+            BasicType.Char => 1,
+            BasicType.Integer => 1,
+            BasicType.Float => 1,
+            _ => throw new UnreachableException(),
+        };
+        return true;
+    }
+
+    #endregion
+
+
+    #region Generate Size
+
+    void GenerateSize(GeneralType type, int result)
+    {
+        switch (type)
+        {
+            case PointerType v: GenerateSize(v, result); break;
+            case ArrayType v: GenerateSize(v, result); break;
+            case FunctionType v: GenerateSize(v, result); break;
+            case StructType v: GenerateSize(v, result); break;
+            case GenericType v: GenerateSize(v, result); break;
+            case BuiltinType v: GenerateSize(v, result); break;
+            case AliasType v: GenerateSize(v, result); break;
+            default: throw new NotImplementedException();
+        };
+    }
+
+    void GenerateSize(PointerType type, int result)
+    {
+        Code.AddValue(result, 1);
+    }
+    void GenerateSize(ArrayType type, int result)
+    {
+        if (FindSize(type, out int size))
+        {
+            Code.AddValue(result, size);
+            return;
+        }
+        if (type.Length is null)
+        { throw new CompilerException($"Array type doesn't have a size", null, CurrentFile); }
+        int lengthAddress = Stack.NextAddress;
+        GenerateCodeForStatement(type.Length);
+
+        if (!FindSize(type.Of, out int elementSize))
+        { throw new NotImplementedException(); }
+
+        using (StackAddress elementSizeAddress = Stack.Push(elementSize))
+        { Code.MULTIPLY(lengthAddress, elementSizeAddress, Stack.GetTemporaryAddress); }
+
+        Code.MoveAddValue(lengthAddress, result);
+        Stack.PopVirtual();
+
+    }
+    void GenerateSize(FunctionType type, int result)
+    {
+        Code.AddValue(result, 1);
+    }
+    void GenerateSize(StructType type, int result)
+    {
+        if (!FindSize(type, out int size))
+        { throw new NotImplementedException(); }
+        Code.AddValue(result, size);
+    }
+    void GenerateSize(GenericType type, int result) => throw new InvalidOperationException($"Generic type doesn't have a size");
+    void GenerateSize(BuiltinType type, int result)
+    {
+        if (!FindSize(type, out int size))
+        { throw new NotImplementedException(); }
+        Code.AddValue(result, size);
+    }
+    void GenerateSize(AliasType type, int result) => GenerateSize(type.Value, result);
+
     #endregion
 
     #region GenerateCodeForSetter()
@@ -282,7 +417,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!TryGetAddress(statementToSet, out int address, out int size))
         {
-            StatementWithValue? dereferencePointer = NeedDerefernce(statementToSet);
+            StatementWithValue? dereferencePointer = NeedDereference(statementToSet);
             if (dereferencePointer is not null)
             {
                 int offset = GetDataOffset(statementToSet, dereferencePointer);
@@ -366,10 +501,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     { throw new InternalException(); }
                     if (literal.Type != LiteralType.String)
                     { throw new InternalException(); }
-                    if (literal.Value.Length != arrayType.Length.Value)
+                    if (!arrayType.ComputedLength.HasValue)
+                    { throw new InternalException(); }
+                    if (literal.Value.Length != arrayType.ComputedLength.Value)
                     { throw new InternalException(); }
 
-                    int arraySize = arrayType.Length.Value;
+                    int arraySize = arrayType.ComputedLength.Value;
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -396,10 +533,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     { throw new InternalException(); }
                     if (literal.Type != LiteralType.String)
                     { throw new InternalException(); }
-                    if (literal.Value.Length != arrayType.Length.Value)
+                    if (!arrayType.ComputedLength.HasValue)
+                    { throw new InternalException(); }
+                    if (literal.Value.Length != arrayType.ComputedLength.Value)
                     { throw new InternalException(); }
 
-                    int arraySize = arrayType.Length.Value;
+                    int arraySize = arrayType.ComputedLength.Value;
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -679,7 +818,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (!functionCall.Original.SaveValue && functionCall.Function.ReturnSomething)
         { Stack.Pop(); }
     }
-   
+
     void GenerateCodeForStatement(Statement statement, GeneralType? expectedType = null)
     {
         switch (statement)
@@ -1177,86 +1316,86 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         switch (statement.Identifier.Content)
         {
             case StatementKeywords.Return:
+            {
+                statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
+
+                if (statement.Arguments.Length is not 0 and not 1)
+                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Arguments.Length})", statement, CurrentFile); }
+
+                if (statement.Arguments.Length is 1)
                 {
-                    statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
+                    if (!GetVariable(ReturnVariableName, out BrainfuckVariable? returnVariable, out WillBeCompilerException? notFoundError))
+                    { throw new CompilerException($"Can't return value for some reason :(", statement, CurrentFile); }
 
-                    if (statement.Arguments.Length is not 0 and not 1)
-                    { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Arguments.Length})", statement, CurrentFile); }
-
-                    if (statement.Arguments.Length is 1)
-                    {
-                        if (!GetVariable(ReturnVariableName, out BrainfuckVariable? returnVariable, out WillBeCompilerException? notFoundError))
-                        { throw new CompilerException($"Can't return value for some reason :(", statement, CurrentFile); }
-
-                        GenerateCodeForSetter(returnVariable, statement.Arguments[0]);
-                    }
-
-                    if (Returns.Count == 0)
-                    { throw new CompilerException($"Can't return for some reason :(", statement.Identifier, CurrentFile); }
-
-                    if (Returns.Last.FlagAddress.HasValue)
-                    { Code.SetValue(Returns.Last.FlagAddress.Value, 0); }
-
-                    Code.SetPointer(Stack.NextAddress);
-                    Code.ClearCurrent();
-                    Code.JumpStart(Stack.NextAddress);
-
-                    Returns.Last.PendingJumps.Last++;
-                    Returns.Last.Doings.Last = true;
-
-                    break;
+                    GenerateCodeForSetter(returnVariable, statement.Arguments[0]);
                 }
+
+                if (Returns.Count == 0)
+                { throw new CompilerException($"Can't return for some reason :(", statement.Identifier, CurrentFile); }
+
+                if (Returns.Last.FlagAddress.HasValue)
+                { Code.SetValue(Returns.Last.FlagAddress.Value, 0); }
+
+                Code.SetPointer(Stack.NextAddress);
+                Code.ClearCurrent();
+                Code.JumpStart(Stack.NextAddress);
+
+                Returns.Last.PendingJumps.Last++;
+                Returns.Last.Doings.Last = true;
+
+                break;
+            }
 
             case StatementKeywords.Break:
-                {
-                    statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
+            {
+                statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
 
-                    if (statement.Arguments.Length != 0)
-                    { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Arguments.Length})", statement, CurrentFile); }
+                if (statement.Arguments.Length != 0)
+                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Arguments.Length})", statement, CurrentFile); }
 
-                    if (Breaks.Count == 0)
-                    { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, CurrentFile); }
+                if (Breaks.Count == 0)
+                { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, CurrentFile); }
 
-                    if (!Breaks.Last.FlagAddress.HasValue)
-                    { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, CurrentFile); }
+                if (!Breaks.Last.FlagAddress.HasValue)
+                { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, CurrentFile); }
 
-                    Code.SetValue(Breaks.Last.FlagAddress.Value, 0);
+                Code.SetValue(Breaks.Last.FlagAddress.Value, 0);
 
-                    Code.SetPointer(Stack.NextAddress);
-                    Code.ClearCurrent();
-                    Code.JumpStart(Stack.NextAddress);
+                Code.SetPointer(Stack.NextAddress);
+                Code.ClearCurrent();
+                Code.JumpStart(Stack.NextAddress);
 
-                    Breaks.Last.PendingJumps.Last++;
-                    Breaks.Last.Doings.Last = true;
+                Breaks.Last.PendingJumps.Last++;
+                Breaks.Last.Doings.Last = true;
 
-                    break;
-                }
+                break;
+            }
 
             case StatementKeywords.Delete:
-                {
-                    statement.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
+            {
+                statement.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
-                    if (statement.Arguments.Length != 1)
-                    { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement, CurrentFile); }
+                if (statement.Arguments.Length != 1)
+                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement, CurrentFile); }
 
-                    GenerateDestructor(statement.Arguments[0]);
+                GenerateDestructor(statement.Arguments[0]);
 
-                    break;
-                }
+                break;
+            }
 
             case StatementKeywords.Throw:
-                {
-                    if (statement.Arguments.Length != 1)
-                    { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement, CurrentFile); }
-                    GenerateCodeForPrinter(Ansi.Style(Ansi.BrightForegroundRed));
-                    GenerateCodeForPrinter(statement.Arguments[0]);
-                    GenerateCodeForPrinter(Ansi.Reset);
-                    Code.SetPointer(Stack.Push(1));
-                    Code += "[]";
-                    Stack.PopVirtual();
-                    break;
-                    throw new NotSupportedException($"How to make exceptions work in brainfuck? (idk)", statement.Identifier, CurrentFile);
-                }
+            {
+                if (statement.Arguments.Length != 1)
+                { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement, CurrentFile); }
+                GenerateCodeForPrinter(Ansi.Style(Ansi.BrightForegroundRed));
+                GenerateCodeForPrinter(statement.Arguments[0]);
+                GenerateCodeForPrinter(Ansi.Reset);
+                Code.SetPointer(Stack.Push(1));
+                Code += "[]";
+                Stack.PopVirtual();
+                break;
+                throw new NotSupportedException($"How to make exceptions work in brainfuck? (idk)", statement.Identifier, CurrentFile);
+            }
 
             default: throw new CompilerException($"Unknown keyword-call \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
         }
@@ -1284,97 +1423,97 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         switch (statement.Operator.Content)
         {
             case "+=":
+            {
+                if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
                 {
-                    if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
-                    {
-                        GenerateCodeForStatement(statement.ToAssignment());
-                        return;
-                    }
-
-                    if (variable.IsDiscarded)
-                    { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
-
-                    if (variable.Size != 1)
-                    { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
-
-                    if (statement.Right == null)
-                    { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
-
-                    if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
-                    {
-                        if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
-                        { constantValue = castedValue; }
-
-                        if (!variable.Type.SameAs(constantValue.Type))
-                        { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
-
-                        Code.AddValue(variable.Address, constantValue);
-
-                        Precomputations++;
-                        return;
-                    }
-
-                    using (Code.Block(this, $"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
-                    {
-                        using (Code.Block(this, $"Compute value"))
-                        {
-                            GenerateCodeForStatement(statement.Right);
-                        }
-
-                        using (Code.Block(this, $"Set computed value to {variable.Address}"))
-                        {
-                            Stack.Pop(address => Code.MoveAddValue(address, variable.Address));
-                        }
-                    }
-
+                    GenerateCodeForStatement(statement.ToAssignment());
                     return;
                 }
+
+                if (variable.IsDiscarded)
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
+
+                if (variable.Size != 1)
+                { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
+
+                if (statement.Right == null)
+                { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
+
+                if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
+                {
+                    if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
+                    { constantValue = castedValue; }
+
+                    if (!variable.Type.SameAs(constantValue.Type))
+                    { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
+
+                    Code.AddValue(variable.Address, constantValue);
+
+                    Precomputations++;
+                    return;
+                }
+
+                using (Code.Block(this, $"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
+                {
+                    using (Code.Block(this, $"Compute value"))
+                    {
+                        GenerateCodeForStatement(statement.Right);
+                    }
+
+                    using (Code.Block(this, $"Set computed value to {variable.Address}"))
+                    {
+                        Stack.Pop(address => Code.MoveAddValue(address, variable.Address));
+                    }
+                }
+
+                return;
+            }
             case "-=":
+            {
+                if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
                 {
-                    if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
-                    {
-                        GenerateCodeForStatement(statement.ToAssignment());
-                        return;
-                    }
-
-                    if (variable.IsDiscarded)
-                    { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
-
-                    if (variable.Size != 1)
-                    { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
-
-                    if (statement.Right == null)
-                    { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
-
-                    if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
-                    {
-                        if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
-                        { constantValue = castedValue; }
-
-                        if (!variable.Type.SameAs(constantValue.Type))
-                        { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
-
-                        Code.AddValue(variable.Address, -constantValue);
-
-                        Precomputations++;
-                        return;
-                    }
-
-                    using (Code.Block(this, $"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
-                    {
-                        using (Code.Block(this, $"Compute value"))
-                        {
-                            GenerateCodeForStatement(statement.Right);
-                        }
-
-                        using (Code.Block(this, $"Set computed value to {variable.Address}"))
-                        {
-                            Stack.Pop(address => Code.MoveSubValue(address, variable.Address));
-                        }
-                    }
-
+                    GenerateCodeForStatement(statement.ToAssignment());
                     return;
                 }
+
+                if (variable.IsDiscarded)
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
+
+                if (variable.Size != 1)
+                { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
+
+                if (statement.Right == null)
+                { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
+
+                if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
+                {
+                    if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
+                    { constantValue = castedValue; }
+
+                    if (!variable.Type.SameAs(constantValue.Type))
+                    { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
+
+                    Code.AddValue(variable.Address, -constantValue);
+
+                    Precomputations++;
+                    return;
+                }
+
+                using (Code.Block(this, $"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
+                {
+                    using (Code.Block(this, $"Compute value"))
+                    {
+                        GenerateCodeForStatement(statement.Right);
+                    }
+
+                    using (Code.Block(this, $"Set computed value to {variable.Address}"))
+                    {
+                        Stack.Pop(address => Code.MoveSubValue(address, variable.Address));
+                    }
+                }
+
+                return;
+            }
             default:
                 GenerateCodeForStatement(statement.ToAssignment());
                 break;
@@ -1401,49 +1540,49 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         switch (statement.Operator.Content)
         {
             case "++":
+            {
+                if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
                 {
-                    if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
-                    {
-                        GenerateCodeForStatement(statement.ToAssignment());
-                        return;
-                    }
-
-                    if (variable.IsDiscarded)
-                    { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
-
-                    if (variable.Size != 1)
-                    { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
-
-                    using (Code.Block(this, $"Increment variable {variable.Name} (at {variable.Address})"))
-                    {
-                        Code.AddValue(variable.Address, 1);
-                    }
-
-                    Optimizations++;
+                    GenerateCodeForStatement(statement.ToAssignment());
                     return;
                 }
+
+                if (variable.IsDiscarded)
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
+
+                if (variable.Size != 1)
+                { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
+
+                using (Code.Block(this, $"Increment variable {variable.Name} (at {variable.Address})"))
+                {
+                    Code.AddValue(variable.Address, 1);
+                }
+
+                Optimizations++;
+                return;
+            }
             case "--":
+            {
+                if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
                 {
-                    if (!GetVariable(statement.Left, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
-                    {
-                        GenerateCodeForStatement(statement.ToAssignment());
-                        return;
-                    }
-
-                    if (variable.IsDiscarded)
-                    { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
-
-                    if (variable.Size != 1)
-                    { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
-
-                    using (Code.Block(this, $"Decrement variable {variable.Name} (at {variable.Address})"))
-                    {
-                        Code.AddValue(variable.Address, -1);
-                    }
-
-                    Optimizations++;
+                    GenerateCodeForStatement(statement.ToAssignment());
                     return;
                 }
+
+                if (variable.IsDiscarded)
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement.Left, CurrentFile); }
+
+                if (variable.Size != 1)
+                { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
+
+                using (Code.Block(this, $"Decrement variable {variable.Name} (at {variable.Address})"))
+                {
+                    Code.AddValue(variable.Address, -1);
+                }
+
+                Optimizations++;
+                return;
+            }
             default:
                 throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile);
         }
@@ -1474,11 +1613,31 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (functionCall.Arguments.Length != 1)
             { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Arguments.Length}", functionCall, CurrentFile); }
 
-            StatementWithValue parameter = functionCall.Arguments[0];
-            GeneralType parameterType = FindStatementType(parameter);
+            StatementWithValue param = functionCall.Arguments[0];
+            GeneralType paramType;
+            if (param is TypeStatement typeStatement)
+            { paramType = GeneralType.From(typeStatement.Type, FindType, TryCompute); }
+            else if (param is CompiledTypeStatement compiledTypeStatement)
+            { paramType = compiledTypeStatement.Type; }
+            else
+            { paramType = FindStatementType(param); }
 
-            if (functionCall.SaveValue)
-            { Stack.Push(parameterType.Size); }
+            OnGotStatementType(functionCall, BuiltinType.Integer);
+
+            if (FindSize(paramType, out int size))
+            {
+                if (functionCall.SaveValue)
+                { Stack.Push(size); }
+            }
+            else
+            {
+                StackAddress sizeAddress = Stack.Push(0);
+
+                GenerateSize(paramType, sizeAddress);
+
+                if (!functionCall.SaveValue)
+                { Stack.Pop(); }
+            }
 
             return;
         }
@@ -1537,34 +1696,34 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             switch (statement.Type)
             {
                 case LiteralType.Integer:
-                    {
-                        int value = statement.GetInt();
-                        Stack.Push(value);
-                        break;
-                    }
+                {
+                    int value = statement.GetInt();
+                    Stack.Push(value);
+                    break;
+                }
                 case LiteralType.Char:
-                    {
-                        Stack.Push(statement.Value[0]);
-                        break;
-                    }
+                {
+                    Stack.Push(statement.Value[0]);
+                    break;
+                }
 
                 case LiteralType.Float:
                     throw new NotSupportedException($"Floats not supported by the brainfuck compiler", statement, CurrentFile);
                 case LiteralType.String:
+                {
+                    if (expectedType is not null &&
+                        expectedType.Is(out PointerType? pointerType) &&
+                        pointerType.To.SameAs(BasicType.Char))
                     {
-                        if (expectedType is not null &&
-                            expectedType.Is(out PointerType? pointerType) &&
-                            pointerType.To.SameAs(BasicType.Char))
-                        {
-                            // TODO: not true but false
-                            GenerateCodeForLiteralString(statement, true);
-                        }
-                        else
-                        {
-                            GenerateCodeForLiteralString(statement, true);
-                        }
-                        break;
+                        // TODO: not true but false
+                        GenerateCodeForLiteralString(statement, true);
                     }
+                    else
+                    {
+                        GenerateCodeForLiteralString(statement, true);
+                    }
+                    break;
+                }
 
                 default:
                     throw new CompilerException($"Unknown literal type {statement.Type}", statement, CurrentFile);
@@ -1667,389 +1826,389 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             switch (statement.Operator.Content)
             {
                 case "==":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
 
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
 
-                        using (Code.Block(this, "Compute equality"))
-                        { Code.LOGIC_EQ(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+                    using (Code.Block(this, "Compute equality"))
+                    { Code.LOGIC_EQ(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
-                        Stack.Pop();
+                    Stack.Pop();
 
-                        break;
-                    }
+                    break;
+                }
                 case "+":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
 
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
 
-                        using (Code.Block(this, $"Move & add right-side (from {rightAddress}) to left-side (to {leftAddress})"))
-                        { Code.MoveAddValue(rightAddress, leftAddress); }
+                    using (Code.Block(this, $"Move & add right-side (from {rightAddress}) to left-side (to {leftAddress})"))
+                    { Code.MoveAddValue(rightAddress, leftAddress); }
 
-                        Stack.PopVirtual();
+                    Stack.PopVirtual();
 
-                        break;
-                    }
+                    break;
+                }
                 case "-":
+                {
                     {
+                        if (AllowOtherOptimizations &&
+                            statement.Left is Identifier _left &&
+                            GetVariable(_left.Content, out BrainfuckVariable? left, out _) &&
+                            !left.IsDiscarded &&
+                            TryCompute(statement.Right, out CompiledValue right) &&
+                            right.Type == RuntimeType.Byte)
                         {
-                            if (AllowOtherOptimizations &&
-                                statement.Left is Identifier _left &&
-                                GetVariable(_left.Content, out BrainfuckVariable? left, out _) &&
-                                !left.IsDiscarded &&
-                                TryCompute(statement.Right, out CompiledValue right) &&
-                                right.Type == RuntimeType.Byte)
-                            {
-                                int resultAddress = Stack.PushVirtual(1);
+                            int resultAddress = Stack.PushVirtual(1);
 
-                                Code.CopyValue(left.Address, resultAddress, Stack.NextAddress);
+                            Code.CopyValue(left.Address, resultAddress, Stack.NextAddress);
 
-                                Code.AddValue(resultAddress, -right.Byte);
+                            Code.AddValue(resultAddress, -right.Byte);
 
-                                Optimizations++;
+                            Optimizations++;
 
-                                return;
-                            }
+                            return;
                         }
-
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
-
-                        using (Code.Block(this, $"Move & sub right-side (from {rightAddress}) from left-side (to {leftAddress})"))
-                        { Code.MoveSubValue(rightAddress, leftAddress); }
-
-                        Stack.PopVirtual();
-
-                        return;
                     }
+
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
+
+                    using (Code.Block(this, $"Move & sub right-side (from {rightAddress}) from left-side (to {leftAddress})"))
+                    { Code.MoveSubValue(rightAddress, leftAddress); }
+
+                    Stack.PopVirtual();
+
+                    return;
+                }
                 case "*":
+                {
                     {
+                        if (AllowOtherOptimizations &&
+                            statement.Left is Identifier identifier1 &&
+                            statement.Right is Identifier identifier2 &&
+                            string.Equals(identifier1.Content, identifier2.Content))
                         {
-                            if (AllowOtherOptimizations &&
-                                statement.Left is Identifier identifier1 &&
-                                statement.Right is Identifier identifier2 &&
-                                string.Equals(identifier1.Content, identifier2.Content))
-                            {
-                                int leftAddress_ = Stack.NextAddress;
-                                using (Code.Block(this, "Compute left-side value (right-side is the same)"))
-                                { GenerateCodeForStatement(statement.Left); }
+                            int leftAddress_ = Stack.NextAddress;
+                            using (Code.Block(this, "Compute left-side value (right-side is the same)"))
+                            { GenerateCodeForStatement(statement.Left); }
 
-                                using (Code.Block(this, $"Snippet MATH_MUL_SELF({leftAddress_})"))
-                                {
-                                    Code.MATH_MUL_SELF(leftAddress_, Stack.GetTemporaryAddress);
-                                    Optimizations++;
-                                    break;
-                                }
+                            using (Code.Block(this, $"Snippet MATH_MUL_SELF({leftAddress_})"))
+                            {
+                                Code.MATH_MUL_SELF(leftAddress_, Stack.GetTemporaryAddress);
+                                Optimizations++;
+                                break;
                             }
                         }
-
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
-
-                        using (Code.Block(this, $"Snippet MULTIPLY({leftAddress} {rightAddress})"))
-                        { Code.MULTIPLY(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
-
-                        Stack.Pop();
-
-                        break;
                     }
+
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
+
+                    using (Code.Block(this, $"Snippet MULTIPLY({leftAddress} {rightAddress})"))
+                    { Code.MULTIPLY(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+
+                    Stack.Pop();
+
+                    break;
+                }
                 case "/":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
 
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
 
-                        using (Code.Block(this, $"Snippet DIVIDE({leftAddress} {rightAddress})"))
-                        { Code.MATH_DIV(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+                    using (Code.Block(this, $"Snippet DIVIDE({leftAddress} {rightAddress})"))
+                    { Code.MATH_DIV(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
-                        Stack.Pop();
+                    Stack.Pop();
 
-                        break;
-                    }
+                    break;
+                }
                 case "%":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
 
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
 
-                        using (Code.Block(this, $"Snippet MOD({leftAddress} {rightAddress})"))
-                        { Code.MATH_MOD(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+                    using (Code.Block(this, $"Snippet MOD({leftAddress} {rightAddress})"))
+                    { Code.MATH_MOD(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
-                        Stack.Pop();
+                    Stack.Pop();
 
-                        break;
-                    }
+                    break;
+                }
                 case "<":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
 
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
 
-                        using (Code.Block(this, $"Snippet LT({leftAddress} {rightAddress})"))
-                        { Code.LOGIC_LT(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+                    using (Code.Block(this, $"Snippet LT({leftAddress} {rightAddress})"))
+                    { Code.LOGIC_LT(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
-                        Stack.Pop();
+                    Stack.Pop();
 
-                        break;
-                    }
+                    break;
+                }
                 case ">":
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
+
+                    using (StackAddress resultAddress = Stack.PushVirtual(1))
                     {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
+                        using (Code.Block(this, $"Snippet MT({leftAddress} {rightAddress})"))
+                        { Code.LOGIC_MT(leftAddress, rightAddress, resultAddress, Stack.GetTemporaryAddress); }
 
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
-
-                        using (StackAddress resultAddress = Stack.PushVirtual(1))
-                        {
-                            using (Code.Block(this, $"Snippet MT({leftAddress} {rightAddress})"))
-                            { Code.LOGIC_MT(leftAddress, rightAddress, resultAddress, Stack.GetTemporaryAddress); }
-
-                            Code.MoveValue(resultAddress, leftAddress);
-                        }
-
-                        Stack.Pop();
-
-                        break;
+                        Code.MoveValue(resultAddress, leftAddress);
                     }
+
+                    Stack.Pop();
+
+                    break;
+                }
                 case ">=":
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
+
+                    using (Code.Block(this, $"Snippet: *{leftAddress} <= *{rightAddress}"))
                     {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
-
-                        using (Code.Block(this, $"Snippet LTEQ({leftAddress} {rightAddress})"))
-                        {
-                            Code.LOGIC_LT(leftAddress, rightAddress, Stack.GetTemporaryAddress);
-                            Stack.Pop();
-                            Code.LOGIC_NOT(leftAddress, Stack.GetTemporaryAddress);
-                        }
-
-                        break;
-                    }
-                case "<=":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
-
-                        using (Code.Block(this, $"Snippet LTEQ({leftAddress} {rightAddress})"))
-                        { Code.LOGIC_LTEQ(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
-
+                        Code.LOGIC_LT(leftAddress, rightAddress, Stack.GetTemporaryAddress);
                         Stack.Pop();
-
-                        break;
-                    }
-                case "!=":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
-                        int rightAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute right-side value"))
-                        { GenerateCodeForStatement(statement.Right); }
-
-                        using (Code.Block(this, $"Snippet NEQ({leftAddress} {rightAddress})"))
-                        { Code.LOGIC_NEQ(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
-
-                        Stack.Pop();
-
-                        break;
-                    }
-                case "&&":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
-                        int tempLeftAddress = Stack.PushVirtual(1);
-                        Code.CopyValue(leftAddress, tempLeftAddress);
-
-                        using (Code.ConditionalBlock(this, tempLeftAddress))
-                        {
-                            int rightAddress = Stack.NextAddress;
-                            using (Code.Block(this, "Compute right-side value"))
-                            { GenerateCodeForStatement(statement.Right); }
-
-                            using (Code.Block(this, $"Snippet AND({leftAddress} {rightAddress})"))
-                            { Code.LOGIC_AND(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
-
-                            Stack.Pop(); // Pop rightAddress
-                        }
-
-                        Stack.PopVirtual(); // Pop tempLeftAddress
-
-                        break;
-                    }
-                case "||":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
-                        int invertedLeftAddress = Stack.PushVirtual(1);
-                        Code.CopyValue(leftAddress, invertedLeftAddress);
-                        Code.LOGIC_NOT(invertedLeftAddress, Stack.GetTemporaryAddress);
-
-                        using (Code.ConditionalBlock(this, invertedLeftAddress))
-                        {
-                            int rightAddress = Stack.NextAddress;
-                            using (Code.Block(this, "Compute right-side value"))
-                            { GenerateCodeForStatement(statement.Right); }
-
-                            using (Code.Block(this, $"Snippet AND({leftAddress} {rightAddress})"))
-                            { Code.LOGIC_OR(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
-
-                            Stack.Pop(); // Pop rightAddress
-                        }
-
-                        Stack.PopVirtual(); // Pop tempLeftAddress
-
-                        break;
-                    }
-                case "<<":
-                    {
-                        int valueAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
-                        if (!TryCompute(statement.Right, out CompiledValue offsetConst))
-                        { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
-
-                        if (offsetConst != 0)
-                        {
-                            if (!Utils.PowerOf2(offsetConst.Int))
-                            { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
-
-                            using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.Int));
-
-                            using (Code.Block(this, $"Snippet MULTIPLY({valueAddress} {offsetAddress})"))
-                            { Code.MULTIPLY(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
-                        }
-
-                        break;
-                    }
-                case ">>":
-                    {
-                        int valueAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
-                        if (!TryCompute(statement.Right, out CompiledValue offsetConst))
-                        { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
-
-                        if (offsetConst != 0)
-                        {
-                            if (!Utils.PowerOf2(offsetConst.Int))
-                            { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
-
-                            using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.Int));
-
-                            using (Code.Block(this, $"Snippet MATH_DIV({valueAddress} {offsetAddress})"))
-                            { Code.MATH_DIV(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
-                        }
-
-                        break;
-                    }
-                case "!":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
-
                         Code.LOGIC_NOT(leftAddress, Stack.GetTemporaryAddress);
-
-                        break;
                     }
-                case "&":
+
+                    break;
+                }
+                case "<=":
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
+
+                    using (Code.Block(this, $"Snippet: *{leftAddress} <= *{rightAddress}"))
+                    { Code.LOGIC_LTEQ(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+
+                    Stack.Pop();
+
+                    break;
+                }
+                case "!=":
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    int rightAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute right-side value"))
+                    { GenerateCodeForStatement(statement.Right); }
+
+                    using (Code.Block(this, $"Snippet NEQ({leftAddress} {rightAddress})"))
+                    { Code.LOGIC_NEQ(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+
+                    Stack.Pop();
+
+                    break;
+                }
+                case "&&":
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    int tempLeftAddress = Stack.PushVirtual(1);
+                    Code.CopyValue(leftAddress, tempLeftAddress);
+
+                    using (Code.ConditionalBlock(this, tempLeftAddress))
                     {
-                        GeneralType leftType = FindStatementType(statement.Left);
+                        int rightAddress = Stack.NextAddress;
+                        using (Code.Block(this, "Compute right-side value"))
+                        { GenerateCodeForStatement(statement.Right); }
 
-                        if ((leftType.SameAs(BasicType.Byte) ||
-                            leftType.SameAs(BasicType.Char) ||
-                            leftType.SameAs(BasicType.Integer)) &&
-                            TryCompute(statement.Right, out CompiledValue right))
+                        using (Code.Block(this, $"Snippet AND({leftAddress} {rightAddress})"))
+                        { Code.LOGIC_AND(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+
+                        Stack.Pop(); // Pop rightAddress
+                    }
+
+                    Stack.PopVirtual(); // Pop tempLeftAddress
+
+                    break;
+                }
+                case "||":
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    int invertedLeftAddress = Stack.PushVirtual(1);
+                    Code.CopyValue(leftAddress, invertedLeftAddress);
+                    Code.LOGIC_NOT(invertedLeftAddress, Stack.GetTemporaryAddress);
+
+                    using (Code.ConditionalBlock(this, invertedLeftAddress))
+                    {
+                        int rightAddress = Stack.NextAddress;
+                        using (Code.Block(this, "Compute right-side value"))
+                        { GenerateCodeForStatement(statement.Right); }
+
+                        using (Code.Block(this, $"Snippet AND({leftAddress} {rightAddress})"))
+                        { Code.LOGIC_OR(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+
+                        Stack.Pop(); // Pop rightAddress
+                    }
+
+                    Stack.PopVirtual(); // Pop tempLeftAddress
+
+                    break;
+                }
+                case "<<":
+                {
+                    int valueAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    if (!TryCompute(statement.Right, out CompiledValue offsetConst))
+                    { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
+
+                    if (offsetConst != 0)
+                    {
+                        if (!Utils.PowerOf2(offsetConst.Int))
+                        { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
+
+                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.Int));
+
+                        using (Code.Block(this, $"Snippet MULTIPLY({valueAddress} {offsetAddress})"))
+                        { Code.MULTIPLY(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
+                    }
+
+                    break;
+                }
+                case ">>":
+                {
+                    int valueAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    if (!TryCompute(statement.Right, out CompiledValue offsetConst))
+                    { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
+
+                    if (offsetConst != 0)
+                    {
+                        if (!Utils.PowerOf2(offsetConst.Int))
+                        { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
+
+                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.Int));
+
+                        using (Code.Block(this, $"Snippet MATH_DIV({valueAddress} {offsetAddress})"))
+                        { Code.MATH_DIV(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
+                    }
+
+                    break;
+                }
+                case "!":
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
+
+                    Code.LOGIC_NOT(leftAddress, Stack.GetTemporaryAddress);
+
+                    break;
+                }
+                case "&":
+                {
+                    GeneralType leftType = FindStatementType(statement.Left);
+
+                    if ((leftType.SameAs(BasicType.Byte) ||
+                        leftType.SameAs(BasicType.Char) ||
+                        leftType.SameAs(BasicType.Integer)) &&
+                        TryCompute(statement.Right, out CompiledValue right))
+                    {
+                        if (right == 1)
                         {
-                            if (right == 1)
-                            {
-                                int leftAddress = Stack.NextAddress;
-                                using (Code.Block(this, "Compute left-side value"))
-                                { GenerateCodeForStatement(statement.Left); }
+                            int leftAddress = Stack.NextAddress;
+                            using (Code.Block(this, "Compute left-side value"))
+                            { GenerateCodeForStatement(statement.Left); }
 
-                                using StackAddress rightAddress = Stack.Push(2);
+                            using StackAddress rightAddress = Stack.Push(2);
 
-                                using (Code.Block(this, $"Snippet MOD({leftAddress} {rightAddress})"))
-                                { Code.MATH_MOD(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
+                            using (Code.Block(this, $"Snippet MOD({leftAddress} {rightAddress})"))
+                            { Code.MATH_MOD(leftAddress, rightAddress, Stack.GetTemporaryAddress); }
 
-                                break;
-                            }
-
-                            if (right == 0b_1_0000000)
-                            {
-                                int leftAddress = Stack.NextAddress;
-                                using (Code.Block(this, "Compute left-side value"))
-                                { GenerateCodeForStatement(statement.Left); }
-
-                                using (StackAddress rightAddress = Stack.Push(0b_0_1111111))
-                                {
-                                    using (Code.Block(this, $"Snippet MT({leftAddress} {rightAddress})"))
-                                    { Code.LOGIC_MT(leftAddress, rightAddress, leftAddress, Stack.GetTemporaryAddress); }
-                                }
-
-                                using (Code.ConditionalBlock(this, leftAddress))
-                                {
-                                    Code.SetValue(leftAddress, 0b_1_0000000);
-                                }
-
-                                break;
-                            }
+                            break;
                         }
 
-                        throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
+                        if (right == 0b_1_0000000)
+                        {
+                            int leftAddress = Stack.NextAddress;
+                            using (Code.Block(this, "Compute left-side value"))
+                            { GenerateCodeForStatement(statement.Left); }
+
+                            using (StackAddress rightAddress = Stack.Push(0b_0_1111111))
+                            {
+                                using (Code.Block(this, $"Snippet MT({leftAddress} {rightAddress})"))
+                                { Code.LOGIC_MT(leftAddress, rightAddress, leftAddress, Stack.GetTemporaryAddress); }
+                            }
+
+                            using (Code.ConditionalBlock(this, leftAddress))
+                            {
+                                Code.SetValue(leftAddress, 0b_1_0000000);
+                            }
+
+                            break;
+                        }
                     }
+
+                    throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
+                }
                 default: throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
             }
         }
@@ -2091,15 +2250,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             switch (statement.Operator.Content)
             {
                 case "!":
-                    {
-                        int leftAddress = Stack.NextAddress;
-                        using (Code.Block(this, "Compute left-side value"))
-                        { GenerateCodeForStatement(statement.Left); }
+                {
+                    int leftAddress = Stack.NextAddress;
+                    using (Code.Block(this, "Compute left-side value"))
+                    { GenerateCodeForStatement(statement.Left); }
 
-                        Code.LOGIC_NOT(leftAddress, Stack.GetTemporaryAddress);
+                    Code.LOGIC_NOT(leftAddress, Stack.GetTemporaryAddress);
 
-                        break;
-                    }
+                    break;
+                }
                 default: throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
             }
         }
@@ -2196,60 +2355,68 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         switch (instanceType)
         {
             case PointerType pointerType:
-                {
-                    int pointerAddress = Stack.NextAddress;
-                    GenerateAllocator(pointerType.To.Size, newInstance);
+            {
+                int pointerAddress = Stack.NextAddress;
 
-                    int temp = Stack.PushVirtual(1);
-                    Code.CopyValue(pointerAddress, temp, temp + 1);
+                GenerateAllocator(new AnyCall(
+                    new Identifier(Token.CreateAnonymous("sizeof"), CurrentFile),
+                    [new CompiledTypeStatement(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To)],
+                    [],
+                    TokenPair.CreateAnonymous(Position.UnknownPosition, "(", ")"),
+                    CurrentFile));
 
-                    for (int i = 0; i < pointerType.To.Size; i++)
-                    {
-                        Heap.Set(temp, 0);
-                        Code.AddValue(temp, 1);
-                    }
+                // GenerateAllocator(pointerType.To.Size, newInstance);
 
-                    Stack.Pop();
+                // int temp = Stack.PushVirtual(1);
+                // Code.CopyValue(pointerAddress, temp, temp + 1);
+                // 
+                // for (int i = 0; i < pointerType.To.Size; i++)
+                // {
+                //     Heap.Set(temp, 0);
+                //     Code.AddValue(temp, 1);
+                // }
+                // 
+                // Stack.Pop();
 
-                    if (!newInstance.SaveValue)
-                    { Stack.Pop(); }
-                    break;
-                }
+                if (!newInstance.SaveValue)
+                { Stack.Pop(); }
+                break;
+            }
 
             case StructType structType:
+            {
+                structType.Struct.References.Add(newInstance.Type, CurrentFile);
+
+                int address = Stack.PushVirtual(structType.Size);
+
+                foreach ((CompiledField field, int offset) in structType.GetFields(false))
                 {
-                    structType.Struct.References.Add(newInstance.Type, CurrentFile);
+                    if (!field.Type.Is(out BuiltinType? builtinType))
+                    { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.File); }
 
-                    int address = Stack.PushVirtual(structType.Size);
+                    int offsettedAddress = address + offset;
 
-                    foreach ((CompiledField field, int offset) in structType.GetFields(false))
+                    switch (builtinType.Type)
                     {
-                        if (!field.Type.Is(out BuiltinType? builtinType))
-                        { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.File); }
-
-                        int offsettedAddress = address + offset;
-
-                        switch (builtinType.Type)
-                        {
-                            case BasicType.Byte:
-                                Code.SetValue(offsettedAddress, 0);
-                                break;
-                            case BasicType.Integer:
-                                Code.SetValue(offsettedAddress, 0);
-                                AnalysisCollection?.Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.File));
-                                break;
-                            case BasicType.Char:
-                                Code.SetValue(offsettedAddress, '\0');
-                                break;
-                            case BasicType.Float:
-                                throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, structType.Struct.File);
-                            default:
-                                throw new CompilerException($"Unknown field type \"{builtinType}\"", field.Identifier, structType.Struct.File);
-                        }
+                        case BasicType.Byte:
+                            Code.SetValue(offsettedAddress, 0);
+                            break;
+                        case BasicType.Integer:
+                            Code.SetValue(offsettedAddress, 0);
+                            AnalysisCollection?.Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.File));
+                            break;
+                        case BasicType.Char:
+                            Code.SetValue(offsettedAddress, '\0');
+                            break;
+                        case BasicType.Float:
+                            throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, structType.Struct.File);
+                        default:
+                            throw new CompilerException($"Unknown field type \"{builtinType}\"", field.Identifier, structType.Struct.File);
                     }
-
-                    break;
                 }
+
+                break;
+            }
 
             default:
                 throw new CompilerException($"Unknown type definition {instanceType}", newInstance.Type, CurrentFile);
@@ -2263,7 +2430,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Equals("Length"))
         {
-            Stack.Push(arrayType.Length.Value);
+            if (!arrayType.ComputedLength.HasValue)
+            { throw new CompilerException($"I will eventually implement this", field.Identifier, CurrentFile); }
+
+            Stack.Push(arrayType.ComputedLength.Value);
             return;
         }
 
@@ -2300,7 +2470,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!TryGetAddress(field, out int address, out int size))
         {
-            StatementWithValue? dereferencePointer = NeedDerefernce(field);
+            StatementWithValue? dereferencePointer = NeedDereference(field);
             if (dereferencePointer is not null)
             {
                 int offset = GetDataOffset(field, dereferencePointer);
@@ -2788,32 +2958,32 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 switch (modifiedStatement.Modifier.Content)
                 {
                     case ModifierKeywords.Ref:
-                        {
-                            Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
+                    {
+                        Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                            if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
-                            { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
+                        if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
+                        { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
 
-                            if (!v.Type.SameAs(definedType))
-                            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+                        if (!v.Type.SameAs(definedType))
+                        { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                            compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
-                            continue;
-                        }
+                        compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
+                        continue;
+                    }
                     case ModifierKeywords.Const:
-                        {
-                            StatementWithValue valueStatement = modifiedStatement.Statement;
-                            if (!TryCompute(valueStatement, out CompiledValue constValue))
-                            { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
+                    {
+                        StatementWithValue valueStatement = modifiedStatement.Statement;
+                        if (!TryCompute(valueStatement, out CompiledValue constValue))
+                        { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
-                            constantParameters.Add(new CompiledParameterConstant(constValue, defined));
-                            continue;
-                        }
+                        constantParameters.Add(new CompiledParameterConstant(constValue, defined));
+                        continue;
+                    }
                     case ModifierKeywords.Temp:
-                        {
-                            passed = modifiedStatement.Statement;
-                            break;
-                        }
+                    {
+                        passed = modifiedStatement.Statement;
+                        break;
+                    }
                     default:
                         throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
                 }
@@ -3296,33 +3466,33 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 switch (modifiedStatement.Modifier.Content)
                 {
                     case ModifierKeywords.Ref:
-                        {
-                            Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
+                    {
+                        Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                            if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
-                            { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
+                        if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out WillBeCompilerException? notFoundError))
+                        { throw notFoundError.Instantiate(modifiedVariable, CurrentFile); }
 
-                            if (!v.Type.SameAs(definedType))
-                            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+                        if (!v.Type.SameAs(definedType))
+                        { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                            compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
-                            continue;
-                        }
+                        compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
+                        continue;
+                    }
                     case ModifierKeywords.Const:
-                        {
-                            StatementWithValue valueStatement = modifiedStatement.Statement;
-                            if (!TryCompute(valueStatement, out CompiledValue constValue))
-                            { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
+                    {
+                        StatementWithValue valueStatement = modifiedStatement.Statement;
+                        if (!TryCompute(valueStatement, out CompiledValue constValue))
+                        { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
-                            constantParameters.Add(new CompiledParameterConstant(constValue, defined));
-                            continue;
-                        }
+                        constantParameters.Add(new CompiledParameterConstant(constValue, defined));
+                        continue;
+                    }
                     case ModifierKeywords.Temp:
-                        {
-                            deallocateOnClean = true;
-                            passed = modifiedStatement.Statement;
-                            break;
-                        }
+                    {
+                        deallocateOnClean = true;
+                        passed = modifiedStatement.Statement;
+                        break;
+                    }
                     default:
                         throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
                 }

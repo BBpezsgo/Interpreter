@@ -275,7 +275,7 @@ public sealed class Parser
 
         Token[] modifiers = ExpectModifiers();
 
-        if (!ExpectType(AllowedType.AnyPointer, out TypeInstance? possibleType, out _))
+        if (!ExpectType(AllowedType.None, out TypeInstance? possibleType, out _))
         { CurrentTokenIndex = parseStart; return false; }
 
         if (!ExpectOperator(OverloadableOperators, out Token? possibleName))
@@ -295,7 +295,7 @@ public sealed class Parser
             Token[] parameterModifiers = ExpectModifiers();
             CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.This, ModifierKeywords.Temp);
 
-            if (!ExpectType(AllowedType.AnyPointer, out TypeInstance? parameterType))
+            if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected a type (the parameter's type)", PreviousToken?.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
@@ -355,7 +355,7 @@ public sealed class Parser
         if (!ExpectIdentifier(out Token? identifier))
         { throw new SyntaxException($"Expected identifier after keyword \"{keyword}\"", keyword.Position.After(), File); }
 
-        if (!ExpectType(AllowedType.AnyPointer | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength | AllowedType.StackArrayWithoutLength | AllowedType.StackArrayWithoutLength, out TypeInstance? type))
+        if (!ExpectType(AllowedType.Any | AllowedType.FunctionPointer | AllowedType.StackArrayWithoutLength, out TypeInstance? type))
         { throw new SyntaxException($"Expected type after alias identifier", identifier.Position.After(), File); }
 
         CheckModifiers(modifiers, AliasModifiers.AsSpan());
@@ -423,7 +423,7 @@ public sealed class Parser
 
         Token[] modifiers = ExpectModifiers();
 
-        if (!ExpectType(AllowedType.FunctionPointer | AllowedType.AnyPointer, out TypeInstance? possibleType, out _))
+        if (!ExpectType(AllowedType.None, out TypeInstance? possibleType, out _))
         { CurrentTokenIndex = parseStart; return false; }
 
         if (!ExpectIdentifier(out Token? possibleNameT))
@@ -444,7 +444,7 @@ public sealed class Parser
             Token[] parameterModifiers = ExpectModifiers();
             CheckParameterModifiers(parameterModifiers, parameters.Count, ParameterModifiers.AsSpan());
 
-            if (!ExpectType(AllowedType.FunctionPointer | AllowedType.AnyPointer, out TypeInstance? parameterType))
+            if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
@@ -516,7 +516,7 @@ public sealed class Parser
             Token[] parameterModifiers = ExpectModifiers();
             CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.Temp);
 
-            if (!ExpectType(AllowedType.AnyPointer, out TypeInstance? parameterType))
+            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
@@ -576,7 +576,7 @@ public sealed class Parser
             Token[] parameterModifiers = ExpectModifiers();
             CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.Temp);
 
-            if (!ExpectType(AllowedType.AnyPointer, out TypeInstance? parameterType))
+            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
@@ -976,7 +976,7 @@ public sealed class Parser
         {
             if (ExpectIdentifier(StatementKeywords.As, out Token? keyword))
             {
-                if (!ExpectType(AllowedType.AnyPointer, out TypeInstance? type))
+                if (!ExpectType(AllowedType.StackArrayWithoutLength, out TypeInstance? type))
                 { throw new SyntaxException($"Expected type after keyword \"{keyword}\"", keyword.Position.After(), File); }
 
                 statementWithValue = new TypeCast(statementWithValue, keyword, type);
@@ -1091,7 +1091,13 @@ public sealed class Parser
         while (ExpectIdentifier(out Token? modifier, VariableModifiers.AsSpan()))
         { modifiers.Add(modifier); }
 
-        if (!ExpectType(AllowedType.Implicit | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength | AllowedType.StackArrayWithoutLength | AllowedType.AnyPointer, out TypeInstance? possibleType))
+        TypeInstance? possibleType;
+        if (ExpectIdentifier(StatementKeywords.Var, out Token? implicitTypeKeyword))
+        {
+            implicitTypeKeyword.AnalyzedType = TokenAnalyzedType.Keyword;
+            possibleType = new TypeInstanceSimple(implicitTypeKeyword, File);
+        }
+        else if (!ExpectType(AllowedType.StackArrayWithoutLength | AllowedType.FunctionPointer, out possibleType))
         { CurrentTokenIndex = startTokenIndex; return false; }
 
         if (!ExpectIdentifier(out Token? possibleVariableName))
@@ -1690,7 +1696,7 @@ public sealed class Parser
 
         Token[] modifiers = ExpectModifiers();
 
-        if (!ExpectType(AllowedType.Implicit | AllowedType.StackArrayWithLength | AllowedType.StackArrayWithoutLength | AllowedType.AnyPointer, out TypeInstance? possibleType))
+        if (!ExpectType(AllowedType.None, out TypeInstance? possibleType))
         { CurrentTokenIndex = startTokenIndex; return false; }
 
         if (!ExpectIdentifier(out Token? possibleVariableName))
@@ -1820,13 +1826,10 @@ public sealed class Parser
     [Flags]
     enum AllowedType
     {
-        None = 0b_0000_0000,
-        Implicit = 0b_0000_0001,
-        ExplicitAny = 0b_0000_0010,
-        FunctionPointer = 0b_0000_0100,
-        StackArrayWithLength = 0b_0000_1000,
-        StackArrayWithoutLength = 0b_0001_0000,
-        AnyPointer = 0b_0010_0000,
+        None = 0x0,
+        Any = 0x1,
+        FunctionPointer = 0x2,
+        StackArrayWithoutLength = 0x4,
     }
 
     static readonly ImmutableArray<string> TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType = ImmutableArray.Create<string>("<", "(", "[");
@@ -1862,37 +1865,15 @@ public sealed class Parser
             if (ExpectOperator("*", out Token? pointerOperator))
             {
                 type = new TypeInstancePointer(type, pointerOperator);
-
-                if ((flags & AllowedType.AnyPointer) == 0)
-                {
-                    error = new LanguageError($"Type {type} is not valid in the current context", possibleType, File, false);
-                    return false;
-                }
             }
             else
             {
-                if ((flags & AllowedType.ExplicitAny) == 0)
+                if ((flags & AllowedType.Any) == 0)
                 {
                     error = new LanguageError($"Type {TypeKeywords.Any} is not valid in the current context", possibleType, File, false);
                     return false;
                 }
             }
-
-            return true;
-        }
-
-        if (possibleType.Content.Equals(StatementKeywords.Var))
-        {
-            possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
-
-            if ((flags & AllowedType.Implicit) == 0)
-            {
-                error = new LanguageError($"Implicit type not allowed in the current context", possibleType, File, false);
-                return false;
-            }
-
-            if (ExpectOperator(TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType, out Token? illegalT))
-            { Errors.Add(new LanguageError($"This is not allowed", illegalT, File)); }
 
             return true;
         }
@@ -1915,7 +1896,7 @@ public sealed class Parser
 
                 while (true)
                 {
-                    if (!ExpectType(AllowedType.FunctionPointer | AllowedType.AnyPointer, out TypeInstance? typeParameter))
+                    if (!ExpectType(AllowedType.None, out TypeInstance? typeParameter))
                     {
                         CurrentTokenIndex = afterIdentifier;
                         goto End;
@@ -1954,7 +1935,7 @@ public sealed class Parser
                 List<TypeInstance> parameterTypes = new();
                 while (!ExpectOperator(")"))
                 {
-                    if (!ExpectType(AllowedType.FunctionPointer | AllowedType.AnyPointer, out TypeInstance? subtype))
+                    if (!ExpectType(AllowedType.None, out TypeInstance? subtype))
                     {
                         CurrentTokenIndex = afterIdentifier;
                         goto End;
@@ -1973,17 +1954,7 @@ public sealed class Parser
             }
             else if (ExpectOperator("[", out Token? bracketStart1))
             {
-                if (!flags.HasFlag(AllowedType.StackArrayWithLength) &&
-                    !flags.HasFlag(AllowedType.StackArrayWithoutLength))
-                { return false; }
-
                 ExpectOneValue(out StatementWithValue? sizeValue);
-
-                if (sizeValue == null && !flags.HasFlag(AllowedType.StackArrayWithoutLength))
-                { Errors.Add(new LanguageError($"Expected value as array size", bracketStart1, File)); }
-
-                if (sizeValue != null && !flags.HasFlag(AllowedType.StackArrayWithLength))
-                { Errors.Add(new LanguageError($"Expected value as array size", bracketStart1, File)); }
 
                 if (!ExpectOperator("]"))
                 { return false; }

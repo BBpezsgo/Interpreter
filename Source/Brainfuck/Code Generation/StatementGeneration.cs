@@ -187,6 +187,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         int size = Snippets.ARRAY_SIZE(arraySize);
 
                         int address = Stack.PushVirtual(size);
+
                         variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type, size)
                         {
                             IsInitialized = true
@@ -2359,11 +2360,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 int pointerAddress = Stack.NextAddress;
 
                 GenerateAllocator(new AnyCall(
-                    new Identifier(Token.CreateAnonymous("sizeof"), CurrentFile),
+                    new Identifier(Token.CreateAnonymous("sizeof"), newInstance.File),
                     [new CompiledTypeStatement(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To)],
                     [],
                     TokenPair.CreateAnonymous(Position.UnknownPosition, "(", ")"),
-                    CurrentFile));
+                    newInstance.File));
 
                 // GenerateAllocator(pointerType.To.Size, newInstance);
 
@@ -2841,9 +2842,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             TryEvaluate(function, parameters, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements))
         {
             Uri? savedFile = CurrentFile;
-            CurrentFile = null;
             foreach (RuntimeStatement runtimeStatement in runtimeStatements)
-            { GenerateCodeForStatement(runtimeStatement); }
+            {
+                CurrentFile = runtimeStatement.File;
+                GenerateCodeForStatement(runtimeStatement);
+            }
             CurrentFile = savedFile;
 
             if (returnValue.HasValue &&

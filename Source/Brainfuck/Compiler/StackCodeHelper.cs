@@ -53,10 +53,10 @@ public class StackCodeHelper
 
     public StackCodeHelper(CodeHelper code, int start, int size)
     {
-        this._code = code;
-        this._stack = new List<int>();
-        this.Start = start;
-        this.MaxSize = size;
+        _code = code;
+        _stack = new List<int>();
+        Start = start;
+        MaxSize = size;
     }
 
     public StackCodeHelper(CodeHelper code, StackCodeHelper other)

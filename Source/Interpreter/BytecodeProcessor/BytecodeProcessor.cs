@@ -49,7 +49,8 @@ public partial class BytecodeProcessor
     public RuntimeContext GetContext() => new(
         Registers,
         ImmutableCollectionsMarshal.AsImmutableArray(Memory),
-        Code
+        Code,
+        StackStart
     );
 
     void Step() => Registers.CodePointer++;

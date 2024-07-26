@@ -1,6 +1,4 @@
-﻿using System.IO;
-
-namespace LanguageCore.Compiler;
+﻿namespace LanguageCore.Compiler;
 
 using Parser;
 using Parser.Statement;
@@ -638,11 +636,13 @@ public sealed class Compiler
         {
             if (IsThingExists(@aliasDefinition))
             { throw new CompilerException("Symbol already exists", @aliasDefinition.Identifier, @aliasDefinition.File); }
-        
-            CompiledAliases.Add(new CompiledAlias(
+
+            CompiledAlias alias = new(
                 GeneralType.From(aliasDefinition.Value, FindType),
                 aliasDefinition
-            ));
+            );
+            aliasDefinition.Value.SetAnalyzedType(alias.Value);
+            CompiledAliases.Add(alias);
         }
 
         foreach (StructDefinition @struct in Structs)

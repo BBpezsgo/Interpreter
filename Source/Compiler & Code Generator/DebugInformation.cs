@@ -217,9 +217,8 @@ public class DebugInformation : IDuplicatable<DebugInformation>
 
     public IEnumerable<ScopeInformation> GetScopes(int codePointer)
     {
-        for (int i = 0; i < ScopeInformation.Count; i++)
+        foreach (ScopeInformation scope in ScopeInformation)
         {
-            ScopeInformation scope = ScopeInformation[i];
             if (!scope.Location.Contains(codePointer)) continue;
             yield return scope;
         }

@@ -1595,17 +1595,19 @@ public class ElseBranch : BaseBranch
     }
 }
 
-public class NewInstance : StatementWithValue, IHaveType
+public class NewInstance : StatementWithValue, IHaveType, IInFile
 {
     public Token Keyword { get; }
     public TypeInstance Type { get; }
+    public Uri File { get; }
 
     public override Position Position => new(Keyword, Type);
 
-    public NewInstance(Token keyword, TypeInstance typeName)
+    public NewInstance(Token keyword, TypeInstance typeName, Uri file)
     {
         Keyword = keyword;
         Type = typeName;
+        File = file;
     }
 
     public override string ToString()
@@ -1704,7 +1706,7 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
         }
     }
 
-    public NewInstance ToInstantiation() => new(Keyword, Type)
+    public NewInstance ToInstantiation() => new(Keyword, Type, File)
     {
         CompiledType = CompiledType,
         SaveValue = true,

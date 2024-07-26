@@ -554,7 +554,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void HeapLoad(StatementWithValue pointer, int offset, int size)
     {
         if (!FindStatementType(pointer).Is(out PointerType? pointerType))
-        { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
+        {
+            if (pointer is Identifier identifier && GetParameter(identifier.Content, out CompiledParameter? parameter) && parameter.IsRef)
+            {
+                pointerType = new PointerType(parameter.Type);
+            }
+            else
+            {
+                throw new CompilerException($"This isn't a pointer", pointer, CurrentFile);
+            }
+        }
 
         GenerateCodeForStatement(pointer, resolveReference: false);
 

@@ -50,6 +50,9 @@ public abstract class TypeInstance : IEquatable<TypeInstance>, IPositioned
             case BuiltinType:
                 analyzedType = TokenAnalyzedType.BuiltinType;
                 return true;
+            case AliasType:
+                analyzedType = TokenAnalyzedType.Type;
+                return true;
             case FunctionType functionType:
                 return TryGetAnalyzedType(functionType.ReturnType, out analyzedType);
             default:
@@ -135,12 +138,11 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
 
         FunctionReturnType.SetAnalyzedType(functionType.ReturnType);
 
-        if (this.FunctionParameterTypes.Length == functionType.Parameters.Length)
+        if (FunctionParameterTypes.Length != functionType.Parameters.Length) return;
+
+        for (int i = 0; i < functionType.Parameters.Length; i++)
         {
-            for (int i = 0; i < functionType.Parameters.Length; i++)
-            {
-                this.FunctionParameterTypes[i].SetAnalyzedType(functionType.Parameters[i]);
-            }
+            FunctionParameterTypes[i].SetAnalyzedType(functionType.Parameters[i]);
         }
     }
 
@@ -201,8 +203,14 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>,
 
     public override void SetAnalyzedType(GeneralType type)
     {
-        if (TryGetAnalyzedType(type, out TokenAnalyzedType analyzedType))
-        { Identifier.AnalyzedType = analyzedType; }
+        Identifier.AnalyzedType = type switch
+        {
+            StructType => TokenAnalyzedType.Struct,
+            GenericType => TokenAnalyzedType.TypeParameter,
+            BuiltinType => TokenAnalyzedType.BuiltinType,
+            AliasType => TokenAnalyzedType.Type,
+            _ => Identifier.AnalyzedType,
+        };
     }
 
     public static TypeInstanceSimple CreateAnonymous(string name, Uri file)

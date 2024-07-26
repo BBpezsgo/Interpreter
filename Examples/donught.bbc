@@ -28,18 +28,18 @@ struct Buffer
 }
 
 {
-	float A = 20f;
-	float B = 20f;
+    float A = 20f;
+    float B = 20f;
 
-	int screen_width = 50;
+    int screen_width = 50;
     int screen_height = 20;
 
     int yes = 0;
 
-	float R1 = 1f;
-	float R2 = 2f;
+    float R1 = 1f;
+    float R2 = 2f;
 
-	float K2 = 5f;
+    float K2 = 5f;
     float K1 = (screen_width as float) * K2 * 3f / (20f * (R1 + R2));
 
     Buffer<float> zbuffer = new Buffer<float>(screen_width, screen_height);
@@ -70,11 +70,11 @@ void RenderFrame(float A, float B, float R1, float R2, float K1, float K2, Buffe
 {
     float PI = 3.1415f;
 
-	int screen_width = 50;
-	int screen_height = 20;
+    int screen_width = 50;
+    int screen_height = 20;
 
-	float theta_spacing = 0.15f;
-	float phi_spacing = 0.1f;
+    float theta_spacing = 0.15f;
+    float phi_spacing = 0.1f;
 
     Clear();
 

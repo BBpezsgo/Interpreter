@@ -18,7 +18,7 @@ public static class Utils
     /// <exception cref="ArgumentOutOfRangeException"/>
     public static unsafe T Read<T>(this Span<byte> buffer) where T : unmanaged => MemoryMarshal.Read<T>(buffer);
 
-    public static unsafe ReadOnlySpan<byte> ToBytes<T>(this T v) where T : unmanaged => new(Unsafe.AsPointer(ref v), sizeof(T));
+    public static unsafe ReadOnlySpan<byte> ToBytes<T>(this T v) where T : unmanaged => new(&v, sizeof(T));
     public static unsafe ReadOnlySpan<byte> AsBytes<T>(ref this T v) where T : unmanaged => new(Unsafe.AsPointer(ref v), sizeof(T));
     public static unsafe T To<T>(this Span<byte> v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }
     public static unsafe T To<T>(this ReadOnlySpan<byte> v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }

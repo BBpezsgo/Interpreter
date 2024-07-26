@@ -83,7 +83,7 @@ public class Interpreter
     {
         if (ReturnValueConsumer != null)
         {
-            ReturnValueConsumer?.Invoke(key.ToBytes());
+            ReturnValueConsumer?.Invoke(key.AsBytes());
             ReturnValueConsumer = null;
         }
 
@@ -188,7 +188,7 @@ public class Interpreter
         }
         catch (UserException error)
         {
-            if (DebugInformation is not null) error.FeedDebugInfo(DebugInformation);
+            error.DebugInformation = DebugInformation;
 
             OnOutput?.Invoke(this, $"User Exception: {error}", LogType.Error);
 
@@ -197,7 +197,7 @@ public class Interpreter
         }
         catch (RuntimeException error)
         {
-            if (DebugInformation is not null) error.FeedDebugInfo(DebugInformation);
+            error.DebugInformation = DebugInformation;
 
             OnOutput?.Invoke(this, $"Runtime Exception: {error}", LogType.Error);
 

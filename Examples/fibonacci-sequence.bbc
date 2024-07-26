@@ -6,11 +6,11 @@ int last = 0;
 
 while (1)
 {
-	int sum = a + b;
-	a = b;
-	b = sum;
-	
-	if (sum < last) break;
-	last = sum;
-	PrintLine(sum);
+    int sum = a + b;
+    a = b;
+    b = sum;
+    
+    if (sum < last) break;
+    last = sum;
+    PrintLine(sum);
 }

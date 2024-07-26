@@ -309,7 +309,7 @@ public abstract class CodeGenerator
                 Identifier = identifier,
                 Arguments = arguments,
                 ArgumentCount = arguments?.Length,
-                Converter = converter,
+                Converter = converter ?? (static (argument, required) => argument as GeneralType ?? throw new InternalException("No argument converter passed")),
                 RelevantFile = relevantFile,
                 ReturnType = returnType,
                 AddCompilable = addCompilable,
@@ -2133,7 +2133,7 @@ public abstract class CodeGenerator
                 { return literalType; }
 
                 AnalysisCollection?.Warnings.Add(new Warning($"No type defined for string literals, using the default u16[]*", literal, CurrentFile));
-                return OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, Literal.CreateAnonymous(literal.Value.Length, literal), literal.Value.Length)));
+                return OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, Literal.CreateAnonymous(literal.Value.Length + 1, literal), literal.Value.Length + 1)));
             case LiteralType.Char:
                 if (expectedType is not null)
                 {
@@ -2475,7 +2475,8 @@ public abstract class CodeGenerator
     static NewInstance InlineMacro(NewInstance newInstance, Dictionary<string, StatementWithValue> parameters)
         => new(
             keyword: newInstance.Keyword,
-            typeName: newInstance.Type)
+            typeName: newInstance.Type,
+            file: newInstance.File)
         {
             SaveValue = newInstance.SaveValue,
             Semicolon = newInstance.Semicolon,
@@ -2984,6 +2985,7 @@ public abstract class CodeGenerator
         : IPositioned
     {
         public abstract Position Position { get; }
+        public abstract Uri File { get; }
     }
 
     protected abstract class RuntimeStatement<TOriginal> : RuntimeStatement
@@ -3003,6 +3005,7 @@ public abstract class CodeGenerator
     {
         public CompiledFunction Function { get; }
         public ImmutableArray<CompiledValue> Parameters { get; }
+        public override Uri File => Original.File;
 
         public RuntimeFunctionCall(CompiledFunction function, ImmutableArray<CompiledValue> parameters, FunctionCall original) : base(original)
         {

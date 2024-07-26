@@ -451,26 +451,26 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         return prevOffset + offset;
     }
 
-    StatementWithValue? NeedDerefernce(StatementWithValue value) => value switch
+    StatementWithValue? NeedDereference(StatementWithValue value) => value switch
     {
         Identifier => null,
         Field v => NeedDereference(v),
-        IndexCall v => NeedDerefernce(v),
+        IndexCall v => NeedDereference(v),
         _ => throw new NotImplementedException()
     };
-    StatementWithValue? NeedDerefernce(IndexCall indexCall)
+    StatementWithValue? NeedDereference(IndexCall indexCall)
     {
         if (FindStatementType(indexCall.PrevStatement).Is<PointerType>())
         { return indexCall.PrevStatement; }
 
-        return NeedDerefernce(indexCall.PrevStatement);
+        return NeedDereference(indexCall.PrevStatement);
     }
     StatementWithValue? NeedDereference(Field field)
     {
         if (FindStatementType(field.PrevStatement).Is<PointerType>())
         { return field.PrevStatement; }
 
-        return NeedDerefernce(field.PrevStatement);
+        return NeedDereference(field.PrevStatement);
     }
 
 #pragma warning disable IDE0060 // Remove unused parameter

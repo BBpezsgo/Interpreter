@@ -375,7 +375,7 @@ public static class Utils
         return result;
     }
 
-    public static (BrainfuckResult Normal, BrainfuckResult Compact, BrainfuckResult Unioptimized) RunBrainfuck(Uri file, string input)
+    public static (BrainfuckResult Normal, BrainfuckResult Compact, BrainfuckResult Unoptimized) RunBrainfuck(Uri file, string input)
     {
         BrainfuckResult resultNormal;
         BrainfuckResult resultCompact;

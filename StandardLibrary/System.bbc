@@ -93,7 +93,7 @@ export inline int ParseInt(temp string v)
 export inline byte ParseByte(temp string v)
 {
     if (v.IsNullOrEmpty())
-    { return 0; }
+    { return 0 as byte; }
 
     byte result;
     

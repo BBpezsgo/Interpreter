@@ -635,8 +635,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        // TODO: what is this -1
-        int returnValueOffset = -1;
+        int returnValueOffset = -externalFunction.ReturnValueSize;
 
         Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(parameters, compiledFunction);
         for (int i = 0; i < parameterCleanup.Count; i++)
@@ -650,7 +649,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (saveValue)
             {
                 AddComment($" Store return value:");
-                PopTo(new AddressOffset(Register.BasePointer, returnValueOffset), compiledFunction.Type.SizeBytes);
+                PopTo(new AddressOffset(Register.StackPointer, -returnValueOffset), compiledFunction.Type.SizeBytes);
             }
             else
             {
@@ -1255,12 +1254,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     pointerType.To.Is(out ArrayType? arrayType) &&
                     arrayType.Of.SameAs(BasicType.Byte))
                 {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Byte, LiteralStatement.CreateAnonymous(literal.Value.Length, literal), literal.Value.Length)));
+                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Byte, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal), literal.Value.Length + 1)));
                     GenerateCodeForLiteralString(literal.Value, true);
                 }
                 else
                 {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, LiteralStatement.CreateAnonymous(literal.Value.Length, literal), literal.Value.Length)));
+                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal), literal.Value.Length + 1)));
                     GenerateCodeForLiteralString(literal.Value, false);
                 }
                 break;
@@ -1698,11 +1697,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case PointerType pointerType:
             {
                 GenerateAllocator(new AnyCall(
-                    new Identifier(Token.CreateAnonymous("sizeof"), CurrentFile),
+                    new Identifier(Token.CreateAnonymous("sizeof"), newObject.File),
                     [new CompiledTypeStatement(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To)],
                     [],
                     TokenPair.CreateAnonymous(Position.UnknownPosition, "(", ")"),
-                    CurrentFile));
+                    newObject.File));
 
                 // using (RegisterUsage.Auto reg = Registers.GetFree())
                 // {
@@ -2328,8 +2327,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!prevType.Is<StructType>())
         { throw new NotImplementedException(); }
 
-        if (!type.SameAs(valueType))
-        { throw new CompilerException($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, CurrentFile); }
+        AssignTypeCheck(type, valueType, value);
 
         GenerateCodeForStatement(value, type);
 

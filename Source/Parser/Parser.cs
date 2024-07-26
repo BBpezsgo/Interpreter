@@ -912,7 +912,7 @@ public sealed class Parser
             }
             else
             {
-                statementWithValue = new NewInstance(keywordNew, instanceTypeName);
+                statementWithValue = new NewInstance(keywordNew, instanceTypeName, File);
             }
         }
         else if (ExpectVariableAddressGetter(out AddressGetter? memoryAddressGetter))

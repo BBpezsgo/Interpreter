@@ -1,6 +1,8 @@
 #if BRAINFUCK
+const byte StatusFlag  = 0b_1_0000000;
 const byte MaxHeapSize = 0b_0_1111111;
 #else
+const byte StatusFlag  = 0b_1_0000000;
 const byte MaxHeapSize = 0b_0_1111111;
 *0 = MaxHeapSize;
 #endif
@@ -8,9 +10,9 @@ const byte MaxHeapSize = 0b_0_1111111;
 export void GetHeader(byte* ptr, byte* size, byte* allocated)
 {
     byte value = *ptr;
-    if (value >= 0b_1_0000000) // value & 0b_1_0000000
+    if (value >= StatusFlag) // value & StatusFlag
     {
-        *size = value - 0b_1_0000000; // value & ~(0b_1_0000000 as byte)
+        *size = value - StatusFlag; // value & ~(StatusFlag as byte)
         *allocated = 1;
     }
     else
@@ -29,7 +31,7 @@ export void SetHeader(byte* ptr, byte size, byte allocated)
 
     if (allocated)
     {
-        value += 0b_1_0000000; // value |= 0b_1_0000000 as byte
+        value += StatusFlag; // value |= StatusFlag as byte
     }
     
     *ptr = value;

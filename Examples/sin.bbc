@@ -5,36 +5,36 @@ const int Height = 10;
 
 for (int y = 0; y < Height; y++)
 {
-	for (int x; x < Width; x++)
-	{
-		float sinv = Sin(x.ToFloat() / 10f);
-		int sinvint = (sinv * (Height / 2)).ToInt() + (Height / 2);
-		if (y == sinvint)
-		{
-			Print('x');
-		}
-		else
-		{
-			Print(' ');
-		}
-	}
-	PrintLine();
+    for (int x; x < Width; x++)
+    {
+        float sinv = Sin(x.ToFloat() / 10f);
+        int sinvint = (sinv * (Height / 2)).ToInt() + (Height / 2);
+        if (y == sinvint)
+        {
+            Print('x');
+        }
+        else
+        {
+            Print(' ');
+        }
+    }
+    PrintLine();
 }
 
 for (int y = 0; y < Height; y++)
 {
-	for (int x; x < Width; x++)
-	{
-		float sinv = Cos(x.ToFloat() / 10f);
-		int sinvint = (sinv * (Height / 2)).ToInt() + (Height / 2);
-		if (y == sinvint)
-		{
-			Print('x');
-		}
-		else
-		{
-			Print(' ');
-		}
-	}
-	PrintLine();
+    for (int x; x < Width; x++)
+    {
+        float sinv = Cos(x.ToFloat() / 10f);
+        int sinvint = (sinv * (Height / 2)).ToInt() + (Height / 2);
+        if (y == sinvint)
+        {
+            Print('x');
+        }
+        else
+        {
+            Print(' ');
+        }
+    }
+    PrintLine();
 }

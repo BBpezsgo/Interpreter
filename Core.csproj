@@ -43,14 +43,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="ConsoleGUI.cs" />
-    <Compile Remove="Core.cs" />
-    <Compile Remove="SomeTests.cs" />
-    <Compile Remove="Source\ASM\CodeGenerator.cs" />
-    <Compile Remove="Source\CompileIntoFile.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Content Include="icon.ico" />
   </ItemGroup>
 

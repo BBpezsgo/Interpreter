@@ -12,6 +12,7 @@ public static class OpcodeExtensions
         Opcode.PopTo8 => 1,
         Opcode.PopTo16 => 1,
         Opcode.PopTo32 => 1,
+        Opcode.PopTo64 => 1,
         Opcode.Exit => 0,
         Opcode.Call => 1,
         Opcode.Return => 0,

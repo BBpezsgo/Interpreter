@@ -143,6 +143,7 @@ public class DebugInformation : IDuplicatable<DebugInformation>
     public readonly List<ScopeInformation> ScopeInformation;
     public readonly Dictionary<int, List<string>> CodeComments;
     public readonly Dictionary<Uri, ImmutableArray<Tokenizing.Token>> OriginalFiles;
+    public StackOffsets StackOffsets;
 
     public DebugInformation(IEnumerable<KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>> originalFiles)
     {
@@ -151,6 +152,11 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         ScopeInformation = new List<ScopeInformation>();
         CodeComments = new Dictionary<int, List<string>>();
         OriginalFiles = new Dictionary<Uri, ImmutableArray<Tokenizing.Token>>(originalFiles);
+        StackOffsets = new StackOffsets()
+        {
+            SavedBasePointer = 0,
+            SavedCodePointer = 0,
+        };
     }
 
     public IEnumerable<SourceCodeLocation> GetSourceLocations(int instruction)

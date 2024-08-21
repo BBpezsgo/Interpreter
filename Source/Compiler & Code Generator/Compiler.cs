@@ -351,6 +351,19 @@ public sealed class Compiler
         return new CompiledStruct(compiledFields, @struct);
     }
 
+    public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, ExternalFunctionBase externalFunction)
+        where TFunction : FunctionThingDefinition, ICompiledFunction
+        => CheckExternalFunctionDeclaration(runtime, definition, externalFunction, definition.Type, definition.ParameterTypes);
+
+    public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, ExternalFunctionBase externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes)
+    {
+        if (externalFunction.ParametersSize != parameterTypes.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.GetSize(runtime)))
+        { throw new CompilerException($"Wrong size of parameters defined for external function \"{externalFunction.ToReadable()}\"", definition.Identifier, definition.File); }
+
+        if (externalFunction.ReturnValueSize != (returnType.SameAs(BasicType.Void) ? 0 : returnType.GetSize(runtime)))
+        { throw new CompilerException($"Wrong size of return type defined for external function \"{externalFunction.ToReadable()}\"", definition.Identifier, definition.File); }
+    }
+
     CompiledFunction CompileFunction(FunctionDefinition function, CompiledStruct? context)
     {
         if (function.Template is not null)
@@ -391,11 +404,7 @@ public sealed class Compiler
                         break;
                     }
 
-                    if (externalFunction.ParametersSize != parameterTypes.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.SizeBytes))
-                    { throw new CompilerException($"Wrong size of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
-
-                    if (externalFunction.ReturnValueSize != (type.SameAs(BasicType.Void) ? 0 : type.SizeBytes))
-                    { throw new CompilerException($"Wrong size of return type passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
+                    // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
 
                     break;
                 }
@@ -472,11 +481,7 @@ public sealed class Compiler
         {
             if (ExternalFunctions.TryGet(name, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
             {
-                if (externalFunction.ParametersSize != parametersType.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.SizeBytes))
-                { throw new CompilerException($"Wrong size of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
-
-                if (externalFunction.ReturnValueSize != (type.SameAs(BasicType.Void) ? 0 : type.SizeBytes))
-                { throw new CompilerException($"Wrong size of return type passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.File); }
+                // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
             }
             else
             {
@@ -574,7 +579,7 @@ public sealed class Compiler
             PreprocessorVariables,
             TokenizerSettings,
             null,
-            [ "System" ]
+            ["System"]
         );
 
         foreach (CollectedAST file_ in files.Values)

@@ -167,6 +167,11 @@ public static class ArgumentParser
         },
         new()
         {
+            LongName = "asm",
+            Help = "Assembles and links the code with nasm and ld",
+        },
+        new()
+        {
             LongName = "console-gui",
             ShortName = 'c',
             Help = "Launch the debugger screen (only avaliable on Windows)",
@@ -277,6 +282,12 @@ public static class ArgumentParser
                     { throw new ArgumentException($"Run type already defined ({result.RunType}), but you tried to set it to {ProgramRunType.Brainfuck}"); }
 
                     result.RunType = ProgramRunType.Brainfuck;
+                    break;
+                case "asm":
+                    if (result.RunType != ProgramRunType.Normal)
+                    { throw new ArgumentException($"Run type already defined ({result.RunType}), but you tried to set it to {ProgramRunType.ASM}"); }
+
+                    result.RunType = ProgramRunType.ASM;
                     break;
                 case "console-gui":
                     result.ConsoleGUI = true;

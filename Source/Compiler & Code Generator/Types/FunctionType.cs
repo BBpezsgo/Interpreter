@@ -12,9 +12,6 @@ public class FunctionType : GeneralType,
     public ImmutableArray<GeneralType> Parameters { get; }
 
     public bool ReturnSomething => !ReturnType.SameAs(BasicType.Void);
-    public override int Size => 1;
-    public override int SizeBytes => BytecodeProcessor.PointerSize;
-    public override BitWidth BitWidth => BytecodeProcessor.PointerBitWidth;
 
     public FunctionType(CompiledFunction function)
     {
@@ -33,6 +30,12 @@ public class FunctionType : GeneralType,
         ReturnType = returnType;
         Parameters = parameters.ToImmutableArray();
     }
+
+    public override int GetSize(IRuntimeInfoProvider runtime)
+        => runtime.PointerSize;
+
+    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
+        => (BitWidth)runtime.PointerSize;
 
     public override bool Equals(object? other) => Equals(other as FunctionType);
     public override bool Equals(GeneralType? other) => Equals(other as FunctionType);

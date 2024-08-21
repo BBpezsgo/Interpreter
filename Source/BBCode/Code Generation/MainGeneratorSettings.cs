@@ -11,6 +11,7 @@ public struct MainGeneratorSettings
     public bool ExternalFunctionsCache;
     public bool CheckNullPointers;
     public CompileLevel CompileLevel;
+    public int PointerSize;
 
     public MainGeneratorSettings(MainGeneratorSettings other)
     {
@@ -21,6 +22,7 @@ public struct MainGeneratorSettings
         ExternalFunctionsCache = other.ExternalFunctionsCache;
         CheckNullPointers = other.CheckNullPointers;
         CompileLevel = other.CompileLevel;
+        PointerSize = other.PointerSize;
     }
 
     public static MainGeneratorSettings Default => new()
@@ -32,5 +34,6 @@ public struct MainGeneratorSettings
         ExternalFunctionsCache = false,
         CheckNullPointers = true,
         CompileLevel = CompileLevel.Minimal,
+        PointerSize = 4,
     };
 }

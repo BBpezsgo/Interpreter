@@ -12,9 +12,6 @@ public class AliasType : GeneralType,
 
     public override GeneralType FinalValue => Value is AliasType aliasType ? aliasType.FinalValue : Value;
     public string Identifier => Definition.Identifier.Content;
-    public override int Size => Value.Size;
-    public override int SizeBytes => Value.SizeBytes;
-    public override BitWidth BitWidth => Value.BitWidth;
 
     public AliasType(AliasType other)
     {
@@ -27,6 +24,9 @@ public class AliasType : GeneralType,
         Value = value;
         Definition = definition;
     }
+
+    public override int GetSize(IRuntimeInfoProvider runtime) => Value.GetSize(runtime);
+    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime) => Value.GetBitWidth(runtime);
 
     public override bool Equals(object? other) => Equals(other as AliasType);
     public override bool Equals(GeneralType? other) => Equals(other as AliasType);

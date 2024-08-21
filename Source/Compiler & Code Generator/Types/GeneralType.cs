@@ -10,13 +10,11 @@ public abstract class GeneralType :
     IEquatable<BasicType>,
     IEquatable<RuntimeType>
 {
-    public abstract int Size { get; }
-    public abstract int SizeBytes { get; }
-    /// <exception cref="InvalidOperationException"/>
-    public abstract BitWidth BitWidth { get; }
-
     public virtual GeneralType FinalValue => this;
     public bool CanBeBuiltin => FinalValue is BuiltinType or PointerType;
+
+    public abstract int GetSize(IRuntimeInfoProvider runtime);
+    public abstract BitWidth GetBitWidth(IRuntimeInfoProvider runtime);
 
     public static GeneralType From(GeneralType other) => other switch
     {

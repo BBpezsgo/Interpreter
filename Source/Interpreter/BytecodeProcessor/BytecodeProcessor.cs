@@ -5,8 +5,6 @@ namespace LanguageCore.Runtime;
 public partial class BytecodeProcessor
 {
     public const int StackDirection = -1;
-    public const int PointerSize = 4;
-    public const BitWidth PointerBitWidth = BitWidth._32;
 
     Instruction CurrentInstruction => Code[Registers.CodePointer];
     public bool IsDone => Registers.CodePointer >= Code.Length;

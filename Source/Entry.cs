@@ -506,6 +506,67 @@ public static class Entry
                 }
                 break;
             }
+            case ProgramRunType.ASM:
+            {
+                Output.LogDebug($"Executing \"{arguments.File}\" ...");
+
+                Dictionary<int, ExternalFunctionBase> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
+
+                BBLangGeneratorResult generatedCode;
+                AnalysisCollection analysisCollection = new();
+
+                if (arguments.ThrowErrors)
+                {
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
+                    generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
+                    analysisCollection.Throw();
+                    analysisCollection.Print();
+                }
+                else
+                {
+                    try
+                    {
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
+                        generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
+                        analysisCollection.Throw();
+                        analysisCollection.Print();
+                    }
+                    catch (LanguageException ex)
+                    {
+                        analysisCollection.Print();
+                        Output.LogError(ex);
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        analysisCollection.Print();
+                        Output.LogError(ex);
+                        return;
+                    }
+                }
+
+                string asm = ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan());
+                string outputFile = arguments.File.LocalPath + "_executable";
+
+                Output.LogDebug("Assembling and linking ...");
+
+                ASM.Assembler.Assemble(asm, outputFile);
+
+                Output.LogInfo($"Output: \"{outputFile}\"");
+
+                // if (File.Exists(outputFile))
+                // {
+                //     Process? process = Process.Start(new ProcessStartInfo(outputFile)) ?? throw new InternalException($"Failed to start process \"{outputFile}\"");
+                //     process.WaitForExit();
+                //     Console.WriteLine();
+                //     Console.WriteLine($"Exit code: {process.ExitCode}");
+                // 
+                //     if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out ProcessRuntimeException? runtimeException))
+                //     { throw runtimeException; }
+                // }
+
+                break;
+            }
             /*
             case ProgramRunType.ASM:
             {

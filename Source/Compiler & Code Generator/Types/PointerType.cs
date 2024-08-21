@@ -9,10 +9,6 @@ public class PointerType : GeneralType,
 {
     public GeneralType To { get; }
 
-    public override int Size => 1;
-    public override int SizeBytes => BytecodeProcessor.PointerSize;
-    public override BitWidth BitWidth => BytecodeProcessor.PointerBitWidth;
-
     public PointerType(PointerType other)
     {
         To = other.To;
@@ -22,6 +18,9 @@ public class PointerType : GeneralType,
     {
         To = to;
     }
+
+    public override int GetSize(IRuntimeInfoProvider runtime) => runtime.PointerSize;
+    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime) => (BitWidth)runtime.PointerSize;
 
     public override bool Equals(object? other) => Equals(other as PointerType);
     public override bool Equals(GeneralType? other) => Equals(other as PointerType);

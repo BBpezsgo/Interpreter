@@ -6,7 +6,6 @@ obj
 
 /Tests/Program.cs
 /Diagsessions
-/TestFiles/*.exe
 /TestFiles/Old
 /DevelopmentEntry.cs
 /TestFiles/run.bat

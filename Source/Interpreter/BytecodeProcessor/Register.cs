@@ -25,4 +25,9 @@ public enum Register
     DX = 0b_11_01_100,
     DH = 0b_11_10_100,
     DL = 0b_11_11_100,
+
+    RAX,
+    RBX,
+    RCX,
+    RDX,
 }

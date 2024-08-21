@@ -60,6 +60,7 @@ public class TextSectionBuilder : SectionBuilder
         OpCode.BitsShiftRight => "shr",
         OpCode.BitsShiftLeft => "shl",
 
+        OpCode.SystemCall => "syscall",
         OpCode.Call => "call",
         OpCode.Return => "ret",
 
@@ -89,6 +90,7 @@ public class TextSectionBuilder : SectionBuilder
         Runtime.Opcode.PopTo8 => "pop",
         Runtime.Opcode.PopTo16 => "pop",
         Runtime.Opcode.PopTo32 => "pop",
+        Runtime.Opcode.PopTo64 => "pop",
 
         Runtime.Opcode.MathAdd => "add",
         Runtime.Opcode.MathSub => "sub",
@@ -128,7 +130,7 @@ public class TextSectionBuilder : SectionBuilder
         AppendText(EOL);
     }
 
-    void AppendInstructionNoEOL(OpCode keyword, params string[] operands)
+    public void AppendInstructionNoEOL(OpCode keyword, params string[] operands)
     {
         AppendInstructionNoEOL(keyword);
         if (operands.Length > 0)
@@ -144,7 +146,7 @@ public class TextSectionBuilder : SectionBuilder
         }
     }
 
-    void AppendInstruction(OpCode keyword, params string[] operands)
+    public void AppendInstruction(OpCode keyword, params string[] operands)
     {
         AppendInstructionNoEOL(keyword, operands);
         AppendText(EOL);
@@ -164,27 +166,6 @@ public class TextSectionBuilder : SectionBuilder
     {
         AppendText(' ', Indent);
         AppendText(instruction.ToString());
-        AppendText(EOL);
-    }
-
-    public void AppendInstruction(Runtime.Instruction instruction)
-    {
-        AppendText(' ', Indent);
-
-        int paramCount = instruction.Opcode.ParameterCount();
-
-        AppendText(StringifyInstruction(instruction.Opcode));
-        if (paramCount <= 1)
-        {
-            Builder.Append(' ');
-            AppendText(instruction.Operand1.ToString());
-        }
-        if (paramCount <= 2)
-        {
-            Builder.Append(' ');
-            AppendText(instruction.Operand2.ToString());
-        }
-
         AppendText(EOL);
     }
 

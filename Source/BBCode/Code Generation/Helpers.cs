@@ -18,20 +18,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int returnToValueInstruction = GeneratedCode.Count;
         AddInstruction(Opcode.Push, 0);
 
-        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.SizeBytes);
+        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this));
         AddInstruction(Opcode.Push, Register.BasePointer);
 
         GenerateCodeForStatement(address);
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Get(addressType.BitWidth));
-            AddInstruction(Opcode.MathSub, reg.Get(addressType.BitWidth), GeneratedCode.Count + 2);
+            PopTo(reg.Get(addressType.GetBitWidth(this)));
+            AddInstruction(Opcode.MathSub, reg.Get(addressType.GetBitWidth(this)), GeneratedCode.Count + 2);
 
             AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
             int jumpInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.Jump, reg.Get(addressType.BitWidth));
+            AddInstruction(Opcode.Jump, reg.Get(addressType.GetBitWidth(this)));
 
             GeneratedCode[returnToValueInstruction].Operand1 = GeneratedCode.Count;
             return jumpInstruction;
@@ -43,7 +43,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int returnToValueInstruction = GeneratedCode.Count;
         AddInstruction(Opcode.Push, 0);
 
-        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.SizeBytes);
+        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this));
         AddInstruction(Opcode.Push, Register.BasePointer);
 
         AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
@@ -59,7 +59,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void Return()
     {
         PopTo(Register.BasePointer);
-        Pop(AbsGlobalAddressType.SizeBytes); // Pop AbsoluteGlobalOffset
+        Pop(AbsGlobalAddressType.GetSize(this)); // Pop AbsoluteGlobalOffset
         AddInstruction(Opcode.Return);
     }
 
@@ -119,7 +119,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!prevType.Is(out StructType? structType))
         { throw new NotImplementedException(); }
 
-        if (!structType.GetField(field.Identifier.Content, true, out _, out int fieldOffset))
+        if (!structType.GetField(field.Identifier.Content, this, out _, out int fieldOffset))
         { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
 
         int prevOffset = GetDataOffset(field.PrevStatement, until);
@@ -138,11 +138,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
 
         int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
-        int offset = (int)index * arrayType.Of.SizeBytes;
+        int offset = (int)index * arrayType.Of.GetSize(this);
         return prevOffset + offset;
     }
 
-    static AddressOffset GetGlobalVariableAddress(CompiledVariable variable)
+    AddressOffset GetGlobalVariableAddress(CompiledVariable variable)
         => new(
             new AddressRuntimePointer(AbsoluteGlobalAddress),
             0
@@ -297,6 +297,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BitWidth._8 => Opcode.PopTo8,
         BitWidth._16 => Opcode.PopTo16,
         BitWidth._32 => Opcode.PopTo32,
+        BitWidth._64 => Opcode.PopTo64,
         _ => throw new UnreachableException(),
     }, destination);
 
@@ -305,6 +306,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BitWidth._8 => Opcode.PopTo8,
         BitWidth._16 => Opcode.PopTo16,
         BitWidth._32 => Opcode.PopTo32,
+        BitWidth._64 => Opcode.PopTo64,
         _ => throw new UnreachableException(),
     }, destination);
 
@@ -314,12 +316,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             case AddressRuntimePointer addressPointer:
             {
-                PushFrom(addressPointer.PointerAddress, BytecodeProcessor.PointerSize);
+                PushFrom(addressPointer.PointerAddress, PointerSize);
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    PopTo(reg.Get(BytecodeProcessor.PointerBitWidth));
-                    AddInstruction(Opcode.MathAdd, reg.Get(BytecodeProcessor.PointerBitWidth), address.Offset);
-                    PopTo(new AddressRegisterPointer(reg.Get(BytecodeProcessor.PointerBitWidth)), size);
+                    PopTo(reg.Get(PointerBitWidth));
+                    AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
+                    PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
                 }
 
                 break;
@@ -329,9 +331,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth), registerPointer.Register);
-                    AddInstruction(Opcode.MathAdd, reg.Get(BytecodeProcessor.PointerBitWidth), address.Offset);
-                    PopTo(new AddressRegisterPointer(reg.Get(BytecodeProcessor.PointerBitWidth)), size);
+                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), registerPointer.Register);
+                    AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
+                    PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
                 }
 
                 break;
@@ -344,11 +346,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void PopTo(AddressRuntimePointer address, int size)
     {
-        PushFrom(address.PointerAddress, BytecodeProcessor.PointerSize);
+        PushFrom(address.PointerAddress, PointerSize);
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Get(BytecodeProcessor.PointerBitWidth));
-            PopTo(new AddressRegisterPointer(reg.Get(BytecodeProcessor.PointerBitWidth)), size);
+            PopTo(reg.Get(PointerBitWidth));
+            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
         }
     }
 
@@ -408,12 +410,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             case AddressRuntimePointer addressPointer:
             {
-                PushFrom(addressPointer.PointerAddress, BytecodeProcessor.PointerSize);
+                PushFrom(addressPointer.PointerAddress, PointerSize);
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    PopTo(reg.Get(BytecodeProcessor.PointerBitWidth));
-                    AddInstruction(Opcode.MathAdd, reg.Get(BytecodeProcessor.PointerBitWidth), address.Offset);
-                    PushFrom(new AddressRegisterPointer(reg.Get(BytecodeProcessor.PointerBitWidth)), size);
+                    PopTo(reg.Get(PointerBitWidth));
+                    AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
+                    PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
                 }
 
                 break;
@@ -423,7 +425,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth), registerPointer.Register);
+                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), registerPointer.Register);
 
                     int currentOffset = size - 1;
 
@@ -431,23 +433,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     {
                         if (currentOffset >= 4 - 1)
                         {
-                            AddInstruction(Opcode.Push, reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(currentOffset + address.Offset - 3, BitWidth._32));
+                            AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset - 3, BitWidth._32));
                             currentOffset -= 4;
                         }
                         else if (currentOffset >= 2 - 1)
                         {
-                            AddInstruction(Opcode.Push, reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(currentOffset + address.Offset - 1, BitWidth._16));
+                            AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset - 1, BitWidth._16));
                             currentOffset -= 2;
                         }
                         else
                         {
-                            AddInstruction(Opcode.Push, reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(currentOffset + address.Offset, BitWidth._8));
+                            AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset, BitWidth._8));
                             currentOffset -= 1;
                         }
                     }
 
-                    // AddInstruction(Opcode.MathAdd, reg.Get(BytecodeProcessor.PointerBitWidth), address.Offset);
-                    // PushFrom(new AddressRegisterPointer(reg.Get(BytecodeProcessor.PointerBitWidth)), size);
+                    // AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
+                    // PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
                 }
 
                 break;
@@ -460,11 +462,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void PushFrom(AddressRuntimePointer address, int size)
     {
-        PushFrom(address.PointerAddress, BytecodeProcessor.PointerSize);
+        PushFrom(address.PointerAddress, PointerSize);
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Get(BytecodeProcessor.PointerBitWidth));
-            PushFrom(new AddressRegisterPointer(reg.Get(BytecodeProcessor.PointerBitWidth)), size);
+            PopTo(reg.Get(PointerBitWidth));
+            PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
         }
     }
 
@@ -529,12 +531,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment($"Check for pointer zero {{");
         if (preservePointer)
-        { PushFrom(StackTop, BytecodeProcessor.PointerSize); }
+        { PushFrom(StackTop, PointerSize); }
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Get(BytecodeProcessor.PointerBitWidth));
-            AddInstruction(Opcode.Compare, reg.Get(BytecodeProcessor.PointerBitWidth), 0);
+            PopTo(reg.Get(PointerBitWidth));
+            AddInstruction(Opcode.Compare, reg.Get(PointerBitWidth), 0);
             AddInstruction(Opcode.JumpIfNotEqual, 0);
         }
 
@@ -543,8 +545,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForLiteralString("null pointer", false);
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Get(BytecodeProcessor.PointerBitWidth));
-            AddInstruction(Opcode.Throw, reg.Get(BytecodeProcessor.PointerBitWidth));
+            PopTo(reg.Get(PointerBitWidth));
+            AddInstruction(Opcode.Throw, reg.Get(PointerBitWidth));
         }
         GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction;
 
@@ -571,9 +573,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Get(BytecodeProcessor.PointerBitWidth));
+            PopTo(reg.Get(PointerBitWidth));
             for (int i = size - 1; i >= 0; i--)
-            { AddInstruction(Opcode.Push, reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(i + offset, BitWidth._8)); }
+            { AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(i + offset, BitWidth._8)); }
         }
     }
 
@@ -588,9 +590,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Get(BytecodeProcessor.PointerBitWidth));
+            PopTo(reg.Get(PointerBitWidth));
             for (int i = 0; i < size; i++)
-            { PopTo(reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(i + offset, BitWidth._8), BitWidth._8); }
+            { PopTo(reg.Get(PointerBitWidth).ToPtr(i + offset, BitWidth._8), BitWidth._8); }
         }
     }
 
@@ -607,33 +609,33 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public static readonly PointerType CodePointerType = new(BuiltinType.Integer);
     public static readonly PointerType BasePointerType = new(BuiltinType.Integer);
 
-    public const int AbsGlobalAddressSize = BytecodeProcessor.PointerSize;
-    public const int StackPointerSize = BytecodeProcessor.PointerSize;
-    public const int CodePointerSize = BytecodeProcessor.PointerSize;
-    public const int BasePointerSize = BytecodeProcessor.PointerSize;
+    public int AbsGlobalAddressSize => PointerSize;
+    public int StackPointerSize => PointerSize;
+    public int CodePointerSize => PointerSize;
+    public int BasePointerSize => PointerSize;
 
     /// <summary>
     /// <c>Saved BP</c> + <c>Abs global address</c> + <c>Saved CP</c>
     /// </summary>
-    public const int StackFrameTags = BasePointerSize + AbsGlobalAddressSize + CodePointerSize;
+    public int StackFrameTags => BasePointerSize + AbsGlobalAddressSize + CodePointerSize;
 
-    public static Address AbsoluteGlobalAddress => new AddressOffset(
+    public Address AbsoluteGlobalAddress => new AddressOffset(
         new AddressRegisterPointer(Register.BasePointer),
         AbsoluteGlobalOffset);
-    public static Address ReturnFlagAddress => new AddressOffset(
+    public Address ReturnFlagAddress => new AddressOffset(
         new AddressRegisterPointer(Register.BasePointer),
         ReturnFlagOffset);
-    public static Address StackTop => new AddressOffset(
+    public Address StackTop => new AddressOffset(
         new AddressRegisterPointer(Register.StackPointer),
         0);
-    public static Address ExitCodeAddress => new AddressOffset(
+    public Address ExitCodeAddress => new AddressOffset(
         new AddressRuntimePointer(AbsoluteGlobalAddress),
         0);
 
-    public static readonly int ReturnFlagOffset = ReturnFlagType.SizeBytes * BytecodeProcessor.StackDirection;
-    public const int SavedBasePointerOffset = 0 * BytecodeProcessor.StackDirection;
-    public static readonly int AbsoluteGlobalOffset = ExitCodeType.SizeBytes * -BytecodeProcessor.StackDirection;
-    public const int SavedCodePointerOffset = (AbsGlobalAddressSize + CodePointerSize) * -BytecodeProcessor.StackDirection;
+    public int ReturnFlagOffset => ReturnFlagType.GetSize(this) * BytecodeProcessor.StackDirection;
+    public int SavedBasePointerOffset => 0 * BytecodeProcessor.StackDirection;
+    public int AbsoluteGlobalOffset => ExitCodeType.GetSize(this) * -BytecodeProcessor.StackDirection;
+    public int SavedCodePointerOffset => (AbsGlobalAddressSize + CodePointerSize) * -BytecodeProcessor.StackDirection;
 
     public const int InvalidFunctionAddress = int.MinValue;
 
@@ -645,7 +647,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             foreach (CompiledParameter parameter in CompiledParameters)
             {
-                sum += parameter.IsRef ? BytecodeProcessor.PointerSize : parameter.Type.SizeBytes;
+                sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this);
             }
 
             return sum;
@@ -659,7 +661,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         foreach (CompiledParameter parameter in CompiledParameters)
         {
             if (parameter.Index <= beforeThis) continue;
-            sum += parameter.IsRef ? BytecodeProcessor.PointerSize : parameter.Type.SizeBytes;
+            sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this);
         }
 
         return sum;

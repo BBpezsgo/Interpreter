@@ -56,16 +56,14 @@ public readonly struct TestFile
         expected.Assert(resultUnoptimized, memoryShouldBeEmpty, expectedMemoryPointer);
     }
 
-    /*
     /// <exception cref="AssertFailedException"/>
     public void DoAssembly()
     {
-        AssemblyResult result = Utils.RunAssembly(new FileInfo(SourceFile), GetInput());
+        AssemblyResult result = Utils.RunAssembly(LanguageCore.Utils.ToFileUri(SourceFile), GetInput());
         Console.Write($"ExitCode: {result.ExitCode}");
         ExpectedResult expected = GetExpectedResult();
         expected.Assert(result);
     }
-    */
 }
 
 public readonly struct ExpectedResult
@@ -437,57 +435,38 @@ public static class Utils
         return (resultNormal, resultCompact, resultUnoptimized);
     }
 
-    /*
-    public static AssemblyResult RunAssembly(FileInfo file, string input)
+    public static AssemblyResult RunAssembly(Uri file, string input)
     {
         AnalysisCollection analysisCollection = new();
 
         CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, Enumerable.Empty<string>(), null, analysisCollection, null, null, AdditionalImports);
-
-        LanguageCore.ASM.Generator.AsmGeneratorResult code = LanguageCore.ASM.Generator.CodeGeneratorForAsm.Generate(compiled, new LanguageCore.ASM.Generator.AsmGeneratorSettings()
-        {
-            Is16Bits = true,
-        }, null, analysisCollection);
-
+        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
         analysisCollection.Throw();
 
-        string? fileDirectoryPath = file.DirectoryName;
-        string fileNameNoExt = Path.GetFileNameWithoutExtension(file.Name);
+        string asm = LanguageCore.ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan());
 
-        fileDirectoryPath ??= ".\\";
+        string outputFile = file.LocalPath + "_executable";
 
-        string outputFile = Path.Combine(fileDirectoryPath, fileNameNoExt);
+        LanguageCore.ASM.Assembler.Assemble(asm, outputFile);
 
-        LanguageCore.ASM.Assembler.Assemble(code.AssemblyCode, outputFile);
+        if (!File.Exists(outputFile)) throw new FileNotFoundException($"File not found", outputFile);
 
-        if (!File.Exists(outputFile + ".exe"))
-        { Assert.Fail(); }
-
-        Process? process = Process.Start(new ProcessStartInfo(outputFile + ".exe")
+        Process? process = Process.Start(new ProcessStartInfo(outputFile)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            RedirectStandardInput = true,
         });
 
         if (process == null)
-        { Assert.Fail(); }
-
-        process.StandardInput.Write(input);
+        { Assert.Fail($"Failed to start process \"{outputFile}\""); }
 
         process.WaitForExit();
-
-        process.StandardInput.Close();
-
-        if (File.Exists(outputFile + ".exe"))
-        { File.Delete(outputFile + ".exe"); }
 
         if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out ProcessRuntimeException? runtimeException))
         { throw runtimeException; }
 
         return new AssemblyResult(process);
     }
-    */
 
     static string? GetLatestResultFile(string testResultsDirectory)
     {

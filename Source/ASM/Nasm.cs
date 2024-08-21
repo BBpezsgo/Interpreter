@@ -58,18 +58,38 @@ public class NasmException : Exception
         if (File == null) return null;
         string text = System.IO.File.ReadAllText(File);
 
-        string[] lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+        string[] lines = text.Split('\n');
 
-        if (LineNumber > lines.Length)
+        if (LineNumber - 1 > lines.Length)
         { return null; }
 
-        string line = lines[LineNumber];
+        string line = lines[LineNumber - 1];
 
         StringBuilder result = new();
 
         result.Append(line.Replace('\t', ' '));
         result.AppendLine();
-        result.Append('^', Math.Max(1, line.Length));
+
+        int leadingWhitespace = 0;
+        for (int i = 0; i < line.Length; i++)
+        {
+            if (char.IsWhiteSpace(line[i]))
+            { leadingWhitespace++; }
+            else
+            { break; }
+        }
+
+        int trailingWhitespace = 0;
+        for (int i = line.Length - 1; i >= 0; i--)
+        {
+            if (char.IsWhiteSpace(line[i]))
+            { trailingWhitespace++; }
+            else
+            { break; }
+        }
+
+        result.Append(' ', leadingWhitespace);
+        result.Append('^', Math.Max(1, line.Length - leadingWhitespace - trailingWhitespace));
         return result.ToString();
     }
 }
@@ -90,14 +110,13 @@ public static class Nasm
         if (File.Exists(outputFile))
         { File.Delete(outputFile); }
 
-        if (!Utils.GetFullPath("nasm.exe", out string? nasm))
-        { throw new FileNotFoundException($"NASM not found", "nasm.exe"); }
-
-        using Process? process = Process.Start(new ProcessStartInfo(nasm, $"-gcv8 -f win32 {inputFile} -o {outputFile}")
+        // -gcv8 -f win32
+        
+        using Process? process = Process.Start(new ProcessStartInfo("nasm", $"-f elf64 -g -F dwarf {inputFile} -o {outputFile}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-        }) ?? throw new ProcessNotStartedException(nasm);
+        }) ?? throw new ProcessNotStartedException("nasm");
         process.WaitForExit();
 
         if (process.ExitCode == 0)
@@ -117,7 +136,7 @@ public static class Nasm
             else throw new NotImplementedException();
         }
 
-        throw new ProcessException(nasm, process.ExitCode, stdOutput, stdError);
+        throw new ProcessException("nasm", process.ExitCode, stdOutput, stdError);
     }
 
     /// <exception cref="ProcessNotStartedException"/>
@@ -133,14 +152,11 @@ public static class Nasm
         if (File.Exists(outputFile))
         { File.Delete(outputFile); }
 
-        if (!Utils.GetFullPath("nasm.exe", out string? nasm))
-        { throw new FileNotFoundException($"NASM not found", "nasm.exe"); }
-
-        using Process? process = Process.Start(new ProcessStartInfo(nasm, $"{inputFile} -f bin -o {outputFile}")
+        using Process? process = Process.Start(new ProcessStartInfo("nasm", $"{inputFile} -f bin -o {outputFile}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-        }) ?? throw new ProcessNotStartedException(nasm);
+        }) ?? throw new ProcessNotStartedException("nasm");
         process.WaitForExit();
 
         if (process.ExitCode == 0)
@@ -160,6 +176,6 @@ public static class Nasm
             else throw new NotImplementedException();
         }
 
-        throw new ProcessException(nasm, process.ExitCode, stdOutput, stdError);
+        throw new ProcessException("nasm", process.ExitCode, stdOutput, stdError);
     }
 }

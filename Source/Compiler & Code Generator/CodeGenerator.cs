@@ -6,7 +6,7 @@ using Runtime;
 using Tokenizing;
 using LiteralStatement = Parser.Statement.Literal;
 
-public abstract class CodeGenerator
+public abstract class CodeGenerator : IRuntimeInfoProvider
 {
     public readonly struct CompliableTemplate<T> where T : ITemplateable<T>
     {
@@ -73,7 +73,12 @@ public abstract class CodeGenerator
     protected readonly PrintCallback? Print;
     protected readonly AnalysisCollection? AnalysisCollection;
 
-    public static readonly BuiltinType BooleanType = BuiltinType.Byte;
+    public abstract int PointerSize { get; }
+    public BitWidth PointerBitWidth => (BitWidth)PointerSize;
+
+    public abstract BuiltinType BooleanType { get; }
+    public abstract BuiltinType SizeofStatementType { get; }
+    public abstract BuiltinType ArrayLengthType { get; }
 
     #endregion
 
@@ -1601,7 +1606,7 @@ public abstract class CodeGenerator
         return false;
     }
 
-    protected void AssignTypeCheck(GeneralType destination, GeneralType valueType, StatementWithValue value)
+    protected void AssignTypeCheck(GeneralType destination, GeneralType valueType, IPositioned value)
     {
         if (destination.SameAs(valueType))
         { return; }
@@ -1609,20 +1614,19 @@ public abstract class CodeGenerator
         if (destination.SameAs(BasicType.Any))
         { return; }
 
-        if (destination.Size != valueType.Size)
-        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.Size}) value to {destination} (size of {destination.Size})", value, CurrentFile); }
-
-        if (destination.SizeBytes != valueType.SizeBytes)
-        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.SizeBytes} bytes) value to {destination} (size of {destination.SizeBytes} bytes)", value, CurrentFile); }
+        if (destination.GetSize(this) != valueType.GetSize(this))
+        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.GetSize(this)} bytes) value to {destination} (size of {destination.GetSize(this)} bytes)", value, CurrentFile); }
 
         if (destination.Is<PointerType>() &&
             valueType.SameAs(BasicType.Integer))
         { return; }
 
-        if (destination.Is(out BuiltinType? destBuiltinType) &&
-            destBuiltinType.Type == BasicType.Byte &&
-            TryCompute(value, out CompiledValue yeah) &&
-            yeah.Type == RuntimeType.Integer)
+        if (destination.Is<PointerType>() &&
+            valueType.SameAs(BasicType.Char))
+        { return; }
+
+        if (destination.Is<PointerType>() &&
+            valueType.SameAs(BasicType.Byte))
         { return; }
 
         if (value is LiteralStatement literal &&
@@ -1686,34 +1690,31 @@ public abstract class CodeGenerator
 
     protected void AssignTypeCheck(GeneralType destination, CompiledValue value, IPositioned valuePosition)
     {
-        BuiltinType valueType = new(value.Type);
-
-        if (destination.SameAs(valueType))
-        { return; }
-
-        if (destination.Size != valueType.Size)
-        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.Size}) value to {destination} (size of {destination.Size})", valuePosition, CurrentFile); }
-
-        if (destination.SizeBytes != valueType.SizeBytes)
-        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.SizeBytes} bytes) value to {destination} (size of {destination.SizeBytes} bytes)", valuePosition, CurrentFile); }
-
-        if (destination.Is<PointerType>())
-        { return; }
-
-        if (destination.SameAs(BasicType.Byte) &&
-            value.Type == RuntimeType.Integer)
-        { return; }
-
-        if (destination.Is<BuiltinType>() &&
-            valueType.Is<BuiltinType>())
+        if (destination.Is<PointerType>() ||
+            destination.Is<BuiltinType>())
         {
-            BitWidth destinationBitWidth = destination.BitWidth;
-            BitWidth valueBitWidth = valueType.BitWidth;
-            if (destinationBitWidth >= valueBitWidth)
-            { return; }
+            switch (destination.GetBitWidth(this))
+            {
+                case BitWidth._8:
+                    if (value >= byte.MinValue && value <= byte.MaxValue)
+                    { return; }
+                    break;
+                case BitWidth._16:
+                    if (value >= char.MinValue && value <= char.MaxValue)
+                    { return; }
+                    break;
+                case BitWidth._32:
+                    if (value >= int.MinValue && value <= int.MaxValue)
+                    { return; }
+                    break;
+                case BitWidth._64:
+                    if (value >= long.MinValue && value <= long.MaxValue)
+                    { return; }
+                    break;
+            }
         }
 
-        throw new CompilerException($"Can not set a {valueType} type value to the {destination} type", valuePosition, CurrentFile);
+        AssignTypeCheck(destination, new BuiltinType(value.Type), valuePosition);
     }
 
     protected static BitWidth MaxBitWidth(BitWidth a, BitWidth b) => a > b ? a : b;
@@ -1942,11 +1943,11 @@ public abstract class CodeGenerator
     {
         if (functionCall.Identifier.Content == "sizeof")
         {
-            if (GetLiteralType(LiteralType.Integer, out var integerType))
+            if (GetLiteralType(LiteralType.Integer, out GeneralType? integerType))
             { return integerType; }
 
             AnalysisCollection?.Warnings.Add(new Warning($"No type defined for integer literals, using the default i32", functionCall, CurrentFile));
-            return BuiltinType.Integer;
+            return SizeofStatementType;
         }
 
         if (!GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundError))
@@ -1980,8 +1981,8 @@ public abstract class CodeGenerator
                     leftBType.Type == BasicType.Float ||
                     rightBType.Type == BasicType.Float;
 
-                BitWidth leftBitWidth = leftType.BitWidth;
-                BitWidth rightBitWidth = rightType.BitWidth;
+                BitWidth leftBitWidth = leftType.GetBitWidth(this);
+                BitWidth rightBitWidth = rightType.GetBitWidth(this);
                 BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
 
                 return @operator.Operator.Content switch
@@ -2245,7 +2246,7 @@ public abstract class CodeGenerator
         if (prevStatementType.Is<ArrayType>() && field.Identifier.Equals("Length"))
         {
             field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
-            return OnGotStatementType(field, BuiltinType.Integer);
+            return OnGotStatementType(field, ArrayLengthType);
         }
 
         if (prevStatementType.Is(out PointerType? pointerType))
@@ -3304,12 +3305,7 @@ public abstract class CodeGenerator
             StatementWithValue param0 = keywordCall.Arguments[0];
             GeneralType param0Type = FindStatementType(param0);
 
-            value = this switch
-            {
-                Brainfuck.Generator.CodeGeneratorForBrainfuck => new CompiledValue(param0Type.Size),
-                BBLang.Generator.CodeGeneratorForMain => new CompiledValue(param0Type.SizeBytes),
-                _ => throw new NotImplementedException(),
-            };
+            value = new CompiledValue(param0Type.GetSize(this));
             return true;
         }
 

@@ -5,14 +5,11 @@ namespace LanguageCore.ASM;
 [ExcludeFromCodeCoverage]
 public static class Assembler
 {
-    public static void Assemble(string asmSourceCode, string outputFile, bool saveAsmFile = false)
+    public static void Assemble(string asmSourceCode, string outputFile)
     {
-        string outputFilename = Path.GetFileName(outputFile);
-
-        string fileAsmTemp = outputFilename + ".asm";
-        string fileObjTemp = outputFilename + ".obj";
-        string fileExeTemp = outputFilename + ".exe";
-        string fileExeFinal = outputFile + ".exe";
+        string fileAsmTemp = outputFile + ".asm";
+        string fileObjTemp = outputFile + ".obj";
+        string fileExeFinal = outputFile;
 
         if (File.Exists(fileAsmTemp))
         { Output.LogWarning($"File \"{fileAsmTemp}\" will be overridden"); }
@@ -20,35 +17,11 @@ public static class Assembler
         if (File.Exists(fileObjTemp))
         { Output.LogWarning($"File \"{fileObjTemp}\" will be overridden"); }
 
-        if (File.Exists(fileExeTemp))
-        { Output.LogWarning($"File \"{fileExeTemp}\" will be overridden"); }
+        File.WriteAllText(fileAsmTemp, asmSourceCode);
 
-        try
-        {
-            File.WriteAllText(fileAsmTemp, asmSourceCode);
+        Nasm.Assemble(fileAsmTemp, fileObjTemp);
 
-            if (saveAsmFile && File.Exists(fileAsmTemp))
-            {
-                Output.LogWarning($"File \"{outputFile + ".asm"}\" will be overridden");
-                File.Copy(fileAsmTemp, outputFile + ".asm", true);
-            }
-
-            Nasm.Assemble(fileAsmTemp, fileObjTemp);
-
-            GolinkLinker.Link(fileObjTemp, fileExeTemp);
-
-            if (File.Exists(fileExeTemp))
-            { File.Copy(fileExeTemp, fileExeFinal, true); }
-        }
-        finally
-        {
-            // if (File.Exists(fileAsmTemp))
-            // { File.Delete(fileAsmTemp); }
-            // if (File.Exists(fileObjTemp))
-            // { File.Delete(fileObjTemp); }
-            // if (File.Exists(fileExeTemp))
-            // { File.Delete(fileExeTemp); }
-        }
+        GnuLinker.Link(fileObjTemp, fileExeFinal);
     }
 
     public static void AssembleRaw(string asmSourceCode, string outputFile, bool saveAsmFile = false, IEnumerable<emu8086.Symbols.Symbol>? symbols = null)

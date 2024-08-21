@@ -6,7 +6,6 @@ public readonly struct RuntimeContext
     public readonly ImmutableArray<byte> Memory;
     public readonly ImmutableArray<Instruction> Code;
     public readonly int StackStart;
-    public readonly ImmutableArray<int> CallTrace;
 
     public RuntimeContext(
         Registers registers,
@@ -18,6 +17,5 @@ public readonly struct RuntimeContext
         Memory = memory;
         Code = code;
         StackStart = stackStart;
-        CallTrace = ImmutableArray.Create(DebugUtils.TraceCalls(Memory, Registers.BasePointer));
     }
 }

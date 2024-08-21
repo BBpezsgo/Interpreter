@@ -9,6 +9,14 @@ class RegisterUsage
     {
         RegisterUsage Registers { get; }
         public Register Register { get; }
+        public Register Register64 => Register switch
+        {
+            Register.EAX => Register.RAX,
+            Register.EBX => Register.RBX,
+            Register.ECX => Register.RCX,
+            Register.EDX => Register.RDX,
+            _ => throw new UnreachableException(),
+        };
         public Register Register16 => Register switch
         {
             Register.EAX => Register.AX,
@@ -47,6 +55,7 @@ class RegisterUsage
             BitWidth._8 => Register8L,
             BitWidth._16 => Register16,
             BitWidth._32 => Register,
+            BitWidth._64 => Register64,
             _ => throw new UnreachableException(),
         };
 
@@ -122,13 +131,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
     CompileLevel CompileLevel => Settings.CompileLevel;
     readonly MainGeneratorSettings Settings;
 
+    public override int PointerSize { get; }
+    public override BuiltinType BooleanType => BuiltinType.Byte;
+    public override BuiltinType SizeofStatementType => BuiltinType.Integer;
+    public override BuiltinType ArrayLengthType => BuiltinType.Integer;
+
     #endregion
 
     public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, analysisCollection, print)
     {
         ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
         GeneratedCode = new List<PreparationInstruction>();
-        DebugInfo = new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Key, v.Value.Tokens)));
         CleanupStack = new Stack<ImmutableArray<CleanupItem>>();
         ReturnInstructions = new Stack<List<int>>();
         BreakInstructions = new Stack<List<int>>();
@@ -138,6 +151,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         UndefinedConstructorOffsets = new List<UndefinedOffset<CompiledConstructor>>();
         Settings = settings;
         Registers = new RegisterUsage();
+        PointerSize = settings.PointerSize;
+        DebugInfo = new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Key, v.Value.Tokens)))
+        {
+            StackOffsets = new StackOffsets()
+            {
+                SavedBasePointer = SavedBasePointerOffset,
+                SavedCodePointer = SavedCodePointerOffset,
+            }
+        };
     }
 
     void SetUndefinedFunctionOffsets<TFunction>(IEnumerable<UndefinedOffset<TFunction>> undefinedOffsets)

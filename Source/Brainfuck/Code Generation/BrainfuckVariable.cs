@@ -31,8 +31,6 @@ public class BrainfuckVariable :
     GeneralType IHaveCompiledType.Type => Type;
     Uri IInFile.File => File;
 
-    public BrainfuckVariable(string name, Uri file, int address, bool isReference, bool haveToClean, bool deallocateOnClean, GeneralType type)
-        : this(name, file, address, isReference, haveToClean, deallocateOnClean, type, type.Size) { }
     public BrainfuckVariable(string name, Uri file, int address, bool isReference, bool haveToClean, bool deallocateOnClean, GeneralType type, int size)
     {
         Name = name;
@@ -49,5 +47,5 @@ public class BrainfuckVariable :
         IsInitialized = false;
     }
 
-    string GetDebuggerDisplay() => $"{Type} {Name} ({Type.Size} bytes at {Address})";
+    string GetDebuggerDisplay() => $"{Type} {Name} ({Size} bytes at {Address})";
 }

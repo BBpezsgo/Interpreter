@@ -12,37 +12,7 @@ public class StructType : GeneralType,
     public ImmutableDictionary<string, GeneralType> TypeArguments { get; }
     public Uri File { get; }
 
-    public override int Size
-    {
-        get
-        {
-            int size = 0;
-            foreach (CompiledField field in Struct.Fields)
-            {
-                GeneralType fieldType = field.Type;
-                fieldType = ReplaceType(fieldType);
-                size += fieldType.Size;
-            }
-            return size;
-        }
-    }
-
-    public override int SizeBytes
-    {
-        get
-        {
-            int size = 0;
-            foreach (CompiledField field in Struct.Fields)
-            {
-                GeneralType fieldType = field.Type;
-                fieldType = ReplaceType(fieldType);
-                size += fieldType.SizeBytes;
-            }
-            return size;
-        }
-    }
-
-    public ImmutableDictionary<CompiledField, int> GetFields(bool sizeInBytes)
+    public ImmutableDictionary<CompiledField, int> GetFields(IRuntimeInfoProvider runtime)
     {
         Dictionary<CompiledField, int> result = new(Struct.Fields.Length);
 
@@ -52,7 +22,7 @@ public class StructType : GeneralType,
             result.Add(field, offset);
             GeneralType fieldType = field.Type;
             fieldType = ReplaceType(fieldType);
-            offset += sizeInBytes ? fieldType.SizeBytes : fieldType.Size;
+            offset += fieldType.GetSize(runtime);
         }
 
         return result.ToImmutableDictionary();
@@ -63,8 +33,6 @@ public class StructType : GeneralType,
         get => Struct;
         set => throw null!;
     }
-
-    public override BitWidth BitWidth => throw new InvalidOperationException();
 
     StructType(CompiledStruct @struct, Uri file, IEnumerable<KeyValuePair<string, GeneralType>> typeArguments)
     {
@@ -114,7 +82,22 @@ public class StructType : GeneralType,
         File = originalFile;
     }
 
-    public bool GetField(string name, bool offsetInBytes, [NotNullWhen(true)] out CompiledField? field, [NotNullWhen(true)] out int offset)
+    public override int GetSize(IRuntimeInfoProvider runtime)
+    {
+        int size = 0;
+        foreach (CompiledField field in Struct.Fields)
+        {
+            GeneralType fieldType = field.Type;
+            fieldType = ReplaceType(fieldType);
+            size += fieldType.GetSize(runtime);
+        }
+        return size;
+    }
+
+    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
+        => throw new InvalidOperationException();
+
+    public bool GetField(string name, IRuntimeInfoProvider runtime, [NotNullWhen(true)] out CompiledField? field, [NotNullWhen(true)] out int offset)
     {
         offset = 0;
         field = null;
@@ -130,7 +113,7 @@ public class StructType : GeneralType,
             GeneralType fieldType = _field.Type;
             fieldType = ReplaceType(fieldType);
 
-            offset += offsetInBytes ? fieldType.SizeBytes : fieldType.Size;
+            offset += fieldType.GetSize(runtime);
         }
 
         return false;

@@ -13,20 +13,6 @@ public class GenericType : GeneralType,
     public Token? Definition { get; }
     public Uri File { get; }
 
-    public override int Size
-    {
-        [DoesNotReturn]
-        get => throw new InternalException($"Can not get the size of a generic type");
-    }
-
-    public override int SizeBytes
-    {
-        [DoesNotReturn]
-        get => throw new InternalException($"Can not get the size of a generic type");
-    }
-
-    public override BitWidth BitWidth => throw new InvalidOperationException($"Can not get the size of a generic type");
-
     Token? IReferenceableTo<Token>.Reference
     {
         get => Definition;
@@ -53,6 +39,12 @@ public class GenericType : GeneralType,
         Definition = definition;
         File = originalFile;
     }
+
+    [DoesNotReturn]
+    public override int GetSize(IRuntimeInfoProvider runtime)
+        => throw new InternalException($"Can not get the size of a generic type");
+    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
+        => throw new InvalidOperationException($"Can not get the size of a generic type");
 
     public override bool Equals(object? other) => Equals(other as GenericType);
     public override bool Equals(GeneralType? other) => Equals(other as GenericType);

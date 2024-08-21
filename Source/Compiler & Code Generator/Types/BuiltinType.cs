@@ -28,26 +28,6 @@ public class BuiltinType : GeneralType,
         _ => throw new NotImplementedException($"Type conversion for {Type} is not implemented"),
     };
 
-    public override int Size => 1;
-    public override int SizeBytes => Type switch
-    {
-        BasicType.Void => throw new InternalException($"Type {this} does not have a size"),
-        BasicType.Any => throw new InternalException($"Type {this} does not have a size"),
-        BasicType.Byte => 1,
-        BasicType.Char => 2,
-        BasicType.Integer => 4,
-        BasicType.Float => 4,
-        _ => throw new UnreachableException(),
-    };
-
-    public override BitWidth BitWidth => SizeBytes switch
-    {
-        1 => BitWidth._8,
-        2 => BitWidth._16,
-        4 => BitWidth._32,
-        _ => throw new NotImplementedException(),
-    };
-
     public BuiltinType(BuiltinType other)
     {
         Type = other.Type;
@@ -71,6 +51,20 @@ public class BuiltinType : GeneralType,
             _ => throw new UnreachableException(),
         };
     }
+
+    public override int GetSize(IRuntimeInfoProvider runtime) => Type switch
+    {
+        BasicType.Void => throw new InternalException($"Type {this} does not have a size"),
+        BasicType.Any => throw new InternalException($"Type {this} does not have a size"),
+        BasicType.Byte => 1,
+        BasicType.Char => 2,
+        BasicType.Integer => 4,
+        BasicType.Float => 4,
+        _ => throw new UnreachableException(),
+    };
+
+    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
+        => (BitWidth)GetSize(runtime);
 
     public override bool Equals(object? other) => Equals(other as BuiltinType);
     public override bool Equals(GeneralType? other) => Equals(other as BuiltinType);

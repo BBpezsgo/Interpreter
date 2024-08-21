@@ -12,10 +12,6 @@ public class ArrayType : GeneralType,
     public StatementWithValue? Length { get; }
     public int? ComputedLength { get; }
 
-    public override int Size => ComputedLength.HasValue ? ComputedLength.Value * Of.Size : throw new InvalidOperationException("Array type's length isn't defined");
-    public override int SizeBytes => ComputedLength.HasValue ? ComputedLength.Value * Of.SizeBytes : throw new InvalidOperationException("Array type's length isn't defined");
-    public override BitWidth BitWidth => throw new InvalidOperationException();
-
     public ArrayType(ArrayType other)
     {
         Of = other.Of;
@@ -28,6 +24,11 @@ public class ArrayType : GeneralType,
         Length = length;
         ComputedLength = computedLength;
     }
+
+    public override int GetSize(IRuntimeInfoProvider runtime)
+        => ComputedLength.HasValue ? ComputedLength.Value * Of.GetSize(runtime) : throw new InvalidOperationException("Array type's length isn't defined");
+    [DoesNotReturn]
+    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime) => throw new InvalidOperationException();
 
     public override bool Equals(object? other) => Equals(other as ArrayType);
     public override bool Equals(GeneralType? other) => Equals(other as ArrayType);

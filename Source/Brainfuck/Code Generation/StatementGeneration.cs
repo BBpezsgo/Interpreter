@@ -162,7 +162,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             GeneralType initialValueType = FindStatementType(initialValue, type);
 
-            if (initialValueType.Size != type.Size)
+            if (initialValueType.GetSize(this) != type.GetSize(this))
             { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
 
             if (type.Is(out ArrayType? arrayType))
@@ -212,8 +212,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                int address = Stack.PushVirtual(type.Size);
-                variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type));
+                int address = Stack.PushVirtual(type.GetSize(this));
+                variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type, type.GetSize(this)));
             }
         }
         else
@@ -232,8 +232,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                int address = Stack.PushVirtual(type.Size);
-                variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type));
+                int address = Stack.PushVirtual(type.GetSize(this));
+                variables.Push(new BrainfuckVariable(name, file, address, false, true, deallocateOnClean, type, type.GetSize(this)));
             }
         }
 
@@ -384,14 +384,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (!pointerType.To.Is(out StructType? structPointerType))
             { throw new CompilerException($"Could not get the field offsets of type {pointerType}", statementToSet.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.GetField(statementToSet.Identifier.Content, false, out CompiledField? fieldDefinition, out int fieldOffset))
+            if (!structPointerType.GetField(statementToSet.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset))
             { throw new CompilerException($"Could not get the field offset of field \"{statementToSet.Identifier}\"", statementToSet.Identifier, CurrentFile); }
 
             statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
             statementToSet.Reference = fieldDefinition;
             statementToSet.CompiledType = fieldDefinition.Type;
 
-            if (type.Size != valueType.Size)
+            if (type.GetSize(this) != valueType.GetSize(this))
             { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
 
             int _pointerAddress = Stack.NextAddress;
@@ -429,7 +429,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             throw new CompilerException($"Failed to get field address", statementToSet, CurrentFile);
         }
 
-        if (size != valueType.Size)
+        if (size != valueType.GetSize(this))
         { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
 
         CompileSetter(address, value);
@@ -492,7 +492,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
 
             GeneralType valueType = FindStatementType(value);
-            int valueSize = valueType.Size;
+            int valueSize = valueType.GetSize(this);
 
             if (variable.Type.Is(out ArrayType? arrayType))
             {
@@ -567,8 +567,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                if (valueSize != variable.Size)
-                { throw new CompilerException($"Variable and value size mismatch ({variable.Size} != {valueSize})", value, CurrentFile); }
+                AssignTypeCheck(variable.Type, valueType, value);
             }
 
             using (Code.Block(this, $"Compute value"))
@@ -673,14 +672,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         int valueAddress = Stack.NextAddress;
         GenerateCodeForStatement(value);
 
-        if (valueType.Size == 1 && AllowOtherOptimizations)
+        if (valueType.GetSize(this) == 1 && AllowOtherOptimizations)
         {
             Heap.Set(pointerAddress, valueAddress);
         }
         else
         {
             using StackAddress tempPointerAddress = Stack.PushVirtual(1);
-            for (int i = 0; i < valueType.Size; i++)
+            for (int i = 0; i < valueType.GetSize(this); i++)
             {
                 Code.CopyValue(pointerAddress, tempPointerAddress);
                 Heap.Set(tempPointerAddress, valueAddress + i);
@@ -738,9 +737,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             int indexAddress = Stack.NextAddress;
             GenerateCodeForStatement(statement.Index);
 
-            if (arrayType.Of.Size != 1)
+            if (arrayType.Of.GetSize(this) != 1)
             {
-                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.Size);
+                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this));
                 Code.MULTIPLY(indexAddress, multiplierAddress, Stack.GetTemporaryAddress);
             }
 
@@ -773,7 +772,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (!elementType.SameAs(valueType))
             { throw new CompilerException("Bruh", value, CurrentFile); }
 
-            int elementSize = elementType.Size;
+            int elementSize = elementType.GetSize(this);
 
             if (elementSize != 1)
             { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", value, CurrentFile); }
@@ -907,7 +906,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             GeneralType elementType = arrayType.Of;
 
-            int elementSize = elementType.Size;
+            int elementSize = elementType.GetSize(this);
 
             if (elementSize != 1)
             { throw new CompilerException($"Array element size must be 1 :(", indexCall, CurrentFile); }
@@ -940,7 +939,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GenerateCodeForStatement(indexCall.Index);
 
             {
-                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.Size);
+                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this));
                 Code.MULTIPLY(indexAddress, multiplierAddress, Stack.GetTemporaryAddress);
             }
 
@@ -1623,7 +1622,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             else
             { paramType = FindStatementType(param); }
 
-            OnGotStatementType(functionCall, BuiltinType.Integer);
+            OnGotStatementType(functionCall, SizeofStatementType);
 
             if (FindSize(paramType, out int size))
             {
@@ -2388,9 +2387,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 structType.Struct.References.Add(newInstance.Type, CurrentFile);
 
-                int address = Stack.PushVirtual(structType.Size);
+                int address = Stack.PushVirtual(structType.GetSize(this));
 
-                foreach ((CompiledField field, int offset) in structType.GetFields(false))
+                foreach ((CompiledField field, int offset) in structType.GetFields(this))
                 {
                     if (!field.Type.Is(out BuiltinType? builtinType))
                     { throw new NotSupportedException($"Not supported :(", field.Identifier, structType.Struct.File); }
@@ -2449,20 +2448,20 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (!pointerType.To.Is(out StructType? structPointerType))
             { throw new CompilerException($"Could not get the field offsets of type {prevType}", field.PrevStatement, CurrentFile); }
 
-            if (!structPointerType.GetField(field.Identifier.Content, false, out CompiledField? fieldDefinition, out int fieldOffset))
+            if (!structPointerType.GetField(field.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset))
             { throw new CompilerException($"Could not get the field \"{field.Identifier}\"", field.Identifier, CurrentFile); }
 
             field.Reference = fieldDefinition;
             field.CompiledType = fieldDefinition.Type;
 
-            int resultAddress = Stack.Push(fieldDefinition.Type.Size);
+            int resultAddress = Stack.Push(fieldDefinition.Type.GetSize(this));
 
             int pointerAddress = Stack.NextAddress;
             GenerateCodeForStatement(field.PrevStatement);
 
             Code.AddValue(pointerAddress, fieldOffset);
 
-            Heap.Get(pointerAddress, resultAddress, fieldDefinition.Type.Size);
+            Heap.Get(pointerAddress, resultAddress, fieldDefinition.Type.GetSize(this));
 
             Stack.Pop();
 
@@ -2512,7 +2511,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
 
-        if (statementType.Size != targetType.Size)
+        if (statementType.GetSize(this) != targetType.GetSize(this))
         { throw new CompilerException($"Type-cast is not supported at the moment", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
 
         GenerateCodeForStatement(typeCast.PrevStatement);
@@ -2616,8 +2615,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (valueType.Size != 1)
-        { throw new NotSupportedException($"Only value of size 1 (not {valueType.Size}) supported by the output printer in brainfuck", value, CurrentFile); }
+        if (valueType.GetSize(this) != 1)
+        { throw new NotSupportedException($"Only value of size 1 (not {valueType.GetSize(this)}) supported by the output printer in brainfuck", value, CurrentFile); }
 
         if (!valueType.Is<BuiltinType>())
         { throw new NotSupportedException($"Only built-in types or string literals (not \"{valueType}\") supported by the output printer in brainfuck", value, CurrentFile); }
@@ -2653,8 +2652,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType valueType = FindStatementType(value);
         return CanGenerateCodeForValuePrinter(valueType);
     }
-    static bool CanGenerateCodeForValuePrinter(GeneralType valueType) =>
-        valueType.Size == 1 &&
+    bool CanGenerateCodeForValuePrinter(GeneralType valueType) =>
+        valueType.GetSize(this) == 1 &&
         valueType.Is<BuiltinType>();
 
     /*
@@ -2919,7 +2918,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GeneralType definedType = function.ParameterTypes[i];
             GeneralType passedType = FindStatementType(passed, definedType);
 
-            if (passedType.Size != definedType.Size)
+            if (passedType.GetSize(this) != definedType.GetSize(this))
             { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
             foreach (BrainfuckVariable compiledParameter in compiledParameters)
@@ -3003,7 +3002,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     !v.Type.SameAs(pointerType.To))
                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {new PointerType(v.Type)}", passed, CurrentFile); }
 
-                compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, v.Type, v.Size));
+                PointerType parameterType = new(v.Type);
+                compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, parameterType, parameterType.GetSize(this)));
                 continue;
             }
 
@@ -3078,7 +3078,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                if (function.Type.Size != 1)
+                if (function.Type.GetSize(this) != 1)
                 {
                     throw new CompilerException($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File);
                 }
@@ -3103,7 +3103,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (function.ReturnSomething)
         {
             GeneralType returnType = function.Type;
-            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, false, returnType);
+            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.GetSize(this)), false, false, false, returnType, returnType.GetSize(this));
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -3216,7 +3216,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                if (function.Type.Size != 1)
+                if (function.Type.GetSize(this) != 1)
                 {
                     throw new CompilerException($"Function with attribute \"StandardInput\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File);
                 }
@@ -3241,7 +3241,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (true) // always returns something
         {
             GeneralType returnType = function.Type;
-            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, false, returnType);
+            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.GetSize(this)), false, false, false, returnType, returnType.GetSize(this));
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -3333,7 +3333,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (function.ReturnSomething)
         {
             GeneralType returnType = GeneralType.InsertTypeParameters(function.Type, typeArguments) ?? function.Type;
-            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.Size), false, false, false, returnType);
+            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.GetSize(this)), false, false, false, returnType, returnType.GetSize(this));
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -3431,7 +3431,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (!newInstanceType.SameAs(function.ParameterTypes[0]))
         { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {0}: Expected {function.ParameterTypes[0]}, passed {newInstanceType}", newInstance, CurrentFile); }
 
-        compiledParameters.Add(new BrainfuckVariable(function.Parameters[0].Identifier.Content, function.Parameters[0].File, newInstanceAddress, false, false, false, newInstanceType));
+        compiledParameters.Add(new BrainfuckVariable(function.Parameters[0].Identifier.Content, function.Parameters[0].File, newInstanceAddress, false, false, false, newInstanceType, newInstanceType.GetSize(this)));
 
         for (int i = 1; i < function.Parameters.Count; i++)
         {

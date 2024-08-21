@@ -7,6 +7,10 @@ public class RuntimeException : LanguageException
 
     public RuntimeContext? Context { get; set; }
     public DebugInformation? DebugInformation { get; set; }
+    public ImmutableArray<int> CallTrace =>
+        Context is null ? ImmutableArray<int>.Empty :
+        DebugInformation is null ? ImmutableArray<int>.Empty :
+        ImmutableArray.Create(DebugUtils.TraceCalls(Context.Value.Memory, Context.Value.Registers.BasePointer, DebugInformation.StackOffsets));
 
     public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
     public RuntimeException(string message, Exception inner) : base(message, inner) { }
@@ -24,6 +28,8 @@ public class RuntimeException : LanguageException
         if (!Context.HasValue) return Message + " (no context)";
         RuntimeContext context = Context.Value;
 
+        ImmutableArray<int> callTrace = CallTrace;
+
         string? arrows = null;
         if (DebugInformation?.TryGetSourceLocation(context.Registers.CodePointer, out SourceCodeLocation sourcePosition) ?? false)
         {
@@ -36,7 +42,7 @@ public class RuntimeException : LanguageException
         else
         { Position = Position.UnknownPosition; }
 
-        ImmutableArray<FunctionInformation> callStack = DebugInformation?.GetFunctionInformation(context.CallTrace).ToImmutableArray() ?? ImmutableArray<FunctionInformation>.Empty;
+        ImmutableArray<FunctionInformation> callStack = DebugInformation?.GetFunctionInformation(callTrace).ToImmutableArray() ?? ImmutableArray<FunctionInformation>.Empty;
 
         File ??= callStack.LastOrDefault().File;
 
@@ -110,7 +116,7 @@ public class RuntimeException : LanguageException
 
         result.AppendLine();
         result.AppendLine("Call Stack (from last to recent):");
-        if (context.CallTrace.Length == 0)
+        if (callTrace.Length == 0)
         {
             result.Append(' ', CallStackIndent);
             result.AppendLine("<empty>");
@@ -122,10 +128,10 @@ public class RuntimeException : LanguageException
                 for (int i = 0; i < callStack.Length; i++)
                 {
                     result.Append(' ', CallStackIndent);
-                    result.Append(callStack[i].ToString() ?? $"<unknown> {context.CallTrace[i]}");
+                    result.Append(callStack[i].ToString() ?? $"<unknown> {callTrace[i]}");
                     result.AppendLine();
 
-                    AppendScope(context.CallTrace[i]);
+                    AppendScope(callTrace[i]);
                 }
             }
         }

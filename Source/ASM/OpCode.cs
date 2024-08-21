@@ -164,6 +164,11 @@ public enum OpCode
     #region Program Transfer Instructions
 
     /// <summary>
+    /// <b>SYSCALL</b>
+    /// </summary>
+    SystemCall,
+
+    /// <summary>
     /// <b>CALL:</b>
     /// Saves procedure linking information on the stack and branches to the called procedure specified using the target operand.
     /// </summary>

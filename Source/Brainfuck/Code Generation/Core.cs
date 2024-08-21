@@ -272,6 +272,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     readonly int MaxRecursiveDepth;
 
+    public override int PointerSize => 1;
+    public override BuiltinType BooleanType => BuiltinType.Byte;
+    public override BuiltinType SizeofStatementType => BuiltinType.Byte;
+    public override BuiltinType ArrayLengthType => BuiltinType.Byte;
+
+    static readonly BuiltinType ExitCodeType = BuiltinType.Byte;
+
     #endregion
 
     public CodeGeneratorForBrainfuck(
@@ -428,7 +435,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         if (!prevType.Is(out StructType? structType))
         { throw new NotImplementedException(); }
 
-        if (!structType.GetField(field.Identifier.Content, false, out _, out int fieldOffset))
+        if (!structType.GetField(field.Identifier.Content, this, out _, out int fieldOffset))
         { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
 
         int prevOffset = GetDataOffset(field.PrevStatement, until);
@@ -447,7 +454,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
 
         int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
-        int offset = (int)index * 2 * arrayType.Of.Size;
+        int offset = (int)index * 2 * arrayType.Of.GetSize(this);
         return prevOffset + offset;
     }
 
@@ -492,7 +499,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         if (variable.Type.Is(out ArrayType? arrayType))
         {
-            size = arrayType.Of.Size;
+            size = arrayType.Of.GetSize(this);
             address = variable.Address;
 
             if (size != 1)
@@ -500,7 +507,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
             if (TryCompute(index.Index, out CompiledValue indexValue))
             {
-                address = variable.Address + ((int)indexValue * 2 * arrayType.Of.Size);
+                address = variable.Address + ((int)indexValue * 2 * arrayType.Of.GetSize(this));
                 return true;
             }
 
@@ -522,13 +529,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
                 return false;
             }
 
-            if (!structType.GetField(field.Identifier.Content, false, out _, out int fieldOffset))
+            if (!structType.GetField(field.Identifier.Content, this, out _, out int fieldOffset))
             { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
 
             GeneralType fieldType = FindStatementType(field);
 
             address = fieldOffset + prevAddress;
-            size = fieldType.Size;
+            size = fieldType.GetSize(this);
             return true;
         }
 
@@ -697,7 +704,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         CurrentFile = file;
 
         if (!isImported)
-        { CompiledVariables.Add(new BrainfuckVariable(ReturnVariableName, file, Stack.PushVirtual(1), false, false, false, BuiltinType.Integer)); }
+        { CompiledVariables.Add(new BrainfuckVariable(ReturnVariableName, file, Stack.PushVirtual(1), false, false, false, ExitCodeType, ExitCodeType.GetSize(this))); }
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(statements)); }

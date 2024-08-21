@@ -23,14 +23,13 @@ public static class GnuLinker
         if (File.Exists(outputFile))
         { File.Delete(outputFile); }
 
-        if (!Utils.GetFullPath("ld.exe", out string? ld))
-        { throw new FileNotFoundException($"LD not found", "ld.exe"); }
-
-        using Process? process = Process.Start(new ProcessStartInfo(ld, $"{inputFile} -m i386pe -o {outputFile} -L \"C:\\Windows\\System32\" -l \"kernel32\"")
+        // -m i386pe 
+        // -L \"C:\\Windows\\System32\" -l \"kernel32\"
+        using Process? process = Process.Start(new ProcessStartInfo("ld", $"{inputFile} -o {outputFile}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-        }) ?? throw new ProcessNotStartedException(ld);
+        }) ?? throw new ProcessNotStartedException("ld");
         process.WaitForExit();
 
         string stdOutput = process.StandardOutput.ReadToEnd();
@@ -43,7 +42,7 @@ public static class GnuLinker
             string[] lines = stdError.Split('\n');
             for (int i = 0; i < lines.Length; i++)
             {
-                string line = lines[i].Replace(ld + ": ", null).Trim();
+                string line = lines[i].Replace("ld" + ": ", null).Trim();
                 if (string.IsNullOrEmpty(line)) continue;
                 linkerExceptions.Add(new GnuLinkerException(line, null));
             }
@@ -51,7 +50,7 @@ public static class GnuLinker
             if (linkerExceptions.Count > 0)
             { throw linkerExceptions[0]; }
 
-            throw new ProcessException(ld, process.ExitCode, stdOutput, stdError);
+            throw new ProcessException("ld", process.ExitCode, stdOutput, stdError);
         }
     }
 }

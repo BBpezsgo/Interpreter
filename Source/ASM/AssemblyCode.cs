@@ -3,6 +3,8 @@
 [ExcludeFromCodeCoverage]
 public class AssemblyCode
 {
+    const string EntryPointSymbol = "_start";
+
     public static readonly string[] ReservedWords = new string[] {
         "$",
         "DF",
@@ -223,9 +225,13 @@ public class AssemblyCode
 
         if (is16Bits)
         {
-            builder.Append("BITS 16" + EOL);
-            builder.Append("ORG 100h" + EOL);
+            builder.Append("[BITS 16]" + EOL);
+            // builder.Append("ORG 100h" + EOL);
             builder.Append(EOL);
+        }
+        else
+        {
+            builder.AppendLine("[BITS 64]");
         }
 
         if (CodeBuilder.Imports.Count > 0)
@@ -245,7 +251,7 @@ public class AssemblyCode
             builder.Append(";" + EOL);
             builder.Append("; Global functions" + EOL);
             builder.Append(";" + EOL);
-            builder.Append("global _main" + EOL);
+            builder.Append($"global {EntryPointSymbol}" + EOL);
             builder.Append(EOL);
         }
 
@@ -255,7 +261,7 @@ public class AssemblyCode
         if (!is16Bits)
         { builder.Append("section .text" + EOL); }
         builder.Append(EOL);
-        builder.Append("_main:" + EOL);
+        builder.Append($"{EntryPointSymbol}:" + EOL);
 
         builder.Append(CodeBuilder.Builder);
         builder.Append(EOL);

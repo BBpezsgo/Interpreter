@@ -357,9 +357,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"Array type doesn't have a size", null, CurrentFile); }
 
         GeneralType lengthType = FindStatementType(type.Length);
-        if (!lengthType.Is(out BuiltinType? lengthBuiltinType))
+        if (!lengthType.Is<BuiltinType>())
         { throw new CompilerException($"Array length must be a builtin type and not {lengthType}", type.Length, CurrentFile); }
-        if (lengthBuiltinType.GetBitWidth(this) != BitWidth._32)
+        if (lengthType.GetBitWidth(this) != BitWidth._32)
         { throw new CompilerException($"Array length must be a 32 bit integer and not {lengthType}", type.Length, CurrentFile); }
 
         if (!FindSize(type.Of, out int elementSize))
@@ -368,9 +368,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(type.Length);
         using (RegisterUsage.Auto lengthRegister = Registers.GetFree())
         {
-            AddInstruction(Opcode.PopTo32, lengthRegister.Get(BitWidth._32));
-            AddInstruction(Opcode.MathMult, lengthRegister.Get(BitWidth._32), elementSize);
-            AddInstruction(Opcode.MathAdd, result, lengthRegister.Get(BitWidth._32));
+            PopTo(lengthRegister.Get(lengthType.GetBitWidth(this)));
+            AddInstruction(Opcode.MathMult, lengthRegister.Get(lengthType.GetBitWidth(this)), elementSize);
+            AddInstruction(Opcode.MathAdd, result, lengthRegister.Get(lengthType.GetBitWidth(this)));
         }
     }
     void GenerateSize(FunctionType type, Register result)
@@ -750,9 +750,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             else
             {
                 using RegisterUsage.Auto reg = Registers.GetFree();
-                AddInstruction(Opcode.Move, reg.Get(BitWidth._32), 0);
-                GenerateSize(paramType, reg.Get(BitWidth._32));
-                AddInstruction(Opcode.Push, reg.Get(BitWidth._32));
+                AddInstruction(Opcode.Move, reg.Get(BuiltinType.Integer.GetBitWidth(this)), 0);
+                GenerateSize(paramType, reg.Get(BuiltinType.Integer.GetBitWidth(this)));
+                AddInstruction(Opcode.Push, reg.Get(BuiltinType.Integer.GetBitWidth(this)));
             }
 
             return;
@@ -1926,10 +1926,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     {
                         PopTo(regIndex.Get(indexType.GetBitWidth(this)));
                         AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this)), arrayType.Of.GetSize(this));
-                        AddInstruction(Opcode.MathAdd, regPtr.Register, regIndex.Get(indexType.GetBitWidth(this)));
+                        AddInstruction(Opcode.MathAdd, regPtr.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this)));
                     }
 
-                    PushFrom(new AddressRegisterPointer(regPtr.Register), arrayType.Of.GetSize(this));
+                    PushFrom(new AddressRegisterPointer(regPtr.Get(PointerBitWidth)), arrayType.Of.GetSize(this));
                 }
                 return;
             }
@@ -1946,24 +1946,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(index.Index);
 
-            using (RegisterUsage.Auto reg1 = Registers.GetFree())
+            using (RegisterUsage.Auto regIndex = Registers.GetFree())
             {
-                PopTo(reg1.Register);
-                AddInstruction(Opcode.MathMult, reg1.Register, arrayType.Of.GetSize(this));
+                PopTo(regIndex.Get(indexType.GetBitWidth(this)));
+                AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this)), arrayType.Of.GetSize(this));
 
-                using (RegisterUsage.Auto reg2 = Registers.GetFree())
+                using (RegisterUsage.Auto regPtr = Registers.GetFree())
                 {
-                    PopTo(reg2.Register);
-                    AddInstruction(Opcode.MathAdd, reg1.Register, reg2.Register);
+                    PopTo(regPtr.Get(PointerBitWidth));
+                    AddInstruction(Opcode.MathAdd, regIndex.Get(indexType.GetBitWidth(this)), regPtr.Get(PointerBitWidth));
                 }
 
-                AddInstruction(Opcode.Push, reg1.Register);
+                AddInstruction(Opcode.Push, regIndex.Get(indexType.GetBitWidth(this)));
 
                 CheckPointerNull();
 
-                PopTo(reg1.Register);
+                PopTo(regIndex.Get(indexType.GetBitWidth(this)));
 
-                PushFrom(new AddressRegisterPointer(reg1.Register), arrayType.Of.GetSize(this));
+                PushFrom(new AddressRegisterPointer(regIndex.Get(indexType.GetBitWidth(this))), arrayType.Of.GetSize(this));
             }
 
             return;

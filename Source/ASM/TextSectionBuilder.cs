@@ -127,7 +127,7 @@ public class TextSectionBuilder : SectionBuilder
     public void AppendInstruction(OpCode keyword)
     {
         AppendInstructionNoEOL(keyword);
-        AppendText(EOL);
+        AppendText(Environment.NewLine);
     }
 
     public void AppendInstructionNoEOL(OpCode keyword, params string[] operands)
@@ -149,7 +149,7 @@ public class TextSectionBuilder : SectionBuilder
     public void AppendInstruction(OpCode keyword, params string[] operands)
     {
         AppendInstructionNoEOL(keyword, operands);
-        AppendText(EOL);
+        AppendText(Environment.NewLine);
     }
 
     public void AppendInstructionNoEOL(OpCode keyword, InstructionOperand parameterA = default, InstructionOperand parameterB = default)
@@ -166,7 +166,7 @@ public class TextSectionBuilder : SectionBuilder
     {
         AppendText(' ', Indent);
         AppendText(instruction.ToString());
-        AppendText(EOL);
+        AppendText(Environment.NewLine);
     }
 
     public void AppendInstructionNoEOL(Instruction instruction)
@@ -215,7 +215,7 @@ public class TextSectionBuilder : SectionBuilder
 
         AppendInstructionNoEOL(OpCode.MathAdd, Intel.Register.SP, parametersSize);
         AppendComment("Remove call arguments from frame");
-        AppendText(EOL);
+        AppendText(Environment.NewLine);
     }
 
     /// <inheritdoc cref="Call_cdecl(string, int, string?[])"/>
@@ -230,7 +230,7 @@ public class TextSectionBuilder : SectionBuilder
 
         AppendInstructionNoEOL(OpCode.MathAdd, Intel.Register.SP, parametersSize);
         AppendComment("Remove call arguments from frame");
-        AppendText(EOL);
+        AppendText(Environment.NewLine);
     }
 
     #endregion

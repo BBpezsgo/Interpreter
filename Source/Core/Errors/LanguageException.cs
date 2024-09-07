@@ -43,7 +43,7 @@ public class LanguageException : Exception, IDiagnostics
         if (position.Range.Start.Line != position.Range.End.Line)
         { return null; }
 
-        string[] lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+        string[] lines = text.ReplaceLineEndings("\n").Split('\n');
 
         if (position.Range.Start.Line >= lines.Length)
         { return null; }

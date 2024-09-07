@@ -443,7 +443,7 @@ public static class Utils
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
         analysisCollection.Throw();
 
-        string asm = LanguageCore.ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan());
+        string asm = LanguageCore.ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), BitWidth._32);
 
         string outputFile = file.LocalPath + "_executable";
 
@@ -663,7 +663,7 @@ public static class Utils
             if (bytecodeResult.ErrorMessage is not null)
             {
                 file.Write(' ');
-                file.Write(bytecodeResult.ErrorMessage.Replace('\r', ' ').Replace('\n', ' '));
+                file.Write(bytecodeResult.ErrorMessage.ReplaceLineEndings(" "));
             }
 
             file.Write(" | ");
@@ -672,7 +672,7 @@ public static class Utils
             if (brainfuckResult.ErrorMessage is not null)
             {
                 file.Write(' ');
-                file.Write(brainfuckResult.ErrorMessage.Replace('\r', ' ').Replace('\n', ' '));
+                file.Write(brainfuckResult.ErrorMessage.ReplaceLineEndings(" "));
             }
 
             file.Write(" |");

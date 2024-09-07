@@ -92,7 +92,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     public void LineBreak()
     {
         if (!AddComments) return;
-        _code.Append("\r\n");
+        _code.Append(Environment.NewLine);
         _code.Append(' ', _indent);
     }
 

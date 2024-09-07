@@ -515,6 +515,10 @@ public static class Entry
                 BBLangGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();
 
+                BitWidth bits = BitWidth._32;
+
+                arguments.MainGeneratorSettings.PointerSize = (int)bits;
+
                 if (arguments.ThrowErrors)
                 {
                     CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
@@ -545,7 +549,7 @@ public static class Entry
                     }
                 }
 
-                string asm = ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan());
+                string asm = ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), bits);
                 string outputFile = arguments.File.LocalPath + "_executable";
 
                 Output.LogDebug("Assembling and linking ...");

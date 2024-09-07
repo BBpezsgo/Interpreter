@@ -7,9 +7,18 @@ class RegisterUsage
 {
     public readonly struct Auto : IDisposable, IEquatable<Auto>
     {
-        RegisterUsage Registers { get; }
-        public Register Register { get; }
-        public Register Register64 => Register switch
+        readonly RegisterUsage _registers;
+        readonly Register _register;
+
+        public Register Register32 => _register switch
+        {
+            Register.EAX => Register.EAX,
+            Register.EBX => Register.EBX,
+            Register.ECX => Register.ECX,
+            Register.EDX => Register.EDX,
+            _ => throw new UnreachableException(),
+        };
+        public Register Register64 => _register switch
         {
             Register.EAX => Register.RAX,
             Register.EBX => Register.RBX,
@@ -17,7 +26,7 @@ class RegisterUsage
             Register.EDX => Register.RDX,
             _ => throw new UnreachableException(),
         };
-        public Register Register16 => Register switch
+        public Register Register16 => _register switch
         {
             Register.EAX => Register.AX,
             Register.EBX => Register.BX,
@@ -25,7 +34,7 @@ class RegisterUsage
             Register.EDX => Register.DX,
             _ => throw new UnreachableException(),
         };
-        public Register Register8H => Register switch
+        public Register Register8H => _register switch
         {
             Register.EAX => Register.AH,
             Register.EBX => Register.BH,
@@ -33,7 +42,7 @@ class RegisterUsage
             Register.EDX => Register.DH,
             _ => throw new UnreachableException(),
         };
-        public Register Register8L => Register switch
+        public Register Register8L => _register switch
         {
             Register.EAX => Register.AL,
             Register.EBX => Register.BL,
@@ -44,30 +53,30 @@ class RegisterUsage
 
         public Auto(RegisterUsage registers, Register register)
         {
-            Registers = registers;
-            Register = register;
+            _registers = registers;
+            _register = register;
 
-            Registers._isUsed[Register] = true;
+            _registers._isUsed[_register] = true;
         }
 
         public Register Get(BitWidth bitWidth) => bitWidth switch
         {
             BitWidth._8 => Register8L,
             BitWidth._16 => Register16,
-            BitWidth._32 => Register,
+            BitWidth._32 => Register32,
             BitWidth._64 => Register64,
             _ => throw new UnreachableException(),
         };
 
-        public void Dispose() => Registers._isUsed[Register] = false;
+        public void Dispose() => _registers._isUsed[_register] = false;
 
-        public override string ToString() => Register.ToString();
+        public override string ToString() => _register.ToString();
 
-        public override bool Equals(object? obj) => obj is Auto other && Register == other.Register;
-        public bool Equals(Auto other) => Register == other.Register;
-        public override int GetHashCode() => Register.GetHashCode();
-        public static bool operator ==(Auto left, Auto right) => left.Register == right.Register;
-        public static bool operator !=(Auto left, Auto right) => left.Register != right.Register;
+        public override bool Equals(object? obj) => obj is Auto other && _register == other._register;
+        public bool Equals(Auto other) => _register == other._register;
+        public override int GetHashCode() => _register.GetHashCode();
+        public static bool operator ==(Auto left, Auto right) => left._register == right._register;
+        public static bool operator !=(Auto left, Auto right) => left._register != right._register;
     }
 
     readonly Dictionary<Register, bool> _isUsed;

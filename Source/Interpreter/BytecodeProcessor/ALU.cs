@@ -15,6 +15,7 @@ public static class ALU
         BitWidth._8 => new RuntimeValue(AddU8(a.U8, b.U8, ref flags)),
         BitWidth._16 => new RuntimeValue(AddU16(a.U16, b.U16, ref flags)),
         BitWidth._32 => new RuntimeValue(AddI32(a.I32, b.I32, ref flags)),
+        BitWidth._64 => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
 
@@ -59,6 +60,7 @@ public static class ALU
         BitWidth._8 => new RuntimeValue(SubtractU8(a.U8, b.U8, ref flags)),
         BitWidth._16 => new RuntimeValue(SubtractU16(a.U16, b.U16, ref flags)),
         BitWidth._32 => new RuntimeValue(SubtractI32(a.I32, b.I32, ref flags)),
+        BitWidth._64 => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
 

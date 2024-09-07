@@ -4,23 +4,21 @@
 [ExcludeFromCodeCoverage]
 public class SectionBuilder
 {
-    public const string EOL = "\r\n";
-
     public readonly StringBuilder Builder;
     public int Indent;
     public const int IndentIncrement = 2;
 
     public SectionBuilder()
     {
-        this.Builder = new StringBuilder();
-        this.Indent = 0;
+        Builder = new StringBuilder();
+        Indent = 0;
     }
 
     public void AppendText(char text) => Builder.Append(text);
     public void AppendText(char text, int repeatCount) => Builder.Append(text, repeatCount);
     public void AppendText(string text) => Builder.Append(text);
-    public void AppendTextLine() => Builder.Append(EOL);
-    public void AppendTextLine(string text) { Builder.Append(text); Builder.Append(EOL); }
+    public void AppendTextLine() => Builder.Append(Environment.NewLine);
+    public void AppendTextLine(string text) { Builder.Append(text); Builder.Append(Environment.NewLine); }
 
     public void AppendComment(string? comment)
     {
@@ -35,7 +33,7 @@ public class SectionBuilder
     public void AppendCommentLine(string? comment)
     {
         AppendComment(comment);
-        Builder.Append(EOL);
+        Builder.Append(Environment.NewLine);
     }
 
     public IndentBlock Block() => new(this);

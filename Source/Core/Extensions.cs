@@ -39,6 +39,7 @@ public static class Extensions
         BitWidth._8 => BasicType.Byte,
         BitWidth._16 => BasicType.Char,
         BitWidth._32 => BasicType.Integer,
+        BitWidth._64 => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
 

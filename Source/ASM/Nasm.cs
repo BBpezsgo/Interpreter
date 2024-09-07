@@ -125,7 +125,7 @@ public static class Nasm
         string stdOutput = process.StandardOutput.ReadToEnd();
         string stdError = process.StandardError.ReadToEnd();
 
-        string[] errorLines = stdError.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
+        string[] errorLines = stdError.ReplaceLineEndings("\n").Split('\n');
 
         for (int i = 0; i < errorLines.Length; i++)
         {
@@ -165,7 +165,7 @@ public static class Nasm
         string stdOutput = process.StandardOutput.ReadToEnd();
         string stdError = process.StandardError.ReadToEnd();
 
-        string[] errorLines = stdError.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
+        string[] errorLines = stdError.ReplaceLineEndings("\n").Split('\n');
 
         for (int i = 0; i < errorLines.Length; i++)
         {

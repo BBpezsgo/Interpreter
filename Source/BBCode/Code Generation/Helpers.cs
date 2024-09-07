@@ -359,20 +359,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int currentOffset = 0;
         while (currentOffset < size)
         {
-            if ((size - currentOffset) >= 4)
+            foreach (BitWidth checkBitWidth in Enum.GetValues<BitWidth>().Reverse())
             {
-                PopTo(address.Register.ToPtr(currentOffset, BitWidth._32), BitWidth._32);
-                currentOffset += 4;
-            }
-            else if ((size - currentOffset) >= 2)
-            {
-                PopTo(address.Register.ToPtr(currentOffset, BitWidth._16), BitWidth._16);
-                currentOffset += 2;
-            }
-            else
-            {
-                PopTo(address.Register.ToPtr(currentOffset, BitWidth._8), BitWidth._8);
-                currentOffset += 1;
+                int checkSize = (int)checkBitWidth;
+                if (size - currentOffset < checkSize) continue;
+                if (PointerSize < checkSize) continue;
+
+                PopTo(address.Register.ToPtr(currentOffset, checkBitWidth), checkBitWidth);
+                currentOffset += checkSize;
+                break;
             }
         }
     }
@@ -431,20 +426,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     while (currentOffset >= 0)
                     {
-                        if (currentOffset >= 4 - 1)
+                        foreach (BitWidth checkBitWidth in Enum.GetValues<BitWidth>().Reverse())
                         {
-                            AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset - 3, BitWidth._32));
-                            currentOffset -= 4;
-                        }
-                        else if (currentOffset >= 2 - 1)
-                        {
-                            AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset - 1, BitWidth._16));
-                            currentOffset -= 2;
-                        }
-                        else
-                        {
-                            AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset, BitWidth._8));
-                            currentOffset -= 1;
+                            int checkSize = (int)checkBitWidth;
+                            if (currentOffset < checkSize - 1) continue;
+                            if (PointerSize < checkSize) continue;
+
+                            AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset - (checkSize - 1), checkBitWidth));
+                            currentOffset -= checkSize;
+                            break;
                         }
                     }
 
@@ -476,7 +466,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         while (currentOffset >= 0)
         {
-            if (currentOffset >= 4)
+            // foreach (BitWidth checkBitWidth in Enum.GetValues<BitWidth>().Reverse())
+            // {
+            //     int checkSize = (int)checkBitWidth;
+            //     if (currentOffset < checkSize) continue;
+            //     if (PointerSize < checkSize) continue;
+            // 
+            //     AddInstruction(Opcode.Push, address.Register.ToPtr(currentOffset - (checkSize - 1), checkBitWidth));
+            //     currentOffset -= checkSize;
+            //     break;
+            // }
+            if (currentOffset >= 8 && PointerSize >= 8)
+            {
+                AddInstruction(Opcode.Push, address.Register.ToPtr(currentOffset - 7, BitWidth._64));
+                currentOffset -= 8;
+            }
+            else if (currentOffset >= 4)
             {
                 AddInstruction(Opcode.Push, address.Register.ToPtr(currentOffset - 3, BitWidth._32));
                 currentOffset -= 4;

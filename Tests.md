@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=289&f=0&s=68)](#)
-[![](https://img.shields.io/badge/Passing-289-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-0-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-68-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=291&f=0&s=165)](#)
+[![](https://img.shields.io/badge/Passing-291-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-0-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-165-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -73,3 +73,4 @@
 | [68](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/68.bbc) | ✅ | ✅ |
 | [69](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/69.bbc) | ✅ | ✅ |
 | [70](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/70.bbc) | ✅ | ✅ |
+| [71](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/71.bbc) | ✅ | ✅ |

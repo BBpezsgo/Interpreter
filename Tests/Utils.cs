@@ -562,7 +562,8 @@ public static class Utils
     {
         string? latest = GetLatestResultFile(testResultsDirectory);
 
-        if (latest is null) return;
+        if (latest is null)
+        { throw new FileNotFoundException($"No test result file found in directory {testResultsDirectory}"); }
 
         (Dictionary<string, TrxTestDefinition> definitions, TrxTestResult[] results) = LoadTestResults(latest);
 

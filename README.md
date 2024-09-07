@@ -28,8 +28,6 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 ### Options:
 
-**Brainfuck:**
-
 - `--help|-h` Prints some information about the program
 
 - `--brainfuck|-b` Compiles and executes the code with a brainfuck interpreter
@@ -77,7 +75,6 @@ This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/window
 
 ## Build From Source
 
-If you want to download the project and build it, there is how to do that:
 1. Download this repository
 2. Download the [Win32-Stuff](https://github.com/BBpezsgo/Win32-Stuff) repository
 3. Download the [Maths](https://github.com/BBpezsgo/Math) repository

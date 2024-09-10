@@ -12,6 +12,9 @@ public partial class InterpreterElement
 
     void RegistersElement_OnBeforeDraw(InlineElement sender)
     {
+        bool focused = _focusedElement == 0;
+        sender.IsFocused = focused;
+
         sender.ClearBuffer();
         sender.DrawBuffer.StepTo(0);
 

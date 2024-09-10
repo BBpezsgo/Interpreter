@@ -605,9 +605,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Addressing Helpers
 
-    public static readonly BuiltinType ReturnFlagType = BuiltinType.Char;
-    public static readonly CompiledValue ReturnFlagTrue = new((char)1);
-    public static readonly CompiledValue ReturnFlagFalse = new((char)0);
+    public static readonly BuiltinType ReturnFlagType = BuiltinType.Byte;
+    public static readonly CompiledValue ReturnFlagTrue = new((byte)1);
+    public static readonly CompiledValue ReturnFlagFalse = new((byte)0);
     public static readonly BuiltinType ExitCodeType = BuiltinType.Integer;
     public static readonly PointerType AbsGlobalAddressType = new(BuiltinType.Integer);
     public static readonly PointerType StackPointerType = new(BuiltinType.Integer);

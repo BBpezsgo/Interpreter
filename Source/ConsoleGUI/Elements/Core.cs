@@ -333,7 +333,6 @@ public enum Side
 [ExcludeFromCodeCoverage]
 public static class Extensions
 {
-    [SupportedOSPlatform("windows")]
     public static ConsoleChar DrawBorder(this Element element, int x, int y)
     {
         if (!element.Contains(x, y)) return ConsoleChar.Empty;
@@ -352,7 +351,7 @@ public static class Extensions
                 { return element.Title[relativeX - titleOffset].Details(); }
             }
         }
-        return side switch
+        ConsoleChar result = side switch
         {
             Side.TopLeft => '┌'.Details(),
             Side.Top => '─'.Details(),
@@ -364,20 +363,23 @@ public static class Extensions
             Side.Left => '│'.Details(),
             _ => ConsoleChar.Empty,
         };
+        if (element.IsFocused)
+        {
+            result.Background = CharColor.Gray;
+            result.Foreground = CharColor.Black;
+        }
+        return result;
     }
 
-    [SupportedOSPlatform("windows")]
     public static bool Contains(this Element element, int x, int y)
         =>
         element.Rect.Contains(x, y) ||
         element.Rect.Contains(x - 1, y) ||
         element.Rect.Contains(x, y - 1) ||
         element.Rect.Contains(x - 1, y - 1);
-    [SupportedOSPlatform("windows")]
     public static bool Contains(this Element element, Coord position)
         => element.Contains(position.X, position.Y);
 
-    [SupportedOSPlatform("windows")]
     public static void OnMouseEvent(this Element[] elements, MouseEvent e)
     {
         for (int i = 0; i < elements.Length; i++)
@@ -389,7 +391,6 @@ public static class Extensions
         }
     }
 
-    [SupportedOSPlatform("windows")]
     public static void OnKeyEvent(this Element[] elements, KeyEvent e)
     {
         for (int i = 0; i < elements.Length; i++)
@@ -400,7 +401,6 @@ public static class Extensions
         }
     }
 
-    [SupportedOSPlatform("windows")]
     public static ConsoleChar DrawContentWithBorders(this Element element, int x, int y)
     {
         if (element.HasBorder)
@@ -417,7 +417,6 @@ public static class Extensions
         return element.DrawContent(x, y);
     }
 
-    [SupportedOSPlatform("windows")]
     public static ConsoleChar? DrawContent(this Element[] elements, int x, int y)
     {
         for (int i = 0; i < elements.Length; i++)
@@ -429,19 +428,15 @@ public static class Extensions
         return null;
     }
 
-    [SupportedOSPlatform("windows")]
     public static void BeforeDraw(this Element[] elements)
     { for (int i = 0; i < elements.Length; i++) elements[i].BeforeDraw(); }
 
-    [SupportedOSPlatform("windows")]
     public static void BeforeDraw(this IEnumerable<Element> elements)
     { foreach (Element element in elements) element.BeforeDraw(); }
 
-    [SupportedOSPlatform("windows")]
     public static void RefreshSize(this Element[] elements)
     { for (int i = 0; i < elements.Length; i++) elements[i].RefreshSize(); }
 
-    [SupportedOSPlatform("windows")]
     public static void RefreshSize(this IEnumerable<Element> elements)
     { foreach (Element element in elements) element.RefreshSize(); }
 

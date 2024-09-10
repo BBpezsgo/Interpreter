@@ -11,7 +11,7 @@ public partial class InterpreterBase
 {
     protected struct RendererContext
     {
-        public ConsoleRenderer? Renderer;
+        public IOnlySetterRenderer<ConsoleChar>? Renderer;
         public Queue<byte>? InputBuffer;
         public string? OutputBuffer;
         public int CodeDisplayPosition;
@@ -40,7 +40,6 @@ public partial class InterpreterBase<TCode> : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
     public void RunWithUI(bool autoTick = true, int wait = 0)
     {
@@ -89,11 +88,12 @@ public partial class InterpreterBase<TCode> : IDisposable
         ConsoleListener.Stop();
     }
 
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
     void SetupUI()
     {
-        _rendererContext.Renderer ??= new ConsoleRenderer((short)Console.WindowWidth, (short)Console.WindowHeight);
+        _rendererContext.Renderer ??= new AnsiRenderer();
+        // _rendererContext.Renderer ??= new ConsoleRenderer((short)Console.WindowWidth, (short)Console.WindowHeight);
+        
         ConsoleListener.Start();
 
         if (_rendererContext.InputBuffer is null)
@@ -122,7 +122,6 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     /// <exception cref="NullReferenceException"/>
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
     public void Draw()
     {
@@ -189,11 +188,10 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     int StartToken;
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
-    void DrawOriginalCode(ConsoleRenderer renderer, SmallRect rect)
+    void DrawOriginalCode(IOnlySetterRenderer<ConsoleChar> renderer, SmallRect rect)
     {
-        renderer.Clear(rect);
+        renderer.Fill(rect, default);
         rect.Top = Math.Max(rect.Top, (short)0);
         rect.Left = Math.Max(rect.Left, (short)0);
         rect.Bottom = Math.Min(rect.Bottom, (short)(renderer.Height - 1));
@@ -261,7 +259,7 @@ public partial class InterpreterBase<TCode> : IDisposable
                 int from = prevToken.Position.Range.Start.Character + rect.X;
                 for (int offset = from; offset < currentX; offset++)
                 {
-                    renderer[offset, currentY].Background = CharColor.Gray;
+                    // renderer[offset, currentY].Background = CharColor.Gray;
                 }
             }
 
@@ -297,20 +295,18 @@ public partial class InterpreterBase<TCode> : IDisposable
             {
                 if (currentX + offset >= rect.Right) return;
 
-                renderer[currentX + offset, currentY] = new ConsoleChar(text[offset], foregroundColor, backgroundColor);
+                renderer.Set(currentX + offset, currentY, new ConsoleChar(text[offset], foregroundColor, backgroundColor));
             }
         }
     }
 
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
-    protected abstract void DrawCode(ConsoleRenderer renderer, Range<int> range, int x, int y, int width);
+    protected abstract void DrawCode(IOnlySetterRenderer<ConsoleChar> renderer, Range<int> range, int x, int y, int width);
 
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
-    void DrawMemory(ConsoleRenderer renderer, Range<int> range, SmallRect rect)
+    void DrawMemory(IOnlySetterRenderer<ConsoleChar> renderer, Range<int> range, SmallRect rect)
     {
-        renderer.Clear(rect);
+        renderer.Fill(rect, default);
 
         int x = rect.Left;
         int y = rect.Top;
@@ -408,9 +404,8 @@ public partial class InterpreterBase<TCode> : IDisposable
         }
     }
 
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
-    static void DrawOutput(ConsoleRenderer renderer, string text, SmallRect rect)
+    static void DrawOutput(IOnlySetterRenderer<ConsoleChar> renderer, string text, SmallRect rect)
     {
         int x = rect.X;
         int y = rect.Y;
@@ -427,11 +422,11 @@ public partial class InterpreterBase<TCode> : IDisposable
             else if (text[i] == '\r')
             { }
             else if (text[i] == '\t')
-            { renderer[x, y] = new ConsoleChar(' ', CharColor.White, CharColor.Black); }
+            { renderer.Set(x, y, new ConsoleChar(' ', CharColor.White, CharColor.Black)); }
             else if (text[i] is < (char)32 or > (char)127)
-            { renderer[x, y] = new ConsoleChar(' ', CharColor.White, CharColor.Black); }
+            { renderer.Set(x, y, new ConsoleChar(' ', CharColor.White, CharColor.Black)); }
             else
-            { renderer[x, y] = new ConsoleChar(text[i], CharColor.White, CharColor.Black); }
+            { renderer.Set(x, y, new ConsoleChar(text[i], CharColor.White, CharColor.Black)); }
 
             x++;
             if (x >= rect.Width)
@@ -443,9 +438,8 @@ public partial class InterpreterBase<TCode> : IDisposable
         }
     }
 
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
-    void DrawStackTrace(ConsoleRenderer renderer, SmallRect rect)
+    void DrawStackTrace(IOnlySetterRenderer<ConsoleChar> renderer, SmallRect rect)
     {
         if (DebugInfo == null)
         { return; }

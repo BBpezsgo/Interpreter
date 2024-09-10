@@ -4,7 +4,6 @@ using Win32.Console;
 namespace ConsoleGUI;
 
 [ExcludeFromCodeCoverage]
-[SupportedOSPlatform("windows")]
 public class StandardIOElement : InlineElement
 {
     public delegate void InputEventHandler(char input);

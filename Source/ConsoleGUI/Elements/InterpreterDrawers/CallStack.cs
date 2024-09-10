@@ -9,6 +9,9 @@ public partial class InterpreterElement
 {
     private void CallStackElement_OnBeforeDraw(InlineElement sender)
     {
+        bool focused = _focusedElement == 4;
+        sender.IsFocused = focused;
+
         sender.ClearBuffer();
         sender.DrawBuffer.StepTo(0);
 

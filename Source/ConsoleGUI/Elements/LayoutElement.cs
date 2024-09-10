@@ -5,7 +5,6 @@ using Win32.Console;
 namespace ConsoleGUI;
 
 [ExcludeFromCodeCoverage]
-[SupportedOSPlatform("windows")]
 public class LayoutElement : Element, IElementWithSubelements, IInlineLayoutElement
 {
     public Element[] Elements { get; set; } = Array.Empty<Element>();
@@ -36,7 +35,6 @@ public class LayoutElement : Element, IElementWithSubelements, IInlineLayoutElem
 }
 
 [ExcludeFromCodeCoverage]
-[SupportedOSPlatform("windows")]
 public class VerticalLayoutElement : LayoutElement
 {
     public override void RefreshSize()
@@ -100,7 +98,6 @@ public class VerticalLayoutElement : LayoutElement
 }
 
 [ExcludeFromCodeCoverage]
-[SupportedOSPlatform("windows")]
 public class HorizontalLayoutElement : LayoutElement
 {
     public override void RefreshSize()

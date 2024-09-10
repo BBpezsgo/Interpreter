@@ -88,8 +88,7 @@ internal sealed class MainThreadEvents<T> : IMainThreadThing
 }
 
 [ExcludeFromCodeCoverage]
-[SupportedOSPlatform("windows")]
-internal sealed class ConsoleGUI : ConsoleRenderer, IDisposable
+internal sealed class ConsoleGUI : AnsiRenderer, IDisposable
 {
     const int TIMER_RESIZE_ELEMENTS = 1000;
     const int TIMER_AUTO_REFRESH_CONSOLE = 1000;
@@ -165,7 +164,7 @@ internal sealed class ConsoleGUI : ConsoleRenderer, IDisposable
             MouseEvents,
         };
 
-        Terminal.Setup();
+        // Terminal.Setup();
 
         ConsoleListener.MouseEvent += MouseEventThread;
         ConsoleListener.KeyEvent += KeyEventThread;
@@ -342,7 +341,7 @@ internal sealed class ConsoleGUI : ConsoleRenderer, IDisposable
 
             ConsoleListener.Stop();
 
-            Terminal.Restore();
+            // Terminal.Restore();
         }
 
         IsDisposed = true;

@@ -6,9 +6,8 @@ namespace LanguageCore.Brainfuck;
 
 public partial class InterpreterCompact
 {
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
-    protected override void DrawCode(ConsoleRenderer renderer, Range<int> range, int x, int y, int width)
+    protected override void DrawCode(IOnlySetterRenderer<ConsoleChar> renderer, Range<int> range, int x, int y, int width)
     {
         for (int i = range.Start; i <= range.End; i++)
         {
@@ -59,7 +58,7 @@ public partial class InterpreterCompact
                     _ => CharColor.Silver,
                 };
 
-                renderer[x, y] = new ConsoleChar(c, fg, bg);
+                renderer.Set(x, y, new ConsoleChar(c, fg, bg));
                 x++;
                 if (x >= width) return;
             }
@@ -73,7 +72,7 @@ public partial class InterpreterCompact
 
         while (x < width)
         {
-            renderer[x, y] = new ConsoleChar(' ');
+            renderer.Set(x, y, new ConsoleChar(' '));
             x++;
         }
     }

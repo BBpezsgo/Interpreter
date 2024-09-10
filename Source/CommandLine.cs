@@ -1,5 +1,4 @@
 using System.IO;
-using Win32.Console;
 
 namespace LanguageCore;
 

@@ -1,4 +1,5 @@
-﻿[assembly: SuppressMessage("Style", "IDE0290:Use primary constructor")]
+﻿[assembly: SuppressMessage("Style", "IDE0130:Namespace does not match folder structure")]
+[assembly: SuppressMessage("Style", "IDE0290:Use primary constructor")]
 [assembly: SuppressMessage("Style", "IDE0305:Simplify collection initialization")]
 [assembly: SuppressMessage("Style", "IDE0300:Simplify collection initialization")]
 [assembly: SuppressMessage("Style", "IDE0301:Simplify collection initialization")]

@@ -113,18 +113,6 @@ public class Interpreter
 
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, (char @char) => OnStdOut?.Invoke(this, @char));
 
-        externalFunctions.AddExternalFunction("console-set",
-            (char @char, int x, int y) =>
-            {
-                if (x < 0 || y < 0) return;
-                (int lx, int ly) = Console.GetCursorPosition();
-                Console.SetCursorPosition(x, y);
-                Console.Write(@char);
-                Console.SetCursorPosition(lx, ly);
-            });
-
-        externalFunctions.AddExternalFunction("console-clear", Console.Clear);
-
         externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char));
 
         externalFunctions.AddExternalFunction("sleep", (int t) => CurrentSleep = new TimeSleep(t));

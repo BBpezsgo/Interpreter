@@ -334,6 +334,7 @@ static class Extensions
 }
 
 [ExcludeFromCodeCoverage]
+[SupportedOSPlatform("windows")]
 public unsafe struct I8086
 {
     public bool IsHalted;
@@ -343,7 +344,6 @@ public unsafe struct I8086
     readonly byte[] Memory;
     readonly ConsoleRenderer Console;
 
-    [SupportedOSPlatform("windows")]
     public I8086(string outputFile)
     {
         Memory = new byte[1024 * 1024 * 4];
@@ -607,7 +607,6 @@ public unsafe struct I8086
         return (mode, reg, rm);
     }
 
-    [SupportedOSPlatform("windows")]
     public void Clock()
     {
         Do();

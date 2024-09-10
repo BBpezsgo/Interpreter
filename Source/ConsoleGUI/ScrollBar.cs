@@ -4,13 +4,12 @@ using Win32.Console;
 namespace ConsoleGUI;
 
 [ExcludeFromCodeCoverage]
-[SupportedOSPlatform("windows")]
 public class ScrollBar
 {
-    readonly Func<Element, Range<int>> GetRange;
+    public readonly Func<Element, Range<int>> GetRange;
     readonly Element Parent;
 
-    public int Offset { get; private set; }
+    public int Offset { get; set; }
 
     float ScrollPercent
     {
@@ -87,7 +86,22 @@ public class ScrollBar
         }
     }
 
-#pragma warning disable CA1822, IDE0060
-    public void FeedEvent(Element sender, KeyEvent e) { }
-#pragma warning restore CA1822, IDE0060
+    public void FeedEvent(Element sender, KeyEvent e)
+    {
+        if (!sender.IsFocused) return;
+
+        Range<int> range = GetRange.Invoke(sender);
+
+        if (e.IsDown == 1 && e.VirtualKeyCode == Win32.VirtualKeyCode.Up)
+        {
+            Offset = Math.Clamp(Offset - 1, range.Start, range.End);
+            return;
+        }
+
+        if (e.IsDown == 1 && e.VirtualKeyCode == Win32.VirtualKeyCode.Down)
+        {
+            Offset = Math.Clamp(Offset + 1, range.Start, range.End);
+            return;
+        }
+    }
 }

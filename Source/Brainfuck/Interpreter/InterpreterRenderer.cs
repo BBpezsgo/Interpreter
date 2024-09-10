@@ -1,4 +1,5 @@
 ﻿using System.Runtime.Versioning;
+using Win32;
 using Win32.Console;
 
 namespace LanguageCore.Brainfuck;
@@ -6,7 +7,6 @@ namespace LanguageCore.Brainfuck;
 public partial class Interpreter
 {
     /*
-    [SupportedOSPlatform("windows")]
     public void RunWithUI(bool autoTick = true, int wait = 0)
     {
         Console.Clear();
@@ -116,9 +116,8 @@ public partial class Interpreter
     }
     */
 
-    [SupportedOSPlatform("windows")]
     [ExcludeFromCodeCoverage]
-    protected override void DrawCode(ConsoleRenderer renderer, Range<int> range, int x, int y, int width)
+    protected override void DrawCode(IOnlySetterRenderer<ConsoleChar> renderer, Range<int> range, int x, int y, int width)
     {
         for (int i = range.Start; i <= range.End; i++)
         {
@@ -131,7 +130,7 @@ public partial class Interpreter
                 '.' or ',' => CharColor.BrightMagenta,
                 _ => CharColor.Silver,
             };
-            renderer[x, y] = new ConsoleChar(CompactCode.FromOpCode(Code[i]), fg, bg);
+            renderer.Set(x, y, new ConsoleChar(CompactCode.FromOpCode(Code[i]), fg, bg));
 
             if (x++ >= width)
             { return; }
@@ -139,7 +138,7 @@ public partial class Interpreter
 
         while (x < width)
         {
-            renderer[x, y] = new ConsoleChar(' ');
+            renderer.Set(x, y, new ConsoleChar(' '));
             x++;
         }
     }

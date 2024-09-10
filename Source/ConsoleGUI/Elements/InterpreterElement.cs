@@ -90,7 +90,6 @@ class BreakPointJump : IJump
     public void Tick() { }
 }
 
-[SupportedOSPlatform("windows")]
 [ExcludeFromCodeCoverage]
 public sealed partial class InterpreterElement : WindowElement
 {
@@ -103,6 +102,8 @@ public sealed partial class InterpreterElement : WindowElement
 
     readonly MainThreadTimer InterpreterTimer;
     readonly StandardIOElement ConsolePanel;
+
+    int _focusedElement;
 
     public InterpreterElement(InterpreterDebuggabble interpreter)
     {
@@ -142,7 +143,13 @@ public sealed partial class InterpreterElement : WindowElement
         StackScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Registers.StackPointer + (30 * BytecodeProcessor.StackDirection)), stackPanel);
 
         stackPanel.OnMouseEventInvoked += StackScrollBar.FeedEvent;
-        stackPanel.OnKeyEventInvoked += StackScrollBar.FeedEvent;
+        stackPanel.OnKeyEventInvoked += (sender, e) =>
+        {
+            if (_focusedElement == 2)
+            {
+                StackScrollBar.FeedEvent(sender, e);
+            }
+        };
 
         InlineElement heapPanel = new()
         {
@@ -154,7 +161,13 @@ public sealed partial class InterpreterElement : WindowElement
 
         heapPanel.OnBeforeDraw += HeapElement_OnBeforeDraw;
         heapPanel.OnMouseEventInvoked += HeapScrollBar.FeedEvent;
-        heapPanel.OnKeyEventInvoked += HeapScrollBar.FeedEvent;
+        heapPanel.OnKeyEventInvoked += (sender, e) =>
+        {
+            if (_focusedElement == 3)
+            {
+                HeapScrollBar.FeedEvent(sender, e);
+            }
+        };
 
         InlineElement callStackPanel = new()
         {
@@ -349,7 +362,18 @@ public sealed partial class InterpreterElement : WindowElement
         base.OnKeyEvent(e);
         Elements.OnKeyEvent(e);
 
-        if (e.IsDown == 1 && (e.VirtualKeyCode == Win32.VirtualKeyCode.Tab || e.VirtualKeyCode == Win32.VirtualKeyCode.Space))
+        if (e.IsDown == 1 && e.VirtualKeyCode == Win32.VirtualKeyCode.Tab)
+        {
+            if (e.ControlKeyState.HasFlag(Win32.ControlKeyState.Shift))
+            { _focusedElement--; }
+            else
+            { _focusedElement++; }
+
+            if (_focusedElement >= 5) _focusedElement = 0;
+            if (_focusedElement < 0) _focusedElement = 4;
+        }
+
+        if (e.IsDown == 1 && (e.VirtualKeyCode == Win32.VirtualKeyCode.Space))
         {
             if (CurrentJump is null ||
                 (CurrentJump is InstructionCountJump instructionCountJump1 && instructionCountJump1.Current == instructionCountJump1.Count))

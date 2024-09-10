@@ -79,7 +79,6 @@ public class RuntimeException : LanguageException
                     Range<int> range = item.GetRange(context.Registers.BasePointer, context.StackStart);
                     if (range.Start > range.End)
                     { range = new Range<int>(range.End, range.Start); }
-                    ImmutableArray<byte> value = context.Memory[range.Start..(range.End + 1)];
                     // if (item.BasePointerRelative)
                     // { value = context.Memory.Slice(context.Registers.BasePointer + item.Address, item.Size); }
                     // else
@@ -90,10 +89,17 @@ public class RuntimeException : LanguageException
                     result.Append(' ');
                     result.Append(item.Tag);
                     result.Append(' ');
+                    if (range.Start < 0 || range.End + 1 >= context.Memory.Length)
+                    {
+                        result.Append("<invalid address>");
+                        result.AppendLine();
+                        continue;
+                    }
+                    ImmutableArray<byte> value = context.Memory[range.Start..(range.End + 1)];
                     if (item.Type.Equals(Compiler.BasicType.Integer))
                     { result.Append(value.To<int>()); }
                     else if (item.Type.Equals(Compiler.BasicType.Float))
-                    { result.Append(value.To<float>()); }
+                    { result.Append(value.To<float>() + "f"); }
                     else if (item.Type.Equals(Compiler.BasicType.Char))
                     { result.Append($"'{value.To<char>().Escape()}'"); }
                     else if (item.Type.Equals(Compiler.BasicType.Byte))

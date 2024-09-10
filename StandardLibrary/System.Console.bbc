@@ -2,13 +2,11 @@ using System.String;
 using System.Memory;
 using System.Lists;
 
-[External("console-set")]
-export void Set(char data, int x, int y);
-
-[External("console-clear")]
-export void Clear();
-
-
+export void Clear()
+{
+    Print("\e[2J");
+    Print("\e[H");
+}
 
 [External("stderr")]
 export void PrintError(char message);

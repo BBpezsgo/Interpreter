@@ -11,6 +11,9 @@ public partial class InterpreterElement
 {
     void StackElement_OnBeforeDraw(InlineElement sender)
     {
+        bool focused = _focusedElement == 2;
+        sender.IsFocused = focused;
+
         sender.ClearBuffer();
         sender.DrawBuffer.StepTo(0);
 

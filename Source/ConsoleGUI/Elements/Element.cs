@@ -5,13 +5,13 @@ using Win32.Console;
 namespace ConsoleGUI;
 
 [ExcludeFromCodeCoverage]
-[SupportedOSPlatform("windows")]
 public class Element : IMainThreadThing
 {
     public Rectangle Rect { get; set; }
 
     public bool HasBorder;
     public string? Title;
+    public bool IsFocused;
 
     public DrawBuffer DrawBuffer = new();
     protected MouseEvent LastMouse;

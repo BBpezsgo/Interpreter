@@ -8,6 +8,9 @@ public partial class InterpreterElement
 {
     void SourceCodeElement_OnBeforeDraw(InlineElement sender)
     {
+        bool focused = _focusedElement == 1;
+        sender.IsFocused = focused;
+
         // sender.ClearBuffer();
         sender.DrawBuffer.StepTo(0);
 

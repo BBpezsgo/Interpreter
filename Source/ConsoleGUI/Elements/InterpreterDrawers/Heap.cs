@@ -8,6 +8,9 @@ public partial class InterpreterElement
 {
     void HeapElement_OnBeforeDraw(InlineElement sender)
     {
+        bool focused = _focusedElement == 3;
+        sender.IsFocused = focused;
+
         sender.ClearBuffer();
         sender.DrawBuffer.StepTo(0);
 

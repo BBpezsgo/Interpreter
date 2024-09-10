@@ -213,8 +213,8 @@ public static class Entry
                     InterpreterDebuggabble _interpreter = new(false, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
                     interpreter = _interpreter;
 
-                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    { throw new PlatformNotSupportedException("Console rendering is only supported on Windows"); }
+                    // if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    // { throw new PlatformNotSupportedException("Console rendering is only supported on Windows"); }
 
                     // if (pauseBeforeRun)
                     // {

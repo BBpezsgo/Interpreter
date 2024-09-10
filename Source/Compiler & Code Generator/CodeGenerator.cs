@@ -1614,9 +1614,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         if (destination.SameAs(BasicType.Any))
         { return; }
 
-        if (destination.GetSize(this) != valueType.GetSize(this))
-        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.GetSize(this)} bytes) value to {destination} (size of {destination.GetSize(this)} bytes)", value, CurrentFile); }
-
         if (destination.Is<PointerType>() &&
             valueType.SameAs(BasicType.Integer))
         { return; }
@@ -1628,6 +1625,9 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         if (destination.Is<PointerType>() &&
             valueType.SameAs(BasicType.Byte))
         { return; }
+
+        if (destination.GetSize(this) != valueType.GetSize(this))
+        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.GetSize(this)} bytes) value to {destination} (size of {destination.GetSize(this)} bytes)", value, CurrentFile); }
 
         if (value is LiteralStatement literal &&
             literal.Type == LiteralType.String)

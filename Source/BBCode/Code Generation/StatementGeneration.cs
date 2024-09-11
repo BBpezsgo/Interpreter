@@ -766,6 +766,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (anyCall.PrevStatement is Identifier _identifier2)
             { _identifier2.Token.AnalyzedType = TokenAnalyzedType.FunctionName; }
             anyCall.Reference = compiledFunction;
+            if (anyCall.PrevStatement is IReferenceableTo<CompiledFunction> _ref1)
+            { _ref1.Reference = compiledFunction; }
 
             if (!Settings.DontOptimize &&
                 TryEvaluate(compiledFunction, functionCall.MethodArguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
@@ -782,9 +784,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (functionCall.CompiledType is not null)
             { OnGotStatementType(anyCall, functionCall.CompiledType); }
 
-            if (anyCall.PrevStatement is IReferenceableTo _ref1)
-            { _ref1.Reference = functionCall.Reference; }
-            anyCall.Reference = functionCall.Reference;
             return;
         }
 
@@ -2898,10 +2897,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             DebugInfo?.FunctionInformation.Add(new FunctionInformation()
             {
                 IsValid = true,
-                SourcePosition = function.Identifier.Position,
-                Identifier = function.Identifier.Content,
-                File = function.File,
-                ReadableIdentifier = function.ToReadable(),
+                Function = function,
+                TypeArguments = TypeArguments.ToImmutableDictionary(),
                 Instructions = (instructionStart, GeneratedCode.Count),
             });
         }

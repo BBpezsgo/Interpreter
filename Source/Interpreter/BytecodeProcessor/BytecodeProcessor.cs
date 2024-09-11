@@ -21,7 +21,11 @@ public partial class BytecodeProcessor
         if (StackDirection > 0)
         { return new ArraySegment<byte>(Memory)[StackStart..Registers.StackPointer]; }
         else
-        { return new ArraySegment<byte>(Memory)[Registers.StackPointer..].Reverse(); }
+        {
+            if (Registers.StackPointer < 0 || Registers.StackPointer >= Memory.Length)
+            { return Enumerable.Empty<byte>(); }
+            return new ArraySegment<byte>(Memory)[Registers.StackPointer..].Reverse();
+        }
     }
 
     public Range<int> GetStackInterval(out bool isReversed)
@@ -61,11 +65,6 @@ public partial class BytecodeProcessor
         try
         {
             Process();
-        }
-        catch (UserException error)
-        {
-            error.Context = GetContext();
-            throw;
         }
         catch (RuntimeException error)
         {
@@ -254,7 +253,7 @@ public partial class BytecodeProcessor
         InstructionOperandType.PointerSP8 => GetData8(Registers.StackPointer + operand.Int),
         InstructionOperandType.PointerSP16 => GetData16(Registers.StackPointer + operand.Int),
         InstructionOperandType.PointerSP32 => GetData32(Registers.StackPointer + operand.Int),
-        
+
         InstructionOperandType.PointerEAX8 => GetData8(Registers.EAX + operand.Int),
         InstructionOperandType.PointerEAX16 => GetData16(Registers.EAX + operand.Int),
         InstructionOperandType.PointerEAX32 => GetData32(Registers.EAX + operand.Int),
@@ -271,7 +270,7 @@ public partial class BytecodeProcessor
         InstructionOperandType.PointerEDX16 => GetData16(Registers.EDX + operand.Int),
         InstructionOperandType.PointerEDX32 => GetData32(Registers.EDX + operand.Int),
         InstructionOperandType.PointerEDX64 => throw new NotImplementedException(),
-        
+
         // FIXME: Same
         InstructionOperandType.PointerRAX8 => GetData8(Registers.EAX + operand.Int),
         InstructionOperandType.PointerRAX16 => GetData16(Registers.EAX + operand.Int),
@@ -334,7 +333,7 @@ public partial class BytecodeProcessor
             case InstructionOperandType.PointerSP8: SetData8(Registers.StackPointer + operand.Int, value.U8); break;
             case InstructionOperandType.PointerSP16: SetData16(Registers.StackPointer + operand.Int, value.U16); break;
             case InstructionOperandType.PointerSP32: SetData32(Registers.StackPointer + operand.Int, value.I32); break;
-            
+
             case InstructionOperandType.PointerEAX8: SetData8(Registers.EAX + operand.Int, value.U8); break;
             case InstructionOperandType.PointerEAX16: SetData16(Registers.EAX + operand.Int, value.U16); break;
             case InstructionOperandType.PointerEAX32: SetData32(Registers.EAX + operand.Int, value.I32); break;
@@ -351,7 +350,7 @@ public partial class BytecodeProcessor
             case InstructionOperandType.PointerEDX16: SetData16(Registers.EDX + operand.Int, value.U16); break;
             case InstructionOperandType.PointerEDX32: SetData32(Registers.EDX + operand.Int, value.I32); break;
             case InstructionOperandType.PointerEDX64: throw new NotImplementedException();
-            
+
             // FIXME: Same
             case InstructionOperandType.PointerRAX8: SetData8(Registers.EAX + operand.Int, value.U8); break;
             case InstructionOperandType.PointerRAX16: SetData16(Registers.EAX + operand.Int, value.U16); break;
@@ -369,7 +368,7 @@ public partial class BytecodeProcessor
             case InstructionOperandType.PointerRDX16: SetData16(Registers.EDX + operand.Int, value.U16); break;
             case InstructionOperandType.PointerRDX32: SetData32(Registers.EDX + operand.Int, value.I32); break;
             case InstructionOperandType.PointerRDX64: throw new NotImplementedException();
-            
+
             case InstructionOperandType.Register:
                 switch ((Register)operand.Int)
                 {

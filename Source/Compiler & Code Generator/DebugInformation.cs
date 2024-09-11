@@ -95,11 +95,14 @@ public readonly struct CollectedScopeInfo
 public struct FunctionInformation
 {
     public bool IsValid;
-    public Position SourcePosition;
-    public string Identifier;
-    public Uri? File;
-    public string ReadableIdentifier;
+    public Parser.FunctionThingDefinition? Function;
+    public ImmutableDictionary<string, GeneralType>? TypeArguments;
     public MutableRange<int> Instructions;
+
+    public readonly Position SourcePosition => Function?.Identifier.Position ?? default;
+    public readonly string? Identifier => Function?.Identifier.Content;
+    public readonly Uri? File => Function?.File;
+    public readonly string? ReadableIdentifier => Function?.ToReadable();
 
     public readonly bool Contains(int instruction) =>
         Instructions.Start <= instruction &&

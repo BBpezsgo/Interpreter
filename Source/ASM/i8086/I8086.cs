@@ -347,8 +347,6 @@ public unsafe struct I8086
     public I8086(string outputFile)
     {
         Memory = new byte[1024 * 1024 * 4];
-        /* C:\Users\bazsi\Desktop\ahh\noname.bin (2024. 03. 14. 6:06:00)
-    Kezdőpozíció(h): 00000000, Végpozíció(h): 0000001F, Hossz(h): 00000020 */
 
         Registers.DS = (1024 * 0) >> 4;
         Registers.SS = (1024 * 1) >> 4;

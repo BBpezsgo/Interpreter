@@ -7,7 +7,7 @@ namespace ConsoleGUI;
 [ExcludeFromCodeCoverage]
 public class WindowElement : Element
 {
-    public bool IsFocused { get; private set; }
+    public new bool IsFocused { get; private set; }
     bool IsDragging;
 
     Point MouseDragStart = Point.Empty;

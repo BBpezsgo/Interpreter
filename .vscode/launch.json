@@ -1,24 +1,26 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Core Launch (console)",
+            "name": "Debug",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net7.0/BBCodeInterpreter.dll",
-            "args": [ "--pause-end" ],
+            "program": "${workspaceFolder}/bin/Debug/net9.0/BBLang",
+            "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
-            "console": "externalTerminal",
-            "env": {
-                "DOTNET_ROOT": "${env.USERPROFILE}\\dotnet7",
-                "PATH": "${env.USERPROFILE}\\dotnet7;${env.PATH}",
-                "DOTNET_MULTILEVEL_LOOKUP": "0",
-            }
+            "console": "internalConsole",
+        },
+        {
+            "name": "Debug core dump",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/TestFiles/02.bbc_executable",
+            "coreDumpPath": "${workspaceFolder}/TestFiles/core",
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb"
         }
     ]
 }

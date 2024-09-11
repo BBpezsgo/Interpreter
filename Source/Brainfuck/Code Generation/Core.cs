@@ -123,24 +123,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         readonly int InstructionStart;
         readonly CodeHelper Code;
         readonly DebugInformation? DebugInfo;
-        readonly Uri? Uri;
-        readonly string Identifier;
-        readonly string ReadableIdentifier;
-        readonly Position Position;
+        readonly FunctionThingDefinition Function;
+        readonly Dictionary<string, GeneralType>? TypeArguments;
 
-        public DebugFunctionBlock(CodeHelper code, DebugInformation? debugInfo, Uri? uri, string identifier, string readableIdentifier, Position position)
+        public DebugFunctionBlock(CodeHelper code, DebugInformation? debugInfo, FunctionThingDefinition function, Dictionary<string, GeneralType>? typeArguments)
         {
             Code = code;
             DebugInfo = debugInfo;
-            Position = position;
-            Uri = uri;
-            Identifier = identifier;
-            ReadableIdentifier = readableIdentifier;
-
-            if (debugInfo is null) return;
-            if (position == Position.UnknownPosition) return;
-
             InstructionStart = code.Length;
+            
+            Function = function;
+            TypeArguments = typeArguments;
         }
 
         void IDisposable.Dispose()
@@ -149,12 +142,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
             DebugInfo.FunctionInformation.Add(new FunctionInformation()
             {
-                File = Uri,
-                Identifier = Identifier,
-                ReadableIdentifier = ReadableIdentifier,
+                Function = Function,
                 Instructions = (InstructionStart, Code.Length),
                 IsValid = true,
-                SourcePosition = Position,
             });
         }
     }
@@ -370,34 +360,26 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     DebugFunctionBlock<CompiledFunction> FunctionBlock(CompiledFunction function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
-        function.File,
-        function.Identifier.Content,
-        function.ToReadable(typeArguments),
-        function.Position);
+        function,
+        typeArguments);
 
     DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledOperator function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
-        function.File,
-        function.Identifier.Content,
-        function.ToReadable(typeArguments),
-        function.Position);
+        function,
+        typeArguments);
 
     DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledGeneralFunction function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
-        function.File,
-        function.Identifier.Content,
-        function.ToReadable(typeArguments),
-        function.Position);
+        function,
+        typeArguments);
 
     DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledConstructor function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
-        function.File,
-        function.Type.ToString(),
-        function.ToReadable(typeArguments),
-        function.Position);
+        function,
+        typeArguments);
 
     protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
     {

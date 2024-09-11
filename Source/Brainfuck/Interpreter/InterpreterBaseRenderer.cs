@@ -468,7 +468,7 @@ public partial class InterpreterBase<TCode> : IDisposable
             if (functionInfos2[fi].IsValid)
             {
                 renderer.Text(0, rect.Y + 1 + i, functionInfos2[fi].ReadableIdentifier, CharColor.White);
-                x += functionInfos2[fi].ReadableIdentifier.Length;
+                x += functionInfos2[fi].ReadableIdentifier!.Length;
             }
             else
             {

@@ -1,4 +1,7 @@
-﻿namespace LanguageCore.Runtime;
+﻿using LanguageCore.Compiler;
+using Win32.Console;
+
+namespace LanguageCore.Runtime;
 
 [ExcludeFromCodeCoverage]
 public class RuntimeException : LanguageException
@@ -44,9 +47,11 @@ public class RuntimeException : LanguageException
 
         ImmutableArray<FunctionInformation> callStack = DebugInformation?.GetFunctionInformation(callTrace).ToImmutableArray() ?? ImmutableArray<FunctionInformation>.Empty;
 
-        File ??= callStack.LastOrDefault().File;
+        File ??= callStack.LastOrDefault().Function?.File;
 
-        StringBuilder result = new(Message);
+        AnsiBuilder result = new();
+
+        result.Append(Message);
 
         result.Append(Position.ToStringCool().Surround(" (at ", ")"));
 
@@ -55,11 +60,116 @@ public class RuntimeException : LanguageException
 
         result.AppendLine();
 
+        result.ResetStyle();
+
         if (arrows is not null)
         {
             result.Append(arrows);
             result.AppendLine();
             result.AppendLine();
+        }
+
+        void AppendType(GeneralType type)
+        {
+            switch (type)
+            {
+                case ArrayType v:
+                    AppendType(v.Of);
+
+                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    result.Append('[');
+
+                    if (v.ComputedLength.HasValue)
+                    {
+                        result.SetGraphics(Ansi.ForegroundWhite);
+                        result.Append(v.ComputedLength.Value.ToString());
+                    }
+                    else if (v.Length is not null)
+                    {
+                        result.SetGraphics(Ansi.ForegroundWhite);
+                        result.Append('?');
+                    }
+
+                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    result.Append(']');
+
+                    break;
+                case BuiltinType v:
+                    result.SetGraphics(Ansi.BrightForegroundBlue);
+                    result.Append(v.ToString());
+
+                    break;
+                case FunctionType v:
+                    AppendType(v.ReturnType);
+
+                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    result.Append('(');
+
+                    for (int i = 0; i < v.Parameters.Length; i++)
+                    {
+                        if (i > 0)
+                        {
+                            result.SetGraphics(Ansi.BrightForegroundBlack);
+                            result.Append(", ");
+                        }
+
+                        AppendType(v.Parameters[i]);
+                    }
+
+                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    result.Append(')');
+
+                    break;
+                case GenericType v:
+                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    result.Append(v.ToString());
+
+                    break;
+                case PointerType v:
+                    AppendType(v.To);
+
+                    result.SetGraphics(Ansi.ForegroundWhite);
+                    result.Append('*');
+
+                    break;
+                case StructType v:
+                    result.SetGraphics(Ansi.BrightForegroundGreen);
+                    result.Append(v.Struct.Identifier.Content);
+
+                    if (!v.TypeArguments.IsEmpty)
+                    {
+                        result.SetGraphics(Ansi.BrightForegroundBlack);
+                        result.Append('<');
+                        result.Append(string.Join(", ", v.TypeArguments.Values));
+                        result.Append('>');
+                    }
+                    else if (v.Struct.Template is not null)
+                    {
+                        result.SetGraphics(Ansi.BrightForegroundBlack);
+                        result.Append('<');
+                        result.Append(string.Join(", ", v.Struct.Template.Parameters));
+                        result.Append('>');
+                    }
+
+                    break;
+                case AliasType aliasType:
+                    if (aliasType.FinalValue is BuiltinType)
+                    {
+                        result.SetGraphics(Ansi.BrightForegroundBlue);
+                        result.Append(type.ToString());
+                    }
+                    else
+                    {
+                        result.SetGraphics(Ansi.BrightForegroundBlack);
+                        result.Append(type.ToString());
+                    }
+                    break;
+                default:
+                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    result.Append(type.ToString());
+                    break;
+            }
+            result.ResetStyle();
         }
 
         void AppendScope(int codePointer)
@@ -85,29 +195,45 @@ public class RuntimeException : LanguageException
                     // { value = context.Memory.Slice(0 - item.Address, item.Size); }
                     result.Append(' ', CallStackIndent);
                     result.Append(' ', scopeDepth);
-                    result.Append(item.Type.ToString());
+                    AppendType(item.Type);
+                    // result.Append(item.Type.ToString());
                     result.Append(' ');
-                    result.Append(item.Tag);
-                    result.Append(' ');
+                    if (item.Kind == StackElementKind.Internal)
+                    {
+                        result.SetGraphics(Ansi.BrightForegroundBlack);
+                        result.Append(item.Tag);
+                        result.ResetStyle();
+                    }
+                    else
+                    {
+                        result.Append(item.Tag);
+                    }
+                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    result.Append(" = ");
+                    result.ResetStyle();
                     if (range.Start < 0 || range.End + 1 >= context.Memory.Length)
                     {
-                        result.Append("<invalid address>");
+                        result.Append("<invalid address>;");
                         result.AppendLine();
                         continue;
                     }
                     ImmutableArray<byte> value = context.Memory[range.Start..(range.End + 1)];
-                    if (item.Type.Equals(Compiler.BasicType.Integer))
+                    if (item.Type.Equals(BasicType.Integer))
                     { result.Append(value.To<int>()); }
-                    else if (item.Type.Equals(Compiler.BasicType.Float))
+                    else if (item.Type.Equals(BasicType.Float))
                     { result.Append(value.To<float>() + "f"); }
-                    else if (item.Type.Equals(Compiler.BasicType.Char))
+                    else if (item.Type.Equals(BasicType.Char))
                     { result.Append($"'{value.To<char>().Escape()}'"); }
-                    else if (item.Type.Equals(Compiler.BasicType.Byte))
+                    else if (item.Type.Equals(BasicType.Byte))
                     { result.Append(value.To<byte>()); }
-                    else if (item.Type is Compiler.PointerType)
-                    { result.Append(value.To<int>()); }
+                    else if (item.Type is PointerType)
+                    {
+                        result.Append('*');
+                        result.Append(value.To<int>());
+                    }
                     else
                     { result.Append(string.Join(' ', value)); }
+                    result.Append(';');
                     result.AppendLine();
                 }
             }
@@ -119,6 +245,61 @@ public class RuntimeException : LanguageException
             }
             result.AppendLine();
         }
+
+        bool AppendFrame(FunctionInformation frame)
+        {
+            if (frame.Function is null) return false;
+
+            Parser.FunctionThingDefinition function = frame.Function;
+            result.SetGraphics(Ansi.BrightForegroundYellow);
+            result.Append(function.Identifier.ToString());
+            result.ResetStyle();
+            result.Append('(');
+            for (int j = 0; j < function.Parameters.Count; j++)
+            {
+                if (j > 0) result.Append(", ");
+                if (function.Parameters[j].Modifiers.Length > 0)
+                {
+                    result.SetGraphics(Ansi.ForegroundBlue);
+                    result.AppendJoin(' ', function.Parameters[j].Modifiers);
+                    result.ResetStyle();
+                    result.Append(' ');
+                }
+
+                if (function is not ICompiledFunction compiledFunction)
+                {
+                    result.Append(function.Parameters[j].Type.ToString());
+                }
+                else
+                {
+                    AppendType(compiledFunction.ParameterTypes[j]);
+                    result.ResetStyle();
+                }
+
+                result.Append(' ');
+                result.Append(function.Parameters[j].Identifier.ToString());
+            }
+            result.Append(')');
+            result.Append(' ');
+
+            if (function.Identifier.Position != Position.UnknownPosition)
+            { result.Append(function.Identifier.Position.ToStringCool().Surround(" (at ", ")")); }
+
+            if (function.File is not null)
+            { result.Append($" (in {function.File})"); }
+            return true;
+        }
+
+        result.AppendLine();
+        result.AppendLine($"Registers:");
+        result.AppendLine($"CP: {context.Registers.CodePointer}");
+        result.AppendLine($"SP: {context.Registers.StackPointer}");
+        result.AppendLine($"BP: {context.Registers.BasePointer}");
+        result.AppendLine($"AX: {context.Registers.AX}");
+        result.AppendLine($"BX: {context.Registers.BX}");
+        result.AppendLine($"CX: {context.Registers.CX}");
+        result.AppendLine($"DX: {context.Registers.DX}");
+        result.AppendLine($"Flags: {context.Registers.Flags}");
 
         result.AppendLine();
         result.AppendLine("Call Stack (from last to recent):");
@@ -133,8 +314,13 @@ public class RuntimeException : LanguageException
             {
                 for (int i = 0; i < callStack.Length; i++)
                 {
+                    FunctionInformation frame = callStack[i];
+
                     result.Append(' ', CallStackIndent);
-                    result.Append(callStack[i].ToString() ?? $"<unknown> {callTrace[i]}");
+
+                    if (!AppendFrame(frame))
+                    { result.Append($"<unknown> {callTrace[i]}"); }
+
                     result.AppendLine();
 
                     AppendScope(callTrace[i]);
@@ -144,7 +330,8 @@ public class RuntimeException : LanguageException
 
         FunctionInformation currentFrame = DebugInformation?.GetFunctionInformation(context.Registers.CodePointer) ?? default;
         result.Append(' ', CallStackIndent);
-        result.Append(currentFrame.ToString());
+        if (!AppendFrame(currentFrame))
+        { result.Append($"<unknown> {context.Registers.CodePointer}"); }
         result.Append(" (current)");
         result.AppendLine();
 

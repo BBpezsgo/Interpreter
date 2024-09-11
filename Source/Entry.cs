@@ -155,7 +155,7 @@ public static class Entry
                         {
                             (int blockSize, bool blockIsUsed) = HeapImplementation.GetHeader(interpreter.BytecodeInterpreter.Memory[i]);
 
-                            Console.Write($"BLOCK {blockIndex} ({i}): ");
+                            Console.Write($"BLOCK {i}: ");
 
                             Console.Write($"SIZE: {blockSize} ");
 

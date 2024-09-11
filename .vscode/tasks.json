@@ -1,16 +1,15 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
+	"version": "2.0.0",
+	"tasks": [
+		{
             "label": "build",
-            "command": ".\\build.bat"
-        },
-        {
-            "label": "run",
-            "command": ".\\run.bat",
-            "icon": {
-                "id": "run"
-            }
-        }
-    ]
+            "command": "dotnet build ./Core.csproj",
+            "type": "shell",
+            "group": "build",
+            "presentation": {
+                "reveal": "silent"
+            },
+            "problemMatcher": "$msCompile"
+		}
+	]
 }

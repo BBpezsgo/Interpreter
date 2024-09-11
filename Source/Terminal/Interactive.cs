@@ -78,6 +78,7 @@ class InteractiveCompiler
     Task? _task;
     readonly Action<Task> _onCompiledAsync;
     readonly Queue<Task> _completedTasks;
+    readonly string? _basePath;
 
     public ImmutableArray<Token> Tokens { get; private set; }
     public Statement? Statement { get; private set; }
@@ -105,6 +106,7 @@ class InteractiveCompiler
         _task = null;
         _onCompiledAsync = onCompiledAsync;
         _completedTasks = new Queue<Task>();
+        _basePath = null;
     }
 
     public void Compile(string text)
@@ -131,7 +133,7 @@ class InteractiveCompiler
             Compiled = Compiler.CompileInteractive(
                 parsed2,
                 externalFunctions,
-                new CompilerSettings() { BasePath = "/home/BB/Projects/BBLang/Core/StandardLibrary/" },
+                new CompilerSettings() { BasePath = _basePath },
                 PreprocessorVariables.Interactive,
                 null,
                 null,
@@ -175,7 +177,7 @@ class InteractiveCompiler
             Compiled = Compiler.CompileInteractive(
                 parsed2,
                 externalFunctions,
-                new CompilerSettings() { BasePath = "/home/BB/Projects/BBLang/Core/StandardLibrary/" },
+                new CompilerSettings() { BasePath = _basePath },
                 PreprocessorVariables.Interactive,
                 null,
                 null,

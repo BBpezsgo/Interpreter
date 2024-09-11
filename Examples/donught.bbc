@@ -7,7 +7,7 @@ struct Buffer
 {
     int width;
     int height;
-    T* ptr;
+    T[]* ptr;
 
     export Buffer<T>(int width, int height)
     {

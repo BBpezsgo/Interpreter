@@ -238,7 +238,7 @@ public static class Utils
     public const long BaseTimeout = 2000;
     public const long BrainfuckTimeout = 5000;
 
-    const string TestFilesPath = $"{TestConstants.TheProjectPath}/TestFiles/";
+    static readonly string TestFilesPath = $"{LanguageCore.Program.ProjectPath}/TestFiles/";
 
     const int TestCount = 70;
     static readonly int TestFileNameWidth = (int)Math.Floor(Math.Log10(TestCount)) + 1;

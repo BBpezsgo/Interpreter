@@ -1985,7 +1985,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 BitWidth rightBitWidth = rightType.GetBitWidth(this);
                 BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
 
-                return @operator.Operator.Content switch
+                return OnGotStatementType(@operator, @operator.Operator.Content switch
                 {
                     BinaryOperatorCall.CompLT or
                     BinaryOperatorCall.CompGT or
@@ -2012,7 +2012,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                         => isFloat ? BuiltinType.Float : new BuiltinType(bitWidth.ToType()),
 
                     _ => throw (new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile)),
-                };
+                });
             }
         }
 

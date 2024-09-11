@@ -1,0 +1,38 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "Tests"
+		},
+		{
+			"path": "../LanguageServer"
+		},
+		{
+			"path": "../VSCodeExtension"
+		}
+	],
+	"settings": {
+		"dotnet.backgroundAnalysis.compilerDiagnosticsScope": "fullSolution",
+		"csharp.inlayHints.enableInlayHintsForImplicitObjectCreation": false,
+		"csharp.inlayHints.enableInlayHintsForLambdaParameterTypes": true,
+		"csharp.debug.console": "externalTerminal",
+		"dotnet.server.trace": "Trace",
+		"files.exclude": {
+			// "bin": true,
+			// "obj": true,
+			"Tests": true,
+		},
+		"dotnet.server.startTimeout": 60000,
+		"files.associations": {
+			"*.trx": "xml"
+		},
+		"search.exclude": {
+			"TestResults/*": true,
+			"**/bin/**": true,
+			"**/obj/**": true,
+		},
+		"csharp.debug.justMyCode": false
+	}
+}

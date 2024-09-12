@@ -295,7 +295,7 @@ public sealed class Parser
             Token[] parameterModifiers = ExpectModifiers();
             CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.This, ModifierKeywords.Temp);
 
-            if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
+            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected a type (the parameter's type)", PreviousToken?.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
@@ -444,7 +444,7 @@ public sealed class Parser
             Token[] parameterModifiers = ExpectModifiers();
             CheckParameterModifiers(parameterModifiers, parameters.Count, ParameterModifiers.AsSpan());
 
-            if (!ExpectType(AllowedType.None, out TypeInstance? parameterType))
+            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
@@ -646,7 +646,13 @@ public sealed class Parser
         Token? bracketEnd;
         while (!ExpectOperator("}", out bracketEnd))
         {
-            if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition))
+            if (ExpectField(out FieldDefinition? field))
+            {
+                fields.Add(field);
+                if (ExpectOperator(";", out Token? semicolon))
+                { field.Semicolon = semicolon; }
+            }
+            else if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition))
             {
                 methods.Add(methodDefinition);
             }
@@ -661,12 +667,6 @@ public sealed class Parser
             else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
             {
                 operators.Add(operatorDefinition);
-            }
-            else if (ExpectField(out FieldDefinition? field))
-            {
-                fields.Add(field);
-                if (ExpectOperator(";", out Token? semicolon))
-                { field.Semicolon = semicolon; }
             }
             else
             {
@@ -926,7 +926,7 @@ public sealed class Parser
         else if (ExpectIdentifier(out Token? simpleIdentifier))
         {
             if (simpleIdentifier.Content == StatementKeywords.Type &&
-                ExpectType(AllowedType.None, out TypeInstance? typeInstance))
+                ExpectType(AllowedType.FunctionPointer, out TypeInstance? typeInstance))
             {
                 simpleIdentifier.AnalyzedType = TokenAnalyzedType.Keyword;
                 statementWithValue = new TypeStatement(simpleIdentifier, typeInstance);
@@ -1696,7 +1696,7 @@ public sealed class Parser
 
         Token[] modifiers = ExpectModifiers();
 
-        if (!ExpectType(AllowedType.None, out TypeInstance? possibleType))
+        if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? possibleType))
         { CurrentTokenIndex = startTokenIndex; return false; }
 
         if (!ExpectIdentifier(out Token? possibleVariableName))
@@ -1896,7 +1896,7 @@ public sealed class Parser
 
                 while (true)
                 {
-                    if (!ExpectType(AllowedType.None, out TypeInstance? typeParameter))
+                    if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? typeParameter))
                     {
                         CurrentTokenIndex = afterIdentifier;
                         goto End;
@@ -1935,7 +1935,7 @@ public sealed class Parser
                 List<TypeInstance> parameterTypes = new();
                 while (!ExpectOperator(")"))
                 {
-                    if (!ExpectType(AllowedType.None, out TypeInstance? subtype))
+                    if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? subtype))
                     {
                         CurrentTokenIndex = afterIdentifier;
                         goto End;

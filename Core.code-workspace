@@ -20,8 +20,8 @@
 		"csharp.debug.console": "externalTerminal",
 		"dotnet.server.trace": "Trace",
 		"files.exclude": {
-			// "bin": true,
-			// "obj": true,
+			"bin": true,
+			"obj": true,
 			"Tests": true,
 		},
 		"dotnet.server.startTimeout": 60000,

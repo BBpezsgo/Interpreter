@@ -197,10 +197,29 @@ public static class Entry
                     Console.WriteLine($" ===== STACK ===== ");
                     Console.WriteLine();
 
-                    foreach (RuntimeValue item in interpreter.BytecodeInterpreter.GetStack())
+                    IEnumerable<byte> stack;
+#pragma warning disable CS0162 // Unreachable code detected
+                    if (BytecodeProcessor.StackDirection > 0)
+                    {
+                        stack = new ArraySegment<byte>(interpreter.BytecodeInterpreter.Memory)[interpreter.BytecodeInterpreter.StackStart..interpreter.BytecodeInterpreter.Registers.StackPointer];
+                    }
+                    else
+                    {
+                        if (interpreter.BytecodeInterpreter.Registers.StackPointer < 0 || interpreter.BytecodeInterpreter.Registers.StackPointer >= interpreter.BytecodeInterpreter.Memory.Length)
+                        {
+                            stack = Enumerable.Empty<byte>();
+                        }
+                        else
+                        {
+                            stack = new ArraySegment<byte>(interpreter.BytecodeInterpreter.Memory)[interpreter.BytecodeInterpreter.Registers.StackPointer..].Reverse();
+                        }
+                    }
+#pragma warning restore CS0162 // Unreachable code detected
+
+                    foreach (byte item in stack)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(item.I32);
+                        Console.Write(item);
                         Console.WriteLine();
                     }
 

@@ -16,18 +16,6 @@ public partial class BytecodeProcessor
     public ImmutableArray<Instruction> Code;
     readonly FrozenDictionary<int, ExternalFunctionBase> ExternalFunctions;
 
-    public IEnumerable<byte> GetStack()
-    {
-        if (StackDirection > 0)
-        { return new ArraySegment<byte>(Memory)[StackStart..Registers.StackPointer]; }
-        else
-        {
-            if (Registers.StackPointer < 0 || Registers.StackPointer >= Memory.Length)
-            { return Enumerable.Empty<byte>(); }
-            return new ArraySegment<byte>(Memory)[Registers.StackPointer..].Reverse();
-        }
-    }
-
     public Range<int> GetStackInterval(out bool isReversed)
     {
         isReversed = StackDirection <= 0;

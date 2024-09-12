@@ -219,7 +219,7 @@ public static class ArgumentParser
             {
                 ("directory", "Path to the directory")
             },
-            Help = $"Sets the path where source files will be searched for \"${DeclarationKeywords.Using}\"",
+            Help = $"Sets the path where source files will be searched for \"{DeclarationKeywords.Using}\"",
         },
         new()
         {
@@ -358,7 +358,7 @@ public static class ArgumentParser
                     result.DoNotPause = true;
                     break;
                 default:
-                    throw new ArgumentException($"Unknown option --\"${option.Name}\"");
+                    throw new ArgumentException($"Unknown option --\"{option.Name}\"");
             }
         }
 

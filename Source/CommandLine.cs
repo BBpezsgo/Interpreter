@@ -62,7 +62,7 @@ public static class CommandLineParser
                 found = spec;
 
                 if (current.Arguments.Count != spec.Arguments.Length)
-                { throw new ArgumentException($"Wrong number of arguments passed to option \"${(current.IsShort ? $"-{current.Name}" : $"--{current.Name}")}\": required {spec.Arguments}, passed {current.Arguments.Count}"); }
+                { throw new ArgumentException($"Wrong number of arguments passed to option \"{(current.IsShort ? $"-{current.Name}" : $"--{current.Name}")}\": required {spec.Arguments}, passed {current.Arguments.Count}"); }
             }
 
             if (found is null)
@@ -81,7 +81,7 @@ public static class CommandLineParser
             if (arg.StartsWith("--"))
             {
                 if (resultArguments.Count > 0)
-                { throw new ArgumentException($"Unexpected option \"${arg}\" after argument \"${resultArguments[^1]}\""); }
+                { throw new ArgumentException($"Unexpected option \"{arg}\" after argument \"{resultArguments[^1]}\""); }
 
                 Finish(ref current);
                 current = new OptionBuilder(arg[2..], false);
@@ -89,7 +89,7 @@ public static class CommandLineParser
             else if (arg.StartsWith('-'))
             {
                 if (resultArguments.Count > 0)
-                { throw new ArgumentException($"Unexpected option \"${arg}\" after argument \"${resultArguments[^1]}\""); }
+                { throw new ArgumentException($"Unexpected option \"{arg}\" after argument \"{resultArguments[^1]}\""); }
 
                 foreach (char c in arg[1..])
                 {

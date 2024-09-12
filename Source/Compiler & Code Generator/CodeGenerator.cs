@@ -1850,7 +1850,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 "integer" => LiteralType.Integer,
                 "float" => LiteralType.Float,
                 "string" => LiteralType.String,
-                _ => throw new CompilerException($"Invalid literal type \"${literalTypeName}\"", attribute.Parameters[0], null),
+                _ => throw new CompilerException($"Invalid literal type \"{literalTypeName}\"", attribute.Parameters[0], null),
             };
         }
 
@@ -1864,7 +1864,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (literalType == literal)
                 {
                     if (type is not null)
-                    { throw new CompilerException($"Multiple type definitions defined with attribute [{"UsedByLiteral"}(${attribute.Parameters[0].Value})]", attribute, alias.File); }
+                    { throw new CompilerException($"Multiple type definitions defined with attribute [{"UsedByLiteral"}({attribute.Parameters[0].Value})]", attribute, alias.File); }
                     type = new AliasType(alias.Value, alias);
                 }
             }
@@ -1878,7 +1878,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (literalType == literal)
                 {
                     if (type is not null)
-                    { throw new CompilerException($"Multiple type definitions defined with attribute [{"UsedByLiteral"}(${attribute.Parameters[0].Value})]", attribute, @struct.File); }
+                    { throw new CompilerException($"Multiple type definitions defined with attribute [{"UsedByLiteral"}({attribute.Parameters[0].Value})]", attribute, @struct.File); }
                     type = new StructType(@struct, @struct.File);
                 }
             }

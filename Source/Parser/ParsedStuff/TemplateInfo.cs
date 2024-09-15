@@ -1,7 +1,7 @@
-﻿namespace LanguageCore.Parser;
+﻿using LanguageCore.Parser.Statement;
+using LanguageCore.Tokenizing;
 
-using Statement;
-using Tokenizing;
+namespace LanguageCore.Parser;
 
 public class TemplateInfo : IPositioned
 {

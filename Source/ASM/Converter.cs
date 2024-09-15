@@ -1,18 +1,18 @@
-﻿namespace LanguageCore.ASM.Generator;
+﻿using LanguageCore.Runtime;
 
-using Runtime;
+namespace LanguageCore.ASM.Generator;
 
 [ExcludeFromCodeCoverage]
 public static class ConverterForAsm
 {
-    public static string Convert(ReadOnlySpan<Instruction> instructions, BitWidth bits)
+    public static string Convert(ReadOnlySpan<Runtime.Instruction> instructions, BitWidth bits)
     {
         AssemblyCode builder = new();
 
         List<int> codeReferences = new();
         for (int i = 0; i < instructions.Length; i++)
         {
-            Instruction instruction = instructions[i];
+            Runtime.Instruction instruction = instructions[i];
             if (instruction.Opcode is Opcode.Jump)
             { codeReferences.Add(i + instruction.Operand1.Int); }
         }
@@ -33,7 +33,7 @@ public static class ConverterForAsm
                 builder.CodeBuilder.AppendLabel($"_{i}");
             }
 
-            Instruction instruction = instructions[i];
+            Runtime.Instruction instruction = instructions[i];
 
             builder.CodeBuilder.AppendText(' ', builder.CodeBuilder.Indent);
 
@@ -87,13 +87,13 @@ public static class ConverterForAsm
                     }
                     if (paramCount >= 2)
                     {
-                        InstructionOperand op2 = instruction.Operand2;
+                        Runtime.InstructionOperand op2 = instruction.Operand2;
 
                         if (instruction.Operand1.BitWidth == BitWidth._64 &&
                             instruction.Operand2.BitWidth < BitWidth._64 &&
-                            instruction.Operand2.Type == InstructionOperandType.Immediate32)
+                            instruction.Operand2.Type == Runtime.InstructionOperandType.Immediate32)
                         {
-                            op2 = new InstructionOperand(op2.Value, InstructionOperandType.Immediate64);
+                            op2 = new Runtime.InstructionOperand(op2.Value, Runtime.InstructionOperandType.Immediate64);
                         }
 
                         builder.CodeBuilder.Builder.Append(',');

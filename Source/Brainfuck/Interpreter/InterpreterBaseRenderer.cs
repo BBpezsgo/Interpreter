@@ -1,11 +1,9 @@
-﻿using System.Runtime.Versioning;
-using System.Threading;
+﻿using System.Threading;
 using Win32;
 using Win32.Console;
+using LanguageCore.Runtime;
 
 namespace LanguageCore.Brainfuck;
-
-using Runtime;
 
 public partial class InterpreterBase
 {
@@ -93,7 +91,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     {
         _rendererContext.Renderer ??= new AnsiRenderer();
         // _rendererContext.Renderer ??= new ConsoleRenderer((short)Console.WindowWidth, (short)Console.WindowHeight);
-        
+
         ConsoleListener.Start();
 
         if (_rendererContext.InputBuffer is null)

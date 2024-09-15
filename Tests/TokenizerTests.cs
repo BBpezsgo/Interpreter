@@ -1,11 +1,9 @@
-﻿#pragma warning disable IDE0059 // Unnecessary assignment of a value
-using System.Collections.Immutable;
-
-namespace Tests;
-
+﻿using System.Collections.Immutable;
 using System.Text;
 using LanguageCore;
 using LanguageCore.Tokenizing;
+
+namespace Tests;
 
 [TestClass, TestCategory("Tokenizer")]
 public class TokenizerTests

@@ -1,8 +1,8 @@
-﻿namespace LanguageCore.Parser;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Tokenizing;
 
-using Compiler;
-using Statement;
-using Tokenizing;
+namespace LanguageCore.Parser;
 
 public class AttributeUsage :
     IPositioned,

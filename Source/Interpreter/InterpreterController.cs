@@ -1,7 +1,5 @@
 ﻿namespace LanguageCore.Runtime;
 
-using Compiler;
-
 public readonly struct TimeSleep : IEquatable<TimeSleep>
 {
     readonly double Timeout;
@@ -137,7 +135,7 @@ public class Interpreter
 
     static void AddRuntimeExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
     {
-        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdIn, static () => { return '\0'; });
+        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdIn, static () => '\0');
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, static (char @char) => { });
         externalFunctions.AddExternalFunction("console-set", static (char @char, int x, int y) => { });
         externalFunctions.AddExternalFunction("console-clear", static () => { });

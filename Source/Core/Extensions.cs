@@ -1,9 +1,9 @@
-﻿namespace LanguageCore;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Parser;
+using LanguageCore.Runtime;
+using LanguageCore.Tokenizing;
 
-using Compiler;
-using Parser;
-using Runtime;
-using Tokenizing;
+namespace LanguageCore;
 
 public static class Extensions
 {

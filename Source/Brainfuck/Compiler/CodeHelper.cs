@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Brainfuck;
+﻿using LanguageCore.Compiler;
 
-using Compiler;
+namespace LanguageCore.Brainfuck;
 
 public interface IBrainfuckGenerator
 {

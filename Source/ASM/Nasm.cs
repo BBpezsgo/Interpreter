@@ -111,7 +111,7 @@ public static class Nasm
         { File.Delete(outputFile); }
 
         // -gcv8 -f win32
-        
+
         using Process? process = Process.Start(new ProcessStartInfo("nasm", $"-f elf64 -g -F dwarf {inputFile} -o {outputFile}")
         {
             RedirectStandardOutput = true,

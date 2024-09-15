@@ -93,7 +93,6 @@ public readonly struct CompactCodeSegment
     }
 }
 
-[SuppressMessage("Roslynator", "RCS1154")]
 public enum OpCodes
 {
     NULL = '\0',
@@ -108,7 +107,6 @@ public enum OpCodes
     Break = '$',
 }
 
-[SuppressMessage("Roslynator", "RCS1154")]
 public enum OpCodesCompact
 {
     NULL = '\0',

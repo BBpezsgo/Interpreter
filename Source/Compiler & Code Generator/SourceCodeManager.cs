@@ -3,10 +3,10 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace LanguageCore.Compiler;
+using LanguageCore.Parser;
+using LanguageCore.Tokenizing;
 
-using Parser;
-using Tokenizing;
+namespace LanguageCore.Compiler;
 
 public delegate bool FileParser(Uri uri, TokenizerSettings? tokenizerSettings, [NotNullWhen(true)] out ParserResult ast);
 
@@ -102,7 +102,7 @@ public class SourceCodeManager
 
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
 
-        ast = Parser.Parse(tokens.Tokens, uri);
+        ast = Parser.Parser.Parse(tokens.Tokens, uri);
 
         AnalysisCollection?.Errors.AddRange(ast.Errors);
 
@@ -124,7 +124,7 @@ public class SourceCodeManager
         TokenizerResult tokens = StreamTokenizer.Tokenize(path, PreprocessorVariables, tokenizerSettings);
         AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
 
-        ast = Parser.Parse(tokens.Tokens, Utils.ToFileUri(path));
+        ast = Parser.Parser.Parse(tokens.Tokens, Utils.ToFileUri(path));
         AnalysisCollection?.Errors.AddRange(ast.Errors);
 
         return true;
@@ -265,7 +265,6 @@ public class SourceCodeManager
         { return new Dictionary<Uri, CollectedAST>(); }
 
         Dictionary<Uri, CollectedAST> collectedASTs = new();
-
         collectedASTs.Add(path, new CollectedAST(ast.Value, path, @using));
 
         foreach (UsingDefinition @using_ in ast.Value.Usings)
@@ -290,7 +289,6 @@ public class SourceCodeManager
         { return new Dictionary<Uri, CollectedAST>(); }
 
         Dictionary<Uri, CollectedAST> collectedASTs = new();
-
         collectedASTs.Add(uri, new CollectedAST(ast.Value, uri, null));
 
         foreach (UsingDefinition @using_ in ast.Value.Usings)

@@ -1,7 +1,7 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Runtime;
+using LanguageCore.Parser;
 
-using Runtime;
-using Parser;
+namespace LanguageCore.Compiler;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public abstract class GeneralType :

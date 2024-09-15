@@ -15,12 +15,11 @@ public static class Program
         return callerFilePath[..^(_thisFileName.Length + 1)];
     }
 
-    public static void Main(string[] args)
-    {
+    public static void Main(string[] args) =>
 #if DEBUG
         DevelopmentEntry.Start(args);
 #else
         Entry.Run(args);
 #endif
-    }
+
 }

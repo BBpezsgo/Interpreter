@@ -1,6 +1,6 @@
-﻿namespace Tests;
+﻿using LanguageCore;
 
-using LanguageCore;
+namespace Tests;
 
 [TestClass, TestCategory("Code Position")]
 public class PositionTests

@@ -1,5 +1,4 @@
 ﻿using System.Drawing;
-using System.Runtime.Versioning;
 using LanguageCore;
 using LanguageCore.Runtime;
 using Win32.Console;

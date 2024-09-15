@@ -1,7 +1,7 @@
-﻿namespace LanguageCore.Parser;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Parser.Statement;
 
-using Compiler;
-using Statement;
+namespace LanguageCore.Parser;
 
 public class ParameterDefinitionCollection :
     IPositioned,

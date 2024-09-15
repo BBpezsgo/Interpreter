@@ -1,7 +1,7 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Runtime;
+using LanguageCore.Parser;
 
-using Parser;
-using Runtime;
+namespace LanguageCore.Compiler;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class StructType : GeneralType,

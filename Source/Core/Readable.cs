@@ -1,7 +1,7 @@
-﻿namespace LanguageCore;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Parser.Statement;
 
-using Compiler;
-using Parser.Statement;
+namespace LanguageCore;
 
 public interface IReadable
 {

@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Runtime;
 
-using Runtime;
+namespace LanguageCore.Compiler;
 
 public partial struct CompiledValue :
     IAdditionOperators<CompiledValue, CompiledValue, CompiledValue>,

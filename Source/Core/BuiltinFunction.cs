@@ -1,6 +1,6 @@
-namespace LanguageCore;
+using LanguageCore.Compiler;
 
-using Compiler;
+namespace LanguageCore;
 
 public class BuiltinFunction
 {

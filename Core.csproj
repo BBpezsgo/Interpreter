@@ -14,6 +14,7 @@
     <PackageId>BBLang</PackageId>
     <Authors>BB</Authors>
     <StartupObject>LanguageCore.Program</StartupObject>
+    <AnalysisLevel>preview-all</AnalysisLevel>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -48,6 +49,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Win32-Stuff\Win32.csproj" />
+    <ProjectReference Include="..\..\Math\Math.csproj" />
   </ItemGroup>
 
   <ItemGroup>

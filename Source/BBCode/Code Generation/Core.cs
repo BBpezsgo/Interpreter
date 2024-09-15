@@ -1,7 +1,7 @@
-﻿namespace LanguageCore.BBLang.Generator;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Runtime;
 
-using Compiler;
-using Runtime;
+namespace LanguageCore.BBLang.Generator;
 
 class RegisterUsage
 {

@@ -206,7 +206,7 @@ public readonly struct ExpectedResult
         {
             // Span<byte> expectedMemory = Utils.GenerateBrainfuckMemory(other.Memory.Length).AsSpan()[1..];
             // Span<byte> actualMemory = other.Memory.AsSpan()[1..];
-            // 
+            //
             // if (!MemoryExtensions.SequenceEqual(expectedMemory, actualMemory))
             // { throw new AssertFailedException($"Memory isn't empty"); }
         }
@@ -788,7 +788,7 @@ public static class AssertUtils
     }
 
     /// <exception cref="AssertFailedException"/>
-    public static void PositionEquals(IReadOnlyList<IPositioned> positions, params Position[] expected)
+    public static void PositionEquals(IReadOnlyList<IPositioned> positions, params ReadOnlySpan<Position> expected)
     {
         Assert.AreEqual(positions.Count, expected.Length);
 

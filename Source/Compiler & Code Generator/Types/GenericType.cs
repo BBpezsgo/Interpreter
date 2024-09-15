@@ -1,8 +1,8 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Runtime;
+using LanguageCore.Parser;
+using LanguageCore.Tokenizing;
 
-using Tokenizing;
-using Parser;
-using Runtime;
+namespace LanguageCore.Compiler;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class GenericType : GeneralType,

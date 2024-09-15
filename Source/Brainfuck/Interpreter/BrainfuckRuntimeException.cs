@@ -75,7 +75,7 @@ public class BrainfuckRuntimeException : Exception
         result.Append(' ', callTraceIndent);
         result.Append(currentFrame.ToString());
         result.Append(" (current)");
-    
+
         return result.ToString();
     }
 }

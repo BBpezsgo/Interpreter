@@ -1,5 +1,4 @@
 ﻿using System.Drawing;
-using System.Runtime.Versioning;
 using Win32.Console;
 
 namespace ConsoleGUI;

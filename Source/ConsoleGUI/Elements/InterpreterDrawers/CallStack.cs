@@ -7,7 +7,7 @@ namespace ConsoleGUI;
 
 public partial class InterpreterElement
 {
-    private void CallStackElement_OnBeforeDraw(InlineElement sender)
+    void CallStackElement_OnBeforeDraw(InlineElement sender)
     {
         bool focused = _focusedElement == 4;
         sender.IsFocused = focused;

@@ -5,11 +5,6 @@ using Win32.Console;
 
 namespace LanguageCore.Intel;
 
-#pragma warning disable IDE0059 // Unnecessary assignment of a value
-#pragma warning disable IDE0051 // Remove unused private members
-#pragma warning disable RCS1213 // Remove unused member declaration
-#pragma warning disable RCS1089 // Use --/++ operator instead of assignment
-
 [Flags]
 enum Flags : ushort
 {

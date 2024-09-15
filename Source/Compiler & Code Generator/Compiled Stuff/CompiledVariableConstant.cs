@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser.Statement;
 
-using Parser.Statement;
+namespace LanguageCore.Compiler;
 
 public class CompiledVariableConstant : VariableDeclaration,
     IConstant,

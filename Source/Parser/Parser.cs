@@ -374,7 +374,6 @@ public sealed class Parser
         return true;
     }
 
-
     bool ExpectTemplateInfo([NotNullWhen(true)] out TemplateInfo? templateInfo)
     {
         if (!ExpectIdentifier(DeclarationKeywords.Template, out Token? keyword))
@@ -1952,7 +1951,7 @@ public sealed class Parser
 
                 type = new TypeInstanceFunction(type, parameterTypes);
             }
-            else if (ExpectOperator("[", out Token? bracketStart1))
+            else if (ExpectOperator("[", out _))
             {
                 ExpectOneValue(out StatementWithValue? sizeValue);
 

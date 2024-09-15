@@ -37,7 +37,7 @@ public static class CommandLineParser
         }
     }
 
-    public static (List<Option> Options, List<string> Arguments) Parse(string[] args, OptionSpecification[] optionSpecifications)
+    public static (List<Option> Options, List<string> Arguments) Parse(string[] args, ImmutableArray<OptionSpecification> optionSpecifications)
     {
         OptionBuilder? current = null;
 
@@ -137,7 +137,7 @@ public static class CommandLineParser
         return (resultOptions, resultArguments);
     }
 
-    public static void PrintHelp(OptionSpecification[] optionSpecifications, (string Name, string Help)[] argumentsHelp)
+    public static void PrintHelp(ImmutableArray<OptionSpecification> optionSpecifications, (string Name, string Help)[] argumentsHelp)
     {
         const int PaddingBefore = 4;
         const int PaddingBetween = 4;

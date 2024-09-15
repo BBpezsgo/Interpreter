@@ -1,12 +1,12 @@
-﻿namespace LanguageCore.BBLang.Generator;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Runtime;
+using LanguageCore.Tokenizing;
+using LiteralStatement = LanguageCore.Parser.Statement.Literal;
+using ParameterCleanupItem = (int Size, bool CanDeallocate, LanguageCore.Compiler.GeneralType Type, LanguageCore.Position Position);
 
-using Compiler;
-using Parser;
-using Parser.Statement;
-using Runtime;
-using Tokenizing;
-using LiteralStatement = Parser.Statement.Literal;
-using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.GeneralType Type, Position Position);
+namespace LanguageCore.BBLang.Generator;
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
@@ -624,7 +624,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForFunctionCall_External<TFunction>(IReadOnlyList<StatementWithValue> parameters, bool saveValue, TFunction compiledFunction, ExternalFunctionBase externalFunction)
         where TFunction : FunctionThingDefinition, ICompiledFunction, ISimpleReadable
     {
-        Compiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction);
+        Compiler.Compiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction);
 
         AddComment($"Call {compiledFunction.ToReadable()} {{");
 
@@ -854,7 +854,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out var notFoundError))
+        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out WillBeCompilerException? notFoundError))
         {
             CompiledOperator? operatorDefinition = result.Function;
 

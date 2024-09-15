@@ -1,6 +1,6 @@
-﻿namespace LanguageCore;
+﻿using LanguageCore.Runtime;
 
-using Runtime;
+namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
 public struct ProgramArguments
@@ -78,81 +78,8 @@ public static class ArgumentNormalizer
 [ExcludeFromCodeCoverage]
 public static class ArgumentParser
 {
-    class ArgumentsSource
-    {
-        readonly ImmutableArray<string> Arguments;
-        int Index;
-
-        public bool Has => Index < Arguments.Length - 1;
-        public object Current => Arguments[Index];
-
-        public ArgumentsSource(IEnumerable<string> args)
-        {
-            Arguments = args.ToImmutableArray();
-            Index = 0;
-        }
-
-        public bool TryConsume([NotNullWhen(true)] out string? result, params string[] name)
-        {
-            result = null;
-
-            if (Index >= Arguments.Length - 1)
-            { return false; }
-
-            for (int j = 0; j < name.Length; j++)
-            {
-                if (Arguments[Index] == name[j])
-                {
-                    result = Arguments[Index];
-                    Index++;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public bool TryConsume(out int result)
-        {
-            result = default;
-
-            if (Index >= Arguments.Length - 1)
-            { return false; }
-
-            if (!int.TryParse(Arguments[Index], out int @int))
-            { return false; }
-
-            Index++;
-            result = @int;
-            return true;
-        }
-
-        public bool TryConsume([NotNullWhen(true)] out string? result)
-        {
-            result = default;
-
-            if (Index >= Arguments.Length - 1)
-            { return false; }
-
-            result = Arguments[Index];
-            Index++;
-            return true;
-        }
-
-        public IEnumerable<string> TryConsumeAll(params string[] words)
-        {
-            while (true)
-            {
-                if (TryConsume(out string? result, words))
-                { yield return result; }
-                else
-                { break; }
-            }
-        }
-    }
-
-    static readonly OptionSpecification[] OptionSpecifications = new OptionSpecification[]
-    {
+    static readonly ImmutableArray<OptionSpecification> OptionSpecifications = ImmutableArray.Create<OptionSpecification>
+    (
         new()
         {
             LongName = "help",
@@ -258,8 +185,8 @@ public static class ArgumentParser
         {
             LongName = "no-pause",
             Help = "Do not pause when finished",
-        },
-    };
+        }
+    );
 
     static ProgramArguments? ParseInternal(string[] args)
     {

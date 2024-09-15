@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Brainfuck;
+﻿using LanguageCore.Runtime;
 
-using Runtime;
+namespace LanguageCore.Brainfuck;
 
 public delegate void OutputCallback(byte data);
 public delegate byte InputCallback();

@@ -1,8 +1,8 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Runtime;
+using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
 
-using Parser.Statement;
-using Runtime;
-using Parser;
+namespace LanguageCore.Compiler;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class ArrayType : GeneralType,

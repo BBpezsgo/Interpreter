@@ -1,10 +1,10 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Runtime;
+using LanguageCore.Tokenizing;
+using LiteralStatement = LanguageCore.Parser.Statement.Literal;
 
-using Parser;
-using Parser.Statement;
-using Runtime;
-using Tokenizing;
-using LiteralStatement = Parser.Statement.Literal;
+namespace LanguageCore.Compiler;
 
 public abstract class CodeGenerator : IRuntimeInfoProvider
 {
@@ -4057,7 +4057,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         if (type.Length is null) return false;
         if (!FindSize(type.Of, out int elementSize)) return false;
-        if (!TryCompute(type.Length, out var sizeValue)) return false;
+        if (!TryCompute(type.Length, out CompiledValue sizeValue)) return false;
 
         size = elementSize * (int)sizeValue;
         return true;

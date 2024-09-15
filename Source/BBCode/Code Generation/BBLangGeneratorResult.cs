@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.BBLang.Generator;
+﻿using LanguageCore.Runtime;
 
-using Runtime;
+namespace LanguageCore.BBLang.Generator;
 
 public struct BBLangGeneratorResult
 {

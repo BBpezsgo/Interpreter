@@ -1,7 +1,7 @@
-﻿namespace LanguageCore.Brainfuck.Generator;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Parser;
 
-using Compiler;
-using Parser;
+namespace LanguageCore.Brainfuck.Generator;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class BrainfuckVariable :

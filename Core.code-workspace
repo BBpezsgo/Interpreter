@@ -11,6 +11,12 @@
 		},
 		{
 			"path": "../VSCodeExtension"
+		},
+		{
+			"path": "../../Math"
+		},
+		{
+			"path": "../../Win32-Stuff"
 		}
 	],
 	"settings": {

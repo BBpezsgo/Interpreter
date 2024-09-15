@@ -1,7 +1,7 @@
-﻿namespace LanguageCore.Parser;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Tokenizing;
 
-using Compiler;
-using Tokenizing;
+namespace LanguageCore.Parser;
 
 public class ParameterDefinition :
     IPositioned,

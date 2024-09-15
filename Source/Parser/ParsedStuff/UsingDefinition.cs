@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Parser;
+﻿using LanguageCore.Tokenizing;
 
-using Tokenizing;
+namespace LanguageCore.Parser;
 
 public class UsingDefinition : IPositioned
 {

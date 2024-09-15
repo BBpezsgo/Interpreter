@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Runtime;
+﻿using LanguageCore.Compiler;
 
-using Compiler;
+namespace LanguageCore.Runtime;
 
 public delegate ReadOnlySpan<byte> ExternalFunctionSyncCallback(BytecodeProcessor bytecodeProcessor, ReadOnlySpan<byte> arguments);
 public delegate void ManagedExternalFunctionAsyncBlockCallback(ReadOnlySpan<byte> arguments, ManagedExternalFunctionAsyncBlockReturnCallback callback);

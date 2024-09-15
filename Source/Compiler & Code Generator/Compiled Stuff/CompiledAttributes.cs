@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser;
 
-using Parser;
+namespace LanguageCore.Compiler;
 
 public static class CompiledAttributes
 {

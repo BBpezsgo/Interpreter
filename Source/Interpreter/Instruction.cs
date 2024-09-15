@@ -247,7 +247,7 @@ public readonly struct InstructionOperand
         InstructionOperandType.PointerEDX16 => $"WORD [EDX{PointerOffsetString(Value.I32)}]",
         InstructionOperandType.PointerEDX32 => $"DWORD [EDX{PointerOffsetString(Value.I32)}]",
         InstructionOperandType.PointerEDX64 => $"QWORD [EDX{PointerOffsetString(Value.I32)}]",
-        
+
         InstructionOperandType.PointerRAX8 => $"BYTE [RAX{PointerOffsetString(Value.I32)}]",
         InstructionOperandType.PointerRAX16 => $"WORD [RAX{PointerOffsetString(Value.I32)}]",
         InstructionOperandType.PointerRAX32 => $"DWORD [RAX{PointerOffsetString(Value.I32)}]",

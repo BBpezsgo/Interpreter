@@ -1,7 +1,7 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser.Statement;
+using LanguageCore.Tokenizing;
 
-using Parser.Statement;
-using Tokenizing;
+namespace LanguageCore.Compiler;
 
 public enum BasicType
 {

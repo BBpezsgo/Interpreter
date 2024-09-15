@@ -1,14 +1,13 @@
-﻿using System.Runtime.Versioning;
-using Win32;
+﻿using Win32;
 using Win32.Console;
 
 namespace ConsoleGUI;
 
-internal delegate void MainThreadTimerCallback();
-internal delegate void MainThreadEventCallback<T>(T e);
+delegate void MainThreadTimerCallback();
+delegate void MainThreadEventCallback<T>(T e);
 
 [ExcludeFromCodeCoverage]
-internal static class MainThreadExtensions
+static class MainThreadExtensions
 {
     public static void Tick(this IMainThreadThing[] mainThreadThings, double deltaTime)
     {
@@ -23,7 +22,7 @@ public interface IMainThreadThing
 }
 
 [ExcludeFromCodeCoverage]
-internal sealed class MainThreadTimer : IMainThreadThing
+sealed class MainThreadTimer : IMainThreadThing
 {
     double Timer;
     readonly double Interval;
@@ -56,7 +55,7 @@ internal sealed class MainThreadTimer : IMainThreadThing
 }
 
 [ExcludeFromCodeCoverage]
-internal sealed class MainThreadEvents<T> : IMainThreadThing
+sealed class MainThreadEvents<T> : IMainThreadThing
 {
     readonly Queue<T> EventQueue;
 
@@ -88,7 +87,7 @@ internal sealed class MainThreadEvents<T> : IMainThreadThing
 }
 
 [ExcludeFromCodeCoverage]
-internal sealed class ConsoleGUI : AnsiRenderer, IDisposable
+sealed class ConsoleGUI : AnsiRenderer, IDisposable
 {
     const int TIMER_RESIZE_ELEMENTS = 1000;
     const int TIMER_AUTO_REFRESH_CONSOLE = 1000;
@@ -329,7 +328,7 @@ internal sealed class ConsoleGUI : AnsiRenderer, IDisposable
         }
     }
 
-    private void Dispose(bool disposing)
+    void Dispose(bool disposing)
     {
         if (IsDisposed) return;
 

@@ -1,11 +1,10 @@
 ﻿using System.Runtime.InteropServices;
 using Win32.Console;
-
-namespace ConsoleGUI;
-
 using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
+
+namespace ConsoleGUI;
 
 public partial class InterpreterElement
 {

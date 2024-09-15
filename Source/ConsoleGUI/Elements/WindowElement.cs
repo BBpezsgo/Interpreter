@@ -1,5 +1,4 @@
-﻿using System.Runtime.Versioning;
-using Win32.Console;
+﻿using Win32.Console;
 using Point = System.Drawing.Point;
 
 namespace ConsoleGUI;

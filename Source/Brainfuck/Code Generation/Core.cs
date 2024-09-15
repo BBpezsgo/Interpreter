@@ -1,9 +1,9 @@
-﻿namespace LanguageCore.Brainfuck.Generator;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Runtime;
 
-using Compiler;
-using Parser;
-using Parser.Statement;
-using Runtime;
+namespace LanguageCore.Brainfuck.Generator;
 
 public struct BrainfuckGeneratorResult
 {
@@ -131,7 +131,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             Code = code;
             DebugInfo = debugInfo;
             InstructionStart = code.Length;
-            
+
             Function = function;
             TypeArguments = typeArguments;
         }

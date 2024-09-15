@@ -1,11 +1,11 @@
-﻿using Ansi = Win32.Console.Ansi;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Tokenizing;
+
+using Ansi = Win32.Console.Ansi;
 
 namespace LanguageCore.Brainfuck.Generator;
-
-using Compiler;
-using Parser;
-using Parser.Statement;
-using Tokenizing;
 
 public partial class CodeGeneratorForBrainfuck : CodeGenerator
 {
@@ -281,7 +281,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
 
     #endregion
-
 
     #region Generate Size
 
@@ -884,7 +883,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType prevType = FindStatementType(indexCall.PrevStatement);
         GeneralType indexType = FindStatementType(indexCall.Index);
 
-        if (GetIndexGetter(prevType, indexType, CurrentFile, out FunctionQueryResult<CompiledFunction>? indexer, out var notFoundError, AddCompilable))
+        if (GetIndexGetter(prevType, indexType, CurrentFile, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError, AddCompilable))
         {
             if (!indexer.Function.CanUse(CurrentFile))
             {

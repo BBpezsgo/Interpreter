@@ -1,8 +1,7 @@
-﻿namespace LanguageCore;
-
-using Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser.Statement;
-using Runtime;
+
+namespace LanguageCore;
 
 public static class DeclarationKeywords
 {

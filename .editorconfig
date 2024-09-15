@@ -1,0 +1,55 @@
+[*.cs]
+
+# IDE0160: Convert to block scoped namespace
+csharp_style_namespace_declarations = file_scoped
+
+# IDE0130: Namespace does not match folder structure
+dotnet_style_namespace_match_folder = false
+
+# IDE0040: Add accessibility modifiers
+dotnet_style_require_accessibility_modifiers = omit_if_default
+
+# IDE0022: Use expression body for method
+dotnet_diagnostic.IDE0022.severity = silent
+
+# IDE0046: Convert to conditional expression
+dotnet_diagnostic.IDE0046.severity = silent
+
+# IDE0021: Use expression body for constructor
+dotnet_diagnostic.IDE0021.severity = silent
+
+# IDE0301: Simplify collection initialization
+dotnet_style_prefer_collection_expression = never
+
+# IDE0290: Use primary constructor
+csharp_style_prefer_primary_constructors = false
+
+# IDE0045: Convert to conditional expression
+dotnet_diagnostic.IDE0045.severity = silent
+
+# IDE0004: Remove Unnecessary Cast
+dotnet_diagnostic.IDE0004.severity = silent
+
+# IDE0058: Expression value is never used
+dotnet_diagnostic.IDE0058.severity = silent
+
+# IDE0072: Add missing cases
+dotnet_diagnostic.IDE0072.severity = silent
+
+# IDE0010: Add missing cases
+dotnet_diagnostic.IDE0010.severity = silent
+
+# IDE0065: Misplaced using directive
+dotnet_diagnostic.IDE0065.severity = suggestion
+
+# IDE0042: Deconstruct variable declaration
+dotnet_diagnostic.IDE0042.severity = suggestion
+
+# IDE0017: Simplify object initialization
+dotnet_diagnostic.IDE0017.severity = suggestion
+
+# IDE0074: Use compound assignment
+dotnet_diagnostic.IDE0074.severity = silent
+
+# IDE0063: Use simple 'using' statement
+dotnet_diagnostic.IDE0063.severity = suggestion

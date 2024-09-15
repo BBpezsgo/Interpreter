@@ -1,7 +1,7 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
 
-using Parser;
-using Parser.Statement;
+namespace LanguageCore.Compiler;
 
 public class CompiledGeneralFunction : GeneralFunctionDefinition,
     IDefinition<CompiledGeneralFunction>,

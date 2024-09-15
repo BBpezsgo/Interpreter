@@ -1,9 +1,9 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Runtime;
+using LanguageCore.Tokenizing;
 
-using Parser;
-using Parser.Statement;
-using Runtime;
-using Tokenizing;
+namespace LanguageCore.Compiler;
 
 public readonly struct CompilerResult
 {

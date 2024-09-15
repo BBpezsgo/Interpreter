@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.BBLang.Generator;
+﻿using LanguageCore.Compiler;
 
-using Compiler;
+namespace LanguageCore.BBLang.Generator;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public readonly struct CleanupItem

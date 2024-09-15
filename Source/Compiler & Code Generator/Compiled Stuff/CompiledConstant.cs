@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser;
 
-using LanguageCore.Parser;
+namespace LanguageCore.Compiler;
 
 public interface IConstant :
     IPositioned,

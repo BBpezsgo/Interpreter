@@ -1,8 +1,7 @@
-namespace LanguageCore.Parser;
+using LanguageCore.Compiler;
+using LanguageCore.Tokenizing;
 
-using System;
-using Compiler;
-using Tokenizing;
+namespace LanguageCore.Parser;
 
 public class AliasDefinition :
     IPositioned,

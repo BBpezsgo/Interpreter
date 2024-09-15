@@ -2,14 +2,14 @@
 using System.Runtime.InteropServices;
 using System.Threading;
 
-namespace LanguageCore;
+using LanguageCore.BBLang.Generator;
+using LanguageCore.Brainfuck;
+using LanguageCore.Brainfuck.Generator;
+using LanguageCore.Compiler;
+using LanguageCore.Runtime;
+using LanguageCore.Tokenizing;
 
-using BBLang.Generator;
-using Brainfuck;
-using Brainfuck.Generator;
-using Compiler;
-using Runtime;
-using Tokenizing;
+namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
 public static class Entry
@@ -127,13 +127,11 @@ public static class Entry
                 {
                     Console.WriteLine($"Writing to \"{arguments.OutputFile}\" ...");
                     File.WriteAllText(arguments.OutputFile, null);
-                    using (FileStream stream = File.OpenWrite(arguments.OutputFile))
-                    using (StreamWriter writer = new(stream))
+                    using FileStream stream = File.OpenWrite(arguments.OutputFile);
+                    using StreamWriter writer = new(stream);
+                    foreach (Instruction instruction in generatedCode.Code)
                     {
-                        foreach (Instruction instruction in generatedCode.Code)
-                        {
-                            writer.WriteLine(instruction.ToString());
-                        }
+                        writer.WriteLine(instruction.ToString());
                     }
                 }
 

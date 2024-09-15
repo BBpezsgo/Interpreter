@@ -1,9 +1,9 @@
-﻿namespace LanguageCore.Parser.Statement;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Tokenizing;
 
-using Compiler;
-using Tokenizing;
+namespace LanguageCore.Parser.Statement;
 
-struct Stringify
+static class Stringify
 {
     public const int CozyLength = 30;
 }

@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser;
 
-using Parser;
+namespace LanguageCore.Compiler;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class CompiledParameter : ParameterDefinition,

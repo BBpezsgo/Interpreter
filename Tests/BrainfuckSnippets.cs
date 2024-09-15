@@ -1,11 +1,11 @@
-﻿namespace Tests;
+﻿using LanguageCore.Brainfuck;
 
-using LanguageCore.Brainfuck;
+namespace Tests;
 
 [TestClass, TestCategory("Brainfuck Snippets")]
 public class BrainfuckSnippets
 {
-    static byte[] MakeMemory(int length, params int[] values)
+    static byte[] MakeMemory(int length, params ReadOnlySpan<int> values)
     {
         byte[] result = new byte[length];
         for (int i = 0; i < values.Length; i++)
@@ -13,7 +13,7 @@ public class BrainfuckSnippets
         return result;
     }
 
-    static void InitializeValues(CodeHelper code, params int[] values)
+    static void InitializeValues(CodeHelper code, params ReadOnlySpan<int> values)
     {
         for (int offset = 0; offset < values.Length; offset++)
         { code.SetValue(offset, values[offset]); }

@@ -1,8 +1,7 @@
 ﻿using Win32.Console;
+using LanguageCore.Runtime;
 
 namespace ConsoleGUI;
-
-using LanguageCore.Runtime;
 
 public partial class InterpreterElement
 {
@@ -281,7 +280,7 @@ public partial class InterpreterElement
                     case InstructionOperandType.PointerSP8: WritePointerOperand("BYTE", "SP", operand.Value.I32); break;
                     case InstructionOperandType.PointerSP16: WritePointerOperand("WORD", "SP", operand.Value.I32); break;
                     case InstructionOperandType.PointerSP32: WritePointerOperand("DWORD", "SP", operand.Value.I32); break;
-                    
+
                     case InstructionOperandType.PointerEAX8: WritePointerOperand("BYTE", "EAX", operand.Value.I32); break;
                     case InstructionOperandType.PointerEAX16: WritePointerOperand("WORD", "EAX", operand.Value.I32); break;
                     case InstructionOperandType.PointerEAX32: WritePointerOperand("DWORD", "EAX", operand.Value.I32); break;
@@ -298,7 +297,7 @@ public partial class InterpreterElement
                     case InstructionOperandType.PointerEDX16: WritePointerOperand("WORD", "EDX", operand.Value.I32); break;
                     case InstructionOperandType.PointerEDX32: WritePointerOperand("DWORD", "EDX", operand.Value.I32); break;
                     case InstructionOperandType.PointerEDX64: WritePointerOperand("QWORD", "EDX", operand.Value.I32); break;
-                    
+
                     case InstructionOperandType.PointerRAX8: WritePointerOperand("BYTE", "RAX", operand.Value.I32); break;
                     case InstructionOperandType.PointerRAX16: WritePointerOperand("WORD", "RAX", operand.Value.I32); break;
                     case InstructionOperandType.PointerRAX32: WritePointerOperand("DWORD", "RAX", operand.Value.I32); break;

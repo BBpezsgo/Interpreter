@@ -7,7 +7,7 @@ public class AssemblyCode
 {
     const string EntryPointSymbol = "_start";
 
-    public static readonly string[] ReservedWords = new string[] {
+    public static readonly ImmutableArray<string> ReservedWords = ImmutableArray.Create(
         "$",
         "DF",
         "GROUP",
@@ -164,8 +164,8 @@ public class AssemblyCode
         "GE",
         "OR",
         ".XLIST",
-        "XOR",
-    };
+        "XOR"
+    );
     public const string ValidIdentifierCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     public readonly TextSectionBuilder CodeBuilder;

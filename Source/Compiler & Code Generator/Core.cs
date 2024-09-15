@@ -1,8 +1,8 @@
-﻿namespace LanguageCore.Compiler;
+﻿using LanguageCore.Parser;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Runtime;
 
-using Parser;
-using Parser.Statement;
-using Runtime;
+namespace LanguageCore.Compiler;
 
 public abstract class Address;
 

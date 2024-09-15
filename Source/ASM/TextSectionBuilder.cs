@@ -1,6 +1,4 @@
-﻿using LanguageCore.Runtime;
-
-namespace LanguageCore.ASM;
+﻿namespace LanguageCore.ASM;
 
 [ExcludeFromCodeCoverage]
 public class TextSectionBuilder : SectionBuilder
@@ -130,7 +128,7 @@ public class TextSectionBuilder : SectionBuilder
         AppendText(Environment.NewLine);
     }
 
-    public void AppendInstructionNoEOL(OpCode keyword, params string[] operands)
+    public void AppendInstructionNoEOL(OpCode keyword, params ReadOnlySpan<string> operands)
     {
         AppendInstructionNoEOL(keyword);
         if (operands.Length > 0)
@@ -146,7 +144,7 @@ public class TextSectionBuilder : SectionBuilder
         }
     }
 
-    public void AppendInstruction(OpCode keyword, params string[] operands)
+    public void AppendInstruction(OpCode keyword, params ReadOnlySpan<string> operands)
     {
         AppendInstructionNoEOL(keyword, operands);
         AppendText(Environment.NewLine);
@@ -182,8 +180,8 @@ public class TextSectionBuilder : SectionBuilder
 
     #region Call_cdecl
 
-    /// <inheritdoc cref="Call_cdecl(string, int, string?[])"/>
-    public void Call_cdecl(string label, int parametersSize, params InstructionOperand[] parameters)
+    /// <inheritdoc cref="Call_cdecl(string, int, ReadOnlySpan{string?})"/>
+    public void Call_cdecl(string label, int parametersSize, ReadOnlySpan<InstructionOperand> parameters)
     {
         string[] parametersString = new string[parameters.Length];
         for (int i = 0; i < parameters.Length; i++)
@@ -194,7 +192,7 @@ public class TextSectionBuilder : SectionBuilder
     /// <summary>
     /// Return value: <see cref="Registers.AX"/>
     /// </summary>
-    void Call_cdecl(string label, int parametersSize, params string?[] parameters)
+    void Call_cdecl(string label, int parametersSize, ReadOnlySpan<string?> parameters)
     {
         if (label.StartsWith('_') && label.Contains('@'))
         { Import(label); }
@@ -218,7 +216,7 @@ public class TextSectionBuilder : SectionBuilder
         AppendText(Environment.NewLine);
     }
 
-    /// <inheritdoc cref="Call_cdecl(string, int, string?[])"/>
+    /// <inheritdoc cref="Call_cdecl(string, int, ReadOnlySpan{string?})"/>
     public void Call_cdecl(string label, int parametersSize)
     {
         if (label.StartsWith('_') && label.Contains('@'))
@@ -237,8 +235,8 @@ public class TextSectionBuilder : SectionBuilder
 
     #region Call_stdcall
 
-    /// <inheritdoc cref="Call_stdcall(string, string?[])"/>
-    public void Call_stdcall(string label, params InstructionOperand[] parameters)
+    /// <inheritdoc cref="Call_stdcall(string, ReadOnlySpan{string?})"/>
+    public void Call_stdcall(string label, params ReadOnlySpan<InstructionOperand> parameters)
     {
         string[] parametersString = new string[parameters.Length];
         for (int i = 0; i < parameters.Length; i++)
@@ -251,7 +249,7 @@ public class TextSectionBuilder : SectionBuilder
     /// Return value: <see cref="Registers.AX"/>
     /// </para>
     /// </summary>
-    void Call_stdcall(string label, params string?[] parameters)
+    void Call_stdcall(string label, params ReadOnlySpan<string?> parameters)
     {
         if (label.StartsWith('_') && label.Contains('@'))
         { Import(label); }
@@ -266,7 +264,7 @@ public class TextSectionBuilder : SectionBuilder
         AppendInstruction(OpCode.Call, label);
     }
 
-    /// <inheritdoc cref="Call_stdcall(string, string?[])"/>
+    /// <inheritdoc cref="Call_stdcall(string, ReadOnlySpan{string?})"/>
     public void Call_stdcall(string label)
     {
         if (label.StartsWith('_') && label.Contains('@'))

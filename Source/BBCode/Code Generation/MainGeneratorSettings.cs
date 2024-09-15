@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.BBLang.Generator;
+﻿using LanguageCore.Compiler;
 
-using Compiler;
+namespace LanguageCore.BBLang.Generator;
 
 public struct MainGeneratorSettings
 {

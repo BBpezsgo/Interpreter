@@ -1,8 +1,8 @@
-﻿namespace LanguageCore.BBLang.Generator;
+﻿using LanguageCore.Compiler;
+using LanguageCore.Parser.Statement;
+using LanguageCore.Runtime;
 
-using Compiler;
-using Parser.Statement;
-using Runtime;
+namespace LanguageCore.BBLang.Generator;
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {

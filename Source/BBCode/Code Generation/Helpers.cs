@@ -159,6 +159,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             variable.MemoryAddress
         );
 
+    [SuppressMessage("Style", "IDE0060:Remove unused parameter")]
     public AddressOffset GetReturnValueAddress(GeneralType returnType)
         => new(
             Register.BasePointer,
@@ -576,16 +577,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void HeapLoad(StatementWithValue pointer, int offset, int size)
     {
-        if (!FindStatementType(pointer).Is(out PointerType? pointerType))
+        if (!FindStatementType(pointer).Is<PointerType>())
         {
-            if (pointer is Identifier identifier && GetParameter(identifier.Content, out CompiledParameter? parameter) && parameter.IsRef)
-            {
-                pointerType = new PointerType(parameter.Type);
-            }
-            else
-            {
-                throw new CompilerException($"This isn't a pointer", pointer, CurrentFile);
-            }
+            if (pointer is not Identifier identifier ||
+                !GetParameter(identifier.Content, out CompiledParameter? parameter) ||
+                !parameter.IsRef)
+            { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
         }
 
         GenerateCodeForStatement(pointer, resolveReference: false);
@@ -602,7 +599,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void HeapStore(StatementWithValue pointer, int offset, int size)
     {
-        if (!FindStatementType(pointer).Is(out PointerType? pointerType))
+        if (!FindStatementType(pointer).Is<PointerType>())
         { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
 
         GenerateCodeForStatement(pointer, resolveReference: false);
@@ -626,12 +623,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
     CompiledValue ReturnFlagFalse => PointerBitWidth == BitWidth._64 ? new((char)0) : new((byte)0);
     readonly BuiltinType ExitCodeType = BuiltinType.Integer;
     readonly PointerType AbsGlobalAddressType = new(BuiltinType.Integer);
-    readonly PointerType StackPointerType = new(BuiltinType.Integer);
+    // readonly PointerType StackPointerType = new(BuiltinType.Integer);
     readonly PointerType CodePointerType = new(BuiltinType.Integer);
     readonly PointerType BasePointerType = new(BuiltinType.Integer);
 
     int AbsGlobalAddressSize => PointerSize;
-    int StackPointerSize => PointerSize;
+    // int StackPointerSize => PointerSize;
     int CodePointerSize => PointerSize;
     int BasePointerSize => PointerSize;
 

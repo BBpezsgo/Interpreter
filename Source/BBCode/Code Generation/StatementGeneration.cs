@@ -2485,7 +2485,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                PopTo(reg.Get(ReturnFlagType.GetBitWidth(this)), ReturnFlagType.GetBitWidth(this));
+                PopTo(reg.Get(ReturnFlagType.GetBitWidth(this)));
                 AddInstruction(Opcode.Compare, reg.Get(ReturnFlagType.GetBitWidth(this)), 0);
                 ReturnInstructions.Last.Add(GeneratedCode.Count);
                 AddInstruction(Opcode.JumpIfNotEqual, 0);

@@ -258,15 +258,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void Pop(int size)
     {
-        int dwordCount = size / 4;
-        size %= 4;
+        if (PointerBitWidth != BitWidth._64)
+        {
+            int dwordCount = size / 4;
+            size %= 4;
+            for (int i = 0; i < dwordCount; i++)
+            { AddInstruction(Opcode.Pop32); }
+        }
 
         int wordCount = size / 2;
         size %= 2;
-
-        for (int i = 0; i < dwordCount; i++)
-        { AddInstruction(Opcode.Pop32); }
-
         for (int i = 0; i < wordCount; i++)
         { AddInstruction(Opcode.Pop16); }
 
@@ -276,15 +277,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void StackAlloc(int size)
     {
-        int dwordCount = size / 4;
-        size %= 4;
+        if (PointerBitWidth != BitWidth._64)
+        {
+            int dwordCount = size / 4;
+            size %= 4;
+            for (int i = 0; i < dwordCount; i++)
+            { AddInstruction(Opcode.Push, new CompiledValue((int)0)); }
+        }
 
         int wordCount = size / 2;
         size %= 2;
-
-        for (int i = 0; i < dwordCount; i++)
-        { AddInstruction(Opcode.Push, new CompiledValue((int)0)); }
-
         for (int i = 0; i < wordCount; i++)
         { AddInstruction(Opcode.Push, new CompiledValue((char)0)); }
 
@@ -292,23 +294,33 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { AddInstruction(Opcode.Push, new CompiledValue((byte)0)); }
     }
 
-    void PopTo(InstructionOperand destination, BitWidth size) => AddInstruction(size switch
+    void PopTo(InstructionOperand destination, BitWidth size)
     {
-        BitWidth._8 => Opcode.PopTo8,
-        BitWidth._16 => Opcode.PopTo16,
-        BitWidth._32 => Opcode.PopTo32,
-        BitWidth._64 => Opcode.PopTo64,
-        _ => throw new UnreachableException(),
-    }, destination);
+        if (PointerBitWidth == BitWidth._64 &&
+            size is BitWidth._8 or BitWidth._32)
+        { throw new NotImplementedException(); }
 
-    void PopTo(Register destination) => AddInstruction(destination.BitWidth() switch
+        AddInstruction(size switch
+        {
+            BitWidth._8 => Opcode.PopTo8,
+            BitWidth._16 => Opcode.PopTo16,
+            BitWidth._32 => Opcode.PopTo32,
+            BitWidth._64 => Opcode.PopTo64,
+            _ => throw new UnreachableException(),
+        }, destination);
+    }
+
+    void PopTo(Register destination)
     {
-        BitWidth._8 => Opcode.PopTo8,
-        BitWidth._16 => Opcode.PopTo16,
-        BitWidth._32 => Opcode.PopTo32,
-        BitWidth._64 => Opcode.PopTo64,
-        _ => throw new UnreachableException(),
-    }, destination);
+        AddInstruction(destination.BitWidth() switch
+        {
+            BitWidth._8 => Opcode.PopTo8,
+            BitWidth._16 => Opcode.PopTo16,
+            BitWidth._32 => Opcode.PopTo32,
+            BitWidth._64 => Opcode.PopTo64,
+            _ => throw new UnreachableException(),
+        }, destination);
+    }
 
     void PopTo(AddressOffset address, int size)
     {
@@ -361,6 +373,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             foreach (BitWidth checkBitWidth in Enum.GetValues<BitWidth>().Reverse())
             {
+                if (PointerBitWidth == BitWidth._64 &&
+                    checkBitWidth == BitWidth._32)
+                { continue; }
+
                 int checkSize = (int)checkBitWidth;
                 if (size - currentOffset < checkSize) continue;
                 if (PointerSize < checkSize) continue;
@@ -530,7 +546,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!Settings.CheckNullPointers)
         {
             if (!preservePointer)
-            { AddInstruction(Opcode.Pop32); }
+            { Pop(PointerSize); }
             return;
         }
 
@@ -605,24 +621,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Addressing Helpers
 
-    public static readonly BuiltinType ReturnFlagType = BuiltinType.Byte;
-    public static readonly CompiledValue ReturnFlagTrue = new((byte)1);
-    public static readonly CompiledValue ReturnFlagFalse = new((byte)0);
-    public static readonly BuiltinType ExitCodeType = BuiltinType.Integer;
-    public static readonly PointerType AbsGlobalAddressType = new(BuiltinType.Integer);
-    public static readonly PointerType StackPointerType = new(BuiltinType.Integer);
-    public static readonly PointerType CodePointerType = new(BuiltinType.Integer);
-    public static readonly PointerType BasePointerType = new(BuiltinType.Integer);
+    BuiltinType ReturnFlagType => PointerBitWidth == BitWidth._64 ? BuiltinType.Char : BuiltinType.Byte;
+    CompiledValue ReturnFlagTrue => PointerBitWidth == BitWidth._64 ? new((char)1) : new((byte)1);
+    CompiledValue ReturnFlagFalse => PointerBitWidth == BitWidth._64 ? new((char)0) : new((byte)0);
+    readonly BuiltinType ExitCodeType = BuiltinType.Integer;
+    readonly PointerType AbsGlobalAddressType = new(BuiltinType.Integer);
+    readonly PointerType StackPointerType = new(BuiltinType.Integer);
+    readonly PointerType CodePointerType = new(BuiltinType.Integer);
+    readonly PointerType BasePointerType = new(BuiltinType.Integer);
 
-    public int AbsGlobalAddressSize => PointerSize;
-    public int StackPointerSize => PointerSize;
-    public int CodePointerSize => PointerSize;
-    public int BasePointerSize => PointerSize;
+    int AbsGlobalAddressSize => PointerSize;
+    int StackPointerSize => PointerSize;
+    int CodePointerSize => PointerSize;
+    int BasePointerSize => PointerSize;
 
     /// <summary>
     /// <c>Saved BP</c> + <c>Abs global address</c> + <c>Saved CP</c>
     /// </summary>
-    public int StackFrameTags => BasePointerSize + AbsGlobalAddressSize + CodePointerSize;
+    int StackFrameTags => BasePointerSize + AbsGlobalAddressSize + CodePointerSize;
 
     public Address AbsoluteGlobalAddress => new AddressOffset(
         new AddressRegisterPointer(Register.BasePointer),

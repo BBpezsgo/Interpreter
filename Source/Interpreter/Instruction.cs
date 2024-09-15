@@ -194,9 +194,9 @@ public readonly struct InstructionOperand
         InstructionOperandType.Pointer32 => $"DWORD [{Value}]",
         InstructionOperandType.Register => (Register)Value.I32 switch
         {
-            Register.CodePointer => "ECP",
-            Register.StackPointer => "ESP",
-            Register.BasePointer => "EBP",
+            Register.CodePointer => "RCP",
+            Register.StackPointer => "RSP",
+            Register.BasePointer => "RBP",
 
             Register.RAX => "RAX",
             Register.EAX => "EAX",

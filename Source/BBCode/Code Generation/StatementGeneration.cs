@@ -1985,7 +1985,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
                     GenerateAddressResolver(addressOffset.Base);
-                    AddInstruction(Opcode.PopTo32, reg.Get(PointerBitWidth));
+                    PopTo(reg.Get(PointerBitWidth));
                     AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), addressOffset.Offset);
                     AddInstruction(Opcode.Push, reg.Get(PointerBitWidth));
                 }

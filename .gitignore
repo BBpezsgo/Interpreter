@@ -3,6 +3,7 @@ bin
 obj
 *.user
 *.xcf
+*.sln
 
 /Tests/Program.cs
 /Diagsessions
@@ -13,3 +14,4 @@ obj
 /Source/ASM/i8086/Builds/build.bat
 /Source/ASM/i8086/Builds/run.bat
 /Tests/TestResults
+/get-dump.sh

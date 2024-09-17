@@ -6,7 +6,7 @@ public static class ConsoleProgress
     public static bool IsEnabled { get; private set; }
     public static ImmutableArray<char> SpinnerCharacters { get; } = ImmutableArray.Create('-', '\\', '|', '/');
 
-    public static void SetProgramArguments(ProgramArguments arguments) => IsEnabled = arguments.ShowProgress;
+    public static void SetProgramArguments(CommandLineOptions arguments) => IsEnabled = arguments.Verbose;
 }
 
 [ExcludeFromCodeCoverage]

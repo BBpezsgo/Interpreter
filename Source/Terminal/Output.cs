@@ -5,18 +5,18 @@ public delegate void PrintCallback(string message, LogType logType);
 [ExcludeFromCodeCoverage]
 public static class Output
 {
-    static ProgramArguments arguments;
+    static CommandLineOptions? arguments;
 
-    public static bool LogDebugs => (arguments.LogFlags & LogType.Debug) != 0;
-    public static bool LogInfos => (arguments.LogFlags & LogType.Normal) != 0;
-    public static bool LogWarnings => (arguments.LogFlags & LogType.Warning) != 0;
+    public static bool LogDebugs => arguments?.Verbose ?? false;
+    public static bool LogInfos => true;
+    public static bool LogWarnings => true;
 
     const ConsoleColor InfoColor = ConsoleColor.Blue;
     const ConsoleColor WarningColor = ConsoleColor.DarkYellow;
     const ConsoleColor ErrorColor = ConsoleColor.Red;
     const ConsoleColor DebugColor = ConsoleColor.DarkGray;
 
-    public static void SetProgramArguments(ProgramArguments arguments) => Output.arguments = arguments;
+    public static void SetProgramArguments(CommandLineOptions arguments) => Output.arguments = arguments;
 
     public static void Log(string message, LogType logType)
     {

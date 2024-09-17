@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
-
+using CommandLine;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Brainfuck;
 using LanguageCore.Brainfuck.Generator;
@@ -16,45 +16,79 @@ public static class Entry
 {
     /// <exception cref="NotSupportedException"/>
     /// <exception cref="NotImplementedException"/>
-    public static void Run(params string[] arguments)
+    public static int Run(params string[] arguments)
     {
-        bool pauseAtEnd = true;
+        CommandLine.Parser parser = new(with => with.HelpWriter = null);
+        ParserResult<CommandLineOptions> parserResult = parser.ParseArguments<CommandLineOptions>(arguments);
 
-        if (ArgumentParser.Parse(out ProgramArguments arguments_, arguments))
+        switch (parserResult.Tag)
         {
-            if (arguments_.ThrowErrors)
+            case ParserResultType.Parsed:
             {
-                Entry.Run(arguments_);
-            }
-            else
-            {
+                if (parserResult.Value.ThrowErrors)
+                {
+                    return Entry.Run(parserResult.Value);
+                }
+
                 try
-                { Entry.Run(arguments_); }
+                {
+                    return Entry.Run(parserResult.Value);
+                }
                 catch (Exception exception)
-                { Output.LogError($"Unhandled exception: {exception}"); }
+                {
+                    Output.LogError($"Unhandled exception: {exception}");
+                    return 1;
+                }
             }
-
-            if (arguments_.DoNotPause) pauseAtEnd = false;
-        }
-
-        if (pauseAtEnd)
-        {
-            Console.Write("Press any key to continue...");
-            Console.ReadKey();
+            case ParserResultType.NotParsed:
+            {
+                Program.DisplayHelp(parserResult, parserResult.Errors);
+                return 1;
+            }
+            default:
+            {
+                return 1;
+            }
         }
     }
 
     /// <exception cref="NotSupportedException"/>
     /// <exception cref="NotImplementedException"/>
-    public static void Run(ProgramArguments arguments)
+    public static int Run(CommandLineOptions arguments)
     {
         Output.SetProgramArguments(arguments);
         ConsoleProgress.SetProgramArguments(arguments);
 
-        if (arguments.IsEmpty)
+        CompilerSettings compilerSettings = new(CompilerSettings.Default)
+        {
+            BasePath = arguments.BasePath,
+        };
+        MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
+        {
+            CheckNullPointers = !arguments.NoNullcheck ?? MainGeneratorSettings.Default.CheckNullPointers,
+            DontOptimize = arguments.DontOptimize ?? MainGeneratorSettings.Default.DontOptimize,
+            PrintInstructions = arguments.PrintInstructions ?? MainGeneratorSettings.Default.PrintInstructions,
+            GenerateDebugInstructions = !arguments.NoDebugInfo ?? MainGeneratorSettings.Default.GenerateDebugInstructions,
+        };
+        BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)
+        {
+            DontOptimize = arguments.DontOptimize ?? BrainfuckGeneratorSettings.Default.DontOptimize,
+            GenerateDebugInformation = !arguments.NoDebugInfo ?? BrainfuckGeneratorSettings.Default.GenerateDebugInformation,
+            GenerateComments = !arguments.NoDebugInfo ?? BrainfuckGeneratorSettings.Default.GenerateComments,
+            GenerateSmallComments = !arguments.NoDebugInfo ?? BrainfuckGeneratorSettings.Default.GenerateSmallComments,
+            StackSize = arguments.StackSize ?? BrainfuckGeneratorSettings.Default.StackSize,
+            HeapSize = arguments.HeapSize ?? BrainfuckGeneratorSettings.Default.HeapSize,
+        };
+        BytecodeInterpreterSettings bytecodeInterpreterSettings = new(BytecodeInterpreterSettings.Default)
+        {
+            StackSize = arguments.StackSize ?? BytecodeInterpreterSettings.Default.StackSize,
+            HeapSize = arguments.HeapSize ?? BytecodeInterpreterSettings.Default.HeapSize,
+        };
+
+        if (arguments.Source is null)
         {
             new Interactive.Interactive().Run();
-            return;
+            return 0;
         }
 
         string[] additionalImports = new string[]
@@ -62,11 +96,11 @@ public static class Entry
             "../StandardLibrary/Primitives.bbc"
         };
 
-        switch (arguments.RunType)
+        switch (arguments.Format)
         {
-            case ProgramRunType.Normal:
+            case "bytecode":
             {
-                Output.LogDebug($"Executing \"{arguments.File}\" ...");
+                Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
                 Dictionary<int, ExternalFunctionBase> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
 
@@ -75,8 +109,8 @@ public static class Entry
 
                 if (arguments.ThrowErrors)
                 {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
-                    generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
+                    generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
                 }
@@ -84,8 +118,8 @@ public static class Entry
                 {
                     try
                     {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
-                        generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
+                        generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
                     }
@@ -93,17 +127,17 @@ public static class Entry
                     {
                         analysisCollection.Print();
                         Output.LogError(ex);
-                        return;
+                        return 1;
                     }
                     catch (Exception ex)
                     {
                         analysisCollection.Print();
                         Output.LogError(ex);
-                        return;
+                        return 1;
                     }
                 }
 
-                if (arguments.MainGeneratorSettings.PrintInstructions)
+                if (mainGeneratorSettings.PrintInstructions)
                 {
                     for (int i = 0; i < generatedCode.Code.Length; i++)
                     {
@@ -123,11 +157,11 @@ public static class Entry
 
                 Console.ResetColor();
 
-                if (arguments.OutputFile is not null)
+                if (arguments.Output is not null)
                 {
-                    Console.WriteLine($"Writing to \"{arguments.OutputFile}\" ...");
-                    File.WriteAllText(arguments.OutputFile, null);
-                    using FileStream stream = File.OpenWrite(arguments.OutputFile);
+                    Console.WriteLine($"Writing to \"{arguments.Output}\" ...");
+                    File.WriteAllText(arguments.Output, null);
+                    using FileStream stream = File.OpenWrite(arguments.Output);
                     using StreamWriter writer = new(stream);
                     foreach (Instruction instruction in generatedCode.Code)
                     {
@@ -225,9 +259,9 @@ public static class Entry
 #endif
                 }
 
-                if (arguments.ConsoleGUI)
+                if (arguments.Debug)
                 {
-                    InterpreterDebuggabble _interpreter = new(false, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
+                    InterpreterDebuggabble _interpreter = new(false, bytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
                     interpreter = _interpreter;
 
                     // if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -260,7 +294,7 @@ public static class Entry
                 }
                 else
                 {
-                    interpreter = new(arguments.ThrowErrors, arguments.BytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
+                    interpreter = new(arguments.ThrowErrors, bytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
 
                     interpreter.OnStdOut += (sender, data) => Console.Out.Write(char.ToString(data));
                     interpreter.OnStdError += (sender, data) => Console.Error.Write(char.ToString(data));
@@ -287,20 +321,19 @@ public static class Entry
 
                 break;
             }
-            case ProgramRunType.Brainfuck:
+            case "brainfuck":
             {
-                Output.LogDebug($"Executing \"{arguments.File}\" ...");
+                Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
                 BrainfuckGeneratorResult generated;
                 ImmutableArray<Token> tokens;
-                BrainfuckGeneratorSettings generatorSettings = arguments.BrainfuckGeneratorSettings;
 
                 AnalysisCollection analysisCollection = new();
                 if (arguments.ThrowErrors)
                 {
-                    tokens = AnyTokenizer.Tokenize(arguments.File, PreprocessorVariables.Brainfuck).Tokens;
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null, additionalImports);
-                    generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
+                    tokens = AnyTokenizer.Tokenize(arguments.Source, PreprocessorVariables.Brainfuck).Tokens;
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null, additionalImports);
+                    generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
                     Output.LogDebug($"Optimized {generated.Optimizations} statements");
@@ -311,9 +344,9 @@ public static class Entry
                 {
                     try
                     {
-                        tokens = AnyTokenizer.Tokenize(arguments.File, PreprocessorVariables.Brainfuck).Tokens;
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, null, arguments.CompilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null, additionalImports);
-                        generated = CodeGeneratorForBrainfuck.Generate(compiled, generatorSettings, Output.Log, analysisCollection);
+                        tokens = AnyTokenizer.Tokenize(arguments.Source, PreprocessorVariables.Brainfuck).Tokens;
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null, additionalImports);
+                        generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
                         Output.LogDebug($"Optimized {generated.Optimizations} statements");
@@ -324,27 +357,27 @@ public static class Entry
                     {
                         analysisCollection.Print();
                         Output.LogError(exception);
-                        return;
+                        return 1;
                     }
                     catch (Exception exception)
                     {
                         analysisCollection.Print();
                         Output.LogError(exception);
-                        return;
+                        return 1;
                     }
                 }
 
                 bool pauseBeforeRun = false;
 
-                if (arguments.PrintFlags.HasFlag(PrintFlags.Commented))
-                {
-                    Console.WriteLine();
-                    Console.WriteLine($" === COMPILED ===");
-                    BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
-                    Console.WriteLine();
-
-                    pauseBeforeRun = true;
-                }
+                // if (arguments.PrintFlags.HasFlag(PrintFlags.Commented))
+                // {
+                //     Console.WriteLine();
+                //     Console.WriteLine($" === COMPILED ===");
+                //     BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
+                //     Console.WriteLine();
+                // 
+                //     pauseBeforeRun = true;
+                // }
 
                 generated.Code = BrainfuckCode.RemoveNoncodes(generated.Code, true, generated.DebugInfo);
 
@@ -353,7 +386,7 @@ public static class Entry
                 generated.Code = Minifier.Minify(generated.Code, generated.DebugInfo);
                 Output.LogDebug($"Minification: {prevCodeLength} -> {generated.Code.Length} ({((float)generated.Code.Length - prevCodeLength) / (float)generated.Code.Length * 100f:#}%)");
 
-                if (arguments.PrintFlags.HasFlag(PrintFlags.Final))
+                if (mainGeneratorSettings.PrintInstructions)
                 {
                     Console.WriteLine();
                     Console.WriteLine($" === FINAL ===");
@@ -364,6 +397,7 @@ public static class Entry
                     pauseBeforeRun = true;
                 }
 
+                /*
                 if (arguments.PrintFlags.HasFlag(PrintFlags.Simplified))
                 {
                     Console.WriteLine();
@@ -374,6 +408,7 @@ public static class Entry
 
                     pauseBeforeRun = true;
                 }
+                */
 
                 /*
                 Output.WriteLine();
@@ -383,10 +418,10 @@ public static class Entry
                 Output.WriteLine();
                 */
 
-                if (arguments.OutputFile is not null)
+                if (arguments.Output is not null)
                 {
-                    Console.WriteLine($"Writing to \"{arguments.OutputFile}\" ...");
-                    File.WriteAllText(arguments.OutputFile, generated.Code);
+                    Console.WriteLine($"Writing to \"{arguments.Output}\" ...");
+                    File.WriteAllText(arguments.Output, generated.Code);
                 }
 
                 InterpreterCompact interpreter = new()
@@ -402,7 +437,7 @@ public static class Entry
                     Console.ReadKey();
                 }
 
-                if (arguments.ConsoleGUI)
+                if (arguments.Debug)
                 {
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     { throw new PlatformNotSupportedException($"Console rendering is only supported on Windows"); }
@@ -415,7 +450,7 @@ public static class Entry
                 {
                     interpreter.Run();
 
-                    if (arguments.PrintFlags.HasFlag(PrintFlags.Heap))
+                    if (arguments.PrintMemory ?? false)
                     {
                         Console.WriteLine();
                         Console.WriteLine();
@@ -431,8 +466,8 @@ public static class Entry
                         finalIndex = Math.Max(finalIndex, interpreter.MemoryPointer);
                         finalIndex = Math.Min(interpreter.Memory.Length, finalIndex + zerosToShow);
 
-                        int heapStart = arguments.BrainfuckGeneratorSettings.HeapStart;
-                        int heapEnd = heapStart + (arguments.BrainfuckGeneratorSettings.HeapSize * HeapCodeHelper.BlockSize);
+                        int heapStart = brainfuckGeneratorSettings.HeapStart;
+                        int heapEnd = heapStart + (brainfuckGeneratorSettings.HeapSize * HeapCodeHelper.BlockSize);
 
                         for (int i = 0; i < finalIndex; i++)
                         {
@@ -523,23 +558,23 @@ public static class Entry
                 }
                 break;
             }
-            case ProgramRunType.ASM:
+            case "assembly":
             {
-                Output.LogDebug($"Executing \"{arguments.File}\" ...");
+                Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
                 Dictionary<int, ExternalFunctionBase> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();
 
-                BitWidth bits = BitWidth._32;
+                BitWidth bits = BitWidth._64;
 
-                arguments.MainGeneratorSettings.PointerSize = (int)bits;
+                mainGeneratorSettings.PointerSize = (int)bits;
 
                 if (arguments.ThrowErrors)
                 {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
-                    generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
+                    generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, analysisCollection);
                     analysisCollection.Throw();
                     analysisCollection.Print();
                 }
@@ -547,8 +582,8 @@ public static class Entry
                 {
                     try
                     {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
-                        generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.MainGeneratorSettings, Output.Log, analysisCollection);
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
+                        generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, analysisCollection);
                         analysisCollection.Throw();
                         analysisCollection.Print();
                     }
@@ -556,18 +591,18 @@ public static class Entry
                     {
                         analysisCollection.Print();
                         Output.LogError(ex);
-                        return;
+                        return 1;
                     }
                     catch (Exception ex)
                     {
                         analysisCollection.Print();
                         Output.LogError(ex);
-                        return;
+                        return 1;
                     }
                 }
 
-                string asm = ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), bits);
-                string outputFile = arguments.File.LocalPath + "_executable";
+                string asm = ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, bits);
+                string outputFile = arguments.Source.LocalPath + "_executable";
 
                 Output.LogDebug("Assembling and linking ...");
 
@@ -647,7 +682,9 @@ public static class Entry
             }
             */
 
-            default: throw new NotImplementedException($"Mode \"{arguments.RunType}\" isn't implemented for some reason");
+            default: throw new NotImplementedException($"Unknown format \"{arguments.Format}\"");
         }
+
+        return 0;
     }
 }

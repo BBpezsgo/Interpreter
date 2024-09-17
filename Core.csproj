@@ -56,4 +56,8 @@
     <None Include=".github\workflows\dotnet-desktop.yml" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+  </ItemGroup>
+
 </Project>

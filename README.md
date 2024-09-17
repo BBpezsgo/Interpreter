@@ -1,6 +1,6 @@
 # My programming language
 
-[![.Net 8.0](https://img.shields.io/badge/.NET-8.0-5C2D91)](#)
+[![.Net 9.0](https://img.shields.io/badge/.NET-9.0-5C2D91)](#)
 [![C# preview](https://img.shields.io/badge/C%23-preview-239120.svg)](#)
 
 ## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
@@ -34,11 +34,11 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 > [!WARNING]
 > Expect buggy behavior and missing features!
 
-- `--console-gui|-c` Launch the debugger screen (only avaliable on Windows) [More info](https://github.com/BBpezsgo/Interpreter/wiki/Debugger)
+- `--console-gui|-c` Launches the debugger screen (only avaliable on Windows) [More info](https://github.com/BBpezsgo/Interpreter/wiki/Debugger)
 
 - `--output|-o file` Writes the generated code to the specified file (this option only works for brainfuck)
 
-- `--throw-errors|-t` Whenever an exception occurs, the program crashes. This is useful when debugging the compiler.
+- `--throw-errors|-t` Crashes the program whenever an exception thrown. This useful for me when debugging the compiler.
 
 - `--hide|-d w;i;d` Hides the specified log levels (w: Warning, i: Information, d: Debug)
 
@@ -46,22 +46,20 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 - `--basepath directory` Sets the path where source files will be searched for `using` statements
 
-- `--dont-optimize` Disable all optimization
+- `--dont-optimize` Disables all optimization
 
-- `--no-debug-info` Do not generate any debug information (if you compiling into brainfuck, generating debug informations will take a lots of time)
+- `--no-debug-info` Disables debug information generation (if you compiling into brainfuck, generating debug informations will take a lots of time)
 
 - `--stack-size size` Specifies the stack size
 
 - `--heap-size size` Specifies the HEAP size
 > [!NOTE]
-> For brainfuck, if you specify zero, the HEAP will not be initialized, and wherever you try to access it, it will not compile.
+> For brainfuck, if you specify zero the HEAP will not be initialized and wherever you try to access it, it will not compile.
 
 > [!NOTE]
 > Because of how HEAP represented in brainfuck, its size can't be larger than 126.
 
-- `--no-nullcheck` Do not generate null-checks when dereferencing a pointer
-
-- `--no-pause` Do not pause when finished
+- `--no-nullcheck` Disables null check generation when dereferencing a pointer
 
 ## Hello World:
 ```cs

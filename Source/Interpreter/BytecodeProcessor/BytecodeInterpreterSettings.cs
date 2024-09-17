@@ -10,4 +10,10 @@ public struct BytecodeInterpreterSettings
         StackSize = 2048,
         HeapSize = 2048,
     };
+
+    public BytecodeInterpreterSettings(BytecodeInterpreterSettings other)
+    {
+        StackSize = other.StackSize;
+        HeapSize = other.HeapSize;
+    }
 }

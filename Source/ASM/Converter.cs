@@ -5,7 +5,7 @@ namespace LanguageCore.ASM.Generator;
 [ExcludeFromCodeCoverage]
 public static class ConverterForAsm
 {
-    public static string Convert(ReadOnlySpan<Runtime.Instruction> instructions, BitWidth bits)
+    public static string Convert(ReadOnlySpan<Runtime.Instruction> instructions, DebugInformation? debugInformation, BitWidth bits)
     {
         AssemblyCode builder = new();
 
@@ -28,6 +28,15 @@ public static class ConverterForAsm
 
         for (int i = 0; i < instructions.Length; i++)
         {
+            if (debugInformation is not null &&
+                debugInformation.CodeComments.TryGetValue(i, out List<string>? comments))
+            {
+                foreach (string comment in comments)
+                {
+                    builder.CodeBuilder.AppendCommentLine(comment);
+                }
+            }
+
             if (codeReferences.Contains(i))
             {
                 builder.CodeBuilder.AppendLabel($"_{i}");
@@ -74,6 +83,9 @@ public static class ConverterForAsm
                     continue;
                 case Opcode.Pop32:
                     builder.CodeBuilder.AppendTextLine($"ADD {registerBasePointer}, 4");
+                    continue;
+                case Opcode.Pop64:
+                    builder.CodeBuilder.AppendTextLine($"ADD {registerBasePointer}, 8");
                     continue;
                 default:
                 {

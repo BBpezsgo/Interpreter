@@ -31,6 +31,12 @@ public enum Opcode : byte
     Pop32,
     /// <summary>
     /// <code>
+    /// <see langword="temp"/> = Pop64()
+    /// </code>
+    /// </summary>
+    Pop64,
+    /// <summary>
+    /// <code>
     /// <paramref name="DST"/> = Pop()
     /// </code>
     /// </summary>

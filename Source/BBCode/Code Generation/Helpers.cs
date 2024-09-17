@@ -259,6 +259,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void Pop(int size)
     {
+        if (PointerBitWidth >= BitWidth._64)
+        {
+            int qwordCount = size / 8;
+            size %= 8;
+            for (int i = 0; i < qwordCount; i++)
+            { AddInstruction(Opcode.Pop64); }
+        }
+
         if (PointerBitWidth != BitWidth._64)
         {
             int dwordCount = size / 4;

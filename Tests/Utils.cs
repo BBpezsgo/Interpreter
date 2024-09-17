@@ -443,7 +443,7 @@ public static class Utils
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
         analysisCollection.Throw();
 
-        string asm = LanguageCore.ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), BitWidth._32);
+        string asm = LanguageCore.ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, BitWidth._32);
 
         string outputFile = file.LocalPath + "_executable";
 

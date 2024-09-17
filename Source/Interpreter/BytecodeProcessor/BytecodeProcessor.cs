@@ -83,6 +83,7 @@ public partial class BytecodeProcessor
             case Opcode.Pop8: POP_VALUE(BitWidth._8); break;
             case Opcode.Pop16: POP_VALUE(BitWidth._16); break;
             case Opcode.Pop32: POP_VALUE(BitWidth._32); break;
+            case Opcode.Pop64: POP_VALUE(BitWidth._64); break;
             case Opcode.PopTo8: POP_TO_VALUE(BitWidth._8); break;
             case Opcode.PopTo16: POP_TO_VALUE(BitWidth._16); break;
             case Opcode.PopTo32: POP_TO_VALUE(BitWidth._32); break;

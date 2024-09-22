@@ -1,6 +1,5 @@
-﻿using System.IO;
+using System.IO;
 using System.Net.Http;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 using LanguageCore.Parser;
@@ -40,22 +39,6 @@ public class SourceCodeManager
         Print = printCallback;
         PreprocessorVariables = preprocessorVariables;
         FileParser = fileParser;
-    }
-
-    static JsonDocument? LoadConfigFile(string? directoryPath)
-    {
-        if (string.IsNullOrEmpty(directoryPath))
-        { return null; }
-
-        if (!Directory.Exists(directoryPath))
-        { return null; }
-
-        string[]? configFiles = Directory.GetFiles(directoryPath, "config.json", SearchOption.TopDirectoryOnly);
-
-        if (configFiles is null || configFiles.Length != 1)
-        { return null; }
-
-        return JsonDocument.Parse(File.ReadAllText(configFiles[0]));
     }
 
     bool FromWeb(
@@ -180,19 +163,6 @@ public class SourceCodeManager
 
     static IEnumerable<Uri> GetSearches(string @using, Uri? parent, string? basePath)
     {
-        if (parent is not null &&
-            parent.IsFile)
-        {
-            FileInfo file = new(parent.AbsolutePath);
-            JsonDocument? config = LoadConfigFile(file.Directory?.FullName);
-            if (config != null &&
-                config.RootElement.TryGetProperty("base", out JsonElement v))
-            {
-                string? b = v.GetString();
-                if (b != null) basePath = b;
-            }
-        }
-
         if (!@using.EndsWith($".{LanguageConstants.LanguageExtension}", StringComparison.Ordinal)) @using += $".{LanguageConstants.LanguageExtension}";
 
         if (Uri.TryCreate(parent, @using, out Uri? uri))

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -238,7 +238,7 @@ public class SourceCodeManager
         collectedASTs.Add(path, new CollectedAST(ast.Value, path, @using));
 
         foreach (UsingDefinition @using_ in ast.Value.Usings)
-        { collectedASTs.AddRange(ProcessFile(@using_, path, null, tokenizerSettings)); }
+        { collectedASTs.AddRange(ProcessFile(@using_, path, basePath, tokenizerSettings)); }
 
         return collectedASTs;
     }

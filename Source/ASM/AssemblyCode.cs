@@ -190,12 +190,24 @@ public class AssemblyCode
         int endlessSafe = 128;
         while (result.Length < length)
         {
-            char newChar = ValidIdentifierCharacters[System.Random.Shared.Next(0, ValidIdentifierCharacters.Length)];
+            char newChar = ValidIdentifierCharacters[(
+#if NET_STANDARD
+                new System.Random(DateTime.UtcNow.Second)
+#else
+                System.Random.Shared
+#endif
+                ).Next(0, ValidIdentifierCharacters.Length)];
             while (AssemblyCode.IsReserved(result.ToString() + newChar) ||
                    isValidCallback == null ||
                    isValidCallback.Invoke(result.ToString() + newChar))
             {
-                newChar = ValidIdentifierCharacters[System.Random.Shared.Next(0, ValidIdentifierCharacters.Length)];
+                newChar = ValidIdentifierCharacters[(
+#if NET_STANDARD
+                new System.Random(DateTime.UtcNow.Second)
+#else
+                System.Random.Shared
+#endif
+                ).Next(0, ValidIdentifierCharacters.Length)];
                 if (endlessSafe-- < 0) throw new EndlessLoopException();
             }
             result.Append(newChar);

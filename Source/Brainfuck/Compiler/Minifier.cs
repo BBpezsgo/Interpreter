@@ -174,8 +174,13 @@ public static class Minifier
 
             alreadyThere = result[i] switch
             {
+                #if NET_STANDARD
+                '+' => alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value + 1,
+                '-' => alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value - 1,
+                #else
                 '+' => alreadyThere + 1,
                 '-' => alreadyThere - 1,
+                #endif
                 ']' => 0,
                 '.' => alreadyThere,
                 _ => PredictedNumber<int>.Unknown,
@@ -268,7 +273,7 @@ public static class Minifier
 
                 result = result[..^removed];
 
-                corrected.CopyTo(result[initializationStarted..(i + movementLength - removed)]);
+                ((ReadOnlySpan<char>)corrected).CopyTo(result[initializationStarted..(i + movementLength - removed)]);
                 result[(i + movementLength)..].CopyTo(result[(i + movementLength - removed)..]);
 
                 // Span<char> newResult = new char[result.Length - removed];
@@ -284,14 +289,22 @@ public static class Minifier
             {
                 case '+':
                 {
+                    #if NET_STANDARD
+                    alreadyThere = alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value + 1;
+                    #else
                     alreadyThere++;
+                    #endif
                     if (initializationStarted == -1) initializationStarted = i;
                     break;
                 }
 
                 case '-':
                 {
+                    #if NET_STANDARD
+                    alreadyThere = alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value - 1;
+                    #else
                     alreadyThere--;
+                    #endif
                     if (initializationStarted == -1) initializationStarted = i;
                     break;
                 }

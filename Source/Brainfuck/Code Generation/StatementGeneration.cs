@@ -3,8 +3,6 @@ using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Tokenizing;
 
-using Ansi = Win32.Console.Ansi;
-
 namespace LanguageCore.Brainfuck.Generator;
 
 public partial class CodeGeneratorForBrainfuck : CodeGenerator

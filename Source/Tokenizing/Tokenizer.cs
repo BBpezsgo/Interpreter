@@ -262,7 +262,11 @@ public abstract partial class Tokenizer
                 CurrentToken.TokenType = PreparationTokenType.LiteralString;
                 SavedUnicode = null;
             }
+#if NET_STANDARD
+            else if (!CompatibilityUtils.IsAsciiHexDigit(currChar))
+#else
             else if (!char.IsAsciiHexDigit(currChar))
+#endif
             {
                 throw new TokenizerException($"This isn't a hex digit \"{currChar}\"", GetCurrentPosition(offsetTotal), File);
             }
@@ -289,7 +293,11 @@ public abstract partial class Tokenizer
                 CurrentToken.TokenType = PreparationTokenType.LiteralCharacter;
                 SavedUnicode = null;
             }
+#if NET_STANDARD
+            else if (!CompatibilityUtils.IsAsciiHexDigit(currChar))
+#else
             else if (!char.IsAsciiHexDigit(currChar))
+#endif
             {
                 throw new TokenizerException($"This isn't a hex digit: \"{currChar}\"", GetCurrentPosition(offsetTotal), File);
             }
@@ -314,7 +322,11 @@ public abstract partial class Tokenizer
         }
         else if (CurrentToken.TokenType == PreparationTokenType.PREPROCESS_Operator)
         {
+#if NET_STANDARD
+            if (CompatibilityUtils.IsAsciiLetter(currChar))
+#else
             if (char.IsAsciiLetter(currChar))
+#endif
             {
                 CurrentToken.TokenType = PreparationTokenType.PREPROCESS_Identifier;
                 CurrentToken.Content.Append(currChar);
@@ -328,7 +340,11 @@ public abstract partial class Tokenizer
         }
         else if (CurrentToken.TokenType == PreparationTokenType.PREPROCESS_Identifier)
         {
+#if NET_STANDARD
+            if (CompatibilityUtils.IsAsciiLetterOrDigit(currChar))
+#else
             if (char.IsAsciiLetterOrDigit(currChar))
+#endif
             {
                 CurrentToken.Content.Append(currChar);
                 goto FinishCharacter;
@@ -344,7 +360,11 @@ public abstract partial class Tokenizer
             if (CurrentToken.TokenType != PreparationTokenType.PREPROCESS_Argument)
             { EndToken(offsetTotal); }
 
+#if NET_STANDARD
+            if (CompatibilityUtils.IsAsciiLetter(currChar))
+#else
             if (char.IsAsciiLetter(currChar))
+#endif
             {
                 CurrentToken.TokenType = PreparationTokenType.PREPROCESS_Argument;
                 CurrentToken.Content.Append(currChar);
@@ -495,7 +515,11 @@ public abstract partial class Tokenizer
             goto FinishCharacter;
         }
 
+#if NET_STANDARD
+        if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_FLOAT && !CompatibilityUtils.IsAsciiDigit(currChar))
+#else
         if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_FLOAT && !char.IsAsciiDigit(currChar))
+#endif
         {
             CurrentToken.TokenType = PreparationTokenType.Operator;
             EndToken(offsetTotal);
@@ -532,7 +556,11 @@ public abstract partial class Tokenizer
             CurrentToken.Content.Append(currChar);
             CurrentToken.TokenType = PreparationTokenType.LiteralBinary;
         }
+#if NET_STANDARD
+        else if (CompatibilityUtils.IsAsciiDigit(currChar))
+#else
         else if (char.IsAsciiDigit(currChar))
+#endif
         {
             if (CurrentToken.TokenType == PreparationTokenType.Whitespace)
             {

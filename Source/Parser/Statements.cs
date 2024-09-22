@@ -1212,7 +1212,7 @@ public class Literal : StatementWithValue
     public static IEnumerable<Literal> CreateAnonymous(IEnumerable<CompiledValue> values, IEnumerable<IPositioned> positions)
         =>
         values
-        .Zip(positions)
+        .Zip(positions, (a, b) => (First: a, Second: b))
         .Select(item => Literal.CreateAnonymous(item.First, item.Second));
 
     public override string ToString()

@@ -78,31 +78,46 @@ public static class GeneralExtensions
     public static void Set<T>(this List<T> collection, ImmutableArray<T> newValues)
     {
         collection.Clear();
+#if NET_STANDARD
+        collection.AddRange(newValues);
+#else
         collection.AddRange(newValues.AsSpan());
+#endif
     }
 
     public static bool Contains(this StringBuilder stringBuilder, char value)
     {
+#if NET_STANDARD
+        return stringBuilder.Contains(value);
+#else
         foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
         {
             if (chunk.Span.Contains(value))
             { return true; }
         }
         return false;
+#endif
     }
 
     public static bool Contains(this StringBuilder stringBuilder, ReadOnlySpan<char> value)
     {
+#if NET_STANDARD
+        return stringBuilder.Contains(value);
+#else
         foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
         {
             if (chunk.Span.Contains(value, StringComparison.Ordinal))
             { return true; }
         }
         return false;
+#endif
     }
 
     public static int IndexOf(this StringBuilder stringBuilder, ReadOnlySpan<char> value)
     {
+#if NET_STANDARD
+        return stringBuilder.IndexOf(value);
+#else
         foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
         {
             int res = chunk.Span.IndexOf(value, StringComparison.Ordinal);
@@ -110,10 +125,14 @@ public static class GeneralExtensions
             { return res; }
         }
         return -1;
+#endif
     }
 
     public static int IndexOf(this StringBuilder stringBuilder, char value)
     {
+#if NET_STANDARD
+        return stringBuilder.IndexOf(value);
+#else
         foreach (ReadOnlyMemory<char> chunk in stringBuilder.GetChunks())
         {
             int res = chunk.Span.IndexOf(value);
@@ -121,5 +140,6 @@ public static class GeneralExtensions
             { return res; }
         }
         return -1;
+#endif
     }
 }

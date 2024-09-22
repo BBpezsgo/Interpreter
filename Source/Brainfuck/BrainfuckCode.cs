@@ -334,7 +334,11 @@ public static class BrainfuckCode
                     expectNumber = false;
                     break;
                 default:
+                #if NET_STANDARD
+                    if (expectNumber && unchecked((uint)(code[i] - '0')) <= 9)
+                #else
                     if (expectNumber && char.IsAsciiDigit(code[i]))
+                #endif
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
                     }

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Library</OutputType>
@@ -27,14 +27,17 @@
     <Compile Remove="Scripts\BuildJob\**" />
     <Compile Remove="Tests\**" />
     <Compile Remove="Utility\**" />
+    <Compile Remove="Source\NotSupportedStuff.cs" />
     <EmbeddedResource Remove="out\**" />
     <EmbeddedResource Remove="Scripts\BuildJob\**" />
     <EmbeddedResource Remove="Tests\**" />
     <EmbeddedResource Remove="Utility\**" />
+    <EmbeddedResource Remove="Source\NotSupportedStuff.cs" />
     <None Remove="out\**" />
     <None Remove="Scripts\BuildJob\**" />
     <None Remove="Tests\**" />
     <None Remove="Utility\**" />
+    <None Remove="Source\NotSupportedStuff.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -104,8 +104,12 @@ public class Token :
     /// <exception cref="ArgumentOutOfRangeException"/>
     public (Token?, Token?) Slice(int at)
     {
+#if NET_STANDARD
+        if (at < 0 || at > Content.Length) throw new ArgumentOutOfRangeException(nameof(at));
+#else
         ArgumentOutOfRangeException.ThrowIfNegative(at);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(at, Content.Length);
+#endif
 
         if (Content.Length == 0)
         { return (null, null); }

@@ -106,7 +106,11 @@ public readonly struct Position :
         if (Range.Start.Line != Range.End.Line)
         { throw new NotImplementedException($"Position slicing on different lines not implemented"); }
 
+#if NET_STANDARD
+        if (at < 0) throw new ArgumentOutOfRangeException(nameof(at));
+#else
         ArgumentOutOfRangeException.ThrowIfNegative(at);
+#endif
         int rangeSize = Range.End.Character - Range.Start.Character;
 
         if (rangeSize < 0)

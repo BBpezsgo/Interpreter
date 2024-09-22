@@ -20,10 +20,10 @@ public class NasmException : Exception
     {
         StringBuilder result = new(OriginalMessage);
 
-        result.Append(CultureInfo.InvariantCulture, $" (at line {LineNumber})");
+        result.Append($" (at line {LineNumber})");
 
         if (File != null)
-        { result.Append(CultureInfo.InvariantCulture, $" (in {File})"); }
+        { result.Append($" (in {File})"); }
 
         return result.ToString();
     }

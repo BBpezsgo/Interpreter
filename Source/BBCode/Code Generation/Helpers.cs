@@ -380,7 +380,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int currentOffset = 0;
         while (currentOffset < size)
         {
-            foreach (BitWidth checkBitWidth in Enum.GetValues<BitWidth>().Reverse())
+            foreach (BitWidth checkBitWidth in
+#if NET_STANDARD
+                CompatibilityUtils.GetEnumValues<BitWidth>().Reverse()
+#else
+                Enum.GetValues<BitWidth>().Reverse()
+#endif
+            )
             {
                 if (PointerBitWidth == BitWidth._64 &&
                     checkBitWidth == BitWidth._32)
@@ -451,7 +457,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     while (currentOffset >= 0)
                     {
-                        foreach (BitWidth checkBitWidth in Enum.GetValues<BitWidth>().Reverse())
+                        foreach (BitWidth checkBitWidth in
+#if NET_STANDARD
+                            CompatibilityUtils.GetEnumValues<BitWidth>().Reverse()
+#else
+                            Enum.GetValues<BitWidth>().Reverse()
+#endif
+                        )
                         {
                             int checkSize = (int)checkBitWidth;
                             if (currentOffset < checkSize - 1) continue;

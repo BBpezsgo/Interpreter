@@ -2352,7 +2352,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Dictionary<string, StatementWithValue> _parameters =
             function.Parameters
             .Select((value, index) => (value.Identifier.Content, parameters[index]))
-            .ToDictionary();
+            .ToDictionary(v => v.Content, v => v.Item2);
 
         return InlineMacro(function, _parameters, out inlined);
     }

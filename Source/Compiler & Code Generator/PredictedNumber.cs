@@ -5,7 +5,11 @@ public readonly struct PredictedNumber<T> :
     ISubtractionOperators<PredictedNumber<T>, PredictedNumber<T>, PredictedNumber<T>>,
     IEquatable<PredictedNumber<T>>,
     IEquatable<T>
+    #if NET_STANDARD
+    where T : struct
+    #else
     where T : struct, INumberBase<T>
+    #endif
 {
     [MemberNotNullWhen(true, nameof(Value))]
     public bool IsUnknown { get; }
@@ -28,15 +32,19 @@ public readonly struct PredictedNumber<T> :
     public static implicit operator PredictedNumber<T>(T value) => new(value);
     public static implicit operator T?(PredictedNumber<T> value) => value.IsUnknown ? default : value.Value;
 
+#if !NET_STANDARD
+
     public static PredictedNumber<T> operator +(PredictedNumber<T> left, PredictedNumber<T> right)
-        => (left.IsUnknown || right.IsUnknown) ? PredictedNumber<T>.Unknown : (left.Value + right.Value);
+        => (left.IsUnknown || right.IsUnknown) ? Unknown : (left.Value + right.Value);
     public static PredictedNumber<T> operator -(PredictedNumber<T> left, PredictedNumber<T> right)
-        => (left.IsUnknown || right.IsUnknown) ? PredictedNumber<T>.Unknown : (left.Value - right.Value);
+        => (left.IsUnknown || right.IsUnknown) ? Unknown : (left.Value - right.Value);
 
     public static PredictedNumber<T> operator ++(PredictedNumber<T> left)
-        => left.IsUnknown ? PredictedNumber<T>.Unknown : (left.Value + T.One);
+        => left.IsUnknown ? Unknown : (left.Value + T.One);
     public static PredictedNumber<T> operator --(PredictedNumber<T> left)
-        => left.IsUnknown ? PredictedNumber<T>.Unknown : (left.Value - T.One);
+        => left.IsUnknown ? Unknown : (left.Value - T.One);
+
+#endif
 
     public static bool operator ==(PredictedNumber<T> left, PredictedNumber<T> right) => left.Equals(right);
     public static bool operator !=(PredictedNumber<T> left, PredictedNumber<T> right) => !left.Equals(right);

@@ -35,8 +35,12 @@ sealed class PreparationToken :
     /// <exception cref="ArgumentOutOfRangeException"/>
     public (PreparationToken?, PreparationToken?) Slice(int at)
     {
+        #if NET_STANDARD
+        if (at < 0 || at >= Content.Length) throw new ArgumentOutOfRangeException(nameof(at));
+        #else
         ArgumentOutOfRangeException.ThrowIfNegative(at);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(at, Content.Length);
+        #endif
 
         if (Content.Length == 0)
         { return (null, null); }

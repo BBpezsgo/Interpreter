@@ -1,5 +1,4 @@
 ﻿using LanguageCore.Compiler;
-using Win32.Console;
 
 namespace LanguageCore.Runtime;
 
@@ -49,7 +48,7 @@ public class RuntimeException : LanguageException
 
         File ??= callStack.LastOrDefault().Function?.File;
 
-        AnsiBuilder result = new();
+        StringBuilder result = new();
 
         result.Append(Message);
 

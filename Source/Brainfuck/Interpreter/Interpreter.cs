@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.Brainfuck;
 
-public partial class Interpreter : InterpreterBase<OpCodes>
+public class Interpreter : InterpreterBase<OpCodes>
 {
     public Interpreter(OutputCallback? onOutput = null, InputCallback? onInput = null)
         : base(onOutput, onInput) { }

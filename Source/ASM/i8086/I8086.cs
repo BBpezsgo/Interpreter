@@ -1,7 +1,6 @@
 ﻿using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using Win32.Console;
 
 namespace LanguageCore.Intel;
 
@@ -327,6 +326,8 @@ static class Extensions
         Set(ref v, Flags.P, (total % 2) == 0);
     }
 }
+
+#if false
 
 [ExcludeFromCodeCoverage]
 [SupportedOSPlatform("windows")]
@@ -1974,3 +1975,5 @@ public unsafe struct I8086
         throw new NotImplementedException();
     }
 }
+
+#endif

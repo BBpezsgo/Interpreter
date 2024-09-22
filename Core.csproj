@@ -1,19 +1,16 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <ApplicationIcon>icon.ico</ApplicationIcon>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <LangVersion>preview</LangVersion>
     <PublishAot>false</PublishAot>
     <AssemblyName>BBLang</AssemblyName>
-    <RootNamespace>LanguageCore</RootNamespace>
     <PackageId>BBLang</PackageId>
     <Authors>BB</Authors>
-    <StartupObject>LanguageCore.Program</StartupObject>
     <AnalysisLevel>preview-all</AnalysisLevel>
   </PropertyGroup>
 
@@ -29,12 +26,15 @@
     <Compile Remove="out\**" />
     <Compile Remove="Scripts\BuildJob\**" />
     <Compile Remove="Tests\**" />
+    <Compile Remove="Utility\**" />
     <EmbeddedResource Remove="out\**" />
     <EmbeddedResource Remove="Scripts\BuildJob\**" />
     <EmbeddedResource Remove="Tests\**" />
+    <EmbeddedResource Remove="Utility\**" />
     <None Remove="out\**" />
     <None Remove="Scripts\BuildJob\**" />
     <None Remove="Tests\**" />
+    <None Remove="Utility\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -48,16 +48,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Win32-Stuff\Win32.csproj" />
     <ProjectReference Include="..\..\Math\Math.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include=".github\workflows\dotnet-desktop.yml" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="CommandLineParser" Version="2.9.1" />
   </ItemGroup>
 
 </Project>

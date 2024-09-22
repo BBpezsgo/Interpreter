@@ -5,7 +5,7 @@ namespace LanguageCore.Brainfuck;
 public delegate void OutputCallback(byte data);
 public delegate byte InputCallback();
 
-public abstract partial class InterpreterBase
+public abstract class InterpreterBase
 {
     public const int MEMORY_SIZE = 1024;
 
@@ -53,11 +53,15 @@ public abstract partial class InterpreterBase
         _codePointer = 0;
         _memoryPointer = 0;
         _memoryPointerRange = default;
+        #if NET_STANDARD
+        Array.Clear(Memory, 0, Memory.Length);
+        #else
         Array.Clear(Memory);
+        #endif
     }
 }
 
-public abstract partial class InterpreterBase<TCode> : InterpreterBase
+public abstract class InterpreterBase<TCode> : InterpreterBase
 {
     protected ImmutableArray<TCode> Code;
 

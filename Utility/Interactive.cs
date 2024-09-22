@@ -13,7 +13,7 @@ using Parser.Statement;
 using Runtime;
 using Tokenizing;
 
-[ExcludeFromCodeCoverage]
+
 readonly struct InteractiveSession
 {
     public readonly string Input;
@@ -31,7 +31,7 @@ readonly struct InteractiveSession
     }
 }
 
-[ExcludeFromCodeCoverage]
+
 struct ActiveInteractiveSession
 {
     public string? ColorizedText;
@@ -70,7 +70,7 @@ struct ActiveInteractiveSession
     }
 }
 
-[ExcludeFromCodeCoverage]
+
 class InteractiveCompiler
 {
     string _text;
@@ -124,7 +124,7 @@ class InteractiveCompiler
         {
             Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
 
-            Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
+            Dictionary<int, IExternalFunction> externalFunctions = Interpreter.GetExternalFunctions();
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
@@ -168,7 +168,7 @@ class InteractiveCompiler
         {
             Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
 
-            Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
+            Dictionary<int, IExternalFunction> externalFunctions = Interpreter.GetExternalFunctions();
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
@@ -195,7 +195,7 @@ class InteractiveCompiler
     }
 }
 
-[ExcludeFromCodeCoverage]
+
 static class InteractiveColors
 {
     public static readonly Color Error = Color.ParseHex("fc3e36");
@@ -215,7 +215,7 @@ static class InteractiveColors
     public static readonly Color TypeParameter = Color.ParseHex("b8d7a3");
 }
 
-[ExcludeFromCodeCoverage]
+
 public class Interactive
 {
     readonly InteractiveCompiler CompilerCache;
@@ -715,7 +715,7 @@ public class Interactive
 
             if (CompilerCache.Tokens.IsEmpty) return;
 
-            Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
+            Dictionary<int, IExternalFunction> externalFunctions = Interpreter.GetExternalFunctions();
 
             BBLangGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, MainGeneratorSettings.Default);
 

@@ -1,6 +1,5 @@
 ﻿#pragma warning disable IDE0059 // Unnecessary assignment of a value
 
-using Win32.Console;
 using LanguageCore.Compiler;
 
 namespace LanguageCore.Brainfuck;

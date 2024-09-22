@@ -13,8 +13,6 @@ public partial class InterpreterElement
         // sender.ClearBuffer();
         sender.DrawBuffer.StepTo(0);
 
-        if (this.Interpreter.BytecodeInterpreter == null) return;
-
         DrawBuffer b = sender.DrawBuffer;
 
         b.ResetColor();

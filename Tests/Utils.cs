@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -230,9 +230,9 @@ public static class Utils
 {
     public const int HeapSize = 2048;
 
-    const string BasePath = "../StandardLibrary/";
-    static readonly ImmutableArray<string> AdditionalImports = ImmutableArray.Create<string>(
-        "../StandardLibrary/Primitives.bbc"
+    static string BasePath => $"{LanguageCore.Program.ProjectPath}/StandardLibrary/";
+    static readonly ImmutableArray<string> AdditionalImports = ImmutableArray.Create(
+        $"{LanguageCore.Program.ProjectPath}/StandardLibrary/Primitives.bbc"
     );
 
     public const long BaseTimeout = 2000;

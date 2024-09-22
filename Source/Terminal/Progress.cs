@@ -1,12 +1,10 @@
-﻿namespace LanguageCore;
+namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
 public static class ConsoleProgress
 {
-    public static bool IsEnabled { get; private set; }
+    public static bool IsEnabled { get; set; } = false;
     public static ImmutableArray<char> SpinnerCharacters { get; } = ImmutableArray.Create('-', '\\', '|', '/');
-
-    public static void SetProgramArguments(CommandLineOptions arguments) => IsEnabled = arguments.Verbose;
 }
 
 [ExcludeFromCodeCoverage]

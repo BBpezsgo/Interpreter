@@ -11,7 +11,6 @@ using LanguageCore.Tokenizing;
 
 namespace LanguageCore;
 
-[ExcludeFromCodeCoverage]
 public static class Entry
 {
     /// <exception cref="NotSupportedException"/>
@@ -56,8 +55,10 @@ public static class Entry
     /// <exception cref="NotImplementedException"/>
     public static int Run(CommandLineOptions arguments)
     {
-        Output.SetProgramArguments(arguments);
-        ConsoleProgress.SetProgramArguments(arguments);
+        Output.LogDebugs = arguments.Verbose;
+        Output.LogInfos = true;
+        Output.LogWarnings = true;
+        ConsoleProgress.IsEnabled = arguments.Verbose;
 
         CompilerSettings compilerSettings = new(CompilerSettings.Default)
         {
@@ -102,7 +103,7 @@ public static class Entry
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                Dictionary<int, ExternalFunctionBase> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
+                Dictionary<int, IExternalFunction> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();
@@ -442,9 +443,9 @@ public static class Entry
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     { throw new PlatformNotSupportedException($"Console rendering is only supported on Windows"); }
 
-                    interpreter.RunWithUI(true, -100);
-
-                    Console.ReadKey();
+                    throw new NotImplementedException();
+                    // interpreter.RunWithUI(true, -100);
+                    // Console.ReadKey();
                 }
                 else
                 {
@@ -562,7 +563,7 @@ public static class Entry
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                Dictionary<int, ExternalFunctionBase> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
+                Dictionary<int, IExternalFunction> externalFunctions = Runtime.Interpreter.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();

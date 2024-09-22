@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.Brainfuck;
 
-public partial class InterpreterCompact : InterpreterBase<CompactCodeSegment>
+public class InterpreterCompact : InterpreterBase<CompactCodeSegment>
 {
     public InterpreterCompact(OutputCallback? onOutput = null, InputCallback? onInput = null)
         : base(onOutput, onInput) { }

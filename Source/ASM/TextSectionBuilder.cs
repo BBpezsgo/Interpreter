@@ -128,7 +128,11 @@ public class TextSectionBuilder : SectionBuilder
         AppendText(Environment.NewLine);
     }
 
+#if NET_STANDARD
+    public void AppendInstructionNoEOL(OpCode keyword, params string[] operands)
+#else
     public void AppendInstructionNoEOL(OpCode keyword, params ReadOnlySpan<string> operands)
+#endif
     {
         AppendInstructionNoEOL(keyword);
         if (operands.Length > 0)
@@ -144,7 +148,11 @@ public class TextSectionBuilder : SectionBuilder
         }
     }
 
+#if NET_STANDARD
+    public void AppendInstruction(OpCode keyword, params string[] operands)
+#else
     public void AppendInstruction(OpCode keyword, params ReadOnlySpan<string> operands)
+#endif
     {
         AppendInstructionNoEOL(keyword, operands);
         AppendText(Environment.NewLine);
@@ -236,7 +244,11 @@ public class TextSectionBuilder : SectionBuilder
     #region Call_stdcall
 
     /// <inheritdoc cref="Call_stdcall(string, ReadOnlySpan{string?})"/>
+#if NET_STANDARD
+    public void Call_stdcall(string label, params InstructionOperand[] parameters)
+#else
     public void Call_stdcall(string label, params ReadOnlySpan<InstructionOperand> parameters)
+#endif
     {
         string[] parametersString = new string[parameters.Length];
         for (int i = 0; i < parameters.Length; i++)
@@ -249,7 +261,11 @@ public class TextSectionBuilder : SectionBuilder
     /// Return value: <see cref="Registers.AX"/>
     /// </para>
     /// </summary>
+#if NET_STANDARD
+    void Call_stdcall(string label, params string?[] parameters)
+#else
     void Call_stdcall(string label, params ReadOnlySpan<string?> parameters)
+#endif
     {
         if (label.StartsWith('_') && label.Contains('@'))
         { Import(label); }

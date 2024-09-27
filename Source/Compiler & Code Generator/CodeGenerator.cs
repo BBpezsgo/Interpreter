@@ -506,7 +506,12 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         [NotNullWhen(false)] out WillBeCompilerException? error,
         Action<CompliableTemplate<CompiledConstructor>>? addCompilable = null)
     {
-        arguments = [type, .. arguments];
+        {
+            ImmutableArray<GeneralType>.Builder argumentsBuilder = ImmutableArray.CreateBuilder<GeneralType>();
+            argumentsBuilder.Add(type);
+            argumentsBuilder.AddRange(arguments);
+            arguments = argumentsBuilder.ToImmutable();
+        }
 
         return GetFunction<CompiledConstructor, GeneralType, GeneralType, GeneralType>(
             GetConstructors(),

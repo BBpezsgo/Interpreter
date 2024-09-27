@@ -1,4 +1,4 @@
-using LanguageCore.Parser;
+﻿using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
@@ -156,7 +156,7 @@ public readonly struct CompilerResult
         Operators = operators.ToImmutableArray();
         Constructors = constructors.ToImmutableArray();
         Aliases = aliases.ToImmutableArray();
-        ExternalFunctions = externalFunctions.ToDictionary();
+        ExternalFunctions = externalFunctions.ToDictionary(v => v.Key, v => v.Value);
         Structs = structs.ToImmutableArray();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
         File = file;
@@ -579,13 +579,13 @@ public sealed class Compiler
             PreprocessorVariables,
             TokenizerSettings,
             null,
-            ["System"]
+            new string[] { "System" }
         );
 
         foreach (CollectedAST file_ in files.Values)
         { AddAST(file_); }
 
-        TopLevelStatements.Add(([statement], file));
+        TopLevelStatements.Add((ImmutableArray.Create(statement), file));
 
         CompileInternal();
 
@@ -870,7 +870,7 @@ public sealed class Compiler
 
     public static CompilerResult CompileFile(
         Uri file,
-        Dictionary<int, ExternalFunctionBase>? externalFunctions,
+        Dictionary<int, IExternalFunction>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback = null,

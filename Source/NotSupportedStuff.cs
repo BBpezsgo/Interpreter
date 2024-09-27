@@ -1,5 +1,8 @@
 global using MemberNotNullWhenAttribute = System.Runtime.CompilerServices.MemberNotNullWhenAttribute_;
 
+[assembly: SuppressMessage("Design", "CS8604")]
+[assembly: SuppressMessage("Design", "CS8632")]
+
 namespace System.Runtime.CompilerServices
 {
     public class IsExternalInit : Attribute

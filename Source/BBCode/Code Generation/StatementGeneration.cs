@@ -1,9 +1,13 @@
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
 using LiteralStatement = LanguageCore.Parser.Statement.Literal;
+
+#if NET_STANDARD
+#pragma warning disable CS8604 // Possible null reference argument.
+#endif
 
 namespace LanguageCore.BBLang.Generator;
 
@@ -1698,8 +1702,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 GenerateAllocator(new AnyCall(
                     new Identifier(Token.CreateAnonymous("sizeof"), newObject.File),
-                    [new CompiledTypeStatement(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To)],
-                    [],
+                    new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To) },
+                    Array.Empty<Token>(),
                     TokenPair.CreateAnonymous(Position.UnknownPosition, "(", ")"),
                     newObject.File));
 

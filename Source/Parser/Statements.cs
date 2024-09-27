@@ -174,7 +174,7 @@ public class Block : Statement
     {
         if (statement is Block block) return block;
         return new Block(
-            [statement],
+            new Statement[] { statement },
             TokenPair.CreateAnonymous(statement.Position, "{", "}"));
     }
 }

@@ -2357,8 +2357,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 GenerateAllocator(new AnyCall(
                     new Identifier(Token.CreateAnonymous("sizeof"), newInstance.File),
-                    [new CompiledTypeStatement(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To)],
-                    [],
+                    new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To) },
+                    Array.Empty<Token>(),
                     TokenPair.CreateAnonymous(Position.UnknownPosition, "(", ")"),
                     newInstance.File));
 

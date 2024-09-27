@@ -4,7 +4,7 @@ using LanguageCore.Runtime;
 
 namespace LanguageCore.Compiler;
 
-public abstract class Address;
+public abstract class Address { }
 
 public class AddressOffset : Address
 {
@@ -167,7 +167,7 @@ public enum Protection
     Public,
 }
 
-public interface IDefinition;
+public interface IDefinition { }
 
 public interface IDefinition<TOther> : IDefinition
 {

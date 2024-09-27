@@ -4,6 +4,7 @@ obj
 *.user
 *.xcf
 *.sln
+*.meta
 
 /Tests/Program.cs
 /Diagsessions

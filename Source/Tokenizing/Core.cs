@@ -4,10 +4,30 @@ namespace LanguageCore.Tokenizing;
 
 public abstract partial class Tokenizer
 {
-    static readonly ImmutableArray<char> Bracelets = ['{', '}', '(', ')', '[', ']'];
-    static readonly ImmutableArray<char> Operators = ['+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~'];
-    static readonly ImmutableArray<string> DoubleOperators = ["++", "--", "<<", ">>", "&&", "||"];
-    static readonly ImmutableArray<char> SimpleOperators = [';', ','];
+    static readonly ImmutableArray<char> Bracelets = ImmutableArray.Create(
+        '{', '}',
+        '(', ')',
+        '[', ']'
+    );
+
+    static readonly ImmutableArray<char> Operators = ImmutableArray.Create(
+        '+', '-',
+        '*', '/',
+        '=', '<', '>',
+        '!', '%',
+        '^', '|', '&', '~'
+    );
+
+    static readonly ImmutableArray<string> DoubleOperators = ImmutableArray.Create(
+        "++", "--",
+        "<<", ">>",
+        "&&", "||"
+    );
+
+    static readonly ImmutableArray<char> SimpleOperators = ImmutableArray.Create(
+        ';',
+        ','
+    );
 
     protected readonly List<Token> Tokens;
     protected readonly List<SimpleToken> UnicodeCharacters;

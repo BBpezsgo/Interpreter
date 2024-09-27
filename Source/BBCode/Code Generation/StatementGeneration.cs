@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -83,7 +83,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (allocator.IsExternal)
         {
-            if (!ExternalFunctions.TryGet(allocator.ExternalFunctionName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+            if (!ExternalFunctions.TryGet(allocator.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
             {
                 AnalysisCollection?.Errors.Add(exception.InstantiateError(size, CurrentFile));
                 AddComment("}");
@@ -145,7 +145,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (deallocator.IsExternal)
         {
-            if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+            if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
             {
                 AnalysisCollection?.Errors.Add(exception.InstantiateError(value, CurrentFile));
                 AddComment("}");
@@ -621,7 +621,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void GenerateCodeForFunctionCall_External<TFunction>(IReadOnlyList<StatementWithValue> parameters, bool saveValue, TFunction compiledFunction, ExternalFunctionBase externalFunction)
+    void GenerateCodeForFunctionCall_External<TFunction>(IReadOnlyList<StatementWithValue> parameters, bool saveValue, TFunction compiledFunction, IExternalFunction externalFunction)
         where TFunction : FunctionThingDefinition, ICompiledFunction, ISimpleReadable
     {
         Compiler.Compiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction);
@@ -679,7 +679,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (compiledFunction.IsExternal)
         {
-            if (!ExternalFunctions.TryGet(compiledFunction.ExternalFunctionName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+            if (!ExternalFunctions.TryGet(compiledFunction.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
             {
                 AnalysisCollection?.Errors.Add(exception.InstantiateError(functionCall.Identifier, CurrentFile));
                 AddComment("}");
@@ -874,7 +874,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (operatorDefinition.IsExternal)
             {
-                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
                 {
                     AnalysisCollection?.Errors.Add(exception.InstantiateError(@operator.Operator, CurrentFile));
                     AddComment("}");
@@ -1124,7 +1124,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (operatorDefinition.IsExternal)
             {
-                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
                 {
                     AnalysisCollection?.Errors.Add(exception.InstantiateError(@operator.Operator, CurrentFile));
                     AddComment("}");

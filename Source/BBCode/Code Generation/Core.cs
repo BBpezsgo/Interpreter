@@ -115,7 +115,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 {
     #region Fields
 
-    readonly ImmutableDictionary<int, ExternalFunctionBase> ExternalFunctions;
+    readonly ImmutableDictionary<int, IExternalFunction> ExternalFunctions;
 
     readonly Stack<ImmutableArray<CleanupItem>> CleanupStack;
     IDefinition? CurrentContext;

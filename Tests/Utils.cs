@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -28,7 +28,7 @@ public readonly struct TestFile
     }
 
     /// <exception cref="AssertFailedException"/>
-    public void DoMain(bool heapShouldBeEmpty = true, Action<Dictionary<int, ExternalFunctionBase>>? externalFunctionAdder = null)
+    public void DoMain(bool heapShouldBeEmpty = true, Action<Dictionary<int, IExternalFunction>>? externalFunctionAdder = null)
     {
         MainResult result = Utils.RunMain(LanguageCore.Utils.ToFileUri(SourceFile), GetInput(), externalFunctionAdder);
         Console.Write($"ExitCode: {result.ExitCode}");
@@ -308,9 +308,9 @@ public static class Utils
         return new TestFile(sourceFile, resultFile, inputFile);
     }
 
-    public static MainResult RunMain(Uri file, string input, Action<Dictionary<int, ExternalFunctionBase>>? externalFunctionAdder = null)
+    public static MainResult RunMain(Uri file, string input, Action<Dictionary<int, IExternalFunction>>? externalFunctionAdder = null)
     {
-        Dictionary<int, ExternalFunctionBase> externalFunctions = Interpreter.GetExternalFunctions();
+        Dictionary<int, IExternalFunction> externalFunctions = Interpreter.GetExternalFunctions();
 
         externalFunctionAdder?.Invoke(externalFunctions);
 
@@ -325,7 +325,7 @@ public static class Utils
 
         (Interpreter, MainResult) Execute(BBLangGeneratorResult code, string input)
         {
-            Dictionary<int, ExternalFunctionBase> _externalFunctions = new();
+            Dictionary<int, IExternalFunction> _externalFunctions = new();
             externalFunctionAdder?.Invoke(_externalFunctions);
 
             Interpreter interpreter = new(true, new BytecodeInterpreterSettings()

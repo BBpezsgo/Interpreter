@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.Runtime;
+namespace LanguageCore.Runtime;
 
 public readonly struct TimeSleep : IEquatable<TimeSleep>
 {
@@ -60,12 +60,12 @@ public class Interpreter
 
     TimeSleep CurrentSleep;
 
-    public Interpreter(bool throwExceptions, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation = null, IEnumerable<KeyValuePair<int, ExternalFunctionBase>>? externalFunctions = null)
+    public Interpreter(bool throwExceptions, BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation = null, IEnumerable<KeyValuePair<int, IExternalFunction>>? externalFunctions = null)
     {
         ThrowExceptions = throwExceptions;
         DebugInformation = debugInformation;
 
-        Dictionary<int, ExternalFunctionBase> _externalFunctions = GenerateExternalFunctions();
+        Dictionary<int, IExternalFunction> _externalFunctions = GenerateExternalFunctions();
         if (externalFunctions is not null) _externalFunctions.AddRange(externalFunctions);
         BytecodeInterpreter = new BytecodeProcessor(program, _externalFunctions.ToFrozenDictionary(), settings);
     }
@@ -88,9 +88,9 @@ public class Interpreter
         IsPaused = false;
     }
 
-    Dictionary<int, ExternalFunctionBase> GenerateExternalFunctions()
+    Dictionary<int, IExternalFunction> GenerateExternalFunctions()
     {
-        Dictionary<int, ExternalFunctionBase> externalFunctions = new();
+        Dictionary<int, IExternalFunction> externalFunctions = new();
 
         #region Console
 
@@ -122,9 +122,9 @@ public class Interpreter
         return externalFunctions;
     }
 
-    public static Dictionary<int, ExternalFunctionBase> GetExternalFunctions()
+    public static Dictionary<int, IExternalFunction> GetExternalFunctions()
     {
-        Dictionary<int, ExternalFunctionBase> externalFunctions = new();
+        Dictionary<int, IExternalFunction> externalFunctions = new();
 
         AddRuntimeExternalFunctions(externalFunctions);
 
@@ -133,7 +133,7 @@ public class Interpreter
         return externalFunctions;
     }
 
-    static void AddRuntimeExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
+    static void AddRuntimeExternalFunctions(Dictionary<int, IExternalFunction> externalFunctions)
     {
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdIn, static () => '\0');
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, static (char @char) => { });
@@ -143,7 +143,7 @@ public class Interpreter
         externalFunctions.AddExternalFunction("sleep", static (int t) => { });
     }
 
-    static void AddStaticExternalFunctions(Dictionary<int, ExternalFunctionBase> externalFunctions)
+    static void AddStaticExternalFunctions(Dictionary<int, IExternalFunction> externalFunctions)
     {
         externalFunctions.AddExternalFunction("utc-time", static () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
         externalFunctions.AddExternalFunction("local-time", static () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);

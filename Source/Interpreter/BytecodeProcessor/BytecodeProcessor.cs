@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 namespace LanguageCore.Runtime;
 
@@ -14,7 +14,7 @@ public partial class BytecodeProcessor
     public Registers Registers;
     public readonly byte[] Memory;
     public ImmutableArray<Instruction> Code;
-    readonly FrozenDictionary<int, ExternalFunctionBase> ExternalFunctions;
+    readonly FrozenDictionary<int, IExternalFunction> ExternalFunctions;
 
     public Range<int> GetStackInterval(out bool isReversed)
     {
@@ -22,7 +22,7 @@ public partial class BytecodeProcessor
         return new Range<int>(StackStart, Registers.StackPointer);
     }
 
-    public BytecodeProcessor(ImmutableArray<Instruction> code, FrozenDictionary<int, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings)
+    public BytecodeProcessor(ImmutableArray<Instruction> code, FrozenDictionary<int, IExternalFunction> externalFunctions, BytecodeInterpreterSettings settings)
     {
         Settings = settings;
         ExternalFunctions = externalFunctions;
@@ -32,8 +32,6 @@ public partial class BytecodeProcessor
         Memory = new byte[settings.HeapSize + settings.StackSize];
 
         Registers.StackPointer = StackStart - StackDirection;
-
-        externalFunctions.SetInterpreter(this);
     }
 
     public RuntimeContext GetContext() => new(

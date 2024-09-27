@@ -1,4 +1,4 @@
-﻿using LanguageCore.Parser;
+using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
@@ -15,7 +15,7 @@ public readonly struct CompilerResult
 
     public readonly ImmutableDictionary<Uri, CollectedAST> Raw;
 
-    public readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
+    public readonly Dictionary<int, IExternalFunction> ExternalFunctions;
 
     public readonly ImmutableArray<CompiledStruct> Structs;
 
@@ -133,7 +133,7 @@ public readonly struct CompilerResult
         Enumerable.Empty<CompiledOperator>(),
         Enumerable.Empty<CompiledConstructor>(),
         Enumerable.Empty<CompiledAlias>(),
-        Enumerable.Empty<KeyValuePair<int, ExternalFunctionBase>>(),
+        Enumerable.Empty<KeyValuePair<int, IExternalFunction>>(),
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<(ImmutableArray<Statement>, Uri)>(),
         file);
@@ -145,7 +145,7 @@ public readonly struct CompilerResult
         IEnumerable<CompiledOperator> operators,
         IEnumerable<CompiledConstructor> constructors,
         IEnumerable<CompiledAlias> aliases,
-        IEnumerable<KeyValuePair<int, ExternalFunctionBase>> externalFunctions,
+        IEnumerable<KeyValuePair<int, IExternalFunction>> externalFunctions,
         IEnumerable<CompiledStruct> structs,
         IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
         Uri file)
@@ -257,15 +257,15 @@ public sealed class Compiler
 
     readonly CompilerSettings Settings;
     readonly TokenizerSettings? TokenizerSettings;
-    readonly Dictionary<int, ExternalFunctionBase> ExternalFunctions;
+    readonly Dictionary<int, IExternalFunction> ExternalFunctions;
     readonly PrintCallback? PrintCallback;
 
     readonly AnalysisCollection? AnalysisCollection;
     readonly IEnumerable<string> PreprocessorVariables;
 
-    Compiler(Dictionary<int, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings)
+    Compiler(Dictionary<int, IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings)
     {
-        ExternalFunctions = externalFunctions ?? new Dictionary<int, ExternalFunctionBase>();
+        ExternalFunctions = externalFunctions ?? new Dictionary<int, IExternalFunction>();
         Settings = settings;
         PrintCallback = printCallback;
         AnalysisCollection = analysisCollection;
@@ -351,11 +351,11 @@ public sealed class Compiler
         return new CompiledStruct(compiledFields, @struct);
     }
 
-    public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, ExternalFunctionBase externalFunction)
+    public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, IExternalFunction externalFunction)
         where TFunction : FunctionThingDefinition, ICompiledFunction
         => CheckExternalFunctionDeclaration(runtime, definition, externalFunction, definition.Type, definition.ParameterTypes);
 
-    public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, ExternalFunctionBase externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes)
+    public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, IExternalFunction externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes)
     {
         if (externalFunction.ParametersSize != parameterTypes.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.GetSize(runtime)))
         { throw new CompilerException($"Wrong size of parameters defined for external function \"{externalFunction.ToReadable()}\"", definition.Identifier, definition.File); }
@@ -398,7 +398,7 @@ public sealed class Compiler
 
                     string externalName = attribute.Parameters[0].Value;
 
-                    if (!ExternalFunctions.TryGet(externalName, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+                    if (!ExternalFunctions.TryGet(externalName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
                     {
                         // AnalysisCollection?.Warnings.Add(exception.InstantiateWarning(attribute, function.File));
                         break;
@@ -479,7 +479,7 @@ public sealed class Compiler
         if (function.Attributes.TryGetAttribute(AttributeConstants.ExternalIdentifier, out AttributeUsage? attribute) &&
             attribute.TryGetValue(out string? name))
         {
-            if (ExternalFunctions.TryGet(name, out ExternalFunctionBase? externalFunction, out WillBeCompilerException? exception))
+            if (ExternalFunctions.TryGet(name, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
             {
                 // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
             }
@@ -891,7 +891,7 @@ public sealed class Compiler
 
     public static CompilerResult CompileInteractive(
         Statement statement,
-        Dictionary<int, ExternalFunctionBase>? externalFunctions,
+        Dictionary<int, IExternalFunction>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,

@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.Runtime;
+namespace LanguageCore.Runtime;
 
 public partial class BytecodeProcessor
 {
@@ -393,7 +393,7 @@ public partial class BytecodeProcessor
     {
         int functionId = GetData(CurrentInstruction.Operand1).I32;
 
-        if (!ExternalFunctions.TryGetValue(functionId, out ExternalFunctionBase? function))
+        if (!ExternalFunctions.TryGetValue(functionId, out IExternalFunction? function))
         { throw new RuntimeException($"Undefined external function {functionId}"); }
 
         Span<byte> parameters = Memory.AsSpan().Slice(Registers.StackPointer, function.ParametersSize);

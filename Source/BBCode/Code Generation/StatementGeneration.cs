@@ -4,9 +4,10 @@ using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
 using LiteralStatement = LanguageCore.Parser.Statement.Literal;
-using ParameterCleanupItem = (int Size, bool CanDeallocate, LanguageCore.Compiler.GeneralType Type, LanguageCore.Position Position);
 
 namespace LanguageCore.BBLang.Generator;
+
+public record struct ParameterCleanupItem(int Size, bool CanDeallocate, GeneralType Type, Position Position) { }
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
@@ -562,7 +563,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(argument, parameterType);
 
-            argumentCleanup.Push((argumentType.GetSize(this), calleeAllowsTemp && callerAllowsTemp && typeAllowsTemp, argumentType, argument.Position));
+            argumentCleanup.Push(new ParameterCleanupItem(argumentType.GetSize(this), calleeAllowsTemp && callerAllowsTemp && typeAllowsTemp, argumentType, argument.Position));
         }
 
         return argumentCleanup;
@@ -598,7 +599,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(passedParameter, definedParameterType);
 
-            parameterCleanup.Push((passedParameterType.GetSize(this), canDeallocate, passedParameterType, passedParameter.Position));
+            parameterCleanup.Push(new ParameterCleanupItem(passedParameterType.GetSize(this), canDeallocate, passedParameterType, passedParameter.Position));
         }
 
         return parameterCleanup;

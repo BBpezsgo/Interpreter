@@ -13,7 +13,6 @@ using Parser.Statement;
 using Runtime;
 using Tokenizing;
 
-
 readonly struct InteractiveSession
 {
     public readonly string Input;

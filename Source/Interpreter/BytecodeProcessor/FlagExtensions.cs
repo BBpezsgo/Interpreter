@@ -8,7 +8,7 @@ public static class FlagExtensions
         else flags &= ~flag;
     }
 
-    public static bool Get(ref this Flags flags, Flags flag) => (flags & flag) != 0;
+    public static bool Get(this Flags flags, Flags flag) => (flags & flag) != 0;
 
     public static void SetSign(ref this Flags flags, int v, BitWidth bitWidth)
     {

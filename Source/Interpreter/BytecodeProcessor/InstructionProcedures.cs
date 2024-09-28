@@ -406,12 +406,12 @@ public partial class BytecodeProcessor
         {
             if (function.ReturnValueSize > 0)
             {
-                ReadOnlySpan<byte> returnValue = simpleFunction.Callback(this, parameters);
+                ReadOnlySpan<byte> returnValue = simpleFunction.Callback(parameters);
                 Push(returnValue);
             }
             else
             {
-                simpleFunction.Callback(this, parameters);
+                simpleFunction.Callback(parameters);
             }
         }
 

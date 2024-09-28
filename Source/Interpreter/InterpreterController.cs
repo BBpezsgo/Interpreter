@@ -1,4 +1,4 @@
-namespace LanguageCore.Runtime;
+﻿namespace LanguageCore.Runtime;
 
 public readonly struct TimeSleep : IEquatable<TimeSleep>
 {
@@ -30,7 +30,6 @@ public class Interpreter
     public delegate void OnStdErrorEventHandler(Interpreter sender, char data);
     public delegate void OnStdOutEventHandler(Interpreter sender, char data);
     public delegate void OnInputEventHandler(Interpreter sender);
-    public delegate void OnExecutedEventHandler(Interpreter sender);
 
     public event OnOutputEventHandler? OnOutput;
     public event OnStdOutEventHandler? OnStdOut;

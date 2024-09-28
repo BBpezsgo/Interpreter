@@ -6,6 +6,14 @@ public partial class BytecodeProcessor
 {
     public const int StackDirection = -1;
 
+    public Instruction? NextInstruction
+    {
+        get
+        {
+            if (Registers.CodePointer < 0 || Registers.CodePointer >= Code.Length) return null;
+            return Code[Registers.CodePointer];
+        }
+    }
     Instruction CurrentInstruction => Code[Registers.CodePointer];
     public bool IsDone => Registers.CodePointer >= Code.Length;
     public int StackStart => StackDirection > 0 ? Settings.HeapSize : Memory.Length - 1;

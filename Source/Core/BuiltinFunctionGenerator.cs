@@ -2,7 +2,7 @@
 
 namespace LanguageCore.Runtime;
 
-public delegate ReadOnlySpan<byte> ExternalFunctionSyncCallback(BytecodeProcessor bytecodeProcessor, ReadOnlySpan<byte> arguments);
+public delegate ReadOnlySpan<byte> ExternalFunctionSyncCallback(ReadOnlySpan<byte> arguments);
 public delegate void ManagedExternalFunctionAsyncBlockCallback(ReadOnlySpan<byte> arguments, ManagedExternalFunctionAsyncBlockReturnCallback callback);
 public delegate void ManagedExternalFunctionAsyncBlockReturnCallback(ReadOnlySpan<byte> returnValue);
 
@@ -58,6 +58,7 @@ public readonly struct ExternalFunctionAsyncBlock : IExternalFunction
 
 [SuppressMessage("Style", "IDE0008:Use explicit type")]
 [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members")]
+[SuppressMessage("Style", "IDE0059:Unnecessary assignment of a value")]
 public static unsafe class ExternalFunctionGenerator
 {
     public static bool TryGet(this IReadOnlyDictionary<int, IExternalFunction> externalFunctions, string name, [NotNullWhen(true)] out IExternalFunction? result, [NotNullWhen(false)] out WillBeCompilerException? exception)
@@ -151,7 +152,7 @@ public static unsafe class ExternalFunctionGenerator
     {
         ImmutableArray<RuntimeType> types = ImmutableArray<RuntimeType>.Empty;
 
-        functions.AddSimpleExternalFunction(id, name, types, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, types, (args) =>
         {
             callback.Invoke();
             return default;
@@ -166,7 +167,7 @@ public static unsafe class ExternalFunctionGenerator
     public static void AddExternalFunction<T0>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Action<T0> callback)
         where T0 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0>(), (args) =>
         {
             var _args = DeconstructValues<T0>(args);
             callback.Invoke(
@@ -185,7 +186,7 @@ public static unsafe class ExternalFunctionGenerator
         where T0 : unmanaged
         where T1 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1>(), (args) =>
         {
             var _args = DeconstructValues<T0, T1>(args);
             callback.Invoke(
@@ -207,7 +208,7 @@ public static unsafe class ExternalFunctionGenerator
         where T1 : unmanaged
         where T2 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2>(), (args) =>
         {
             var _args = DeconstructValues<T0, T1, T2>(args);
             callback.Invoke(
@@ -232,7 +233,7 @@ public static unsafe class ExternalFunctionGenerator
         where T2 : unmanaged
         where T3 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3>(), (args) =>
         {
             var _args = DeconstructParameters<T0, T1, T2, T3>(args);
             callback.Invoke(
@@ -260,7 +261,7 @@ public static unsafe class ExternalFunctionGenerator
         where T3 : unmanaged
         where T4 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4>(), (args) =>
         {
             var _args = DeconstructValues<T0, T1, T2, T3, T4>(args);
             callback.Invoke(
@@ -291,7 +292,7 @@ public static unsafe class ExternalFunctionGenerator
         where T4 : unmanaged
         where T5 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4, T5>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4, T5>(), (args) =>
         {
             var _args = DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
             callback.Invoke(
@@ -313,7 +314,7 @@ public static unsafe class ExternalFunctionGenerator
     public static void AddExternalFunction<TResult>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Func<TResult> callback)
         where TResult : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, 0, (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, 0, (args) =>
         {
             TResult result = callback.Invoke();
 
@@ -331,7 +332,7 @@ public static unsafe class ExternalFunctionGenerator
         where TResult : unmanaged
         where T0 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0>(), (args) =>
         {
             var _args = DeconstructValues<T0>(args);
             TResult result = callback.Invoke(
@@ -353,7 +354,7 @@ public static unsafe class ExternalFunctionGenerator
         where T0 : unmanaged
         where T1 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1>(), (args) =>
         {
             var _args = DeconstructValues<T0, T1>(args);
             TResult result = callback.Invoke(
@@ -378,7 +379,7 @@ public static unsafe class ExternalFunctionGenerator
         where T1 : unmanaged
         where T2 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2>(), (args) =>
         {
             var _args = DeconstructValues<T0, T1, T2>(args);
             TResult result = callback.Invoke(
@@ -406,7 +407,7 @@ public static unsafe class ExternalFunctionGenerator
         where T2 : unmanaged
         where T3 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3>(), (args) =>
         {
             var _args = DeconstructParameters<T0, T1, T2, T3>(args);
             TResult result = callback.Invoke(
@@ -437,7 +438,7 @@ public static unsafe class ExternalFunctionGenerator
         where T3 : unmanaged
         where T4 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4>(), (args) =>
         {
             var _args = DeconstructValues<T0, T1, T2, T3, T4>(args);
             TResult result = callback.Invoke(
@@ -471,7 +472,7 @@ public static unsafe class ExternalFunctionGenerator
         where T4 : unmanaged
         where T5 : unmanaged
     {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4, T5>(), (sender, args) =>
+        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4, T5>(), (args) =>
         {
             var _args = DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
             TResult result = callback.Invoke(

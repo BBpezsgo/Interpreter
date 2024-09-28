@@ -10,6 +10,9 @@ public static class MemoryUtils
     public static unsafe void Set<T>(this Span<byte> memory, int ptr, T data) where T : unmanaged => *GetPtr<T>(memory, ptr) = data;
     public static unsafe T Get<T>(this Span<byte> memory, int ptr) where T : unmanaged => *GetPtr<T>(memory, ptr);
 
+    public static unsafe void Set(this Span<byte> memory, int ptr, ReadOnlySpan<byte> data) => data.CopyTo(memory[ptr..]);
+    public static unsafe Span<byte> Get(this Span<byte> memory, int ptr, int size) => memory.Slice(ptr, size);
+
     public static unsafe void Set<T>(this byte[] memory, int ptr, T data) where T : unmanaged => *GetPtr<T>(memory, ptr) = data;
     public static unsafe T Get<T>(this byte[] memory, int ptr) where T : unmanaged => *GetPtr<T>(memory, ptr);
 

@@ -9,7 +9,7 @@ obj
 /Tests/Program.cs
 /Diagsessions
 /TestFiles/Old
-/DevelopmentEntry.cs
+/Utility/DevelopmentEntry.cs
 /TestFiles/run.bat
 /TestFiles/test.bbc
 /Source/ASM/i8086/Builds/build.bat

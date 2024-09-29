@@ -16,7 +16,7 @@ public partial class BytecodeProcessor
     }
     Instruction CurrentInstruction => Code[Registers.CodePointer];
     public bool IsDone => Registers.CodePointer >= Code.Length;
-    public int StackStart => StackDirection > 0 ? Settings.HeapSize : Memory.Length - 1;
+    public int StackStart => StackDirection > 0 ? Settings.HeapSize : Settings.HeapSize + Settings.StackSize - 1;
 
     readonly BytecodeInterpreterSettings Settings;
     public Registers Registers;
@@ -30,15 +30,12 @@ public partial class BytecodeProcessor
         return new Range<int>(StackStart, Registers.StackPointer);
     }
 
-    public BytecodeProcessor(ImmutableArray<Instruction> code, FrozenDictionary<int, IExternalFunction> externalFunctions, BytecodeInterpreterSettings settings)
+    public BytecodeProcessor(ImmutableArray<Instruction> code, byte[]? memory, FrozenDictionary<int, IExternalFunction> externalFunctions, BytecodeInterpreterSettings settings)
     {
         Settings = settings;
         ExternalFunctions = externalFunctions;
-
         Code = code;
-
-        Memory = new byte[settings.HeapSize + settings.StackSize];
-
+        Memory = memory ?? new byte[settings.HeapSize + settings.StackSize];
         Registers.StackPointer = StackStart - StackDirection;
     }
 

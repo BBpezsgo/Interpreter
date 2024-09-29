@@ -66,7 +66,7 @@ public class Interpreter
 
         Dictionary<int, IExternalFunction> _externalFunctions = GenerateExternalFunctions();
         if (externalFunctions is not null) _externalFunctions.AddRange(externalFunctions);
-        BytecodeInterpreter = new BytecodeProcessor(program, _externalFunctions.ToFrozenDictionary(), settings);
+        BytecodeInterpreter = new BytecodeProcessor(program, null, _externalFunctions.ToFrozenDictionary(), settings);
     }
 
     /// <summary>

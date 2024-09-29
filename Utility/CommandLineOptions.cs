@@ -11,18 +11,18 @@ public class CommandLineOptions
 
     [Option("verbose",
         Required = false,
-        HelpText = "Prints some information")]
+        HelpText = "Prints some information about the compilation process")]
     public bool Verbose { get; set; }
 
     [Option('f', "format",
         Required = false,
         Default = "bytecode",
-        HelpText = "Sets the format of the generated code")]
+        HelpText = "Specifies which generator to use")]
     public string? Format { get; set; }
 
     [Option('d', "debug",
         Required = false,
-        HelpText = "Launches the debug screen")]
+        HelpText = "Launches the debugger screen (only avaliable on Windows)")]
     public bool Debug { get; set; }
 
     [Option('o', "output",
@@ -32,12 +32,12 @@ public class CommandLineOptions
 
     [Option("throw-errors",
         Required = false,
-        HelpText = "Whenever an exception occurs, the program crashes. This is useful when debugging the compiler")]
+        HelpText = "Crashes the program whenever an exception thrown. This useful for me when debugging the compiler.")]
     public bool ThrowErrors { get; set; }
 
     [Option("basepath",
         Required = false,
-        HelpText = "Sets the path where source files will be searched for \"{DeclarationKeywords.Using}\"")]
+        HelpText = $"Sets the path where source files will be searched for \"{DeclarationKeywords.Using}\"")]
     public string? BasePath { get; set; }
 
     [Option("dont-optimize",
@@ -47,7 +47,7 @@ public class CommandLineOptions
 
     [Option("no-debug-info",
         Required = false,
-        HelpText = "Do not generate any debug information (if you compiling into brainfuck, generating debug informations will take a lots of time)")]
+        HelpText = "Disables debug information generation (if you compiling into brainfuck, generating debug informations will take a lots of time)")]
     public bool? NoDebugInfo { get; set; }
 
     [Option("stack-size",
@@ -67,11 +67,11 @@ public class CommandLineOptions
 
     [Option("print-instructions",
         Required = false,
-        HelpText = "Prints the generated instructions")]
+        HelpText = "Prints the generated instructions before execution")]
     public bool? PrintInstructions { get; set; }
 
     [Option("print-memory",
         Required = false,
-        HelpText = "Prints the memory after execution completed")]
+        HelpText = "Prints the memory after execution")]
     public bool? PrintMemory { get; set; }
 }

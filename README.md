@@ -13,36 +13,30 @@ It's my own programming language that can generate bytecodes (executed by a cust
 I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tutorial series](https://www.youtube.com/watch?v=2DTNDrdqGlo&list=PLZjGMBjt_VVAMW53XnMtNfAQowZwMviBF) showing how to make a parser and a compiler. I basically copied the code with minimal changes. When the series ended, I was left on my own, so I improved the code myself.
 
 ## Command line arguments
-> 
-> `BBLang.exe` is the compiled compiler program
-> 
-> `[stuff]` - "stuff" is an **optional** argument.
-> 
-> `<stuff>` - You **should** specify this argument with a value (in this example you don't have to specify "stuff" but any value that doesn't contain any whitespaces).
-> 
-> `stuff1|stuff2` you can use **one** of the listed arguments separated by `|` (in this example "stuff1" or "stuff2").
-> 
-> `stuff1;stuff2` you can use **any combination** of the listed arguments (or none) separated by `;` (in this example "stuff1" or "stuff2").
 
-`BBLang.exe [options...] <source path>`
+`BBLang [options...] source`
 
-### Options:
+- `--help` Prints some information about the program
 
-- `--help|-h` Prints some information about the program
+- `--verbose` Prints some information about the compilation process
 
-- `--brainfuck|-b` Compiles and executes the code with a brainfuck interpreter
+- `--format format` Specifies which generator to use. Supported formats are `bytecode`, `brainfuck` and `assembly`.
+
 > [!WARNING]
-> Expect buggy behavior and missing features!
+> Brainfuck sometimes aint working.
 
-- `--console-gui|-c` Launches the debugger screen (only avaliable on Windows) [More info](https://github.com/BBpezsgo/Interpreter/wiki/Debugger)
+> [!WARNING]
+> Assembly 100% not working.
 
-- `--output|-o file` Writes the generated code to the specified file (this option only works for brainfuck)
+- `--debug` Launches the debugger screen (only avaliable on Windows) [More info](https://github.com/BBpezsgo/Interpreter/wiki/Debugger)
 
-- `--throw-errors|-t` Crashes the program whenever an exception thrown. This useful for me when debugging the compiler.
+- `--output file` Writes the generated code to the specified file (this option only works for brainfuck)
 
-- `--hide|-d w;i;d` Hides the specified log levels (w: Warning, i: Information, d: Debug)
+- `--throw-errors` Crashes the program whenever an exception thrown. This useful for me when debugging the compiler.
 
-- `--print|-p w;i;d` Prints the specified informations (i: Instructions, m: Memory, p: Compilation progress)
+- `--print-instructions` Prints the generated instructions before execution
+
+- `--print-memory` Prints the memory after execution
 
 - `--basepath directory` Sets the path where source files will be searched for `using` statements
 
@@ -57,7 +51,7 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 > For brainfuck, if you specify zero the HEAP will not be initialized and wherever you try to access it, it will not compile.
 
 > [!NOTE]
-> Because of how HEAP represented in brainfuck, its size can't be larger than 126.
+> Because of how HEAP represented, its size can't be larger than 126.
 
 - `--no-nullcheck` Disables null check generation when dereferencing a pointer
 

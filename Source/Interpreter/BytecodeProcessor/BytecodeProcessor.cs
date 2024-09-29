@@ -15,7 +15,7 @@ public partial class BytecodeProcessor
         }
     }
     Instruction CurrentInstruction => Code[Registers.CodePointer];
-    public bool IsDone => Registers.CodePointer >= Code.Length;
+    public bool IsDone => Registers.CodePointer == Code.Length;
     public int StackStart => StackDirection > 0 ? Settings.HeapSize : Settings.HeapSize + Settings.StackSize - 1;
 
     readonly BytecodeInterpreterSettings Settings;
@@ -23,12 +23,6 @@ public partial class BytecodeProcessor
     public readonly byte[] Memory;
     public ImmutableArray<Instruction> Code;
     readonly FrozenDictionary<int, IExternalFunction> ExternalFunctions;
-
-    public Range<int> GetStackInterval(out bool isReversed)
-    {
-        isReversed = StackDirection <= 0;
-        return new Range<int>(StackStart, Registers.StackPointer);
-    }
 
     public BytecodeProcessor(ImmutableArray<Instruction> code, byte[]? memory, FrozenDictionary<int, IExternalFunction> externalFunctions, BytecodeInterpreterSettings settings)
     {
@@ -49,9 +43,9 @@ public partial class BytecodeProcessor
     void Step() => Registers.CodePointer++;
     void Step(int num) => Registers.CodePointer += num;
 
-    public bool Tick()
+    public void Tick()
     {
-        if (IsDone) return false;
+        if (IsDone) return;
 
         try
         {
@@ -66,12 +60,6 @@ public partial class BytecodeProcessor
         {
             throw new RuntimeException(error.Message, GetContext());
         }
-        // catch (Exception error)
-        // {
-        //     throw new RuntimeException("Internal", error, GetContext());
-        // }
-
-        return true;
     }
 
     void Process()

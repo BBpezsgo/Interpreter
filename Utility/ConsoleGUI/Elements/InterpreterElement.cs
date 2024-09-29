@@ -24,7 +24,7 @@ interface IJump
 {
     public bool IsPaused { get; set; }
     public bool ShouldDelete { get; }
-    public bool ShouldJump(Interpreter interpreter);
+    public bool ShouldJump(BytecodeProcessorEx interpreter);
     public void Tick();
 }
 
@@ -48,7 +48,7 @@ class InstructionCountJump : IJump
         Current = 0;
     }
 
-    public bool ShouldJump(Interpreter interpreter)
+    public bool ShouldJump(BytecodeProcessorEx interpreter)
     {
         return Current < Count;
     }
@@ -75,9 +75,9 @@ class BreakPointJump : IJump
         Invisible = invisible;
     }
 
-    public bool ShouldJump(Interpreter interpreter)
+    public bool ShouldJump(BytecodeProcessorEx interpreter)
     {
-        if (interpreter.BytecodeInterpreter.Registers.CodePointer == Instruction)
+        if (interpreter.Processor.Registers.CodePointer == Instruction)
         {
             ShouldDelete = true;
             return false;
@@ -92,7 +92,7 @@ class BreakPointJump : IJump
 [ExcludeFromCodeCoverage]
 public sealed partial class InterpreterElement : WindowElement
 {
-    readonly InterpreterDebuggabble Interpreter;
+    readonly BytecodeProcessorEx Interpreter;
 
     readonly ScrollBar HeapScrollBar;
     readonly ScrollBar StackScrollBar;
@@ -104,7 +104,7 @@ public sealed partial class InterpreterElement : WindowElement
 
     int _focusedElement;
 
-    public InterpreterElement(InterpreterDebuggabble interpreter)
+    public InterpreterElement(BytecodeProcessorEx interpreter)
     {
         Interpreter = interpreter;
 
@@ -139,7 +139,7 @@ public sealed partial class InterpreterElement : WindowElement
         };
         stackPanel.OnBeforeDraw += StackElement_OnBeforeDraw;
 
-        StackScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Registers.StackPointer + (30 * BytecodeProcessor.StackDirection)), stackPanel);
+        StackScrollBar = new ScrollBar((sender) => (0, Interpreter.Processor.Registers.StackPointer + (30 * BytecodeProcessor.StackDirection)), stackPanel);
 
         stackPanel.OnMouseEventInvoked += StackScrollBar.FeedEvent;
         stackPanel.OnKeyEventInvoked += (sender, e) =>
@@ -156,7 +156,7 @@ public sealed partial class InterpreterElement : WindowElement
             Title = "HEAP",
         };
 
-        HeapScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Memory.Length - 3), heapPanel);
+        HeapScrollBar = new ScrollBar((sender) => (0, Interpreter.Processor.Memory.Length - 3), heapPanel);
 
         heapPanel.OnBeforeDraw += HeapElement_OnBeforeDraw;
         heapPanel.OnMouseEventInvoked += HeapScrollBar.FeedEvent;
@@ -210,14 +210,10 @@ public sealed partial class InterpreterElement : WindowElement
         InterpreterTimer.Elapsed += OnInterpreterTimer;
         InterpreterTimer.Enabled = true;
 
-        Interpreter.OnOutput += (_, p1, p2) => PrintOutput(p1, p2);
+        Interpreter.IO.OnStdOut += (data) => ConsolePanel.Write(char.ToString(data));
+        Interpreter.IO.OnNeedInput += () => ConsolePanel.BeginRead();
 
-        Interpreter.OnStdOut += (sender, data) => ConsolePanel.Write(char.ToString(data));
-        Interpreter.OnStdError += (sender, data) => ConsolePanel.Write(char.ToString(data), CharColor.BrightRed);
-
-        Interpreter.OnNeedInput += (_) => ConsolePanel.BeginRead();
-
-        ConsolePanel.OnInput += Interpreter.OnInput;
+        ConsolePanel.OnInput += Interpreter.IO.SendKey;
     }
 
     void GetDataMovementIndicators(Instruction instruction, List<DataMovement> loadIndicators, List<DataMovement> storeIndicators)
@@ -227,10 +223,10 @@ public sealed partial class InterpreterElement : WindowElement
             case Opcode.Push:
             {
                 int size = (int)instruction.Operand1.BitWidth;
-                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer + (size * BytecodeProcessor.StackDirection);
+                int address = Interpreter.Processor.Registers.StackPointer + (size * BytecodeProcessor.StackDirection);
                 storeIndicators.Add(new DataMovement(address, size));
 
-                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                if (Interpreter.Processor.ResolveAddress(instruction.Operand1, out address))
                 {
                     loadIndicators.Add(new DataMovement(address, size));
                 }
@@ -239,54 +235,54 @@ public sealed partial class InterpreterElement : WindowElement
             }
             case Opcode.Pop8:
             {
-                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                int address = Interpreter.Processor.Registers.StackPointer;
                 const int size = 1;
                 loadIndicators.Add(new DataMovement(address, size));
                 return;
             }
             case Opcode.Pop16:
             {
-                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                int address = Interpreter.Processor.Registers.StackPointer;
                 const int size = 2;
                 loadIndicators.Add(new DataMovement(address, size));
                 return;
             }
             case Opcode.Pop32:
             {
-                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                int address = Interpreter.Processor.Registers.StackPointer;
                 const int size = 4;
                 loadIndicators.Add(new DataMovement(address, size));
                 return;
             }
             case Opcode.PopTo8:
             {
-                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                int address = Interpreter.Processor.Registers.StackPointer;
                 const int size = 1;
                 loadIndicators.Add(new DataMovement(address, size));
 
-                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                if (Interpreter.Processor.ResolveAddress(instruction.Operand1, out address))
                 { storeIndicators.Add(new DataMovement(address, size)); }
 
                 return;
             }
             case Opcode.PopTo16:
             {
-                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                int address = Interpreter.Processor.Registers.StackPointer;
                 const int size = 2;
                 loadIndicators.Add(new DataMovement(address, size));
 
-                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                if (Interpreter.Processor.ResolveAddress(instruction.Operand1, out address))
                 { storeIndicators.Add(new DataMovement(address, size)); }
 
                 return;
             }
             case Opcode.PopTo32:
             {
-                int address = Interpreter.BytecodeInterpreter.Registers.StackPointer;
+                int address = Interpreter.Processor.Registers.StackPointer;
                 const int size = 4;
                 loadIndicators.Add(new DataMovement(address, size));
 
-                if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                if (Interpreter.Processor.ResolveAddress(instruction.Operand1, out address))
                 { storeIndicators.Add(new DataMovement(address, size)); }
 
                 return;
@@ -297,10 +293,10 @@ public sealed partial class InterpreterElement : WindowElement
                 {
                     int size = (int)instruction.Operand1.BitWidth;
 
-                    if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand2, out int address))
+                    if (Interpreter.Processor.ResolveAddress(instruction.Operand2, out int address))
                     { loadIndicators.Add(new DataMovement(address, size)); }
 
-                    if (Interpreter.BytecodeInterpreter.ResolveAddress(instruction.Operand1, out address))
+                    if (Interpreter.Processor.ResolveAddress(instruction.Operand1, out address))
                     { storeIndicators.Add(new DataMovement(address, size)); }
                 }
 
@@ -320,8 +316,23 @@ public sealed partial class InterpreterElement : WindowElement
             if (!CurrentJump.ShouldJump(Interpreter)) return;
 
             CurrentJump?.Tick();
-            Interpreter.DoUpdate();
-            if (Interpreter.BytecodeInterpreter.IsDone)
+            try
+            {
+                Interpreter.Tick();
+            }
+            catch (UserException error)
+            {
+                PrintOutput($"User Exception: {error}", LogType.Error);
+            }
+            catch (RuntimeException error)
+            {
+                PrintOutput($"Runtime Exception: {error}", LogType.Error);
+            }
+            catch (Exception error)
+            {
+                PrintOutput($"Internal Exception: {new RuntimeException(error.Message, error, Interpreter.Processor.GetContext())}", LogType.Error);
+            }
+            if (Interpreter.Processor.IsDone)
             {
                 ConsoleGUI.Instance?.Dispose();
                 return;
@@ -377,7 +388,7 @@ public sealed partial class InterpreterElement : WindowElement
             if (CurrentJump is null ||
                 (CurrentJump is InstructionCountJump instructionCountJump1 && instructionCountJump1.Current == instructionCountJump1.Count))
             {
-                CurrentJump = new BreakPointJump(Interpreter.BytecodeInterpreter.Registers.CodePointer + 1, true);
+                CurrentJump = new BreakPointJump(Interpreter.Processor.Registers.CodePointer + 1, true);
                 return;
             }
 

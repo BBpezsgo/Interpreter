@@ -30,7 +30,6 @@ readonly struct InteractiveSession
     }
 }
 
-
 struct ActiveInteractiveSession
 {
     public string? ColorizedText;
@@ -68,7 +67,6 @@ struct ActiveInteractiveSession
         InterpreterStandardOutput.Clear();
     }
 }
-
 
 class InteractiveCompiler
 {
@@ -123,7 +121,7 @@ class InteractiveCompiler
         {
             Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
 
-            Dictionary<int, IExternalFunction> externalFunctions = Interpreter.GetExternalFunctions();
+            Dictionary<int, IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
@@ -167,7 +165,7 @@ class InteractiveCompiler
         {
             Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
 
-            Dictionary<int, IExternalFunction> externalFunctions = Interpreter.GetExternalFunctions();
+            Dictionary<int, IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
@@ -194,7 +192,6 @@ class InteractiveCompiler
     }
 }
 
-
 static class InteractiveColors
 {
     public static readonly Color Error = Color.ParseHex("fc3e36");
@@ -213,7 +210,6 @@ static class InteractiveColors
     public static readonly Color Statement = Color.ParseHex("d8a0df");
     public static readonly Color TypeParameter = Color.ParseHex("b8d7a3");
 }
-
 
 public class Interactive
 {
@@ -706,7 +702,7 @@ public class Interactive
     {
         source ??= string.Empty;
 
-        Interpreter interpreter;
+        BytecodeProcessorEx interpreter;
 
         try
         {
@@ -714,18 +710,17 @@ public class Interactive
 
             if (CompilerCache.Tokens.IsEmpty) return;
 
-            Dictionary<int, IExternalFunction> externalFunctions = Interpreter.GetExternalFunctions();
+            Dictionary<int, IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
             BBLangGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, MainGeneratorSettings.Default);
 
-            interpreter = new(false, BytecodeInterpreterSettings.Default, generated.Code, generated.DebugInfo);
+            interpreter = new(BytecodeInterpreterSettings.Default, generated.Code, generated.DebugInfo);
 
-            interpreter.OnStdOut += OnInterpreterStandardOut;
-            interpreter.OnStdError += OnInterpreterStandardError;
-            interpreter.OnNeedInput += OnInterpreterNeedInput;
+            interpreter.IO.OnStdOut += OnInterpreterStandardOut;
+            interpreter.IO.OnNeedInput += OnInterpreterNeedInput;
 
-            while (!interpreter.BytecodeInterpreter.IsDone)
-            { interpreter.Update(); }
+            while (!interpreter.Processor.IsDone)
+            { interpreter.Tick(); }
         }
         catch (LanguageException ex)
         {
@@ -775,7 +770,7 @@ public class Interactive
         }
 
         {
-            int exitCode = interpreter.BytecodeInterpreter.GetData(interpreter.BytecodeInterpreter.Registers.StackPointer - (1 * BytecodeProcessor.StackDirection), BitWidth._32).I32;
+            int exitCode = interpreter.Processor.GetData(interpreter.Processor.Registers.StackPointer - (1 * BytecodeProcessor.StackDirection), BitWidth._32).I32;
 
             AnsiBuilder output = new();
 
@@ -795,13 +790,8 @@ public class Interactive
         }
     }
 
-    void OnInterpreterNeedInput(Interpreter sender) { throw new NotImplementedException(); }
-    void OnInterpreterStandardError(Interpreter sender, char data)
-    {
-        CurrentSession.InterpreterStandardOutput.ForegroundColor = InteractiveColors.Error;
-        CurrentSession.InterpreterStandardOutput.Append(data);
-    }
-    void OnInterpreterStandardOut(Interpreter sender, char data)
+    void OnInterpreterNeedInput() { throw new NotImplementedException(); }
+    void OnInterpreterStandardOut(char data)
     {
         CurrentSession.InterpreterStandardOutput.ForegroundColor = Color.Silver;
         CurrentSession.InterpreterStandardOutput.Append(data);

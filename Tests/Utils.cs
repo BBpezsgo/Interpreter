@@ -310,7 +310,7 @@ public static class Utils
 
     public static MainResult RunMain(Uri file, string input, Action<Dictionary<int, IExternalFunction>>? externalFunctionAdder = null)
     {
-        Dictionary<int, IExternalFunction> externalFunctions = Interpreter.GetExternalFunctions();
+        Dictionary<int, IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
         externalFunctionAdder?.Invoke(externalFunctions);
 
@@ -323,12 +323,12 @@ public static class Utils
 
         analysisCollection.Throw();
 
-        (Interpreter, MainResult) Execute(BBLangGeneratorResult code, string input)
+        (BytecodeProcessorEx, MainResult) Execute(BBLangGeneratorResult code, string input)
         {
             Dictionary<int, IExternalFunction> _externalFunctions = new();
             externalFunctionAdder?.Invoke(_externalFunctions);
 
-            Interpreter interpreter = new(true, new BytecodeInterpreterSettings()
+            BytecodeProcessorEx interpreter = new(new BytecodeInterpreterSettings()
             {
                 HeapSize = HeapSize,
                 StackSize = BytecodeInterpreterSettings.Default.StackSize,
@@ -338,28 +338,26 @@ public static class Utils
             StringBuilder stdOutput = new();
             StringBuilder stdError = new();
 
-            interpreter.OnStdOut += (sender, data) => stdOutput.Append(data);
-            interpreter.OnStdError += (sender, data) => stdError.Append(data);
+            interpreter.IO.OnStdOut += (data) => stdOutput.Append(data);
+            interpreter.IO.OnNeedInput += () => interpreter.IO.SendKey(inputBuffer.Read());
 
-            interpreter.OnNeedInput += (sender) => sender.OnInput(inputBuffer.Read());
+            while (!interpreter.Processor.IsDone)
+            { interpreter.Tick(); }
 
-            while (!interpreter.BytecodeInterpreter.IsDone)
-            { interpreter.Update(); }
-
-            return (interpreter, new MainResult(stdOutput.ToString(), stdError.ToString(), interpreter.BytecodeInterpreter));
+            return (interpreter, new MainResult(stdOutput.ToString(), stdError.ToString(), interpreter.Processor));
         }
 
-        (Interpreter interpreterUnoptimized, MainResult unoptimizedResult) = Execute(generatedCodeUnoptimized, input);
-        (Interpreter interpreter, MainResult result) = Execute(generatedCode, input);
+        (BytecodeProcessorEx interpreterUnoptimized, MainResult unoptimizedResult) = Execute(generatedCodeUnoptimized, input);
+        (BytecodeProcessorEx interpreter, MainResult result) = Execute(generatedCode, input);
 
-        if (interpreter.BytecodeInterpreter.Registers.BasePointer != interpreterUnoptimized.BytecodeInterpreter.Registers.BasePointer)
-        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.BytecodeInterpreter.Registers.BasePointer} != {interpreterUnoptimized.BytecodeInterpreter.Registers.BasePointer})"); }
+        if (interpreter.Processor.Registers.BasePointer != interpreterUnoptimized.Processor.Registers.BasePointer)
+        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.Processor.Registers.BasePointer} != {interpreterUnoptimized.Processor.Registers.BasePointer})"); }
 
-        if (interpreter.BytecodeInterpreter.Registers.StackPointer != interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer)
-        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.BytecodeInterpreter.Registers.StackPointer} != {interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer})"); }
+        if (interpreter.Processor.Registers.StackPointer != interpreterUnoptimized.Processor.Registers.StackPointer)
+        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.Processor.Registers.StackPointer} != {interpreterUnoptimized.Processor.Registers.StackPointer})"); }
 
-        if (interpreter.BytecodeInterpreter.Registers.StackPointer != interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer)
-        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.BytecodeInterpreter.Registers.StackPointer} != {interpreterUnoptimized.BytecodeInterpreter.Registers.StackPointer})"); }
+        if (interpreter.Processor.Registers.StackPointer != interpreterUnoptimized.Processor.Registers.StackPointer)
+        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.Processor.Registers.StackPointer} != {interpreterUnoptimized.Processor.Registers.StackPointer})"); }
 
         if (result.StdOutput != unoptimizedResult.StdOutput)
         { throw new AssertFailedException($"StdOutput are different on optimized and unoptimized version (\"{result.StdOutput.Escape()}\" != \"{unoptimizedResult.StdOutput.Escape()}\")"); }

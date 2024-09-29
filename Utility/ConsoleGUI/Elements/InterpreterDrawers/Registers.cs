@@ -21,9 +21,9 @@ public partial class InterpreterElement
         HashSet<Register> loadIndicators = new();
         HashSet<Register> storeIndicators = new();
 
-        if (Interpreter.NextInstruction.HasValue)
+        if (Interpreter.Processor.NextInstruction.HasValue)
         {
-            Instruction instruction = Interpreter.NextInstruction.Value;
+            Instruction instruction = Interpreter.Processor.NextInstruction.Value;
 
             void HandleDestinationOperand(InstructionOperand operand)
             {
@@ -107,7 +107,7 @@ public partial class InterpreterElement
             b.AddChar(' ');
         }
         b.ForegroundColor = CharColor.BrightCyan;
-        b.AddText(Interpreter.BytecodeInterpreter.Registers.CodePointer.ToString());
+        b.AddText(Interpreter.Processor.Registers.CodePointer.ToString());
         b.BackgroundColor = CharColor.Black;
         b.FinishLine();
         b.ForegroundColor = CharColor.Silver;
@@ -129,7 +129,7 @@ public partial class InterpreterElement
             b.AddChar(' ');
         }
         b.ForegroundColor = CharColor.BrightCyan;
-        b.AddText(Interpreter.BytecodeInterpreter.Registers.StackPointer.ToString());
+        b.AddText(Interpreter.Processor.Registers.StackPointer.ToString());
         b.BackgroundColor = CharColor.Black;
         b.FinishLine();
         b.ForegroundColor = CharColor.Silver;
@@ -151,7 +151,7 @@ public partial class InterpreterElement
             b.AddChar(' ');
         }
         b.ForegroundColor = CharColor.BrightCyan;
-        b.AddText(Interpreter.BytecodeInterpreter.Registers.BasePointer.ToString());
+        b.AddText(Interpreter.Processor.Registers.BasePointer.ToString());
         b.BackgroundColor = CharColor.Black;
         b.FinishLine();
         b.ForegroundColor = CharColor.Silver;
@@ -254,9 +254,9 @@ public partial class InterpreterElement
             b.ForegroundColor = CharColor.Silver;
         }
 
-        DrawGeneralRegister('A', Interpreter.BytecodeInterpreter.Registers.EAX);
-        DrawGeneralRegister('B', Interpreter.BytecodeInterpreter.Registers.EBX);
-        DrawGeneralRegister('C', Interpreter.BytecodeInterpreter.Registers.ECX);
-        DrawGeneralRegister('D', Interpreter.BytecodeInterpreter.Registers.EDX);
+        DrawGeneralRegister('A', Interpreter.Processor.Registers.EAX);
+        DrawGeneralRegister('B', Interpreter.Processor.Registers.EBX);
+        DrawGeneralRegister('C', Interpreter.Processor.Registers.ECX);
+        DrawGeneralRegister('D', Interpreter.Processor.Registers.EDX);
     }
 }

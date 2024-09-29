@@ -29,7 +29,7 @@ public partial class InterpreterElement
         int indent = 0;
         if (Interpreter.DebugInformation is not null)
         {
-            for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Registers.CodePointer - 5; i++)
+            for (int i = 0; i < this.Interpreter.Processor.Registers.CodePointer - 5; i++)
             {
                 if (Interpreter.DebugInformation.CodeComments.TryGetValue(i, out List<string>? comments))
                 {
@@ -45,11 +45,11 @@ public partial class InterpreterElement
         }
 
         bool IsNextInstruction = false;
-        for (int i = Math.Max(0, this.Interpreter.BytecodeInterpreter.Registers.CodePointer - 5); i < this.Interpreter.BytecodeInterpreter.Code.Length; i++)
+        for (int i = Math.Max(0, this.Interpreter.Processor.Registers.CodePointer - 5); i < this.Interpreter.Processor.Code.Length; i++)
         {
-            if (Interpreter.BytecodeInterpreter.Registers.CodePointer == i) IsNextInstruction = true;
+            if (Interpreter.Processor.Registers.CodePointer == i) IsNextInstruction = true;
 
-            Instruction instruction = Interpreter.BytecodeInterpreter.Code[i];
+            Instruction instruction = Interpreter.Processor.Code[i];
 
             if (this.Interpreter.DebugInformation is not null)
             {

@@ -29,9 +29,8 @@
 		"csharp.debug.console": "externalTerminal",
 		"dotnet.server.trace": "Trace",
 		"files.exclude": {
-			"bin": true,
-			"obj": true,
 			"Tests": true,
+			"**/*.meta": true,
 		},
 		"dotnet.server.startTimeout": 60000,
 		"files.associations": {
@@ -43,5 +42,46 @@
 			"**/obj/**": true,
 		},
 		"csharp.debug.justMyCode": false
-	}
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "build",
+				"command": "dotnet build ./Utility/Utility.csproj",
+				"type": "shell",
+				"group": "build",
+				"presentation": {
+					"reveal": "silent"
+				},
+				"problemMatcher": "$msCompile"
+			}
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Debug",
+				"type": "coreclr",
+				"request": "launch",
+				"preLaunchTask": "build",
+				"program": "${workspaceFolder}/Utility/bin/Debug/net9.0/Utility",
+				"args": [],
+				"cwd": "${workspaceFolder}",
+				"stopAtEntry": false,
+				"console": "internalConsole",
+			},
+			{
+				"name": "Debug core dump",
+				"type": "cppdbg",
+				"request": "launch",
+				"program": "${workspaceFolder}/TestFiles/02.bbc_executable",
+				"coreDumpPath": "${workspaceFolder}/TestFiles/core",
+				"cwd": "${workspaceFolder}",
+				"MIMode": "gdb",
+				"miDebuggerPath": "/usr/bin/gdb"
+			}
+		]
+	},	
 }

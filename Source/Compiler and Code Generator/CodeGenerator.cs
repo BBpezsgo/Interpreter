@@ -828,7 +828,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             if (from.SameAs(to))
             { return true; }
 
-            if (to.Is<PointerType>() && from.SameAs(BasicType.Integer))
+            if (to.Is<PointerType>() && from.SameAs(BasicType.I32))
             { return true; }
 
             if (to.Is(out PointerType? toPtr) && from.Is<PointerType>() && toPtr.To.SameAs(BasicType.Any))
@@ -1237,21 +1237,24 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         if (!TryCompute(variableDeclaration.InitialValue, out CompiledValue constantValue))
         { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.File); }
 
+        GeneralType constantType;
         if (variableDeclaration.Type != StatementKeywords.Var)
         {
-            GeneralType constantType = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
+            constantType = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
             variableDeclaration.Type.SetAnalyzedType(constantType);
 
-            if (!constantType.Is(out BuiltinType? builtinType))
-            { throw new NotSupportedException($"Only builtin types supported as a constant value", variableDeclaration.Type, variableDeclaration.File); }
-
-            CompiledValue.TryCast(ref constantValue, builtinType.RuntimeType);
+            if (constantType.Is(out BuiltinType? builtinType))
+            { constantValue.TryCast(builtinType.RuntimeType, out constantValue); }
+        }
+        else
+        {
+            constantType = new BuiltinType(constantValue.Type);
         }
 
         if (GetConstant(variableDeclaration.Identifier.Content, out _))
         { throw new CompilerException($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.File); }
 
-        return new(constantValue, variableDeclaration);
+        return new(constantValue, constantType, variableDeclaration);
     }
 
     #endregion
@@ -1611,6 +1614,72 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         return false;
     }
 
+    public static bool CanImplicitlyCast(GeneralType source, GeneralType destination, IRuntimeInfoProvider runtimeInfoProvider)
+    {
+        if (destination.SameAs(source))
+        { return true; }
+
+        if (destination.SameAs(BasicType.Any))
+        { return true; }
+
+        if (destination.Is<PointerType>() && (
+            source.SameAs(BasicType.U8) ||
+            source.SameAs(BasicType.I8) ||
+            source.SameAs(BasicType.Char) ||
+            source.SameAs(BasicType.I16) ||
+            source.SameAs(BasicType.U32) ||
+            source.SameAs(BasicType.I32)))
+        { return true; }
+
+        if (destination.GetSize(runtimeInfoProvider) != source.GetSize(runtimeInfoProvider))
+        { return false; }
+
+        if (destination.Is(out PointerType? destPointerType) &&
+            source.Is<PointerType>() &&
+            destPointerType.To.SameAs(BasicType.Any))
+        { return true; }
+
+        if (destination.Is(out PointerType? dstPointer) &&
+            source.Is(out PointerType? srcPointer))
+        {
+            if (dstPointer.To.Is(out ArrayType? dstArray) &&
+                srcPointer.To.Is(out ArrayType? srcArray))
+            {
+                if (dstArray.ComputedLength.HasValue &&
+                    srcArray.ComputedLength.HasValue &&
+                    dstArray.ComputedLength.Value != srcArray.ComputedLength.Value)
+                { return false; }
+
+                if (dstArray.Length is null)
+                { return true; }
+            }
+        }
+
+        return false;
+    }
+
+    public static bool CanImplicitlyCast(GeneralType source, GeneralType destination, IRuntimeInfoProvider runtimeInfoProvider, CompiledValue value)
+    {
+        if (CanImplicitlyCast(source, destination, runtimeInfoProvider)) return true;
+
+        if (destination.Is(out BuiltinType? builtinType))
+        { return value.TryCast(builtinType.RuntimeType, out _); }
+
+        if (destination.Is<PointerType>() || destination.Is<BuiltinType>())
+        {
+            return destination.GetBitWidth(runtimeInfoProvider) switch
+            {
+                BitWidth._8 => value >= byte.MinValue && value <= byte.MaxValue,
+                BitWidth._16 => value >= char.MinValue && value <= char.MaxValue,
+                BitWidth._32 => value >= int.MinValue && value <= int.MaxValue,
+                BitWidth._64 => value >= long.MinValue && value <= long.MaxValue,
+                _ => throw new UnreachableException(),
+            };
+        }
+
+        return false;
+    }
+
     protected void AssignTypeCheck(GeneralType destination, GeneralType valueType, IPositioned value)
     {
         if (destination.SameAs(valueType))
@@ -1620,7 +1689,11 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         { return; }
 
         if (destination.Is<PointerType>() &&
-            valueType.SameAs(BasicType.Integer))
+            valueType.SameAs(BasicType.U8))
+        { return; }
+
+        if (destination.Is<PointerType>() &&
+            valueType.SameAs(BasicType.I8))
         { return; }
 
         if (destination.Is<PointerType>() &&
@@ -1628,7 +1701,15 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         { return; }
 
         if (destination.Is<PointerType>() &&
-            valueType.SameAs(BasicType.Byte))
+            valueType.SameAs(BasicType.I16))
+        { return; }
+
+        if (destination.Is<PointerType>() &&
+            valueType.SameAs(BasicType.U32))
+        { return; }
+
+        if (destination.Is<PointerType>() &&
+            valueType.SameAs(BasicType.I32))
         { return; }
 
         if (destination.GetSize(this) != valueType.GetSize(this))
@@ -1755,10 +1836,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     protected static CompiledValue GetInitialValue(BasicType type) => type switch
     {
-        BasicType.Byte => new CompiledValue((byte)0),
-        BasicType.Integer => new CompiledValue((int)0),
-        BasicType.Float => new CompiledValue((float)0f),
-        BasicType.Char => new CompiledValue((char)'\0'),
+        BasicType.U8 => new CompiledValue(default(byte)),
+        BasicType.I8 => new CompiledValue(default(sbyte)),
+        BasicType.Char => new CompiledValue(default(char)),
+        BasicType.I16 => new CompiledValue(default(short)),
+        BasicType.U32 => new CompiledValue(default(uint)),
+        BasicType.I32 => new CompiledValue(default(int)),
+        BasicType.F32 => new CompiledValue(default(float)),
         _ => throw new NotImplementedException($"Type {type} can't have value"),
     };
 
@@ -1972,19 +2056,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         GeneralType leftType = FindStatementType(@operator.Left, expectedType);
         GeneralType rightType = FindStatementType(@operator.Right, expectedType);
 
-        if (!leftType.CanBeBuiltin ||
-            !rightType.CanBeBuiltin ||
-            leftType.SameAs(BasicType.Void) ||
-            rightType.SameAs(BasicType.Void))
-        { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
-
         {
             if (leftType.Is(out BuiltinType? leftBType) &&
                 rightType.Is(out BuiltinType? rightBType))
             {
                 bool isFloat =
-                    leftBType.Type == BasicType.Float ||
-                    rightBType.Type == BasicType.Float;
+                    leftBType.Type == BasicType.F32 ||
+                    rightBType.Type == BasicType.F32;
 
                 BitWidth leftBitWidth = leftType.GetBitWidth(this);
                 BitWidth rightBitWidth = rightType.GetBitWidth(this);
@@ -2014,7 +2092,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                     BinaryOperatorCall.Multiplication or
                     BinaryOperatorCall.Division or
                     BinaryOperatorCall.Modulo
-                        => isFloat ? BuiltinType.Float : new BuiltinType(bitWidth.ToType()),
+                        => isFloat ? BuiltinType.F32 : new BuiltinType(bitWidth.ToType()),
 
                     _ => throw (new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile)),
                 });
@@ -2024,39 +2102,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         CompiledValue leftValue = GetInitialValue(leftType);
         CompiledValue rightValue = GetInitialValue(rightType);
 
-        CompiledValue predictedValue = @operator.Operator.Content switch
-        {
-            "+" => leftValue + rightValue,
-            "-" => leftValue - rightValue,
-            "*" => leftValue * rightValue,
-            "/" => leftValue,
-            "%" => leftValue,
-
-            "&&" => new CompiledValue((bool)leftValue && (bool)rightValue),
-            "||" => new CompiledValue((bool)leftValue || (bool)rightValue),
-
-            "&" => leftValue & rightValue,
-            "|" => leftValue | rightValue,
-            "^" => leftValue ^ rightValue,
-
-            "<<" => leftValue << rightValue,
-            ">>" => leftValue >> rightValue,
-
-            "<" => new CompiledValue(leftValue < rightValue),
-            ">" => new CompiledValue(leftValue > rightValue),
-            "==" => new CompiledValue(leftValue == rightValue),
-            "!=" => new CompiledValue(leftValue != rightValue),
-            "<=" => new CompiledValue(leftValue <= rightValue),
-            ">=" => new CompiledValue(leftValue >= rightValue),
-
-            _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
-        };
+        CompiledValue predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
 
         BuiltinType result = new(predictedValue.Type);
 
         if (expectedType is not null)
         {
-            if (result.SameAs(BasicType.Integer) &&
+            if (result.SameAs(BasicType.I32) &&
                 expectedType.Is<PointerType>())
             { return OnGotStatementType(@operator, expectedType); }
         }
@@ -2073,9 +2125,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         GeneralType leftType = FindStatementType(@operator.Left);
 
-        if (!leftType.CanBeBuiltin || leftType.SameAs(BasicType.Void))
-        { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content}", @operator.Operator, CurrentFile); }
-
         GeneralType result = @operator.Operator.Content switch
         {
             UnaryOperatorCall.LogicalNOT => BooleanType,
@@ -2084,7 +2133,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             _ => throw new CompilerException($"Unknown operator {@operator.Operator.Content}", @operator.Operator, CurrentFile),
         };
 
-        if (expectedType is not null && expectedType.Is<PointerType>() && result.SameAs(BasicType.Integer))
+        if (expectedType is not null && expectedType.Is<PointerType>() && result.SameAs(BasicType.I32))
         { return OnGotStatementType(@operator, expectedType); }
 
         return OnGotStatementType(@operator, result);
@@ -2096,9 +2145,16 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             case LiteralType.Integer:
                 if (expectedType is not null)
                 {
-                    if (expectedType.SameAs(BasicType.Byte))
+                    if (expectedType.SameAs(BasicType.U8))
                     {
                         if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
+                        {
+                            return OnGotStatementType(literal, expectedType);
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.I8))
+                    {
+                        if (literal.GetInt() is >= sbyte.MinValue and <= sbyte.MaxValue)
                         {
                             return OnGotStatementType(literal, expectedType);
                         }
@@ -2110,7 +2166,21 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                             return OnGotStatementType(literal, expectedType);
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.Float))
+                    else if (expectedType.SameAs(BasicType.I16))
+                    {
+                        if (literal.GetInt() is >= short.MinValue and <= short.MaxValue)
+                        {
+                            return OnGotStatementType(literal, expectedType);
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.U32))
+                    {
+                        if (literal.GetInt() >= (int)uint.MinValue)
+                        {
+                            return OnGotStatementType(literal, expectedType);
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.F32))
                     {
                         return OnGotStatementType(literal, expectedType);
                     }
@@ -2120,19 +2190,19 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 { return literalType; }
 
                 AnalysisCollection?.Warnings.Add(new Warning($"No type defined for integer literals, using the default i32", literal, CurrentFile));
-                return OnGotStatementType(literal, BuiltinType.Integer);
+                return OnGotStatementType(literal, BuiltinType.I32);
             case LiteralType.Float:
 
                 if (GetLiteralType(literal.Type, out literalType))
                 { return literalType; }
 
                 AnalysisCollection?.Warnings.Add(new Warning($"No type defined for float literals, using the default f32", literal, CurrentFile));
-                return OnGotStatementType(literal, BuiltinType.Float);
+                return OnGotStatementType(literal, BuiltinType.F32);
             case LiteralType.String:
                 if (expectedType is not null &&
                     expectedType.Is(out PointerType? pointerType) &&
                     pointerType.To.Is(out ArrayType? arrayType) &&
-                    arrayType.Of.SameAs(BasicType.Byte))
+                    arrayType.Of.SameAs(BasicType.U8))
                 { return OnGotStatementType(literal, expectedType); }
 
                 if (GetLiteralType(literal.Type, out literalType))
@@ -2143,14 +2213,28 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             case LiteralType.Char:
                 if (expectedType is not null)
                 {
-                    if (expectedType.SameAs(BasicType.Byte))
+                    if (expectedType.SameAs(BasicType.U8))
                     {
                         if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
                         {
                             return OnGotStatementType(literal, expectedType);
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.Float))
+                    else if (expectedType.SameAs(BasicType.I8))
+                    {
+                        if ((int)literal.Value[0] is >= sbyte.MinValue and <= sbyte.MaxValue)
+                        {
+                            return OnGotStatementType(literal, expectedType);
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.I16))
+                    {
+                        if ((int)literal.Value[0] is >= short.MinValue and <= short.MaxValue)
+                        {
+                            return OnGotStatementType(literal, expectedType);
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.F32))
                     {
                         return OnGotStatementType(literal, expectedType);
                     }
@@ -3130,28 +3214,28 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         UnaryOperatorCall.LogicalNOT => !left,
         UnaryOperatorCall.BinaryNOT => ~left,
 
-        "+" => left + right,
-        "-" => left - right,
-        "*" => left * right,
-        "/" => left / right,
-        "%" => left % right,
+        BinaryOperatorCall.Addition => left + right,
+        BinaryOperatorCall.Subtraction => left - right,
+        BinaryOperatorCall.Multiplication => left * right,
+        BinaryOperatorCall.Division => left / right,
+        BinaryOperatorCall.Modulo => left % right,
 
-        "&&" => new CompiledValue((bool)left && (bool)right),
-        "||" => new CompiledValue((bool)left || (bool)right),
+        BinaryOperatorCall.LogicalAND => new CompiledValue((bool)left && (bool)right),
+        BinaryOperatorCall.LogicalOR => new CompiledValue((bool)left || (bool)right),
 
-        "&" => left & right,
-        "|" => left | right,
-        "^" => left ^ right,
+        BinaryOperatorCall.BitwiseAND => left & right,
+        BinaryOperatorCall.BitwiseOR => left | right,
+        BinaryOperatorCall.BitwiseXOR => left ^ right,
 
-        "<<" => left << right,
-        ">>" => left >> right,
+        BinaryOperatorCall.BitshiftLeft => left << right,
+        BinaryOperatorCall.BitshiftRight => left >> right,
 
-        "<" => new CompiledValue(left < right),
-        ">" => new CompiledValue(left > right),
-        "==" => new CompiledValue(left == right),
-        "!=" => new CompiledValue(left != right),
-        "<=" => new CompiledValue(left <= right),
-        ">=" => new CompiledValue(left >= right),
+        BinaryOperatorCall.CompLT => new CompiledValue(left < right),
+        BinaryOperatorCall.CompGT => new CompiledValue(left > right),
+        BinaryOperatorCall.CompEQ => new CompiledValue(left == right),
+        BinaryOperatorCall.CompNEQ => new CompiledValue(left != right),
+        BinaryOperatorCall.CompLEQ => new CompiledValue(left <= right),
+        BinaryOperatorCall.CompGEQ => new CompiledValue(left >= right),
 
         _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
     };
@@ -3443,7 +3527,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         {
             GeneralType type = GeneralType.From(typeCast.Type, FindType, TryCompute);
             if (!type.Is(out BuiltinType? builtinType)) return false;
-            if (!CompiledValue.TryCast(ref value, builtinType.RuntimeType))
+            if (!value.TryCast(builtinType.RuntimeType, out value))
             { return false; }
             return true;
         }
@@ -4092,10 +4176,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         {
             BasicType.Void => throw new InternalException($"Type {type} does not have a size"),
             BasicType.Any => throw new InternalException($"Type {type} does not have a size"),
-            BasicType.Byte => 1,
+            BasicType.U8 => 1,
+            BasicType.I8 => 1,
             BasicType.Char => 2,
-            BasicType.Integer => 4,
-            BasicType.Float => 4,
+            BasicType.I16 => 2,
+            BasicType.I32 => 4,
+            BasicType.U32 => 4,
+            BasicType.F32 => 4,
             _ => throw new UnreachableException(),
         };
         return true;

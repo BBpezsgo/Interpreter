@@ -1158,10 +1158,13 @@ public class Literal : StatementWithValue
     {
         Type = value.Type switch
         {
-            RuntimeType.Byte => LiteralType.Integer,
-            RuntimeType.Integer => LiteralType.Integer,
-            RuntimeType.Single => LiteralType.Float,
+            RuntimeType.U8 => LiteralType.Integer,
+            RuntimeType.I8 => LiteralType.Integer,
             RuntimeType.Char => LiteralType.Char,
+            RuntimeType.I16 => LiteralType.Integer,
+            RuntimeType.U32 => LiteralType.Integer,
+            RuntimeType.I32 => LiteralType.Integer,
+            RuntimeType.F32 => LiteralType.Float,
             _ => throw new NotImplementedException(),
         };
         Value = value.ToString();
@@ -1196,10 +1199,13 @@ public class Literal : StatementWithValue
     {
         TokenType tokenType = value.Type switch
         {
-            RuntimeType.Byte => TokenType.LiteralNumber,
-            RuntimeType.Integer => TokenType.LiteralNumber,
-            RuntimeType.Single => TokenType.LiteralFloat,
+            RuntimeType.U8 => TokenType.LiteralNumber,
+            RuntimeType.I8 => TokenType.LiteralNumber,
             RuntimeType.Char => TokenType.LiteralCharacter,
+            RuntimeType.I16 => TokenType.LiteralNumber,
+            RuntimeType.U32 => TokenType.LiteralNumber,
+            RuntimeType.I32 => TokenType.LiteralNumber,
+            RuntimeType.F32 => TokenType.LiteralFloat,
             _ => TokenType.Identifier,
         };
         return new Literal(value, Token.CreateAnonymous(value.ToString(), tokenType))

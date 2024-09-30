@@ -6,30 +6,39 @@ public partial struct CompiledValue :
     public static bool IsZero(CompiledValue value) => value.Type switch
     {
         RuntimeType.Null => true,
-        RuntimeType.Byte => value.Byte == 0,
-        RuntimeType.Integer => value.Int == 0,
-        RuntimeType.Single => value.Single == 0,
-        RuntimeType.Char => value.Char == 0,
+        RuntimeType.U8 => value.U8 == default,
+        RuntimeType.I8 => value.I8 == default,
+        RuntimeType.Char => value.Char == default,
+        RuntimeType.I16 => value.I16 == default,
+        RuntimeType.U32 => value.U32 == default,
+        RuntimeType.I32 => value.I32 == default,
+        RuntimeType.F32 => value.F32 == default,
         _ => throw new UnreachableException(),
     };
 
     public override string ToString() => Type switch
     {
         RuntimeType.Null => "null",
-        RuntimeType.Byte => Byte.ToString(),
-        RuntimeType.Integer => Int.ToString(),
+        RuntimeType.U8 => U8.ToString(),
+        RuntimeType.I8 => I8.ToString(),
         RuntimeType.Char => Char.ToString(),
-        RuntimeType.Single => Single.ToString(),
+        RuntimeType.I16 => I16.ToString(),
+        RuntimeType.U32 => U32.ToString(),
+        RuntimeType.I32 => I32.ToString(),
+        RuntimeType.F32 => F32.ToString(),
         _ => throw new UnreachableException(),
     };
 
     public string ToString(IFormatProvider? provider) => Type switch
     {
         RuntimeType.Null => "null",
-        RuntimeType.Byte => Convert.ToString(Byte, provider),
-        RuntimeType.Integer => Convert.ToString(Int, provider),
+        RuntimeType.U8 => Convert.ToString(U8, provider),
+        RuntimeType.I8 => Convert.ToString(I8, provider),
         RuntimeType.Char => Convert.ToString(Char, provider),
-        RuntimeType.Single => Convert.ToString(Single, provider),
+        RuntimeType.I16 => Convert.ToString(I16, provider),
+        RuntimeType.U32 => Convert.ToString(U32, provider),
+        RuntimeType.I32 => Convert.ToString(I32, provider),
+        RuntimeType.F32 => Convert.ToString(F32, provider),
         _ => throw new UnreachableException(),
     };
 
@@ -38,120 +47,93 @@ public partial struct CompiledValue :
         value = default;
         return type.FinalValue switch
         {
-            BuiltinType builtinType => TryCast(builtinType, out value),
+            BuiltinType builtinType => TryCast(builtinType.RuntimeType, out value),
             _ => false
         };
     }
 
-    public readonly bool TryCast(BuiltinType type, out CompiledValue value)
+    public readonly bool TryCast(RuntimeType targetType, out CompiledValue value)
     {
-        value = default;
-        switch (type.Type)
-        {
-            case BasicType.Byte:
-                switch (Type)
-                {
-                    case RuntimeType.Integer:
-                        if (Int is >= byte.MinValue and <= byte.MaxValue)
-                        {
-                            value = new CompiledValue((byte)this);
-                            return true;
-                        }
-                        return false;
-                    case RuntimeType.Char:
-                        if ((ushort)Char is >= byte.MinValue and <= byte.MaxValue)
-                        {
-                            value = new CompiledValue((byte)this);
-                            return true;
-                        }
-                        return false;
-                    case RuntimeType.Byte:
-                        value = this;
-                        return true;
-                    default: return false;
-                }
-            case BasicType.Integer:
-                switch (Type)
-                {
-                    case RuntimeType.Integer:
-                        value = this;
-                        return true;
-                    case RuntimeType.Char:
-                        value = new CompiledValue((int)this);
-                        return true;
-                    case RuntimeType.Byte:
-                        value = new CompiledValue((int)this);
-                        return true;
-                    default: return false;
-                }
-            case BasicType.Float:
-                if (Type == RuntimeType.Single)
-                {
-                    value = this;
-                    return true;
-                }
-                return false;
-            case BasicType.Char:
-                switch (Type)
-                {
-                    case RuntimeType.Integer:
-                        if (Int is >= ushort.MinValue and <= ushort.MaxValue)
-                        {
-                            value = new CompiledValue((char)this);
-                            return true;
-                        }
-                        return false;
-                    case RuntimeType.Char:
-                        value = this;
-                        return true;
-                    case RuntimeType.Byte:
-                        value = new CompiledValue((char)this);
-                        return true;
-                    default: return false;
-                }
-            default: return false;
-        }
-    }
-
-    public static bool TryCast(ref CompiledValue value, RuntimeType targetType)
-    {
+#pragma warning disable CS0652
+#pragma warning disable IDE0078
         value = targetType switch
         {
             RuntimeType.Null => CompiledValue.Null,
-            RuntimeType.Byte => value.Type switch
+            RuntimeType.U8 => Type switch
             {
-                RuntimeType.Byte => value,
-                RuntimeType.Integer => (value.Int is >= byte.MinValue and <= byte.MaxValue) ? new CompiledValue((byte)value.Int) : value,
-                RuntimeType.Single => value,
-                RuntimeType.Char => ((ushort)value.Char is >= byte.MinValue and <= byte.MaxValue) ? new CompiledValue((byte)value.Char) : value,
-                _ => value,
+                RuntimeType.U8 => (U8 >= byte.MinValue && U8 <= byte.MaxValue) ? new CompiledValue((byte)I8) : this,
+                RuntimeType.I8 => (I8 >= byte.MinValue && I8 <= byte.MaxValue) ? new CompiledValue((byte)I8) : this,
+                RuntimeType.Char => (Char >= byte.MinValue && Char <= byte.MaxValue) ? new CompiledValue((byte)Char) : this,
+                RuntimeType.I16 => (I16 >= byte.MinValue && I16 <= byte.MaxValue) ? new CompiledValue((byte)I16) : this,
+                RuntimeType.U32 => (U32 >= byte.MinValue && U32 <= byte.MaxValue) ? new CompiledValue((byte)U32) : this,
+                RuntimeType.I32 => (I32 >= byte.MinValue && I32 <= byte.MaxValue) ? new CompiledValue((byte)I32) : this,
+                _ => this,
             },
-            RuntimeType.Integer => value.Type switch
+            RuntimeType.I8 => Type switch
             {
-                RuntimeType.Byte => new CompiledValue((int)value.Byte),
-                RuntimeType.Integer => value,
-                RuntimeType.Single => value,
-                RuntimeType.Char => new CompiledValue((int)value.Char),
-                _ => value,
+                RuntimeType.U8 => (U8 >= sbyte.MinValue && U8 <= sbyte.MaxValue) ? new CompiledValue((sbyte)I8) : this,
+                RuntimeType.I8 => (I8 >= sbyte.MinValue && I8 <= sbyte.MaxValue) ? new CompiledValue((sbyte)I8) : this,
+                RuntimeType.Char => (Char >= sbyte.MinValue && Char <= sbyte.MaxValue) ? new CompiledValue((sbyte)Char) : this,
+                RuntimeType.I16 => (I16 >= sbyte.MinValue && I16 <= sbyte.MaxValue) ? new CompiledValue((sbyte)I16) : this,
+                RuntimeType.U32 => (U32 >= sbyte.MinValue && U32 <= sbyte.MaxValue) ? new CompiledValue((sbyte)U32) : this,
+                RuntimeType.I32 => (I32 >= sbyte.MinValue && I32 <= sbyte.MaxValue) ? new CompiledValue((sbyte)I32) : this,
+                _ => this,
             },
-            RuntimeType.Single => value.Type switch
+            RuntimeType.Char => Type switch
             {
-                RuntimeType.Byte => new CompiledValue((float)value.Byte),
-                RuntimeType.Integer => new CompiledValue((float)value.Int),
-                RuntimeType.Single => value,
-                RuntimeType.Char => new CompiledValue((float)value.Char),
-                _ => value,
+                RuntimeType.U8 => (U8 >= char.MinValue && U8 <= char.MaxValue) ? new CompiledValue((char)I8) : this,
+                RuntimeType.I8 => (I8 >= char.MinValue && I8 <= char.MaxValue) ? new CompiledValue((char)I8) : this,
+                RuntimeType.Char => (Char >= char.MinValue && Char <= char.MaxValue) ? new CompiledValue((char)Char) : this,
+                RuntimeType.I16 => (I16 >= char.MinValue && I16 <= char.MaxValue) ? new CompiledValue((char)I16) : this,
+                RuntimeType.U32 => (U32 >= char.MinValue && U32 <= char.MaxValue) ? new CompiledValue((char)U32) : this,
+                RuntimeType.I32 => (I32 >= char.MinValue && I32 <= char.MaxValue) ? new CompiledValue((char)I32) : this,
+                _ => this,
             },
-            RuntimeType.Char => value.Type switch
+            RuntimeType.I16 => Type switch
             {
-                RuntimeType.Byte => new CompiledValue((char)value.Byte),
-                RuntimeType.Integer => (value.Int is >= char.MinValue and <= char.MaxValue) ? new CompiledValue((char)value.Int) : value,
-                RuntimeType.Single => value,
-                RuntimeType.Char => value,
-                _ => value,
+                RuntimeType.U8 => (U8 >= short.MinValue && U8 <= short.MaxValue) ? new CompiledValue((short)I8) : this,
+                RuntimeType.I8 => (I8 >= short.MinValue && I8 <= short.MaxValue) ? new CompiledValue((short)I8) : this,
+                RuntimeType.Char => (Char >= short.MinValue && Char <= short.MaxValue) ? new CompiledValue((short)Char) : this,
+                RuntimeType.I16 => (I16 >= short.MinValue && I16 <= short.MaxValue) ? new CompiledValue((short)I16) : this,
+                RuntimeType.U32 => (U32 >= short.MinValue && U32 <= short.MaxValue) ? new CompiledValue((short)U32) : this,
+                RuntimeType.I32 => (I32 >= short.MinValue && I32 <= short.MaxValue) ? new CompiledValue((short)I32) : this,
+                _ => this,
             },
-            _ => value,
+            RuntimeType.U32 => Type switch
+            {
+                RuntimeType.U8 => (U8 >= uint.MinValue && U8 <= uint.MaxValue) ? new CompiledValue((uint)I8) : this,
+                RuntimeType.I8 => (I8 >= uint.MinValue && I8 <= uint.MaxValue) ? new CompiledValue((uint)I8) : this,
+                RuntimeType.Char => (Char >= uint.MinValue && Char <= uint.MaxValue) ? new CompiledValue((uint)Char) : this,
+                RuntimeType.I16 => (I16 >= uint.MinValue && I16 <= uint.MaxValue) ? new CompiledValue((uint)I16) : this,
+                RuntimeType.U32 => (U32 >= uint.MinValue && U32 <= uint.MaxValue) ? new CompiledValue((uint)U32) : this,
+                RuntimeType.I32 => (I32 >= uint.MinValue && I32 <= uint.MaxValue) ? new CompiledValue((uint)I32) : this,
+                _ => this,
+            },
+            RuntimeType.I32 => Type switch
+            {
+                RuntimeType.U8 => (U8 >= int.MinValue && U8 <= int.MaxValue) ? new CompiledValue((int)I8) : this,
+                RuntimeType.I8 => (I8 >= int.MinValue && I8 <= int.MaxValue) ? new CompiledValue((int)I8) : this,
+                RuntimeType.Char => (Char >= int.MinValue && Char <= int.MaxValue) ? new CompiledValue((int)Char) : this,
+                RuntimeType.I16 => (I16 >= int.MinValue && I16 <= int.MaxValue) ? new CompiledValue((int)I16) : this,
+                RuntimeType.U32 => (U32 >= int.MinValue && U32 <= int.MaxValue) ? new CompiledValue((int)U32) : this,
+                RuntimeType.I32 => (I32 >= int.MinValue && I32 <= int.MaxValue) ? new CompiledValue((int)I32) : this,
+                _ => this,
+            },
+            RuntimeType.F32 => this.Type switch
+            {
+                RuntimeType.U8 => new CompiledValue((float)I8),
+                RuntimeType.I8 => new CompiledValue((float)I8),
+                RuntimeType.Char => new CompiledValue((float)Char),
+                RuntimeType.I16 => new CompiledValue((float)I16),
+                RuntimeType.U32 => new CompiledValue((float)U32),
+                RuntimeType.I32 => new CompiledValue((float)I32),
+                RuntimeType.F32 => new CompiledValue((float)F32),
+                _ => this,
+            },
+            _ => this,
         };
+#pragma warning restore IDE0078 // Use pattern matching
+#pragma warning restore CS0652 // Comparison to integral constant is useless; the constant is outside the range of the type
 
         return value.Type == targetType;
     }
@@ -168,10 +150,13 @@ public partial struct CompiledValue :
     public static explicit operator bool(CompiledValue v) => v.Type switch
     {
         RuntimeType.Null => false,
-        RuntimeType.Byte => v.Byte != 0,
-        RuntimeType.Integer => v.Int != 0,
-        RuntimeType.Single => v.Single != 0f,
-        RuntimeType.Char => v.Char != 0,
+        RuntimeType.U8 => v.U8 != default,
+        RuntimeType.I8 => v.I8 != default,
+        RuntimeType.Char => v.Char != default,
+        RuntimeType.I16 => v.I16 != default,
+        RuntimeType.I32 => v.I32 != default,
+        RuntimeType.U32 => v.U32 != default,
+        RuntimeType.F32 => v.F32 != default,
         _ => throw new UnreachableException(),
     };
     public static implicit operator CompiledValue(bool v) => new(v);
@@ -180,10 +165,12 @@ public partial struct CompiledValue :
     /// <exception cref="InvalidCastException"/>
     public static explicit operator byte(CompiledValue v) => v.Type switch
     {
-        RuntimeType.Byte => v.Byte,
-        RuntimeType.Integer => (byte)v.Int,
+        RuntimeType.U8 => (byte)v.U8,
+        RuntimeType.I8 => (byte)v.I8,
         RuntimeType.Char => (byte)v.Char,
-        RuntimeType.Single => (byte)v.Single,
+        RuntimeType.I16 => (byte)v.I16,
+        RuntimeType.I32 => (byte)v.I32,
+        RuntimeType.F32 => (byte)v.F32,
         _ => throw new InvalidCastException($"Can't cast {v.Type} to {typeof(byte)}"),
     };
     public static implicit operator CompiledValue(byte v) => new(v);
@@ -192,10 +179,13 @@ public partial struct CompiledValue :
     /// <exception cref="InvalidCastException"/>
     public static explicit operator ushort(CompiledValue v) => v.Type switch
     {
-        RuntimeType.Byte => v.Byte,
-        RuntimeType.Integer => (ushort)v.Int,
-        RuntimeType.Char => v.Char,
-        RuntimeType.Single => (ushort)v.Single,
+        RuntimeType.U8 => (ushort)v.U8,
+        RuntimeType.I8 => (ushort)v.U8,
+        RuntimeType.Char => (ushort)v.Char,
+        RuntimeType.I16 => (ushort)v.I16,
+        RuntimeType.U32 => (ushort)v.U32,
+        RuntimeType.I32 => (ushort)v.I32,
+        RuntimeType.F32 => (ushort)v.F32,
         _ => throw new InvalidCastException($"Can't cast {v.Type} to {typeof(ushort)}"),
     };
 
@@ -203,10 +193,13 @@ public partial struct CompiledValue :
     /// <exception cref="InvalidCastException"/>
     public static explicit operator int(CompiledValue v) => v.Type switch
     {
-        RuntimeType.Byte => v.Byte,
-        RuntimeType.Integer => v.Int,
-        RuntimeType.Char => v.Char,
-        RuntimeType.Single => (int)v.Single,
+        RuntimeType.U8 => (int)v.U8,
+        RuntimeType.I8 => (int)v.U8,
+        RuntimeType.Char => (int)v.Char,
+        RuntimeType.I16 => (int)v.I16,
+        RuntimeType.U32 => (int)v.U32,
+        RuntimeType.I32 => (int)v.I32,
+        RuntimeType.F32 => (int)v.F32,
         _ => throw new InvalidCastException($"Can't cast {v.Type} to {typeof(int)}"),
     };
     public static implicit operator CompiledValue(int v) => new(v);
@@ -215,10 +208,13 @@ public partial struct CompiledValue :
     /// <exception cref="InvalidCastException"/>
     public static explicit operator float(CompiledValue v) => v.Type switch
     {
-        RuntimeType.Byte => v.Byte,
-        RuntimeType.Integer => v.Int,
-        RuntimeType.Char => v.Char,
-        RuntimeType.Single => v.Single,
+        RuntimeType.U8 => (float)v.U8,
+        RuntimeType.I8 => (float)v.U8,
+        RuntimeType.Char => (float)v.Char,
+        RuntimeType.I16 => (float)v.I16,
+        RuntimeType.U32 => (float)v.U32,
+        RuntimeType.I32 => (float)v.I32,
+        RuntimeType.F32 => (float)v.F32,
         _ => throw new InvalidCastException($"Can't cast {v.Type} to {typeof(float)}"),
     };
     public static implicit operator CompiledValue(float v) => new(v);
@@ -227,10 +223,13 @@ public partial struct CompiledValue :
     /// <exception cref="InvalidCastException"/>
     public static explicit operator char(CompiledValue v) => v.Type switch
     {
-        RuntimeType.Byte => (char)v.Byte,
-        RuntimeType.Integer => (char)v.Int,
-        RuntimeType.Char => v.Char,
-        RuntimeType.Single => (char)v.Single,
+        RuntimeType.U8 => (char)v.U8,
+        RuntimeType.I8 => (char)v.U8,
+        RuntimeType.Char => (char)v.Char,
+        RuntimeType.I16 => (char)v.I16,
+        RuntimeType.U32 => (char)v.U32,
+        RuntimeType.I32 => (char)v.I32,
+        RuntimeType.F32 => (char)v.F32,
         _ => throw new InvalidCastException($"Can't cast {v.Type} to {typeof(char)}"),
     };
     public static implicit operator CompiledValue(char v) => new(v);

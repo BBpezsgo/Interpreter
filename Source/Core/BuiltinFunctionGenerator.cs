@@ -537,28 +537,37 @@ public static unsafe class ExternalFunctionGenerator
         Type type_ = typeof(T);
 
         if (type_ == typeof(byte))
-        { return RuntimeType.Byte; }
+        { return RuntimeType.U8; }
 
-        if (type_ == typeof(int))
-        { return RuntimeType.Integer; }
-
-        if (type_ == typeof(float))
-        { return RuntimeType.Single; }
+        if (type_ == typeof(sbyte))
+        { return RuntimeType.I8; }
 
         if (type_ == typeof(char))
         { return RuntimeType.Char; }
 
-        if (type_.IsClass)
-        { return RuntimeType.Integer; }
+        if (type_ == typeof(ushort))
+        { return RuntimeType.Char; }
+
+        if (type_ == typeof(short))
+        { return RuntimeType.I16; }
+
+        if (type_ == typeof(int))
+        { return RuntimeType.I32; }
 
         if (type_ == typeof(uint))
-        { return RuntimeType.Integer; }
+        { return RuntimeType.U32; }
+
+        if (type_ == typeof(float))
+        { return RuntimeType.F32; }
+
+        if (type_.IsClass)
+        { return RuntimeType.I32; }
 
         if (type_ == typeof(IntPtr))
-        { return RuntimeType.Integer; }
+        { return RuntimeType.I32; }
 
         if (type_ == typeof(UIntPtr))
-        { return RuntimeType.Integer; }
+        { return RuntimeType.I32; }
 
         throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
     }
@@ -575,10 +584,13 @@ public static unsafe class ExternalFunctionGenerator
             size += type switch
             {
                 RuntimeType.Null => 0,
-                RuntimeType.Byte => 1,
+                RuntimeType.U8 => 1,
+                RuntimeType.I8 => 1,
                 RuntimeType.Char => 2,
-                RuntimeType.Integer => 4,
-                RuntimeType.Single => 4,
+                RuntimeType.I16 => 2,
+                RuntimeType.I32 => 4,
+                RuntimeType.U32 => 4,
+                RuntimeType.F32 => 4,
                 _ => throw new UnreachableException(),
             };
         }

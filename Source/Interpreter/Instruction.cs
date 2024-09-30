@@ -270,10 +270,13 @@ public readonly struct InstructionOperand
     public static implicit operator InstructionOperand(CompiledValue value) => value.Type switch
     {
         RuntimeType.Null => new InstructionOperand(default, InstructionOperandType.Immediate32),
-        RuntimeType.Byte => new InstructionOperand(value.Byte, InstructionOperandType.Immediate8),
+        RuntimeType.U8 => new InstructionOperand(value.U8, InstructionOperandType.Immediate8),
+        RuntimeType.I8 => new InstructionOperand(value.I8, InstructionOperandType.Immediate8),
         RuntimeType.Char => new InstructionOperand(value.Char, InstructionOperandType.Immediate16),
-        RuntimeType.Integer => new InstructionOperand(value.Int, InstructionOperandType.Immediate32),
-        RuntimeType.Single => new InstructionOperand(new RuntimeValue(value.Single), InstructionOperandType.Immediate32),
+        RuntimeType.I16 => new InstructionOperand(value.I16, InstructionOperandType.Immediate16),
+        RuntimeType.U32 => new InstructionOperand(value.U32, InstructionOperandType.Immediate16),
+        RuntimeType.I32 => new InstructionOperand(value.I32, InstructionOperandType.Immediate32),
+        RuntimeType.F32 => new InstructionOperand(new RuntimeValue(value.F32), InstructionOperandType.Immediate32),
         _ => throw new UnreachableException(),
     };
     public static implicit operator InstructionOperand(int value) => new(new RuntimeValue(value), InstructionOperandType.Immediate32);

@@ -5,10 +5,12 @@ public static class ALU
     public const byte SignBit8 = unchecked((byte)0x80);
     public const char SignBit16 = unchecked((char)0x8000);
     public const int SignBit32 = unchecked((int)0x80000000);
+    public const int SignBit64 = unchecked((int)0x8000000000000000);
 
     public const byte AllBit8 = unchecked((byte)0xFF);
     public const char AllBit16 = unchecked((char)0xFFFF);
     public const int AllBit32 = unchecked((int)0xFFFFFFFF);
+    public const int AllBit64 = unchecked((int)0xFFFFFFFFFFFFFFFF);
 
     public static RuntimeValue Add(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
     {
@@ -55,6 +57,18 @@ public static class ALU
         return unchecked((int)result);
     }
 
+    public static long AddI64(long a, long b, ref Flags flags)
+    {
+        long result = a + b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit64) != 0);
+        flags.Set(Flags.Zero, (result & AllBit64) == 0);
+        flags.Set(Flags.Carry, result > AllBit64);
+        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit64) == SignBit64);
+
+        return unchecked((int)result);
+    }
+
     public static RuntimeValue Subtract(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
     {
         BitWidth._8 => new RuntimeValue(SubtractU8(a.U8, b.U8, ref flags)),
@@ -83,7 +97,7 @@ public static class ALU
         flags.Set(Flags.Sign, unchecked(result & SignBit16) != 0);
         flags.Set(Flags.Zero, (result & AllBit16) == 0);
         flags.Set(Flags.Carry, result > AllBit16);
-        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)0x8000) == (long)0x8000);
+        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit16) == (long)SignBit16);
 
         return unchecked((char)result);
     }
@@ -96,6 +110,18 @@ public static class ALU
         flags.Set(Flags.Zero, (result & AllBit32) == 0);
         flags.Set(Flags.Carry, result > AllBit32);
         // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit32) == (long)SignBit32);
+
+        return unchecked((int)result);
+    }
+
+    public static long SubtractI64(long a, long b, ref Flags flags)
+    {
+        long result = a - b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit64) != 0);
+        flags.Set(Flags.Zero, (result & AllBit64) == 0);
+        flags.Set(Flags.Carry, result > AllBit64);
+        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit64) == (long)SignBit64);
 
         return unchecked((int)result);
     }

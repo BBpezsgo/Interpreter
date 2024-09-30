@@ -263,11 +263,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     readonly int MaxRecursiveDepth;
 
     public override int PointerSize => 1;
-    public override BuiltinType BooleanType => BuiltinType.Byte;
-    public override BuiltinType SizeofStatementType => BuiltinType.Byte;
-    public override BuiltinType ArrayLengthType => BuiltinType.Byte;
+    public override BuiltinType BooleanType => BuiltinType.U8;
+    public override BuiltinType SizeofStatementType => BuiltinType.U8;
+    public override BuiltinType ArrayLengthType => BuiltinType.U8;
 
-    static readonly BuiltinType ExitCodeType = BuiltinType.Byte;
+    static readonly BuiltinType ExitCodeType = BuiltinType.U8;
 
     #endregion
 
@@ -533,7 +533,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         if (!CompiledValue.TryShrinkTo8bit(ref addressToSet))
         { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, CurrentFile); }
 
-        address = addressToSet.Byte;
+        address = addressToSet.U8;
         size = 1;
         return true;
     }

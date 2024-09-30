@@ -31,6 +31,7 @@ public class AddressOffset : Address
         }
     }
 
+    [ExcludeFromCodeCoverage]
     public override string ToString() => Offset switch
     {
         > 0 => $"{Base} + {Offset}",
@@ -48,6 +49,7 @@ public class AddressRuntimePointer : Address
         PointerAddress = pointerAddress;
     }
 
+    [ExcludeFromCodeCoverage]
     public override string ToString() => $"*[{PointerAddress}]";
 }
 
@@ -60,6 +62,7 @@ public class AddressRegisterPointer : Address
         Register = register;
     }
 
+    [ExcludeFromCodeCoverage]
     public override string ToString() => $"{Register}";
 }
 

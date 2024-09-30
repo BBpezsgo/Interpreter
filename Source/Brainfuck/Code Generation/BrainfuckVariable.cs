@@ -47,5 +47,6 @@ public class BrainfuckVariable :
         IsInitialized = false;
     }
 
+    [ExcludeFromCodeCoverage]
     string GetDebuggerDisplay() => $"{Type} {Name} ({Size} bytes at {Address})";
 }

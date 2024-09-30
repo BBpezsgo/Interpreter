@@ -66,9 +66,9 @@
 				"type": "coreclr",
 				"request": "launch",
 				"preLaunchTask": "build",
-				"program": "${workspaceFolder}/Utility/bin/Debug/net9.0/Utility",
+				"program": "${workspaceFolder:Core}/Utility/bin/Debug/net9.0/Utility",
 				"args": [],
-				"cwd": "${workspaceFolder}",
+				"cwd": "${workspaceFolder:Core}",
 				"stopAtEntry": false,
 				"console": "internalConsole",
 			},
@@ -83,5 +83,5 @@
 				"miDebuggerPath": "/usr/bin/gdb"
 			}
 		]
-	},	
+	},
 }

@@ -217,14 +217,20 @@ public class RuntimeException : LanguageException
                         continue;
                     }
                     ImmutableArray<byte> value = context.Memory[range.Start..(range.End + 1)];
-                    if (item.Type.Equals(BasicType.Integer))
-                    { result.Append(value.To<int>()); }
-                    else if (item.Type.Equals(BasicType.Float))
+                    if (item.Type.Equals(BasicType.F32))
                     { result.Append(value.To<float>() + "f"); }
+                    else if (item.Type.Equals(BasicType.U8))
+                    { result.Append(value.To<byte>()); }
+                    else if (item.Type.Equals(BasicType.I8))
+                    { result.Append(value.To<sbyte>()); }
                     else if (item.Type.Equals(BasicType.Char))
                     { result.Append($"'{value.To<char>().Escape()}'"); }
-                    else if (item.Type.Equals(BasicType.Byte))
-                    { result.Append(value.To<byte>()); }
+                    else if (item.Type.Equals(BasicType.I16))
+                    { result.Append(value.To<short>()); }
+                    else if (item.Type.Equals(BasicType.U32))
+                    { result.Append(value.To<uint>()); }
+                    else if (item.Type.Equals(BasicType.I32))
+                    { result.Append(value.To<int>()); }
                     else if (item.Type is PointerType)
                     {
                         result.Append('*');

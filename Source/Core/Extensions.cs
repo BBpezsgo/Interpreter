@@ -36,9 +36,9 @@ public static class Extensions
     /// <exception cref="NotImplementedException"/>
     public static BasicType ToType(this BitWidth v) => v switch
     {
-        BitWidth._8 => BasicType.Byte,
+        BitWidth._8 => BasicType.U8,
         BitWidth._16 => BasicType.Char,
-        BitWidth._32 => BasicType.Integer,
+        BitWidth._32 => BasicType.I32,
         BitWidth._64 => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
@@ -46,10 +46,13 @@ public static class Extensions
     /// <exception cref="NotImplementedException"/>
     public static BasicType Convert(this RuntimeType v) => v switch
     {
-        RuntimeType.Byte => BasicType.Byte,
-        RuntimeType.Integer => BasicType.Integer,
-        RuntimeType.Single => BasicType.Float,
+        RuntimeType.U8 => BasicType.U8,
+        RuntimeType.I8 => BasicType.I8,
         RuntimeType.Char => BasicType.Char,
+        RuntimeType.I16 => BasicType.I16,
+        RuntimeType.U32 => BasicType.U32,
+        RuntimeType.I32 => BasicType.I32,
+        RuntimeType.F32 => BasicType.F32,
         RuntimeType.Null => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };

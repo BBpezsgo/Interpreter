@@ -6,14 +6,14 @@ public class CompiledParameterConstant : ParameterDefinition,
     IConstant
 {
     public CompiledValue Value { get; }
+    public new GeneralType Type { get; }
 
     public new string Identifier => base.Identifier.Content;
     public bool IsExported => false;
 
-    public new GeneralType Type => new BuiltinType(Value.Type);
-
-    public CompiledParameterConstant(CompiledValue value, ParameterDefinition declaration) : base(declaration)
+    public CompiledParameterConstant(CompiledValue value, GeneralType type, ParameterDefinition declaration) : base(declaration)
     {
         Value = value;
+        Type = type;
     }
 }

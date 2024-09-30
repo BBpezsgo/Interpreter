@@ -2,6 +2,7 @@
 
 namespace LanguageCore.BBLang.Generator;
 
+[ExcludeFromCodeCoverage]
 public struct MainGeneratorSettings
 {
     public bool GenerateComments;

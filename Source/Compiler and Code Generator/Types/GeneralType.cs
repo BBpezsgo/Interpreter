@@ -11,7 +11,6 @@ public abstract class GeneralType :
     IEquatable<RuntimeType>
 {
     public virtual GeneralType FinalValue => this;
-    public bool CanBeBuiltin => FinalValue is BuiltinType or PointerType;
 
     public abstract int GetSize(IRuntimeInfoProvider runtime);
     public abstract BitWidth GetBitWidth(IRuntimeInfoProvider runtime);
@@ -224,7 +223,7 @@ public abstract class GeneralType :
     public bool Equals(RuntimeType other) => FinalValue switch
     {
         BuiltinType builtinType => builtinType.RuntimeType == other,
-        PointerType => other == RuntimeType.Integer,
+        PointerType => other == RuntimeType.I32,
         _ => false,
     };
 

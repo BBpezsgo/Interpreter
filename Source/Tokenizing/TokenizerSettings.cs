@@ -1,5 +1,6 @@
 ﻿namespace LanguageCore.Tokenizing;
 
+[ExcludeFromCodeCoverage]
 public struct TokenizerSettings
 {
     /// <summary> The tokenizer will produce <see cref="TokenType.Whitespace"/> tokens </summary>

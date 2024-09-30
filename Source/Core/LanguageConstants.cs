@@ -17,16 +17,22 @@ public static class TypeKeywords
     public const string Any = "any";
 
     public const string U8 = "u8";
+    public const string I8 = "i8";
+    public const string U16 = "u16";
+    public const string I16 = "i16";
+    public const string U32 = "u32";
     public const string I32 = "i32";
     public const string F32 = "f32";
-    public const string U16 = "u16";
 
     public static ImmutableArray<string> List { get; } = ImmutableArray.Create
     (
         TypeKeywords.Void,
         TypeKeywords.Any,
         TypeKeywords.U8,
+        TypeKeywords.I8,
         TypeKeywords.U16,
+        TypeKeywords.I16,
+        TypeKeywords.U32,
         TypeKeywords.I32,
         TypeKeywords.F32
     );
@@ -36,10 +42,13 @@ public static class TypeKeywords
         { TypeKeywords.Void, BasicType.Void },
         { TypeKeywords.Any, BasicType.Any },
 
-        { TypeKeywords.U8, BasicType.Byte },
+        { TypeKeywords.U8, BasicType.U8 },
+        { TypeKeywords.I8, BasicType.I8 },
         { TypeKeywords.U16, BasicType.Char },
-        { TypeKeywords.I32, BasicType.Integer },
-        { TypeKeywords.F32, BasicType.Float },
+        { TypeKeywords.I16, BasicType.I16 },
+        { TypeKeywords.U32, BasicType.U32 },
+        { TypeKeywords.I32, BasicType.I32 },
+        { TypeKeywords.F32, BasicType.F32 },
     }.ToImmutableDictionary();
 }
 
@@ -93,7 +102,10 @@ public static class LanguageConstants
         TypeKeywords.Any,
 
         TypeKeywords.U8,
+        TypeKeywords.I8,
         TypeKeywords.U16,
+        TypeKeywords.I16,
+        TypeKeywords.U32,
         TypeKeywords.I32,
         TypeKeywords.F32,
 
@@ -188,7 +200,12 @@ public static class BuiltinFunctions
         {
             Allocate, new BuiltinFunction(
                 v => v.SameAs(new PointerType(BuiltinType.Any)),
-                v => v.SameAs(BasicType.Integer) || v.SameAs(BasicType.Char) || v.SameAs(BasicType.Byte)
+                v => v.SameAs(BasicType.U8)
+                  || v.SameAs(BasicType.I8)
+                  || v.SameAs(BasicType.Char)
+                  || v.SameAs(BasicType.I16)
+                  || v.SameAs(BasicType.U32)
+                  || v.SameAs(BasicType.I32)
             )
         },
         {

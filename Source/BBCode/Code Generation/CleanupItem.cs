@@ -18,6 +18,7 @@ public readonly struct CleanupItem
         Type = type;
     }
 
+    [ExcludeFromCodeCoverage]
     public override string ToString()
     {
         if (Type is null && SizeOnStack == 0 && !ShouldDeallocate) return "null";

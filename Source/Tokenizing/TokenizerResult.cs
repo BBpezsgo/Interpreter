@@ -1,7 +1,13 @@
 ﻿namespace LanguageCore.Tokenizing;
 
+[ExcludeFromCodeCoverage]
 public readonly struct TokenizerResult
 {
+    public static TokenizerResult Empty => new(
+        Enumerable.Empty<Token>(),
+        Enumerable.Empty<SimpleToken>(),
+        Enumerable.Empty<Warning>());
+
     public readonly ImmutableArray<Token> Tokens;
     public readonly ImmutableArray<SimpleToken> UnicodeCharacterTokens;
     public readonly ImmutableArray<Warning> Warnings;
@@ -15,9 +21,4 @@ public readonly struct TokenizerResult
         UnicodeCharacterTokens = unicodeCharacterTokens.ToImmutableArray();
         Warnings = warnings.ToImmutableArray();
     }
-
-    public static TokenizerResult Empty => new(
-        Enumerable.Empty<Token>(),
-        Enumerable.Empty<SimpleToken>(),
-        Enumerable.Empty<Warning>());
 }

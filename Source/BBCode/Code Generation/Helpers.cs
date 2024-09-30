@@ -638,14 +638,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Addressing Helpers
 
-    BuiltinType ReturnFlagType => PointerBitWidth == BitWidth._64 ? BuiltinType.Char : BuiltinType.Byte;
+    BuiltinType ReturnFlagType => PointerBitWidth == BitWidth._64 ? BuiltinType.Char : BuiltinType.U8;
     CompiledValue ReturnFlagTrue => PointerBitWidth == BitWidth._64 ? new((char)1) : new((byte)1);
     CompiledValue ReturnFlagFalse => PointerBitWidth == BitWidth._64 ? new((char)0) : new((byte)0);
-    readonly BuiltinType ExitCodeType = BuiltinType.Integer;
-    readonly PointerType AbsGlobalAddressType = new(BuiltinType.Integer);
+    readonly BuiltinType ExitCodeType = BuiltinType.I32;
+    readonly PointerType AbsGlobalAddressType = new(BuiltinType.I32);
     // readonly PointerType StackPointerType = new(BuiltinType.Integer);
-    readonly PointerType CodePointerType = new(BuiltinType.Integer);
-    readonly PointerType BasePointerType = new(BuiltinType.Integer);
+    readonly PointerType CodePointerType = new(BuiltinType.I32);
+    readonly PointerType BasePointerType = new(BuiltinType.I32);
 
     int AbsGlobalAddressSize => PointerSize;
     // int StackPointerSize => PointerSize;

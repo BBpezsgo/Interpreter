@@ -269,10 +269,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             BasicType.Void => throw new InternalException($"Type {type} does not have a size"),
             BasicType.Any => throw new InternalException($"Type {type} does not have a size"),
-            BasicType.Byte => 1,
+            BasicType.U8 => 1,
+            BasicType.I8 => 1,
             BasicType.Char => 1,
-            BasicType.Integer => 1,
-            BasicType.Float => 1,
+            BasicType.I16 => 1,
+            BasicType.U32 => 1,
+            BasicType.I32 => 1,
+            BasicType.F32 => 1,
             _ => throw new UnreachableException(),
         };
         return true;
@@ -525,7 +528,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     return;
                 }
-                else if (arrayType.Of.SameAs(BasicType.Byte))
+                else if (arrayType.Of.SameAs(BasicType.U8))
                 {
                     if (value is not Literal literal)
                     { throw new InternalException(); }
@@ -610,7 +613,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (AllowPrecomputing && TryCompute(value, out CompiledValue constantValue))
             {
-                Code.SetValue(address, constantValue.Byte);
+                Code.SetValue(address, constantValue.U8);
 
                 Precomputations++;
 
@@ -1822,7 +1825,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             switch (statement.Operator.Content)
             {
-                case "==":
+                case BinaryOperatorCall.CompEQ:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1839,7 +1842,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "+":
+                case BinaryOperatorCall.Addition:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1856,7 +1859,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "-":
+                case BinaryOperatorCall.Subtraction:
                 {
                     {
                         if (AllowOtherOptimizations &&
@@ -1864,13 +1867,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             GetVariable(_left.Content, out BrainfuckVariable? left, out _) &&
                             !left.IsDiscarded &&
                             TryCompute(statement.Right, out CompiledValue right) &&
-                            right.Type == RuntimeType.Byte)
+                            right.Type == RuntimeType.U8)
                         {
                             int resultAddress = Stack.PushVirtual(1);
 
                             Code.CopyValue(left.Address, resultAddress, Stack.NextAddress);
 
-                            Code.AddValue(resultAddress, -right.Byte);
+                            Code.AddValue(resultAddress, -right.U8);
 
                             Optimizations++;
 
@@ -1893,7 +1896,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     return;
                 }
-                case "*":
+                case BinaryOperatorCall.Multiplication:
                 {
                     {
                         if (AllowOtherOptimizations &&
@@ -1929,7 +1932,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "/":
+                case BinaryOperatorCall.Division:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1946,7 +1949,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "%":
+                case BinaryOperatorCall.Modulo:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1963,7 +1966,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "<":
+                case BinaryOperatorCall.CompLT:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1980,7 +1983,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case ">":
+                case BinaryOperatorCall.CompGT:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2002,7 +2005,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case ">=":
+                case BinaryOperatorCall.CompGEQ:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2021,7 +2024,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "<=":
+                case BinaryOperatorCall.CompLEQ:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2038,7 +2041,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "!=":
+                case BinaryOperatorCall.CompNEQ:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2055,7 +2058,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "&&":
+                case BinaryOperatorCall.LogicalAND:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2080,7 +2083,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "||":
+                case BinaryOperatorCall.LogicalOR:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2106,7 +2109,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "<<":
+                case BinaryOperatorCall.BitshiftLeft:
                 {
                     int valueAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2117,10 +2120,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     if (offsetConst != 0)
                     {
-                        if (!Utils.PowerOf2(offsetConst.Int))
+                        if (!Utils.PowerOf2(offsetConst.I32))
                         { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
-                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.Int));
+                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.I32));
 
                         using (Code.Block(this, $"Snippet MULTIPLY({valueAddress} {offsetAddress})"))
                         { Code.MULTIPLY(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
@@ -2128,7 +2131,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case ">>":
+                case BinaryOperatorCall.BitshiftRight:
                 {
                     int valueAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2139,10 +2142,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     if (offsetConst != 0)
                     {
-                        if (!Utils.PowerOf2(offsetConst.Int))
+                        if (!Utils.PowerOf2(offsetConst.I32))
                         { throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile); }
 
-                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.Int));
+                        using StackAddress offsetAddress = Stack.Push((int)Math.Pow(2, offsetConst.I32));
 
                         using (Code.Block(this, $"Snippet MATH_DIV({valueAddress} {offsetAddress})"))
                         { Code.MATH_DIV(valueAddress, offsetAddress, Stack.GetTemporaryAddress); }
@@ -2150,23 +2153,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case "!":
-                {
-                    int leftAddress = Stack.NextAddress;
-                    using (Code.Block(this, "Compute left-side value"))
-                    { GenerateCodeForStatement(statement.Left); }
-
-                    Code.LOGIC_NOT(leftAddress, Stack.GetTemporaryAddress);
-
-                    break;
-                }
-                case "&":
+                case BinaryOperatorCall.BitwiseAND:
                 {
                     GeneralType leftType = FindStatementType(statement.Left);
 
-                    if ((leftType.SameAs(BasicType.Byte) ||
+                    if ((leftType.SameAs(BasicType.U8) ||
+                        leftType.SameAs(BasicType.I8) ||
                         leftType.SameAs(BasicType.Char) ||
-                        leftType.SameAs(BasicType.Integer)) &&
+                        leftType.SameAs(BasicType.I16) ||
+                        leftType.SameAs(BasicType.U32) ||
+                        leftType.SameAs(BasicType.I32)) &&
                         TryCompute(statement.Right, out CompiledValue right))
                     {
                         if (right == 1)
@@ -2246,7 +2242,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             switch (statement.Operator.Content)
             {
-                case "!":
+                case UnaryOperatorCall.LogicalNOT:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2395,17 +2391,29 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     switch (builtinType.Type)
                     {
-                        case BasicType.Byte:
+                        case BasicType.U8:
                             Code.SetValue(offsettedAddress, 0);
                             break;
-                        case BasicType.Integer:
+                        case BasicType.I8:
                             Code.SetValue(offsettedAddress, 0);
-                            AnalysisCollection?.Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.File));
+                            AnalysisCollection?.Warnings.Add(new Warning($"Signed bytes not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.File));
                             break;
                         case BasicType.Char:
                             Code.SetValue(offsettedAddress, '\0');
                             break;
-                        case BasicType.Float:
+                        case BasicType.I16:
+                            Code.SetValue(offsettedAddress, 0);
+                            AnalysisCollection?.Warnings.Add(new Warning($"Shorts not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.File));
+                            break;
+                        case BasicType.U32:
+                            Code.SetValue(offsettedAddress, 0);
+                            AnalysisCollection?.Warnings.Add(new Warning($"Unsigned integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.File));
+                            break;
+                        case BasicType.I32:
+                            Code.SetValue(offsettedAddress, 0);
+                            AnalysisCollection?.Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, structType.Struct.File));
+                            break;
+                        case BasicType.F32:
                             throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, structType.Struct.File);
                         default:
                             throw new CompilerException($"Unknown field type \"{builtinType}\"", field.Identifier, structType.Struct.File);
@@ -2975,7 +2983,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         if (!TryCompute(valueStatement, out CompiledValue constValue))
                         { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
-                        constantParameters.Add(new CompiledParameterConstant(constValue, defined));
+                        GeneralType constantType;
+                        if (defined.Type != StatementKeywords.Var)
+                        {
+                            constantType = GeneralType.From(defined.Type, FindType, TryCompute);
+                            defined.Type.SetAnalyzedType(constantType);
+
+                            if (constantType.Is(out BuiltinType? builtinType))
+                            { constValue.TryCast(builtinType.RuntimeType, out constValue); }
+                        }
+                        else
+                        {
+                            constantType = new BuiltinType(constValue.Type);
+                        }
+
+                        constantParameters.Add(new CompiledParameterConstant(constValue, constantType, defined));
                         continue;
                     }
                     case ModifierKeywords.Temp:
@@ -3153,7 +3175,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.I32, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -3291,7 +3313,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.I32, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }
@@ -3481,10 +3503,25 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     case ModifierKeywords.Const:
                     {
                         StatementWithValue valueStatement = modifiedStatement.Statement;
+
                         if (!TryCompute(valueStatement, out CompiledValue constValue))
                         { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
-                        constantParameters.Add(new CompiledParameterConstant(constValue, defined));
+                        GeneralType constantType;
+                        if (defined.Type != StatementKeywords.Var)
+                        {
+                            constantType = GeneralType.From(defined.Type, FindType, TryCompute);
+                            defined.Type.SetAnalyzedType(constantType);
+
+                            if (constantType.Is(out BuiltinType? builtinType))
+                            { constValue.TryCast(builtinType.RuntimeType, out constValue); }
+                        }
+                        else
+                        {
+                            constantType = new BuiltinType(constValue.Type);
+                        }
+
+                        constantParameters.Add(new CompiledParameterConstant(constValue, constantType, defined));
                         continue;
                     }
                     case ModifierKeywords.Temp:
@@ -3576,7 +3613,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             new TypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
                                 Token.CreateAnonymous(StatementKeywords.As),
-                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.I32, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
+                                new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
                     }

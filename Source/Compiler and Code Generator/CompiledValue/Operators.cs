@@ -24,10 +24,13 @@ public partial struct CompiledValue :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new CompiledValue((byte)(a._integer + b._integer)),
-            RuntimeType.Integer => new CompiledValue((int)(a._integer + b._integer)),
-            RuntimeType.Single => new CompiledValue((float)(a._single + b._single)),
-            RuntimeType.Char => new CompiledValue((ushort)((char)a._integer + (char)b._integer)),
+            RuntimeType.U8 => new CompiledValue((byte)(a.U8 + b.U8)),
+            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 + b.I8)),
+            RuntimeType.Char => new CompiledValue((ushort)(a.Char + b.Char)),
+            RuntimeType.I16 => new CompiledValue((short)(a.I16 + b.I16)),
+            RuntimeType.U32 => new CompiledValue((uint)(a.U32 + b.U32)),
+            RuntimeType.I32 => new CompiledValue((int)(a.I32 + b.I32)),
+            RuntimeType.F32 => new CompiledValue((float)(a.F32 + b.F32)),
             _ => throw new RuntimeException($"Can't do + operation with type {a_} and {b_}"),
         };
     }
@@ -40,10 +43,13 @@ public partial struct CompiledValue :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new CompiledValue((byte)(a._integer - b._integer)),
-            RuntimeType.Integer => new CompiledValue((int)(a._integer - b._integer)),
-            RuntimeType.Single => new CompiledValue((float)(a._single - b._single)),
-            RuntimeType.Char => new CompiledValue((ushort)((char)a._integer - (char)b._integer)),
+            RuntimeType.U8 => new CompiledValue((byte)(a.U8 - b.U8)),
+            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 - b.I8)),
+            RuntimeType.Char => new CompiledValue((ushort)(a.Char - b.Char)),
+            RuntimeType.I16 => new CompiledValue((short)(a.I16 - b.I16)),
+            RuntimeType.U32 => new CompiledValue((uint)(a.U32 - b.U32)),
+            RuntimeType.I32 => new CompiledValue((int)(a.I32 - b.I32)),
+            RuntimeType.F32 => new CompiledValue((float)(a.F32 - b.F32)),
             _ => throw new RuntimeException($"Can't do - operation with type {a_} and {b_}"),
         };
     }
@@ -51,41 +57,50 @@ public partial struct CompiledValue :
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator <<(CompiledValue leftSide, CompiledValue rightSide)
-        => leftSide << rightSide.Int;
+        => leftSide << rightSide.I32;
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator >>(CompiledValue leftSide, CompiledValue rightSide)
-        => leftSide >> rightSide.Int;
+        => leftSide >> rightSide.I32;
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator >>>(CompiledValue leftSide, CompiledValue rightSide)
-        => leftSide >>> rightSide.Int;
+        => leftSide >>> rightSide.I32;
 
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator <<(CompiledValue leftSide, int rightSide) => leftSide.Type switch
     {
-        RuntimeType.Byte => new CompiledValue(unchecked((byte)(leftSide._integer << rightSide))),
-        RuntimeType.Integer => new CompiledValue(unchecked((int)(leftSide._integer << rightSide))),
-        RuntimeType.Char => new CompiledValue(unchecked((char)(leftSide._integer << rightSide))),
+        RuntimeType.U8 => new CompiledValue(unchecked((byte)(leftSide.U8 << rightSide))),
+        RuntimeType.I8 => new CompiledValue(unchecked((sbyte)(leftSide.I8 << rightSide))),
+        RuntimeType.Char => new CompiledValue(unchecked((char)(leftSide.Char << rightSide))),
+        RuntimeType.I16 => new CompiledValue(unchecked((short)(leftSide.I16 << rightSide))),
+        RuntimeType.U32 => new CompiledValue(unchecked((uint)(leftSide.U32 << rightSide))),
+        RuntimeType.I32 => new CompiledValue(unchecked((int)(leftSide.I32 << rightSide))),
         _ => throw new RuntimeException($"Can't do << operation with type {leftSide.Type}"),
     };
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator >>(CompiledValue leftSide, int rightSide) => leftSide.Type switch
     {
-        RuntimeType.Byte => new CompiledValue(unchecked((byte)(leftSide._integer >> rightSide))),
-        RuntimeType.Integer => new CompiledValue(unchecked((int)(leftSide._integer >> rightSide))),
-        RuntimeType.Char => new CompiledValue(unchecked((char)(leftSide._integer >> rightSide))),
+        RuntimeType.U8 => new CompiledValue(unchecked((byte)(leftSide.U8 >> rightSide))),
+        RuntimeType.I8 => new CompiledValue(unchecked((sbyte)(leftSide.I8 >> rightSide))),
+        RuntimeType.Char => new CompiledValue(unchecked((char)(leftSide.Char >> rightSide))),
+        RuntimeType.I16 => new CompiledValue(unchecked((short)(leftSide.I16 >> rightSide))),
+        RuntimeType.U32 => new CompiledValue(unchecked((uint)(leftSide.U32 >> rightSide))),
+        RuntimeType.I32 => new CompiledValue(unchecked((int)(leftSide.I32 >> rightSide))),
         _ => throw new RuntimeException($"Can't do >> operation with type {leftSide.Type}"),
     };
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator >>>(CompiledValue leftSide, int rightSide) => leftSide.Type switch
     {
-        RuntimeType.Byte => new CompiledValue(unchecked((byte)(leftSide._integer >>> rightSide))),
-        RuntimeType.Integer => new CompiledValue(unchecked((int)(leftSide._integer >>> rightSide))),
-        RuntimeType.Char => new CompiledValue(unchecked((char)(leftSide._integer >>> rightSide))),
+        RuntimeType.U8 => new CompiledValue(unchecked((byte)(leftSide.U8 >>> rightSide))),
+        RuntimeType.I8 => new CompiledValue(unchecked((sbyte)(leftSide.I8 >>> rightSide))),
+        RuntimeType.Char => new CompiledValue(unchecked((char)(leftSide.Char >>> rightSide))),
+        RuntimeType.I16 => new CompiledValue(unchecked((short)(leftSide.I16 >>> rightSide))),
+        RuntimeType.U32 => new CompiledValue(unchecked((uint)(leftSide.U32 >>> rightSide))),
+        RuntimeType.I32 => new CompiledValue(unchecked((int)(leftSide.I32 >>> rightSide))),
         _ => throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type}"),
     };
 
@@ -97,10 +112,13 @@ public partial struct CompiledValue :
         return Type switch
         {
             RuntimeType.Null => true,
-            RuntimeType.Byte => (byte)_integer == (byte)other._integer,
-            RuntimeType.Integer => _integer == other._integer,
-            RuntimeType.Single => _single == other._single,
-            RuntimeType.Char => (char)_integer == (char)other._integer,
+            RuntimeType.U8 => U8 == other.U8,
+            RuntimeType.I8 => I8 == other.I8,
+            RuntimeType.Char => Char == other.Char,
+            RuntimeType.I16 => I16 == other.I16,
+            RuntimeType.U32 => U32 == other.U32,
+            RuntimeType.I32 => I32 == other.I32,
+            RuntimeType.F32 => F32 == other.F32,
             _ => false,
         };
     }
@@ -113,8 +131,8 @@ public partial struct CompiledValue :
         CompiledValue xBefore = x;
         CompiledValue yBefore = y;
 
-        CompiledValue.TryCast(ref x, y.Type);
-        CompiledValue.TryCast(ref y, x.Type);
+        x.TryCast(y.Type, out x);
+        y.TryCast(x.Type, out y);
 
         if (x.IsNull || y.IsNull)
         { throw new InternalException(); }
@@ -143,10 +161,13 @@ public partial struct CompiledValue :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new CompiledValue((byte)(a._integer * b._integer)),
-            RuntimeType.Integer => new CompiledValue((int)(a._integer * b._integer)),
-            RuntimeType.Single => new CompiledValue((float)(a._single * b._single)),
-            RuntimeType.Char => new CompiledValue((ushort)(a._integer * b._integer)),
+            RuntimeType.U8 => new CompiledValue((byte)(a.U8 * b.U8)),
+            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 * b.I8)),
+            RuntimeType.Char => new CompiledValue((ushort)(a.Char * b.Char)),
+            RuntimeType.I16 => new CompiledValue((short)(a.I16 * b.I16)),
+            RuntimeType.U32 => new CompiledValue((uint)(a.U32 * b.U32)),
+            RuntimeType.I32 => new CompiledValue((int)(a.I32 * b.I32)),
+            RuntimeType.F32 => new CompiledValue((float)(a.F32 * b.F32)),
             _ => throw new RuntimeException($"Can't do * operation with type {a_} and {b_}"),
         };
     }
@@ -159,10 +180,13 @@ public partial struct CompiledValue :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new CompiledValue((byte)(a._integer / b._integer)),
-            RuntimeType.Integer => new CompiledValue((int)(a._integer / b._integer)),
-            RuntimeType.Single => new CompiledValue((float)(a._single / b._single)),
-            RuntimeType.Char => new CompiledValue((ushort)(a._integer / b._integer)),
+            RuntimeType.U8 => new CompiledValue((byte)(a.U8 / b.U8)),
+            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 / b.I8)),
+            RuntimeType.Char => new CompiledValue((ushort)(a.Char / b.Char)),
+            RuntimeType.I16 => new CompiledValue((short)(a.I16 / b.I16)),
+            RuntimeType.U32 => new CompiledValue((uint)(a.U32 / b.U32)),
+            RuntimeType.I32 => new CompiledValue((int)(a.I32 / b.I32)),
+            RuntimeType.F32 => new CompiledValue((float)(a.F32 / b.F32)),
             _ => throw new RuntimeException($"Can't do / operation with type {a_} and {b_}"),
         };
     }
@@ -175,10 +199,13 @@ public partial struct CompiledValue :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new CompiledValue((byte)(a._integer % b._integer)),
-            RuntimeType.Integer => new CompiledValue((int)(a._integer % b._integer)),
-            RuntimeType.Single => new CompiledValue((float)(a._single % b._single)),
-            RuntimeType.Char => new CompiledValue((ushort)(a._integer % b._integer)),
+            RuntimeType.U8 => new CompiledValue((byte)(a.U8 % b.U8)),
+            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 % b.I8)),
+            RuntimeType.Char => new CompiledValue((ushort)(a.Char % b.Char)),
+            RuntimeType.I16 => new CompiledValue((short)(a.I16 % b.I16)),
+            RuntimeType.U32 => new CompiledValue((uint)(a.U32 % b.U32)),
+            RuntimeType.I32 => new CompiledValue((int)(a.I32 % b.I32)),
+            RuntimeType.F32 => new CompiledValue((float)(a.F32 % b.F32)),
             _ => throw new RuntimeException($"Can't do % operation with type {a_} and {b_}"),
         };
     }
@@ -190,10 +217,13 @@ public partial struct CompiledValue :
         return a.Type switch
         {
             RuntimeType.Null => false,
-            RuntimeType.Byte => (byte)a._integer < (byte)b._integer,
-            RuntimeType.Integer => a._integer < b._integer,
-            RuntimeType.Single => a._single < b._single,
-            RuntimeType.Char => (char)a._integer < (char)b._integer,
+            RuntimeType.U8 => a.U8 < b.U8,
+            RuntimeType.I8 => a.I8 < b.I8,
+            RuntimeType.Char => a.Char < b.Char,
+            RuntimeType.I16 => a.I16 < b.I16,
+            RuntimeType.U32 => a.U32 < b.U32,
+            RuntimeType.I32 => a.I32 < b.I32,
+            RuntimeType.F32 => a.F32 < b.F32,
             _ => false,
         };
     }
@@ -204,10 +234,13 @@ public partial struct CompiledValue :
         return a.Type switch
         {
             RuntimeType.Null => false,
-            RuntimeType.Byte => (byte)a._integer > (byte)b._integer,
-            RuntimeType.Integer => a._integer > b._integer,
-            RuntimeType.Single => a._single > b._single,
-            RuntimeType.Char => (char)a._integer > (char)b._integer,
+            RuntimeType.U8 => a.U8 > b.U8,
+            RuntimeType.I8 => a.I8 > b.I8,
+            RuntimeType.Char => a.Char > b.Char,
+            RuntimeType.I16 => a.I16 > b.I16,
+            RuntimeType.U32 => a.U32 > b.U32,
+            RuntimeType.I32 => a.I32 > b.I32,
+            RuntimeType.F32 => a.F32 > b.F32,
             _ => false,
         };
     }
@@ -219,10 +252,13 @@ public partial struct CompiledValue :
         return a.Type switch
         {
             RuntimeType.Null => false,
-            RuntimeType.Byte => (byte)a._integer <= (byte)b._integer,
-            RuntimeType.Integer => a._integer <= b._integer,
-            RuntimeType.Single => a._single <= b._single,
-            RuntimeType.Char => (char)a._integer <= (char)b._integer,
+            RuntimeType.U8 => a.U8 <= b.U8,
+            RuntimeType.I8 => a.I8 <= b.I8,
+            RuntimeType.Char => a.Char <= b.Char,
+            RuntimeType.I16 => a.I16 <= b.I16,
+            RuntimeType.U32 => a.U32 <= b.U32,
+            RuntimeType.I32 => a.I32 <= b.I32,
+            RuntimeType.F32 => a.F32 <= b.F32,
             _ => false,
         };
     }
@@ -233,10 +269,13 @@ public partial struct CompiledValue :
         return a.Type switch
         {
             RuntimeType.Null => false,
-            RuntimeType.Byte => (byte)a._integer >= (byte)b._integer,
-            RuntimeType.Integer => a._integer >= b._integer,
-            RuntimeType.Single => a._single >= b._single,
-            RuntimeType.Char => (char)a._integer >= (char)b._integer,
+            RuntimeType.U8 => a.U8 >= b.U8,
+            RuntimeType.I8 => a.I8 >= b.I8,
+            RuntimeType.Char => a.Char >= b.Char,
+            RuntimeType.I16 => a.I16 >= b.I16,
+            RuntimeType.U32 => a.U32 >= b.U32,
+            RuntimeType.I32 => a.I32 >= b.I32,
+            RuntimeType.F32 => a.F32 >= b.F32,
             _ => false,
         };
     }
@@ -250,10 +289,13 @@ public partial struct CompiledValue :
         return a.Type switch
         {
             RuntimeType.Null => b.IsNull,
-            RuntimeType.Byte => (byte)a._integer == (byte)b._integer,
-            RuntimeType.Integer => a._integer == b._integer,
-            RuntimeType.Single => a._single == b._single,
-            RuntimeType.Char => (char)a._integer == (char)b._integer,
+            RuntimeType.U8 => a.U8 == b.U8,
+            RuntimeType.I8 => a.I8 == b.I8,
+            RuntimeType.Char => a.Char == b.Char,
+            RuntimeType.I16 => a.I16 == b.I16,
+            RuntimeType.U32 => a.U32 == b.U32,
+            RuntimeType.I32 => a.I32 == b.I32,
+            RuntimeType.F32 => a.F32 == b.F32,
             _ => false,
         };
     }
@@ -264,10 +306,13 @@ public partial struct CompiledValue :
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator !(CompiledValue value) => value.Type switch
     {
-        RuntimeType.Byte => new CompiledValue((byte)((value._integer == 0) ? (byte)1 : (byte)0)),
-        RuntimeType.Integer => new CompiledValue((int)((value._integer == 0) ? (int)1 : (int)0)),
-        RuntimeType.Single => new CompiledValue((float)((value._single == 0) ? (float)1f : (float)0f)),
-        RuntimeType.Char => new CompiledValue((char)((value._integer == 0) ? (ushort)1 : (ushort)0)),
+        RuntimeType.U8 => new CompiledValue(!(bool)value),
+        RuntimeType.I8 => new CompiledValue(!(bool)value),
+        RuntimeType.Char => new CompiledValue(!(bool)value),
+        RuntimeType.I16 => new CompiledValue(!(bool)value),
+        RuntimeType.U32 => new CompiledValue(!(bool)value),
+        RuntimeType.I32 => new CompiledValue(!(bool)value),
+        RuntimeType.F32 => new CompiledValue(!(bool)value),
         _ => throw new RuntimeException($"Can't do ! operation with type {value.Type}"),
     };
 
@@ -275,10 +320,13 @@ public partial struct CompiledValue :
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator +(CompiledValue value) => value.Type switch
     {
-        RuntimeType.Byte => new CompiledValue((byte)+value._integer),
-        RuntimeType.Integer => new CompiledValue((int)+value._integer),
-        RuntimeType.Single => new CompiledValue((float)+value._single),
-        RuntimeType.Char => new CompiledValue((char)+value._integer),
+        RuntimeType.U8 => new CompiledValue((byte)+value.U8),
+        RuntimeType.I8 => new CompiledValue((sbyte)+value.I8),
+        RuntimeType.Char => new CompiledValue((char)+value.Char),
+        RuntimeType.I16 => new CompiledValue((short)+value.I16),
+        RuntimeType.U32 => new CompiledValue((uint)+value.U32),
+        RuntimeType.I32 => new CompiledValue((int)+value.I32),
+        RuntimeType.F32 => new CompiledValue((float)+value.F32),
         _ => throw new RuntimeException($"Can't do + operation with type {value.Type}"),
     };
 
@@ -286,10 +334,13 @@ public partial struct CompiledValue :
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator -(CompiledValue value) => value.Type switch
     {
-        RuntimeType.Byte => new CompiledValue((byte)-value._integer),
-        RuntimeType.Integer => new CompiledValue((int)-value._integer),
-        RuntimeType.Single => new CompiledValue((float)-value._single),
-        RuntimeType.Char => new CompiledValue((char)-value._integer),
+        RuntimeType.U8 => new CompiledValue((byte)-value.U8),
+        RuntimeType.I8 => new CompiledValue((sbyte)-value.I8),
+        RuntimeType.Char => new CompiledValue((char)-value.Char),
+        RuntimeType.I16 => new CompiledValue((short)-value.I16),
+        RuntimeType.U32 => new CompiledValue((uint)-value.U32),
+        RuntimeType.I32 => new CompiledValue((int)-value.I32),
+        RuntimeType.F32 => new CompiledValue((float)-value.F32),
         _ => throw new RuntimeException($"Can't do - operation with type {value.Type}"),
     };
 
@@ -302,9 +353,12 @@ public partial struct CompiledValue :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new CompiledValue((byte)(a._integer | b._integer)),
-            RuntimeType.Integer => new CompiledValue((int)(a._integer | b._integer)),
-            RuntimeType.Char => new CompiledValue((ushort)(a._integer | b._integer)),
+            RuntimeType.U8 => new CompiledValue((byte)(a.U8 | b.U8)),
+            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 | b.I8)),
+            RuntimeType.Char => new CompiledValue((ushort)(a.Char | b.Char)),
+            RuntimeType.I16 => new CompiledValue((short)(a.I16 | b.I16)),
+            RuntimeType.U32 => new CompiledValue((uint)(a.U32 | b.U32)),
+            RuntimeType.I32 => new CompiledValue((int)(a.I32 | b.I32)),
             _ => throw new RuntimeException($"Can't do | operation with type {a_} and {b_}"),
         };
     }
@@ -317,9 +371,12 @@ public partial struct CompiledValue :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new CompiledValue((byte)(a._integer & b._integer)),
-            RuntimeType.Integer => new CompiledValue((int)(a._integer & b._integer)),
-            RuntimeType.Char => new CompiledValue((ushort)(a._integer & b._integer)),
+            RuntimeType.U8 => new CompiledValue((byte)(a.U8 & b.U8)),
+            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 & b.I8)),
+            RuntimeType.Char => new CompiledValue((ushort)(a.Char & b.Char)),
+            RuntimeType.I16 => new CompiledValue((short)(a.I16 & b.I16)),
+            RuntimeType.U32 => new CompiledValue((uint)(a.U32 & b.U32)),
+            RuntimeType.I32 => new CompiledValue((int)(a.I32 & b.I32)),
             _ => throw new RuntimeException($"Can't do & operation with type {a_} and {b_}"),
         };
     }
@@ -332,9 +389,12 @@ public partial struct CompiledValue :
 
         return a.Type switch
         {
-            RuntimeType.Byte => new CompiledValue((byte)(a._integer ^ b._integer)),
-            RuntimeType.Integer => new CompiledValue((int)(a._integer ^ b._integer)),
-            RuntimeType.Char => new CompiledValue((ushort)(a._integer ^ b._integer)),
+            RuntimeType.U8 => new CompiledValue((byte)(a.U8 ^ b.U8)),
+            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 ^ b.I8)),
+            RuntimeType.Char => new CompiledValue((ushort)(a.Char ^ b.Char)),
+            RuntimeType.I16 => new CompiledValue((short)(a.I16 ^ b.I16)),
+            RuntimeType.U32 => new CompiledValue((uint)(a.U32 ^ b.U32)),
+            RuntimeType.I32 => new CompiledValue((int)(a.I32 ^ b.I32)),
             _ => throw new RuntimeException($"Can't do ^ operation with type {a_} and {b_}"),
         };
     }
@@ -342,9 +402,12 @@ public partial struct CompiledValue :
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator ~(CompiledValue value) => value.Type switch
     {
-        RuntimeType.Byte => new CompiledValue((byte)~value._integer),
-        RuntimeType.Integer => new CompiledValue(~value._integer),
-        RuntimeType.Char => new CompiledValue((char)~value._integer),
+        RuntimeType.U8 => new CompiledValue((byte)~value.U8),
+        RuntimeType.I8 => new CompiledValue((sbyte)~value.I8),
+        RuntimeType.Char => new CompiledValue((char)~value.Char),
+        RuntimeType.I16 => new CompiledValue((short)~value.I16),
+        RuntimeType.U32 => new CompiledValue((uint)~value.U32),
+        RuntimeType.I32 => new CompiledValue((int)~value.I32),
         _ => throw new RuntimeException($"Can't do ~ operation with type {value.Type}"),
     };
 }

@@ -3,8 +3,11 @@
 public enum RuntimeType : byte
 {
     Null,
-    Byte,
+    U8,
+    I8,
     Char,
-    Integer,
-    Single,
+    I16,
+    U32,
+    I32,
+    F32,
 }

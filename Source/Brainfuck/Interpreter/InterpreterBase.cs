@@ -53,11 +53,11 @@ public abstract class InterpreterBase
         _codePointer = 0;
         _memoryPointer = 0;
         _memoryPointerRange = default;
-        #if NET_STANDARD
+#if NET_STANDARD
         Array.Clear(Memory, 0, Memory.Length);
-        #else
+#else
         Array.Clear(Memory);
-        #endif
+#endif
     }
 }
 

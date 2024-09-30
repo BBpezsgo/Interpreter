@@ -745,7 +745,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             else
             { paramType = FindStatementType(param); }
 
-            OnGotStatementType(anyCall, BuiltinType.Integer);
+            OnGotStatementType(anyCall, BuiltinType.I32);
 
             if (FindSize(paramType, out int size))
             {
@@ -755,9 +755,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             else
             {
                 using RegisterUsage.Auto reg = Registers.GetFree();
-                AddInstruction(Opcode.Move, reg.Get(BuiltinType.Integer.GetBitWidth(this)), 0);
-                GenerateSize(paramType, reg.Get(BuiltinType.Integer.GetBitWidth(this)));
-                AddInstruction(Opcode.Push, reg.Get(BuiltinType.Integer.GetBitWidth(this)));
+                AddInstruction(Opcode.Move, reg.Get(BuiltinType.I32.GetBitWidth(this)), 0);
+                GenerateSize(paramType, reg.Get(BuiltinType.I32.GetBitWidth(this)));
+                AddInstruction(Opcode.Push, reg.Get(BuiltinType.I32.GetBitWidth(this)));
             }
 
             return;
@@ -932,8 +932,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(@operator.Left, expectedType);
 
-            if (!leftType.SameAs(BasicType.Float) &&
-                rightType.SameAs(BasicType.Float))
+            if (!leftType.SameAs(BasicType.F32) &&
+                rightType.SameAs(BasicType.F32))
             {
                 AddInstruction(Opcode.FTo,
                     (InstructionOperand)StackTop,
@@ -968,8 +968,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(@operator.Right, expectedType);
 
-            if (leftType.SameAs(BasicType.Float) &&
-                !rightType.SameAs(BasicType.Float))
+            if (leftType.SameAs(BasicType.F32) &&
+                !rightType.SameAs(BasicType.F32))
             {
                 AddInstruction(Opcode.FTo,
                     (InstructionOperand)StackTop,
@@ -979,7 +979,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
             using (RegisterUsage.Auto regRight = Registers.GetFree())
             {
-                bool isFloat = leftType.SameAs(BasicType.Float) || rightType.SameAs(BasicType.Float);
+                bool isFloat = leftType.SameAs(BasicType.F32) || rightType.SameAs(BasicType.F32);
 
                 PopTo(regRight.Get(bitWidth), rightBitWidth);
                 PopTo(regLeft.Get(bitWidth), leftBitWidth);
@@ -1214,12 +1214,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 if (expectedType is not null)
                 {
-                    if (expectedType.SameAs(BasicType.Byte))
+                    if (expectedType.SameAs(BasicType.U8))
                     {
                         if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            OnGotStatementType(literal, BuiltinType.Byte);
+                            OnGotStatementType(literal, BuiltinType.U8);
                             AddInstruction(Opcode.Push, new CompiledValue((byte)literal.GetInt()));
+                            return;
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.I8))
+                    {
+                        if (literal.GetInt() is >= sbyte.MinValue and <= sbyte.MaxValue)
+                        {
+                            OnGotStatementType(literal, BuiltinType.I8);
+                            AddInstruction(Opcode.Push, new CompiledValue((sbyte)literal.GetInt()));
                             return;
                         }
                     }
@@ -1232,21 +1241,45 @@ public partial class CodeGeneratorForMain : CodeGenerator
                             return;
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.Float))
+                    else if (expectedType.SameAs(BasicType.I16))
                     {
-                        OnGotStatementType(literal, BuiltinType.Float);
+                        if (literal.GetInt() is >= short.MinValue and <= short.MaxValue)
+                        {
+                            OnGotStatementType(literal, BuiltinType.I16);
+                            AddInstruction(Opcode.Push, new CompiledValue((short)literal.GetInt()));
+                            return;
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.U32))
+                    {
+                        if (literal.GetInt() >= (int)uint.MinValue)
+                        {
+                            OnGotStatementType(literal, BuiltinType.U32);
+                            AddInstruction(Opcode.Push, new CompiledValue((uint)literal.GetInt()));
+                            return;
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.I32))
+                    {
+                        OnGotStatementType(literal, BuiltinType.I32);
+                        AddInstruction(Opcode.Push, new CompiledValue(literal.GetInt()));
+                        return;
+                    }
+                    else if (expectedType.SameAs(BasicType.F32))
+                    {
+                        OnGotStatementType(literal, BuiltinType.F32);
                         AddInstruction(Opcode.Push, new CompiledValue((float)literal.GetInt()));
                         return;
                     }
                 }
 
-                OnGotStatementType(literal, BuiltinType.Integer);
+                OnGotStatementType(literal, BuiltinType.I32);
                 AddInstruction(Opcode.Push, new CompiledValue(literal.GetInt()));
                 break;
             }
             case LiteralType.Float:
             {
-                OnGotStatementType(literal, BuiltinType.Float);
+                OnGotStatementType(literal, BuiltinType.F32);
 
                 AddInstruction(Opcode.Push, new CompiledValue(literal.GetFloat()));
                 break;
@@ -1256,9 +1289,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (expectedType is not null &&
                     expectedType.Is(out PointerType? pointerType) &&
                     pointerType.To.Is(out ArrayType? arrayType) &&
-                    arrayType.Of.SameAs(BasicType.Byte))
+                    arrayType.Of.SameAs(BasicType.U8))
                 {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Byte, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal), literal.Value.Length + 1)));
+                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.U8, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal), literal.Value.Length + 1)));
                     GenerateCodeForLiteralString(literal.Value, true);
                 }
                 else
@@ -1274,18 +1307,60 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 if (expectedType is not null)
                 {
-                    if (expectedType.SameAs(BasicType.Byte))
+                    if (expectedType.SameAs(BasicType.U8))
                     {
                         if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            OnGotStatementType(literal, BuiltinType.Byte);
+                            OnGotStatementType(literal, BuiltinType.U8);
                             AddInstruction(Opcode.Push, new CompiledValue((byte)literal.Value[0]));
                             return;
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.Float))
+                    else if (expectedType.SameAs(BasicType.I8))
                     {
-                        OnGotStatementType(literal, BuiltinType.Float);
+                        if ((int)literal.Value[0] is >= sbyte.MinValue and <= sbyte.MaxValue)
+                        {
+                            OnGotStatementType(literal, BuiltinType.I8);
+                            AddInstruction(Opcode.Push, new CompiledValue((sbyte)literal.Value[0]));
+                            return;
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.Char))
+                    {
+                        OnGotStatementType(literal, BuiltinType.Char);
+                        AddInstruction(Opcode.Push, new CompiledValue(literal.Value[0]));
+                        return;
+                    }
+                    else if (expectedType.SameAs(BasicType.I16))
+                    {
+                        if ((int)literal.Value[0] is >= short.MinValue and <= short.MaxValue)
+                        {
+                            OnGotStatementType(literal, BuiltinType.I16);
+                            AddInstruction(Opcode.Push, new CompiledValue((short)literal.Value[0]));
+                            return;
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.U32))
+                    {
+                        if (literal.Value[0] >= uint.MinValue)
+                        {
+                            OnGotStatementType(literal, BuiltinType.U32);
+                            AddInstruction(Opcode.Push, new CompiledValue((short)literal.Value[0]));
+                            return;
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.I32))
+                    {
+                        if (literal.Value[0] >= int.MinValue)
+                        {
+                            OnGotStatementType(literal, BuiltinType.I32);
+                            AddInstruction(Opcode.Push, new CompiledValue((short)literal.Value[0]));
+                            return;
+                        }
+                    }
+                    else if (expectedType.SameAs(BasicType.F32))
+                    {
+                        OnGotStatementType(literal, BuiltinType.F32);
                         AddInstruction(Opcode.Push, new CompiledValue((float)literal.Value[0]));
                         return;
                     }
@@ -1301,7 +1376,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForLiteralString(string literal, bool withBytes)
     {
-        BuiltinType type = withBytes ? BuiltinType.Byte : BuiltinType.Char;
+        BuiltinType type = withBytes ? BuiltinType.U8 : BuiltinType.Char;
 
         AddComment($"Create String \"{literal}\" {{");
 
@@ -2029,7 +2104,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!Settings.DontOptimize &&
             targetType.Is(out BuiltinType? targetBuiltinType) &&
             TryComputeSimple(typeCast.PrevStatement, out CompiledValue prevValue) &&
-            CompiledValue.TryCast(ref prevValue, targetBuiltinType.RuntimeType))
+            prevValue.TryCast(targetBuiltinType.RuntimeType, out prevValue))
         {
             AddInstruction(Opcode.Push, prevValue);
             return;

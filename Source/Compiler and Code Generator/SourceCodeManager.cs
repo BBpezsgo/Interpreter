@@ -1,7 +1,8 @@
-﻿using System.IO;
+﻿#pragma warning disable IDE0028 // Simplify collection initialization
+
+using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
-
 using LanguageCore.Parser;
 using LanguageCore.Tokenizing;
 

@@ -7,12 +7,13 @@ public class CompiledVariableConstant : VariableDeclaration,
     IHaveCompiledType
 {
     public CompiledValue Value { get; }
+    public new GeneralType Type { get; }
 
     public new string Identifier => base.Identifier.Content;
-    public new GeneralType Type => new BuiltinType(Value.Type);
 
-    public CompiledVariableConstant(CompiledValue value, VariableDeclaration declaration) : base(declaration)
+    public CompiledVariableConstant(CompiledValue value, GeneralType type, VariableDeclaration declaration) : base(declaration)
     {
         Value = value;
+        Type = type;
     }
 }

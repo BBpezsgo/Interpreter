@@ -1,0 +1,38 @@
+using System.Math;
+
+export struct Vector2
+{
+    float x;
+    float y;
+
+    export Vector2(float x, float y)
+    {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+export float Distance(Vector2 a, Vector2 b)
+{
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    return Sqrt((dx * dx) + (dy * dy));
+}
+
+export inline float Dot(Vector2 a, Vector2 b)
+{
+    return (a.x * b.x) + (a.y * b.y);
+}
+
+export float Magnitude(this Vector2 v)
+{
+    return Sqrt((v.x * v.x) + (v.y * v.y));
+}
+
+export Vector2 Normalised(this Vector2 v)
+{
+    float d = v.Magnitude();
+    v.x /= d;
+    v.y /= d;
+    return v;
+}

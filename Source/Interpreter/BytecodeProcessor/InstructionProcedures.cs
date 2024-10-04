@@ -108,7 +108,7 @@ public partial class BytecodeProcessor
         RuntimeValue dst = GetData(CurrentInstruction.Operand1);
         RuntimeValue src = GetData(CurrentInstruction.Operand2);
 
-        ALU.Subtract(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
+        ALU.SubtractI(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
 
         Step();
     }
@@ -214,60 +214,60 @@ public partial class BytecodeProcessor
 
     void MathAdd()
     {
-        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
 
-        dst = ALU.Add(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
+        a = ALU.AddI(a, b, CurrentInstruction.BitWidth, ref Registers.Flags);
 
-        SetData(CurrentInstruction.Operand1, dst);
+        SetData(CurrentInstruction.Operand1, a);
 
         Step();
     }
 
     void MathDiv()
     {
-        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
 
-        dst = CurrentInstruction.BitWidth switch
+        a = CurrentInstruction.BitWidth switch
         {
-            BitWidth._8 => new RuntimeValue((byte)(dst.U8 / src.U8)),
-            BitWidth._16 => new RuntimeValue((char)(dst.U16 / src.U16)),
-            BitWidth._32 => new RuntimeValue((int)(dst.I32 / src.I32)),
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 / b.U8)),
+            BitWidth._16 => new RuntimeValue((char)(a.U16 / b.U16)),
+            BitWidth._32 => new RuntimeValue((int)(a.I32 / b.I32)),
             _ => throw new UnreachableException(),
         };
-        SetData(CurrentInstruction.Operand1, dst);
+        SetData(CurrentInstruction.Operand1, a);
 
         Step();
     }
 
     void MathSub()
     {
-        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
 
-        dst = ALU.Subtract(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
+        a = ALU.SubtractI(a, b, CurrentInstruction.BitWidth, ref Registers.Flags);
 
-        SetData(CurrentInstruction.Operand1, dst);
+        SetData(CurrentInstruction.Operand1, a);
 
         Step();
     }
 
     void MathMult()
     {
-        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
 
-        dst = CurrentInstruction.BitWidth switch
+        a = CurrentInstruction.BitWidth switch
         {
-            BitWidth._8 => new RuntimeValue((byte)(dst.U8 * src.U8)),
-            BitWidth._16 => new RuntimeValue((char)(dst.U16 * src.U16)),
-            BitWidth._32 => new RuntimeValue((int)(dst.I32 * src.I32)),
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 * b.U8)),
+            BitWidth._16 => new RuntimeValue((char)(a.U16 * b.U16)),
+            BitWidth._32 => new RuntimeValue((int)(a.I32 * b.I32)),
             _ => throw new UnreachableException(),
         };
-        SetData(CurrentInstruction.Operand1, dst);
+        SetData(CurrentInstruction.Operand1, a);
 
-        Registers.Flags.SetCarry(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetCarry(a.I32, CurrentInstruction.BitWidth);
 
         Step();
     }
@@ -291,49 +291,130 @@ public partial class BytecodeProcessor
 
     #endregion
 
+    #region Unsigned Math Operations
+
+    void UMathAdd()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = ALU.AddU(a, b, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    void UMathDiv()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 / b.U8)),
+            BitWidth._16 => new RuntimeValue((ushort)(a.U16 / b.U16)),
+            BitWidth._32 => new RuntimeValue((uint)(a.U32 / b.U32)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    void UMathSub()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = ALU.SubtractU(a, b, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    void UMathMult()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 * b.U8)),
+            BitWidth._16 => new RuntimeValue((ushort)(a.U16 * b.U16)),
+            BitWidth._32 => new RuntimeValue((uint)(a.U32 * b.U32)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, a);
+
+        Registers.Flags.SetCarry(a.I32, CurrentInstruction.BitWidth);
+
+        Step();
+    }
+
+    void UMathMod()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 % b.U8)),
+            BitWidth._16 => new RuntimeValue((ushort)(a.U16 % b.U16)),
+            BitWidth._32 => new RuntimeValue((uint)(a.U32 % b.U32)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    #endregion
+
     #region Float Math Operations
 
     void FMathAdd()
     {
-        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 + src.F32));
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 + b.F32));
 
         Step();
     }
 
     void FMathDiv()
     {
-        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 / src.F32));
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 / b.F32));
 
         Step();
     }
 
     void FMathSub()
     {
-        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 - src.F32));
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 - b.F32));
 
         Step();
     }
 
     void FMathMult()
     {
-        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 * src.F32));
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 * b.F32));
 
         Step();
     }
 
     void FMathMod()
     {
-        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
-        RuntimeValue src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, new RuntimeValue(dst.F32 % src.F32));
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 % b.F32));
 
         Step();
     }

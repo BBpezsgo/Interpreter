@@ -260,6 +260,39 @@ public enum Opcode : byte
     MathMod,
     #endregion
 
+    #region === UNSIGNED MATH OPERATIONS ===
+    /// <summary>
+    /// <code>
+    /// <paramref name="DST"/> += <paramref name="SRC"/>
+    /// </code>
+    /// </summary>
+    UMathAdd,
+    /// <summary>
+    /// <code>
+    /// <paramref name="DST"/> -= <paramref name="SRC"/>
+    /// </code>
+    /// </summary>
+    UMathSub,
+    /// <summary>
+    /// <code>
+    /// <paramref name="DST"/> *= <paramref name="SRC"/>
+    /// </code>
+    /// </summary>
+    UMathMult,
+    /// <summary>
+    /// <code>
+    /// <paramref name="DST"/> /= <paramref name="SRC"/>
+    /// </code>
+    /// </summary>
+    UMathDiv,
+    /// <summary>
+    /// <code>
+    /// <paramref name="DST"/> %= <paramref name="SRC"/>
+    /// </code>
+    /// </summary>
+    UMathMod,
+    #endregion
+
     #region === FLOAT MATH OPERATIONS ===
     /// <summary>
     /// <code>

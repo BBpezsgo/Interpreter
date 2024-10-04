@@ -1,0 +1,4 @@
+using System.Console;
+
+i32 v = -55;
+Print(v);

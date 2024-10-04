@@ -21,14 +21,89 @@ export void Print(char message);
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-inline int _FindMaxPowOf10(int num)
+inline u8 _FindMaxPowOf10(u8 num)
 {
-    int result = 1;
-    num /= 10;
+    u8 result = 1;
+    num /= (10 as u8);
     while (num)
     {
-        result *= 10;
-        num /= 10;
+        result *= (10 as u8);
+        num /= (10 as u8);
+    }
+    return result;
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+inline i8 _FindMaxPowOf10(i8 num)
+{
+    i8 result = (1 as i8);
+    num /= (10 as i8);
+    while (num)
+    {
+        result *= (10 as i8);
+        num /= (10 as i8);
+    }
+    return result;
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+inline u16 _FindMaxPowOf10(u16 num)
+{
+    u16 result = 1;
+    num /= (10 as u16);
+    while (num)
+    {
+        result *= (10 as u16);
+        num /= (10 as u16);
+    }
+    return result;
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+inline i16 _FindMaxPowOf10(i16 num)
+{
+    i16 result = (1 as i16);
+    num /= (10 as i16);
+    while (num)
+    {
+        result *= (10 as i16);
+        num /= (10 as i16);
+    }
+    return result;
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+inline u32 _FindMaxPowOf10(u32 num)
+{
+    u32 result = (1 as u32);
+    num /= (10 as u32);
+    while (num)
+    {
+        result *= (10 as u32);
+        num /= (10 as u32);
+    }
+    return result;
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+inline i32 _FindMaxPowOf10(i32 num)
+{
+    i32 result = (1 as i32);
+    num /= (10 as i32);
+    while (num)
+    {
+        result *= (10 as i32);
+        num /= (10 as i32);
     }
     return result;
 }
@@ -52,6 +127,102 @@ export inline void Print(int message)
         message -= digit * pow10;
         pow10 /= 10;
     }
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+export inline void Print(u8 message)
+{
+    u8 pow10 = _FindMaxPowOf10(message);
+    while (pow10)
+    {
+        u8 digit = message / pow10;
+        Print((digit + ('0' as u8)) as char);
+        message -= digit * pow10;
+        pow10 /= (10 as u8);
+    }
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+export inline void Print(i8 message)
+{
+    if (message < (0 as i8))
+    {
+        Print('-');
+        message = message * -1;
+    }
+    
+    i8 pow10 = _FindMaxPowOf10(message);
+    while (pow10)
+    {
+        i8 digit = message / pow10;
+        Print((digit + ('0' as i8)) as char);
+        message -= digit * pow10;
+        pow10 /= (10 as i8);
+    }
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+export inline void Print(u16 message)
+{
+    u16 pow10 = _FindMaxPowOf10(message);
+    while (pow10)
+    {
+        u16 digit = message / pow10;
+        Print((digit + ('0' as u16)) as char);
+        message -= digit * pow10;
+        pow10 /= (10 as u16);
+    }
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+export inline void Print(i16 message)
+{
+    if (message < (0 as i16))
+    {
+        Print('-');
+        message = message * -1;
+    }
+    
+    i16 pow10 = _FindMaxPowOf10(message);
+    while (pow10)
+    {
+        i16 digit = message / pow10;
+        Print((digit + ('0' as i16)) as char);
+        message -= digit * pow10;
+        pow10 /= (10 as i16);
+    }
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+export inline void Print(u32 message)
+{
+    u32 pow10 = _FindMaxPowOf10(message);
+    while (pow10)
+    {
+        u32 digit = message / pow10;
+        Print((digit + ('0' as u32)) as char);
+        message -= digit * pow10;
+        pow10 /= (10 as u32);
+    }
+}
+
+export void Print(temp float message)
+{
+    Print(message as int);
+    message %= 1f;
+    message *= 1000f;
+    Print('.');
+    Print(message as int);
 }
 
 export inline void Print(temp string message)
@@ -123,6 +294,12 @@ export inline void PrintLine(char message)
 }
 
 export inline void PrintLine(int message)
+{
+    Print(message);
+    PrintLine();
+}
+
+export inline void PrintLine(float message)
 {
     Print(message);
     PrintLine();

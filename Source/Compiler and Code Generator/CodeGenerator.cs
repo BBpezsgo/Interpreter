@@ -860,7 +860,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.ParameterCount)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: wrong number of parameters passed to {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: wrong number of parameters ({query.ArgumentCount.Value}) passed to {function.ToReadable()}");
                 }
                 return false;
             }
@@ -902,7 +902,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of {checkedQuery.ToReadable()} doesn't match with {function.ToReadable()}");
+                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of caller {checkedQuery.ToReadable()} doesn't match with callee {function.ToReadable()}");
                     }
                     return false;
                 }
@@ -947,7 +947,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of {checkedQuery.ToReadable()} doesn't match with {function.ToReadable()}");
+                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of caller {checkedQuery.ToReadable()} doesn't match with callee {function.ToReadable()}");
                     }
                     return false;
                 }
@@ -986,7 +986,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of {checkedQuery.ToReadable()} doesn't match with {function.ToReadable()}");
+                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of caller {checkedQuery.ToReadable()} doesn't match with callee {function.ToReadable()}");
                     }
                     return false;
                 }
@@ -1007,7 +1007,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.ReturnType)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of {query} doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of caller {query} doesn't match with callee {function.ToReadable()}");
                 }
                 return false;
             }
@@ -1024,7 +1024,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of {query} doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of caller {query} doesn't match with callee {function.ToReadable()}");
                 }
                 return false;
             }
@@ -1045,7 +1045,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of {query} doesn't match with {function.ToReadable()}");
+                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of caller {query} doesn't match with callee {function.ToReadable()}");
                 }
                 return false;
             }
@@ -1172,7 +1172,30 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             return true;
         }
 
-        error = error_ ?? new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found");
+        if (query.Arguments.HasValue)
+        {
+            GeneralType[] argumentTypes = new GeneralType[query.Arguments.Value.Length];
+            for (int i = 0; i < query.Arguments.Value.Length; i++)
+            {
+                argumentTypes[i] = query.Converter.Invoke(query.Arguments.Value[i], null);
+            }
+            FunctionQuery<TFunction, TPassedIdentifier, GeneralType> typeConvertedQuery = new()
+            {
+                AddCompilable = query.AddCompilable,
+                ArgumentCount = query.ArgumentCount,
+                Arguments = argumentTypes.ToImmutableArray(),
+                Converter = (v, _) => v,
+                Identifier = query.Identifier,
+                RelevantFile = query.RelevantFile,
+                ReturnType = query.ReturnType,
+            };
+            error = error_ ?? new WillBeCompilerException($"{kindNameCapital} {readableName ?? typeConvertedQuery.ToReadable()} not found");
+        }
+        else
+        {
+            error = error_ ?? new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found");
+        }
+
         result = null;
         return false;
     }
@@ -1776,28 +1799,42 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     protected void AssignTypeCheck(GeneralType destination, CompiledValue value, IPositioned valuePosition)
     {
-        if (destination.Is<PointerType>() ||
-            destination.Is<BuiltinType>())
+        if (destination.TryGetNumericType(out var numericType))
         {
-            switch (destination.GetBitWidth(this))
+            if (numericType == NumericType.Float) return;
+            (CompiledValue min, CompiledValue max) = destination.GetBitWidth(this) switch
             {
-                case BitWidth._8:
-                    if (value >= byte.MinValue && value <= byte.MaxValue)
-                    { return; }
-                    break;
-                case BitWidth._16:
-                    if (value >= char.MinValue && value <= char.MaxValue)
-                    { return; }
-                    break;
-                case BitWidth._32:
-                    if (value >= int.MinValue && value <= int.MaxValue)
-                    { return; }
-                    break;
-                case BitWidth._64:
-                    if (value >= long.MinValue && value <= long.MaxValue)
-                    { return; }
-                    break;
-            }
+                BitWidth._8 => numericType switch
+                {
+                    NumericType.UnsignedInteger => ((CompiledValue)byte.MinValue, (CompiledValue)byte.MaxValue),
+                    NumericType.SignedInteger => ((CompiledValue)sbyte.MinValue, (CompiledValue)sbyte.MaxValue),
+                    NumericType.Float => default,
+                    _ => default,
+                },
+                BitWidth._16 => numericType switch
+                {
+                    NumericType.UnsignedInteger => ((CompiledValue)ushort.MinValue, (CompiledValue)ushort.MaxValue),
+                    NumericType.SignedInteger => ((CompiledValue)short.MinValue, (CompiledValue)short.MaxValue),
+                    NumericType.Float => default,
+                    _ => default,
+                },
+                BitWidth._32 => numericType switch
+                {
+                    NumericType.UnsignedInteger => ((CompiledValue)uint.MinValue, (CompiledValue)uint.MaxValue),
+                    NumericType.SignedInteger => ((CompiledValue)int.MinValue, (CompiledValue)int.MaxValue),
+                    NumericType.Float => default,
+                    _ => default,
+                },
+                BitWidth._64 => numericType switch
+                {
+                    NumericType.UnsignedInteger => ((CompiledValue)ulong.MinValue, (CompiledValue)ulong.MaxValue),
+                    NumericType.SignedInteger => ((CompiledValue)long.MinValue, (CompiledValue)long.MaxValue),
+                    NumericType.Float => default,
+                    _ => default,
+                },
+                _ => default,
+            };
+            if (value >= min && value <= max) return;
         }
 
         AssignTypeCheck(destination, new BuiltinType(value.Type), valuePosition);
@@ -2068,6 +2105,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 BitWidth rightBitWidth = rightType.GetBitWidth(this);
                 BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
 
+                if (!leftBType.TryGetNumericType(out NumericType leftNType) ||
+                    !rightBType.TryGetNumericType(out NumericType rightNType))
+                { throw new UnreachableException(); }
+                NumericType numericType = leftNType > rightNType ? leftNType : rightNType;
+
+                BuiltinType numericResultType = BuiltinType.CreateNumeric(numericType, bitWidth);
+
                 return OnGotStatementType(@operator, @operator.Operator.Content switch
                 {
                     BinaryOperatorCall.CompLT or
@@ -2085,14 +2129,14 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                     BinaryOperatorCall.BitwiseXOR or
                     BinaryOperatorCall.BitshiftLeft or
                     BinaryOperatorCall.BitshiftRight
-                        => new BuiltinType(bitWidth.ToType()),
+                        => numericResultType,
 
                     BinaryOperatorCall.Addition or
                     BinaryOperatorCall.Subtraction or
                     BinaryOperatorCall.Multiplication or
                     BinaryOperatorCall.Division or
                     BinaryOperatorCall.Modulo
-                        => isFloat ? BuiltinType.F32 : new BuiltinType(bitWidth.ToType()),
+                        => isFloat ? BuiltinType.F32 : numericResultType,
 
                     _ => throw (new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile)),
                 });

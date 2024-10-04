@@ -12,10 +12,19 @@ public static class ALU
     public const int AllBit32 = unchecked((int)0xFFFFFFFF);
     public const int AllBit64 = unchecked((int)0xFFFFFFFFFFFFFFFF);
 
-    public static RuntimeValue Add(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
+    public static RuntimeValue AddU(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
     {
         BitWidth._8 => new RuntimeValue(AddU8(a.U8, b.U8, ref flags)),
         BitWidth._16 => new RuntimeValue(AddU16(a.U16, b.U16, ref flags)),
+        BitWidth._32 => new RuntimeValue(AddU32(a.U32, b.U32, ref flags)),
+        BitWidth._64 => throw new NotImplementedException(),
+        _ => throw new UnreachableException(),
+    };
+
+    public static RuntimeValue AddI(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
+    {
+        BitWidth._8 => new RuntimeValue(AddI8(a.I8, b.I8, ref flags)),
+        BitWidth._16 => new RuntimeValue(AddI16(a.I16, b.I16, ref flags)),
         BitWidth._32 => new RuntimeValue(AddI32(a.I32, b.I32, ref flags)),
         BitWidth._64 => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
@@ -33,7 +42,19 @@ public static class ALU
         return unchecked((byte)result);
     }
 
-    public static char AddU16(char a, char b, ref Flags flags)
+    public static byte AddI8(sbyte a, sbyte b, ref Flags flags)
+    {
+        long result = a + b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit8) != 0);
+        flags.Set(Flags.Zero, (result & AllBit8) == 0);
+        flags.Set(Flags.Carry, result > AllBit8);
+        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit8) == SignBit8);
+
+        return unchecked((byte)result);
+    }
+
+    public static ushort AddU16(ushort a, ushort b, ref Flags flags)
     {
         long result = a + b;
 
@@ -42,7 +63,31 @@ public static class ALU
         flags.Set(Flags.Carry, result > AllBit16);
         flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit16) == SignBit16);
 
-        return unchecked((char)result);
+        return unchecked((ushort)result);
+    }
+
+    public static short AddI16(short a, short b, ref Flags flags)
+    {
+        long result = a + b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit16) != 0);
+        flags.Set(Flags.Zero, (result & AllBit16) == 0);
+        flags.Set(Flags.Carry, result > AllBit16);
+        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit16) == SignBit16);
+
+        return unchecked((short)result);
+    }
+
+    public static uint AddU32(uint a, uint b, ref Flags flags)
+    {
+        long result = a + b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit32) != 0);
+        flags.Set(Flags.Zero, (result & AllBit32) == 0);
+        flags.Set(Flags.Carry, result > AllBit32);
+        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit32) == SignBit32);
+
+        return unchecked((uint)result);
     }
 
     public static int AddI32(int a, int b, ref Flags flags)
@@ -69,10 +114,19 @@ public static class ALU
         return unchecked((int)result);
     }
 
-    public static RuntimeValue Subtract(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
+    public static RuntimeValue SubtractU(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
     {
         BitWidth._8 => new RuntimeValue(SubtractU8(a.U8, b.U8, ref flags)),
         BitWidth._16 => new RuntimeValue(SubtractU16(a.U16, b.U16, ref flags)),
+        BitWidth._32 => new RuntimeValue(SubtractU32(a.U32, b.U32, ref flags)),
+        BitWidth._64 => throw new NotImplementedException(),
+        _ => throw new UnreachableException(),
+    };
+
+    public static RuntimeValue SubtractI(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
+    {
+        BitWidth._8 => new RuntimeValue(SubtractI8(a.I8, b.I8, ref flags)),
+        BitWidth._16 => new RuntimeValue(SubtractI16(a.I16, b.I16, ref flags)),
         BitWidth._32 => new RuntimeValue(SubtractI32(a.I32, b.I32, ref flags)),
         BitWidth._64 => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
@@ -90,7 +144,19 @@ public static class ALU
         return unchecked((byte)result);
     }
 
-    public static char SubtractU16(char a, char b, ref Flags flags)
+    public static sbyte SubtractI8(sbyte a, sbyte b, ref Flags flags)
+    {
+        long result = a - b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit8) != 0);
+        flags.Set(Flags.Zero, (result & AllBit8) == 0);
+        flags.Set(Flags.Carry, result > AllBit8);
+        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit8) == (long)SignBit8);
+
+        return unchecked((sbyte)result);
+    }
+
+    public static ushort SubtractU16(ushort a, ushort b, ref Flags flags)
     {
         long result = a - b;
 
@@ -99,7 +165,31 @@ public static class ALU
         flags.Set(Flags.Carry, result > AllBit16);
         // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit16) == (long)SignBit16);
 
-        return unchecked((char)result);
+        return unchecked((ushort)result);
+    }
+
+    public static short SubtractI16(short a, short b, ref Flags flags)
+    {
+        long result = a - b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit16) != 0);
+        flags.Set(Flags.Zero, (result & AllBit16) == 0);
+        flags.Set(Flags.Carry, result > AllBit16);
+        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit16) == (long)SignBit16);
+
+        return unchecked((short)result);
+    }
+
+    public static uint SubtractU32(uint a, uint b, ref Flags flags)
+    {
+        long result = a - b;
+
+        flags.Set(Flags.Sign, unchecked(result & SignBit32) != 0);
+        flags.Set(Flags.Zero, (result & AllBit32) == 0);
+        flags.Set(Flags.Carry, result > AllBit32);
+        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit32) == (long)SignBit32);
+
+        return unchecked((uint)result);
     }
 
     public static int SubtractI32(int a, int b, ref Flags flags)

@@ -258,10 +258,14 @@ public static class Entry
 #endif
                 }
 
+                BytecodeProcessorEx interpreter = new(
+                    bytecodeInterpreterSettings,
+                    generatedCode.Code,
+                    null,
+                    generatedCode.DebugInfo);
+
                 if (arguments.Debug)
                 {
-                    Runtime.BytecodeProcessorEx _interpreter = new(bytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
-
                     // if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     // { throw new PlatformNotSupportedException("Console rendering is only supported on Windows"); }
 
@@ -277,7 +281,7 @@ public static class Entry
 
                     ConsoleGUI.ConsoleGUI gui = new()
                     {
-                        FilledElement = new ConsoleGUI.InterpreterElement(_interpreter)
+                        FilledElement = new ConsoleGUI.InterpreterElement(interpreter)
                     };
 
                     while (!gui.IsDisposed)
@@ -288,12 +292,10 @@ public static class Entry
 
                     Console.Clear();
                     Console.ResetColor();
-                    PrintStuff(_interpreter);
+                    PrintStuff(interpreter);
                 }
                 else
                 {
-                    Runtime.BytecodeProcessorEx interpreter = new(bytecodeInterpreterSettings, generatedCode.Code, generatedCode.DebugInfo);
-
                     interpreter.IO.OnStdOut += (data) => Console.Out.Write(char.ToString(data));
 
                     interpreter.IO.OnNeedInput += () =>
@@ -319,7 +321,7 @@ public static class Entry
                     }
                     catch (Exception error)
                     {
-                        Output.LogError($"Internal Exception: {new RuntimeException(error.Message, error, interpreter.Processor.GetContext())}");
+                        Output.LogError($"Internal Exception: {new RuntimeException(error.Message, error, interpreter.Processor.GetContext(), interpreter.DebugInformation)}");
                         if (arguments.ThrowErrors) throw;
                     }
                     finally

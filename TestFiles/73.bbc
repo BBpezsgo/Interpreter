@@ -1,0 +1,4 @@
+using System.Console;
+
+i8 v = -55;
+Print(v);

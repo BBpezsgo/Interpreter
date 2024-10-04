@@ -78,6 +78,35 @@ public class BuiltinType : GeneralType,
     public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
         => (BitWidth)GetSize(runtime);
 
+    public static BuiltinType CreateNumeric(NumericType type, BitWidth size) => type switch
+    {
+        NumericType.UnsignedInteger => size switch
+        {
+            BitWidth._8 => U8,
+            BitWidth._16 => Char,
+            BitWidth._32 => U32,
+            BitWidth._64 => throw new NotImplementedException(),
+            _ => throw new UnreachableException(),
+        },
+        NumericType.SignedInteger => size switch
+        {
+            BitWidth._8 => I8,
+            BitWidth._16 => I16,
+            BitWidth._32 => I32,
+            BitWidth._64 => throw new NotImplementedException(),
+            _ => throw new UnreachableException(),
+        },
+        NumericType.Float => size switch
+        {
+            BitWidth._8 => throw new NotImplementedException(),
+            BitWidth._16 => throw new NotImplementedException(),
+            BitWidth._32 => F32,
+            BitWidth._64 => throw new NotImplementedException(),
+            _ => throw new UnreachableException(),
+        },
+        _ => throw new UnreachableException(),
+    };
+
     public override bool Equals(object? other) => Equals(other as BuiltinType);
     public override bool Equals(GeneralType? other) => Equals(other as BuiltinType);
     public bool Equals(BuiltinType? other)

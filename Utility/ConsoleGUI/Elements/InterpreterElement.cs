@@ -330,7 +330,7 @@ public sealed partial class InterpreterElement : WindowElement
             }
             catch (Exception error)
             {
-                PrintOutput($"Internal Exception: {new RuntimeException(error.Message, error, Interpreter.Processor.GetContext())}", LogType.Error);
+                PrintOutput($"Internal Exception: {new RuntimeException(error.Message, error, Interpreter.Processor.GetContext(), Interpreter.DebugInformation)}", LogType.Error);
             }
             if (Interpreter.Processor.IsDone)
             {

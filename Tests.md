@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=291&f=0&s=165)](#)
-[![](https://img.shields.io/badge/Passing-291-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-0-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-165-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=303&f=3&s=150)](#)
+[![](https://img.shields.io/badge/Passing-303-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-3-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-150-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -74,3 +74,16 @@
 | [69](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/69.bbc) | ✅ | ✅ |
 | [70](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/70.bbc) | ✅ | ✅ |
 | [71](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/71.bbc) | ✅ | ✅ |
+| [72](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/72.bbc) | ✅ | ✅ |
+| [73](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/73.bbc) | ✅ | ✖ i8 not supported |
+| [74](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/74.bbc) | ✅ | ✖ u16 not supported |
+| [75](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/75.bbc) | ✅ | ✖ i16 not supported |
+| [76](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/76.bbc) | ❌ Test method Tests.MainFileTests.Test76 threw exception:  System.DivideByZeroException: Attempted to divide by zero. | ✖ u32 not supported |
+| [77](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/77.bbc) | ✅ | ✖ i32 not supported |
+| [78](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/78.bbc) | ✅ | ✅ |
+| [79](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/79.bbc) | ✅ | ✖ i8 not supported |
+| [80](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/80.bbc) | ✅ | ✖ u16 not supported |
+| [81](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/81.bbc) | ✅ | ✖ i16 not supported |
+| [82](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/82.bbc) | ❌ Test method Tests.MainFileTests.Test82 threw exception:  System.DivideByZeroException: Attempted to divide by zero. | ✖ u32 not supported |
+| [83](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/83.bbc) | ✅ | ✖ i32 not supported |
+| [84](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/84.bbc) | ❌ Standard output isn't what is expected: Expected: "(8.0,0.0)\n(1.0,0.0)\n7.0\n7.0\n1.0\n" Actual:   "(8.0,0.0)\r\n(1.0,0.0)\r\n7.62\r\n7.62\r\n1.0\r\n" | ✖ Floats not supported |

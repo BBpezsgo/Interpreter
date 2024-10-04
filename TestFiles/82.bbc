@@ -1,0 +1,5 @@
+using System.Console;
+
+u32 a = 55;
+u32 b = 55;
+Print(a + b);

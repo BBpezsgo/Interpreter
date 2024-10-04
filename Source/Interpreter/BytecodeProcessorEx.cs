@@ -8,14 +8,19 @@ public class BytecodeProcessorEx
     public readonly IOHandler IO;
     double CurrentSleepFinishAt;
 
-    public BytecodeProcessorEx(BytecodeInterpreterSettings settings, ImmutableArray<Instruction> program, DebugInformation? debugInformation = null, IEnumerable<KeyValuePair<int, IExternalFunction>>? externalFunctions = null)
+    public BytecodeProcessorEx(
+        BytecodeInterpreterSettings settings,
+        ImmutableArray<Instruction> program,
+        byte[]? memory,
+        DebugInformation? debugInformation = null,
+        IEnumerable<KeyValuePair<int, IExternalFunction>>? externalFunctions = null)
     {
         DebugInformation = debugInformation;
 
         Dictionary<int, IExternalFunction> _externalFunctions = GenerateExternalFunctions();
         IO = IOHandler.Create(_externalFunctions);
         if (externalFunctions is not null) _externalFunctions.AddRange(externalFunctions);
-        Processor = new BytecodeProcessor(program, null, _externalFunctions.ToFrozenDictionary(), settings);
+        Processor = new BytecodeProcessor(program, memory, _externalFunctions.ToFrozenDictionary(), settings);
     }
 
     Dictionary<int, IExternalFunction> GenerateExternalFunctions()

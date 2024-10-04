@@ -1,0 +1,5 @@
+using System.Console;
+
+u16 a = 55;
+u16 b = 55;
+Print(a + b);

@@ -24,7 +24,7 @@ export void GetHeader(byte* ptr, byte* size, byte* allocated)
 
 export void SetHeader(byte* ptr, byte size, byte allocated)
 {
-    if (size > MaxHeapSize)
+    if (size > (MaxHeapSize as int))
     { throw "What"; }
 
     byte value = size;
@@ -41,7 +41,7 @@ byte JoinFreeBlocks()
 {
     byte* headerPointer = 0;
     byte prevBlockSize = 0 as byte;
-    while (headerPointer < MaxHeapSize)
+    while (headerPointer < (MaxHeapSize as int))
     {
         byte blockSize;
         byte blockUsed;
@@ -85,7 +85,7 @@ export any* Alloc(int sizeNeed)
     byte* headerPointer;
     while (1)
     {
-        if (headerPointer >= MaxHeapSize) { throw "Out of memory"; }
+        if (headerPointer >= (MaxHeapSize as int)) { throw "Out of memory"; }
 
         byte blockSize;
         byte blockUsed;

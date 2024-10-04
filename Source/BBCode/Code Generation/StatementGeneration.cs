@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -917,27 +917,37 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             FindStatementType(@operator);
 
-            GeneralType leftType = FindStatementType(@operator.Left, expectedType);
-            GeneralType rightType = FindStatementType(@operator.Right, expectedType);
+            StatementWithValue left = @operator.Left;
+            StatementWithValue right = @operator.Right;
 
-            if (!leftType.Is<BuiltinType>() &&
-                !rightType.Is<BuiltinType>())
-            { AnalysisCollection?.Warnings.Add(notFoundError.InstantiateWarning(@operator, @operator.File)); }
+            GeneralType leftType = FindStatementType(left, expectedType);
+            GeneralType rightType = FindStatementType(right, expectedType);
+
+            if (!leftType.TryGetNumericType(out NumericType leftNType) ||
+                !rightType.TryGetNumericType(out NumericType rightNType))
+            {
+                // AnalysisCollection?.Warnings.Add(notFoundError.InstantiateWarning(@operator, @operator.File));
+                throw notFoundError.Instantiate(@operator, @operator.File);
+            }
 
             BitWidth leftBitWidth = leftType.GetBitWidth(this);
             BitWidth rightBitWidth = rightType.GetBitWidth(this);
             BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
 
+            leftType = BuiltinType.CreateNumeric(leftNType, leftBitWidth);
+            rightType = BuiltinType.CreateNumeric(rightNType, rightBitWidth);
+
             int jumpInstruction = InvalidFunctionAddress;
 
-            GenerateCodeForStatement(@operator.Left, expectedType);
+            GenerateCodeForStatement(left, leftType);
 
-            if (!leftType.SameAs(BasicType.F32) &&
-                rightType.SameAs(BasicType.F32))
+            if (leftNType != NumericType.Float &&
+                rightNType == NumericType.Float)
             {
                 AddInstruction(Opcode.FTo,
                     (InstructionOperand)StackTop,
                     (InstructionOperand)StackTop);
+                leftType = BuiltinType.F32;
             }
 
             if (@operator.Operator.Content == BinaryOperatorCall.LogicalAND)
@@ -966,7 +976,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
             }
 
-            GenerateCodeForStatement(@operator.Right, expectedType);
+            GenerateCodeForStatement(right, rightType);
 
             if (leftType.SameAs(BasicType.F32) &&
                 !rightType.SameAs(BasicType.F32))
@@ -976,34 +986,44 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     (InstructionOperand)StackTop);
             }
 
+            if ((leftNType == NumericType.Float) != (rightNType == NumericType.Float))
+            {
+                throw notFoundError.Instantiate(@operator, @operator.File);
+            }
+
+            bool isFloat = leftType.SameAs(BasicType.F32) || rightType.SameAs(BasicType.F32);
+            bool isUnsigned = false;
+            if (!isFloat)
+            {
+                isUnsigned = leftNType == NumericType.UnsignedInteger && rightNType == NumericType.UnsignedInteger;
+            }
+
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
             using (RegisterUsage.Auto regRight = Registers.GetFree())
             {
-                bool isFloat = leftType.SameAs(BasicType.F32) || rightType.SameAs(BasicType.F32);
-
                 PopTo(regRight.Get(bitWidth), rightBitWidth);
                 PopTo(regLeft.Get(bitWidth), leftBitWidth);
 
                 switch (@operator.Operator.Content)
                 {
                     case BinaryOperatorCall.Addition:
-                        AddInstruction(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathAdd : isUnsigned ? Opcode.UMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Subtraction:
-                        AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathSub : isUnsigned ? Opcode.UMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Multiplication:
-                        AddInstruction(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathMult : isUnsigned ? Opcode.UMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Division:
-                        AddInstruction(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathDiv : isUnsigned ? Opcode.UMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Modulo:
-                        AddInstruction(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathMod : isUnsigned ? Opcode.UMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.LogicalAND:
@@ -2107,6 +2127,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
             prevValue.TryCast(targetBuiltinType.RuntimeType, out prevValue))
         {
             AddInstruction(Opcode.Push, prevValue);
+            return;
+        }
+
+        if (statementType.SameAs(BuiltinType.F32) &&
+            targetType.SameAs(BuiltinType.I32))
+        {
+            GenerateCodeForStatement(typeCast.PrevStatement);
+            AddInstruction(Opcode.FFrom, (InstructionOperand)StackTop, (InstructionOperand)StackTop);
+            return;
+        }
+
+        if (statementType.SameAs(BuiltinType.I32) &&
+            targetType.SameAs(BuiltinType.F32))
+        {
+            GenerateCodeForStatement(typeCast.PrevStatement);
+            AddInstruction(Opcode.FTo, (InstructionOperand)StackTop, (InstructionOperand)StackTop);
             return;
         }
 

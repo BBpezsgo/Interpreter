@@ -567,7 +567,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                AssignTypeCheck(variable.Type, valueType, value);
+                if (TryComputeSimple(value, out CompiledValue compiledValue))
+                { AssignTypeCheck(variable.Type, compiledValue, value); }
+                else
+                { AssignTypeCheck(variable.Type, valueType, value); }
             }
 
             using (Code.Block(this, $"Compute value"))

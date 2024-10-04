@@ -1,0 +1,4 @@
+using System.Console;
+
+u16 v = 55;
+Print(v);

@@ -332,7 +332,7 @@ public static class Utils
             {
                 HeapSize = HeapSize,
                 StackSize = BytecodeInterpreterSettings.Default.StackSize,
-            }, code.Code, code.DebugInfo, _externalFunctions);
+            }, code.Code, null, code.DebugInfo, _externalFunctions);
 
             InputBuffer inputBuffer = new(input);
             StringBuilder stdOutput = new();

@@ -16,13 +16,15 @@ public class RuntimeException : LanguageException
 
     public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
     public RuntimeException(string message, Exception inner) : base(message, inner) { }
-    public RuntimeException(string message, RuntimeContext context) : base(message, Position.UnknownPosition, null)
+    public RuntimeException(string message, RuntimeContext context, DebugInformation? debugInformation) : base(message, Position.UnknownPosition, null)
     {
         Context = context;
+        DebugInformation = debugInformation;
     }
-    public RuntimeException(string message, Exception inner, RuntimeContext context) : this(message, inner)
+    public RuntimeException(string message, Exception inner, RuntimeContext context, DebugInformation? debugInformation) : this(message, inner)
     {
         Context = context;
+        DebugInformation = debugInformation;
     }
 
     public override string ToString()

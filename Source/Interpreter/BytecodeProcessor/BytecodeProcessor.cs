@@ -58,7 +58,7 @@ public partial class BytecodeProcessor
         }
         catch (ArgumentOutOfRangeException error)
         {
-            throw new RuntimeException(error.Message, GetContext());
+            throw new RuntimeException(error.Message, GetContext(), null);
         }
     }
 
@@ -100,6 +100,12 @@ public partial class BytecodeProcessor
             case Opcode.MathMult: MathMult(); break;
             case Opcode.MathDiv: MathDiv(); break;
             case Opcode.MathMod: MathMod(); break;
+
+            case Opcode.UMathAdd: UMathAdd(); break;
+            case Opcode.UMathSub: UMathSub(); break;
+            case Opcode.UMathMult: UMathMult(); break;
+            case Opcode.UMathDiv: UMathDiv(); break;
+            case Opcode.UMathMod: UMathMod(); break;
 
             case Opcode.FMathAdd: FMathAdd(); break;
             case Opcode.FMathSub: FMathSub(); break;
@@ -421,14 +427,14 @@ public partial class BytecodeProcessor
         Registers.StackPointer += (int)size * StackDirection;
         SetData(Registers.StackPointer, data, size);
 
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
-        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), null);
+        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext(), null);
     }
 
     RuntimeValue Pop(BitWidth size)
     {
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
-        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), null);
+        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext(), null);
 
         RuntimeValue data = GetData(Registers.StackPointer, size);
         Registers.StackPointer -= (int)size * StackDirection;
@@ -440,14 +446,14 @@ public partial class BytecodeProcessor
         Registers.StackPointer += data.Length * StackDirection;
         Memory.Set(Registers.StackPointer, data);
 
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
-        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), null);
+        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext(), null);
     }
 
     Span<byte> Pop(int size)
     {
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext());
-        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext());
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), null);
+        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext(), null);
 
         Span<byte> data = Memory.Get(Registers.StackPointer, size);
         Registers.StackPointer -= size * StackDirection;

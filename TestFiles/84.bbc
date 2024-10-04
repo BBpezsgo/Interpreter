@@ -1,0 +1,30 @@
+using System.Console;
+using System.Vectors;
+using System.Math;
+
+void PrintLine(Vector2 v)
+{
+    Print('(');
+    Print(v.x);
+    Print(',');
+    Print(v.y);
+    Print(')');
+    PrintLine();
+}
+
+Vector2 v1 = new Vector2(8f, 0f);
+Vector2 v2 = new Vector2(1f, 0f);
+
+PrintLine(v1);
+PrintLine(v2);
+
+PrintLine(Distance(v1, v2));
+
+v2.y = 0f;
+
+PrintLine(Distance(v1, v2));
+
+v1 = v1.Normalised();
+v2 = v2.Normalised();
+
+PrintLine(Dot(v1, v2));

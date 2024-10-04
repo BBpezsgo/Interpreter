@@ -714,7 +714,7 @@ public class Interactive
 
             BBLangGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, MainGeneratorSettings.Default);
 
-            interpreter = new(BytecodeInterpreterSettings.Default, generated.Code, generated.DebugInfo);
+            interpreter = new(BytecodeInterpreterSettings.Default, generated.Code, null, generated.DebugInfo);
 
             interpreter.IO.OnStdOut += OnInterpreterStandardOut;
             interpreter.IO.OnNeedInput += OnInterpreterNeedInput;

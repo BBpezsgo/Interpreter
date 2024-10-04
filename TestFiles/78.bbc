@@ -1,0 +1,5 @@
+using System.Console;
+
+u8 a = 55;
+u8 b = 55;
+Print(a + b);

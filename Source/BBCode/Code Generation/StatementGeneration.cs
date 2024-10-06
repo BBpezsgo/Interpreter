@@ -1,4 +1,4 @@
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -26,17 +26,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void AddInstruction(
         Opcode opcode,
         CompiledValue operand)
-        => AddInstruction(new PreparationInstruction(opcode, operand));
+        => AddInstruction(new PreparationInstruction(opcode, new InstructionOperand(operand)));
 
     void AddInstruction(
         Opcode opcode,
         int operand)
-        => AddInstruction(new PreparationInstruction(opcode, new CompiledValue(operand)));
+        => AddInstruction(new PreparationInstruction(opcode, new InstructionOperand(new CompiledValue(operand))));
 
     void AddInstruction(
         Opcode opcode,
         bool operand)
-        => AddInstruction(new PreparationInstruction(opcode, new CompiledValue(operand)));
+        => AddInstruction(new PreparationInstruction(opcode, new InstructionOperand(new CompiledValue(operand))));
 
     void AddInstruction(Opcode opcode,
         InstructionOperand operand1)

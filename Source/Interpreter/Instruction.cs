@@ -94,7 +94,7 @@ public readonly struct InstructionOperand
         InstructionOperandType.Immediate8 => BitWidth._8,
         InstructionOperandType.Immediate16 => BitWidth._16,
         InstructionOperandType.Immediate32 => BitWidth._32,
-        InstructionOperandType.Immediate64 => BitWidth._32, // FIXME
+        InstructionOperandType.Immediate64 => BitWidth._64,
         InstructionOperandType.Register => ((Register)Value.I32).BitWidth(),
         InstructionOperandType.Pointer8 => BitWidth._8,
         InstructionOperandType.Pointer16 => BitWidth._16,
@@ -149,35 +149,20 @@ public readonly struct InstructionOperand
         Type = type;
     }
 
-    public InstructionOperand(int value)
+    public InstructionOperand(CompiledValue value)
     {
-        Value = new RuntimeValue(value);
-        Type = InstructionOperandType.Immediate32;
-    }
-    public InstructionOperand(byte value)
-    {
-        Value = new RuntimeValue(value);
-        Type = InstructionOperandType.Immediate8;
-    }
-    public InstructionOperand(float value)
-    {
-        Value = new RuntimeValue(value);
-        Type = InstructionOperandType.Immediate32;
-    }
-    public InstructionOperand(char value)
-    {
-        Value = new RuntimeValue(value);
-        Type = InstructionOperandType.Immediate16;
-    }
-    public InstructionOperand(ushort value)
-    {
-        Value = new RuntimeValue(value);
-        Type = InstructionOperandType.Immediate16;
-    }
-    public InstructionOperand(bool value)
-    {
-        Value = new RuntimeValue(value);
-        Type = InstructionOperandType.Immediate8;
+        (Value, Type) = value.Type switch
+        {
+            RuntimeType.Null => (default(RuntimeValue), InstructionOperandType.Immediate32),
+            RuntimeType.U8 => (new RuntimeValue(value.U8), InstructionOperandType.Immediate8),
+            RuntimeType.I8 => (new RuntimeValue(value.I8), InstructionOperandType.Immediate8),
+            RuntimeType.Char => (new RuntimeValue(value.Char), InstructionOperandType.Immediate16),
+            RuntimeType.I16 => (new RuntimeValue(value.I16), InstructionOperandType.Immediate16),
+            RuntimeType.U32 => (new RuntimeValue(value.U32), InstructionOperandType.Immediate32),
+            RuntimeType.I32 => (new RuntimeValue(value.I32), InstructionOperandType.Immediate32),
+            RuntimeType.F32 => (new RuntimeValue(value.F32), InstructionOperandType.Immediate32),
+            _ => throw new UnreachableException(),
+        };
     }
 
     static string? PointerOffsetString(int offset) => offset == 0 ? null : offset > 0 ? $"+{offset}" : $"-{-offset}";
@@ -267,18 +252,6 @@ public readonly struct InstructionOperand
         _ => throw new UnreachableException(),
     };
 
-    public static implicit operator InstructionOperand(CompiledValue value) => value.Type switch
-    {
-        RuntimeType.Null => new InstructionOperand(default, InstructionOperandType.Immediate32),
-        RuntimeType.U8 => new InstructionOperand(value.U8, InstructionOperandType.Immediate8),
-        RuntimeType.I8 => new InstructionOperand(value.I8, InstructionOperandType.Immediate8),
-        RuntimeType.Char => new InstructionOperand(value.Char, InstructionOperandType.Immediate16),
-        RuntimeType.I16 => new InstructionOperand(value.I16, InstructionOperandType.Immediate16),
-        RuntimeType.U32 => new InstructionOperand(value.U32, InstructionOperandType.Immediate16),
-        RuntimeType.I32 => new InstructionOperand(value.I32, InstructionOperandType.Immediate32),
-        RuntimeType.F32 => new InstructionOperand(new RuntimeValue(value.F32), InstructionOperandType.Immediate32),
-        _ => throw new UnreachableException(),
-    };
     public static implicit operator InstructionOperand(int value) => new(new RuntimeValue(value), InstructionOperandType.Immediate32);
     public static implicit operator InstructionOperand(Register register) => new((int)register, InstructionOperandType.Register);
     public static explicit operator InstructionOperand(AddressRegisterPointer address) => address.Register.ToPtr(0, BitWidth._32);

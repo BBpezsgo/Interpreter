@@ -152,7 +152,7 @@ export inline void Print(i8 message)
     if (message < (0 as i8))
     {
         Print('-');
-        message = message * -1;
+        message = message * (-1 as i8);
     }
     
     i8 pow10 = _FindMaxPowOf10(message);

@@ -174,13 +174,13 @@ public static class Minifier
 
             alreadyThere = result[i] switch
             {
-                #if NET_STANDARD
+#if NET_STANDARD
                 '+' => alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value + 1,
                 '-' => alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value - 1,
-                #else
+#else
                 '+' => alreadyThere + 1,
                 '-' => alreadyThere - 1,
-                #endif
+#endif
                 ']' => 0,
                 '.' => alreadyThere,
                 _ => PredictedNumber<int>.Unknown,
@@ -271,16 +271,10 @@ public static class Minifier
 
                 debugInformation?.OffsetCodeFrom(i, -removed);
 
-                result = result[..^removed];
-
                 ((ReadOnlySpan<char>)corrected).CopyTo(result[initializationStarted..(i + movementLength - removed)]);
                 result[(i + movementLength)..].CopyTo(result[(i + movementLength - removed)..]);
 
-                // Span<char> newResult = new char[result.Length - removed];
-                // result[..initializationStarted].CopyTo(newResult[..initializationStarted]);
-                // corrected.CopyTo(newResult[initializationStarted..(i + movementLength - removed)]);
-                // result[(i + movementLength)..].CopyTo(newResult[(i + movementLength - removed)..]);
-                // result = newResult;
+                result = result[..^removed];
 
                 return true;
             }
@@ -289,22 +283,22 @@ public static class Minifier
             {
                 case '+':
                 {
-                    #if NET_STANDARD
+#if NET_STANDARD
                     alreadyThere = alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value + 1;
-                    #else
+#else
                     alreadyThere++;
-                    #endif
+#endif
                     if (initializationStarted == -1) initializationStarted = i;
                     break;
                 }
 
                 case '-':
                 {
-                    #if NET_STANDARD
+#if NET_STANDARD
                     alreadyThere = alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value - 1;
-                    #else
+#else
                     alreadyThere--;
-                    #endif
+#endif
                     if (initializationStarted == -1) initializationStarted = i;
                     break;
                 }

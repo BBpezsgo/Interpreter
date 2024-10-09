@@ -1,0 +1,6 @@
+using System.Console;
+
+for (int i = 0; i < 10; i++)
+{
+    Print(i);
+}

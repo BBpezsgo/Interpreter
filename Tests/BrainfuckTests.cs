@@ -90,7 +90,7 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout), Ignore("u32 not supported")] public void Test82() => Utils.GetTest(82).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("i32 not supported")] public void Test83() => Utils.GetTest(83).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Floats not supported")] public void Test84() => Utils.GetTest(84).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test85() => Utils.GetTest(85).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test85() => Utils.GetTest(85).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test86() => Utils.GetTest(86).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test87() => Utils.GetTest(87).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test88() => Utils.GetTest(88).DoBrainfuck();

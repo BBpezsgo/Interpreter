@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=305&f=1&s=150)](#)
-[![](https://img.shields.io/badge/Passing-305-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-1-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-150-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=307&f=1&s=148)](#)
+[![](https://img.shields.io/badge/Passing-307-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-1-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-148-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -87,3 +87,4 @@
 | [82](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/82.bbc) | ✅ | ✖ u32 not supported |
 | [83](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/83.bbc) | ✅ | ✖ i32 not supported |
 | [84](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/84.bbc) | ❌ Standard output isn't what is expected: Expected: "(8.0,0.0)\n(1.0,0.0)\n7.0\n7.0\n1.0\n" Actual:   "(8.0,0.0)\r\n(1.0,0.0)\r\n7.62\r\n7.62\r\n1.0\r\n" | ✖ Floats not supported |
+| [85](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/85.bbc) | ✅ | ✅ |

@@ -3495,16 +3495,21 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 return false;
             }
 
+            if (!TryCompute(functionCall.MethodArguments, context, out ImmutableArray<CompiledValue> parameters))
+            {
+                value = default;
+                return false;
+            }
+
             if (function.IsExternal &&
-                !functionCall.SaveValue &&
-                TryCompute(functionCall.MethodArguments, context, out ImmutableArray<CompiledValue> parameters))
+                !functionCall.SaveValue)
             {
                 context.RuntimeStatements.Add(new RuntimeFunctionCall(function, parameters, functionCall));
                 value = CompiledValue.Null;
                 return true;
             }
 
-            if (TryEvaluate(function, functionCall.MethodArguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
+            if (TryEvaluate(function, parameters, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -3782,13 +3787,25 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         if (function.Block is null)
         { return false; }
 
-        for (int i = 0; i < parameterValues.Length; i++)
         {
-            if (!function.ParameterTypes[i].Equals(parameterValues[i].Type))
+            CompiledValue[] castedParameterValues = new CompiledValue[parameterValues.Length];
+            for (int i = 0; i < parameterValues.Length; i++)
             {
-                // Debugger.Break();
-                return false;
+                if (!parameterValues[i].TryCast(function.ParameterTypes[i], out CompiledValue castedValue))
+                {
+                    // Debugger.Break();
+                    return false;
+                }
+
+                if (!function.ParameterTypes[i].SameAs(castedValue.Type))
+                {
+                    // Debugger.Break();
+                    return false;
+                }
+
+                castedParameterValues[i] = castedValue;
             }
+            parameterValues = castedParameterValues.ToImmutableArray();
         }
 
         Dictionary<string, CompiledValue> variables = new();

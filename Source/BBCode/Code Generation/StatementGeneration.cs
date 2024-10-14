@@ -1,4 +1,4 @@
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -424,10 +424,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (GetConstant(newVariable.Identifier.Content, out _))
         { throw new CompilerException($"Can not set constant value: it is readonly", newVariable, newVariable.File); }
 
-        if (newVariable.InitialValue is LiteralList)
-        { throw new NotImplementedException(); }
+        Identifier variableIdentifier = new(newVariable.Identifier, newVariable.File);
+        if (newVariable.InitialValue is LiteralList literalList)
+        {
+            for (int i = 0; i < literalList.Values.Length; i++)
+            {
+                StatementWithValue value = literalList.Values[i];
+                GenerateCodeForValueSetter(new IndexCall(variableIdentifier, LiteralStatement.CreateAnonymous(i, variableIdentifier.Position.After()), TokenPair.CreateAnonymous(variableIdentifier.Position.After(), "[", "]"), variableIdentifier.File), value);
+            }
+            AddComment("}");
+            return;
+        }
 
-        GenerateCodeForValueSetter(new Identifier(newVariable.Identifier, newVariable.File), newVariable.InitialValue);
+        GenerateCodeForValueSetter(variableIdentifier, newVariable.InitialValue);
         AddComment("}");
     }
     void GenerateCodeForStatement(KeywordCall keywordCall)

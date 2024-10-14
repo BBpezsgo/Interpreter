@@ -1,4 +1,4 @@
-using LanguageCore.Parser;
+﻿using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
@@ -2616,6 +2616,16 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             Semicolon = newInstance.Semicolon,
         };
 
+    static LiteralList InlineMacro(LiteralList literalList, Dictionary<string, StatementWithValue> parameters)
+        => new(
+            values: literalList.Values.Select(v => InlineMacro(v, parameters)),
+            brackets: literalList.Brackets)
+        {
+            SaveValue = literalList.SaveValue,
+            Semicolon = literalList.Semicolon,
+            SurroundingBracelet = literalList.SurroundingBracelet,
+        };
+
     static TypeInstance InlineMacro(TypeInstance type, Dictionary<string, StatementWithValue> parameters) => type switch
     {
         TypeInstanceFunction v => new TypeInstanceFunction(
@@ -3046,6 +3056,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         TypeStatement v => v,
         ConstructorCall v => InlineMacro(v, parameters),
         NewInstance v => InlineMacro(v, parameters),
+        LiteralList v => InlineMacro(v, parameters),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 
@@ -3652,6 +3663,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             NewInstance => false,
             ConstructorCall => false,
             AddressGetter => false,
+            LiteralList => false,
             _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
     }

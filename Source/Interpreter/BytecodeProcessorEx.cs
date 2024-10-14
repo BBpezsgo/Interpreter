@@ -51,7 +51,6 @@ public class BytecodeProcessorEx
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, static (char @char) => { });
         externalFunctions.AddExternalFunction("console-set", static (char @char, int x, int y) => { });
         externalFunctions.AddExternalFunction("console-clear", static () => { });
-        externalFunctions.AddExternalFunction("stderr", static (char @char) => { });
         externalFunctions.AddExternalFunction("sleep", static (int t) => { });
     }
 
@@ -59,9 +58,9 @@ public class BytecodeProcessorEx
     {
         externalFunctions.AddExternalFunction("utc-time", static () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
         externalFunctions.AddExternalFunction("local-time", static () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
-        externalFunctions.AddExternalFunction("utc-date-day", static () => (int)DateTime.Now.DayOfYear);
+        externalFunctions.AddExternalFunction("utc-date-day", static () => (int)DateTime.UtcNow.DayOfYear);
         externalFunctions.AddExternalFunction("local-date-day", static () => (int)DateTime.Now.DayOfYear);
-        externalFunctions.AddExternalFunction("utc-date-year", static () => (int)DateTime.Now.Year);
+        externalFunctions.AddExternalFunction("utc-date-year", static () => (int)DateTime.UtcNow.Year);
         externalFunctions.AddExternalFunction("local-date-year", static () => (int)DateTime.Now.Year);
     }
 

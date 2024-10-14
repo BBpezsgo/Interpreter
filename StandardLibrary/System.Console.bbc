@@ -8,9 +8,6 @@ export void Clear()
     Print("\e[H");
 }
 
-[External("stderr")]
-export void PrintError(char message);
-
 //
 //  == PRINT ==
 //

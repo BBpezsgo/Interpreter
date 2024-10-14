@@ -32,14 +32,14 @@ struct List
     export T indexer_get(int index)
     {
         if (index < 0 || index >= this._length)
-        { throw "Index out of range exception"; }
+        { crash "Index out of range exception"; }
         return this._ptr[index];
     }
 
     export void indexer_set(int index, T value)
     {
         if (index < 0 || index >= this._length)
-        { throw "Index out of range exception"; }
+        { crash "Index out of range exception"; }
         this._ptr[index] = value;
     }
     
@@ -72,7 +72,7 @@ struct List
     export T Remove(int index)
     {
         if (index < 0 || index >= this._length)
-        { throw "Index out of range exception"; }
+        { crash "Index out of range exception"; }
         T removed = this._ptr[index];
         
         int length = this._length;

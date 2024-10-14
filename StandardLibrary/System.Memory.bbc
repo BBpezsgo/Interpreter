@@ -25,7 +25,7 @@ export void GetHeader(byte* ptr, byte* size, byte* allocated)
 export void SetHeader(byte* ptr, byte size, byte allocated)
 {
     if (size > ((int)MaxHeapSize))
-    { throw "What"; }
+    { crash "What"; }
 
     byte value = size;
 
@@ -80,13 +80,13 @@ export any* Alloc(int sizeNeed)
 {
     if (sizeNeed == 0)
     {
-        throw "What";
+        crash "What";
     }
 
     byte* headerPointer;
     while (1)
     {
-        if (headerPointer >= ((int)MaxHeapSize)) { throw "Out of memory"; }
+        if (headerPointer >= ((int)MaxHeapSize)) { crash "Out of memory"; }
 
         byte blockSize;
         byte blockUsed;

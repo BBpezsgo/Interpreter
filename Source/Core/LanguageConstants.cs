@@ -75,7 +75,7 @@ public static class StatementKeywords
     public const string While = "while";
     public const string For = "for";
     public const string Return = "return";
-    public const string Throw = "throw";
+    public const string Crash = "crash";
     public const string Delete = "delete";
     public const string New = "new";
     public const string Type = "type";

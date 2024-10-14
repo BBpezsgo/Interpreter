@@ -2037,7 +2037,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     protected BuiltinType FindStatementType(KeywordCall keywordCall) => keywordCall.Identifier.Content switch
     {
         StatementKeywords.Return => OnGotStatementType(keywordCall, BuiltinType.Void),
-        StatementKeywords.Throw => OnGotStatementType(keywordCall, BuiltinType.Void),
+        StatementKeywords.Crash => OnGotStatementType(keywordCall, BuiltinType.Void),
         StatementKeywords.Break => OnGotStatementType(keywordCall, BuiltinType.Void),
         StatementKeywords.Delete => OnGotStatementType(keywordCall, BuiltinType.Void),
         _ => throw new CompilerException($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile)
@@ -3134,7 +3134,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             }
 
             case StatementKeywords.Delete:
-            case StatementKeywords.Throw:
+            case StatementKeywords.Crash:
                 return ControlFlowUsage.None;
 
             default: throw new NotImplementedException(statement.ToString());

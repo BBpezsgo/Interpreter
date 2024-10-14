@@ -16,7 +16,7 @@ public partial class BytecodeProcessor
 
     #region Flow Control
 
-    void THROW()
+    void CRASH()
     {
         int pointer = GetData(CurrentInstruction.Operand1).I32;
         string? value = HeapUtils.GetString(Memory, pointer);

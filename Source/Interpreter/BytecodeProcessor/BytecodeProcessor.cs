@@ -77,7 +77,7 @@ public partial class BytecodeProcessor
             case Opcode.PopTo64: POP_TO_VALUE(BitWidth._64); break;
 
             case Opcode.Jump: JUMP_BY(); break;
-            case Opcode.Throw: THROW(); break;
+            case Opcode.Crash: CRASH(); break;
 
             case Opcode.JumpIfEqual: JumpIfEqual(); break;
             case Opcode.JumpIfNotEqual: JumpIfNotEqual(); break;

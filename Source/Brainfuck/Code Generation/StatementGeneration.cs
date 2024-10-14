@@ -1398,7 +1398,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 break;
             }
 
-            case StatementKeywords.Throw:
+            case StatementKeywords.Crash:
             {
                 if (statement.Arguments.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement, CurrentFile); }

@@ -490,10 +490,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (keywordCall.Identifier.Content == StatementKeywords.Throw)
+        if (keywordCall.Identifier.Content == StatementKeywords.Crash)
         {
             if (keywordCall.Arguments.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Throw}\": required {1} passed {keywordCall.Arguments}", keywordCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Crash}\": required {1} passed {keywordCall.Arguments}", keywordCall, CurrentFile); }
 
             AddComment(" Param 0:");
 
@@ -504,7 +504,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
                 PopTo(reg.Get(throwType.GetBitWidth(this)));
-                AddInstruction(Opcode.Throw, reg.Get(throwType.GetBitWidth(this)));
+                AddInstruction(Opcode.Crash, reg.Get(throwType.GetBitWidth(this)));
             }
 
             return;

@@ -158,7 +158,7 @@ public enum Opcode : byte
     /// <see langword="crash"/> (*<see cref="char"/>)<paramref name="SRC"/>
     /// </code>
     /// </summary>
-    Throw,
+    Crash,
     #endregion
 
     #region === COMPARISON OPERATIONS ===

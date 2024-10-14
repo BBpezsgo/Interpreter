@@ -49,7 +49,7 @@ public partial class InterpreterElement
                 case Opcode.Call:
                 case Opcode.CallExternal:
                 case Opcode.Push:
-                case Opcode.Throw:
+                case Opcode.Crash:
                     HandleSourceOperand(instruction.Operand1);
                     break;
                 case Opcode.Compare:

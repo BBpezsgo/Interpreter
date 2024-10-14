@@ -590,7 +590,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(PointerBitWidth));
-            AddInstruction(Opcode.Throw, reg.Get(PointerBitWidth));
+            AddInstruction(Opcode.Crash, reg.Get(PointerBitWidth));
         }
         GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction;
 

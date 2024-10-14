@@ -1341,7 +1341,7 @@ public sealed class Parser
             return true;
         }
 
-        if (ExpectKeywordCall(StatementKeywords.Throw, 1, out KeywordCall? keywordCallThrow))
+        if (ExpectKeywordCall(StatementKeywords.Crash, 1, out KeywordCall? keywordCallThrow))
         {
             statement = keywordCallThrow;
             return true;

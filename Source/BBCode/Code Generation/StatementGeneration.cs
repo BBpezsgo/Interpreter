@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -563,6 +563,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 if (explicitDeallocate)
                 { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", argument, CurrentFile)); }
+            }
+
+            if (argument is AddressGetter addressGetter &&
+                addressGetter.PrevStatement is Identifier identifier &&
+                GetVariable(identifier.Content, out CompiledVariable? variable))
+            {
+                variable.IsInitialized = true;
             }
 
             GenerateCodeForStatement(argument, parameterType);
@@ -1474,6 +1481,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             variable.Reference = val;
             OnGotStatementType(variable, val.Type);
 
+            if (!val.IsInitialized)
+            { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {val.Identifier} but its aint initialized.", variable, variable.File)); }
+
             PushFrom(GetLocalVariableAddress(val), val.Type.GetSize(this));
             return;
         }
@@ -2000,6 +2010,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (!val.Type.SameAs(arrayType))
                     { throw new NotImplementedException(); }
 
+                    if (!val.IsInitialized)
+                    { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {val.Identifier} but its aint initialized.", identifier, identifier.File)); }
+
                     int offset = (int)computedIndexData * arrayType.Of.GetSize(this);
                     Address address = GetLocalVariableAddress(val);
 
@@ -2396,6 +2409,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForStatement(value, variable.Type);
 
             PopTo(GetLocalVariableAddress(variable), variable.Type.GetSize(this));
+            variable.IsInitialized = true;
         }
         else if (GetGlobalVariable(statementToSet.Content, statementToSet.File, out CompiledVariable? globalVariable, out _))
         {
@@ -2498,6 +2512,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     if (!variable.Type.SameAs(arrayType))
                     { throw new NotImplementedException(); }
+
+                    if (!variable.IsInitialized)
+                    { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {variable.Identifier} but its aint initialized.", identifier, identifier.File)); }
 
                     int offset = (int)computedIndexData * arrayType.Of.GetSize(this);
                     PopTo(new AddressOffset(GetLocalVariableAddress(variable), offset), arrayType.Of.GetSize(this));

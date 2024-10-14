@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 
@@ -286,6 +286,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void StackAlloc(int size)
     {
+        // AddInstruction(Opcode.MathSub, Register.StackPointer, size);
+        // return;
         if (PointerBitWidth != BitWidth._64)
         {
             int dwordCount = size / 4;

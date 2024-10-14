@@ -5,7 +5,7 @@ void Func(int* v)
 	*v += 7;
 }
 
-int* a = Alloc(1) as int*;
+int* a = Alloc(4) as int*;
 *a = 3;
 
 Func(a);

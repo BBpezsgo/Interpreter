@@ -56,10 +56,6 @@ public partial class BytecodeProcessor
             error.Context = GetContext();
             throw;
         }
-        catch (ArgumentOutOfRangeException error)
-        {
-            throw new RuntimeException(error.Message, GetContext(), null);
-        }
     }
 
     void Process()

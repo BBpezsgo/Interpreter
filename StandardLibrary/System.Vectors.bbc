@@ -29,10 +29,22 @@ export float Magnitude(this Vector2 v)
     return Sqrt((v.x * v.x) + (v.y * v.y));
 }
 
+export float Magnitude(this Vector2* v)
+{
+    return Sqrt((v.x * v.x) + (v.y * v.y));
+}
+
 export Vector2 Normalised(this Vector2 v)
 {
     float d = v.Magnitude();
     v.x /= d;
     v.y /= d;
     return v;
+}
+
+export void Normalise(Vector2* v)
+{
+    float d = v.Magnitude();
+    v.x /= d;
+    v.y /= d;
 }

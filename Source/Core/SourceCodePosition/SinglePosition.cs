@@ -64,8 +64,8 @@ public struct SinglePosition :
         return false;
     }
 
-    public override readonly string ToString() => $"({Line}:{Character})";
-    public readonly string ToStringMin() => $"{Line}:{Character}";
+    public override readonly string ToString() => $"({Line + 1}:{Character})";
+    public readonly string ToStringMin() => $"{Line + 1}:{Character}";
     readonly string GetDebuggerDisplay()
     {
         if (this == SinglePosition.Undefined)

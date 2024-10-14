@@ -5,7 +5,7 @@ namespace LanguageCore.Runtime;
 
 public static class MemoryUtils
 {
-    public static unsafe T* GetPtr<T>(this Span<byte> memory, int ptr) where T : unmanaged => (T*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(memory[ptr..]));
+    public static unsafe T* GetPtr<T>(this Span<byte> memory, int ptr) where T : unmanaged => ptr >= 0 && ptr < memory.Length ? (T*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(memory[ptr..])) : throw new RuntimeException($"Memory access violation (pointer {ptr} was out of range)");
 
     public static unsafe void Set<T>(this Span<byte> memory, int ptr, T data) where T : unmanaged => *GetPtr<T>(memory, ptr) = data;
     public static unsafe T Get<T>(this Span<byte> memory, int ptr) where T : unmanaged => *GetPtr<T>(memory, ptr);

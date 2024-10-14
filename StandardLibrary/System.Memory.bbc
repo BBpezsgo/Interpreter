@@ -72,6 +72,7 @@ byte JoinFreeBlocks()
         // Jump to the next block's header offset
         headerPointer += blockSize + 1;
     }
+    return 0 as byte;
 }
 
 [Builtin("alloc")]
@@ -127,6 +128,7 @@ export any* Alloc(int sizeNeed)
 
         headerPointer += blockSize + 1;
     }
+    return 0;
 }
 
 [Builtin("free")]

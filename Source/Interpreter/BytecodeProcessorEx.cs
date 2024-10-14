@@ -75,6 +75,14 @@ public class BytecodeProcessorEx
 
         if (IO.IsAwaitingInput) return;
 
-        Processor.Tick();
+        try
+        {
+            Processor.Tick();
+        }
+        catch (RuntimeException runtimeException)
+        {
+            runtimeException.DebugInformation = DebugInformation;
+            throw;
+        }
     }
 }

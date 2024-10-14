@@ -73,7 +73,7 @@ public readonly struct Position :
     public string ToStringRange()
     {
         if (Range.Start == Range.End) return Range.Start.ToStringMin();
-        if (Range.Start.Line == Range.End.Line) return $"{Range.Start.Line}:({Range.Start.Character}-{Range.End.Character})";
+        if (Range.Start.Line == Range.End.Line) return $"{Range.Start.Line + 1}:({Range.Start.Character}-{Range.End.Character})";
         return $"{Range.Start.ToStringMin()}-{Range.End.ToStringMin()}";
     }
 
@@ -84,9 +84,9 @@ public readonly struct Position :
         { return null; }
 
         if (Range.Start.Character < 0)
-        { return $"line {Range.Start.Character}"; }
+        { return $"line {Range.Start.Line}"; }
 
-        return $"line {Range.Start.Line} and column {Range.Start.Character}";
+        return $"line {Range.Start.Line + 1} and column {Range.Start.Character}";
     }
 
     string GetDebuggerDisplay()

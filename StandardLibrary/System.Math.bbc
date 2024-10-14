@@ -12,7 +12,7 @@ export inline float Sin(float x)
     for (int counter = 0; counter < 100; counter++)
 	{
         fac += 2;
-        value *= -1 * x * x / (fac * (fac - 1));
+        value *= -1 * x * x / ((fac * (fac - 1)) as float);
         sum += value;
     }
 
@@ -33,7 +33,7 @@ export inline float Cos(float x)
     for (int counter = 0; counter < 100; counter++)
 	{
         fac += 2;
-        value *= -1 * x * x / (fac * (fac - 1));
+        value *= -1 * x * x / ((fac * (fac - 1)) as float);
         sum += value;
     }
 
@@ -68,6 +68,15 @@ export int Pow(int base, int exp)
 export int Abs(int v)
 {
     if (v < 0) { return v * -1; };
+    return v;
+}
+
+/*
+ * Calculates the absolute value of `v`
+ */
+export f32 Abs(f32 v)
+{
+    if (v < 0f) { return v * -1f; };
     return v;
 }
 

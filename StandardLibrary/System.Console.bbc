@@ -216,12 +216,13 @@ export inline void Print(u32 message)
     }
 }
 
-export void Print(temp float message)
+export void Print(temp f32 message)
 {
     Print(message as int);
     message %= 1f;
     message *= 1000f;
     Print('.');
+    if (message < 0f) { message *= -1f; }
     Print(message as int);
 }
 
@@ -299,7 +300,7 @@ export inline void PrintLine(int message)
     PrintLine();
 }
 
-export inline void PrintLine(float message)
+export inline void PrintLine(f32 message)
 {
     Print(message);
     PrintLine();

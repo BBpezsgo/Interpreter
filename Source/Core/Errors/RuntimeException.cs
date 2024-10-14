@@ -15,13 +15,12 @@ public class RuntimeException : LanguageException
         ImmutableArray.Create(DebugUtils.TraceCalls(Context.Value.Memory, Context.Value.Registers.BasePointer, DebugInformation.StackOffsets));
 
     public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
-    public RuntimeException(string message, Exception inner) : base(message, inner) { }
     public RuntimeException(string message, RuntimeContext context, DebugInformation? debugInformation) : base(message, Position.UnknownPosition, null)
     {
         Context = context;
         DebugInformation = debugInformation;
     }
-    public RuntimeException(string message, Exception inner, RuntimeContext context, DebugInformation? debugInformation) : this(message, inner)
+    public RuntimeException(string message, Exception inner, RuntimeContext context, DebugInformation? debugInformation) : base(message, inner)
     {
         Context = context;
         DebugInformation = debugInformation;
@@ -197,7 +196,6 @@ public class RuntimeException : LanguageException
                     result.Append(' ', CallStackIndent);
                     result.Append(' ', scopeDepth);
                     AppendType(item.Type);
-                    // result.Append(item.Type.ToString());
                     result.Append(' ');
                     if (item.Kind == StackElementKind.Internal)
                     {

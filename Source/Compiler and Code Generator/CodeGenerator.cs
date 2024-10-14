@@ -1,4 +1,4 @@
-﻿using LanguageCore.Parser;
+using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
@@ -1799,7 +1799,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     protected void AssignTypeCheck(GeneralType destination, CompiledValue value, IPositioned valuePosition)
     {
-        if (destination.TryGetNumericType(out var numericType))
+        if (destination.TryGetNumericType(out NumericType numericType))
         {
             if (numericType == NumericType.Float) return;
             (CompiledValue min, CompiledValue max) = destination.GetBitWidth(this) switch

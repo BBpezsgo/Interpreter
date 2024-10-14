@@ -2403,7 +2403,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         throw new CompilerException($"Type \"{prevStatementType}\" does not have a field \"{field.Identifier}\"", field, CurrentFile);
     }
-    protected GeneralType FindStatementType(TypeCast @as)
+    protected GeneralType FindStatementType(BasicTypeCast @as)
+    {
+        GeneralType type = GeneralType.From(@as.Type, FindType);
+        @as.Type.SetAnalyzedType(type);
+        return OnGotStatementType(@as, type);
+    }
+    protected GeneralType FindStatementType(ManagedTypeCast @as)
     {
         GeneralType type = GeneralType.From(@as.Type, FindType);
         @as.Type.SetAnalyzedType(type);
@@ -2444,7 +2450,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             NewInstance v => FindStatementType(v),
             ConstructorCall v => FindStatementType(v),
             Field v => FindStatementType(v),
-            TypeCast v => FindStatementType(v),
+            BasicTypeCast v => FindStatementType(v),
+            ManagedTypeCast v => FindStatementType(v),
             KeywordCall v => FindStatementType(v),
             IndexCall v => FindStatementType(v),
             ModifiedStatement v => FindStatementType(v, expectedType),
@@ -3013,10 +3020,21 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             Semicolon = statement.Semicolon,
         };
 
-    static TypeCast InlineMacro(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
+    static BasicTypeCast InlineMacro(BasicTypeCast statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
             keyword: statement.Keyword,
+            type: statement.Type)
+        {
+            SaveValue = statement.SaveValue,
+            Semicolon = statement.Semicolon,
+
+            CompiledType = statement.CompiledType,
+        };
+
+    static ManagedTypeCast InlineMacro(ManagedTypeCast statement, Dictionary<string, StatementWithValue> parameters)
+        => new(
+            prevStatement: InlineMacro(statement.PrevStatement, parameters),
             type: statement.Type)
         {
             SaveValue = statement.SaveValue,
@@ -3051,7 +3069,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         LiteralStatement v => InlineMacro(v, parameters),
         Field v => InlineMacro(v, parameters),
         IndexCall v => InlineMacro(v, parameters),
-        TypeCast v => InlineMacro(v, parameters),
+        BasicTypeCast v => InlineMacro(v, parameters),
+        ManagedTypeCast v => InlineMacro(v, parameters),
         ModifiedStatement v => InlineMacro(v, parameters),
         TypeStatement v => v,
         ConstructorCall v => InlineMacro(v, parameters),
@@ -3581,7 +3600,20 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute(TypeCast typeCast, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(BasicTypeCast typeCast, EvaluationContext context, out CompiledValue value)
+    {
+        if (TryCompute(typeCast.PrevStatement, context, out value))
+        {
+            GeneralType type = GeneralType.From(typeCast.Type, FindType, TryCompute);
+            if (!type.Is(out BuiltinType? builtinType)) return false;
+            value = CompiledValue.CreateUnsafe(value.I32, builtinType.RuntimeType);
+            return true;
+        }
+
+        value = CompiledValue.Null;
+        return false;
+    }
+    bool TryCompute(ManagedTypeCast typeCast, EvaluationContext context, out CompiledValue value)
     {
         if (TryCompute(typeCast.PrevStatement, context, out value))
         {
@@ -3656,7 +3688,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             FunctionCall v => TryCompute(v, context, out value),
             AnyCall v => TryCompute(v, context, out value),
             Identifier v => TryCompute(v, context, out value),
-            TypeCast v => TryCompute(v, context, out value),
+            BasicTypeCast v => TryCompute(v, context, out value),
+            ManagedTypeCast v => TryCompute(v, context, out value),
             Field v => TryCompute(v, context, out value),
             IndexCall v => TryCompute(v, context, out value),
             ModifiedStatement => false,

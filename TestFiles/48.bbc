@@ -1,1 +1,1 @@
-return ((46 as byte) + (222 as byte)) as int;
+return (int)(((byte)46) + ((byte)222));

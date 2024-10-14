@@ -21,4 +21,4 @@ struct A
 temp A* a = new A*(55);
 A b = new A(66);
 
-return ((a._isPtr as int) * a._a) + ((b._isPtr as int) * b._a);
+return (((int)a._isPtr) * a._a) + (((int)b._isPtr) * b._a);

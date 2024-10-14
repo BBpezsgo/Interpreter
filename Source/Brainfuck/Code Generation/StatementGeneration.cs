@@ -841,7 +841,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case ShortOperatorCall v: GenerateCodeForStatement(v); break;
             case CompoundAssignment v: GenerateCodeForStatement(v); break;
             case VariableDeclaration v: GenerateCodeForStatement(v); break;
-            case TypeCast v: GenerateCodeForStatement(v); break;
+            case BasicTypeCast v: GenerateCodeForStatement(v); break;
+            case ManagedTypeCast v: GenerateCodeForStatement(v); break;
             case NewInstance v: GenerateCodeForStatement(v); break;
             case ConstructorCall v: GenerateCodeForStatement(v); break;
             case Field v: GenerateCodeForStatement(v); break;
@@ -968,7 +969,18 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
 
         {
-            if (@if.Condition is TypeCast _typeCast &&
+            if (@if.Condition is BasicTypeCast _basicTypeCast &&
+                GeneralType.From(_basicTypeCast.Type, FindType, TryCompute).Is<BuiltinType>() &&
+                _basicTypeCast.PrevStatement is Literal _literal &&
+                _literal.Type == LiteralType.String)
+            {
+                GenerateCodeForStatement(Block.CreateIfNotBlock(@if.Block));
+                return;
+            }
+        }
+
+        {
+            if (@if.Condition is ManagedTypeCast _typeCast &&
                 GeneralType.From(_typeCast.Type, FindType, TryCompute).Is<BuiltinType>() &&
                 _typeCast.PrevStatement is Literal _literal &&
                 _literal.Type == LiteralType.String)
@@ -2512,7 +2524,22 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
         }
     }
-    void GenerateCodeForStatement(TypeCast typeCast)
+    void GenerateCodeForStatement(BasicTypeCast typeCast)
+    {
+        GeneralType statementType = FindStatementType(typeCast.PrevStatement);
+        GeneralType targetType = GeneralType.From(typeCast.Type, FindType, TryCompute);
+        typeCast.Type.SetAnalyzedType(targetType);
+        OnGotStatementType(typeCast, targetType);
+
+        if (statementType.SameAs(targetType))
+        { AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", typeCast.Keyword, CurrentFile)); }
+
+        if (statementType.GetSize(this) != targetType.GetSize(this))
+        { throw new CompilerException($"Can't convert {statementType} ({statementType.GetSize(this)} bytes) to {targetType} ({statementType.GetSize(this)} bytes)", typeCast.Keyword, CurrentFile); }
+
+        GenerateCodeForStatement(typeCast.PrevStatement);
+    }
+    void GenerateCodeForStatement(ManagedTypeCast typeCast)
     {
         GeneralType statementType = FindStatementType(typeCast.PrevStatement);
         GeneralType targetType = GeneralType.From(typeCast.Type, FindType, TryCompute);
@@ -2520,7 +2547,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         OnGotStatementType(typeCast, targetType);
 
         if (statementType.GetSize(this) != targetType.GetSize(this))
-        { throw new CompilerException($"Type-cast is not supported at the moment", new Position(typeCast.Keyword, typeCast.Type), CurrentFile); }
+        { throw new CompilerException($"Type-cast is not supported at the moment", typeCast, CurrentFile); }
 
         GenerateCodeForStatement(typeCast.PrevStatement);
     }
@@ -3175,9 +3202,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         variable.Type.Is<PointerType>())
                     {
                         GenerateDestructor(
-                            new TypeCast(
+                            new ManagedTypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
-                                Token.CreateAnonymous(StatementKeywords.As),
                                 new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
@@ -3313,9 +3339,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         variable.Type.Is<PointerType>())
                     {
                         GenerateDestructor(
-                            new TypeCast(
+                            new ManagedTypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
-                                Token.CreateAnonymous(StatementKeywords.As),
                                 new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );
@@ -3613,9 +3638,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         variable.Type.Is<PointerType>())
                     {
                         GenerateDestructor(
-                            new TypeCast(
+                            new ManagedTypeCast(
                                 new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
-                                Token.CreateAnonymous(StatementKeywords.As),
                                 new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, CurrentFile), Token.CreateAnonymous("*", TokenType.Operator))
                                 )
                             );

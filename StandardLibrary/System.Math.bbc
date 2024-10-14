@@ -12,7 +12,7 @@ export inline float Sin(float x)
     for (int counter = 0; counter < 100; counter++)
 	{
         fac += 2;
-        value *= -1 * x * x / ((fac * (fac - 1)) as float);
+        value *= -1 * x * x / ((float)(fac * (fac - 1)));
         sum += value;
     }
 
@@ -33,7 +33,7 @@ export inline float Cos(float x)
     for (int counter = 0; counter < 100; counter++)
 	{
         fac += 2;
-        value *= -1 * x * x / ((fac * (fac - 1)) as float);
+        value *= -1 * x * x / ((float)(fac * (fac - 1)));
         sum += value;
     }
 
@@ -115,7 +115,7 @@ float Sqrt(int number)
         // then break
         if (mid * mid == number)
         {
-            ans = mid as float;
+            ans = (float)mid;
             break;
         }
  
@@ -123,7 +123,7 @@ float Sqrt(int number)
         if (mid * mid < number)
         {
             // first start value should be added to answer
-            ans = start as float;
+            ans = (float)start;
             // then start should be changed
             start = mid + 1;
         }
@@ -140,11 +140,11 @@ float Sqrt(int number)
     {
         while (ans * ans <= number)
         {
-            ans += increment as float;
+            ans += (float)increment;
         }
  
         // Loop terminates, when ans * ans > number
-        ans = ans - (increment as float);
+        ans = ans - ((float)increment);
         increment = increment / 10;
     }
     return ans;
@@ -232,8 +232,8 @@ export inline int Log10(i32 v)
  */
 export inline byte Log10(u8 v)
 {
-    if (v >= 100) { return 2 as u8; }
-    if (v >= 10) { return 1 as u8; }
+    if (v >= 100) { return (u8)2; }
+    if (v >= 10) { return (u8)1; }
 }
 
 /**

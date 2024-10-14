@@ -832,15 +832,19 @@ public sealed class Parser
 
     bool ExpectIndex(StatementWithValue prevStatement, [NotNullWhen(true)] out IndexCall? statement)
     {
+        int savedToken = CurrentTokenIndex;
+
         if (!ExpectOperator("[", out Token? bracketStart))
         {
             statement = null;
+            CurrentTokenIndex = savedToken;
             return false;
         }
 
         if (!ExpectExpression(out StatementWithValue? expression))
         {
             statement = null;
+            CurrentTokenIndex = savedToken;
             return false;
         }
 
@@ -862,6 +866,10 @@ public sealed class Parser
         else if (ExpectLiteral(out Literal? literal))
         {
             statementWithValue = literal;
+        }
+        else if (ExpectTypeCast(out ManagedTypeCast? typeCast))
+        {
+            statementWithValue = typeCast;
         }
         else if (ExpectOperator("(", out Token? bracketStart1))
         {
@@ -982,11 +990,46 @@ public sealed class Parser
                 if (!ExpectType(AllowedType.StackArrayWithoutLength, out TypeInstance? type))
                 { throw new SyntaxException($"Expected type after keyword \"{keyword}\"", keyword.Position.After(), File); }
 
-                statementWithValue = new TypeCast(statementWithValue, keyword, type);
+                statementWithValue = new BasicTypeCast(statementWithValue, keyword, type);
             }
         }
 
         return statementWithValue != null;
+    }
+
+    bool ExpectTypeCast([NotNullWhen(true)] out ManagedTypeCast? typeCast)
+    {
+        int savedToken = CurrentTokenIndex;
+        typeCast = default;
+
+        if (!ExpectOperator("(", out Token? leftTypeBracket))
+        {
+            CurrentTokenIndex = savedToken;
+            return false;
+        }
+
+        if (!ExpectType(AllowedType.Any | AllowedType.FunctionPointer | AllowedType.StackArrayWithoutLength, out TypeInstance? type))
+        {
+            CurrentTokenIndex = savedToken;
+            return false;
+        }
+
+        if (!ExpectOperator(")", out Token? rightTypeBracket))
+        {
+            CurrentTokenIndex = savedToken;
+            return false;
+        }
+
+        // { throw new SyntaxException($"Expected ')' after type of the type cast", type.Position.After(), File); }
+        if (!ExpectOneValue(out StatementWithValue? value, false))
+        {
+            CurrentTokenIndex = savedToken;
+            return false;
+        }
+        // { throw new SyntaxException($"Expected one value for the type cast", rightTypeBracket.Position.After(), File); }
+
+        typeCast = new ManagedTypeCast(value, type);
+        return true;
     }
 
     bool ExpectVariableAddressGetter([NotNullWhen(true)] out AddressGetter? statement)

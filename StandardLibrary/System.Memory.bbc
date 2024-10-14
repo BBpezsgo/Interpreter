@@ -12,7 +12,7 @@ export void GetHeader(byte* ptr, byte* size, byte* allocated)
     byte value = *ptr;
     if (value >= StatusFlag) // value & StatusFlag
     {
-        *size = value - StatusFlag; // value & ~(StatusFlag as byte)
+        *size = value - StatusFlag; // value & ~((byte)StatusFlag)
         *allocated = 1;
     }
     else
@@ -24,14 +24,14 @@ export void GetHeader(byte* ptr, byte* size, byte* allocated)
 
 export void SetHeader(byte* ptr, byte size, byte allocated)
 {
-    if (size > (MaxHeapSize as int))
+    if (size > ((int)MaxHeapSize))
     { throw "What"; }
 
     byte value = size;
 
     if (allocated)
     {
-        value += StatusFlag; // value |= StatusFlag as byte
+        value += StatusFlag; // value |= (byte)StatusFlag
     }
     
     *ptr = value;
@@ -40,8 +40,8 @@ export void SetHeader(byte* ptr, byte size, byte allocated)
 byte JoinFreeBlocks()
 {
     byte* headerPointer = 0;
-    byte prevBlockSize = 0 as byte;
-    while (headerPointer < (MaxHeapSize as int))
+    byte prevBlockSize = (byte)0;
+    while (headerPointer < ((int)MaxHeapSize))
     {
         byte blockSize;
         byte blockUsed;
@@ -50,7 +50,7 @@ byte JoinFreeBlocks()
         // This is a free block that is not at the beginning of the heap
         if (headerPointer != 0 && blockUsed == 0)
         {
-            byte* prevOffset = headerPointer - (prevBlockSize as int) - 1;
+            byte* prevOffset = headerPointer - ((int)prevBlockSize) - 1;
 
             byte d;
             byte prevBlockUsed;
@@ -60,10 +60,10 @@ byte JoinFreeBlocks()
             if (prevBlockUsed == 0)
             {
                 // Update the previous block's header
-                SetHeader(prevOffset, (blockSize + prevBlockSize + 1) as byte, 0 as byte);
+                SetHeader(prevOffset, (byte)(blockSize + prevBlockSize + 1), (byte)0);
                 // Remove the current block's header
-                *headerPointer = 0 as byte;
-                return 1 as byte;
+                *headerPointer = (byte)0;
+                return (byte)1;
             }
         }
 
@@ -72,7 +72,7 @@ byte JoinFreeBlocks()
         // Jump to the next block's header offset
         headerPointer += blockSize + 1;
     }
-    return 0 as byte;
+    return (byte)0;
 }
 
 [Builtin("alloc")]
@@ -86,7 +86,7 @@ export any* Alloc(int sizeNeed)
     byte* headerPointer;
     while (1)
     {
-        if (headerPointer >= (MaxHeapSize as int)) { throw "Out of memory"; }
+        if (headerPointer >= ((int)MaxHeapSize)) { throw "Out of memory"; }
 
         byte blockSize;
         byte blockUsed;
@@ -99,7 +99,7 @@ export any* Alloc(int sizeNeed)
             if (blockSize == sizeNeed)
             {
                 // Update the current block's header
-                SetHeader(headerPointer, sizeNeed as byte, 1 as byte);
+                SetHeader(headerPointer, (byte)sizeNeed, (byte)1);
 
                 return dataPointer;
             }
@@ -108,18 +108,18 @@ export any* Alloc(int sizeNeed)
             if (blockSize > sizeNeed)
             {
                 // Update the current block's header
-                SetHeader(headerPointer, sizeNeed as byte, 1 as byte);
+                SetHeader(headerPointer, (byte)sizeNeed, (byte)1);
 
                 byte* nextHeaderPointer = (dataPointer + sizeNeed) as byte*;
 
                 // Calculate remaining size
-                byte _remainingSize = blockSize - (sizeNeed as byte) - 1;
+                byte _remainingSize = blockSize - ((byte)sizeNeed) - 1;
 
                 // If a larger block is allocated than needed
                 if (_remainingSize >= 0)
                 {
                     // Update the next block's header
-                    SetHeader(nextHeaderPointer, _remainingSize, 0 as byte);
+                    SetHeader(nextHeaderPointer, _remainingSize, (byte)0);
                 }
 
                 return dataPointer;
@@ -144,7 +144,7 @@ export void Dealloc(any* ptr)
     if (allocated == 0)
     { return; }
 
-    SetHeader((ptr - 1) as byte*, size, 0 as byte);
+    SetHeader((ptr - 1) as byte*, size, (byte)0);
 
     // *(ptr - 1) = 0;
 

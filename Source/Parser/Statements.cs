@@ -1812,7 +1812,7 @@ public class Field : StatementWithValue, IReferenceableTo<CompiledField>
     }
 }
 
-public class TypeCast : StatementWithValue, IHaveType
+public class BasicTypeCast : StatementWithValue, IHaveType
 {
     public StatementWithValue PrevStatement { get; }
     public Token Keyword { get; }
@@ -1820,7 +1820,7 @@ public class TypeCast : StatementWithValue, IHaveType
 
     public override Position Position => new(PrevStatement, Keyword, Type);
 
-    public TypeCast(StatementWithValue prevStatement, Token keyword, TypeInstance type)
+    public BasicTypeCast(StatementWithValue prevStatement, Token keyword, TypeInstance type)
     {
         PrevStatement = prevStatement;
         Keyword = keyword;
@@ -1829,6 +1829,31 @@ public class TypeCast : StatementWithValue, IHaveType
 
     public override string ToString()
         => $"{SurroundingBracelet?.Start}{PrevStatement} {Keyword} {Type}{SurroundingBracelet?.End}{Semicolon}";
+
+    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    {
+        if (includeThis) yield return this;
+
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        { yield return statement; }
+    }
+}
+
+public class ManagedTypeCast : StatementWithValue, IHaveType
+{
+    public StatementWithValue PrevStatement { get; }
+    public TypeInstance Type { get; }
+
+    public override Position Position => new(PrevStatement, Type);
+
+    public ManagedTypeCast(StatementWithValue prevStatement, TypeInstance type)
+    {
+        PrevStatement = prevStatement;
+        Type = type;
+    }
+
+    public override string ToString()
+        => $"{SurroundingBracelet?.Start}({Type}){PrevStatement}{SurroundingBracelet?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {

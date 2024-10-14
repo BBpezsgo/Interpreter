@@ -6,4 +6,4 @@ byte size;
 byte allocated;
 GetHeader(&header, &size, &allocated);
 
-return (size - allocated) as int;
+return (int)(size - allocated);

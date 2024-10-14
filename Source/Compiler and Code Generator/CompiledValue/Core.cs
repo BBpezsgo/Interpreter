@@ -46,6 +46,15 @@ public readonly partial struct CompiledValue
     public CompiledValue(bool value) : this((byte)(value ? 1 : 0))
     { }
 
+    CompiledValue(int value, RuntimeType type) : this(type)
+    { I32 = value; }
+
+    CompiledValue(float value, RuntimeType type) : this(type)
+    { F32 = value; }
+
+    public static CompiledValue CreateUnsafe(int value, RuntimeType type) => new(value, type);
+    public static CompiledValue CreateUnsafe(float value, RuntimeType type) => new(value, type);
+
     #endregion
 
     public string GetDebuggerDisplay() => Type switch

@@ -13,4 +13,4 @@ a._b = 66666666;
 temp A* b = new A*;
 *b = a;
 
-return (b._a as int) + b._b;
+return ((int)b._a) + b._b;

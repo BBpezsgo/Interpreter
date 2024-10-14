@@ -21,11 +21,11 @@ export void Print(char message);
 inline u8 _FindMaxPowOf10(u8 num)
 {
     u8 result = 1;
-    num /= (10 as u8);
+    num /= ((u8)10);
     while (num)
     {
-        result *= (10 as u8);
-        num /= (10 as u8);
+        result *= ((u8)10);
+        num /= ((u8)10);
     }
     return result;
 }
@@ -35,12 +35,12 @@ inline u8 _FindMaxPowOf10(u8 num)
  */
 inline i8 _FindMaxPowOf10(i8 num)
 {
-    i8 result = (1 as i8);
-    num /= (10 as i8);
+    i8 result = ((i8)1);
+    num /= ((i8)10);
     while (num)
     {
-        result *= (10 as i8);
-        num /= (10 as i8);
+        result *= ((i8)10);
+        num /= ((i8)10);
     }
     return result;
 }
@@ -51,11 +51,11 @@ inline i8 _FindMaxPowOf10(i8 num)
 inline u16 _FindMaxPowOf10(u16 num)
 {
     u16 result = 1;
-    num /= (10 as u16);
+    num /= ((u16)10);
     while (num)
     {
-        result *= (10 as u16);
-        num /= (10 as u16);
+        result *= ((u16)10);
+        num /= ((u16)10);
     }
     return result;
 }
@@ -65,12 +65,12 @@ inline u16 _FindMaxPowOf10(u16 num)
  */
 inline i16 _FindMaxPowOf10(i16 num)
 {
-    i16 result = (1 as i16);
-    num /= (10 as i16);
+    i16 result = ((i16)1);
+    num /= ((i16)10);
     while (num)
     {
-        result *= (10 as i16);
-        num /= (10 as i16);
+        result *= ((i16)10);
+        num /= ((i16)10);
     }
     return result;
 }
@@ -80,12 +80,12 @@ inline i16 _FindMaxPowOf10(i16 num)
  */
 inline u32 _FindMaxPowOf10(u32 num)
 {
-    u32 result = (1 as u32);
-    num /= (10 as u32);
+    u32 result = ((u32)1);
+    num /= ((u32)10);
     while (num)
     {
-        result *= (10 as u32);
-        num /= (10 as u32);
+        result *= ((u32)10);
+        num /= ((u32)10);
     }
     return result;
 }
@@ -95,12 +95,12 @@ inline u32 _FindMaxPowOf10(u32 num)
  */
 inline i32 _FindMaxPowOf10(i32 num)
 {
-    i32 result = (1 as i32);
-    num /= (10 as i32);
+    i32 result = ((i32)1);
+    num /= ((i32)10);
     while (num)
     {
-        result *= (10 as i32);
-        num /= (10 as i32);
+        result *= ((i32)10);
+        num /= ((i32)10);
     }
     return result;
 }
@@ -120,7 +120,7 @@ export inline void Print(int message)
     while (pow10)
     {
         int digit = message / pow10;
-        Print((digit + '0') as char);
+        Print((char)(digit + '0'));
         message -= digit * pow10;
         pow10 /= 10;
     }
@@ -135,9 +135,9 @@ export inline void Print(u8 message)
     while (pow10)
     {
         u8 digit = message / pow10;
-        Print((digit + ('0' as u8)) as char);
+        Print((char)(digit + ((u8)'0')));
         message -= digit * pow10;
-        pow10 /= (10 as u8);
+        pow10 /= ((u8)10);
     }
 }
 
@@ -146,19 +146,19 @@ export inline void Print(u8 message)
  */
 export inline void Print(i8 message)
 {
-    if (message < (0 as i8))
+    if (message < ((i8)0))
     {
         Print('-');
-        message = message * (-1 as i8);
+        message = message * ((i8)(-1));
     }
     
     i8 pow10 = _FindMaxPowOf10(message);
     while (pow10)
     {
         i8 digit = message / pow10;
-        Print((digit + ('0' as i8)) as char);
+        Print((char)(digit + ((i8)'0')));
         message -= digit * pow10;
-        pow10 /= (10 as i8);
+        pow10 /= ((i8)10);
     }
 }
 
@@ -171,9 +171,9 @@ export inline void Print(u16 message)
     while (pow10)
     {
         u16 digit = message / pow10;
-        Print((digit + ('0' as u16)) as char);
+        Print((char)(digit + ((u16)'0')));
         message -= digit * pow10;
-        pow10 /= (10 as u16);
+        pow10 /= ((u16)10);
     }
 }
 
@@ -182,7 +182,7 @@ export inline void Print(u16 message)
  */
 export inline void Print(i16 message)
 {
-    if (message < (0 as i16))
+    if (message < ((i16)0))
     {
         Print('-');
         message = message * -1;
@@ -192,9 +192,9 @@ export inline void Print(i16 message)
     while (pow10)
     {
         i16 digit = message / pow10;
-        Print((digit + ('0' as i16)) as char);
+        Print((char)(digit + ((i16)'0')));
         message -= digit * pow10;
-        pow10 /= (10 as i16);
+        pow10 /= ((i16)10);
     }
 }
 
@@ -207,20 +207,20 @@ export inline void Print(u32 message)
     while (pow10)
     {
         u32 digit = message / pow10;
-        Print((digit + ('0' as u32)) as char);
+        Print((char)(digit + ((u32)'0')));
         message -= digit * pow10;
-        pow10 /= (10 as u32);
+        pow10 /= ((u32)10);
     }
 }
 
 export void Print(temp f32 message)
 {
-    Print(message as int);
+    Print((int)message);
     message %= 1f;
     message *= 1000f;
     Print('.');
     if (message < 0f) { message *= -1f; }
-    Print(message as int);
+    Print((int)message);
 }
 
 export inline void Print(temp string message)

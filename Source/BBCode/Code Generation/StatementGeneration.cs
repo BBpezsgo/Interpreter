@@ -2136,12 +2136,35 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     [DoesNotReturn]
     void GenerateCodeForStatement(LiteralList listValue) => throw new NotImplementedException();
-    void GenerateCodeForStatement(TypeCast typeCast)
+    void GenerateCodeForStatement(BasicTypeCast typeCast)
+    {
+        GeneralType statementType = FindStatementType(typeCast.PrevStatement);
+        GeneralType targetType = GeneralType.From(typeCast.Type, FindType, TryCompute);
+
+        if (statementType.SameAs(targetType))
+        { AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", typeCast.Keyword, CurrentFile)); }
+
+        if (statementType.GetSize(this) != targetType.GetSize(this))
+        { throw new CompilerException($"Can't convert {statementType} ({statementType.GetSize(this)} bytes) to {targetType} ({statementType.GetSize(this)} bytes)", typeCast.Keyword, CurrentFile); }
+
+        typeCast.Type.SetAnalyzedType(targetType);
+        OnGotStatementType(typeCast, targetType);
+
+        GenerateCodeForStatement(typeCast.PrevStatement);
+    }
+    void GenerateCodeForStatement(ManagedTypeCast typeCast)
     {
         GeneralType statementType = FindStatementType(typeCast.PrevStatement);
         GeneralType targetType = GeneralType.From(typeCast.Type, FindType, TryCompute);
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
+
+        if (statementType.SameAs(targetType))
+        {
+            AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", typeCast.Type, CurrentFile));
+            GenerateCodeForStatement(typeCast.PrevStatement);
+            return;
+        }
 
         if (!Settings.DontOptimize &&
             targetType.Is(out BuiltinType? targetBuiltinType) &&
@@ -2152,6 +2175,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
+        // f32 -> i32
         if (statementType.SameAs(BuiltinType.F32) &&
             targetType.SameAs(BuiltinType.I32))
         {
@@ -2160,6 +2184,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
+        // i32 -> f32
         if (statementType.SameAs(BuiltinType.I32) &&
             targetType.SameAs(BuiltinType.F32))
         {
@@ -2218,17 +2243,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return;
             }
 
-            throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.GetSize(this)}) to {targetType} (size of {targetType.GetSize(this)})", new Position(typeCast.Keyword, typeCast.Type), CurrentFile);
+            throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.GetSize(this)}) to {targetType} (size of {targetType.GetSize(this)})", typeCast, CurrentFile);
         }
 
         GenerateCodeForStatement(typeCast.PrevStatement, targetType);
-
-        GeneralType type = FindStatementType(typeCast.PrevStatement, targetType);
-
-        if (!targetType.Is<FunctionType>() && type.SameAs(targetType))
-        {
-            AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", typeCast.Keyword, CurrentFile));
-        }
     }
 
     /// <param name="silent">
@@ -2287,7 +2305,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case ConstructorCall v: GenerateCodeForStatement(v); break;
             case IndexCall v: GenerateCodeForStatement(v); break;
             case Field v: GenerateCodeForStatement(v); break;
-            case TypeCast v: GenerateCodeForStatement(v); break;
+            case BasicTypeCast v: GenerateCodeForStatement(v); break;
+            case ManagedTypeCast v: GenerateCodeForStatement(v); break;
             case ModifiedStatement v: GenerateCodeForStatement(v); break;
             case AnyCall v: GenerateCodeForStatement(v); break;
             case Block v: GenerateCodeForStatement(v); break;

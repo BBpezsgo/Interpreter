@@ -2592,8 +2592,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         GeneralType targetType = FindStatementType(statementToSet);
         GeneralType valueType = FindStatementType(value, targetType);
+        GeneralType pointerValueType = FindStatementType(statementToSet.PrevStatement);
 
         AssignTypeCheck(targetType, valueType, value);
+
+        if (pointerValueType.GetBitWidth(this) != PointerBitWidth)
+        { throw new CompilerException($"Type {pointerValueType} cant be a pointer", statementToSet.PrevStatement, CurrentFile); }
 
         GenerateCodeForStatement(value, targetType);
 

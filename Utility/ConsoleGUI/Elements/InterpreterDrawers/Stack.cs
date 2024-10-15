@@ -208,6 +208,10 @@ public partial class InterpreterElement
                     }
 
                     break;
+                case AliasType v:
+                    b.ForegroundColor = CharColor.BrightGreen;
+                    b.AddText(v.ToString());
+                    break;
                 default:
                     b.ForegroundColor = CharColor.Gray;
                     b.AddText(type.ToString());

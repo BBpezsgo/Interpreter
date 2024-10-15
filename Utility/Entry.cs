@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using CommandLine;
@@ -236,14 +236,7 @@ public static class Entry
                     }
                     else
                     {
-                        if (interpreter.Processor.Registers.StackPointer < 0 || interpreter.Processor.Registers.StackPointer >= interpreter.Processor.Memory.Length)
-                        {
-                            stack = Enumerable.Empty<byte>();
-                        }
-                        else
-                        {
-                            stack = new ArraySegment<byte>(interpreter.Processor.Memory)[interpreter.Processor.Registers.StackPointer..].Reverse();
-                        }
+                        stack = new ArraySegment<byte>(interpreter.Processor.Memory)[interpreter.Processor.Registers.StackPointer..(interpreter.Processor.StackStart + 1)].Reverse();
                     }
 #pragma warning restore CS0162 // Unreachable code detected
 

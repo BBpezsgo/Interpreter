@@ -323,13 +323,29 @@ public sealed class Compiler
         return false;
     }
 
-    CompiledStruct CompileStruct(StructDefinition @struct)
+    CompiledStruct CompileStructNoFields(StructDefinition @struct)
     {
         if (LanguageConstants.KeywordList.Contains(@struct.Identifier.Content))
         { throw new CompilerException($"Illegal struct name \"{@struct.Identifier.Content}\"", @struct.Identifier, @struct.File); }
 
         @struct.Identifier.AnalyzedType = TokenAnalyzedType.Struct;
 
+        if (@struct.Template is not null)
+        {
+            GenericParameters.Push(@struct.Template.Parameters);
+            foreach (Token typeParameter in @struct.Template.Parameters)
+            { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
+        }
+
+        if (@struct.Template is not null)
+        { GenericParameters.Pop(); }
+
+        // Oh no wtf
+        return new CompiledStruct(@struct.Fields.Select(v => new CompiledField(BuiltinType.Any, null!, v)), @struct);
+    }
+
+    void CompileStructFields(CompiledStruct @struct)
+    {
         if (@struct.Template is not null)
         {
             GenericParameters.Push(@struct.Template.Parameters);
@@ -348,7 +364,7 @@ public sealed class Compiler
         if (@struct.Template is not null)
         { GenericParameters.Pop(); }
 
-        return new CompiledStruct(compiledFields, @struct);
+        @struct.SetFields(compiledFields);
     }
 
     public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, IExternalFunction externalFunction)
@@ -650,12 +666,22 @@ public sealed class Compiler
             CompiledAliases.Add(alias);
         }
 
+        // First compile the structs without fields
+        // so it can reference other structs that are
+        // not compiled but will be.
         foreach (StructDefinition @struct in Structs)
         {
             if (IsThingExists(@struct))
             { throw new CompilerException("Symbol already exists", @struct.Identifier, @struct.File); }
 
-            CompiledStructs.Add(CompileStruct(@struct));
+            CompiledStructs.Add(CompileStructNoFields(@struct));
+        }
+
+        // Now compile the fields. Now every struct is compiled
+        // so it can reference other structs.
+        foreach (CompiledStruct @struct in CompiledStructs)
+        {
+            CompileStructFields(@struct);
         }
 
         foreach (FunctionDefinition @operator in Operators)

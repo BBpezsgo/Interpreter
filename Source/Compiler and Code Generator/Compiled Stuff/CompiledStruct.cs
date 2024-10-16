@@ -6,7 +6,7 @@ public class CompiledStruct : StructDefinition,
     IReferenceable<TypeInstance>,
     IDuplicatable<CompiledStruct>
 {
-    public new ImmutableArray<CompiledField> Fields { get; }
+    public new ImmutableArray<CompiledField> Fields { get; private set; }
     public List<Reference<TypeInstance>> References { get; }
 
     public CompiledStruct(IEnumerable<CompiledField> fields, StructDefinition definition) : base(definition)
@@ -26,6 +26,12 @@ public class CompiledStruct : StructDefinition,
     }
 
     public CompiledStruct Duplicate() => new(Fields, this);
+
+    public void SetFields(IEnumerable<CompiledField> fields)
+    {
+        Fields = fields.ToImmutableArray();
+        foreach (CompiledField field in fields) field.Context = this;
+    }
 
     public bool TryGetTypeArgumentIndex(string typeArgumentName, out int index)
     {

@@ -113,6 +113,21 @@ public partial class BytecodeProcessor
         Step();
     }
 
+    void CompareF()
+    {
+        float a = GetData(CurrentInstruction.Operand1).F32;
+        float b = GetData(CurrentInstruction.Operand2).F32;
+
+        float result = a - b;
+
+        Registers.Flags.Set(Flags.Sign, result < 0);
+        Registers.Flags.Set(Flags.Zero, result == 0f);
+        Registers.Flags.Set(Flags.Carry, false);
+        // Registers.Flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit32) == (long)SignBit32);
+
+        Step();
+    }
+
     #endregion
 
     #region Logic Operations

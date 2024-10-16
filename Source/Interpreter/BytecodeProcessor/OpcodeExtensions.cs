@@ -26,6 +26,7 @@ public static class OpcodeExtensions
         Opcode.CallExternal => 1,
         Opcode.Crash => 1,
         Opcode.Compare => 2,
+        Opcode.CompareF => 2,
         Opcode.LogicOR => 2,
         Opcode.LogicAND => 2,
         Opcode.BitsAND => 2,

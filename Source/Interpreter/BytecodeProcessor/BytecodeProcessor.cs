@@ -110,6 +110,7 @@ public partial class BytecodeProcessor
             case Opcode.FMathMod: FMathMod(); break;
 
             case Opcode.Compare: Compare(); break;
+            case Opcode.CompareF: CompareF(); break;
 
             case Opcode.BitsShiftLeft: BitsShiftLeft(); break;
             case Opcode.BitsShiftRight: BitsShiftRight(); break;

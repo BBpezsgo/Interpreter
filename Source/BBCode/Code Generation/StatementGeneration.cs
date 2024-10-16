@@ -1072,7 +1072,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         break;
 
                     case BinaryOperatorCall.CompEQ:
-                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfEqual, 3);
                         AddInstruction(Opcode.Push, false);
                         AddInstruction(Opcode.Jump, 2);
@@ -1080,7 +1080,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         break;
 
                     case BinaryOperatorCall.CompNEQ:
-                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfNotEqual, 3);
                         AddInstruction(Opcode.Push, false);
                         AddInstruction(Opcode.Jump, 2);
@@ -1088,7 +1088,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         break;
 
                     case BinaryOperatorCall.CompGT:
-                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfLessOrEqual, 3);
                         AddInstruction(Opcode.Push, true);
                         AddInstruction(Opcode.Jump, 2);
@@ -1096,7 +1096,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         break;
 
                     case BinaryOperatorCall.CompGEQ:
-                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfLess, 3);
                         AddInstruction(Opcode.Push, true);
                         AddInstruction(Opcode.Jump, 2);
@@ -1104,7 +1104,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         break;
 
                     case BinaryOperatorCall.CompLT:
-                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfLess, 3);
                         AddInstruction(Opcode.Push, false);
                         AddInstruction(Opcode.Jump, 2);
@@ -1112,7 +1112,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         break;
 
                     case BinaryOperatorCall.CompLEQ:
-                        AddInstruction(Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfLessOrEqual, 3);
                         AddInstruction(Opcode.Push, false);
                         AddInstruction(Opcode.Jump, 2);

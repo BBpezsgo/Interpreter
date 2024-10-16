@@ -53,6 +53,7 @@ public partial class InterpreterElement
                     HandleSourceOperand(instruction.Operand1);
                     break;
                 case Opcode.Compare:
+                case Opcode.CompareF:
                     HandleSourceOperand(instruction.Operand1);
                     HandleSourceOperand(instruction.Operand2);
                     break;

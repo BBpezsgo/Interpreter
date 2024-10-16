@@ -170,6 +170,13 @@ public enum Opcode : byte
     /// </summary>
     Compare,
 
+    /// <summary>
+    /// <code>
+    /// <see langword="temp"/> = <paramref name="DST"/> - <paramref name="SRC"/>
+    /// </code>
+    /// </summary>
+    CompareF,
+
     #endregion
 
     #region === LOGIC OPERATIONS ===

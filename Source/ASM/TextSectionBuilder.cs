@@ -93,6 +93,7 @@ public class TextSectionBuilder : SectionBuilder
         Runtime.Opcode.MathAdd => "add",
         Runtime.Opcode.MathSub => "sub",
         Runtime.Opcode.Compare => "cmp",
+        Runtime.Opcode.CompareF => "cmp",
         Runtime.Opcode.MathMult => "mul",
         Runtime.Opcode.MathDiv => "div",
         Runtime.Opcode.BitsAND => "and",

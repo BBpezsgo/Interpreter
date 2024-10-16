@@ -106,7 +106,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (allocator.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            StackAlloc(allocator.Type.GetSize(this));
+            StackAlloc(allocator.Type.GetSize(this), false);
             AddComment($"}}");
         }
 
@@ -168,7 +168,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (deallocator.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            StackAlloc(deallocator.Type.GetSize(this));
+            StackAlloc(deallocator.Type.GetSize(this), false);
             AddComment($"}}");
         }
 
@@ -652,7 +652,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            StackAlloc(compiledFunction.Type.GetSize(this));
+            StackAlloc(compiledFunction.Type.GetSize(this), false);
             AddComment($"}}");
         }
 
@@ -718,7 +718,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (compiledFunction.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            StackAlloc(compiledFunction.Type.GetSize(this));
+            StackAlloc(compiledFunction.Type.GetSize(this), false);
             AddComment($"}}");
         }
 
@@ -844,7 +844,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (functionType.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            StackAlloc(functionType.ReturnType.GetSize(this));
+            StackAlloc(functionType.ReturnType.GetSize(this), false);
             AddComment($"}}");
         }
 
@@ -908,7 +908,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment($"Call {operatorDefinition.Identifier} {{");
 
-            StackAlloc(operatorDefinition.Type.GetSize(this));
+            StackAlloc(operatorDefinition.Type.GetSize(this), false);
 
             Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(@operator.Arguments, operatorDefinition);
 
@@ -1178,7 +1178,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             AddComment($"Call {operatorDefinition.Identifier} {{");
 
-            StackAlloc(operatorDefinition.Type.GetSize(this));
+            StackAlloc(operatorDefinition.Type.GetSize(this), false);
 
             Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(@operator.Arguments, operatorDefinition);
 
@@ -1836,7 +1836,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 structType.Struct.References.Add(newObject.Type, CurrentFile);
 
-                StackAlloc(structType.GetSize(this));
+                StackAlloc(structType.GetSize(this), true);
                 break;
             }
 
@@ -2197,11 +2197,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (statementType.GetSize(this) < targetType.GetSize(this))
             {
-                AddComment($"Shrink {statementType} ({statementType.GetSize(this)} bytes) to {targetType} ({targetType.GetSize(this)}) {{");
+                AddComment($"Grow {statementType} ({statementType.GetSize(this)} bytes) to {targetType} ({targetType.GetSize(this)}) {{");
 
                 AddComment("Make space");
 
-                StackAlloc(targetType.GetSize(this));
+                StackAlloc(targetType.GetSize(this), true);
 
                 AddComment("Value");
 
@@ -2222,7 +2222,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment("Make space");
 
-                StackAlloc(targetType.GetSize(this));
+                StackAlloc(targetType.GetSize(this), false);
 
                 AddComment("Value");
 
@@ -2760,7 +2760,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"Initial value {{");
 
             size = compiledVariable.Type.GetSize(this);
-            StackAlloc(size);
+            StackAlloc(size, false);
 
             if (size <= 0)
             { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }

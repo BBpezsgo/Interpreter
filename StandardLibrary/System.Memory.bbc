@@ -83,7 +83,7 @@ export any* Alloc(int sizeNeed)
         crash "What";
     }
 
-    byte* headerPointer;
+    byte* headerPointer = 0;
     while (1)
     {
         if (headerPointer >= ((int)MaxHeapSize)) { crash "Out of memory"; }

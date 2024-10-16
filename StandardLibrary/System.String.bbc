@@ -78,12 +78,12 @@ export string +(temp string a, temp string b)
 
     string result = Alloc((lengthSum + 1) * sizeof(char)) as string;
   
-    for (int i; i < al; i++)
+    for (int i = 0; i < al; i++)
     {
         result[i] = a[i];
     }
   
-    for (int i; i < bl; i++)
+    for (int i = 0; i < bl; i++)
     {
         result[al + i] = b[i];
     }
@@ -104,7 +104,7 @@ export string +(char a, temp string b)
 
     string result = Alloc((length + 2) * sizeof(char)) as string;
   
-    for (int i; i < length; i++)
+    for (int i = 0; i < length; i++)
     {
         result[i + 1] = b[i];
     }
@@ -127,7 +127,7 @@ export string +(temp string a, char b)
 
     string result = Alloc((length + 2) * sizeof(char)) as string;
   
-    for (int i; i < length; i++)
+    for (int i = 0; i < length; i++)
     {
         result[i] = a[i];
     }

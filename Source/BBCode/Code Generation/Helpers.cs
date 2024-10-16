@@ -284,10 +284,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { AddInstruction(Opcode.Pop8); }
     }
 
-    void StackAlloc(int size)
+    void StackAlloc(int size, bool initializeZero)
     {
-        // AddInstruction(Opcode.MathSub, Register.StackPointer, size);
-        // return;
+        if (!initializeZero)
+        {
+            AddInstruction(Opcode.MathSub, Register.StackPointer, size);
+            return;
+        }
+
         if (PointerBitWidth != BitWidth._64)
         {
             int dwordCount = size / 4;
@@ -631,8 +635,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(PointerBitWidth));
-            for (int i = 0; i < size; i++)
-            { PopTo(reg.Get(PointerBitWidth).ToPtr(i + offset, BitWidth._8), BitWidth._8); }
+            PopTo(new AddressOffset(new AddressRegisterPointer(reg.Get(PointerBitWidth)), offset), size);
         }
     }
 

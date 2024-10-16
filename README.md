@@ -56,7 +56,7 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 - `--no-nullcheck` Disables null check generation when dereferencing a pointer
 
 ## Hello World:
-```cs
+```
 using "https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/StandardLibrary/System.Console.bbc";
 
 PrintLine("hello, world");

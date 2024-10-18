@@ -13,19 +13,19 @@ public class BytecodeProcessorEx
         ImmutableArray<Instruction> program,
         byte[]? memory,
         DebugInformation? debugInformation = null,
-        IEnumerable<KeyValuePair<int, IExternalFunction>>? externalFunctions = null)
+        IEnumerable<IExternalFunction>? externalFunctions = null)
     {
         DebugInformation = debugInformation;
 
-        Dictionary<int, IExternalFunction> _externalFunctions = GenerateExternalFunctions();
+        List<IExternalFunction> _externalFunctions = GenerateExternalFunctions();
         IO = IOHandler.Create(_externalFunctions);
         if (externalFunctions is not null) _externalFunctions.AddRange(externalFunctions);
-        Processor = new BytecodeProcessor(program, memory, _externalFunctions.ToFrozenDictionary(), settings);
+        Processor = new BytecodeProcessor(program, memory, _externalFunctions.Select(v => new KeyValuePair<int, IExternalFunction>(v.Id, v)).ToFrozenDictionary(), settings);
     }
 
-    Dictionary<int, IExternalFunction> GenerateExternalFunctions()
+    List<IExternalFunction> GenerateExternalFunctions()
     {
-        Dictionary<int, IExternalFunction> externalFunctions = new();
+        List<IExternalFunction> externalFunctions = new();
 
         externalFunctions.AddExternalFunction("sleep", (int t) => CurrentSleepFinishAt = DateTime.UtcNow.TimeOfDay.TotalSeconds + t);
 
@@ -34,9 +34,9 @@ public class BytecodeProcessorEx
         return externalFunctions;
     }
 
-    public static Dictionary<int, IExternalFunction> GetExternalFunctions()
+    public static List<IExternalFunction> GetExternalFunctions()
     {
-        Dictionary<int, IExternalFunction> externalFunctions = new();
+        List<IExternalFunction> externalFunctions = new();
 
         AddRuntimeExternalFunctions(externalFunctions);
 
@@ -45,7 +45,7 @@ public class BytecodeProcessorEx
         return externalFunctions;
     }
 
-    static void AddRuntimeExternalFunctions(Dictionary<int, IExternalFunction> externalFunctions)
+    static void AddRuntimeExternalFunctions(List<IExternalFunction> externalFunctions)
     {
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdIn, static () => '\0');
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, static (char @char) => { });
@@ -54,7 +54,7 @@ public class BytecodeProcessorEx
         externalFunctions.AddExternalFunction("sleep", static (int t) => { });
     }
 
-    static void AddStaticExternalFunctions(Dictionary<int, IExternalFunction> externalFunctions)
+    static void AddStaticExternalFunctions(List<IExternalFunction> externalFunctions)
     {
         externalFunctions.AddExternalFunction("utc-time", static () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
         externalFunctions.AddExternalFunction("local-time", static () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
@@ -62,6 +62,7 @@ public class BytecodeProcessorEx
         externalFunctions.AddExternalFunction("local-date-day", static () => (int)DateTime.Now.DayOfYear);
         externalFunctions.AddExternalFunction("utc-date-year", static () => (int)DateTime.UtcNow.Year);
         externalFunctions.AddExternalFunction("local-date-year", static () => (int)DateTime.Now.Year);
+        externalFunctions.AddExternalFunction<float, float, float>("atan2", MathF.Atan2);
     }
 
     public void Tick()

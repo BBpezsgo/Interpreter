@@ -121,7 +121,7 @@ class InteractiveCompiler
         {
             Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
 
-            Dictionary<int, IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+            List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
@@ -165,7 +165,7 @@ class InteractiveCompiler
         {
             Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
 
-            Dictionary<int, IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+            List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
@@ -710,7 +710,7 @@ public class Interactive
 
             if (CompilerCache.Tokens.IsEmpty) return;
 
-            Dictionary<int, IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+            List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
             BBLangGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, MainGeneratorSettings.Default);
 

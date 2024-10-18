@@ -3,8 +3,8 @@
 namespace LanguageCore.Runtime;
 
 public delegate ReadOnlySpan<byte> ExternalFunctionSyncCallback(ReadOnlySpan<byte> arguments);
-public delegate void ManagedExternalFunctionAsyncBlockCallback(ReadOnlySpan<byte> arguments, ManagedExternalFunctionAsyncBlockReturnCallback callback);
-public delegate void ManagedExternalFunctionAsyncBlockReturnCallback(ReadOnlySpan<byte> returnValue);
+public delegate ExternalFunctionAsyncReturnChecker ExternalFunctionAsyncCallback(ref ProcessorState processor, ReadOnlySpan<byte> arguments);
+public delegate bool ExternalFunctionAsyncReturnChecker(ref ProcessorState processor, out ReadOnlySpan<byte> returnValue);
 
 public static class ExternalFunctionExtensions
 {
@@ -43,10 +43,10 @@ public readonly struct ExternalFunctionAsyncBlock : IExternalFunction
     public int Id { get; }
     public int ParametersSize { get; }
     public int ReturnValueSize { get; }
-    public ManagedExternalFunctionAsyncBlockCallback Callback { get; }
+    public ExternalFunctionAsyncCallback Callback { get; }
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionAsyncBlock(ManagedExternalFunctionAsyncBlockCallback callback, int id, string? name, int parametersSize, int returnValueSize)
+    public ExternalFunctionAsyncBlock(ExternalFunctionAsyncCallback callback, int id, string? name, int parametersSize, int returnValueSize)
     {
         Callback = callback;
         Id = id;
@@ -61,12 +61,12 @@ public readonly struct ExternalFunctionAsyncBlock : IExternalFunction
 [SuppressMessage("Style", "IDE0059:Unnecessary assignment of a value")]
 public static unsafe class ExternalFunctionGenerator
 {
-    public static bool TryGet(this IReadOnlyDictionary<int, IExternalFunction> externalFunctions, string name, [NotNullWhen(true)] out IExternalFunction? result, [NotNullWhen(false)] out WillBeCompilerException? exception)
+    public static bool TryGet(this IReadOnlyList<IExternalFunction> externalFunctions, string name, [NotNullWhen(true)] out IExternalFunction? result, [NotNullWhen(false)] out WillBeCompilerException? exception)
     {
         result = null;
         exception = null;
 
-        foreach (IExternalFunction function in externalFunctions.Values)
+        foreach (IExternalFunction function in externalFunctions)
         {
             if (function.Name == name)
             {
@@ -89,14 +89,14 @@ public static unsafe class ExternalFunctionGenerator
         return true;
     }
 
-    public static int GenerateId(this Dictionary<int, IExternalFunction> functions, string? name)
+    public static int GenerateId(this List<IExternalFunction> functions, string? name)
     {
         int result;
 
         if (name is not null) result = name.GetHashCode();
         else result = 1;
 
-        while (functions.ContainsKey(result))
+        while (functions.Any(v => v.Id == result))
         { result++; }
 
         return result;
@@ -104,51 +104,54 @@ public static unsafe class ExternalFunctionGenerator
 
     #region AddExternalFunction()
 
-    public static void AddManagedExternalFunction(this Dictionary<int, IExternalFunction> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, ManagedExternalFunctionAsyncBlockCallback callback, int returnValueSize)
+    public static void AddManagedExternalFunction(this List<IExternalFunction> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionAsyncCallback callback, int returnValueSize)
         => functions.AddExternalFunction(new ExternalFunctionAsyncBlock(callback, functions.GenerateId(name), name, SizeOf(parameterTypes), returnValueSize));
 
-    public static void AddManagedExternalFunction(this Dictionary<int, IExternalFunction> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, ManagedExternalFunctionAsyncBlockCallback callback)
+    public static void AddManagedExternalFunction(this List<IExternalFunction> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionAsyncCallback callback)
         => functions.AddExternalFunction(new ExternalFunctionAsyncBlock(callback, id, name, SizeOf(parameterTypes), 0));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, IExternalFunction> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback, int returnValueSize)
+    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback, int returnValueSize)
         => functions.AddExternalFunction(new ExternalFunctionSync(callback, id, name, SizeOf(parameterTypes), returnValueSize));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, IExternalFunction> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback, int returnValueSize)
+    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback, int returnValueSize)
         => functions.AddExternalFunction(new ExternalFunctionSync(callback, functions.GenerateId(name), name, SizeOf(parameterTypes), returnValueSize));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, IExternalFunction> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback)
+    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback)
         => functions.AddExternalFunction(new ExternalFunctionSync(callback, id, name, SizeOf(parameterTypes), 0));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, IExternalFunction> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback)
+    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback)
         => functions.AddExternalFunction(new ExternalFunctionSync(callback, functions.GenerateId(name), name, SizeOf(parameterTypes), 0));
 
-    public static void AddManagedExternalFunction(this Dictionary<int, IExternalFunction> functions, string? name, int parametersSize, ManagedExternalFunctionAsyncBlockCallback callback, int returnValueSize)
+    public static void AddManagedExternalFunction(this List<IExternalFunction> functions, string? name, int parametersSize, ExternalFunctionAsyncCallback callback, int returnValueSize)
         => functions.AddExternalFunction(new ExternalFunctionAsyncBlock(callback, functions.GenerateId(name), name, parametersSize, returnValueSize));
 
-    public static void AddManagedExternalFunction(this Dictionary<int, IExternalFunction> functions, int id, string? name, int parametersSize, ManagedExternalFunctionAsyncBlockCallback callback)
+    public static void AddManagedExternalFunction(this List<IExternalFunction> functions, int id, string? name, int parametersSize, ExternalFunctionAsyncCallback callback)
         => functions.AddExternalFunction(new ExternalFunctionAsyncBlock(callback, id, name, parametersSize, 0));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, IExternalFunction> functions, int id, string? name, int parametersSize, ExternalFunctionSyncCallback callback, int returnValueSize)
+    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, int id, string? name, int parametersSize, ExternalFunctionSyncCallback callback, int returnValueSize)
         => functions.AddExternalFunction(new ExternalFunctionSync(callback, id, name, parametersSize, returnValueSize));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, IExternalFunction> functions, string? name, int parametersSize, ExternalFunctionSyncCallback callback, int returnValueSize)
+    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, string? name, int parametersSize, ExternalFunctionSyncCallback callback, int returnValueSize)
         => functions.AddExternalFunction(new ExternalFunctionSync(callback, functions.GenerateId(name), name, parametersSize, returnValueSize));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, IExternalFunction> functions, int id, string? name, int parametersSize, ExternalFunctionSyncCallback callback)
+    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, int id, string? name, int parametersSize, ExternalFunctionSyncCallback callback)
         => functions.AddExternalFunction(new ExternalFunctionSync(callback, id, name, parametersSize, 0));
 
-    public static void AddSimpleExternalFunction(this Dictionary<int, IExternalFunction> functions, string? name, int parametersSize, ExternalFunctionSyncCallback callback)
+    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, string? name, int parametersSize, ExternalFunctionSyncCallback callback)
         => functions.AddExternalFunction(new ExternalFunctionSync(callback, functions.GenerateId(name), name, parametersSize, 0));
 
-    static void AddExternalFunction(this Dictionary<int, IExternalFunction> functions, IExternalFunction function)
+    static void AddExternalFunction(this List<IExternalFunction> functions, IExternalFunction function)
     {
-        if (!functions.TryAdd(function.Id, function))
-        { functions[function.Id] = function; }
+        int i = functions.FindIndex(v => v.Id == function.Id);
+        if (i != -1)
+        { functions[i] = function; }
+        else
+        { functions.Add(function); }
     }
 
-    public static void AddExternalFunction(this Dictionary<int, IExternalFunction> functions, string name, Action callback)
+    public static void AddExternalFunction(this List<IExternalFunction> functions, string name, Action callback)
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    public static void AddExternalFunction(this Dictionary<int, IExternalFunction> functions, int id, string? name, Action callback)
+    public static void AddExternalFunction(this List<IExternalFunction> functions, int id, string? name, Action callback)
     {
         ImmutableArray<RuntimeType> types = ImmutableArray<RuntimeType>.Empty;
 
@@ -160,11 +163,11 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0>(this Dictionary<int, IExternalFunction> functions, string name, Action<T0> callback)
+    public static void AddExternalFunction<T0>(this List<IExternalFunction> functions, string name, Action<T0> callback)
         where T0 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Action<T0> callback)
+    public static void AddExternalFunction<T0>(this List<IExternalFunction> functions, int id, string? name, Action<T0> callback)
         where T0 : unmanaged
     {
         functions.AddSimpleExternalFunction(id, name, SizeOf<T0>(), (args) =>
@@ -177,12 +180,12 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1>(this Dictionary<int, IExternalFunction> functions, string name, Action<T0, T1> callback)
+    public static void AddExternalFunction<T0, T1>(this List<IExternalFunction> functions, string name, Action<T0, T1> callback)
         where T0 : unmanaged
         where T1 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Action<T0, T1> callback)
+    public static void AddExternalFunction<T0, T1>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1> callback)
         where T0 : unmanaged
         where T1 : unmanaged
     {
@@ -197,13 +200,13 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<int, IExternalFunction> functions, string name, Action<T0, T1, T2> callback)
+    public static void AddExternalFunction<T0, T1, T2>(this List<IExternalFunction> functions, string name, Action<T0, T1, T2> callback)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Action<T0, T1, T2> callback)
+    public static void AddExternalFunction<T0, T1, T2>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1, T2> callback)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -220,14 +223,14 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<int, IExternalFunction> functions, string name, Action<T0, T1, T2, T3> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3>(this List<IExternalFunction> functions, string name, Action<T0, T1, T2, T3> callback)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
         where T3 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Action<T0, T1, T2, T3> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1, T2, T3> callback)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -246,7 +249,7 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<int, IExternalFunction> functions, string name, Action<T0, T1, T2, T3, T4> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this List<IExternalFunction> functions, string name, Action<T0, T1, T2, T3, T4> callback)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -254,7 +257,7 @@ public static unsafe class ExternalFunctionGenerator
         where T4 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Action<T0, T1, T2, T3, T4> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1, T2, T3, T4> callback)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -275,7 +278,7 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<int, IExternalFunction> functions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this List<IExternalFunction> functions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -284,7 +287,7 @@ public static unsafe class ExternalFunctionGenerator
         where T5 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Action<T0, T1, T2, T3, T4, T5> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1, T2, T3, T4, T5> callback)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -307,11 +310,11 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<TResult>(this Dictionary<int, IExternalFunction> functions, string? name, Func<TResult> callback)
+    public static void AddExternalFunction<TResult>(this List<IExternalFunction> functions, string? name, Func<TResult> callback)
         where TResult : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<TResult>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Func<TResult> callback)
+    public static void AddExternalFunction<TResult>(this List<IExternalFunction> functions, int id, string? name, Func<TResult> callback)
         where TResult : unmanaged
     {
         functions.AddSimpleExternalFunction(id, name, 0, (args) =>
@@ -323,12 +326,12 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, TResult>(this Dictionary<int, IExternalFunction> functions, string? name, Func<T0, TResult> callback)
+    public static void AddExternalFunction<T0, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, TResult>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Func<T0, TResult> callback)
+    public static void AddExternalFunction<T0, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
     {
@@ -343,13 +346,13 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<int, IExternalFunction> functions, string? name, Func<T0, T1, TResult> callback)
+    public static void AddExternalFunction<T0, T1, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Func<T0, T1, TResult> callback)
+    public static void AddExternalFunction<T0, T1, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged
@@ -366,14 +369,14 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<int, IExternalFunction> functions, string? name, Func<T0, T1, T2, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, T2, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged
@@ -392,7 +395,7 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<int, IExternalFunction> functions, string? name, Func<T0, T1, T2, T3, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, T2, T3, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged
@@ -400,7 +403,7 @@ public static unsafe class ExternalFunctionGenerator
         where T3 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, T3, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, T3, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged
@@ -421,7 +424,7 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<int, IExternalFunction> functions, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged
@@ -430,7 +433,7 @@ public static unsafe class ExternalFunctionGenerator
         where T4 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged
@@ -453,7 +456,7 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<int, IExternalFunction> functions, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged
@@ -463,7 +466,7 @@ public static unsafe class ExternalFunctionGenerator
         where T5 : unmanaged
         => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
     /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<int, IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
+    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
         where T1 : unmanaged

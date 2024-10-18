@@ -103,7 +103,7 @@ public static class Entry
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                Dictionary<int, IExternalFunction> externalFunctions = Runtime.BytecodeProcessorEx.GetExternalFunctions();
+                List<IExternalFunction> externalFunctions = Runtime.BytecodeProcessorEx.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();
@@ -567,7 +567,7 @@ public static class Entry
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                Dictionary<int, IExternalFunction> externalFunctions = Runtime.BytecodeProcessorEx.GetExternalFunctions();
+                List<IExternalFunction> externalFunctions = Runtime.BytecodeProcessorEx.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
                 AnalysisCollection analysisCollection = new();

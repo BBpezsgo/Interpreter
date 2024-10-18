@@ -1,5 +1,7 @@
 namespace LanguageCore.Runtime;
 
+public delegate void KeyConsumer(char key);
+
 public class IOHandler
 {
     public delegate void OnStdErrorEventHandler(char data);
@@ -15,7 +17,7 @@ public class IOHandler
 
     public bool IsAwaitingInput => _keyConsumer is not null;
 
-    ManagedExternalFunctionAsyncBlockReturnCallback? _keyConsumer;
+    KeyConsumer? _keyConsumer;
 
     /// <summary>
     /// Provides input to the interpreter<br/>
@@ -27,19 +29,31 @@ public class IOHandler
     public void SendKey(char key)
     {
         if (_keyConsumer == null) return;
-        _keyConsumer.Invoke(key.AsBytes());
+        _keyConsumer.Invoke(key);
         _keyConsumer = null;
     }
 
-    public static IOHandler Create(Dictionary<int, IExternalFunction> externalFunctions)
+    public static IOHandler Create(List<IExternalFunction> externalFunctions)
     {
         IOHandler ioHandler = new();
 
-        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, 0, (ReadOnlySpan<byte> parameters, ManagedExternalFunctionAsyncBlockReturnCallback callback) =>
+        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, 0, (ref ProcessorState processor, ReadOnlySpan<byte> parameters) =>
         {
             if (ioHandler.OnNeedInput == null) throw new RuntimeException($"Event {ioHandler.OnNeedInput} does not have listeners");
-            ioHandler._keyConsumer = callback;
+            ProcessorState _processor = processor;
+            char? consumedKey = null;
+            ioHandler._keyConsumer = (char key) => consumedKey = key;
             ioHandler.OnNeedInput.Invoke();
+            return (ref ProcessorState processor, out ReadOnlySpan<byte> returnValue) =>
+            {
+                if (consumedKey.HasValue)
+                {
+                    returnValue = consumedKey.Value.ToBytes();
+                    return true;
+                }
+                returnValue = ReadOnlySpan<byte>.Empty;
+                return false;
+            };
         }, sizeof(char));
 
         externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, (char @char) => ioHandler.OnStdOut?.Invoke(@char));

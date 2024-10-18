@@ -496,7 +496,8 @@ public partial class BytecodeProcessor
 
         if (function is ExternalFunctionAsyncBlock managedFunction)
         {
-            managedFunction.Callback(parameters, Push);
+            throw new NotImplementedException();
+            // managedFunction.Callback(parameters, Push);
         }
         else if (function is ExternalFunctionSync simpleFunction)
         {

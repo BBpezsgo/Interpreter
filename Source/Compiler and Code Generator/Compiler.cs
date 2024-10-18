@@ -15,7 +15,7 @@ public readonly struct CompilerResult
 
     public readonly ImmutableDictionary<Uri, CollectedAST> Raw;
 
-    public readonly Dictionary<int, IExternalFunction> ExternalFunctions;
+    public readonly ImmutableArray<IExternalFunction> ExternalFunctions;
 
     public readonly ImmutableArray<CompiledStruct> Structs;
 
@@ -133,7 +133,7 @@ public readonly struct CompilerResult
         Enumerable.Empty<CompiledOperator>(),
         Enumerable.Empty<CompiledConstructor>(),
         Enumerable.Empty<CompiledAlias>(),
-        Enumerable.Empty<KeyValuePair<int, IExternalFunction>>(),
+        Enumerable.Empty<IExternalFunction>(),
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<(ImmutableArray<Statement>, Uri)>(),
         file);
@@ -145,7 +145,7 @@ public readonly struct CompilerResult
         IEnumerable<CompiledOperator> operators,
         IEnumerable<CompiledConstructor> constructors,
         IEnumerable<CompiledAlias> aliases,
-        IEnumerable<KeyValuePair<int, IExternalFunction>> externalFunctions,
+        IEnumerable<IExternalFunction> externalFunctions,
         IEnumerable<CompiledStruct> structs,
         IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
         Uri file)
@@ -156,7 +156,7 @@ public readonly struct CompilerResult
         Operators = operators.ToImmutableArray();
         Constructors = constructors.ToImmutableArray();
         Aliases = aliases.ToImmutableArray();
-        ExternalFunctions = externalFunctions.ToDictionary(v => v.Key, v => v.Value);
+        ExternalFunctions = externalFunctions.ToImmutableArray();
         Structs = structs.ToImmutableArray();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
         File = file;
@@ -257,15 +257,15 @@ public sealed class Compiler
 
     readonly CompilerSettings Settings;
     readonly TokenizerSettings? TokenizerSettings;
-    readonly Dictionary<int, IExternalFunction> ExternalFunctions;
+    readonly ImmutableArray<IExternalFunction> ExternalFunctions;
     readonly PrintCallback? PrintCallback;
 
     readonly AnalysisCollection? AnalysisCollection;
     readonly IEnumerable<string> PreprocessorVariables;
 
-    Compiler(Dictionary<int, IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings)
+    Compiler(IEnumerable<IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings)
     {
-        ExternalFunctions = externalFunctions ?? new Dictionary<int, IExternalFunction>();
+        ExternalFunctions = (externalFunctions ?? new List<IExternalFunction>()).ToImmutableArray();
         Settings = settings;
         PrintCallback = printCallback;
         AnalysisCollection = analysisCollection;
@@ -896,7 +896,7 @@ public sealed class Compiler
 
     public static CompilerResult CompileFile(
         Uri file,
-        Dictionary<int, IExternalFunction>? externalFunctions,
+        IEnumerable<IExternalFunction>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback = null,
@@ -917,7 +917,7 @@ public sealed class Compiler
 
     public static CompilerResult CompileInteractive(
         Statement statement,
-        Dictionary<int, IExternalFunction>? externalFunctions,
+        IEnumerable<IExternalFunction>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,

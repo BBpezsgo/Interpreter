@@ -1,42 +1,45 @@
-using System.Runtime.InteropServices;
-
 namespace LanguageCore.Runtime;
 
-public partial class BytecodeProcessor
+public ref struct ProcessorState
 {
     public const int StackDirection = -1;
 
-    public Instruction? NextInstruction
-    {
-        get
-        {
-            if (Registers.CodePointer < 0 || Registers.CodePointer >= Code.Length) return null;
-            return Code[Registers.CodePointer];
-        }
-    }
-    Instruction CurrentInstruction => Code[Registers.CodePointer];
-    public bool IsDone => Registers.CodePointer == Code.Length;
-    public int StackStart => StackDirection > 0 ? Settings.HeapSize : Settings.HeapSize + Settings.StackSize - 1;
+    readonly Instruction CurrentInstruction => Code[Registers.CodePointer];
+    public readonly bool IsDone => Registers.CodePointer == Code.Length;
+    public readonly int StackStart => StackDirection > 0 ? Settings.HeapSize : Settings.HeapSize + Settings.StackSize - 1;
 
     readonly BytecodeInterpreterSettings Settings;
     public Registers Registers;
-    public readonly byte[] Memory;
-    public ImmutableArray<Instruction> Code;
-    readonly FrozenDictionary<int, IExternalFunction> ExternalFunctions;
+    ExternalFunctionAsyncReturnChecker? PendingExternalFunction;
 
-    public BytecodeProcessor(ImmutableArray<Instruction> code, byte[]? memory, FrozenDictionary<int, IExternalFunction> externalFunctions, BytecodeInterpreterSettings settings)
+    public readonly Span<byte> Memory;
+    public readonly ReadOnlySpan<Instruction> Code;
+    public readonly ReadOnlySpan<IExternalFunction> ExternalFunctions;
+
+    public ProcessorState(
+        BytecodeInterpreterSettings settings,
+        Registers registers,
+        Span<byte> memory,
+        ReadOnlySpan<Instruction> code,
+        ReadOnlySpan<IExternalFunction> externalFunctions)
     {
         Settings = settings;
-        ExternalFunctions = externalFunctions;
+        Registers = registers;
+        Memory = memory;
         Code = code;
-        Memory = memory ?? new byte[settings.HeapSize + settings.StackSize];
+        ExternalFunctions = externalFunctions;
+        PendingExternalFunction = null;
+    }
+
+    public void Setup()
+    {
         Registers.StackPointer = StackStart - StackDirection;
     }
 
-    public RuntimeContext GetContext() => new(
+    public readonly RuntimeContext GetContext() => new(
         Registers,
-        ImmutableCollectionsMarshal.AsImmutableArray(Memory),
-        Code,
+        ImmutableArray.Create(Memory),
+        ImmutableArray.Create(Code),
         StackStart
     );
 
@@ -45,19 +48,15 @@ public partial class BytecodeProcessor
 
     public void Tick()
     {
-        ProcessorState state = new(
-            Settings,
-            Registers,
-            Memory,
-            Code.AsSpan(),
-            ExternalFunctions.Values.AsSpan()
-        );
+        if (PendingExternalFunction != null)
+        {
+            if (PendingExternalFunction.Invoke(ref this, out ReadOnlySpan<byte> ret))
+            {
+                Push(ret);
+                PendingExternalFunction = null;
+            }
+        }
 
-        state.Tick();
-
-        Registers = state.Registers;
-
-        return;
         if (IsDone) return;
 
         try
@@ -145,7 +144,7 @@ public partial class BytecodeProcessor
         }
     }
 
-    public bool ResolveAddress(InstructionOperand operand, out int address)
+    public readonly bool ResolveAddress(InstructionOperand operand, out int address)
     {
         switch (operand.Type)
         {
@@ -221,19 +220,19 @@ public partial class BytecodeProcessor
         }
     }
 
-    public void SetData(int ptr, RuntimeValue data, BitWidth size) => Memory.SetData(ptr, data, size);
-    public RuntimeValue GetData(int ptr, BitWidth size) => Memory.GetData(ptr, size);
+    public readonly void SetData(int ptr, RuntimeValue data, BitWidth size) => Memory.SetData(ptr, data, size);
+    public readonly RuntimeValue GetData(int ptr, BitWidth size) => Memory.GetData(ptr, size);
 
-    public void SetData8(int ptr, byte data) => Memory.Set(ptr, data);
-    public byte GetData8(int ptr) => Memory.Get<byte>(ptr);
+    public readonly void SetData8(int ptr, byte data) => Memory.Set(ptr, data);
+    public readonly byte GetData8(int ptr) => Memory.Get<byte>(ptr);
 
-    public void SetData16(int ptr, char data) => Memory.Set(ptr, data);
-    public char GetData16(int ptr) => Memory.Get<char>(ptr);
+    public readonly void SetData16(int ptr, char data) => Memory.Set(ptr, data);
+    public readonly char GetData16(int ptr) => Memory.Get<char>(ptr);
 
-    public void SetData32(int ptr, int data) => Memory.Set(ptr, data);
-    public int GetData32(int ptr) => Memory.Get<int>(ptr);
+    public readonly void SetData32(int ptr, int data) => Memory.Set(ptr, data);
+    public readonly int GetData32(int ptr) => Memory.Get<int>(ptr);
 
-    RuntimeValue GetData(InstructionOperand operand) => operand.Type switch
+    readonly RuntimeValue GetData(InstructionOperand operand) => operand.Type switch
     {
         InstructionOperandType.Immediate8 => operand.Value,
         InstructionOperandType.Immediate16 => operand.Value,
@@ -451,7 +450,7 @@ public partial class BytecodeProcessor
         return data;
     }
 
-    void Push(ReadOnlySpan<byte> data)
+    void Push(scoped ReadOnlySpan<byte> data)
     {
         Registers.StackPointer += data.Length * StackDirection;
         Memory.Set(Registers.StackPointer, data);
@@ -469,4 +468,530 @@ public partial class BytecodeProcessor
         Registers.StackPointer -= size * StackDirection;
         return data;
     }
+
+    #region Memory Operations
+
+    void Move()
+    {
+        RuntimeValue value = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, value);
+
+        Step();
+    }
+
+    #endregion
+
+    #region Flow Control
+
+    readonly void CRASH()
+    {
+        int pointer = GetData(CurrentInstruction.Operand1).I32;
+        string? value = HeapUtils.GetString(Memory, pointer);
+        throw new UserException(value ?? string.Empty);
+    }
+
+    void CALL()
+    {
+        int relativeAddress = GetData(CurrentInstruction.Operand1).I32;
+
+        Push(Registers.CodePointer, Register.CodePointer.BitWidth());
+
+        Step(relativeAddress);
+    }
+
+    void RETURN()
+    {
+        RuntimeValue codePointer = Pop(BitWidth._32);
+
+        Registers.CodePointer = codePointer.I32;
+    }
+
+    void JUMP_BY()
+    {
+        int relativeAddress = GetData(CurrentInstruction.Operand1).I32;
+
+        Step(relativeAddress);
+    }
+
+    void EXIT()
+    {
+        Registers.CodePointer = Code.Length;
+    }
+
+    void JumpIfEqual()
+    {
+        if (Registers.Flags.Get(Flags.Zero))
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfNotEqual()
+    {
+        if (!Registers.Flags.Get(Flags.Zero))
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfGreater()
+    {
+        if ((!(Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow))) && !Registers.Flags.Get(Flags.Zero))
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfGreaterOrEqual()
+    {
+        if (!(Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow)))
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfLess()
+    {
+        if (Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow))
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
+        else
+        { Step(); }
+    }
+
+    void JumpIfLessOrEqual()
+    {
+        if ((Registers.Flags.Get(Flags.Sign) ^ Registers.Flags.Get(Flags.Overflow)) || Registers.Flags.Get(Flags.Zero))
+        { Step(GetData(CurrentInstruction.Operand1).I32); }
+        else
+        { Step(); }
+    }
+
+    #endregion
+
+    #region Comparison Operations
+
+    void Compare()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+
+        ALU.SubtractI(dst, src, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        Step();
+    }
+
+    void CompareF()
+    {
+        float a = GetData(CurrentInstruction.Operand1).F32;
+        float b = GetData(CurrentInstruction.Operand2).F32;
+
+        float result = a - b;
+
+        Registers.Flags.Set(Flags.Sign, result < 0);
+        Registers.Flags.Set(Flags.Zero, result == 0f);
+        Registers.Flags.Set(Flags.Carry, false);
+        // Registers.Flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit32) == (long)SignBit32);
+
+        Step();
+    }
+
+    #endregion
+
+    #region Logic Operations
+
+    void LogicAND()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, ((dst.I32 != 0) && (src.I32 != 0)) ? 1 : 0);
+
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
+
+        Step();
+    }
+
+    void LogicOR()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, ((dst.I32 != 0) || (src.I32 != 0)) ? 1 : 0);
+
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
+
+        Step();
+    }
+
+    void BitsShiftLeft()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.I32 << src.I32);
+
+        Step();
+    }
+
+    void BitsShiftRight()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.I32 >> src.I32);
+
+        Step();
+    }
+
+    void BitsOR()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.I32 | src.I32);
+
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
+
+        Step();
+    }
+
+    void BitsXOR()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.I32 ^ src.I32);
+
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
+
+        Step();
+    }
+
+    void BitsNOT()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        SetData(CurrentInstruction.Operand1, ~dst.I32);
+
+        Step();
+    }
+
+    void BitsAND()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, dst.I32 & src.I32);
+
+        Registers.Flags.SetSign(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.SetZero(dst.I32, CurrentInstruction.BitWidth);
+        Registers.Flags.Set(Flags.Carry, false);
+
+        Step();
+    }
+
+    #endregion
+
+    #region Math Operations
+
+    void MathAdd()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = ALU.AddI(a, b, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    void MathDiv()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 / b.U8)),
+            BitWidth._16 => new RuntimeValue((char)(a.U16 / b.U16)),
+            BitWidth._32 => new RuntimeValue((int)(a.I32 / b.I32)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    void MathSub()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = ALU.SubtractI(a, b, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    void MathMult()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 * b.U8)),
+            BitWidth._16 => new RuntimeValue((char)(a.U16 * b.U16)),
+            BitWidth._32 => new RuntimeValue((int)(a.I32 * b.I32)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, a);
+
+        Registers.Flags.SetCarry(a.I32, CurrentInstruction.BitWidth);
+
+        Step();
+    }
+
+    void MathMod()
+    {
+        RuntimeValue dst = GetData(CurrentInstruction.Operand1);
+        RuntimeValue src = GetData(CurrentInstruction.Operand2);
+
+        dst = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new RuntimeValue((byte)(dst.U8 % src.U8)),
+            BitWidth._16 => new RuntimeValue((char)(dst.U16 % src.U16)),
+            BitWidth._32 => new RuntimeValue((int)(dst.I32 % src.I32)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, dst);
+
+        Step();
+    }
+
+    #endregion
+
+    #region Unsigned Math Operations
+
+    void UMathAdd()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = ALU.AddU(a, b, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    void UMathDiv()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 / b.U8)),
+            BitWidth._16 => new RuntimeValue((ushort)(a.U16 / b.U16)),
+            BitWidth._32 => new RuntimeValue((uint)(a.U32 / b.U32)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    void UMathSub()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = ALU.SubtractU(a, b, CurrentInstruction.BitWidth, ref Registers.Flags);
+
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    void UMathMult()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 * b.U8)),
+            BitWidth._16 => new RuntimeValue((ushort)(a.U16 * b.U16)),
+            BitWidth._32 => new RuntimeValue((uint)(a.U32 * b.U32)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, a);
+
+        Registers.Flags.SetCarry(a.I32, CurrentInstruction.BitWidth);
+
+        Step();
+    }
+
+    void UMathMod()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+
+        a = CurrentInstruction.BitWidth switch
+        {
+            BitWidth._8 => new RuntimeValue((byte)(a.U8 % b.U8)),
+            BitWidth._16 => new RuntimeValue((ushort)(a.U16 % b.U16)),
+            BitWidth._32 => new RuntimeValue((uint)(a.U32 % b.U32)),
+            _ => throw new UnreachableException(),
+        };
+        SetData(CurrentInstruction.Operand1, a);
+
+        Step();
+    }
+
+    #endregion
+
+    #region Float Math Operations
+
+    void FMathAdd()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 + b.F32));
+
+        Step();
+    }
+
+    void FMathDiv()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 / b.F32));
+
+        Step();
+    }
+
+    void FMathSub()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 - b.F32));
+
+        Step();
+    }
+
+    void FMathMult()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 * b.F32));
+
+        Step();
+    }
+
+    void FMathMod()
+    {
+        RuntimeValue a = GetData(CurrentInstruction.Operand1);
+        RuntimeValue b = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue(a.F32 % b.F32));
+
+        Step();
+    }
+
+    #endregion
+
+    #region Stack Operations
+
+    void PUSH_VALUE()
+    {
+        RuntimeValue v = GetData(CurrentInstruction.Operand1);
+        Push(v, CurrentInstruction.Operand1.BitWidth);
+
+        Step();
+    }
+
+    void POP_VALUE(BitWidth size)
+    {
+        Pop(size);
+
+        Step();
+    }
+
+    void POP_TO_VALUE(BitWidth size)
+    {
+        RuntimeValue v = Pop(size);
+        SetData(CurrentInstruction.Operand1, v);
+
+        Step();
+    }
+
+    #endregion
+
+    #region Utility Operations
+
+    void FTo()
+    {
+        RuntimeValue data = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, new RuntimeValue((float)data.I32));
+
+        Step();
+    }
+
+    void FFrom()
+    {
+        RuntimeValue data = GetData(CurrentInstruction.Operand2);
+        SetData(CurrentInstruction.Operand1, (int)data.F32);
+
+        Step();
+    }
+
+    #endregion
+
+    #region External Calls
+
+    void CALL_EXTERNAL()
+    {
+        int functionId = GetData(CurrentInstruction.Operand1).I32;
+
+        IExternalFunction? function = null;
+        for (int i = 0; i < ExternalFunctions.Length; i++)
+        {
+            if (ExternalFunctions[i].Id == functionId)
+            {
+                function = ExternalFunctions[i];
+                break;
+            }
+        }
+
+        if (function is null)
+        { throw new RuntimeException($"Undefined external function {functionId}"); }
+
+        Span<byte> parameters = Memory.Slice(Registers.StackPointer, function.ParametersSize);
+
+        if (function is ExternalFunctionAsyncBlock managedFunction)
+        {
+            PendingExternalFunction = managedFunction.Callback(
+                ref this,
+                parameters);
+        }
+        else if (function is ExternalFunctionSync simpleFunction)
+        {
+            if (function.ReturnValueSize > 0)
+            {
+                ReadOnlySpan<byte> returnValue = simpleFunction.Callback(parameters);
+                Push(returnValue);
+            }
+            else
+            {
+                simpleFunction.Callback(parameters);
+            }
+        }
+
+        Step();
+    }
+
+    #endregion
 }

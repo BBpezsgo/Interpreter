@@ -115,7 +115,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 {
     #region Fields
 
-    readonly ImmutableDictionary<int, IExternalFunction> ExternalFunctions;
+    readonly ImmutableArray<IExternalFunction> ExternalFunctions;
 
     readonly Stack<ImmutableArray<CleanupItem>> CleanupStack;
     IDefinition? CurrentContext;
@@ -149,7 +149,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, analysisCollection, print)
     {
-        ExternalFunctions = compilerResult.ExternalFunctions.ToImmutableDictionary();
+        ExternalFunctions = compilerResult.ExternalFunctions;
         GeneratedCode = new List<PreparationInstruction>();
         CleanupStack = new Stack<ImmutableArray<CleanupItem>>();
         ReturnInstructions = new Stack<List<int>>();

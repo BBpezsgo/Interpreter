@@ -28,7 +28,7 @@ public readonly struct TestFile
     }
 
     /// <exception cref="AssertFailedException"/>
-    public void DoMain(bool heapShouldBeEmpty = true, Action<Dictionary<int, IExternalFunction>>? externalFunctionAdder = null)
+    public void DoMain(bool heapShouldBeEmpty = true, Action<List<IExternalFunction>>? externalFunctionAdder = null)
     {
         MainResult result = Utils.RunMain(LanguageCore.Utils.ToFileUri(SourceFile), GetInput(), externalFunctionAdder);
         Console.Write($"ExitCode: {result.ExitCode}");
@@ -308,9 +308,9 @@ public static class Utils
         return new TestFile(sourceFile, resultFile, inputFile);
     }
 
-    public static MainResult RunMain(Uri file, string input, Action<Dictionary<int, IExternalFunction>>? externalFunctionAdder = null)
+    public static MainResult RunMain(Uri file, string input, Action<List<IExternalFunction>>? externalFunctionAdder = null)
     {
-        Dictionary<int, IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
         externalFunctionAdder?.Invoke(externalFunctions);
 
@@ -325,7 +325,7 @@ public static class Utils
 
         (BytecodeProcessorEx, MainResult) Execute(BBLangGeneratorResult code, string input)
         {
-            Dictionary<int, IExternalFunction> _externalFunctions = new();
+            List<IExternalFunction> _externalFunctions = new();
             externalFunctionAdder?.Invoke(_externalFunctions);
 
             BytecodeProcessorEx interpreter = new(new BytecodeInterpreterSettings()

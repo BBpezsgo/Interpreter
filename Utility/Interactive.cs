@@ -770,7 +770,7 @@ public class Interactive
         }
 
         {
-            int exitCode = interpreter.Processor.GetData(interpreter.Processor.Registers.StackPointer - (1 * BytecodeProcessor.StackDirection), BitWidth._32).I32;
+            int exitCode = interpreter.Processor.Memory.GetData(interpreter.Processor.Registers.StackPointer - (1 * BytecodeProcessor.StackDirection), BitWidth._32).I32;
 
             AnsiBuilder output = new();
 

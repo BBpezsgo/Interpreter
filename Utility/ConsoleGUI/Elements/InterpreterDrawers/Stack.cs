@@ -26,7 +26,7 @@ public partial class InterpreterElement
         else
         { stackDebugInfo = CollectedScopeInfo.Empty; }
 
-        ReadOnlySpan<int> savedBasePointers = DebugUtils.TraceBasePointers(ImmutableCollectionsMarshal.AsImmutableArray(Interpreter.Processor.Memory), Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation?.StackOffsets);
+        ReadOnlySpan<int> savedBasePointers = DebugUtils.TraceBasePointers(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation?.StackOffsets);
 
         List<DataMovement> loadIndicators = new();
         List<DataMovement> storeIndicators = new();

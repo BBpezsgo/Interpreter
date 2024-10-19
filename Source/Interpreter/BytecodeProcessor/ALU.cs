@@ -1,5 +1,8 @@
 ﻿namespace LanguageCore.Runtime;
 
+#if UNITY
+[Unity.Burst.BurstCompile]
+#endif
 public static class ALU
 {
     public const byte SignBit8 = unchecked((byte)0x80);
@@ -12,6 +15,10 @@ public static class ALU
     public const int AllBit32 = unchecked((int)0xFFFFFFFF);
     public const int AllBit64 = unchecked((int)0xFFFFFFFFFFFFFFFF);
 
+#if UNITY
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    // [Unity.Burst.BurstCompile]
+#endif
     public static RuntimeValue AddU(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
     {
         BitWidth._8 => new RuntimeValue(AddU8(a.U8, b.U8, ref flags)),
@@ -21,6 +28,10 @@ public static class ALU
         _ => throw new UnreachableException(),
     };
 
+#if UNITY
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    // [Unity.Burst.BurstCompile]
+#endif
     public static RuntimeValue AddI(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
     {
         BitWidth._8 => new RuntimeValue(AddI8(a.I8, b.I8, ref flags)),
@@ -30,6 +41,9 @@ public static class ALU
         _ => throw new UnreachableException(),
     };
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static byte AddU8(byte a, byte b, ref Flags flags)
     {
         long result = a + b;
@@ -42,6 +56,9 @@ public static class ALU
         return unchecked((byte)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static byte AddI8(sbyte a, sbyte b, ref Flags flags)
     {
         long result = a + b;
@@ -54,6 +71,9 @@ public static class ALU
         return unchecked((byte)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static ushort AddU16(ushort a, ushort b, ref Flags flags)
     {
         long result = a + b;
@@ -66,6 +86,9 @@ public static class ALU
         return unchecked((ushort)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static short AddI16(short a, short b, ref Flags flags)
     {
         long result = a + b;
@@ -78,6 +101,9 @@ public static class ALU
         return unchecked((short)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static uint AddU32(uint a, uint b, ref Flags flags)
     {
         long result = a + b;
@@ -90,6 +116,9 @@ public static class ALU
         return unchecked((uint)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static int AddI32(int a, int b, ref Flags flags)
     {
         long result = a + b;
@@ -102,6 +131,9 @@ public static class ALU
         return unchecked((int)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static long AddI64(long a, long b, ref Flags flags)
     {
         long result = a + b;
@@ -114,6 +146,10 @@ public static class ALU
         return unchecked((int)result);
     }
 
+#if UNITY
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    // [Unity.Burst.BurstCompile]
+#endif
     public static RuntimeValue SubtractU(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
     {
         BitWidth._8 => new RuntimeValue(SubtractU8(a.U8, b.U8, ref flags)),
@@ -123,6 +159,10 @@ public static class ALU
         _ => throw new UnreachableException(),
     };
 
+#if UNITY
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    // [Unity.Burst.BurstCompile]
+#endif
     public static RuntimeValue SubtractI(RuntimeValue a, RuntimeValue b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
     {
         BitWidth._8 => new RuntimeValue(SubtractI8(a.I8, b.I8, ref flags)),
@@ -132,6 +172,9 @@ public static class ALU
         _ => throw new UnreachableException(),
     };
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static byte SubtractU8(byte a, byte b, ref Flags flags)
     {
         long result = a - b;
@@ -144,6 +187,9 @@ public static class ALU
         return unchecked((byte)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static sbyte SubtractI8(sbyte a, sbyte b, ref Flags flags)
     {
         long result = a - b;
@@ -156,6 +202,9 @@ public static class ALU
         return unchecked((sbyte)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static ushort SubtractU16(ushort a, ushort b, ref Flags flags)
     {
         long result = a - b;
@@ -168,6 +217,9 @@ public static class ALU
         return unchecked((ushort)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static short SubtractI16(short a, short b, ref Flags flags)
     {
         long result = a - b;
@@ -180,6 +232,9 @@ public static class ALU
         return unchecked((short)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static uint SubtractU32(uint a, uint b, ref Flags flags)
     {
         long result = a - b;
@@ -192,6 +247,9 @@ public static class ALU
         return unchecked((uint)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static int SubtractI32(int a, int b, ref Flags flags)
     {
         long result = a - b;
@@ -204,6 +262,9 @@ public static class ALU
         return unchecked((int)result);
     }
 
+#if UNITY
+    [Unity.Burst.BurstCompile]
+#endif
     public static long SubtractI64(long a, long b, ref Flags flags)
     {
         long result = a - b;

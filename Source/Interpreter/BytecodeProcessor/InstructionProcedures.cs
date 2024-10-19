@@ -1,6 +1,6 @@
 namespace LanguageCore.Runtime;
 
-public partial class BytecodeProcessor
+public ref partial struct ProcessorState
 {
     #region Memory Operations
 
@@ -16,7 +16,7 @@ public partial class BytecodeProcessor
 
     #region Flow Control
 
-    void CRASH()
+    readonly void CRASH()
     {
         int pointer = GetData(CurrentInstruction.Operand1).I32;
         string? value = HeapUtils.GetString(Memory, pointer);
@@ -489,15 +489,26 @@ public partial class BytecodeProcessor
     {
         int functionId = GetData(CurrentInstruction.Operand1).I32;
 
-        if (!ExternalFunctions.TryGetValue(functionId, out IExternalFunction? function))
+        IExternalFunction? function = null;
+        for (int i = 0; i < ExternalFunctions.Length; i++)
+        {
+            if (ExternalFunctions[i].Id == functionId)
+            {
+                function = ExternalFunctions[i];
+                break;
+            }
+        }
+
+        if (function is null)
         { throw new RuntimeException($"Undefined external function {functionId}"); }
 
-        Span<byte> parameters = Memory.AsSpan().Slice(Registers.StackPointer, function.ParametersSize);
+        Span<byte> parameters = Memory.Slice(Registers.StackPointer, function.ParametersSize);
 
-        if (function is ExternalFunctionAsyncBlock managedFunction)
+        if (function is ExternalFunctionAsync managedFunction)
         {
-            throw new NotImplementedException();
-            // managedFunction.Callback(parameters, Push);
+            PendingExternalFunction = managedFunction.Callback(
+                ref this,
+                parameters);
         }
         else if (function is ExternalFunctionSync simpleFunction)
         {

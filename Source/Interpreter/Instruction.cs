@@ -1,6 +1,6 @@
-﻿namespace LanguageCore.Runtime;
+﻿using LanguageCore.Compiler;
 
-using Compiler;
+namespace LanguageCore.Runtime;
 
 public enum AddressingMode : byte
 {

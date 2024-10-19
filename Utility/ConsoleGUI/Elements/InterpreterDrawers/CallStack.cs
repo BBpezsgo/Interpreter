@@ -17,7 +17,7 @@ public partial class InterpreterElement
 
         sender.DrawBuffer.ResetColor();
 
-        ReadOnlySpan<int> callTraceRaw = DebugUtils.TraceCalls(ImmutableCollectionsMarshal.AsImmutableArray(Interpreter.Processor.Memory), Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation?.StackOffsets);
+        ReadOnlySpan<int> callTraceRaw = DebugUtils.TraceCalls(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation?.StackOffsets);
 
         FunctionInformation[] callStack;
         if (Interpreter.DebugInformation is not null)

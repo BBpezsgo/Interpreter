@@ -37,7 +37,7 @@ public class IOHandler
     {
         IOHandler ioHandler = new();
 
-        externalFunctions.AddManagedExternalFunction(ExternalFunctionNames.StdIn, 0, (ref ProcessorState processor, ReadOnlySpan<byte> parameters) =>
+        externalFunctions.AddExternalFunction(new ExternalFunctionAsync((ref ProcessorState processor, ReadOnlySpan<byte> parameters) =>
         {
             if (ioHandler.OnNeedInput == null) throw new RuntimeException($"Event {ioHandler.OnNeedInput} does not have listeners");
             ProcessorState _processor = processor;
@@ -54,9 +54,9 @@ public class IOHandler
                 returnValue = ReadOnlySpan<byte>.Empty;
                 return false;
             };
-        }, sizeof(char));
+        }, externalFunctions.GenerateId(ExternalFunctionNames.StdIn), ExternalFunctionNames.StdIn, 0, sizeof(char)));
 
-        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, (char @char) => ioHandler.OnStdOut?.Invoke(@char));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdOut), ExternalFunctionNames.StdOut, (char @char) => ioHandler.OnStdOut?.Invoke(@char)));
 
         return ioHandler;
     }

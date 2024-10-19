@@ -6,6 +6,9 @@ public delegate ReadOnlySpan<byte> ExternalFunctionSyncCallback(ReadOnlySpan<byt
 public delegate ExternalFunctionAsyncReturnChecker ExternalFunctionAsyncCallback(ref ProcessorState processor, ReadOnlySpan<byte> arguments);
 public delegate bool ExternalFunctionAsyncReturnChecker(ref ProcessorState processor, out ReadOnlySpan<byte> returnValue);
 
+#if UNITY
+[Unity.Burst.BurstCompile]
+#endif
 public static class ExternalFunctionExtensions
 {
     public static string ToReadable(this IExternalFunction externalFunction) => $"<{externalFunction.ReturnValueSize}bytes> {externalFunction.Name ?? externalFunction.Id.ToString()}(<{externalFunction.ParametersSize}bytes>)";
@@ -19,6 +22,10 @@ public interface IExternalFunction
     public int ReturnValueSize { get; }
 }
 
+#if UNITY
+// [Unity.Burst.BurstCompile]
+#endif
+[SuppressMessage("Style", "IDE0008:Use explicit type")]
 public readonly struct ExternalFunctionSync : IExternalFunction
 {
     public string? Name { get; }
@@ -35,9 +42,266 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         ParametersSize = parametersSize;
         ReturnValueSize = returnValueSize;
     }
+
+    #region Generators
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create(int id, string? name, Action callback)
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            callback.Invoke();
+            return default;
+        }, id, name, 0, 0);
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0>(int id, string? name, Action<T0> callback)
+        where T0 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0>(args);
+            callback.Invoke(
+                _args);
+            return default;
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0>(), 0);
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1>(int id, string? name, Action<T0, T1> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1>(args);
+            callback.Invoke(
+                _args.P0,
+                _args.P1);
+            return default;
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), 0);
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1, T2>(int id, string? name, Action<T0, T1, T2> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2>(args);
+            callback.Invoke(
+                _args.P0,
+                _args.P1,
+                _args.P2);
+            return default;
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), 0);
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1, T2, T3>(int id, string? name, Action<T0, T1, T2, T3> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructParameters<T0, T1, T2, T3>(args);
+            callback.Invoke(
+                _args.P0,
+                _args.P1,
+                _args.P2,
+                _args.P3);
+            return default;
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), 0);
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1, T2, T3, T4>(int id, string? name, Action<T0, T1, T2, T3, T4> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4>(args);
+            callback.Invoke(
+                _args.P0,
+                _args.P1,
+                _args.P2,
+                _args.P3,
+                _args.P4);
+            return default;
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), 0);
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1, T2, T3, T4, T5>(int id, string? name, Action<T0, T1, T2, T3, T4, T5> callback)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
+            callback.Invoke(
+                _args.P0,
+                _args.P1,
+                _args.P2,
+                _args.P3,
+                _args.P4,
+                _args.P5);
+            return default;
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4, T5>(), 0);
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<TResult>(int id, string? name, Func<TResult> callback)
+        where TResult : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            TResult result = callback.Invoke();
+
+            return result.ToBytes();
+        }, id, name, 0, ExternalFunctionGenerator.SizeOf<TResult>());
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, TResult>(int id, string? name, Func<T0, TResult> callback)
+        where TResult : unmanaged
+        where T0 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0>(args);
+            TResult result = callback.Invoke(
+                _args);
+
+            return result.ToBytes();
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0>(), ExternalFunctionGenerator.SizeOf<TResult>());
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1, TResult>(int id, string? name, Func<T0, T1, TResult> callback)
+        where TResult : unmanaged
+        where T0 : unmanaged
+        where T1 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1>(args);
+            TResult result = callback.Invoke(
+                _args.P0,
+                _args.P1);
+
+            return result.ToBytes();
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), ExternalFunctionGenerator.SizeOf<TResult>());
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1, T2, TResult>(int id, string? name, Func<T0, T1, T2, TResult> callback)
+        where TResult : unmanaged
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2>(args);
+            TResult result = callback.Invoke(
+                _args.P0,
+                _args.P1,
+                _args.P2);
+
+            return result.ToBytes();
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), ExternalFunctionGenerator.SizeOf<TResult>());
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1, T2, T3, TResult>(int id, string? name, Func<T0, T1, T2, T3, TResult> callback)
+        where TResult : unmanaged
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructParameters<T0, T1, T2, T3>(args);
+            TResult result = callback.Invoke(
+                _args.P0,
+                _args.P1,
+                _args.P2,
+                _args.P3);
+
+            return result.ToBytes();
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), ExternalFunctionGenerator.SizeOf<TResult>());
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1, T2, T3, T4, TResult>(int id, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
+        where TResult : unmanaged
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4>(args);
+            TResult result = callback.Invoke(
+                _args.P0,
+                _args.P1,
+                _args.P2,
+                _args.P3,
+                _args.P4);
+
+            return result.ToBytes();
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), ExternalFunctionGenerator.SizeOf<TResult>());
+    }
+
+    /// <exception cref="NotImplementedException"/>
+    public static ExternalFunctionSync Create<T0, T1, T2, T3, T4, T5, TResult>(int id, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
+        where TResult : unmanaged
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+    {
+        return new ExternalFunctionSync((args) =>
+        {
+            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
+            TResult result = callback.Invoke(
+                _args.P0,
+                _args.P1,
+                _args.P2,
+                _args.P3,
+                _args.P4,
+                _args.P5);
+
+            return result.ToBytes();
+        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4, T5>(), ExternalFunctionGenerator.SizeOf<TResult>());
+    }
+
+    #endregion
 }
 
-public readonly struct ExternalFunctionAsyncBlock : IExternalFunction
+#if UNITY
+// [Unity.Burst.BurstCompile]
+#endif
+public readonly struct ExternalFunctionAsync : IExternalFunction
 {
     public string? Name { get; }
     public int Id { get; }
@@ -46,7 +310,7 @@ public readonly struct ExternalFunctionAsyncBlock : IExternalFunction
     public ExternalFunctionAsyncCallback Callback { get; }
 
     /// <param name="callback">Callback when the interpreter process this function</param>
-    public ExternalFunctionAsyncBlock(ExternalFunctionAsyncCallback callback, int id, string? name, int parametersSize, int returnValueSize)
+    public ExternalFunctionAsync(ExternalFunctionAsyncCallback callback, int id, string? name, int parametersSize, int returnValueSize)
     {
         Callback = callback;
         Id = id;
@@ -56,7 +320,9 @@ public readonly struct ExternalFunctionAsyncBlock : IExternalFunction
     }
 }
 
-[SuppressMessage("Style", "IDE0008:Use explicit type")]
+#if UNITY
+[Unity.Burst.BurstCompile]
+#endif
 [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members")]
 [SuppressMessage("Style", "IDE0059:Unnecessary assignment of a value")]
 public static unsafe class ExternalFunctionGenerator
@@ -89,7 +355,7 @@ public static unsafe class ExternalFunctionGenerator
         return true;
     }
 
-    public static int GenerateId(this List<IExternalFunction> functions, string? name)
+    public static int GenerateId(this List<IExternalFunction> functions, string? name = null)
     {
         int result;
 
@@ -104,390 +370,13 @@ public static unsafe class ExternalFunctionGenerator
 
     #region AddExternalFunction()
 
-    public static void AddManagedExternalFunction(this List<IExternalFunction> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionAsyncCallback callback, int returnValueSize)
-        => functions.AddExternalFunction(new ExternalFunctionAsyncBlock(callback, functions.GenerateId(name), name, SizeOf(parameterTypes), returnValueSize));
-
-    public static void AddManagedExternalFunction(this List<IExternalFunction> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionAsyncCallback callback)
-        => functions.AddExternalFunction(new ExternalFunctionAsyncBlock(callback, id, name, SizeOf(parameterTypes), 0));
-
-    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback, int returnValueSize)
-        => functions.AddExternalFunction(new ExternalFunctionSync(callback, id, name, SizeOf(parameterTypes), returnValueSize));
-
-    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback, int returnValueSize)
-        => functions.AddExternalFunction(new ExternalFunctionSync(callback, functions.GenerateId(name), name, SizeOf(parameterTypes), returnValueSize));
-
-    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, int id, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback)
-        => functions.AddExternalFunction(new ExternalFunctionSync(callback, id, name, SizeOf(parameterTypes), 0));
-
-    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, string? name, ImmutableArray<RuntimeType> parameterTypes, ExternalFunctionSyncCallback callback)
-        => functions.AddExternalFunction(new ExternalFunctionSync(callback, functions.GenerateId(name), name, SizeOf(parameterTypes), 0));
-
-    public static void AddManagedExternalFunction(this List<IExternalFunction> functions, string? name, int parametersSize, ExternalFunctionAsyncCallback callback, int returnValueSize)
-        => functions.AddExternalFunction(new ExternalFunctionAsyncBlock(callback, functions.GenerateId(name), name, parametersSize, returnValueSize));
-
-    public static void AddManagedExternalFunction(this List<IExternalFunction> functions, int id, string? name, int parametersSize, ExternalFunctionAsyncCallback callback)
-        => functions.AddExternalFunction(new ExternalFunctionAsyncBlock(callback, id, name, parametersSize, 0));
-
-    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, int id, string? name, int parametersSize, ExternalFunctionSyncCallback callback, int returnValueSize)
-        => functions.AddExternalFunction(new ExternalFunctionSync(callback, id, name, parametersSize, returnValueSize));
-
-    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, string? name, int parametersSize, ExternalFunctionSyncCallback callback, int returnValueSize)
-        => functions.AddExternalFunction(new ExternalFunctionSync(callback, functions.GenerateId(name), name, parametersSize, returnValueSize));
-
-    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, int id, string? name, int parametersSize, ExternalFunctionSyncCallback callback)
-        => functions.AddExternalFunction(new ExternalFunctionSync(callback, id, name, parametersSize, 0));
-
-    public static void AddSimpleExternalFunction(this List<IExternalFunction> functions, string? name, int parametersSize, ExternalFunctionSyncCallback callback)
-        => functions.AddExternalFunction(new ExternalFunctionSync(callback, functions.GenerateId(name), name, parametersSize, 0));
-
-    static void AddExternalFunction(this List<IExternalFunction> functions, IExternalFunction function)
+    public static void AddExternalFunction(this List<IExternalFunction> functions, IExternalFunction function)
     {
         int i = functions.FindIndex(v => v.Id == function.Id);
         if (i != -1)
         { functions[i] = function; }
         else
         { functions.Add(function); }
-    }
-
-    public static void AddExternalFunction(this List<IExternalFunction> functions, string name, Action callback)
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    public static void AddExternalFunction(this List<IExternalFunction> functions, int id, string? name, Action callback)
-    {
-        ImmutableArray<RuntimeType> types = ImmutableArray<RuntimeType>.Empty;
-
-        functions.AddSimpleExternalFunction(id, name, types, (args) =>
-        {
-            callback.Invoke();
-            return default;
-        });
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0>(this List<IExternalFunction> functions, string name, Action<T0> callback)
-        where T0 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0>(this List<IExternalFunction> functions, int id, string? name, Action<T0> callback)
-        where T0 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0>(), (args) =>
-        {
-            var _args = DeconstructValues<T0>(args);
-            callback.Invoke(
-                _args);
-            return default;
-        });
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1>(this List<IExternalFunction> functions, string name, Action<T0, T1> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1>(), (args) =>
-        {
-            var _args = DeconstructValues<T0, T1>(args);
-            callback.Invoke(
-                _args.P0,
-                _args.P1);
-            return default;
-        });
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2>(this List<IExternalFunction> functions, string name, Action<T0, T1, T2> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1, T2> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2>(), (args) =>
-        {
-            var _args = DeconstructValues<T0, T1, T2>(args);
-            callback.Invoke(
-                _args.P0,
-                _args.P1,
-                _args.P2);
-            return default;
-        });
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3>(this List<IExternalFunction> functions, string name, Action<T0, T1, T2, T3> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1, T2, T3> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3>(), (args) =>
-        {
-            var _args = DeconstructParameters<T0, T1, T2, T3>(args);
-            callback.Invoke(
-                _args.P0,
-                _args.P1,
-                _args.P2,
-                _args.P3);
-            return default;
-        });
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this List<IExternalFunction> functions, string name, Action<T0, T1, T2, T3, T4> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where T4 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1, T2, T3, T4> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where T4 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4>(), (args) =>
-        {
-            var _args = DeconstructValues<T0, T1, T2, T3, T4>(args);
-            callback.Invoke(
-                _args.P0,
-                _args.P1,
-                _args.P2,
-                _args.P3,
-                _args.P4);
-            return default;
-        });
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this List<IExternalFunction> functions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where T4 : unmanaged
-        where T5 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this List<IExternalFunction> functions, int id, string? name, Action<T0, T1, T2, T3, T4, T5> callback)
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where T4 : unmanaged
-        where T5 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4, T5>(), (args) =>
-        {
-            var _args = DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
-            callback.Invoke(
-                _args.P0,
-                _args.P1,
-                _args.P2,
-                _args.P3,
-                _args.P4,
-                _args.P5);
-            return default;
-        });
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<TResult>(this List<IExternalFunction> functions, string? name, Func<TResult> callback)
-        where TResult : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<TResult>(this List<IExternalFunction> functions, int id, string? name, Func<TResult> callback)
-        where TResult : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, 0, (args) =>
-        {
-            TResult result = callback.Invoke();
-
-            return result.ToBytes();
-        }, SizeOf<TResult>());
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0>(), (args) =>
-        {
-            var _args = DeconstructValues<T0>(args);
-            TResult result = callback.Invoke(
-                _args);
-
-            return result.ToBytes();
-        }, SizeOf<TResult>());
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1>(), (args) =>
-        {
-            var _args = DeconstructValues<T0, T1>(args);
-            TResult result = callback.Invoke(
-                _args.P0,
-                _args.P1);
-
-            return result.ToBytes();
-        }, SizeOf<TResult>());
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, T2, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2>(), (args) =>
-        {
-            var _args = DeconstructValues<T0, T1, T2>(args);
-            TResult result = callback.Invoke(
-                _args.P0,
-                _args.P1,
-                _args.P2);
-
-            return result.ToBytes();
-        }, SizeOf<TResult>());
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, T2, T3, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, T3, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3>(), (args) =>
-        {
-            var _args = DeconstructParameters<T0, T1, T2, T3>(args);
-            TResult result = callback.Invoke(
-                _args.P0,
-                _args.P1,
-                _args.P2,
-                _args.P3);
-
-            return result.ToBytes();
-        }, SizeOf<TResult>());
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where T4 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where T4 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4>(), (args) =>
-        {
-            var _args = DeconstructValues<T0, T1, T2, T3, T4>(args);
-            TResult result = callback.Invoke(
-                _args.P0,
-                _args.P1,
-                _args.P2,
-                _args.P3,
-                _args.P4);
-
-            return result.ToBytes();
-        }, SizeOf<TResult>());
-    }
-
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this List<IExternalFunction> functions, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where T4 : unmanaged
-        where T5 : unmanaged
-        => functions.AddExternalFunction(functions.GenerateId(name), name, callback);
-    /// <exception cref="NotImplementedException"/>
-    public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this List<IExternalFunction> functions, int id, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
-        where TResult : unmanaged
-        where T0 : unmanaged
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where T4 : unmanaged
-        where T5 : unmanaged
-    {
-        functions.AddSimpleExternalFunction(id, name, SizeOf<T0, T1, T2, T3, T4, T5>(), (args) =>
-        {
-            var _args = DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
-            TResult result = callback.Invoke(
-                _args.P0,
-                _args.P1,
-                _args.P2,
-                _args.P3,
-                _args.P4,
-                _args.P5);
-
-            return result.ToBytes();
-        }, SizeOf<TResult>());
     }
 
     #endregion
@@ -579,7 +468,7 @@ public static unsafe class ExternalFunctionGenerator
 
     #region Other
 
-    static int SizeOf(ImmutableArray<RuntimeType> types)
+    public static int SizeOf(ImmutableArray<RuntimeType> types)
     {
         int size = 0;
         foreach (RuntimeType type in types)
@@ -600,29 +489,29 @@ public static unsafe class ExternalFunctionGenerator
         return size;
     }
 
-    static int SizeOf<T0>()
+    public static int SizeOf<T0>()
         where T0 : unmanaged
         => sizeof(T0);
 
-    static int SizeOf<T0, T1>()
+    public static int SizeOf<T0, T1>()
         where T0 : unmanaged
         where T1 : unmanaged
         => sizeof(T0) + sizeof(T1);
 
-    static int SizeOf<T0, T1, T2>()
+    public static int SizeOf<T0, T1, T2>()
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
         => sizeof(T0) + sizeof(T1) + sizeof(T2);
 
-    static int SizeOf<T0, T1, T2, T3>()
+    public static int SizeOf<T0, T1, T2, T3>()
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
         where T3 : unmanaged
         => sizeof(T0) + sizeof(T1) + sizeof(T2) + sizeof(T3);
 
-    static int SizeOf<T0, T1, T2, T3, T4>()
+    public static int SizeOf<T0, T1, T2, T3, T4>()
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -630,7 +519,7 @@ public static unsafe class ExternalFunctionGenerator
         where T4 : unmanaged
         => sizeof(T0) + sizeof(T1) + sizeof(T2) + sizeof(T3) + sizeof(T4);
 
-    static int SizeOf<T0, T1, T2, T3, T4, T5>()
+    public static int SizeOf<T0, T1, T2, T3, T4, T5>()
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -639,7 +528,7 @@ public static unsafe class ExternalFunctionGenerator
         where T5 : unmanaged
         => sizeof(T0) + sizeof(T1) + sizeof(T2) + sizeof(T3) + sizeof(T4) + sizeof(T5);
 
-    static T0 DeconstructValues<T0>(ReadOnlySpan<byte> data)
+    public static T0 DeconstructValues<T0>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
     {
         T0 p0;
@@ -652,7 +541,7 @@ public static unsafe class ExternalFunctionGenerator
         return p0;
     }
 
-    static (T0 P0, T1 P1) DeconstructValues<T0, T1>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1) DeconstructValues<T0, T1>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
     {
@@ -670,7 +559,7 @@ public static unsafe class ExternalFunctionGenerator
         return (p0, p1);
     }
 
-    static (T0 P0, T1 P1, T2 P2) DeconstructValues<T0, T1, T2>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1, T2 P2) DeconstructValues<T0, T1, T2>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -693,7 +582,7 @@ public static unsafe class ExternalFunctionGenerator
         return (p0, p1, p2);
     }
 
-    static (T0 P0, T1 P1, T2 P2, T3 P3) DeconstructParameters<T0, T1, T2, T3>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1, T2 P2, T3 P3) DeconstructParameters<T0, T1, T2, T3>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -721,7 +610,7 @@ public static unsafe class ExternalFunctionGenerator
         return (p0, p1, p2, p3);
     }
 
-    static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4) DeconstructValues<T0, T1, T2, T3, T4>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4) DeconstructValues<T0, T1, T2, T3, T4>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -754,7 +643,7 @@ public static unsafe class ExternalFunctionGenerator
         return (p0, p1, p2, p3, p4);
     }
 
-    static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4, T5 P5) DeconstructValues<T0, T1, T2, T3, T4, T5>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4, T5 P5) DeconstructValues<T0, T1, T2, T3, T4, T5>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged

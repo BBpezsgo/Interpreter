@@ -2,7 +2,10 @@
 
 namespace LanguageCore.Runtime;
 
-[StructLayout(LayoutKind.Explicit)]
+[StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
+#if UNITY
+[Unity.Burst.BurstCompile]
+#endif
 public struct Registers
 {
     [FieldOffset(0)] public int CodePointer;

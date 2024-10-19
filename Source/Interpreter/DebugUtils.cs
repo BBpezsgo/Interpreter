@@ -11,7 +11,7 @@ public readonly struct StackOffsets
 [ExcludeFromCodeCoverage]
 public static class DebugUtils
 {
-    static bool CanTraceCallsWith(ImmutableArray<byte> stack, int basePointer, [NotNullWhen(true)] StackOffsets? stackOffsets)
+    static bool CanTraceCallsWith(ReadOnlySpan<byte> stack, int basePointer, [NotNullWhen(true)] StackOffsets? stackOffsets)
     {
         if (!stackOffsets.HasValue) { return false; }
 
@@ -24,7 +24,7 @@ public static class DebugUtils
         return true;
     }
 
-    static bool CanTraceBPsWith(ImmutableArray<byte> stack, int basePointer, [NotNullWhen(true)] StackOffsets? stackOffsets)
+    static bool CanTraceBPsWith(ReadOnlySpan<byte> stack, int basePointer, [NotNullWhen(true)] StackOffsets? stackOffsets)
     {
         if (!stackOffsets.HasValue) { return false; }
 
@@ -35,12 +35,12 @@ public static class DebugUtils
         return true;
     }
 
-    public static void TraceCalls(ImmutableArray<byte> stack, int basePointer, StackOffsets? stackOffsets, List<int> callTrace)
+    public static void TraceCalls(ReadOnlySpan<byte> stack, int basePointer, StackOffsets? stackOffsets, List<int> callTrace)
     {
         if (!CanTraceCallsWith(stack, basePointer, stackOffsets)) return;
 
-        int savedCodePointer = stack.AsSpan()[(basePointer + stackOffsets.Value.SavedCodePointer)..].To<int>();
-        int savedBasePointer = stack.AsSpan()[(basePointer + stackOffsets.Value.SavedBasePointer)..].To<int>();
+        int savedCodePointer = stack[(basePointer + stackOffsets.Value.SavedCodePointer)..].To<int>();
+        int savedBasePointer = stack[(basePointer + stackOffsets.Value.SavedBasePointer)..].To<int>();
 
         if (savedBasePointer == basePointer || callTrace.Contains(savedCodePointer)) return;
 
@@ -49,11 +49,11 @@ public static class DebugUtils
         TraceCalls(stack, savedBasePointer, stackOffsets, callTrace);
     }
 
-    static void TraceBasePointers(ImmutableArray<byte> stack, int basePointer, StackOffsets? stackOffsets, List<int> result)
+    static void TraceBasePointers(ReadOnlySpan<byte> stack, int basePointer, StackOffsets? stackOffsets, List<int> result)
     {
         if (!CanTraceBPsWith(stack, basePointer, stackOffsets)) return;
 
-        int newBasePointer = stack.AsSpan()[(basePointer + stackOffsets.Value.SavedBasePointer)..].To<int>();
+        int newBasePointer = stack[(basePointer + stackOffsets.Value.SavedBasePointer)..].To<int>();
 
         result.Add(newBasePointer);
 
@@ -62,7 +62,7 @@ public static class DebugUtils
         TraceBasePointers(stack, newBasePointer, stackOffsets, result);
     }
 
-    public static ReadOnlySpan<int> TraceCalls(ImmutableArray<byte> stack, int basePointer, StackOffsets? stackOffsets)
+    public static ReadOnlySpan<int> TraceCalls(ReadOnlySpan<byte> stack, int basePointer, StackOffsets? stackOffsets)
     {
         if (!CanTraceCallsWith(stack, basePointer, stackOffsets))
         { return ReadOnlySpan<int>.Empty; }
@@ -76,7 +76,7 @@ public static class DebugUtils
         return callTraceResult;
     }
 
-    public static ReadOnlySpan<int> TraceBasePointers(ImmutableArray<byte> stack, int basePointer, StackOffsets? stackOffsets)
+    public static ReadOnlySpan<int> TraceBasePointers(ReadOnlySpan<byte> stack, int basePointer, StackOffsets? stackOffsets)
     {
         if (!CanTraceBPsWith(stack, basePointer, stackOffsets))
         { return ReadOnlySpan<int>.Empty; }

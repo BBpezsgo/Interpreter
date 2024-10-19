@@ -64,13 +64,13 @@ public class MainFileTests
     [TestMethod, Timeout(Timeout)]
     public void Test55() => Utils.GetTest(55).DoMain(externalFunctionAdder: static (externalFunctions) =>
     {
-        externalFunctions.AddExternalFunction("test", static (int a, int b, int c, int d) =>
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(), "test", static (int a, int b, int c, int d) =>
         {
             Assert.AreEqual(a, 1, "parameter 0");
             Assert.AreEqual(b, 2, "parameter 1");
             Assert.AreEqual(c, 3, "parameter 2");
             Assert.AreEqual(d, 4, "parameter 3");
-        });
+        }));
     });
     [TestMethod, Timeout(Timeout)] public void Test56() => Utils.GetTest(56).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test57() => Utils.GetTest(57).DoMain();

@@ -27,7 +27,7 @@ public class BytecodeProcessorEx
     {
         List<IExternalFunction> externalFunctions = new();
 
-        externalFunctions.AddExternalFunction("sleep", (int t) => CurrentSleepFinishAt = DateTime.UtcNow.TimeOfDay.TotalSeconds + t);
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("sleep"), "sleep", (int t) => CurrentSleepFinishAt = DateTime.UtcNow.TimeOfDay.TotalSeconds + t));
 
         AddStaticExternalFunctions(externalFunctions);
 
@@ -47,22 +47,22 @@ public class BytecodeProcessorEx
 
     static void AddRuntimeExternalFunctions(List<IExternalFunction> externalFunctions)
     {
-        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdIn, static () => '\0');
-        externalFunctions.AddExternalFunction(ExternalFunctionNames.StdOut, static (char @char) => { });
-        externalFunctions.AddExternalFunction("console-set", static (char @char, int x, int y) => { });
-        externalFunctions.AddExternalFunction("console-clear", static () => { });
-        externalFunctions.AddExternalFunction("sleep", static (int t) => { });
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdIn), ExternalFunctionNames.StdIn, static () => '\0'));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdOut), ExternalFunctionNames.StdOut, static (char @char) => { }));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("console-set"), "console-set", static (char @char, int x, int y) => { }));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("console-clear"), "console-clear", static () => { }));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("sleep"), "sleep", static (int t) => { }));
     }
 
     static void AddStaticExternalFunctions(List<IExternalFunction> externalFunctions)
     {
-        externalFunctions.AddExternalFunction("utc-time", static () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
-        externalFunctions.AddExternalFunction("local-time", static () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
-        externalFunctions.AddExternalFunction("utc-date-day", static () => (int)DateTime.UtcNow.DayOfYear);
-        externalFunctions.AddExternalFunction("local-date-day", static () => (int)DateTime.Now.DayOfYear);
-        externalFunctions.AddExternalFunction("utc-date-year", static () => (int)DateTime.UtcNow.Year);
-        externalFunctions.AddExternalFunction("local-date-year", static () => (int)DateTime.Now.Year);
-        externalFunctions.AddExternalFunction<float, float, float>("atan2", MathF.Atan2);
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("utc-time"), "utc-time", static () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("local-time"), "local-time", static () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("utc-date-day"), "utc-date-day", static () => (int)DateTime.UtcNow.DayOfYear));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("local-date-day"), "local-date-day", static () => (int)DateTime.Now.DayOfYear));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("utc-date-year"), "utc-date-year", static () => (int)DateTime.UtcNow.Year));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("local-date-year"), "local-date-year", static () => (int)DateTime.Now.Year));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<float, float, float>(externalFunctions.GenerateId("atan2"), "atan2", MathF.Atan2));
     }
 
     public void Tick()

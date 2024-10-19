@@ -3,16 +3,17 @@
 namespace LanguageCore.Runtime;
 
 [ExcludeFromCodeCoverage]
-public class RuntimeException : LanguageException
+public class RuntimeException : LanguageException, IDisposable
 {
     const int CallStackIndent = 1;
 
+    bool IsDisposed;
     public RuntimeContext? Context { get; set; }
     public DebugInformation? DebugInformation { get; set; }
     public ImmutableArray<int> CallTrace =>
         Context is null ? ImmutableArray<int>.Empty :
         DebugInformation is null ? ImmutableArray<int>.Empty :
-        ImmutableArray.Create(DebugUtils.TraceCalls(Context.Value.Memory, Context.Value.Registers.BasePointer, DebugInformation.StackOffsets));
+        ImmutableArray.Create(DebugUtils.TraceCalls(Context.Value.Memory.AsSpan(), Context.Value.Registers.BasePointer, DebugInformation.StackOffsets));
 
     public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
     public RuntimeException(string message, RuntimeContext context, DebugInformation? debugInformation) : base(message, Position.UnknownPosition, null)
@@ -216,7 +217,7 @@ public class RuntimeException : LanguageException
                         result.AppendLine();
                         continue;
                     }
-                    ImmutableArray<byte> value = context.Memory[range.Start..(range.End + 1)];
+                    ReadOnlySpan<byte> value = context.Memory.AsSpan()[range.Start..(range.End + 1)];
                     if (item.Type.Equals(BasicType.F32))
                     { result.Append(value.To<float>() + "f"); }
                     else if (item.Type.Equals(BasicType.U8))
@@ -237,7 +238,7 @@ public class RuntimeException : LanguageException
                         result.Append(value.To<int>());
                     }
                     else
-                    { result.Append(string.Join(' ', value)); }
+                    { result.AppendJoin(' ', value.ToArray()); }
                     result.Append(';');
                     result.AppendLine();
                 }
@@ -343,5 +344,21 @@ public class RuntimeException : LanguageException
         AppendScope(context.Registers.CodePointer);
 
         return result.ToString();
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (IsDisposed) return;
+        if (disposing) { }
+        Context?.Dispose();
+        IsDisposed = true;
+    }
+
+    ~RuntimeException() { Dispose(disposing: false); }
+
+    void IDisposable.Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }

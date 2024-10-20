@@ -37,7 +37,8 @@ public partial class BytecodeProcessor
             Registers,
             Memory,
             Code.AsSpan(),
-            ExternalFunctions.Values.AsSpan()
+            ExternalFunctions.Values.AsSpan(),
+            ReadOnlySpan<ExternalFunctionScopedSync>.Empty
         );
 
         state.Tick();

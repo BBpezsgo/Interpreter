@@ -485,7 +485,7 @@ public ref partial struct ProcessorState
 
     #region External Calls
 
-    void CALL_EXTERNAL()
+    unsafe void CALL_EXTERNAL()
     {
         int functionId = GetData(CurrentInstruction.Operand1).I32;
 
@@ -500,7 +500,31 @@ public ref partial struct ProcessorState
         }
 
         if (function is null)
-        { throw new RuntimeException($"Undefined external function {functionId}"); }
+        {
+            for (int i = 0; i < ScopedExternalFunctions.Length; i++)
+            {
+                ref readonly ExternalFunctionScopedSync scopedExternalFunction = ref ScopedExternalFunctions[i];
+                if (scopedExternalFunction.Id != functionId) continue;
+
+                Span<byte> _parameters = Memory.Slice(Registers.StackPointer, scopedExternalFunction.ParametersSize);
+
+                if (scopedExternalFunction.ReturnValueSize > 0)
+                {
+                    Span<byte> returnValue = stackalloc byte[scopedExternalFunction.ReturnValueSize];
+                    scopedExternalFunction.Callback(scopedExternalFunction.Scope, _parameters, returnValue);
+                    Push(returnValue);
+                }
+                else
+                {
+                    scopedExternalFunction.Callback(scopedExternalFunction.Scope, _parameters, default);
+                }
+
+                Step();
+                return;
+            }
+
+            throw new RuntimeException($"Undefined external function {functionId}");
+        }
 
         Span<byte> parameters = Memory.Slice(Registers.StackPointer, function.ParametersSize);
 
@@ -514,12 +538,13 @@ public ref partial struct ProcessorState
         {
             if (function.ReturnValueSize > 0)
             {
-                ReadOnlySpan<byte> returnValue = simpleFunction.Callback(parameters);
+                Span<byte> returnValue = stackalloc byte[function.ReturnValueSize];
+                simpleFunction.Callback(parameters, returnValue);
                 Push(returnValue);
             }
             else
             {
-                simpleFunction.Callback(parameters);
+                simpleFunction.Callback(parameters, default);
             }
         }
 

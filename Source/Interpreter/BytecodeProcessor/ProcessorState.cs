@@ -18,13 +18,15 @@ public ref partial struct ProcessorState
     public readonly Span<byte> Memory;
     public readonly ReadOnlySpan<Instruction> Code;
     public readonly ReadOnlySpan<IExternalFunction> ExternalFunctions;
+    public readonly ReadOnlySpan<ExternalFunctionScopedSync> ScopedExternalFunctions;
 
     public ProcessorState(
         BytecodeInterpreterSettings settings,
         Registers registers,
         Span<byte> memory,
         ReadOnlySpan<Instruction> code,
-        ReadOnlySpan<IExternalFunction> externalFunctions)
+        ReadOnlySpan<IExternalFunction> externalFunctions,
+        ReadOnlySpan<ExternalFunctionScopedSync> scopedExternalFunctions)
     {
         Settings = settings;
         Registers = registers;
@@ -32,6 +34,7 @@ public ref partial struct ProcessorState
         Code = code;
         ExternalFunctions = externalFunctions;
         PendingExternalFunction = null;
+        ScopedExternalFunctions = scopedExternalFunctions;
     }
 
     public void Setup()

@@ -2,7 +2,8 @@
 
 namespace LanguageCore.Runtime;
 
-public delegate ReadOnlySpan<byte> ExternalFunctionSyncCallback(ReadOnlySpan<byte> arguments);
+public delegate void ExternalFunctionSyncCallback(ReadOnlySpan<byte> arguments, Span<byte> returnValue);
+public delegate void ExternalFunctionSyncScopedCallback(Span<byte> scope, ReadOnlySpan<byte> arguments, Span<byte> returnValue);
 public delegate ExternalFunctionAsyncReturnChecker ExternalFunctionAsyncCallback(ref ProcessorState processor, ReadOnlySpan<byte> arguments);
 public delegate bool ExternalFunctionAsyncReturnChecker(ref ProcessorState processor, out ReadOnlySpan<byte> returnValue);
 
@@ -22,10 +23,30 @@ public interface IExternalFunction
     public int ReturnValueSize { get; }
 }
 
+public readonly unsafe struct ExternalFunctionScopedSync : IExternalFunction
+{
+    public string? Name => null;
+    public int Id { get; }
+    public int ParametersSize { get; }
+    public int ReturnValueSize { get; }
+    public nint Scope { get; }
+    public delegate*<nint, ReadOnlySpan<byte>, Span<byte>, void> Callback { get; }
+
+    public ExternalFunctionScopedSync(delegate*<nint, ReadOnlySpan<byte>, Span<byte>, void> callback, int id, int parametersSize, int returnValueSize, nint scope)
+    {
+        Callback = callback;
+        Id = id;
+        ParametersSize = parametersSize;
+        ReturnValueSize = returnValueSize;
+        Scope = scope;
+    }
+}
+
 #if UNITY
 // [Unity.Burst.BurstCompile]
 #endif
 [SuppressMessage("Style", "IDE0008:Use explicit type")]
+[SuppressMessage("Style", "IDE0053:Use expression body for lambda expression")]
 public readonly struct ExternalFunctionSync : IExternalFunction
 {
     public string? Name { get; }
@@ -48,10 +69,9 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create(int id, string? name, Action callback)
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             callback.Invoke();
-            return default;
         }, id, name, 0, 0);
     }
 
@@ -59,12 +79,11 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     public static ExternalFunctionSync Create<T0>(int id, string? name, Action<T0> callback)
         where T0 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0>(args);
             callback.Invoke(
                 _args);
-            return default;
         }, id, name, ExternalFunctionGenerator.SizeOf<T0>(), 0);
     }
 
@@ -73,13 +92,12 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T0 : unmanaged
         where T1 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1>(args);
             callback.Invoke(
                 _args.P0,
                 _args.P1);
-            return default;
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), 0);
     }
 
@@ -89,14 +107,13 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T1 : unmanaged
         where T2 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2>(args);
             callback.Invoke(
                 _args.P0,
                 _args.P1,
                 _args.P2);
-            return default;
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), 0);
     }
 
@@ -107,7 +124,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T2 : unmanaged
         where T3 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructParameters<T0, T1, T2, T3>(args);
             callback.Invoke(
@@ -115,7 +132,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P1,
                 _args.P2,
                 _args.P3);
-            return default;
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), 0);
     }
 
@@ -127,7 +143,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T3 : unmanaged
         where T4 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4>(args);
             callback.Invoke(
@@ -136,7 +152,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P2,
                 _args.P3,
                 _args.P4);
-            return default;
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), 0);
     }
 
@@ -149,7 +164,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T4 : unmanaged
         where T5 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
             callback.Invoke(
@@ -159,7 +174,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P3,
                 _args.P4,
                 _args.P5);
-            return default;
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4, T5>(), 0);
     }
 
@@ -167,11 +181,10 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     public static ExternalFunctionSync Create<TResult>(int id, string? name, Func<TResult> callback)
         where TResult : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             TResult result = callback.Invoke();
-
-            return result.ToBytes();
+            result.AsBytes().CopyTo(returnValue);
         }, id, name, 0, ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
@@ -180,13 +193,13 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where TResult : unmanaged
         where T0 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0>(args);
             TResult result = callback.Invoke(
                 _args);
 
-            return result.ToBytes();
+            result.AsBytes().CopyTo(returnValue);
         }, id, name, ExternalFunctionGenerator.SizeOf<T0>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
@@ -196,14 +209,14 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T0 : unmanaged
         where T1 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1>(args);
             TResult result = callback.Invoke(
                 _args.P0,
                 _args.P1);
 
-            return result.ToBytes();
+            result.AsBytes().CopyTo(returnValue);
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
@@ -214,7 +227,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T1 : unmanaged
         where T2 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2>(args);
             TResult result = callback.Invoke(
@@ -222,7 +235,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P1,
                 _args.P2);
 
-            return result.ToBytes();
+            result.AsBytes().CopyTo(returnValue);
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
@@ -234,7 +247,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T2 : unmanaged
         where T3 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructParameters<T0, T1, T2, T3>(args);
             TResult result = callback.Invoke(
@@ -243,7 +256,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P2,
                 _args.P3);
 
-            return result.ToBytes();
+            result.AsBytes().CopyTo(returnValue);
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
@@ -256,7 +269,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T3 : unmanaged
         where T4 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4>(args);
             TResult result = callback.Invoke(
@@ -266,7 +279,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P3,
                 _args.P4);
 
-            return result.ToBytes();
+            result.AsBytes().CopyTo(returnValue);
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
@@ -280,7 +293,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         where T4 : unmanaged
         where T5 : unmanaged
     {
-        return new ExternalFunctionSync((args) =>
+        return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
             TResult result = callback.Invoke(
@@ -291,7 +304,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P4,
                 _args.P5);
 
-            return result.ToBytes();
+            result.AsBytes().CopyTo(returnValue);
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4, T5>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 

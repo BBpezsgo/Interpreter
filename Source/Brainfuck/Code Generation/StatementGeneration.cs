@@ -450,6 +450,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (valueVariable.IsDiscarded)
             { throw new CompilerException($"Variable \"{valueVariable.Name}\" is discarded", _identifier, CurrentFile); }
 
+            if (!valueVariable.IsInitialized)
+            { AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{valueVariable.Name}\" is not initialized", _identifier, _identifier.File)); }
+
             if (variable.Size != valueVariable.Size)
             { throw new CompilerException($"Variable and value size mismatch ({variable.Size} != {valueVariable.Size})", value, CurrentFile); }
 
@@ -467,6 +470,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
 
             Optimizations++;
+
+            variable.IsInitialized = valueVariable.IsInitialized;
 
             return;
         }
@@ -488,6 +493,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 Precomputations++;
 
                 VariableCanBeDiscarded = null;
+                variable.IsInitialized = true;
                 return;
             }
 
@@ -584,6 +590,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             UndiscardVariable(CompiledVariables, variable.Name);
 
             VariableCanBeDiscarded = null;
+            variable.IsInitialized = true;
         }
     }
 
@@ -599,6 +606,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (variable.Size != 1)
             { throw new CompilerException($"Bruh", variableIdentifier, CurrentFile); }
+
+            if (!variable.IsInitialized)
+            { AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{variable.Name}\" is not initialized", variableIdentifier, variableIdentifier.File)); }
 
             if (variable.IsReference)
             {
@@ -764,6 +774,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (variable.IsDiscarded)
         { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", _variableIdentifier, CurrentFile); }
+
+        if (!variable.IsInitialized)
+        { AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{variable.Name}\" is not initialized", _variableIdentifier, _variableIdentifier.File)); }
 
         using (Code.Block(this, $"Set array (variable {variable.Name}) index ({statement.Index}) (at {variable.Address}) to {value}"))
         {
@@ -1454,6 +1467,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (statement.Right == null)
                 { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
+                if (!variable.IsInitialized)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left, CurrentFile)); }
+
                 if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
                 {
                     if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
@@ -1499,6 +1515,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (statement.Right == null)
                 { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
+
+                if (!variable.IsInitialized)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left, CurrentFile)); }
 
                 if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
                 {
@@ -1568,6 +1587,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (variable.Size != 1)
                 { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
 
+                if (!variable.IsInitialized)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left, CurrentFile)); }
+
                 using (Code.Block(this, $"Increment variable {variable.Name} (at {variable.Address})"))
                 {
                     Code.AddValue(variable.Address, 1);
@@ -1589,6 +1611,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (variable.Size != 1)
                 { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
+
+                if (!variable.IsInitialized)
+                { AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left, CurrentFile)); }
 
                 using (Code.Block(this, $"Decrement variable {variable.Name} (at {variable.Address})"))
                 {
@@ -1775,6 +1800,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (variable.IsDiscarded)
         { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement, CurrentFile); }
 
+        if (!variable.IsInitialized)
+        { AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{variable.Name}\" is not initialized", statement, CurrentFile)); }
+
         int variableSize = variable.Size;
 
         if (variableSize <= 0)
@@ -1884,6 +1912,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             TryCompute(statement.Right, out CompiledValue right) &&
                             right.Type == RuntimeType.U8)
                         {
+                            if (!left.IsInitialized)
+                            { AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{left.Name}\" is not initialized", _left, _left.File)); }
+
                             int resultAddress = Stack.PushVirtual(1);
 
                             Code.CopyValue(left.Address, resultAddress, Stack.NextAddress);

@@ -1,4 +1,5 @@
-﻿using LanguageCore.Compiler;
+﻿using System.Runtime.CompilerServices;
+using LanguageCore.Compiler;
 
 namespace LanguageCore.Runtime;
 
@@ -81,7 +82,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0>(args);
             callback.Invoke(
                 _args);
         }, id, name, ExternalFunctionGenerator.SizeOf<T0>(), 0);
@@ -94,7 +95,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1>(args);
             callback.Invoke(
                 _args.P0,
                 _args.P1);
@@ -109,7 +110,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1, T2>(args);
             callback.Invoke(
                 _args.P0,
                 _args.P1,
@@ -126,7 +127,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructParameters<T0, T1, T2, T3>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1, T2, T3>(args);
             callback.Invoke(
                 _args.P0,
                 _args.P1,
@@ -145,7 +146,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1, T2, T3, T4>(args);
             callback.Invoke(
                 _args.P0,
                 _args.P1,
@@ -166,7 +167,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1, T2, T3, T4, T5>(args);
             callback.Invoke(
                 _args.P0,
                 _args.P1,
@@ -195,7 +196,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0>(args);
             TResult result = callback.Invoke(
                 _args);
 
@@ -211,7 +212,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1>(args);
             TResult result = callback.Invoke(
                 _args.P0,
                 _args.P1);
@@ -229,7 +230,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1, T2>(args);
             TResult result = callback.Invoke(
                 _args.P0,
                 _args.P1,
@@ -249,7 +250,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructParameters<T0, T1, T2, T3>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1, T2, T3>(args);
             TResult result = callback.Invoke(
                 _args.P0,
                 _args.P1,
@@ -271,7 +272,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1, T2, T3, T4>(args);
             TResult result = callback.Invoke(
                 _args.P0,
                 _args.P1,
@@ -295,7 +296,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
-            var _args = ExternalFunctionGenerator.DeconstructValues<T0, T1, T2, T3, T4, T5>(args);
+            var _args = ExternalFunctionGenerator.TakeParameters<T0, T1, T2, T3, T4, T5>(args);
             TResult result = callback.Invoke(
                 _args.P0,
                 _args.P1,
@@ -479,44 +480,27 @@ public static unsafe class ExternalFunctionGenerator
 
     #endregion
 
-    #region Other
+    #region SizeOf
 
-    public static int SizeOf(ImmutableArray<RuntimeType> types)
-    {
-        int size = 0;
-        foreach (RuntimeType type in types)
-        {
-            size += type switch
-            {
-                RuntimeType.Null => 0,
-                RuntimeType.U8 => 1,
-                RuntimeType.I8 => 1,
-                RuntimeType.Char => 2,
-                RuntimeType.I16 => 2,
-                RuntimeType.I32 => 4,
-                RuntimeType.U32 => 4,
-                RuntimeType.F32 => 4,
-                _ => throw new UnreachableException(),
-            };
-        }
-        return size;
-    }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int SizeOf<T0>()
         where T0 : unmanaged
         => sizeof(T0);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int SizeOf<T0, T1>()
         where T0 : unmanaged
         where T1 : unmanaged
         => sizeof(T0) + sizeof(T1);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int SizeOf<T0, T1, T2>()
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
         => sizeof(T0) + sizeof(T1) + sizeof(T2);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int SizeOf<T0, T1, T2, T3>()
         where T0 : unmanaged
         where T1 : unmanaged
@@ -524,6 +508,7 @@ public static unsafe class ExternalFunctionGenerator
         where T3 : unmanaged
         => sizeof(T0) + sizeof(T1) + sizeof(T2) + sizeof(T3);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int SizeOf<T0, T1, T2, T3, T4>()
         where T0 : unmanaged
         where T1 : unmanaged
@@ -532,6 +517,7 @@ public static unsafe class ExternalFunctionGenerator
         where T4 : unmanaged
         => sizeof(T0) + sizeof(T1) + sizeof(T2) + sizeof(T3) + sizeof(T4);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int SizeOf<T0, T1, T2, T3, T4, T5>()
         where T0 : unmanaged
         where T1 : unmanaged
@@ -541,7 +527,11 @@ public static unsafe class ExternalFunctionGenerator
         where T5 : unmanaged
         => sizeof(T0) + sizeof(T1) + sizeof(T2) + sizeof(T3) + sizeof(T4) + sizeof(T5);
 
-    public static T0 DeconstructValues<T0>(ReadOnlySpan<byte> data)
+    #endregion
+
+    #region TakeParameters
+
+    public static T0 TakeParameters<T0>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
     {
         T0 p0;
@@ -554,7 +544,7 @@ public static unsafe class ExternalFunctionGenerator
         return p0;
     }
 
-    public static (T0 P0, T1 P1) DeconstructValues<T0, T1>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1) TakeParameters<T0, T1>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
     {
@@ -572,7 +562,7 @@ public static unsafe class ExternalFunctionGenerator
         return (p0, p1);
     }
 
-    public static (T0 P0, T1 P1, T2 P2) DeconstructValues<T0, T1, T2>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1, T2 P2) TakeParameters<T0, T1, T2>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -595,7 +585,7 @@ public static unsafe class ExternalFunctionGenerator
         return (p0, p1, p2);
     }
 
-    public static (T0 P0, T1 P1, T2 P2, T3 P3) DeconstructParameters<T0, T1, T2, T3>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1, T2 P2, T3 P3) TakeParameters<T0, T1, T2, T3>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -623,7 +613,7 @@ public static unsafe class ExternalFunctionGenerator
         return (p0, p1, p2, p3);
     }
 
-    public static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4) DeconstructValues<T0, T1, T2, T3, T4>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4) TakeParameters<T0, T1, T2, T3, T4>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged
@@ -656,7 +646,7 @@ public static unsafe class ExternalFunctionGenerator
         return (p0, p1, p2, p3, p4);
     }
 
-    public static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4, T5 P5) DeconstructValues<T0, T1, T2, T3, T4, T5>(ReadOnlySpan<byte> data)
+    public static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4, T5 P5) TakeParameters<T0, T1, T2, T3, T4, T5>(ReadOnlySpan<byte> data)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged

@@ -2019,8 +2019,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (!val.Type.SameAs(arrayType))
                     { throw new NotImplementedException(); }
 
-                    if (!val.IsInitialized)
-                    { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {val.Identifier} but its aint initialized.", identifier, identifier.File)); }
+                    // TODO: this
+                    // if (!val.IsInitialized)
+                    // { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {val.Identifier} but its aint initialized.", identifier, identifier.File)); }
 
                     int offset = (int)computedIndexData * arrayType.Of.GetSize(this);
                     Address address = GetLocalVariableAddress(val);
@@ -2541,8 +2542,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (!variable.Type.SameAs(arrayType))
                     { throw new NotImplementedException(); }
 
-                    if (!variable.IsInitialized)
-                    { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {variable.Identifier} but its aint initialized.", identifier, identifier.File)); }
+                    // TODO: this
+                    // if (!variable.IsInitialized)
+                    // { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {variable.Identifier} but its aint initialized.", identifier, identifier.File)); }
 
                     int offset = (int)computedIndexData * arrayType.Of.GetSize(this);
                     PopTo(new AddressOffset(GetLocalVariableAddress(variable), offset), arrayType.Of.GetSize(this));

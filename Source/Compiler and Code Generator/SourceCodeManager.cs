@@ -140,18 +140,18 @@ public class SourceCodeManager
             return true;
         }
 
-        if (uri.IsFile)
+        if (uri.Scheme is "https" or "http")
         {
-            if (FromFile(uri.AbsolutePath, tokenizerSettings, out ParserResult ast2))
+            if (FromWeb(uri, tokenizerSettings, out ParserResult ast2))
             {
                 ast = ast2;
                 AlreadyLoadedCodes.Add(uri, new CollectedAST(ast2, uri, @using));
                 return true;
             }
         }
-        else
+        else if (uri.IsFile)
         {
-            if (FromWeb(uri, tokenizerSettings, out ParserResult ast2))
+            if (FromFile(uri.AbsolutePath, tokenizerSettings, out ParserResult ast2))
             {
                 ast = ast2;
                 AlreadyLoadedCodes.Add(uri, new CollectedAST(ast2, uri, @using));

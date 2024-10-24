@@ -24,13 +24,13 @@ public interface IExternalFunction
     public int ReturnValueSize { get; }
 }
 
-public readonly unsafe struct ExternalFunctionScopedSync : IExternalFunction
+public unsafe struct ExternalFunctionScopedSync : IExternalFunction
 {
-    public string? Name => null;
+    public readonly string? Name => null;
     public int Id { get; }
     public int ParametersSize { get; }
     public int ReturnValueSize { get; }
-    public nint Scope { get; }
+    public nint Scope { get; set; }
     public delegate*<nint, ReadOnlySpan<byte>, Span<byte>, void> Callback { get; }
 
     public ExternalFunctionScopedSync(delegate*<nint, ReadOnlySpan<byte>, Span<byte>, void> callback, int id, int parametersSize, int returnValueSize, nint scope)

@@ -144,6 +144,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public override BuiltinType BooleanType => BuiltinType.U8;
     public override BuiltinType SizeofStatementType => BuiltinType.I32;
     public override BuiltinType ArrayLengthType => BuiltinType.I32;
+    readonly Stack<int> ScopeSizes = new();
 
     #endregion
 

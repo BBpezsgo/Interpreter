@@ -252,6 +252,7 @@ public static class Utils
     public static MainGeneratorSettings MainGeneratorSettings => new(MainGeneratorSettings.Default)
     {
         GenerateDebugInstructions = false,
+        StackSize = MainGeneratorSettings.Default.StackSize,
     };
 
     public static CompilerSettings CompilerSettings => new(CompilerSettings.Default)
@@ -328,11 +329,7 @@ public static class Utils
             List<IExternalFunction> _externalFunctions = new();
             externalFunctionAdder?.Invoke(_externalFunctions);
 
-            BytecodeProcessorEx interpreter = new(new BytecodeInterpreterSettings()
-            {
-                HeapSize = HeapSize,
-                StackSize = BytecodeInterpreterSettings.Default.StackSize,
-            }, code.Code, null, code.DebugInfo, _externalFunctions);
+            BytecodeProcessorEx interpreter = new(BytecodeInterpreterSettings, code.Code, null, code.DebugInfo, _externalFunctions);
 
             InputBuffer inputBuffer = new(input);
             StringBuilder stdOutput = new();

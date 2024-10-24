@@ -70,6 +70,7 @@ public static class Entry
             DontOptimize = arguments.DontOptimize ?? MainGeneratorSettings.Default.DontOptimize,
             PrintInstructions = arguments.PrintInstructions ?? MainGeneratorSettings.Default.PrintInstructions,
             GenerateDebugInstructions = !arguments.NoDebugInfo ?? MainGeneratorSettings.Default.GenerateDebugInstructions,
+            StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
         };
         BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)
         {

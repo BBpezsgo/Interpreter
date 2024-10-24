@@ -82,7 +82,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
-            AddInstruction(Opcode.Push, returnValue.Value);
+            Push(returnValue.Value);
             return;
         }
 
@@ -144,7 +144,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
-            AddInstruction(Opcode.Push, returnValue.Value);
+            Push(returnValue.Value);
             return;
         }
 
@@ -478,7 +478,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (CanReturn)
             {
-                AddInstruction(Opcode.Push, ReturnFlagTrue);
+                Push(ReturnFlagTrue);
                 PopTo(ReturnFlagAddress, ReturnFlagType.GetSize(this));
             }
 
@@ -765,7 +765,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (FindSize(paramType, out int size))
             {
-                AddInstruction(Opcode.Push, size);
+                Push(size);
                 anyCall.PredictedValue = size;
             }
             else
@@ -773,7 +773,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using RegisterUsage.Auto reg = Registers.GetFree();
                 AddInstruction(Opcode.Move, reg.Get(BuiltinType.I32.GetBitWidth(this)), 0);
                 GenerateSize(paramType, reg.Get(BuiltinType.I32.GetBitWidth(this)));
-                AddInstruction(Opcode.Push, reg.Get(BuiltinType.I32.GetBitWidth(this)));
+                Push(reg.Get(BuiltinType.I32.GetBitWidth(this)));
             }
 
             return;
@@ -796,7 +796,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 runtimeStatements.Length == 0)
             {
                 anyCall.PredictedValue = returnValue.Value;
-                AddInstruction(Opcode.Push, returnValue.Value);
+                Push(returnValue.Value);
                 return;
             }
 
@@ -871,7 +871,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
             @operator.PredictedValue = predictedValue;
 
-            AddInstruction(Opcode.Push, predictedValue);
+            Push(predictedValue);
             return;
         }
 
@@ -1024,99 +1024,99 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     case BinaryOperatorCall.Addition:
                         AddInstruction(isFloat ? Opcode.FMathAdd : isUnsigned ? Opcode.UMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Subtraction:
                         AddInstruction(isFloat ? Opcode.FMathSub : isUnsigned ? Opcode.UMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Multiplication:
                         AddInstruction(isFloat ? Opcode.FMathMult : isUnsigned ? Opcode.UMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Division:
                         AddInstruction(isFloat ? Opcode.FMathDiv : isUnsigned ? Opcode.UMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Modulo:
                         AddInstruction(isFloat ? Opcode.FMathMod : isUnsigned ? Opcode.UMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.LogicalAND:
                         AddInstruction(Opcode.LogicAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.LogicalOR:
                         AddInstruction(Opcode.LogicOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.BitwiseAND:
                         AddInstruction(Opcode.BitsAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.BitwiseOR:
                         AddInstruction(Opcode.BitsOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.BitwiseXOR:
                         AddInstruction(Opcode.BitsXOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.BitshiftLeft:
                         AddInstruction(Opcode.BitsShiftLeft, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.BitshiftRight:
                         AddInstruction(Opcode.BitsShiftRight, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.Push, regLeft.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
                         break;
 
                     case BinaryOperatorCall.CompEQ:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfEqual, 3);
-                        AddInstruction(Opcode.Push, false);
+                        Push(false);
                         AddInstruction(Opcode.Jump, 2);
-                        AddInstruction(Opcode.Push, true);
+                        Push(true);
                         break;
 
                     case BinaryOperatorCall.CompNEQ:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfNotEqual, 3);
-                        AddInstruction(Opcode.Push, false);
+                        Push(false);
                         AddInstruction(Opcode.Jump, 2);
-                        AddInstruction(Opcode.Push, true);
+                        Push(true);
                         break;
 
                     case BinaryOperatorCall.CompGT:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfLessOrEqual, 3);
-                        AddInstruction(Opcode.Push, true);
+                        Push(true);
                         AddInstruction(Opcode.Jump, 2);
-                        AddInstruction(Opcode.Push, false);
+                        Push(false);
                         break;
 
                     case BinaryOperatorCall.CompGEQ:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfLess, 3);
-                        AddInstruction(Opcode.Push, true);
+                        Push(true);
                         AddInstruction(Opcode.Jump, 2);
-                        AddInstruction(Opcode.Push, false);
+                        Push(false);
                         break;
 
                     case BinaryOperatorCall.CompLT:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfLess, 3);
-                        AddInstruction(Opcode.Push, false);
+                        Push(false);
                         AddInstruction(Opcode.Jump, 2);
-                        AddInstruction(Opcode.Push, true);
+                        Push(true);
                         break;
 
                     case BinaryOperatorCall.CompLEQ:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         AddInstruction(Opcode.JumpIfLessOrEqual, 3);
-                        AddInstruction(Opcode.Push, false);
+                        Push(false);
                         AddInstruction(Opcode.Jump, 2);
-                        AddInstruction(Opcode.Push, true);
+                        Push(true);
                         break;
 
                     default:
@@ -1141,7 +1141,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
             @operator.PredictedValue = predictedValue;
 
-            AddInstruction(Opcode.Push, predictedValue);
+            Push(predictedValue);
             return;
         }
 
@@ -1215,9 +1215,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         PopTo(reg.Get(bitWidth));
                         AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
                         AddInstruction(Opcode.JumpIfEqual, 3);
-                        AddInstruction(Opcode.Push, false);
+                        Push(false);
                         AddInstruction(Opcode.Jump, 2);
-                        AddInstruction(Opcode.Push, true);
+                        Push(true);
                     }
 
                     return;
@@ -1230,7 +1230,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     {
                         PopTo(reg.Get(bitWidth));
                         AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
-                        AddInstruction(Opcode.Push, reg.Get(bitWidth));
+                        Push(reg.Get(bitWidth));
                     }
 
                     return;
@@ -1255,7 +1255,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
                         {
                             OnGotStatementType(literal, BuiltinType.U8);
-                            AddInstruction(Opcode.Push, new CompiledValue((byte)literal.GetInt()));
+                            Push(new CompiledValue((byte)literal.GetInt()));
                             return;
                         }
                     }
@@ -1264,7 +1264,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if (literal.GetInt() is >= sbyte.MinValue and <= sbyte.MaxValue)
                         {
                             OnGotStatementType(literal, BuiltinType.I8);
-                            AddInstruction(Opcode.Push, new CompiledValue((sbyte)literal.GetInt()));
+                            Push(new CompiledValue((sbyte)literal.GetInt()));
                             return;
                         }
                     }
@@ -1273,7 +1273,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
                         {
                             OnGotStatementType(literal, BuiltinType.Char);
-                            AddInstruction(Opcode.Push, new CompiledValue((ushort)literal.GetInt()));
+                            Push(new CompiledValue((ushort)literal.GetInt()));
                             return;
                         }
                     }
@@ -1282,7 +1282,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if (literal.GetInt() is >= short.MinValue and <= short.MaxValue)
                         {
                             OnGotStatementType(literal, BuiltinType.I16);
-                            AddInstruction(Opcode.Push, new CompiledValue((short)literal.GetInt()));
+                            Push(new CompiledValue((short)literal.GetInt()));
                             return;
                         }
                     }
@@ -1291,33 +1291,33 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if (literal.GetInt() >= (int)uint.MinValue)
                         {
                             OnGotStatementType(literal, BuiltinType.U32);
-                            AddInstruction(Opcode.Push, new CompiledValue((uint)literal.GetInt()));
+                            Push(new CompiledValue((uint)literal.GetInt()));
                             return;
                         }
                     }
                     else if (expectedType.SameAs(BasicType.I32))
                     {
                         OnGotStatementType(literal, BuiltinType.I32);
-                        AddInstruction(Opcode.Push, new CompiledValue(literal.GetInt()));
+                        Push(new CompiledValue(literal.GetInt()));
                         return;
                     }
                     else if (expectedType.SameAs(BasicType.F32))
                     {
                         OnGotStatementType(literal, BuiltinType.F32);
-                        AddInstruction(Opcode.Push, new CompiledValue((float)literal.GetInt()));
+                        Push(new CompiledValue((float)literal.GetInt()));
                         return;
                     }
                 }
 
                 OnGotStatementType(literal, BuiltinType.I32);
-                AddInstruction(Opcode.Push, new CompiledValue(literal.GetInt()));
+                Push(new CompiledValue(literal.GetInt()));
                 break;
             }
             case LiteralType.Float:
             {
                 OnGotStatementType(literal, BuiltinType.F32);
 
-                AddInstruction(Opcode.Push, new CompiledValue(literal.GetFloat()));
+                Push(new CompiledValue(literal.GetFloat()));
                 break;
             }
             case LiteralType.String:
@@ -1348,7 +1348,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
                         {
                             OnGotStatementType(literal, BuiltinType.U8);
-                            AddInstruction(Opcode.Push, new CompiledValue((byte)literal.Value[0]));
+                            Push(new CompiledValue((byte)literal.Value[0]));
                             return;
                         }
                     }
@@ -1357,14 +1357,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if ((int)literal.Value[0] is >= sbyte.MinValue and <= sbyte.MaxValue)
                         {
                             OnGotStatementType(literal, BuiltinType.I8);
-                            AddInstruction(Opcode.Push, new CompiledValue((sbyte)literal.Value[0]));
+                            Push(new CompiledValue((sbyte)literal.Value[0]));
                             return;
                         }
                     }
                     else if (expectedType.SameAs(BasicType.Char))
                     {
                         OnGotStatementType(literal, BuiltinType.Char);
-                        AddInstruction(Opcode.Push, new CompiledValue(literal.Value[0]));
+                        Push(new CompiledValue(literal.Value[0]));
                         return;
                     }
                     else if (expectedType.SameAs(BasicType.I16))
@@ -1372,7 +1372,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if ((int)literal.Value[0] is >= short.MinValue and <= short.MaxValue)
                         {
                             OnGotStatementType(literal, BuiltinType.I16);
-                            AddInstruction(Opcode.Push, new CompiledValue((short)literal.Value[0]));
+                            Push(new CompiledValue((short)literal.Value[0]));
                             return;
                         }
                     }
@@ -1381,7 +1381,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if (literal.Value[0] >= uint.MinValue)
                         {
                             OnGotStatementType(literal, BuiltinType.U32);
-                            AddInstruction(Opcode.Push, new CompiledValue((short)literal.Value[0]));
+                            Push(new CompiledValue((short)literal.Value[0]));
                             return;
                         }
                     }
@@ -1390,20 +1390,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         if (literal.Value[0] >= int.MinValue)
                         {
                             OnGotStatementType(literal, BuiltinType.I32);
-                            AddInstruction(Opcode.Push, new CompiledValue((short)literal.Value[0]));
+                            Push(new CompiledValue((short)literal.Value[0]));
                             return;
                         }
                     }
                     else if (expectedType.SameAs(BasicType.F32))
                     {
                         OnGotStatementType(literal, BuiltinType.F32);
-                        AddInstruction(Opcode.Push, new CompiledValue((float)literal.Value[0]));
+                        Push(new CompiledValue((float)literal.Value[0]));
                         return;
                     }
                 }
 
                 OnGotStatementType(literal, BuiltinType.Char);
-                AddInstruction(Opcode.Push, new CompiledValue(literal.Value[0]));
+                Push(new CompiledValue(literal.Value[0]));
                 break;
             }
             default: throw new UnreachableException();
@@ -1463,7 +1463,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             variable.Reference = constant;
             variable.Token.AnalyzedType = TokenAnalyzedType.ConstantName;
 
-            AddInstruction(Opcode.Push, constant.Value);
+            Push(constant.Value);
             return;
         }
 
@@ -1519,7 +1519,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
             { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction, CurrentFile)); }
 
-            AddInstruction(Opcode.Push, compiledFunction.InstructionOffset);
+            Push(compiledFunction.InstructionOffset);
 
             return;
         }
@@ -1904,7 +1904,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             OnGotStatementType(field, ArrayLengthType);
             field.PredictedValue = arrayType.ComputedLength.Value;
 
-            AddInstruction(Opcode.Push, arrayType.ComputedLength.Value);
+            Push(arrayType.ComputedLength.Value);
             return;
         }
 
@@ -2079,7 +2079,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     AddInstruction(Opcode.MathAdd, regIndex.Get(indexType.GetBitWidth(this)), regPtr.Get(PointerBitWidth));
                 }
 
-                AddInstruction(Opcode.Push, regIndex.Get(indexType.GetBitWidth(this)));
+                Push(regIndex.Get(indexType.GetBitWidth(this)));
 
                 CheckPointerNull();
 
@@ -2102,7 +2102,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 GenerateAddressResolver(runtimePointer.PointerAddress);
                 break;
             case AddressRegisterPointer registerPointer:
-                AddInstruction(Opcode.Push, registerPointer.Register);
+                Push(registerPointer.Register);
                 break;
             case AddressOffset addressOffset:
                 using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -2110,7 +2110,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     GenerateAddressResolver(addressOffset.Base);
                     PopTo(reg.Get(PointerBitWidth));
                     AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), addressOffset.Offset);
-                    AddInstruction(Opcode.Push, reg.Get(PointerBitWidth));
+                    Push(reg.Get(PointerBitWidth));
                 }
                 break;
             default: throw new NotImplementedException();
@@ -2172,7 +2172,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             TryComputeSimple(typeCast.PrevStatement, out CompiledValue prevValue) &&
             prevValue.TryCast(targetBuiltinType.RuntimeType, out prevValue))
         {
-            AddInstruction(Opcode.Push, prevValue);
+            Push(prevValue);
             return;
         }
 
@@ -2579,7 +2579,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     AddInstruction(Opcode.MathAdd, regPtr.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this)));
 
-                    AddInstruction(Opcode.Push, regPtr.Get(PointerBitWidth));
+                    Push(regPtr.Get(PointerBitWidth));
 
                     CheckPointerNull(false);
 
@@ -2734,7 +2734,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             size = new BuiltinType(computedInitialValue.Type).GetSize(this);
 
-            AddInstruction(Opcode.Push, computedInitialValue);
+            Push(computedInitialValue);
             compiledVariable.IsInitialized = true;
 
             if (size <= 0)
@@ -2754,7 +2754,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             for (int i = 0; i < literalStatement.Value.Length; i++)
             {
-                AddInstruction(Opcode.Push, new CompiledValue(literalStatement.Value[i]));
+                Push(new CompiledValue(literalStatement.Value[i]));
             }
         }
         else
@@ -2829,7 +2829,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             size = new BuiltinType(computedInitialValue.Type).SizeBytes;
 
-            AddInstruction(Opcode.Push, computedInitialValue);
+            Push(computedInitialValue);
             compiledVariable.IsInitialized = true;
 
             if (size <= 0)
@@ -2848,7 +2848,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             for (int i = 0; i < literalStatement.Value.Length; i++)
             {
-                AddInstruction(Opcode.Push, new CompiledValue(literalStatement.Value[i]));
+                Push(new CompiledValue(literalStatement.Value[i]));
             }
         }
         else
@@ -2954,6 +2954,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledParameters.Clear();
         CompiledVariables.Clear();
         ReturnInstructions.Clear();
+        ScopeSizes.Push(0);
 
         CompileParameters(function.Parameters);
 
@@ -2967,7 +2968,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { CurrentReturnType = BuiltinType.Void; }
 
         AddComment("Return flag");
-        AddInstruction(Opcode.Push, ReturnFlagFalse);
+        Push(ReturnFlagFalse);
 
         OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.File));
 
@@ -3073,6 +3074,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledParameters.Clear();
         CompiledVariables.Clear();
         ReturnInstructions.Clear();
+        if (ScopeSizes.Pop() != 0) ; // throw new InternalException("Bruh", function.Block!, function.File);
 
         CurrentContext = null;
         InFunction = false;
@@ -3159,10 +3161,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Stack = new List<StackElementInformation>(),
         });
 
+        ScopeSizes.Push(0);
+
         AddComment("TopLevelStatements {");
 
         AddComment("Create stack frame");
-        AddInstruction(Opcode.Push, Register.BasePointer);
+        Push(Register.BasePointer);
         AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
@@ -3181,7 +3185,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CurrentReturnType = ExitCodeType;
 
         AddComment("Return flag");
-        AddInstruction(Opcode.Push, ReturnFlagFalse);
+        Push(ReturnFlagFalse);
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
             Address = ReturnFlagOffset,
@@ -3212,6 +3216,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Pop stack frame");
         PopTo(Register.BasePointer);
+        if (ScopeSizes.Pop() != 0) ; // throw new InternalException("Bruh");
 
         AddComment("}");
 
@@ -3228,6 +3233,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new NotImplementedException(); }
 
         Print?.Invoke("Generating code ...", LogType.Debug);
+        ScopeSizes.Push(0);
 
         List<string> usedExternalFunctions = new();
 
@@ -3263,7 +3269,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             // Exit code
 
             AddComment("Push exit code");
-            AddInstruction(Opcode.Push, new CompiledValue(0));
+            Push(new CompiledValue(0));
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
             {
@@ -3283,7 +3289,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                AddInstruction(Opcode.Push, Register.StackPointer);
+                Push(Register.StackPointer);
             }
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
@@ -3318,6 +3324,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Pop(AbsGlobalAddressType.GetSize(this)); // Pop abs global offset
 
         AddInstruction(Opcode.Exit); // Exit code already there
+
+        // 4 -> exit code
+        if (ScopeSizes.Pop() != 4) ; // throw new InternalException("Bruh");
 
         foreach (CompiledVariable variable in CompiledGlobalVariables)
         {

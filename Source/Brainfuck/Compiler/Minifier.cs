@@ -227,17 +227,8 @@ public static class Minifier
 
                 debugInformation?.OffsetCodeFrom(i + 1, -removed);
 
-                result = result[..^removed];
                 slice.CopyTo(result[(i + 1)..]);
-
-                /*
-                Span<char> final = new char[result.Length - removed];
-
-                result[..(i + 1)].CopyTo(final);
-                slice.CopyTo(final[(i + 1)..]);
-
-                result = final;
-                */
+                result = result[..^removed];
 
                 return true;
             }

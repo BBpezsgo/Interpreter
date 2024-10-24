@@ -16,10 +16,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new CompilerException($"This should be a function pointer and not {addressType}", address, CurrentFile); }
 
         int returnToValueInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Push, 0);
+        Push(0);
 
         PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this));
-        AddInstruction(Opcode.Push, Register.BasePointer);
+        Push(Register.BasePointer);
 
         GenerateCodeForStatement(address);
 
@@ -41,10 +41,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     int Call(int absoluteAddress)
     {
         int returnToValueInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Push, 0);
+        Push(0);
 
         PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this));
-        AddInstruction(Opcode.Push, Register.BasePointer);
+        Push(Register.BasePointer);
 
         AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
@@ -61,6 +61,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         PopTo(Register.BasePointer);
         Pop(AbsGlobalAddressType.GetSize(this)); // Pop AbsoluteGlobalOffset
         AddInstruction(Opcode.Return);
+        ScopeSizes.LastRef -= PointerSize;
     }
 
     #endregion
@@ -264,7 +265,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             int qwordCount = size / 8;
             size %= 8;
             for (int i = 0; i < qwordCount; i++)
-            { AddInstruction(Opcode.Pop64); }
+            {
+                AddInstruction(Opcode.Pop64);
+                ScopeSizes.LastRef -= 8;
+            }
         }
 
         if (PointerBitWidth != BitWidth._64)
@@ -272,16 +276,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
             int dwordCount = size / 4;
             size %= 4;
             for (int i = 0; i < dwordCount; i++)
-            { AddInstruction(Opcode.Pop32); }
+            {
+                AddInstruction(Opcode.Pop32);
+                ScopeSizes.LastRef -= 4;
+            }
         }
 
         int wordCount = size / 2;
         size %= 2;
         for (int i = 0; i < wordCount; i++)
-        { AddInstruction(Opcode.Pop16); }
+        {
+            AddInstruction(Opcode.Pop16);
+            ScopeSizes.LastRef -= 2;
+        }
 
         for (int i = 0; i < size; i++)
-        { AddInstruction(Opcode.Pop8); }
+        {
+            AddInstruction(Opcode.Pop8);
+            ScopeSizes.LastRef -= 1;
+        }
     }
 
     void StackAlloc(int size, bool initializeZero)
@@ -289,6 +302,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!initializeZero)
         {
             AddInstruction(Opcode.MathSub, Register.StackPointer, size);
+            ScopeSizes.LastRef += size;
+            if (ScopeSizes.Last >= Settings.StackSize)
+            {
+                throw null!;
+            }
             return;
         }
 
@@ -297,16 +315,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
             int dwordCount = size / 4;
             size %= 4;
             for (int i = 0; i < dwordCount; i++)
-            { AddInstruction(Opcode.Push, new CompiledValue((int)0)); }
+            { Push(new CompiledValue((int)0)); }
         }
 
         int wordCount = size / 2;
         size %= 2;
         for (int i = 0; i < wordCount; i++)
-        { AddInstruction(Opcode.Push, new CompiledValue((char)0)); }
+        { Push(new CompiledValue((char)0)); }
 
         for (int i = 0; i < size; i++)
-        { AddInstruction(Opcode.Push, new CompiledValue((byte)0)); }
+        { Push(new CompiledValue((byte)0)); }
     }
 
     void PopTo(InstructionOperand destination, BitWidth size)
@@ -323,6 +341,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BitWidth._64 => Opcode.PopTo64,
             _ => throw new UnreachableException(),
         }, destination);
+        ScopeSizes.LastRef -= (int)size;
     }
 
     void PopTo(Register destination)
@@ -335,6 +354,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BitWidth._64 => Opcode.PopTo64,
             _ => throw new UnreachableException(),
         }, destination);
+        ScopeSizes.LastRef -= (int)destination.BitWidth();
     }
 
     void PopTo(AddressOffset address, int size)
@@ -475,7 +495,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                             if (currentOffset < checkSize - 1) continue;
                             if (PointerSize < checkSize) continue;
 
-                            AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset - (checkSize - 1), checkBitWidth));
+                            Push(reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset - (checkSize - 1), checkBitWidth));
                             currentOffset -= checkSize;
                             break;
                         }
@@ -515,28 +535,28 @@ public partial class CodeGeneratorForMain : CodeGenerator
             //     if (currentOffset < checkSize) continue;
             //     if (PointerSize < checkSize) continue;
             // 
-            //     AddInstruction(Opcode.Push, address.Register.ToPtr(currentOffset - (checkSize - 1), checkBitWidth));
+            //     Push(address.Register.ToPtr(currentOffset - (checkSize - 1), checkBitWidth));
             //     currentOffset -= checkSize;
             //     break;
             // }
             if (currentOffset >= 8 && PointerSize >= 8)
             {
-                AddInstruction(Opcode.Push, address.Register.ToPtr(currentOffset - 7, BitWidth._64));
+                Push(address.Register.ToPtr(currentOffset - 7, BitWidth._64));
                 currentOffset -= 8;
             }
             else if (currentOffset >= 4)
             {
-                AddInstruction(Opcode.Push, address.Register.ToPtr(currentOffset - 3, BitWidth._32));
+                Push(address.Register.ToPtr(currentOffset - 3, BitWidth._32));
                 currentOffset -= 4;
             }
             else if (currentOffset >= 2)
             {
-                AddInstruction(Opcode.Push, address.Register.ToPtr(currentOffset - 1, BitWidth._16));
+                Push(address.Register.ToPtr(currentOffset - 1, BitWidth._16));
                 currentOffset -= 2;
             }
             else
             {
-                AddInstruction(Opcode.Push, address.Register.ToPtr(currentOffset, BitWidth._8));
+                Push(address.Register.ToPtr(currentOffset, BitWidth._8));
                 currentOffset -= 1;
             }
         }
@@ -565,6 +585,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             default:
                 throw new NotImplementedException();
+        }
+    }
+
+    void Push(int value) => Push(new InstructionOperand(value));
+    void Push(CompiledValue value) => Push(new InstructionOperand(value));
+    void Push(Register value) => Push((InstructionOperand)value);
+    void Push(InstructionOperand value)
+    {
+        AddInstruction(Opcode.Push, value);
+        ScopeSizes.LastRef += (int)value.BitWidth;
+        if (ScopeSizes.Last >= Settings.StackSize)
+        {
+            throw null!;
         }
     }
 
@@ -619,7 +652,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             PopTo(reg.Get(PointerBitWidth));
             for (int i = size - 1; i >= 0; i--)
-            { AddInstruction(Opcode.Push, reg.Get(PointerBitWidth).ToPtr(i + offset, BitWidth._8)); }
+            { Push(reg.Get(PointerBitWidth).ToPtr(i + offset, BitWidth._8)); }
         }
     }
 

@@ -1890,6 +1890,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             case GenericType:
             case StructType:
             case FunctionType:
+            case ArrayType:
                 value = default;
                 return false;
             case BuiltinType builtinType:
@@ -2056,12 +2057,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         if (prevType.Is(out PointerType? pointerType) &&
             pointerType.To.Is(out arrayType))
-        {
-            if (!arrayType.Of.Is<BuiltinType>())
-            { AnalysisCollection?.Warnings.Add(notFoundError.InstantiateWarning(index, index.File)); }
-
-            return arrayType.Of;
-        }
+        { return arrayType.Of; }
 
         throw notFoundError.Instantiate(index, index.File);
     }

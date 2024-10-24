@@ -42,12 +42,19 @@ struct List
         { crash "Index out of range exception"; }
         this._ptr[index] = value;
     }
-    
+
+    export List<T>(int capacity)
+    {
+        this._capacity = capacity;
+        this._length = 0;
+        this._ptr = Alloc(capacity * sizeof(T)) as T[]*;
+    }
+
     export List<T>*(int capacity)
     {
         this._capacity = capacity;
         this._length = 0;
-        this._ptr = Alloc(capacity * sizeof(T));
+        this._ptr = Alloc(capacity * sizeof(T)) as T[]*;
     }
 
     export destructor()

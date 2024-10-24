@@ -213,8 +213,14 @@ export inline void Print(u32 message)
     }
 }
 
-export void Print(temp f32 message)
+export void Print(f32 message)
 {
+    if (message < 0f)
+    {
+        Print('-');
+        message *= -1f;
+    }
+
     Print((int)message);
     message %= 1f;
     message *= 1000f;

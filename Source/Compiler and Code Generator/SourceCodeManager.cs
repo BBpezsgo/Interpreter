@@ -100,6 +100,10 @@ public class SourceCodeManager
     {
         ast = default;
 
+        if (path.StartsWith("/~")) path = path[1..];
+        if (path.StartsWith('~'))
+        { path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "." + path[1..]); }
+
         if (!File.Exists(path))
         { return false; }
 
@@ -177,6 +181,10 @@ public class SourceCodeManager
         if (parent is not null &&
             !parent.IsFile)
         { yield break; }
+
+        if (@using.StartsWith("/~")) @using = @using[1..];
+        if (@using.StartsWith('~'))
+        { @using = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "." + @using[1..]); }
 
         if (parent != null)
         {

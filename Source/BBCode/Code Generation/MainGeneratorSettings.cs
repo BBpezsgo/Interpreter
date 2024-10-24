@@ -1,4 +1,5 @@
 ﻿using LanguageCore.Compiler;
+using LanguageCore.Runtime;
 
 namespace LanguageCore.BBLang.Generator;
 
@@ -13,6 +14,7 @@ public struct MainGeneratorSettings
     public bool CheckNullPointers;
     public CompileLevel CompileLevel;
     public int PointerSize;
+    public int StackSize;
 
     public MainGeneratorSettings(MainGeneratorSettings other)
     {
@@ -24,6 +26,7 @@ public struct MainGeneratorSettings
         CheckNullPointers = other.CheckNullPointers;
         CompileLevel = other.CompileLevel;
         PointerSize = other.PointerSize;
+        StackSize = other.StackSize;
     }
 
     public static MainGeneratorSettings Default => new()
@@ -36,5 +39,6 @@ public struct MainGeneratorSettings
         CheckNullPointers = true,
         CompileLevel = CompileLevel.Minimal,
         PointerSize = 4,
+        StackSize = BytecodeInterpreterSettings.Default.StackSize,
     };
 }

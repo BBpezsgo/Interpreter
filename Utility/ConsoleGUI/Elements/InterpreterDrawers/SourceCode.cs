@@ -27,13 +27,13 @@ public partial class InterpreterElement
         }
 
         int indent = 0;
-        if (Interpreter.DebugInformation is not null)
+        if (!Interpreter.DebugInformation.IsEmpty)
         {
             for (int i = 0; i < this.Interpreter.Processor.Registers.CodePointer - 5; i++)
             {
-                if (Interpreter.DebugInformation.CodeComments.TryGetValue(i, out List<string>? comments))
+                if (Interpreter.DebugInformation.CodeComments.TryGetValue(i, out ImmutableArray<string> comments))
                 {
-                    for (int j = 0; j < comments.Count; j++)
+                    for (int j = 0; j < comments.Length; j++)
                     {
                         if (!comments[j].EndsWith("{ }", StringComparison.Ordinal) && comments[j].EndsWith('}'))
                         { indent--; }
@@ -51,11 +51,11 @@ public partial class InterpreterElement
 
             Instruction instruction = Interpreter.Processor.Code[i];
 
-            if (this.Interpreter.DebugInformation is not null)
+            if (!Interpreter.DebugInformation.IsEmpty)
             {
-                if (this.Interpreter.DebugInformation.CodeComments.TryGetValue(i, out List<string>? comments))
+                if (Interpreter.DebugInformation.CodeComments.TryGetValue(i, out ImmutableArray<string> comments))
                 {
-                    for (int j = 0; j < comments.Count; j++)
+                    for (int j = 0; j < comments.Length; j++)
                     {
                         string comment = comments[j];
 

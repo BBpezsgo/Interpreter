@@ -139,6 +139,150 @@ public struct FunctionInformation
 }
 
 [ExcludeFromCodeCoverage]
+public readonly struct CompiledDebugInformation
+{
+    public readonly bool HasValue;
+    public bool IsEmpty => !HasValue;
+    public readonly ImmutableArray<SourceCodeLocation> SourceCodeLocations;
+    public readonly ImmutableArray<FunctionInformation> FunctionInformation;
+    public readonly ImmutableArray<ScopeInformation> ScopeInformation;
+    public readonly FrozenDictionary<int, ImmutableArray<string>> CodeComments;
+    public readonly FrozenDictionary<Uri, ImmutableArray<Tokenizing.Token>> OriginalFiles;
+    public readonly StackOffsets StackOffsets;
+
+    public CompiledDebugInformation(DebugInformation? debugInformation)
+    {
+        if (debugInformation is null)
+        {
+            SourceCodeLocations = ImmutableArray<SourceCodeLocation>.Empty;
+            FunctionInformation = ImmutableArray<FunctionInformation>.Empty;
+            ScopeInformation = ImmutableArray<ScopeInformation>.Empty;
+            CodeComments = FrozenDictionary<int, ImmutableArray<string>>.Empty;
+            OriginalFiles = FrozenDictionary<Uri, ImmutableArray<Tokenizing.Token>>.Empty;
+            StackOffsets = new StackOffsets()
+            {
+                SavedBasePointer = 0,
+                SavedCodePointer = 0,
+            };
+            HasValue = false;
+        }
+        else
+        {
+            SourceCodeLocations = debugInformation.SourceCodeLocations.ToImmutableArray();
+            FunctionInformation = debugInformation.FunctionInformation.ToImmutableArray();
+            ScopeInformation = debugInformation.ScopeInformation.ToImmutableArray();
+            CodeComments = debugInformation.CodeComments.Select(v => new KeyValuePair<int, ImmutableArray<string>>(v.Key, v.Value.ToImmutableArray())).ToFrozenDictionary();
+            OriginalFiles = debugInformation.OriginalFiles.ToFrozenDictionary();
+            StackOffsets = new StackOffsets()
+            {
+                SavedBasePointer = 0,
+                SavedCodePointer = 0,
+            };
+            HasValue = true;
+        }
+    }
+
+    public ImmutableArray<SourceCodeLocation> GetSourceLocations(int instruction) => GetSourceLocations(SourceCodeLocations.AsSpan(), instruction);
+    public static ImmutableArray<SourceCodeLocation> GetSourceLocations(ReadOnlySpan<SourceCodeLocation> sourceCodeLocations, int instruction)
+    {
+        List<SourceCodeLocation> result = new();
+        for (int i = 0; i < sourceCodeLocations.Length; i++)
+        {
+            SourceCodeLocation sourceLocation = sourceCodeLocations[i];
+            if (!sourceLocation.Contains(instruction))
+            { continue; }
+            result.Add(sourceLocation);
+        }
+        return result.ToImmutableArray();
+    }
+
+    public bool TryGetSourceLocation(int instruction, out SourceCodeLocation sourceLocation)
+        => TryGetSourceLocation(SourceCodeLocations.AsSpan(), instruction, out sourceLocation);
+    public static bool TryGetSourceLocation(ReadOnlySpan<SourceCodeLocation> sourceCodeLocations, int instruction, out SourceCodeLocation sourceLocation)
+    {
+        sourceLocation = default;
+        bool success = false;
+
+        for (int i = 0; i < sourceCodeLocations.Length; i++)
+        {
+            SourceCodeLocation _sourceLocation = sourceCodeLocations[i];
+            if (!_sourceLocation.Contains(instruction))
+            { continue; }
+            if (success && sourceLocation.Instructions.Size() < _sourceLocation.Instructions.Size())
+            { continue; }
+            sourceLocation = _sourceLocation;
+            success = true;
+        }
+
+        return success;
+    }
+
+    public ImmutableArray<FunctionInformation> GetFunctionInformation(ReadOnlySpan<int> codePointers)
+        => GetFunctionInformation(FunctionInformation.AsSpan(), codePointers);
+    public static ImmutableArray<FunctionInformation> GetFunctionInformation(ReadOnlySpan<FunctionInformation> functionInformation, ReadOnlySpan<int> codePointers)
+    {
+        FunctionInformation[] result = new FunctionInformation[functionInformation.Length];
+        for (int i = 0; i < codePointers.Length; i++)
+        {
+            result[i] = GetFunctionInformation(functionInformation, codePointers[i]);
+        }
+        return result.ToImmutableArray();
+    }
+
+    public FunctionInformation GetFunctionInformation(int codePointer) => GetFunctionInformation(FunctionInformation.AsSpan(), codePointer);
+    public static FunctionInformation GetFunctionInformation(ReadOnlySpan<FunctionInformation> functionInformation, int codePointer)
+    {
+        for (int i = 0; i < functionInformation.Length; i++)
+        {
+            FunctionInformation function = functionInformation[i];
+
+            if (function.Contains(codePointer))
+            { return function; }
+        }
+        return default;
+    }
+
+    public ImmutableArray<FunctionInformation> GetFunctionInformationNested(int codePointer)
+        => GetFunctionInformationNested(FunctionInformation.AsSpan(), codePointer);
+    public static ImmutableArray<FunctionInformation> GetFunctionInformationNested(ReadOnlySpan<FunctionInformation> functionInformation, int codePointer)
+    {
+        List<FunctionInformation> result = new();
+        for (int i = 0; i < functionInformation.Length; i++)
+        {
+            FunctionInformation info = functionInformation[i];
+
+            if (info.Contains(codePointer))
+            { result.Add(info); }
+        }
+        result.Sort((a, b) => a.Instructions.Size() - b.Instructions.Size());
+        return result.ToImmutableArray();
+    }
+
+    public ImmutableArray<ScopeInformation> GetScopes(int codePointer)
+        => GetScopes(ScopeInformation.AsSpan(), codePointer);
+    public static ImmutableArray<ScopeInformation> GetScopes(ReadOnlySpan<ScopeInformation> scopeInformation, int codePointer)
+    {
+        List<ScopeInformation> result = new();
+        foreach (ScopeInformation scope in scopeInformation)
+        {
+            if (!scope.Location.Contains(codePointer)) continue;
+            result.Add(scope);
+        }
+        return result.ToImmutableArray();
+    }
+
+    public CollectedScopeInfo GetScopeInformation(int codePointer)
+        => GetScopeInformation(ScopeInformation.AsSpan(), codePointer);
+    public static CollectedScopeInfo GetScopeInformation(ReadOnlySpan<ScopeInformation> scopeInformation, int codePointer)
+    {
+        List<StackElementInformation> result = new();
+        foreach (ScopeInformation scope in GetScopes(scopeInformation, codePointer))
+        { result.AddRange(scope.Stack); }
+        return new CollectedScopeInfo(result);
+    }
+}
+
+[ExcludeFromCodeCoverage]
 public class DebugInformation : IDuplicatable<DebugInformation>
 {
     public readonly List<SourceCodeLocation> SourceCodeLocations;
@@ -160,85 +304,6 @@ public class DebugInformation : IDuplicatable<DebugInformation>
             SavedBasePointer = 0,
             SavedCodePointer = 0,
         };
-    }
-
-    public IEnumerable<SourceCodeLocation> GetSourceLocations(int instruction)
-    {
-        for (int i = 0; i < SourceCodeLocations.Count; i++)
-        {
-            SourceCodeLocation sourceLocation = SourceCodeLocations[i];
-            if (!sourceLocation.Contains(instruction))
-            { continue; }
-            yield return sourceLocation;
-        }
-    }
-
-    public bool TryGetSourceLocation(int instruction, out SourceCodeLocation sourceLocation)
-    {
-        sourceLocation = default;
-        bool success = false;
-
-        for (int i = 0; i < SourceCodeLocations.Count; i++)
-        {
-            SourceCodeLocation _sourceLocation = SourceCodeLocations[i];
-            if (!_sourceLocation.Contains(instruction))
-            { continue; }
-            if (success && sourceLocation.Instructions.Size() < _sourceLocation.Instructions.Size())
-            { continue; }
-            sourceLocation = _sourceLocation;
-            success = true;
-        }
-
-        return success;
-    }
-
-    public IEnumerable<FunctionInformation> GetFunctionInformation(IEnumerable<int> codePointers)
-    {
-        foreach (int item in codePointers)
-        { yield return GetFunctionInformation(item); }
-    }
-
-    public FunctionInformation GetFunctionInformation(int codePointer)
-    {
-        for (int i = 0; i < FunctionInformation.Count; i++)
-        {
-            FunctionInformation function = FunctionInformation[i];
-
-            if (function.Contains(codePointer))
-            { return function; }
-        }
-        return default;
-    }
-
-    public ImmutableArray<FunctionInformation> GetFunctionInformationNested(int codePointer)
-    {
-        List<FunctionInformation> result = new();
-        for (int i = 0; i < FunctionInformation.Count; i++)
-        {
-            FunctionInformation info = FunctionInformation[i];
-
-            if (info.Contains(codePointer))
-            { result.Add(info); }
-        }
-        result.Sort((a, b) => a.Instructions.Size() - b.Instructions.Size());
-        return result.ToImmutableArray();
-    }
-
-    public IEnumerable<ScopeInformation> GetScopes(int codePointer)
-    {
-        foreach (ScopeInformation scope in ScopeInformation)
-        {
-            if (!scope.Location.Contains(codePointer)) continue;
-            yield return scope;
-        }
-    }
-
-    public CollectedScopeInfo GetScopeInformation(int codePointer)
-    {
-        List<StackElementInformation> result = new();
-        foreach (ScopeInformation scope in GetScopes(codePointer))
-        { result.AddRange(scope.Stack); }
-        return new CollectedScopeInfo(result);
     }
 
     public void OffsetCodeFrom(int from, int offset)

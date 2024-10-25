@@ -1,0 +1,15 @@
+using System.Console;
+
+int yeah = 59;
+
+PrintLine(yeah);
+
+void Bruh()
+{
+    int* yeahPtr = &yeah;
+    *yeahPtr = *yeahPtr + 22;
+    PrintLine(*yeahPtr);
+}
+
+Bruh();
+PrintLine(yeah);

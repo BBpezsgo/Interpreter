@@ -1,4 +1,5 @@
-﻿using LanguageCore.Compiler;
+﻿using LanguageCore.BBLang.Generator;
+using LanguageCore.Compiler;
 
 namespace LanguageCore.Runtime;
 
@@ -9,33 +10,31 @@ public class RuntimeException : LanguageException, IDisposable
 
     bool IsDisposed;
     public RuntimeContext? Context { get; set; }
-    public DebugInformation? DebugInformation { get; set; }
+    public CompiledDebugInformation DebugInformation { get; set; }
     public ImmutableArray<int> CallTrace =>
         Context is null ? ImmutableArray<int>.Empty :
-        DebugInformation is null ? ImmutableArray<int>.Empty :
+        DebugInformation.IsEmpty ? ImmutableArray<int>.Empty :
         ImmutableArray.Create(DebugUtils.TraceCalls(Context.Value.Memory.AsSpan(), Context.Value.Registers.BasePointer, DebugInformation.StackOffsets));
 
     public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
-    public RuntimeException(string message, RuntimeContext context, DebugInformation? debugInformation) : base(message, Position.UnknownPosition, null)
+    public RuntimeException(string message, RuntimeContext context, CompiledDebugInformation debugInformation) : base(message, Position.UnknownPosition, null)
     {
         Context = context;
         DebugInformation = debugInformation;
     }
-    public RuntimeException(string message, Exception inner, RuntimeContext context, DebugInformation? debugInformation) : base(message, inner)
+    public RuntimeException(string message, Exception inner, RuntimeContext context, CompiledDebugInformation debugInformation) : base(message, inner)
     {
         Context = context;
         DebugInformation = debugInformation;
     }
 
-    public override string ToString()
+    public string ToString(bool colored)
     {
         if (!Context.HasValue) return Message + " (no context)";
         RuntimeContext context = Context.Value;
 
-        ImmutableArray<int> callTrace = CallTrace;
-
         string? arrows = null;
-        if (DebugInformation?.TryGetSourceLocation(context.Registers.CodePointer, out SourceCodeLocation sourcePosition) ?? false)
+        if (!DebugInformation.IsEmpty && DebugInformation.TryGetSourceLocation(context.Registers.CodePointer, out SourceCodeLocation sourcePosition))
         {
             Position = sourcePosition.SourcePosition;
             File = sourcePosition.Uri;
@@ -46,7 +45,7 @@ public class RuntimeException : LanguageException, IDisposable
         else
         { Position = Position.UnknownPosition; }
 
-        ImmutableArray<FunctionInformation> callStack = DebugInformation?.GetFunctionInformation(callTrace).ToImmutableArray() ?? ImmutableArray<FunctionInformation>.Empty;
+        ImmutableArray<FunctionInformation> callStack = DebugInformation.IsEmpty ? ImmutableArray<FunctionInformation>.Empty : DebugInformation.GetFunctionInformation(CallTrace.AsSpan());
 
         File ??= callStack.LastOrDefault().Function?.File;
 
@@ -61,7 +60,7 @@ public class RuntimeException : LanguageException, IDisposable
 
         result.AppendLine();
 
-        result.ResetStyle();
+        if (colored) result.ResetStyle();
 
         if (arrows is not null)
         {
@@ -77,76 +76,76 @@ public class RuntimeException : LanguageException, IDisposable
                 case ArrayType v:
                     AppendType(v.Of);
 
-                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append('[');
 
                     if (v.ComputedLength.HasValue)
                     {
-                        result.SetGraphics(Ansi.ForegroundWhite);
+                        if (colored) result.SetGraphics(Ansi.ForegroundWhite);
                         result.Append(v.ComputedLength.Value.ToString());
                     }
                     else if (v.Length is not null)
                     {
-                        result.SetGraphics(Ansi.ForegroundWhite);
+                        if (colored) result.SetGraphics(Ansi.ForegroundWhite);
                         result.Append('?');
                     }
 
-                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append(']');
 
                     break;
                 case BuiltinType v:
-                    result.SetGraphics(Ansi.BrightForegroundBlue);
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlue);
                     result.Append(v.ToString());
 
                     break;
                 case FunctionType v:
                     AppendType(v.ReturnType);
 
-                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append('(');
 
                     for (int i = 0; i < v.Parameters.Length; i++)
                     {
                         if (i > 0)
                         {
-                            result.SetGraphics(Ansi.BrightForegroundBlack);
+                            if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                             result.Append(", ");
                         }
 
                         AppendType(v.Parameters[i]);
                     }
 
-                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append(')');
 
                     break;
                 case GenericType v:
-                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append(v.ToString());
 
                     break;
                 case PointerType v:
                     AppendType(v.To);
 
-                    result.SetGraphics(Ansi.ForegroundWhite);
+                    if (colored) result.SetGraphics(Ansi.ForegroundWhite);
                     result.Append('*');
 
                     break;
                 case StructType v:
-                    result.SetGraphics(Ansi.BrightForegroundGreen);
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundGreen);
                     result.Append(v.Struct.Identifier.Content);
 
                     if (!v.TypeArguments.IsEmpty)
                     {
-                        result.SetGraphics(Ansi.BrightForegroundBlack);
+                        if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                         result.Append('<');
                         result.Append(string.Join(", ", v.TypeArguments.Values));
                         result.Append('>');
                     }
                     else if (v.Struct.Template is not null)
                     {
-                        result.SetGraphics(Ansi.BrightForegroundBlack);
+                        if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                         result.Append('<');
                         result.Append(string.Join(", ", v.Struct.Template.Parameters));
                         result.Append('>');
@@ -156,27 +155,98 @@ public class RuntimeException : LanguageException, IDisposable
                 case AliasType aliasType:
                     if (aliasType.FinalValue is BuiltinType)
                     {
-                        result.SetGraphics(Ansi.BrightForegroundBlue);
+                        if (colored) result.SetGraphics(Ansi.BrightForegroundBlue);
                         result.Append(type.ToString());
                     }
                     else
                     {
-                        result.SetGraphics(Ansi.BrightForegroundBlack);
+                        if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                         result.Append(type.ToString());
                     }
                     break;
                 default:
-                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append(type.ToString());
                     break;
             }
-            result.ResetStyle();
+            if (colored) result.ResetStyle();
+        }
+
+        void AppendValue(Range<int> range, GeneralType type)
+        {
+            RuntimeInfoProvider runtimeInfoProvider = new()
+            {
+                PointerSize = 4,
+            };
+
+            if (colored) result.ResetStyle();
+            if (range.Start < 0 || range.End + 1 >= context.Memory.Length)
+            {
+                result.Append("<invalid address>");
+                return;
+            }
+            ReadOnlySpan<byte> value = context.Memory.AsSpan()[range.Start..(range.End + 1)];
+            if (type.Equals(BasicType.F32))
+            { result.Append(value.To<float>() + "f"); }
+            else if (type.Equals(BasicType.U8))
+            { result.Append(value.To<byte>()); }
+            else if (type.Equals(BasicType.I8))
+            { result.Append(value.To<sbyte>()); }
+            else if (type.Equals(BasicType.Char))
+            { result.Append($"'{value.To<char>().Escape()}'"); }
+            else if (type.Equals(BasicType.I16))
+            { result.Append(value.To<short>()); }
+            else if (type.Equals(BasicType.U32))
+            { result.Append(value.To<uint>()); }
+            else if (type.Equals(BasicType.I32))
+            { result.Append(value.To<int>()); }
+            else if (type is PointerType pointerType)
+            {
+                result.Append('*');
+                result.Append(value.To<int>());
+
+                if (pointerType.To is ArrayType toArrayType &&
+                    !toArrayType.ComputedLength.HasValue)
+                {
+                    result.Append("[ ? ]");
+                }
+                else if (pointerType.To is BuiltinType toBuiltinType &&
+                    toBuiltinType.Equals(BasicType.Any))
+                {
+                    result.Append("?");
+                }
+                else
+                {
+                    result.Append(" -> ");
+                    Range<int> pointerTo = new(value.To<int>(), value.To<int>() + pointerType.To.GetSize(runtimeInfoProvider));
+                    AppendValue(pointerTo, pointerType.To);
+                }
+            }
+            else if (type is StructType structType)
+            {
+                result.Append("{ ");
+                KeyValuePair<CompiledField, int>[] fields = structType.GetFields(runtimeInfoProvider).ToArray();
+                for (int i = 0; i < fields.Length; i++)
+                {
+                    if (i > 0) result.Append(", ");
+                    (CompiledField field, int offset) = fields[i];
+                    result.Append(field.Identifier.Content);
+                    result.Append(": ");
+                    Range<int> fieldRange = new(range.Start + offset, range.Start + offset + field.Type.GetSize(runtimeInfoProvider));
+                    AppendValue(fieldRange, field.Type);
+                }
+                if (fields.Length > 0) result.Append(' ');
+                result.Append('}');
+            }
+            else
+            { result.AppendJoin(' ', value.ToArray()); }
         }
 
         void AppendScope(int codePointer)
         {
-            IEnumerable<ScopeInformation>? scopes = DebugInformation?.GetScopes(codePointer);
-            if (scopes is null) return;
+            if (DebugInformation.IsEmpty) return;
+            ImmutableArray<ScopeInformation> scopes = DebugInformation.GetScopes(codePointer);
+            if (scopes.IsEmpty) return;
 
             int scopeDepth = 0;
             foreach (ScopeInformation scope in scopes.Reverse())
@@ -196,49 +266,25 @@ public class RuntimeException : LanguageException, IDisposable
                     // { value = context.Memory.Slice(0 - item.Address, item.Size); }
                     result.Append(' ', CallStackIndent);
                     result.Append(' ', scopeDepth);
+                    result.Append("(");
+                    result.Append(range.Start);
+                    result.Append(") ");
                     AppendType(item.Type);
                     result.Append(' ');
                     if (item.Kind == StackElementKind.Internal)
                     {
-                        result.SetGraphics(Ansi.BrightForegroundBlack);
+                        if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                         result.Append(item.Tag);
-                        result.ResetStyle();
+                        if (colored) result.ResetStyle();
                     }
                     else
                     {
                         result.Append(item.Tag);
                     }
-                    result.SetGraphics(Ansi.BrightForegroundBlack);
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append(" = ");
-                    result.ResetStyle();
-                    if (range.Start < 0 || range.End + 1 >= context.Memory.Length)
-                    {
-                        result.Append("<invalid address>;");
-                        result.AppendLine();
-                        continue;
-                    }
-                    ReadOnlySpan<byte> value = context.Memory.AsSpan()[range.Start..(range.End + 1)];
-                    if (item.Type.Equals(BasicType.F32))
-                    { result.Append(value.To<float>() + "f"); }
-                    else if (item.Type.Equals(BasicType.U8))
-                    { result.Append(value.To<byte>()); }
-                    else if (item.Type.Equals(BasicType.I8))
-                    { result.Append(value.To<sbyte>()); }
-                    else if (item.Type.Equals(BasicType.Char))
-                    { result.Append($"'{value.To<char>().Escape()}'"); }
-                    else if (item.Type.Equals(BasicType.I16))
-                    { result.Append(value.To<short>()); }
-                    else if (item.Type.Equals(BasicType.U32))
-                    { result.Append(value.To<uint>()); }
-                    else if (item.Type.Equals(BasicType.I32))
-                    { result.Append(value.To<int>()); }
-                    else if (item.Type is PointerType)
-                    {
-                        result.Append('*');
-                        result.Append(value.To<int>());
-                    }
-                    else
-                    { result.AppendJoin(' ', value.ToArray()); }
+                    if (colored) result.ResetStyle();
+                    AppendValue(range, item.Type);
                     result.Append(';');
                     result.AppendLine();
                 }
@@ -257,18 +303,18 @@ public class RuntimeException : LanguageException, IDisposable
             if (frame.Function is null) return false;
 
             Parser.FunctionThingDefinition function = frame.Function;
-            result.SetGraphics(Ansi.BrightForegroundYellow);
+            if (colored) result.SetGraphics(Ansi.BrightForegroundYellow);
             result.Append(function.Identifier.ToString());
-            result.ResetStyle();
+            if (colored) result.ResetStyle();
             result.Append('(');
             for (int j = 0; j < function.Parameters.Count; j++)
             {
                 if (j > 0) result.Append(", ");
                 if (function.Parameters[j].Modifiers.Length > 0)
                 {
-                    result.SetGraphics(Ansi.ForegroundBlue);
+                    if (colored) result.SetGraphics(Ansi.ForegroundBlue);
                     result.AppendJoin(' ', function.Parameters[j].Modifiers);
-                    result.ResetStyle();
+                    if (colored) result.ResetStyle();
                     result.Append(' ');
                 }
 
@@ -279,7 +325,7 @@ public class RuntimeException : LanguageException, IDisposable
                 else
                 {
                     AppendType(compiledFunction.ParameterTypes[j]);
-                    result.ResetStyle();
+                    if (colored) result.ResetStyle();
                 }
 
                 result.Append(' ');
@@ -309,7 +355,7 @@ public class RuntimeException : LanguageException, IDisposable
 
         result.AppendLine();
         result.AppendLine("Call Stack (from last to recent):");
-        if (callTrace.Length == 0)
+        if (CallTrace.Length == 0)
         {
             result.Append(' ', CallStackIndent);
             result.AppendLine("<empty>");
@@ -318,23 +364,30 @@ public class RuntimeException : LanguageException, IDisposable
         {
             if (!callStack.IsDefaultOrEmpty)
             {
-                for (int i = 0; i < callStack.Length; i++)
+                if (callStack.Length != CallTrace.Length)
                 {
-                    FunctionInformation frame = callStack[i];
-
                     result.Append(' ', CallStackIndent);
-
-                    if (!AppendFrame(frame))
-                    { result.Append($"<unknown> {callTrace[i]}"); }
-
+                    result.Append($"Invalid stack trace");
                     result.AppendLine();
+                }
+                else
+                {
+                    for (int i = 0; i < callStack.Length; i++)
+                    {
+                        result.Append(' ', CallStackIndent);
 
-                    AppendScope(callTrace[i]);
+                        if (!AppendFrame(callStack[i]))
+                        { result.Append($"<unknown> {CallTrace[i]}"); }
+
+                        result.AppendLine();
+
+                        AppendScope(CallTrace[i]);
+                    }
                 }
             }
         }
 
-        FunctionInformation currentFrame = DebugInformation?.GetFunctionInformation(context.Registers.CodePointer) ?? default;
+        FunctionInformation currentFrame = DebugInformation.IsEmpty ? default : DebugInformation.GetFunctionInformation(context.Registers.CodePointer);
         result.Append(' ', CallStackIndent);
         if (!AppendFrame(currentFrame))
         { result.Append($"<unknown> {context.Registers.CodePointer}"); }
@@ -345,6 +398,8 @@ public class RuntimeException : LanguageException, IDisposable
 
         return result.ToString();
     }
+
+    public override string ToString() => ToString(false);
 
     protected virtual void Dispose(bool disposing)
     {

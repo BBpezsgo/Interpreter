@@ -21,7 +21,7 @@ public abstract class InterpreterBase
 
     protected bool _isPaused;
 
-    public DebugInformation? DebugInfo { get; set; }
+    public CompiledDebugInformation DebugInfo { get; set; }
     public int CodePointer => _codePointer;
     public int MemoryPointer => _memoryPointer;
     public RuntimeContext CurrentContext => new(_memoryPointer, _codePointer);

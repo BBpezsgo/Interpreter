@@ -1,0 +1,35 @@
+using System.Console;
+using System.Lists;
+
+temp List<int> yeah = new List<int>(8);
+
+void Bruh(int index, int value)
+{
+    (&yeah)[index] = (&yeah)[index] + value;
+}
+
+void Bruh2()
+{
+    for (int i = 0; i < (&yeah).Length(); i++)
+    {
+        (&yeah)[i] = (&yeah)[i] + 1;
+        if ((&yeah)[i] == 82) { break; }
+    }
+}
+
+(&yeah).Add(33);
+(&yeah).Add(42);
+(&yeah).Add(58);
+(&yeah).Add(21);
+(&yeah).Add(3);
+
+(&yeah)[3] = 59;
+
+PrintLine((&yeah)[3]);
+
+Bruh(3, 22);
+PrintLine((&yeah)[3]);
+
+Bruh2();
+PrintLine((&yeah)[3]);
+PrintLine((&yeah)[4]);

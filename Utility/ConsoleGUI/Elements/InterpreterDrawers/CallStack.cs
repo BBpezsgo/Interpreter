@@ -1,5 +1,4 @@
-﻿using System.Runtime.InteropServices;
-using LanguageCore;
+﻿using LanguageCore;
 using LanguageCore.Runtime;
 using Win32.Console;
 
@@ -17,11 +16,11 @@ public partial class InterpreterElement
 
         sender.DrawBuffer.ResetColor();
 
-        ReadOnlySpan<int> callTraceRaw = DebugUtils.TraceCalls(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation?.StackOffsets);
+        ReadOnlySpan<int> callTraceRaw = DebugUtils.TraceCalls(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation.IsEmpty ? null : Interpreter.DebugInformation.StackOffsets);
 
         FunctionInformation[] callStack;
-        if (Interpreter.DebugInformation is not null)
-        { callStack = Interpreter.DebugInformation.GetFunctionInformation(callTraceRaw.ToArray()).ToArray(); }
+        if (!Interpreter.DebugInformation.IsEmpty)
+        { callStack = Interpreter.DebugInformation.GetFunctionInformation(callTraceRaw).ToArray(); }
         else
         { callStack = new FunctionInformation[callTraceRaw.Length]; }
 
@@ -110,7 +109,7 @@ public partial class InterpreterElement
             sender.DrawBuffer.ForegroundColor = CharColor.Silver;
         }
 
-        if (Interpreter.DebugInformation is not null)
+        if (!Interpreter.DebugInformation.IsEmpty)
         {
             FunctionInformation callframe = Interpreter.DebugInformation.GetFunctionInformation(this.Interpreter.Processor.Registers.CodePointer);
 

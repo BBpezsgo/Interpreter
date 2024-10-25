@@ -1,5 +1,4 @@
-﻿using System.Runtime.InteropServices;
-using Win32.Console;
+﻿using Win32.Console;
 using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
@@ -21,12 +20,12 @@ public partial class InterpreterElement
         b.ResetColor();
 
         CollectedScopeInfo stackDebugInfo;
-        if (Interpreter.DebugInformation is not null)
+        if (!Interpreter.DebugInformation.IsEmpty)
         { stackDebugInfo = Interpreter.DebugInformation.GetScopeInformation(Interpreter.Processor.Registers.CodePointer); }
         else
         { stackDebugInfo = CollectedScopeInfo.Empty; }
 
-        ReadOnlySpan<int> savedBasePointers = DebugUtils.TraceBasePointers(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation?.StackOffsets);
+        ReadOnlySpan<int> savedBasePointers = DebugUtils.TraceBasePointers(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation.IsEmpty ? null : Interpreter.DebugInformation.StackOffsets);
 
         List<DataMovement> loadIndicators = new();
         List<DataMovement> storeIndicators = new();

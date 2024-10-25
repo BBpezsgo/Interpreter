@@ -1,0 +1,21 @@
+using System.Console;
+
+int yeah = 59;
+
+void Modify(int* ptr)
+{
+    *ptr = *ptr + 22;
+}
+
+void Bruh()
+{
+    Modify(&yeah);
+}
+
+PrintLine(yeah);
+
+Modify(&yeah);
+PrintLine(yeah);
+
+Bruh();
+PrintLine(yeah);

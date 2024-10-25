@@ -19,9 +19,9 @@ public readonly struct RuntimeContext
 public class BrainfuckRuntimeException : Exception
 {
     public readonly RuntimeContext RuntimeContext;
-    readonly Runtime.DebugInformation? DebugInfo;
+    readonly CompiledDebugInformation DebugInfo;
 
-    public BrainfuckRuntimeException(string message, RuntimeContext context, Runtime.DebugInformation? debugInfo) : base(message)
+    public BrainfuckRuntimeException(string message, RuntimeContext context, CompiledDebugInformation debugInfo) : base(message)
     {
         RuntimeContext = context;
         DebugInfo = debugInfo;
@@ -29,10 +29,8 @@ public class BrainfuckRuntimeException : Exception
 
     public override string ToString()
     {
-        if (DebugInfo is null)
-        {
-            return Message;
-        }
+        if (DebugInfo.IsEmpty)
+        { return Message; }
 
         Position position;
         if (!DebugInfo.TryGetSourceLocation(RuntimeContext.CodePointer, out SourceCodeLocation sourcePosition))

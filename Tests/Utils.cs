@@ -395,9 +395,9 @@ public static class Utils
             inputBuffer = new(input);
             stdOutput.Clear();
 
-            LanguageCore.Brainfuck.Interpreter interpreter = new(OutputCallback, InputCallback)
-            { DebugInfo = generated.DebugInfo };
+            LanguageCore.Brainfuck.Interpreter interpreter = new(OutputCallback, InputCallback);
             interpreter.LoadCode(generated.Code, false, generated.DebugInfo);
+            interpreter.DebugInfo = new CompiledDebugInformation(generated.DebugInfo);
             interpreter.Run();
 
             resultNormal = new BrainfuckResult(stdOutput.ToString(), interpreter);
@@ -407,9 +407,9 @@ public static class Utils
             inputBuffer = new(input);
             stdOutput.Clear();
 
-            LanguageCore.Brainfuck.InterpreterCompact interpreter = new(OutputCallback, InputCallback)
-            { DebugInfo = generated.DebugInfo };
+            LanguageCore.Brainfuck.InterpreterCompact interpreter = new(OutputCallback, InputCallback);
             interpreter.LoadCode(generated.Code, false, generated.DebugInfo);
+            interpreter.DebugInfo = new CompiledDebugInformation(generated.DebugInfo);
             interpreter.Run();
 
             resultCompact = new BrainfuckResult(stdOutput.ToString(), interpreter);
@@ -419,9 +419,9 @@ public static class Utils
             inputBuffer = new(input);
             stdOutput.Clear();
 
-            LanguageCore.Brainfuck.InterpreterCompact interpreter = new(OutputCallback, InputCallback)
-            { DebugInfo = generatedUnoptimized.DebugInfo };
+            LanguageCore.Brainfuck.InterpreterCompact interpreter = new(OutputCallback, InputCallback);
             interpreter.LoadCode(generatedUnoptimized.Code, false, generatedUnoptimized.DebugInfo);
+            interpreter.DebugInfo = new CompiledDebugInformation(generatedUnoptimized.DebugInfo);
             interpreter.Run();
 
             resultUnoptimized = new BrainfuckResult(stdOutput.ToString(), interpreter);

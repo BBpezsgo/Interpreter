@@ -463,14 +463,14 @@ public ref partial struct ProcessorState
         Registers.StackPointer += (int)size * StackDirection;
         SetData(Registers.StackPointer, data, size);
 
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), null);
-        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext(), null);
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), default);
+        if (Registers.StackPointer < Settings.HeapSize) throw new RuntimeException("Stack overflow", GetContext(), default);
     }
 
     RuntimeValue Pop(BitWidth size)
     {
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), null);
-        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext(), null);
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), default);
+        if (Registers.StackPointer < Settings.HeapSize) throw new RuntimeException("Stack overflow", GetContext(), default);
 
         RuntimeValue data = GetData(Registers.StackPointer, size);
         Registers.StackPointer -= (int)size * StackDirection;
@@ -482,14 +482,14 @@ public ref partial struct ProcessorState
         Registers.StackPointer += data.Length * StackDirection;
         Memory.Set(Registers.StackPointer, data);
 
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), null);
-        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext(), null);
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), default);
+        if (Registers.StackPointer < Settings.HeapSize) throw new RuntimeException("Stack overflow", GetContext(), default);
     }
 
     Span<byte> Pop(int size)
     {
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), null);
-        if (Registers.StackPointer < 0) throw new RuntimeException("Stack underflow", GetContext(), null);
+        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), default);
+        if (Registers.StackPointer < Settings.HeapSize) throw new RuntimeException("Stack overflow", GetContext(), default);
 
         Span<byte> data = Memory.Get(Registers.StackPointer, size);
         Registers.StackPointer -= size * StackDirection;

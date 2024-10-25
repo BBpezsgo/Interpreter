@@ -1,4 +1,5 @@
-﻿namespace LanguageCore;
+﻿
+namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
 public class AnalysisCollection
@@ -35,5 +36,13 @@ public class AnalysisCollection
 
         for (int i = 0; i < Hints.Count; i++)
         { Output.LogInfo(Hints[i]); }
+    }
+
+    public void Clear()
+    {
+        Errors.Clear();
+        Warnings.Clear();
+        Informations.Clear();
+        Hints.Clear();
     }
 }

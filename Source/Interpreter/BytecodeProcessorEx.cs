@@ -2,7 +2,7 @@
 
 public class BytecodeProcessorEx
 {
-    public readonly DebugInformation? DebugInformation;
+    public readonly CompiledDebugInformation DebugInformation;
     public readonly BytecodeProcessor Processor;
 
     public readonly IOHandler IO;
@@ -15,7 +15,7 @@ public class BytecodeProcessorEx
         DebugInformation? debugInformation = null,
         IEnumerable<IExternalFunction>? externalFunctions = null)
     {
-        DebugInformation = debugInformation;
+        DebugInformation = debugInformation is null ? default : new CompiledDebugInformation(debugInformation);
 
         List<IExternalFunction> _externalFunctions = GenerateExternalFunctions();
         IO = IOHandler.Create(_externalFunctions);

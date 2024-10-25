@@ -430,11 +430,9 @@ public static class Entry
                     File.WriteAllText(arguments.Output, generated.Code);
                 }
 
-                InterpreterCompact interpreter = new()
-                {
-                    DebugInfo = generated.DebugInfo,
-                };
-                interpreter.LoadCode(generated.Code, true, interpreter.DebugInfo);
+                InterpreterCompact interpreter = new();
+                interpreter.LoadCode(generated.Code, true, generated.DebugInfo);
+                interpreter.DebugInfo = new CompiledDebugInformation(generated.DebugInfo);
 
                 if (pauseBeforeRun)
                 {

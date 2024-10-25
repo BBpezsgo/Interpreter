@@ -1840,6 +1840,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 break;
             }
 
+            case ArrayType arrayType:
+            {
+                StackAlloc(arrayType.GetSize(this), true);
+                break;
+            }
+
             default:
                 throw new CompilerException($"Unknown type definition {instanceType}", newObject.Type, CurrentFile);
         }
@@ -2099,12 +2105,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
         switch (address)
         {
             case AddressRuntimePointer runtimePointer:
-                GenerateAddressResolver(runtimePointer.PointerAddress);
+            {
+                PushFrom(runtimePointer.PointerAddress, PointerSize);
                 break;
+            }
             case AddressRegisterPointer registerPointer:
+            {
                 Push(registerPointer.Register);
                 break;
+            }
             case AddressOffset addressOffset:
+            {
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
                     GenerateAddressResolver(addressOffset.Base);
@@ -2113,6 +2124,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     Push(reg.Get(PointerBitWidth));
                 }
                 break;
+            }
             default: throw new NotImplementedException();
         }
     }
@@ -2551,6 +2563,40 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     return;
                 }
             }
+
+            /*
+            AssignTypeCheck(arrayType.Of, valueType, value);
+
+            GenerateCodeForStatement(value);
+
+            GenerateAddressResolver(GetDataAddress(identifier));
+
+            if (!indexType.Is<BuiltinType>())
+            { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", statementToSet.Index, CurrentFile); }
+
+            GenerateCodeForStatement(statementToSet.Index);
+
+            using (RegisterUsage.Auto regIndex = Registers.GetFree())
+            {
+                PopTo(regIndex.Get(indexType.GetBitWidth(this)));
+                AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this)), arrayType.Of.GetSize(this));
+
+                using (RegisterUsage.Auto regPtr = Registers.GetFree())
+                {
+                    PopTo(regPtr.Get(PointerBitWidth));
+
+                    AddInstruction(Opcode.MathAdd, regPtr.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this)));
+
+                    Push(regPtr.Get(PointerBitWidth));
+
+                    CheckPointerNull(false);
+
+                    PopTo(new AddressRegisterPointer(regPtr.Get(PointerBitWidth)), valueType.GetSize(this));
+                }
+            }
+
+            return;
+            */
 
             throw new NotImplementedException();
         }
@@ -3074,7 +3120,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledParameters.Clear();
         CompiledVariables.Clear();
         ReturnInstructions.Clear();
-        if (ScopeSizes.Pop() != 0) ; // throw new InternalException("Bruh", function.Block!, function.File);
+        if (ScopeSizes.Pop() != 0) { } // throw new InternalException("Bruh", function.Block!, function.File);
 
         CurrentContext = null;
         InFunction = false;
@@ -3216,7 +3262,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Pop stack frame");
         PopTo(Register.BasePointer);
-        if (ScopeSizes.Pop() != 0) ; // throw new InternalException("Bruh");
+        if (ScopeSizes.Pop() != 0) { } // throw new InternalException("Bruh");
 
         AddComment("}");
 
@@ -3326,7 +3372,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.Exit); // Exit code already there
 
         // 4 -> exit code
-        if (ScopeSizes.Pop() != 4) ; // throw new InternalException("Bruh");
+        if (ScopeSizes.Pop() != 4) { } // throw new InternalException("Bruh");
 
         foreach (CompiledVariable variable in CompiledGlobalVariables)
         {

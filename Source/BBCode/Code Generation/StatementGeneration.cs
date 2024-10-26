@@ -1008,11 +1008,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             bool isFloat = leftType.SameAs(BasicType.F32) || rightType.SameAs(BasicType.F32);
-            bool isUnsigned = false;
-            if (!isFloat)
-            {
-                isUnsigned = leftNType == NumericType.UnsignedInteger && rightNType == NumericType.UnsignedInteger;
-            }
+            // bool isUnsigned = false;
+            // if (!isFloat)
+            // {
+            //     isUnsigned = leftNType == NumericType.UnsignedInteger && rightNType == NumericType.UnsignedInteger;
+            // }
 
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
             using (RegisterUsage.Auto regRight = Registers.GetFree())
@@ -1023,23 +1023,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 switch (@operator.Operator.Content)
                 {
                     case BinaryOperatorCall.Addition:
-                        AddInstruction(isFloat ? Opcode.FMathAdd : isUnsigned ? Opcode.UMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Subtraction:
-                        AddInstruction(isFloat ? Opcode.FMathSub : isUnsigned ? Opcode.UMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Multiplication:
-                        AddInstruction(isFloat ? Opcode.FMathMult : isUnsigned ? Opcode.UMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Division:
-                        AddInstruction(isFloat ? Opcode.FMathDiv : isUnsigned ? Opcode.UMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.Modulo:
-                        AddInstruction(isFloat ? Opcode.FMathMod : isUnsigned ? Opcode.UMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        AddInstruction(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case BinaryOperatorCall.LogicalAND:

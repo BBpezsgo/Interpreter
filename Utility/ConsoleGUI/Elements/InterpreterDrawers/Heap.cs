@@ -28,7 +28,7 @@ public partial class InterpreterElement
         int nextHeader = 0;
         for (int i = 0; i < Interpreter.Processor.Memory.Length; i++)
         {
-            RuntimeValue item = Interpreter.Processor.Memory[i];
+            byte item = Interpreter.Processor.Memory[i];
             bool isHeader = (nextHeader == i) && (Interpreter.Processor.Memory[i] != 0);
             (int, bool) header = (default, default);
 
@@ -119,7 +119,7 @@ public partial class InterpreterElement
                 else
                 {
                     b.ForegroundColor = CharColor.BrightCyan;
-                    b.AddText(item.I32.ToString());
+                    b.AddText(item.ToString());
                 }
             }
 

@@ -8,9 +8,6 @@ public delegate void ExternalFunctionSyncScopedCallback(Span<byte> scope, ReadOn
 public delegate ExternalFunctionAsyncReturnChecker ExternalFunctionAsyncCallback(ref ProcessorState processor, ReadOnlySpan<byte> arguments);
 public delegate bool ExternalFunctionAsyncReturnChecker(ref ProcessorState processor, out ReadOnlySpan<byte> returnValue);
 
-#if UNITY
-[Unity.Burst.BurstCompile]
-#endif
 public static class ExternalFunctionExtensions
 {
     public static string ToReadable(this IExternalFunction externalFunction) => $"<{externalFunction.ReturnValueSize}bytes> {externalFunction.Name ?? externalFunction.Id.ToString()}(<{externalFunction.ParametersSize}bytes>)";
@@ -24,16 +21,28 @@ public interface IExternalFunction
     public int ReturnValueSize { get; }
 }
 
-public unsafe struct ExternalFunctionScopedSync : IExternalFunction
+public unsafe ref struct ExternalFunctionScopedSync
 {
-    public readonly string? Name => null;
     public int Id { get; }
     public int ParametersSize { get; }
     public int ReturnValueSize { get; }
     public nint Scope { get; set; }
+#if UNITY
+    public Unity.Burst.FunctionPointer<Action<nint, nint, nint>> Callback { get; }
+#else
     public delegate*<nint, ReadOnlySpan<byte>, Span<byte>, void> Callback { get; }
+#endif
 
-    public ExternalFunctionScopedSync(delegate*<nint, ReadOnlySpan<byte>, Span<byte>, void> callback, int id, int parametersSize, int returnValueSize, nint scope)
+    public ExternalFunctionScopedSync(
+#if UNITY
+        Unity.Burst.FunctionPointer<Action<nint, nint, nint>> callback,
+#else
+        delegate*<nint, ReadOnlySpan<byte>, Span<byte>, void> callback,
+#endif
+        int id,
+        int parametersSize,
+        int returnValueSize,
+        nint scope)
     {
         Callback = callback;
         Id = id;
@@ -43,9 +52,6 @@ public unsafe struct ExternalFunctionScopedSync : IExternalFunction
     }
 }
 
-#if UNITY
-// [Unity.Burst.BurstCompile]
-#endif
 [SuppressMessage("Style", "IDE0008:Use explicit type")]
 [SuppressMessage("Style", "IDE0053:Use expression body for lambda expression")]
 public readonly struct ExternalFunctionSync : IExternalFunction
@@ -312,9 +318,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     #endregion
 }
 
-#if UNITY
-// [Unity.Burst.BurstCompile]
-#endif
 public readonly struct ExternalFunctionAsync : IExternalFunction
 {
     public string? Name { get; }
@@ -334,9 +337,6 @@ public readonly struct ExternalFunctionAsync : IExternalFunction
     }
 }
 
-#if UNITY
-[Unity.Burst.BurstCompile]
-#endif
 [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members")]
 [SuppressMessage("Style", "IDE0059:Unnecessary assignment of a value")]
 public static unsafe class ExternalFunctionGenerator
@@ -647,6 +647,163 @@ public static unsafe class ExternalFunctionGenerator
     }
 
     public static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4, T5 P5) TakeParameters<T0, T1, T2, T3, T4, T5>(ReadOnlySpan<byte> data)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+    {
+        T0 p0;
+        T1 p1;
+        T2 p2;
+        T3 p3;
+        T4 p4;
+        T5 p5;
+
+        int ptr = 0;
+
+        p5 = data.Slice(ptr, sizeof(T5)).To<T5>();
+        ptr += sizeof(T5);
+
+        p4 = data.Slice(ptr, sizeof(T4)).To<T4>();
+        ptr += sizeof(T4);
+
+        p3 = data.Slice(ptr, sizeof(T3)).To<T3>();
+        ptr += sizeof(T3);
+
+        p2 = data.Slice(ptr, sizeof(T2)).To<T2>();
+        ptr += sizeof(T2);
+
+        p1 = data.Slice(ptr, sizeof(T1)).To<T1>();
+        ptr += sizeof(T1);
+
+        p0 = data.Slice(ptr, sizeof(T0)).To<T0>();
+        ptr += sizeof(T0);
+
+        return (p0, p1, p2, p3, p4, p5);
+    }
+
+    #endregion
+
+    #region TakeParameters
+
+    public static T0 TakeParameters<T0>(nint data)
+        where T0 : unmanaged
+    {
+        T0 p0;
+
+        int ptr = 0;
+
+        p0 = data.Slice(ptr, sizeof(T0)).To<T0>();
+        ptr += sizeof(T0);
+
+        return p0;
+    }
+
+    public static (T0 P0, T1 P1) TakeParameters<T0, T1>(nint data)
+        where T0 : unmanaged
+        where T1 : unmanaged
+    {
+        T0 p0;
+        T1 p1;
+
+        int ptr = 0;
+
+        p1 = data.Slice(ptr, sizeof(T1)).To<T1>();
+        ptr += sizeof(T1);
+
+        p0 = data.Slice(ptr, sizeof(T0)).To<T0>();
+        ptr += sizeof(T0);
+
+        return (p0, p1);
+    }
+
+    public static (T0 P0, T1 P1, T2 P2) TakeParameters<T0, T1, T2>(nint data)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+    {
+        T0 p0;
+        T1 p1;
+        T2 p2;
+
+        int ptr = 0;
+
+        p2 = data.Slice(ptr, sizeof(T2)).To<T2>();
+        ptr += sizeof(T2);
+
+        p1 = data.Slice(ptr, sizeof(T1)).To<T1>();
+        ptr += sizeof(T1);
+
+        p0 = data.Slice(ptr, sizeof(T0)).To<T0>();
+        ptr += sizeof(T0);
+
+        return (p0, p1, p2);
+    }
+
+    public static (T0 P0, T1 P1, T2 P2, T3 P3) TakeParameters<T0, T1, T2, T3>(nint data)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+    {
+        T0 p0;
+        T1 p1;
+        T2 p2;
+        T3 p3;
+
+        int ptr = 0;
+
+        p3 = data.Slice(ptr, sizeof(T3)).To<T3>();
+        ptr += sizeof(T3);
+
+        p2 = data.Slice(ptr, sizeof(T2)).To<T2>();
+        ptr += sizeof(T2);
+
+        p1 = data.Slice(ptr, sizeof(T1)).To<T1>();
+        ptr += sizeof(T1);
+
+        p0 = data.Slice(ptr, sizeof(T0)).To<T0>();
+        ptr += sizeof(T0);
+
+        return (p0, p1, p2, p3);
+    }
+
+    public static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4) TakeParameters<T0, T1, T2, T3, T4>(nint data)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+    {
+        T0 p0;
+        T1 p1;
+        T2 p2;
+        T3 p3;
+        T4 p4;
+
+        int ptr = 0;
+
+        p4 = data.Slice(ptr, sizeof(T4)).To<T4>();
+        ptr += sizeof(T4);
+
+        p3 = data.Slice(ptr, sizeof(T3)).To<T3>();
+        ptr += sizeof(T3);
+
+        p2 = data.Slice(ptr, sizeof(T2)).To<T2>();
+        ptr += sizeof(T2);
+
+        p1 = data.Slice(ptr, sizeof(T1)).To<T1>();
+        ptr += sizeof(T1);
+
+        p0 = data.Slice(ptr, sizeof(T0)).To<T0>();
+        ptr += sizeof(T0);
+
+        return (p0, p1, p2, p3, p4);
+    }
+
+    public static (T0 P0, T1 P1, T2 P2, T3 P3, T4 P4, T5 P5) TakeParameters<T0, T1, T2, T3, T4, T5>(nint data)
         where T0 : unmanaged
         where T1 : unmanaged
         where T2 : unmanaged

@@ -171,14 +171,14 @@ public static class Entry
                     }
                 }
 
-                static void PrintStuff(Runtime.BytecodeProcessorEx interpreter)
+                static void PrintStuff(BytecodeProcessorEx interpreter)
                 {
 #if DEBUG
                     Console.WriteLine();
                     Console.WriteLine($" ===== HEAP ===== ");
                     Console.WriteLine();
 
-                    if (interpreter.Processor.Memory.GetData(0, BitWidth._32).I32 != 0)
+                    if (interpreter.Processor.Memory.AsSpan().Get<int>(0) != 0)
                     {
                         int endlessSafe = interpreter.Processor.Memory.Length;
                         int i = 0;
@@ -202,7 +202,7 @@ public static class Entry
                                 for (int j = i + 1; j < (blockSize + i + 1); j++)
                                 {
                                     Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Write(interpreter.Processor.Memory.GetData(j, BitWidth._8).U8);
+                                    Console.Write(interpreter.Processor.Memory.AsSpan().Get<byte>(j));
                                     Console.Write(" ");
                                 }
                                 Console.WriteLine();

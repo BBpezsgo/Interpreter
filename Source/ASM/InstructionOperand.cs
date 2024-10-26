@@ -1,6 +1,4 @@
-﻿using LanguageCore.Compiler;
-
-namespace LanguageCore.ASM;
+﻿namespace LanguageCore.ASM;
 
 public enum InstructionOperandType
 {
@@ -73,7 +71,4 @@ public readonly struct InstructionOperand : IEquatable<InstructionOperand>
     public static InstructionOperand Pointer(Intel.Register indirectAddress) => new(InstructionOperandType.IndirectAddress, (ushort)indirectAddress);
     public static InstructionOperand Pointer(Intel.Register baseAddress, int offset) => new(InstructionOperandType.IndexedAddress, (ushort)baseAddress, checked((ushort)offset));
     public static InstructionOperand Label(string label) => new(InstructionOperandType.Label, label);
-
-    public static explicit operator InstructionOperand(Runtime.RuntimeValue v) => new(InstructionOperandType.Immediate, v.U16);
-    public static explicit operator InstructionOperand(CompiledValue v) => new(InstructionOperandType.Immediate, v.Char);
 }

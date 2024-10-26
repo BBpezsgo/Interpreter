@@ -30,7 +30,7 @@ public partial class BytecodeProcessor
         Registers.StackPointer = StackStart - StackDirection;
     }
 
-    public void Tick()
+    public unsafe void Tick()
     {
         ProcessorState state = new(
             Settings,
@@ -38,10 +38,19 @@ public partial class BytecodeProcessor
             Memory,
             Code.AsSpan(),
             ExternalFunctions.Values.AsSpan(),
-            ReadOnlySpan<ExternalFunctionScopedSync>.Empty
+            default,
+            default
         );
 
-        state.Tick();
+        try
+        {
+            state.Tick();
+        }
+        catch (RuntimeException error)
+        {
+            error.Context = GetContext();
+            throw;
+        }
 
         Registers = state.Registers;
     }

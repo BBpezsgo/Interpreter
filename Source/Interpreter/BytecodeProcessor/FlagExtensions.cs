@@ -33,8 +33,7 @@ public static class FlagExtensions
                 flags.Set(Flags.Sign, unchecked((uint)v & (uint)0x8000) != 0);
                 break;
             case BitWidth._32:
-                flags.Set(Flags.Sign, v < 0);
-                // flags.Set(Flags.Sign, unchecked((uint)v & (uint)0x80000000) != 0);
+                flags.Set(Flags.Sign, unchecked((uint)v & (uint)0x80000000) != 0);
                 break;
         }
     }

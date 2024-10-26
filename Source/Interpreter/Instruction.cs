@@ -82,12 +82,12 @@ public enum InstructionOperandType : byte
 
 public readonly struct InstructionOperand
 {
-    public readonly RuntimeValue Value;
+    public readonly int Value;
     public readonly InstructionOperandType Type;
 
-    public int Int => Value.I32;
-    public int Char => Value.U16;
-    public int Byte => Value.U8;
+    public int Int => Value.I32();
+    public int Char => Value.U16();
+    public int Byte => Value.U8();
 
     public BitWidth BitWidth => Type switch
     {
@@ -95,7 +95,7 @@ public readonly struct InstructionOperand
         InstructionOperandType.Immediate16 => BitWidth._16,
         InstructionOperandType.Immediate32 => BitWidth._32,
         InstructionOperandType.Immediate64 => BitWidth._64,
-        InstructionOperandType.Register => ((Register)Value.I32).BitWidth(),
+        InstructionOperandType.Register => ((Register)Value).BitWidth(),
         InstructionOperandType.Pointer8 => BitWidth._8,
         InstructionOperandType.Pointer16 => BitWidth._16,
         InstructionOperandType.Pointer32 => BitWidth._32,
@@ -143,7 +143,7 @@ public readonly struct InstructionOperand
         _ => throw new UnreachableException(),
     };
 
-    public InstructionOperand(RuntimeValue value, InstructionOperandType type)
+    public InstructionOperand(int value, InstructionOperandType type)
     {
         Value = value;
         Type = type;
@@ -153,14 +153,14 @@ public readonly struct InstructionOperand
     {
         (Value, Type) = value.Type switch
         {
-            RuntimeType.Null => (default(RuntimeValue), InstructionOperandType.Immediate32),
-            RuntimeType.U8 => (new RuntimeValue(value.U8), InstructionOperandType.Immediate8),
-            RuntimeType.I8 => (new RuntimeValue(value.I8), InstructionOperandType.Immediate8),
-            RuntimeType.Char => (new RuntimeValue(value.Char), InstructionOperandType.Immediate16),
-            RuntimeType.I16 => (new RuntimeValue(value.I16), InstructionOperandType.Immediate16),
-            RuntimeType.U32 => (new RuntimeValue(value.U32), InstructionOperandType.Immediate32),
-            RuntimeType.I32 => (new RuntimeValue(value.I32), InstructionOperandType.Immediate32),
-            RuntimeType.F32 => (new RuntimeValue(value.F32), InstructionOperandType.Immediate32),
+            RuntimeType.Null => (default(int), InstructionOperandType.Immediate32),
+            RuntimeType.U8 => (value.U8.I32(), InstructionOperandType.Immediate8),
+            RuntimeType.I8 => (value.I8.I32(), InstructionOperandType.Immediate8),
+            RuntimeType.Char => (value.Char.I32(), InstructionOperandType.Immediate16),
+            RuntimeType.I16 => (value.I16.I32(), InstructionOperandType.Immediate16),
+            RuntimeType.U32 => (value.U32.I32(), InstructionOperandType.Immediate32),
+            RuntimeType.I32 => (value.I32.I32(), InstructionOperandType.Immediate32),
+            RuntimeType.F32 => (value.F32.I32(), InstructionOperandType.Immediate32),
             _ => throw new UnreachableException(),
         };
     }
@@ -177,7 +177,7 @@ public readonly struct InstructionOperand
         InstructionOperandType.Pointer8 => $"BYTE [{Value}]",
         InstructionOperandType.Pointer16 => $"WORD [{Value}]",
         InstructionOperandType.Pointer32 => $"DWORD [{Value}]",
-        InstructionOperandType.Register => (Register)Value.I32 switch
+        InstructionOperandType.Register => (Register)Value switch
         {
             Register.CodePointer => "RCP",
             Register.StackPointer => "RSP",
@@ -208,51 +208,51 @@ public readonly struct InstructionOperand
             Register.DL => "DL",
             _ => throw new UnreachableException(),
         },
-        InstructionOperandType.PointerBP8 => $"BYTE [BP{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerBP16 => $"WORD [BP{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerBP32 => $"DWORD [BP{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerBP64 => $"QWORD [BP{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerSP8 => $"BYTE [SP{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerSP16 => $"WORD [SP{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerSP32 => $"DWORD [SP{PointerOffsetString(Value.I32)}]",
+        InstructionOperandType.PointerBP8 => $"BYTE [BP{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerBP16 => $"WORD [BP{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerBP32 => $"DWORD [BP{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerBP64 => $"QWORD [BP{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerSP8 => $"BYTE [SP{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerSP16 => $"WORD [SP{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerSP32 => $"DWORD [SP{PointerOffsetString(Value)}]",
 
-        InstructionOperandType.PointerEAX8 => $"BYTE [EAX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEAX16 => $"WORD [EAX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEAX32 => $"DWORD [EAX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEAX64 => $"QWORD [EAX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEBX8 => $"BYTE [EBX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEBX16 => $"WORD [EBX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEBX32 => $"DWORD [EBX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEBX64 => $"QWORD [EBX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerECX8 => $"BYTE [ECX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerECX16 => $"WORD [ECX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerECX32 => $"DWORD [ECX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerECX64 => $"QWORD [ECX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEDX8 => $"BYTE [EDX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEDX16 => $"WORD [EDX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEDX32 => $"DWORD [EDX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerEDX64 => $"QWORD [EDX{PointerOffsetString(Value.I32)}]",
+        InstructionOperandType.PointerEAX8 => $"BYTE [EAX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEAX16 => $"WORD [EAX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEAX32 => $"DWORD [EAX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEAX64 => $"QWORD [EAX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEBX8 => $"BYTE [EBX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEBX16 => $"WORD [EBX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEBX32 => $"DWORD [EBX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEBX64 => $"QWORD [EBX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerECX8 => $"BYTE [ECX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerECX16 => $"WORD [ECX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerECX32 => $"DWORD [ECX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerECX64 => $"QWORD [ECX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEDX8 => $"BYTE [EDX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEDX16 => $"WORD [EDX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEDX32 => $"DWORD [EDX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerEDX64 => $"QWORD [EDX{PointerOffsetString(Value)}]",
 
-        InstructionOperandType.PointerRAX8 => $"BYTE [RAX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRAX16 => $"WORD [RAX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRAX32 => $"DWORD [RAX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRAX64 => $"QWORD [RAX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRBX8 => $"BYTE [RBX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRBX16 => $"WORD [RBX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRBX32 => $"DWORD [RBX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRBX64 => $"QWORD [RBX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRCX8 => $"BYTE [RCX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRCX16 => $"WORD [RCX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRCX32 => $"DWORD [RCX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRCX64 => $"QWORD [RCX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRDX8 => $"BYTE [RDX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRDX16 => $"WORD [RDX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRDX32 => $"DWORD [RDX{PointerOffsetString(Value.I32)}]",
-        InstructionOperandType.PointerRDX64 => $"QWORD [RDX{PointerOffsetString(Value.I32)}]",
+        InstructionOperandType.PointerRAX8 => $"BYTE [RAX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRAX16 => $"WORD [RAX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRAX32 => $"DWORD [RAX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRAX64 => $"QWORD [RAX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRBX8 => $"BYTE [RBX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRBX16 => $"WORD [RBX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRBX32 => $"DWORD [RBX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRBX64 => $"QWORD [RBX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRCX8 => $"BYTE [RCX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRCX16 => $"WORD [RCX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRCX32 => $"DWORD [RCX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRCX64 => $"QWORD [RCX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRDX8 => $"BYTE [RDX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRDX16 => $"WORD [RDX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRDX32 => $"DWORD [RDX{PointerOffsetString(Value)}]",
+        InstructionOperandType.PointerRDX64 => $"QWORD [RDX{PointerOffsetString(Value)}]",
         _ => throw new UnreachableException(),
     };
 
-    public static implicit operator InstructionOperand(int value) => new(new RuntimeValue(value), InstructionOperandType.Immediate32);
+    public static implicit operator InstructionOperand(int value) => new(value, InstructionOperandType.Immediate32);
     public static implicit operator InstructionOperand(Register register) => new((int)register, InstructionOperandType.Register);
     public static explicit operator InstructionOperand(AddressRegisterPointer address) => address.Register.ToPtr(0, BitWidth._32);
     public static explicit operator InstructionOperand(AddressOffset address) => address.Base switch

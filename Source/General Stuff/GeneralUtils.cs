@@ -22,6 +22,7 @@ public static class Utils
 
     public static unsafe ReadOnlySpan<byte> ToBytes<T>(this T v) where T : unmanaged => new(&v, sizeof(T));
     public static unsafe ReadOnlySpan<byte> AsBytes<T>(ref this T v) where T : unmanaged => new(Unsafe.AsPointer(ref v), sizeof(T));
+    public static unsafe T To<T>(this nint v) where T : unmanaged => *(T*)v;
     public static unsafe T To<T>(this Span<byte> v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }
     public static unsafe T To<T>(this ReadOnlySpan<byte> v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }
     public static unsafe T To<T>(this ImmutableArray<byte> v) where T : unmanaged { fixed (byte* ptr = v.AsSpan()) return *(T*)ptr; }

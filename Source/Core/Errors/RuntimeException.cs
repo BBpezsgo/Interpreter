@@ -1,5 +1,4 @@
-﻿using LanguageCore.BBLang.Generator;
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 
 namespace LanguageCore.Runtime;
 
@@ -11,10 +10,10 @@ public class RuntimeException : LanguageException, IDisposable
     bool IsDisposed;
     public RuntimeContext? Context { get; set; }
     public CompiledDebugInformation DebugInformation { get; set; }
-    public ImmutableArray<int> CallTrace =>
-        Context is null ? ImmutableArray<int>.Empty :
-        DebugInformation.IsEmpty ? ImmutableArray<int>.Empty :
-        ImmutableArray.Create(DebugUtils.TraceCalls(Context.Value.Memory.AsSpan(), Context.Value.Registers.BasePointer, DebugInformation.StackOffsets));
+    public ReadOnlySpan<int> CallTrace =>
+        Context is null ? ReadOnlySpan<int>.Empty :
+        DebugInformation.IsEmpty ? ReadOnlySpan<int>.Empty :
+        DebugUtils.TraceCalls(Context.Value.Memory.AsSpan(), Context.Value.Registers.BasePointer, DebugInformation.StackOffsets);
 
     public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
     public RuntimeException(string message, RuntimeContext context, CompiledDebugInformation debugInformation) : base(message, Position.UnknownPosition, null)
@@ -45,7 +44,7 @@ public class RuntimeException : LanguageException, IDisposable
         else
         { Position = Position.UnknownPosition; }
 
-        ImmutableArray<FunctionInformation> callStack = DebugInformation.IsEmpty ? ImmutableArray<FunctionInformation>.Empty : DebugInformation.GetFunctionInformation(CallTrace.AsSpan());
+        ImmutableArray<FunctionInformation> callStack = DebugInformation.IsEmpty ? ImmutableArray<FunctionInformation>.Empty : DebugInformation.GetFunctionInformation(CallTrace);
 
         File ??= callStack.LastOrDefault().Function?.File;
 

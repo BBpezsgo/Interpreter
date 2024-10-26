@@ -694,7 +694,7 @@ public readonly struct MainResult : IResult
     {
         StdOutput = stdOut;
         StdError = stdErr;
-        ExitCode = interpreter.Memory.GetData(interpreter.Registers.StackPointer, BitWidth._32).I32;
+        ExitCode = interpreter.Memory.AsSpan().Get<int>(interpreter.Registers.StackPointer);
         Heap = ImmutableCollectionsMarshal.AsImmutableArray(interpreter.Memory);
     }
 }

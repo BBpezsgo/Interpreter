@@ -33,7 +33,7 @@ public partial class InterpreterElement
         if (Interpreter.Processor.NextInstruction.HasValue)
         { GetDataMovementIndicators(Interpreter.Processor.NextInstruction.Value, loadIndicators, storeIndicators); }
 
-        void DrawElement(int address, RuntimeValue item, ReadOnlySpan<int> savedBasePointers)
+        void DrawElement(int address, byte item, ReadOnlySpan<int> savedBasePointers)
         {
             if (Interpreter.Processor.Registers.BasePointer == address)
             {
@@ -120,7 +120,7 @@ public partial class InterpreterElement
             else
             {
                 b.ForegroundColor = CharColor.BrightCyan;
-                b.AddText(item.I32.ToString());
+                b.AddText(item.ToString());
             }
         }
 
@@ -218,7 +218,7 @@ public partial class InterpreterElement
             }
         }
 
-        void DrawElementWInfo(int address, RuntimeValue item, ReadOnlySpan<int> savedBasePointers, StackElementInformation info)
+        void DrawElementWInfo(int address, byte item, ReadOnlySpan<int> savedBasePointers, StackElementInformation info)
         {
             Range<int> range = info.GetRange(Interpreter.Processor.Registers.BasePointer, Interpreter.Processor.StackStart);
 
@@ -296,7 +296,7 @@ public partial class InterpreterElement
 
         foreach (int i in enumerator)
         {
-            RuntimeValue item = Interpreter.Processor.Memory[i];
+            byte item = Interpreter.Processor.Memory[i];
 
             if (stackDebugInfo.TryGet(Interpreter.Processor.Registers.BasePointer, Interpreter.Processor.StackStart, i, out StackElementInformation itemDebugInfo))
             { DrawElementWInfo(i, item, savedBasePointers, itemDebugInfo); }
@@ -331,7 +331,7 @@ public partial class InterpreterElement
             if (nextEmpty < 0 || nextEmpty >= Interpreter.Processor.Memory.Length)
             { break; }
 
-            RuntimeValue item = Interpreter.Processor.Memory[nextEmpty];
+            byte item = Interpreter.Processor.Memory[nextEmpty];
 
             if (stackDebugInfo.TryGet(Interpreter.Processor.Registers.BasePointer, Interpreter.Processor.StackStart, nextEmpty, out StackElementInformation itemDebugInfo))
             { DrawElementWInfo(nextEmpty, item, savedBasePointers, itemDebugInfo); }

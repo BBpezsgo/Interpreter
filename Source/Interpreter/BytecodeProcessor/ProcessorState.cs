@@ -1,8 +1,14 @@
 namespace LanguageCore.Runtime;
 
-#if UNITY
-// [Unity.Burst.BurstCompile]
-#endif
+public enum Signal : byte
+{
+    None,
+    UserCrash,
+    StackOverflow,
+    Halt,
+    UndefinedExternalFunction,
+}
+
 public ref partial struct ProcessorState
 {
     public const int StackDirection = -1;
@@ -13,28 +19,39 @@ public ref partial struct ProcessorState
 
     readonly BytecodeInterpreterSettings Settings;
     public Registers Registers;
+#if !UNITY
     ExternalFunctionAsyncReturnChecker? PendingExternalFunction;
+#endif
 
     public readonly Span<byte> Memory;
     public readonly ReadOnlySpan<Instruction> Code;
     public readonly ReadOnlySpan<IExternalFunction> ExternalFunctions;
-    public readonly ReadOnlySpan<ExternalFunctionScopedSync> ScopedExternalFunctions;
+    public readonly unsafe ExternalFunctionScopedSync* ScopedExternalFunctions;
+    public readonly int ScopedExternalFunctionsCount;
+    public int Crash;
+    public Signal Signal;
 
-    public ProcessorState(
+    public unsafe ProcessorState(
         BytecodeInterpreterSettings settings,
         Registers registers,
         Span<byte> memory,
         ReadOnlySpan<Instruction> code,
         ReadOnlySpan<IExternalFunction> externalFunctions,
-        ReadOnlySpan<ExternalFunctionScopedSync> scopedExternalFunctions)
+        ExternalFunctionScopedSync* scopedExternalFunctions,
+        int scopedExternalFunctionsCount)
     {
         Settings = settings;
         Registers = registers;
         Memory = memory;
         Code = code;
         ExternalFunctions = externalFunctions;
+#if !UNITY
         PendingExternalFunction = null;
+#endif
         ScopedExternalFunctions = scopedExternalFunctions;
+        ScopedExternalFunctionsCount = scopedExternalFunctionsCount;
+        Crash = 0;
+        Signal = Signal.None;
     }
 
     public void Setup()
@@ -58,20 +75,12 @@ public ref partial struct ProcessorState
     );
 #endif
 
-#if UNITY
-    [Unity.Burst.BurstCompile]
-#endif
     void Step() => Registers.CodePointer++;
-#if UNITY
-    [Unity.Burst.BurstCompile]
-#endif
     void Step(int num) => Registers.CodePointer += num;
 
-#if UNITY
-    // [Unity.Burst.BurstCompile]
-#endif
     public void Tick()
     {
+#if !UNITY
         if (PendingExternalFunction != null)
         {
             if (PendingExternalFunction.Invoke(ref this, out ReadOnlySpan<byte> ret))
@@ -80,24 +89,14 @@ public ref partial struct ProcessorState
                 PendingExternalFunction = null;
             }
         }
+#endif
 
         if (IsDone) return;
 
-        try
-        {
-            Process();
-        }
-        catch (RuntimeException error)
-        {
-            error.Context = GetContext();
-            throw;
-        }
+        Process();
     }
 
-#if UNITY
-    // [Unity.Burst.BurstCompile]
-#endif
-    void Process()
+    public void Process()
     {
         switch (CurrentInstruction.Opcode)
         {
@@ -135,12 +134,6 @@ public ref partial struct ProcessorState
             case Opcode.MathMult: MathMult(); break;
             case Opcode.MathDiv: MathDiv(); break;
             case Opcode.MathMod: MathMod(); break;
-
-            case Opcode.UMathAdd: UMathAdd(); break;
-            case Opcode.UMathSub: UMathSub(); break;
-            case Opcode.UMathMult: UMathMult(); break;
-            case Opcode.UMathDiv: UMathDiv(); break;
-            case Opcode.UMathMod: UMathMod(); break;
 
             case Opcode.FMathAdd: FMathAdd(); break;
             case Opcode.FMathSub: FMathSub(); break;
@@ -247,96 +240,121 @@ public ref partial struct ProcessorState
         }
     }
 
-    public readonly void SetData(int ptr, RuntimeValue data, BitWidth size) => Memory.SetData(ptr, data, size);
-    public readonly RuntimeValue GetData(int ptr, BitWidth size) => Memory.GetData(ptr, size);
+    public readonly void SetData(int address, int data, BitWidth size)
+    {
+        switch (size)
+        {
+            case BitWidth._8:
+                Memory.Set(address, data.U8());
+                break;
+            case BitWidth._16:
+                Memory.Set(address, data.U16());
+                break;
+            case BitWidth._32:
+                Memory.Set(address, data.U32());
+                break;
+            default:
+                throw new UnreachableException();
+        }
+    }
+    public readonly int GetData(int address, BitWidth size)
+    {
+        return size switch
+        {
+            BitWidth._8 => Memory.Get<byte>(address).I32(),
+            BitWidth._16 => Memory.Get<ushort>(address).I32(),
+            BitWidth._32 => Memory.Get<int>(address).I32(),
+            _ => throw new UnreachableException(),
+        };
+    }
 
     public readonly void SetData8(int ptr, byte data) => Memory.Set(ptr, data);
     public readonly byte GetData8(int ptr) => Memory.Get<byte>(ptr);
 
-    public readonly void SetData16(int ptr, char data) => Memory.Set(ptr, data);
-    public readonly char GetData16(int ptr) => Memory.Get<char>(ptr);
+    public readonly void SetData16(int ptr, ushort data) => Memory.Set(ptr, data);
+    public readonly short GetData16(int ptr) => Memory.Get<short>(ptr);
 
     public readonly void SetData32(int ptr, int data) => Memory.Set(ptr, data);
     public readonly int GetData32(int ptr) => Memory.Get<int>(ptr);
 
-    readonly RuntimeValue GetData(InstructionOperand operand) => operand.Type switch
+    readonly int GetData(InstructionOperand operand) => operand.Type switch
     {
         InstructionOperandType.Immediate8 => operand.Value,
         InstructionOperandType.Immediate16 => operand.Value,
         InstructionOperandType.Immediate32 => operand.Value,
         InstructionOperandType.Immediate64 => operand.Value,
-        InstructionOperandType.Pointer8 => GetData8(operand.Int),
-        InstructionOperandType.Pointer16 => GetData16(operand.Int),
-        InstructionOperandType.Pointer32 => GetData32(operand.Int),
-        InstructionOperandType.PointerBP8 => GetData8(Registers.BasePointer + operand.Int),
-        InstructionOperandType.PointerBP16 => GetData16(Registers.BasePointer + operand.Int),
-        InstructionOperandType.PointerBP32 => GetData32(Registers.BasePointer + operand.Int),
+        InstructionOperandType.Pointer8 => GetData8(operand.Int).I32(),
+        InstructionOperandType.Pointer16 => GetData16(operand.Int).I32(),
+        InstructionOperandType.Pointer32 => GetData32(operand.Int).I32(),
+        InstructionOperandType.PointerBP8 => GetData8(Registers.BasePointer + operand.Int).I32(),
+        InstructionOperandType.PointerBP16 => GetData16(Registers.BasePointer + operand.Int).I32(),
+        InstructionOperandType.PointerBP32 => GetData32(Registers.BasePointer + operand.Int).I32(),
         InstructionOperandType.PointerBP64 => throw new NotImplementedException(),
-        InstructionOperandType.PointerSP8 => GetData8(Registers.StackPointer + operand.Int),
-        InstructionOperandType.PointerSP16 => GetData16(Registers.StackPointer + operand.Int),
-        InstructionOperandType.PointerSP32 => GetData32(Registers.StackPointer + operand.Int),
+        InstructionOperandType.PointerSP8 => GetData8(Registers.StackPointer + operand.Int).I32(),
+        InstructionOperandType.PointerSP16 => GetData16(Registers.StackPointer + operand.Int).I32(),
+        InstructionOperandType.PointerSP32 => GetData32(Registers.StackPointer + operand.Int).I32(),
 
-        InstructionOperandType.PointerEAX8 => GetData8(Registers.EAX + operand.Int),
-        InstructionOperandType.PointerEAX16 => GetData16(Registers.EAX + operand.Int),
-        InstructionOperandType.PointerEAX32 => GetData32(Registers.EAX + operand.Int),
+        InstructionOperandType.PointerEAX8 => GetData8(Registers.EAX + operand.Int).I32(),
+        InstructionOperandType.PointerEAX16 => GetData16(Registers.EAX + operand.Int).I32(),
+        InstructionOperandType.PointerEAX32 => GetData32(Registers.EAX + operand.Int).I32(),
         InstructionOperandType.PointerEAX64 => throw new NotImplementedException(),
-        InstructionOperandType.PointerEBX8 => GetData8(Registers.EBX + operand.Int),
-        InstructionOperandType.PointerEBX16 => GetData16(Registers.EBX + operand.Int),
-        InstructionOperandType.PointerEBX32 => GetData32(Registers.EBX + operand.Int),
+        InstructionOperandType.PointerEBX8 => GetData8(Registers.EBX + operand.Int).I32(),
+        InstructionOperandType.PointerEBX16 => GetData16(Registers.EBX + operand.Int).I32(),
+        InstructionOperandType.PointerEBX32 => GetData32(Registers.EBX + operand.Int).I32(),
         InstructionOperandType.PointerEBX64 => throw new NotImplementedException(),
-        InstructionOperandType.PointerECX8 => GetData8(Registers.ECX + operand.Int),
-        InstructionOperandType.PointerECX16 => GetData16(Registers.ECX + operand.Int),
-        InstructionOperandType.PointerECX32 => GetData32(Registers.ECX + operand.Int),
+        InstructionOperandType.PointerECX8 => GetData8(Registers.ECX + operand.Int).I32(),
+        InstructionOperandType.PointerECX16 => GetData16(Registers.ECX + operand.Int).I32(),
+        InstructionOperandType.PointerECX32 => GetData32(Registers.ECX + operand.Int).I32(),
         InstructionOperandType.PointerECX64 => throw new NotImplementedException(),
-        InstructionOperandType.PointerEDX8 => GetData8(Registers.EDX + operand.Int),
-        InstructionOperandType.PointerEDX16 => GetData16(Registers.EDX + operand.Int),
-        InstructionOperandType.PointerEDX32 => GetData32(Registers.EDX + operand.Int),
+        InstructionOperandType.PointerEDX8 => GetData8(Registers.EDX + operand.Int).I32(),
+        InstructionOperandType.PointerEDX16 => GetData16(Registers.EDX + operand.Int).I32(),
+        InstructionOperandType.PointerEDX32 => GetData32(Registers.EDX + operand.Int).I32(),
         InstructionOperandType.PointerEDX64 => throw new NotImplementedException(),
 
         // FIXME: Same
-        InstructionOperandType.PointerRAX8 => GetData8(Registers.EAX + operand.Int),
-        InstructionOperandType.PointerRAX16 => GetData16(Registers.EAX + operand.Int),
-        InstructionOperandType.PointerRAX32 => GetData32(Registers.EAX + operand.Int),
+        InstructionOperandType.PointerRAX8 => GetData8(Registers.EAX + operand.Int).I32(),
+        InstructionOperandType.PointerRAX16 => GetData16(Registers.EAX + operand.Int).I32(),
+        InstructionOperandType.PointerRAX32 => GetData32(Registers.EAX + operand.Int).I32(),
         InstructionOperandType.PointerRAX64 => throw new NotImplementedException(),
-        InstructionOperandType.PointerRBX8 => GetData8(Registers.EBX + operand.Int),
-        InstructionOperandType.PointerRBX16 => GetData16(Registers.EBX + operand.Int),
-        InstructionOperandType.PointerRBX32 => GetData32(Registers.EBX + operand.Int),
+        InstructionOperandType.PointerRBX8 => GetData8(Registers.EBX + operand.Int).I32(),
+        InstructionOperandType.PointerRBX16 => GetData16(Registers.EBX + operand.Int).I32(),
+        InstructionOperandType.PointerRBX32 => GetData32(Registers.EBX + operand.Int).I32(),
         InstructionOperandType.PointerRBX64 => throw new NotImplementedException(),
-        InstructionOperandType.PointerRCX8 => GetData8(Registers.ECX + operand.Int),
-        InstructionOperandType.PointerRCX16 => GetData16(Registers.ECX + operand.Int),
-        InstructionOperandType.PointerRCX32 => GetData32(Registers.ECX + operand.Int),
+        InstructionOperandType.PointerRCX8 => GetData8(Registers.ECX + operand.Int).I32(),
+        InstructionOperandType.PointerRCX16 => GetData16(Registers.ECX + operand.Int).I32(),
+        InstructionOperandType.PointerRCX32 => GetData32(Registers.ECX + operand.Int).I32(),
         InstructionOperandType.PointerRCX64 => throw new NotImplementedException(),
-        InstructionOperandType.PointerRDX8 => GetData8(Registers.EDX + operand.Int),
-        InstructionOperandType.PointerRDX16 => GetData16(Registers.EDX + operand.Int),
-        InstructionOperandType.PointerRDX32 => GetData32(Registers.EDX + operand.Int),
+        InstructionOperandType.PointerRDX8 => GetData8(Registers.EDX + operand.Int).I32(),
+        InstructionOperandType.PointerRDX16 => GetData16(Registers.EDX + operand.Int).I32(),
+        InstructionOperandType.PointerRDX32 => GetData32(Registers.EDX + operand.Int).I32(),
         InstructionOperandType.PointerRDX64 => throw new NotImplementedException(),
         InstructionOperandType.Register => (Register)operand.Int switch
         {
-            Register.CodePointer => new RuntimeValue(Registers.CodePointer),
-            Register.StackPointer => new RuntimeValue(Registers.StackPointer),
-            Register.BasePointer => new RuntimeValue(Registers.BasePointer),
-            Register.EAX => new RuntimeValue(Registers.EAX),
-            Register.AX => new RuntimeValue(Registers.AX),
-            Register.AH => new RuntimeValue(Registers.AH),
-            Register.AL => new RuntimeValue(Registers.AL),
-            Register.EBX => new RuntimeValue(Registers.EBX),
-            Register.BX => new RuntimeValue(Registers.BX),
-            Register.BH => new RuntimeValue(Registers.BH),
-            Register.BL => new RuntimeValue(Registers.BL),
-            Register.ECX => new RuntimeValue(Registers.ECX),
-            Register.CX => new RuntimeValue(Registers.CX),
-            Register.CH => new RuntimeValue(Registers.CH),
-            Register.CL => new RuntimeValue(Registers.CL),
-            Register.EDX => new RuntimeValue(Registers.EDX),
-            Register.DX => new RuntimeValue(Registers.DX),
-            Register.DH => new RuntimeValue(Registers.DH),
-            Register.DL => new RuntimeValue(Registers.DL),
+            Register.CodePointer => Registers.CodePointer.I32(),
+            Register.StackPointer => Registers.StackPointer.I32(),
+            Register.BasePointer => Registers.BasePointer.I32(),
+            Register.EAX => Registers.EAX.I32(),
+            Register.AX => Registers.AX.I32(),
+            Register.AH => Registers.AH.I32(),
+            Register.AL => Registers.AL.I32(),
+            Register.EBX => Registers.EBX.I32(),
+            Register.BX => Registers.BX.I32(),
+            Register.BH => Registers.BH.I32(),
+            Register.BL => Registers.BL.I32(),
+            Register.ECX => Registers.ECX.I32(),
+            Register.CX => Registers.CX.I32(),
+            Register.CH => Registers.CH.I32(),
+            Register.CL => Registers.CL.I32(),
+            Register.EDX => Registers.EDX.I32(),
+            Register.DX => Registers.DX.I32(),
+            Register.DH => Registers.DH.I32(),
+            Register.DL => Registers.DL.I32(),
             _ => throw new UnreachableException(),
         },
         _ => throw new UnreachableException(),
     };
 
-    void SetData(InstructionOperand operand, RuntimeValue value)
+    void SetData(InstructionOperand operand, int value)
     {
         switch (operand.Type)
         {
@@ -344,112 +362,112 @@ public ref partial struct ProcessorState
             case InstructionOperandType.Immediate16:
             case InstructionOperandType.Immediate32:
             case InstructionOperandType.Immediate64:
-                throw new RuntimeException($"Can't set an immediate value");
+                throw new RuntimeException("Can't set an immediate value");
             case InstructionOperandType.Pointer8: SetData(operand.Int, value, BitWidth._8); break;
             case InstructionOperandType.Pointer16: SetData(operand.Int, value, BitWidth._16); break;
             case InstructionOperandType.Pointer32: SetData(operand.Int, value, BitWidth._32); break;
-            case InstructionOperandType.PointerBP8: SetData8(Registers.BasePointer + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerBP16: SetData16(Registers.BasePointer + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerBP32: SetData32(Registers.BasePointer + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerBP8: SetData8(Registers.BasePointer + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerBP16: SetData16(Registers.BasePointer + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerBP32: SetData32(Registers.BasePointer + operand.Int, value.I32()); break;
             case InstructionOperandType.PointerBP64: throw new NotImplementedException();
-            case InstructionOperandType.PointerSP8: SetData8(Registers.StackPointer + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerSP16: SetData16(Registers.StackPointer + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerSP32: SetData32(Registers.StackPointer + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerSP8: SetData8(Registers.StackPointer + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerSP16: SetData16(Registers.StackPointer + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerSP32: SetData32(Registers.StackPointer + operand.Int, value.I32()); break;
 
-            case InstructionOperandType.PointerEAX8: SetData8(Registers.EAX + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerEAX16: SetData16(Registers.EAX + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerEAX32: SetData32(Registers.EAX + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerEAX8: SetData8(Registers.EAX + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerEAX16: SetData16(Registers.EAX + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerEAX32: SetData32(Registers.EAX + operand.Int, value.I32()); break;
             case InstructionOperandType.PointerEAX64: throw new NotImplementedException();
-            case InstructionOperandType.PointerEBX8: SetData8(Registers.EBX + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerEBX16: SetData16(Registers.EBX + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerEBX32: SetData32(Registers.EBX + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerEBX8: SetData8(Registers.EBX + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerEBX16: SetData16(Registers.EBX + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerEBX32: SetData32(Registers.EBX + operand.Int, value.I32()); break;
             case InstructionOperandType.PointerEBX64: throw new NotImplementedException();
-            case InstructionOperandType.PointerECX8: SetData8(Registers.ECX + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerECX16: SetData16(Registers.ECX + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerECX32: SetData32(Registers.ECX + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerECX8: SetData8(Registers.ECX + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerECX16: SetData16(Registers.ECX + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerECX32: SetData32(Registers.ECX + operand.Int, value.I32()); break;
             case InstructionOperandType.PointerECX64: throw new NotImplementedException();
-            case InstructionOperandType.PointerEDX8: SetData8(Registers.EDX + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerEDX16: SetData16(Registers.EDX + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerEDX32: SetData32(Registers.EDX + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerEDX8: SetData8(Registers.EDX + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerEDX16: SetData16(Registers.EDX + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerEDX32: SetData32(Registers.EDX + operand.Int, value.I32()); break;
             case InstructionOperandType.PointerEDX64: throw new NotImplementedException();
 
             // FIXME: Same
-            case InstructionOperandType.PointerRAX8: SetData8(Registers.EAX + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerRAX16: SetData16(Registers.EAX + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerRAX32: SetData32(Registers.EAX + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerRAX8: SetData8(Registers.EAX + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerRAX16: SetData16(Registers.EAX + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerRAX32: SetData32(Registers.EAX + operand.Int, value.I32()); break;
             case InstructionOperandType.PointerRAX64: throw new NotImplementedException();
-            case InstructionOperandType.PointerRBX8: SetData8(Registers.EBX + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerRBX16: SetData16(Registers.EBX + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerRBX32: SetData32(Registers.EBX + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerRBX8: SetData8(Registers.EBX + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerRBX16: SetData16(Registers.EBX + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerRBX32: SetData32(Registers.EBX + operand.Int, value.I32()); break;
             case InstructionOperandType.PointerRBX64: throw new NotImplementedException();
-            case InstructionOperandType.PointerRCX8: SetData8(Registers.ECX + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerRCX16: SetData16(Registers.ECX + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerRCX32: SetData32(Registers.ECX + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerRCX8: SetData8(Registers.ECX + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerRCX16: SetData16(Registers.ECX + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerRCX32: SetData32(Registers.ECX + operand.Int, value.I32()); break;
             case InstructionOperandType.PointerRCX64: throw new NotImplementedException();
-            case InstructionOperandType.PointerRDX8: SetData8(Registers.EDX + operand.Int, value.U8); break;
-            case InstructionOperandType.PointerRDX16: SetData16(Registers.EDX + operand.Int, value.U16); break;
-            case InstructionOperandType.PointerRDX32: SetData32(Registers.EDX + operand.Int, value.I32); break;
+            case InstructionOperandType.PointerRDX8: SetData8(Registers.EDX + operand.Int, value.U8()); break;
+            case InstructionOperandType.PointerRDX16: SetData16(Registers.EDX + operand.Int, value.U16()); break;
+            case InstructionOperandType.PointerRDX32: SetData32(Registers.EDX + operand.Int, value.I32()); break;
             case InstructionOperandType.PointerRDX64: throw new NotImplementedException();
 
             case InstructionOperandType.Register:
                 switch ((Register)operand.Int)
                 {
                     case Register.CodePointer:
-                        Registers.CodePointer = value.I32;
+                        Registers.CodePointer = value.I32();
                         break;
                     case Register.StackPointer:
-                        Registers.StackPointer = value.I32;
+                        Registers.StackPointer = value.I32();
                         break;
                     case Register.BasePointer:
-                        Registers.BasePointer = value.I32;
+                        Registers.BasePointer = value.I32();
                         break;
                     case Register.EAX:
-                        Registers.EAX = value.I32;
+                        Registers.EAX = value.I32();
                         break;
                     case Register.AX:
-                        Registers.AX = value.U16;
+                        Registers.AX = value.U16();
                         break;
                     case Register.AH:
-                        Registers.AH = value.U8;
+                        Registers.AH = value.U8();
                         break;
                     case Register.AL:
-                        Registers.AL = value.U8;
+                        Registers.AL = value.U8();
                         break;
                     case Register.EBX:
-                        Registers.EBX = value.I32;
+                        Registers.EBX = value.I32();
                         break;
                     case Register.BX:
-                        Registers.BX = value.U16;
+                        Registers.BX = value.U16();
                         break;
                     case Register.BH:
-                        Registers.BH = value.U8;
+                        Registers.BH = value.U8();
                         break;
                     case Register.BL:
-                        Registers.BL = value.U8;
+                        Registers.BL = value.U8();
                         break;
                     case Register.ECX:
-                        Registers.ECX = value.I32;
+                        Registers.ECX = value.I32();
                         break;
                     case Register.CX:
-                        Registers.CX = value.U16;
+                        Registers.CX = value.U16();
                         break;
                     case Register.CH:
-                        Registers.CH = value.U8;
+                        Registers.CH = value.U8();
                         break;
                     case Register.CL:
-                        Registers.CL = value.U8;
+                        Registers.CL = value.U8();
                         break;
                     case Register.EDX:
-                        Registers.EDX = value.I32;
+                        Registers.EDX = value.I32();
                         break;
                     case Register.DX:
-                        Registers.DX = value.U16;
+                        Registers.DX = value.U16();
                         break;
                     case Register.DH:
-                        Registers.DH = value.U8;
+                        Registers.DH = value.U8();
                         break;
                     case Register.DL:
-                        Registers.DL = value.U8;
+                        Registers.DL = value.U8();
                         break;
                     default: throw new UnreachableException();
                 }
@@ -458,21 +476,33 @@ public ref partial struct ProcessorState
         }
     }
 
-    void Push(RuntimeValue data, BitWidth size)
+    void Push(int data, BitWidth size)
     {
         Registers.StackPointer += (int)size * StackDirection;
         SetData(Registers.StackPointer, data, size);
 
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), default);
-        if (Registers.StackPointer < Settings.HeapSize) throw new RuntimeException("Stack overflow", GetContext(), default);
+        if (Registers.StackPointer >= Memory.Length ||
+            Registers.StackPointer < Settings.HeapSize)
+        {
+            Signal = Signal.StackOverflow;
+#if !UNITY
+            throw new RuntimeException("Stack overflow", GetContext(), default);
+#endif
+        }
     }
 
-    RuntimeValue Pop(BitWidth size)
+    int Pop(BitWidth size)
     {
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), default);
-        if (Registers.StackPointer < Settings.HeapSize) throw new RuntimeException("Stack overflow", GetContext(), default);
+        if (Registers.StackPointer >= Memory.Length ||
+            Registers.StackPointer < Settings.HeapSize)
+        {
+            Signal = Signal.StackOverflow;
+#if !UNITY
+            throw new RuntimeException("Stack overflow", GetContext(), default);
+#endif
+        }
 
-        RuntimeValue data = GetData(Registers.StackPointer, size);
+        int data = GetData(Registers.StackPointer, size);
         Registers.StackPointer -= (int)size * StackDirection;
         return data;
     }
@@ -482,14 +512,26 @@ public ref partial struct ProcessorState
         Registers.StackPointer += data.Length * StackDirection;
         Memory.Set(Registers.StackPointer, data);
 
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), default);
-        if (Registers.StackPointer < Settings.HeapSize) throw new RuntimeException("Stack overflow", GetContext(), default);
+        if (Registers.StackPointer >= Memory.Length ||
+            Registers.StackPointer < Settings.HeapSize)
+        {
+            Signal = Signal.StackOverflow;
+#if !UNITY
+            throw new RuntimeException("Stack overflow", GetContext(), default);
+#endif
+        }
     }
 
     Span<byte> Pop(int size)
     {
-        if (Registers.StackPointer >= Memory.Length) throw new RuntimeException("Stack overflow", GetContext(), default);
-        if (Registers.StackPointer < Settings.HeapSize) throw new RuntimeException("Stack overflow", GetContext(), default);
+        if (Registers.StackPointer >= Memory.Length ||
+            Registers.StackPointer < Settings.HeapSize)
+        {
+            Signal = Signal.StackOverflow;
+#if !UNITY
+            throw new RuntimeException("Stack overflow", GetContext(), default);
+#endif
+        }
 
         Span<byte> data = Memory.Get(Registers.StackPointer, size);
         Registers.StackPointer -= size * StackDirection;

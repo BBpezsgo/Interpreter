@@ -3,6 +3,17 @@ using System.String;
 using System.Memory;
 using System.Math;
 
+export const f32 NEG_ZERO = 0b_1_00000000_00000000000000000000000 as f32;
+export const f32 POSITIVE_INFINITY = 1f / 0f;
+export const f32 NEGATIVE_INFINITY = -1f / 0f;
+
+export inline byte IsNaN(this f32 v)
+{
+    return (
+        (v as i32) & 0b_0_11111111_00000000000000000000000
+    ) == 0b_0_11111111_00000000000000000000000;
+}
+
 export string ToString(this u8 number)
 {
 	if (number == 0)

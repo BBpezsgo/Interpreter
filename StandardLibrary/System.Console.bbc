@@ -215,6 +215,24 @@ export inline void Print(u32 message)
 
 export void Print(f32 message)
 {
+    if (message as i32 == POSITIVE_INFINITY as i32)
+    {
+        Print("+Infinity");
+        return;
+    }
+
+    if (message as i32 == NEGATIVE_INFINITY as i32)
+    {
+        Print("-Infinity");
+        return;
+    }
+
+    if (message.IsNaN())
+    {
+        Print("NaN");
+        return;
+    }
+
     if (message < 0f)
     {
         Print('-');
@@ -222,10 +240,12 @@ export void Print(f32 message)
     }
 
     Print((int)message);
-    message %= 1f;
-    message *= 1000f;
     Print('.');
-    if (message < 0f) { message *= -1f; }
+    message = (message % 1f) * 10f;
+    Print((int)message);
+    message = (message % 1f) * 10f;
+    Print((int)message);
+    message = (message % 1f) * 10f;
     Print((int)message);
 }
 

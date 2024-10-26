@@ -247,3 +247,16 @@ export float Sqrt(float z)
 	*_z = (((*_z) - (1 << 23)) >> 1) + (1 << 29);
 	return *(_z as float*);
 }
+
+export float Round(float v)
+{
+    f32 frac = v % 1f;
+    if (v < 0.5f)
+    {
+        return v - frac;
+    }
+    else
+    {
+        return v + 1f - frac;
+    }
+}

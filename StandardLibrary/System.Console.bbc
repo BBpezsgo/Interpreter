@@ -329,6 +329,36 @@ export inline void PrintLine(f32 message)
     PrintLine();
 }
 
+export inline void PrintLine(u8 message)
+{
+    Print(message);
+    PrintLine();
+}
+
+export inline void PrintLine(i8 message)
+{
+    Print(message);
+    PrintLine();
+}
+
+export inline void PrintLine(u16 message)
+{
+    Print(message);
+    PrintLine();
+}
+
+export inline void PrintLine(i16 message)
+{
+    Print(message);
+    PrintLine();
+}
+
+export inline void PrintLine(u32 message)
+{
+    Print(message);
+    PrintLine();
+}
+
 //
 //  == INPUT ==
 //

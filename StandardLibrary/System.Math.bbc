@@ -86,7 +86,19 @@ export int Min(int a, int b)
     return b;
 }
 
+export f32 Min(f32 a, f32 b)
+{
+    if (a < b) { return a; };
+    return b;
+}
+
 export int Max(int a, int b)
+{
+    if (a > b) { return a; };
+    return b;
+}
+
+export f32 Max(f32 a, f32 b)
 {
     if (a > b) { return a; };
     return b;

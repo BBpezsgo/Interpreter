@@ -389,7 +389,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             return true;
         }
 
-        if (GetConstant(symbolName, out IConstant? constant))
+        if (CurrentFile is null)
+        { throw new InternalException($"{nameof(CurrentFile)} is null"); }
+
+        if (GetConstant(symbolName, CurrentFile, out IConstant? constant, out _))
         {
             type = GeneralType.From(constant.Type);
             return true;

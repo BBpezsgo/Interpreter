@@ -407,7 +407,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-        if (GetConstant(newVariable.Identifier.Content, out _))
+        if (GetConstant(newVariable.Identifier.Content, newVariable.File, out _, out _))
         { throw new CompilerException($"Symbol name \"{newVariable.Identifier}\" conflicts with an another symbol name", newVariable.Identifier, newVariable.File); }
 
         if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable))
@@ -421,7 +421,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment($"New Variable \"{newVariable.Identifier.Content}\" {{");
 
-        if (GetConstant(newVariable.Identifier.Content, out _))
+        if (GetConstant(newVariable.Identifier.Content, newVariable.File, out _, out _))
         { throw new CompilerException($"Can not set constant value: it is readonly", newVariable, newVariable.File); }
 
         Identifier variableIdentifier = new(newVariable.Identifier, newVariable.File);
@@ -1456,7 +1456,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForStatement(Identifier variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        if (GetConstant(variable.Content, out IConstant? constant))
+        if (GetConstant(variable.Content, variable.File, out IConstant? constant, out WillBeCompilerException? constantNotFoundError))
         {
             OnGotStatementType(variable, constant.Type);
             variable.PredictedValue = constant.Value;
@@ -2411,7 +2411,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value)
     {
-        if (GetConstant(statementToSet.Content, out _))
+        if (GetConstant(statementToSet.Content, statementToSet.File, out _, out _))
         {
             statementToSet.Token.AnalyzedType = TokenAnalyzedType.ConstantName;
             throw new CompilerException($"Can not set constant value: it is readonly", statementToSet, CurrentFile);

@@ -363,7 +363,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void GenerateCodeForSetter(Identifier statement, StatementWithValue value)
     {
-        if (GetConstant(statement.Content, out _))
+        if (GetConstant(statement.Content, statement.File, out _, out _))
         { throw new CompilerException($"This is a constant so you can not modify it's value", statement, CurrentFile); }
 
         if (!GetVariable(statement.Content, out BrainfuckVariable? variable, out WillBeCompilerException? notFoundError))
@@ -1780,7 +1780,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (GetConstant(statement.Content, out IConstant? constant))
+        if (GetConstant(statement.Content, statement.File, out IConstant? constant, out WillBeCompilerException? constantNotFoundError))
         {
             using (Code.Block(this, $"Load constant {statement.Content} (with value {constant.Value})"))
             {
@@ -3201,7 +3201,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CompiledVariables.PushRange(compiledParameters);
         CurrentFile = function.File;
         CompiledLocalConstants.PushRange(constantParameters);
-        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, v.File, out _, out _));
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 
@@ -3338,7 +3338,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CompiledVariables.PushRange(compiledParameters);
         CurrentFile = function.File;
         CompiledLocalConstants.PushRange(constantParameters);
-        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, v.File, out _, out _));
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 
@@ -3428,7 +3428,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CompiledVariables.PushIf(returnVariable);
         CompiledVariables.PushRange(compiledParameters);
         CompiledLocalConstants.PushRange(constantParameters);
-        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, v.File, out _, out _));
 
         if (function.Block is null)
         { throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.File); }
@@ -3636,7 +3636,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CompiledVariables.PushRange(compiledParameters);
         CurrentFile = function.File;
         CompiledLocalConstants.PushRange(constantParameters);
-        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, out _));
+        CompiledLocalConstants.AddRangeIf(frame.SavedConstants, v => !GetConstant(v.Identifier, v.File, out _, out _));
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(function.Block.Brackets.Start, FindControlFlowUsage(function.Block.Statements));
 

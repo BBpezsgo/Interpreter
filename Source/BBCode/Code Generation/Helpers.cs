@@ -77,7 +77,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     };
     Address GetDataAddress(Identifier variable)
     {
-        if (GetConstant(variable.Content, out _))
+        if (GetConstant(variable.Content, variable.File, out _, out _))
         { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
 
         if (GetParameter(variable.Content, out CompiledParameter? parameter))
@@ -194,7 +194,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     };
     Address GetBaseAddress(Identifier variable)
     {
-        if (GetConstant(variable.Content, out _))
+        if (GetConstant(variable.Content, variable.File, out _, out _))
         { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
 
         if (GetParameter(variable.Content, out CompiledParameter? parameter))

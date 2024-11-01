@@ -136,17 +136,46 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         CompiledLocalConstants.Pop(count);
     }
 
-    protected bool GetConstant(string identifier, [NotNullWhen(true)] out IConstant? constant)
+    enum ConstantPerfectus
+    {
+        None,
+        Name,
+        File,
+    }
+
+    protected bool GetConstant(string identifier, Uri file, [NotNullWhen(true)] out IConstant? constant, [NotNullWhen(false)] out WillBeCompilerException? notFoundError)
     {
         constant = null;
+        notFoundError = null;
+        ConstantPerfectus perfectus = ConstantPerfectus.None;
 
         foreach (IConstant _constant in CompiledLocalConstants)
         {
             if (_constant.Identifier != identifier)
-            { continue; }
+            {
+                if (perfectus < ConstantPerfectus.Name ||
+                    notFoundError is null)
+                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" not found"); }
+                continue;
+            }
+            perfectus = ConstantPerfectus.Name;
+
+            if (!_constant.CanUse(file))
+            {
+                if (perfectus < ConstantPerfectus.File ||
+                    notFoundError is null)
+                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" cannot be used due to its protection level"); }
+                continue;
+            }
+            perfectus = ConstantPerfectus.File;
 
             if (constant is not null)
-            { throw new CompilerException($"Constant \"{constant.Identifier}\" defined more than once", constant, constant.File); }
+            {
+                if (perfectus <= ConstantPerfectus.File ||
+                    notFoundError is null)
+                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" not found: multiple constants found"); }
+                return false;
+            }
 
             constant = _constant;
         }
@@ -154,10 +183,30 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         foreach (IConstant _constant in CompiledGlobalConstants)
         {
             if (_constant.Identifier != identifier)
-            { continue; }
+            {
+                if (perfectus < ConstantPerfectus.Name ||
+                    notFoundError is null)
+                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" not found"); }
+                continue;
+            }
+            perfectus = ConstantPerfectus.Name;
+
+            if (!_constant.CanUse(file))
+            {
+                if (perfectus < ConstantPerfectus.File ||
+                    notFoundError is null)
+                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" cannot be used due to its protection level"); }
+                continue;
+            }
+            perfectus = ConstantPerfectus.File;
 
             if (constant is not null)
-            { throw new CompilerException($"Constant \"{constant.Identifier}\" defined more than once", constant, constant.File); }
+            {
+                if (perfectus <= ConstantPerfectus.File ||
+                    notFoundError is null)
+                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" not found: multiple constants found"); }
+                return false;
+            }
 
             constant = _constant;
         }
@@ -1274,7 +1323,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             constantType = new BuiltinType(constantValue.Type);
         }
 
-        if (GetConstant(variableDeclaration.Identifier.Content, out _))
+        if (GetConstant(variableDeclaration.Identifier.Content, variableDeclaration.File, out _, out _))
         { throw new CompilerException($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.File); }
 
         return new(constantValue, constantType, variableDeclaration);
@@ -2291,7 +2340,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     }
     protected GeneralType FindStatementType(Identifier identifier, GeneralType? expectedType = null)
     {
-        if (GetConstant(identifier.Content, out IConstant? constant))
+        if (GetConstant(identifier.Content, identifier.File, out IConstant? constant, out WillBeCompilerException? constantNotFoundError))
         {
             identifier.Reference = constant;
             identifier.Token.AnalyzedType = TokenAnalyzedType.ConstantName;
@@ -3552,7 +3601,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     }
     bool TryCompute(Identifier identifier, EvaluationContext context, out CompiledValue value)
     {
-        if (GetConstant(identifier.Content, out IConstant? constantValue))
+        if (GetConstant(identifier.Content, identifier.File, out IConstant? constantValue, out _))
         {
             identifier.Reference = constantValue;
             value = constantValue.Value;

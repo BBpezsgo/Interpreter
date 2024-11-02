@@ -21,6 +21,14 @@ public static unsafe class MemoryUtils
             Buffer.MemoryCopy(ptr, (void*)target, length, length);
         }
     }
+    public static void CopyTo<T>(this Span<T> span, nint target) where T : unmanaged
+    {
+        int length = span.Length * sizeof(T);
+        fixed (void* ptr = span)
+        {
+            Buffer.MemoryCopy(ptr, (void*)target, length, length);
+        }
+    }
 
     public static T* GetPtr<T>(this Span<byte> memory, int ptr) where T : unmanaged => ptr >= 0 && ptr < memory.Length ? (T*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(memory[ptr..])) : throw new RuntimeException($"Memory access violation (pointer {ptr} was out of range)");
     public static T* GetPtr<T>(this Span<byte> memory) where T : unmanaged => (T*)Unsafe.AsPointer(ref MemoryMarshal.GetReference(memory));

@@ -1,6 +1,12 @@
 ﻿using System.Runtime.CompilerServices;
 using LanguageCore.Compiler;
 
+#if UNITY
+using unsafe FunctionPointer = delegate* unmanaged[Cdecl]<nint, nint, nint, void>;
+#else
+using unsafe FunctionPointer = delegate*<nint, System.ReadOnlySpan<byte>, System.Span<byte>, void>;
+#endif
+
 namespace LanguageCore.Runtime;
 
 public delegate void ExternalFunctionSyncCallback(ReadOnlySpan<byte> arguments, Span<byte> returnValue);
@@ -21,30 +27,35 @@ public interface IExternalFunction
     public int ReturnValueSize { get; }
 }
 
-public unsafe ref struct ExternalFunctionScopedSync
+#if UNITY
+public delegate void ExternalFunctionUnity(nint scope, nint arguments, nint returnValue);
+#endif
+
+public unsafe struct ExternalFunctionScopedSync
 {
     public int Id { get; }
     public int ParametersSize { get; }
     public int ReturnValueSize { get; }
     public nint Scope { get; set; }
 #if UNITY
-    public Unity.Burst.FunctionPointer<Action<nint, nint, nint>> Callback { get; }
+    readonly nint _callback;
+    public FunctionPointer Callback => (FunctionPointer)_callback;
 #else
-    public delegate*<nint, ReadOnlySpan<byte>, Span<byte>, void> Callback { get; }
+    public FunctionPointer Callback { get; }
 #endif
 
     public ExternalFunctionScopedSync(
-#if UNITY
-        Unity.Burst.FunctionPointer<Action<nint, nint, nint>> callback,
-#else
-        delegate*<nint, ReadOnlySpan<byte>, Span<byte>, void> callback,
-#endif
+        FunctionPointer callback,
         int id,
         int parametersSize,
         int returnValueSize,
         nint scope)
     {
+#if UNITY
+        _callback = callback;
+#else
         Callback = callback;
+#endif
         Id = id;
         ParametersSize = parametersSize;
         ReturnValueSize = returnValueSize;

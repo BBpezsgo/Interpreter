@@ -631,7 +631,7 @@ public ref partial struct ProcessorState
                 fixed (byte* _parametersPtr = _parameters)
                 fixed (byte* returnValuePtr = returnValue)
                 {
-                    scopedExternalFunction.Callback.Invoke(scopedExternalFunction.Scope, (nint)_parametersPtr, (nint)returnValuePtr);
+                    scopedExternalFunction.Callback(scopedExternalFunction.Scope, (nint)_parametersPtr, (nint)returnValuePtr);
                 }
 #else
                 scopedExternalFunction.Callback(scopedExternalFunction.Scope, _parameters, returnValue);
@@ -643,7 +643,7 @@ public ref partial struct ProcessorState
 #if UNITY
                 fixed (byte* _parametersPtr = _parameters)
                 {
-                    scopedExternalFunction.Callback.Invoke(scopedExternalFunction.Scope, (nint)_parametersPtr, default);
+                    scopedExternalFunction.Callback(scopedExternalFunction.Scope, (nint)_parametersPtr, default);
                 }
 #else
                 scopedExternalFunction.Callback(scopedExternalFunction.Scope, _parameters, default);

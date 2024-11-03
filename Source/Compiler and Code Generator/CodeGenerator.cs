@@ -71,7 +71,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     protected DebugInformation? DebugInfo;
 
     protected readonly PrintCallback? Print;
-    protected readonly AnalysisCollection? AnalysisCollection;
+    protected readonly Diagnostics? Diagnostics;
 
     public abstract int PointerSize { get; }
     public BitWidth PointerBitWidth => (BitWidth)PointerSize;
@@ -91,7 +91,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     #endregion
 
-    protected CodeGenerator(CompilerResult compilerResult, AnalysisCollection? analysisCollection, PrintCallback? print)
+    protected CodeGenerator(CompilerResult compilerResult, Diagnostics? diagnostics, PrintCallback? print)
     {
         CompiledGlobalConstants = ImmutableArray.Create<IConstant>();
 
@@ -117,7 +117,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         CompiledGeneralFunctions = compilerResult.GeneralFunctions;
         CompiledAliases = compilerResult.Aliases;
 
-        AnalysisCollection = analysisCollection;
+        Diagnostics = diagnostics;
         Print = print;
     }
 
@@ -143,7 +143,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         File,
     }
 
-    protected bool GetConstant(string identifier, Uri file, [NotNullWhen(true)] out IConstant? constant, [NotNullWhen(false)] out WillBeCompilerException? notFoundError)
+    protected bool GetConstant(string identifier, Uri file, [NotNullWhen(true)] out IConstant? constant, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError)
     {
         constant = null;
         notFoundError = null;
@@ -155,7 +155,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             {
                 if (perfectus < ConstantPerfectus.Name ||
                     notFoundError is null)
-                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" not found"); }
+                { notFoundError = new PossibleDiagnostic($"Constant \"{_constant.Identifier}\" not found"); }
                 continue;
             }
             perfectus = ConstantPerfectus.Name;
@@ -164,7 +164,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             {
                 if (perfectus < ConstantPerfectus.File ||
                     notFoundError is null)
-                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" cannot be used due to its protection level"); }
+                { notFoundError = new PossibleDiagnostic($"Constant \"{_constant.Identifier}\" cannot be used due to its protection level"); }
                 continue;
             }
             perfectus = ConstantPerfectus.File;
@@ -173,7 +173,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             {
                 if (perfectus <= ConstantPerfectus.File ||
                     notFoundError is null)
-                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" not found: multiple constants found"); }
+                { notFoundError = new PossibleDiagnostic($"Constant \"{_constant.Identifier}\" not found: multiple constants found"); }
                 return false;
             }
 
@@ -186,7 +186,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             {
                 if (perfectus < ConstantPerfectus.Name ||
                     notFoundError is null)
-                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" not found"); }
+                { notFoundError = new PossibleDiagnostic($"Constant \"{_constant.Identifier}\" not found"); }
                 continue;
             }
             perfectus = ConstantPerfectus.Name;
@@ -195,7 +195,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             {
                 if (perfectus < ConstantPerfectus.File ||
                     notFoundError is null)
-                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" cannot be used due to its protection level"); }
+                { notFoundError = new PossibleDiagnostic($"Constant \"{_constant.Identifier}\" cannot be used due to its protection level"); }
                 continue;
             }
             perfectus = ConstantPerfectus.File;
@@ -204,7 +204,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             {
                 if (perfectus <= ConstantPerfectus.File ||
                     notFoundError is null)
-                { notFoundError = new WillBeCompilerException($"Constant \"{_constant.Identifier}\" not found: multiple constants found"); }
+                { notFoundError = new PossibleDiagnostic($"Constant \"{_constant.Identifier}\" not found: multiple constants found"); }
                 return false;
             }
 
@@ -224,7 +224,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 BinaryOperatorCall or
                 UnaryOperatorCall)
             {
-                AnalysisCollection?.Hints.Add(new Hint($"Unnecessary explicit temp modifier ({modifiedStatement.Statement.GetType().Name} statements are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
+                Diagnostics?.Add(LanguageCore.Diagnostic.Hint($"Unnecessary explicit temp modifier ({modifiedStatement.Statement.GetType().Name} statements are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
             }
 
             explicitly = true;
@@ -552,7 +552,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledConstructor>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledConstructor>>? addCompilable = null)
     {
         {
@@ -580,7 +580,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, indexType);
@@ -604,7 +604,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, indexType, elementType);
@@ -627,7 +627,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         IEnumerable<CompiledFunction> builtinCompiledFunctions =
@@ -663,7 +663,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         IEnumerable<CompiledFunction> builtinCompiledFunctions =
@@ -698,7 +698,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledOperator>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledOperator>>? addCompilable = null)
     {
         FunctionQuery<CompiledOperator, string, StatementWithValue> query = FunctionQuery.Create(@operator.Operator.Content, @operator.Arguments, FindStatementType, relevantFile, null, addCompilable);
@@ -719,7 +719,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledOperator>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledOperator>>? addCompilable = null)
     {
         FunctionQuery<CompiledOperator, string, StatementWithValue> query = FunctionQuery.Create(@operator.Operator.Content, @operator.Arguments, FindStatementType, relevantFile, null, addCompilable);
@@ -742,7 +742,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledGeneralFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledGeneralFunction>>? addCompilable = null)
     {
         IEnumerable<CompiledGeneralFunction> compiledGeneralFunctionsInContext =
@@ -773,7 +773,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         string identifier,
         GeneralType? type,
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error)
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         if (type is null || !type.Is(out FunctionType? functionType))
         {
@@ -795,7 +795,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         AnyCall call,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         result = null;
@@ -803,7 +803,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         if (!call.ToFunctionCall(out FunctionCall? functionCall))
         {
-            error ??= new WillBeCompilerException($"Function {call.ToReadable(FindStatementType)} not found");
+            error ??= new PossibleDiagnostic($"Function {call.ToReadable(FindStatementType)} not found");
             return false;
         }
 
@@ -820,7 +820,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         FunctionCall functionCallStatement,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error,
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
     {
         string identifier = functionCallStatement.Identifier.Content;
@@ -836,7 +836,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         FunctionQuery<CompiledFunction, string, TArgument> query,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error)
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
         where TArgument : notnull
         => GetFunction<CompiledFunction, Token, string, TArgument>(
             GetFunctions(),
@@ -856,14 +856,14 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         FunctionQuery<TFunction, TPassedIdentifier, TArgument> query,
 
         [NotNullWhen(true)] out FunctionQueryResult<TFunction>? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error)
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
         where TFunction : ICompiledFunction, IInFile, ITemplateable<TFunction>, ISimpleReadable, IIdentifiable<TDefinedIdentifier>
         where TDefinedIdentifier : notnull, IEquatable<TPassedIdentifier>
         where TArgument : notnull
     {
         TFunction? result_ = default;
         Dictionary<string, GeneralType>? typeArguments = null;
-        WillBeCompilerException? error_ = null;
+        PossibleDiagnostic? error_ = null;
 
         string kindNameLower = kindName.ToLowerInvariant();
         string kindNameCapital = char.ToUpperInvariant(kindName[0]) + kindName[1..];
@@ -909,7 +909,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.ParameterCount)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: wrong number of parameters ({query.ArgumentCount.Value}) passed to {function.ToReadable()}");
+                    error_ = new PossibleDiagnostic($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: wrong number of parameters ({query.ArgumentCount.Value}) passed to {function.ToReadable()}");
                 }
                 return false;
             }
@@ -951,7 +951,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of caller {checkedQuery.ToReadable()} doesn't match with callee {function.ToReadable()}");
+                        error_ = new PossibleDiagnostic($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of caller {checkedQuery.ToReadable()} doesn't match with callee {function.ToReadable()}");
                     }
                     return false;
                 }
@@ -996,7 +996,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of caller {checkedQuery.ToReadable()} doesn't match with callee {function.ToReadable()}");
+                        error_ = new PossibleDiagnostic($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of caller {checkedQuery.ToReadable()} doesn't match with callee {function.ToReadable()}");
                     }
                     return false;
                 }
@@ -1035,7 +1035,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of caller {checkedQuery.ToReadable()} doesn't match with callee {function.ToReadable()}");
+                        error_ = new PossibleDiagnostic($"{kindNameCapital} {readableName ?? checkedQuery.ToReadable()} not found: parameter types of caller {checkedQuery.ToReadable()} doesn't match with callee {function.ToReadable()}");
                     }
                     return false;
                 }
@@ -1056,7 +1056,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.ReturnType)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of caller {query} doesn't match with callee {function.ToReadable()}");
+                    error_ = new PossibleDiagnostic($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of caller {query} doesn't match with callee {function.ToReadable()}");
                 }
                 return false;
             }
@@ -1073,7 +1073,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of caller {query} doesn't match with callee {function.ToReadable()}");
+                    error_ = new PossibleDiagnostic($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of caller {query} doesn't match with callee {function.ToReadable()}");
                 }
                 return false;
             }
@@ -1094,7 +1094,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of caller {query} doesn't match with callee {function.ToReadable()}");
+                    error_ = new PossibleDiagnostic($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: return type of caller {query} doesn't match with callee {function.ToReadable()}");
                 }
                 return false;
             }
@@ -1118,7 +1118,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
             if (perfectus >= FunctionPerfectus.File)
             {
-                error_ = new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: multiple {kindNameLower}s matched in the same file");
+                error_ = new PossibleDiagnostic($"{kindNameCapital} {readableName ?? query.ToReadable()} not found: multiple {kindNameLower}s matched in the same file");
                 // Debugger.Break();
             }
 
@@ -1238,11 +1238,11 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 RelevantFile = query.RelevantFile,
                 ReturnType = query.ReturnType,
             };
-            error = error_ ?? new WillBeCompilerException($"{kindNameCapital} {readableName ?? typeConvertedQuery.ToReadable()} not found");
+            error = error_ ?? new PossibleDiagnostic($"{kindNameCapital} {readableName ?? typeConvertedQuery.ToReadable()} not found");
         }
         else
         {
-            error = error_ ?? new WillBeCompilerException($"{kindNameCapital} {readableName ?? query.ToReadable()} not found");
+            error = error_ ?? new PossibleDiagnostic($"{kindNameCapital} {readableName ?? query.ToReadable()} not found");
         }
 
         result = null;
@@ -1303,11 +1303,17 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     {
         variableDeclaration.Identifier.AnalyzedType = TokenAnalyzedType.ConstantName;
 
+        CompiledValue constantValue;
         if (variableDeclaration.InitialValue == null)
-        { throw new CompilerException($"Constant value must have initial value", variableDeclaration, variableDeclaration.File); }
-
-        if (!TryCompute(variableDeclaration.InitialValue, out CompiledValue constantValue))
-        { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.File); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Constant value must have initial value", variableDeclaration, variableDeclaration.File));
+            constantValue = default;
+        }
+        else if (!TryCompute(variableDeclaration.InitialValue, out constantValue))
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.File));
+            constantValue = default;
+        }
 
         GeneralType constantType;
         if (variableDeclaration.Type != StatementKeywords.Var)
@@ -1324,7 +1330,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         }
 
         if (GetConstant(variableDeclaration.Identifier.Content, variableDeclaration.File, out _, out _))
-        { throw new CompilerException($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.File); }
+        { Diagnostics?.Add(Diagnostic.Critical($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.File)); }
 
         return new(constantValue, constantType, variableDeclaration);
     }
@@ -1360,7 +1366,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out CompiledStruct? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error)
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
         => CodeGenerator.GetStruct(
             CompiledStructs,
 
@@ -1377,10 +1383,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out CompiledStruct? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error)
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         CompiledStruct? result_ = default;
-        WillBeCompilerException? error_ = null;
+        PossibleDiagnostic? error_ = null;
 
         StructPerfectus perfectus = StructPerfectus.None;
 
@@ -1407,7 +1413,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
             if (perfectus >= StructPerfectus.File)
             {
-                error_ = new WillBeCompilerException($"Struct {structName} not found: multiple structs matched in the same file");
+                error_ = new PossibleDiagnostic($"Struct {structName} not found: multiple structs matched in the same file");
                 // Debugger.Break();
             }
 
@@ -1440,7 +1446,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             return true;
         }
 
-        error = error_ ?? new WillBeCompilerException($"Struct {structName} not found");
+        error = error_ ?? new PossibleDiagnostic($"Struct {structName} not found");
         result = null;
         return false;
     }
@@ -1476,7 +1482,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out CompiledAlias? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error)
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
         => CodeGenerator.GetAlias(
             CompiledAliases,
 
@@ -1493,10 +1499,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri? relevantFile,
 
         [NotNullWhen(true)] out CompiledAlias? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error)
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         CompiledAlias? result_ = default;
-        WillBeCompilerException? error_ = null;
+        PossibleDiagnostic? error_ = null;
 
         AliasPerfectus perfectus = AliasPerfectus.None;
 
@@ -1523,7 +1529,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
             if (perfectus >= AliasPerfectus.File)
             {
-                error_ = new WillBeCompilerException($"Alias {aliasName} not found: multiple aliases matched in the same file");
+                error_ = new PossibleDiagnostic($"Alias {aliasName} not found: multiple aliases matched in the same file");
                 // Debugger.Break();
             }
 
@@ -1556,7 +1562,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             return true;
         }
 
-        error = error_ ?? new WillBeCompilerException($"Alias {aliasName} not found");
+        error = error_ ?? new PossibleDiagnostic($"Alias {aliasName} not found");
         result = null;
         return false;
     }
@@ -1604,10 +1610,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Uri relevantFile,
 
         [NotNullWhen(true)] out CompiledVariable? result,
-        [NotNullWhen(false)] out WillBeCompilerException? error)
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         CompiledVariable? result_ = default;
-        WillBeCompilerException? error_ = null;
+        PossibleDiagnostic? error_ = null;
 
         GlobalVariablePerfectus perfectus = GlobalVariablePerfectus.None;
 
@@ -1634,7 +1640,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
             if (perfectus >= GlobalVariablePerfectus.File)
             {
-                error_ = new WillBeCompilerException($"Global variable {variableName} not found: multiple variables matched in the same file");
+                error_ = new PossibleDiagnostic($"Global variable {variableName} not found: multiple variables matched in the same file");
                 // Debugger.Break();
             }
 
@@ -1667,7 +1673,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             return true;
         }
 
-        error = error_ ?? new WillBeCompilerException($"Global variable {variableName} not found");
+        error = error_ ?? new PossibleDiagnostic($"Global variable {variableName} not found");
         result = null;
         return false;
     }
@@ -1785,7 +1791,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         { return; }
 
         if (destination.GetSize(this) != valueType.GetSize(this))
-        { throw new CompilerException($"Can not set \"{valueType}\" (size of {valueType.GetSize(this)} bytes) value to {destination} (size of {destination.GetSize(this)} bytes)", value, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Can not set \"{valueType}\" (size of {valueType.GetSize(this)} bytes) value to {destination} (size of {destination.GetSize(this)} bytes)", value, CurrentFile));
+            return;
+        }
 
         if (value is LiteralStatement literal &&
             literal.Type == LiteralType.String)
@@ -1795,11 +1804,20 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             {
                 string literalValue = literal.Value;
                 if (destArrayType.Length is null)
-                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (without length)", value, CurrentFile); }
+                {
+                    Diagnostics?.Add(Diagnostic.Critical($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (without length)", value, CurrentFile));
+                    return;
+                }
                 if (!destArrayType.ComputedLength.HasValue)
-                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of <runtime value>)", value, CurrentFile); }
+                {
+                    Diagnostics?.Add(Diagnostic.Critical($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of <runtime value>)", value, CurrentFile));
+                    return;
+                }
                 if (literalValue.Length != destArrayType.ComputedLength.Value)
-                { throw new CompilerException($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of {destArrayType.Length?.ToString() ?? "null"})", value, CurrentFile); }
+                {
+                    Diagnostics?.Add(Diagnostic.Critical($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array {destination} (length of {destArrayType.Length?.ToString() ?? "null"})", value, CurrentFile));
+                    return;
+                }
                 return;
             }
 
@@ -1810,9 +1828,15 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (arrayType.Length is not null)
                 {
                     if (!arrayType.ComputedLength.HasValue)
-                    { throw new CompilerException($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array {destination} (length of <runtime value>)", value, CurrentFile); }
+                    {
+                        Diagnostics?.Add(Diagnostic.Critical($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array {destination} (length of <runtime value>)", value, CurrentFile));
+                        return;
+                    }
                     if (literal.Value.Length != arrayType.ComputedLength.Value)
-                    { throw new CompilerException($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array {destination} (length of {arrayType.Length?.ToString() ?? "null"})", value, CurrentFile); }
+                    {
+                        Diagnostics?.Add(Diagnostic.Critical($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array {destination} (length of {arrayType.Length?.ToString() ?? "null"})", value, CurrentFile));
+                        return;
+                    }
                 }
                 return;
             }
@@ -1835,7 +1859,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                     if (dstArray.ComputedLength.HasValue &&
                         srcArray.ComputedLength.HasValue &&
                         dstArray.ComputedLength.Value != srcArray.ComputedLength.Value)
-                    { throw new CompilerException($"Can not set an array pointer with length of {dstArray.ComputedLength.Value} to an array pointer with length of {srcArray.ComputedLength.Value}", value, CurrentFile); }
+                    {
+                        Diagnostics?.Add(Diagnostic.Critical($"Can not set an array pointer with length of {dstArray.ComputedLength.Value} to an array pointer with length of {srcArray.ComputedLength.Value}", value, CurrentFile));
+                        return;
+                    }
 
                     if (dstArray.Length is null)
                     { return; }
@@ -1843,7 +1870,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             }
         }
 
-        throw new CompilerException($"Can not set a {valueType} type value to the {destination} type", value, CurrentFile);
+        Diagnostics?.Add(Diagnostic.Critical($"Can not set a {valueType} type value to the {destination} type", value, CurrentFile));
+        return;
     }
 
     protected void AssignTypeCheck(GeneralType destination, CompiledValue value, IPositioned valuePosition)
@@ -1894,15 +1922,20 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset)
     {
         if (LanguageConstants.KeywordList.Contains(newVariable.Identifier.Content))
-        { throw new CompilerException($"Illegal variable name \"{newVariable.Identifier.Content}\"", newVariable.Identifier, CurrentFile); }
+        { Diagnostics?.Add(Diagnostic.Critical($"Illegal variable name \"{newVariable.Identifier.Content}\"", newVariable.Identifier, CurrentFile)); }
 
         GeneralType type;
         if (newVariable.Type == StatementKeywords.Var)
         {
             if (newVariable.InitialValue == null)
-            { throw new CompilerException($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.File); }
-
-            type = FindStatementType(newVariable.InitialValue);
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.File));
+                type = BuiltinType.Void;
+            }
+            else
+            {
+                type = FindStatementType(newVariable.InitialValue);
+            }
         }
         else
         {
@@ -2016,18 +2049,25 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     protected bool GetLiteralType(LiteralType literal, [NotNullWhen(true)] out GeneralType? type)
     {
-        static LiteralType ParseLiteralType(AttributeUsage attribute)
+        LiteralType ParseLiteralType(AttributeUsage attribute)
         {
             if (!attribute.TryGetValue(out string? literalTypeName))
-            { throw new CompilerException($"Attribute \"{attribute.Identifier}\" needs one string argument", attribute, null); }
-            return literalTypeName switch
             {
-                "char" => LiteralType.Char,
-                "integer" => LiteralType.Integer,
-                "float" => LiteralType.Float,
-                "string" => LiteralType.String,
-                _ => throw new CompilerException($"Invalid literal type \"{literalTypeName}\"", attribute.Parameters[0], null),
-            };
+                Diagnostics?.Add(Diagnostic.Critical($"Attribute \"{attribute.Identifier}\" needs one string argument", attribute, null));
+                return default;
+            }
+            switch (literalTypeName)
+            {
+                case "char": return LiteralType.Char;
+                case "integer": return LiteralType.Integer;
+                case "float": return LiteralType.Float;
+                case "string": return LiteralType.String;
+                default:
+                {
+                    Diagnostics?.Add(Diagnostic.Critical($"Invalid literal type \"{literalTypeName}\"", attribute.Parameters[0], null));
+                    return default;
+                }
+            }
         }
 
         type = null;
@@ -2040,7 +2080,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (literalType == literal)
                 {
                     if (type is not null)
-                    { throw new CompilerException($"Multiple type definitions defined with attribute [{"UsedByLiteral"}({attribute.Parameters[0].Value})]", attribute, alias.File); }
+                    {
+                        Diagnostics?.Add(Diagnostic.Critical($"Multiple type definitions defined with attribute [{"UsedByLiteral"}({attribute.Parameters[0].Value})]", attribute, alias.File));
+                        return default;
+                    }
                     type = new AliasType(alias.Value, alias);
                 }
             }
@@ -2054,7 +2097,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (literalType == literal)
                 {
                     if (type is not null)
-                    { throw new CompilerException($"Multiple type definitions defined with attribute [{"UsedByLiteral"}({attribute.Parameters[0].Value})]", attribute, @struct.File); }
+                    {
+                        Diagnostics?.Add(Diagnostic.Critical($"Multiple type definitions defined with attribute [{"UsedByLiteral"}({attribute.Parameters[0].Value})]", attribute, @struct.File));
+                        return default;
+                    }
                     type = new StructType(@struct, @struct.File);
                 }
             }
@@ -2080,25 +2126,35 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         GeneralType prevType = FindStatementType(anyCall.PrevStatement);
 
         if (!prevType.Is(out FunctionType? functionType))
-        { throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"This isn't a function", anyCall.PrevStatement, CurrentFile));
+            return BuiltinType.Void;
+        }
 
         return OnGotStatementType(anyCall, functionType.ReturnType);
     }
-    protected BuiltinType FindStatementType(KeywordCall keywordCall) => keywordCall.Identifier.Content switch
+    protected BuiltinType FindStatementType(KeywordCall keywordCall)
     {
-        StatementKeywords.Return => OnGotStatementType(keywordCall, BuiltinType.Void),
-        StatementKeywords.Crash => OnGotStatementType(keywordCall, BuiltinType.Void),
-        StatementKeywords.Break => OnGotStatementType(keywordCall, BuiltinType.Void),
-        StatementKeywords.Delete => OnGotStatementType(keywordCall, BuiltinType.Void),
-        _ => throw new CompilerException($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile)
-    };
+        switch (keywordCall.Identifier.Content)
+        {
+            case StatementKeywords.Return: return OnGotStatementType(keywordCall, BuiltinType.Void);
+            case StatementKeywords.Crash: return OnGotStatementType(keywordCall, BuiltinType.Void);
+            case StatementKeywords.Break: return OnGotStatementType(keywordCall, BuiltinType.Void);
+            case StatementKeywords.Delete: return OnGotStatementType(keywordCall, BuiltinType.Void);
+            default:
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile));
+                return OnGotStatementType(keywordCall, BuiltinType.Void);
+            }
+        }
+    }
     protected GeneralType FindStatementType(IndexCall index)
     {
         GeneralType prevType = FindStatementType(index.PrevStatement);
         GeneralType indexType = FindStatementType(index.Index);
 
         // TODO: (index.PrevStatement as IInFile)?.OriginalFile can be null
-        if (GetIndexGetter(prevType, indexType, (index.PrevStatement as IInFile)?.File, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError))
+        if (GetIndexGetter(prevType, indexType, (index.PrevStatement as IInFile)?.File, out FunctionQueryResult<CompiledFunction>? indexer, out PossibleDiagnostic? notFoundError))
         { return OnGotStatementType(index, indexer.Function.Type); }
 
         if (prevType.Is(out ArrayType? arrayType))
@@ -2108,7 +2164,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             pointerType.To.Is(out arrayType))
         { return arrayType.Of; }
 
-        throw notFoundError.Instantiate(index, index.File);
+        Diagnostics?.Add(notFoundError.InstantiateError(index, index.File));
+        return BuiltinType.Void;
     }
     protected GeneralType FindStatementType(FunctionCall functionCall)
     {
@@ -2117,12 +2174,15 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             if (GetLiteralType(LiteralType.Integer, out GeneralType? integerType))
             { return integerType; }
 
-            AnalysisCollection?.Warnings.Add(new Warning($"No type defined for integer literals, using the default i32", functionCall, CurrentFile));
+            Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"No type defined for integer literals, using the default i32", functionCall, CurrentFile));
             return SizeofStatementType;
         }
 
-        if (!GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundError))
-        { throw notFoundError.Instantiate(functionCall, CurrentFile); }
+        if (!GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFoundError))
+        {
+            Diagnostics?.Add(notFoundError.InstantiateError(functionCall, functionCall.File));
+            return BuiltinType.Void;
+        }
 
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
         return OnGotStatementType(functionCall, result.Function.Type);
@@ -2137,6 +2197,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         GeneralType leftType = FindStatementType(@operator.Left, expectedType);
         GeneralType rightType = FindStatementType(@operator.Right, expectedType);
+        GeneralType result;
 
         {
             if (leftType.Is(out BuiltinType? leftBType) &&
@@ -2157,34 +2218,41 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
                 BuiltinType numericResultType = BuiltinType.CreateNumeric(numericType, bitWidth);
 
-                return OnGotStatementType(@operator, @operator.Operator.Content switch
+                switch (@operator.Operator.Content)
                 {
-                    BinaryOperatorCall.CompLT or
-                    BinaryOperatorCall.CompGT or
-                    BinaryOperatorCall.CompLEQ or
-                    BinaryOperatorCall.CompGEQ or
-                    BinaryOperatorCall.CompEQ or
-                    BinaryOperatorCall.CompNEQ
-                        => BooleanType,
+                    case BinaryOperatorCall.CompLT:
+                    case BinaryOperatorCall.CompGT:
+                    case BinaryOperatorCall.CompLEQ:
+                    case BinaryOperatorCall.CompGEQ:
+                    case BinaryOperatorCall.CompEQ:
+                    case BinaryOperatorCall.CompNEQ:
+                        result = BooleanType;
+                        break;
 
-                    BinaryOperatorCall.LogicalOR or
-                    BinaryOperatorCall.LogicalAND or
-                    BinaryOperatorCall.BitwiseAND or
-                    BinaryOperatorCall.BitwiseOR or
-                    BinaryOperatorCall.BitwiseXOR or
-                    BinaryOperatorCall.BitshiftLeft or
-                    BinaryOperatorCall.BitshiftRight
-                        => numericResultType,
+                    case BinaryOperatorCall.LogicalOR:
+                    case BinaryOperatorCall.LogicalAND:
+                    case BinaryOperatorCall.BitwiseAND:
+                    case BinaryOperatorCall.BitwiseOR:
+                    case BinaryOperatorCall.BitwiseXOR:
+                    case BinaryOperatorCall.BitshiftLeft:
+                    case BinaryOperatorCall.BitshiftRight:
+                        result = numericResultType;
+                        break;
 
-                    BinaryOperatorCall.Addition or
-                    BinaryOperatorCall.Subtraction or
-                    BinaryOperatorCall.Multiplication or
-                    BinaryOperatorCall.Division or
-                    BinaryOperatorCall.Modulo
-                        => isFloat ? BuiltinType.F32 : numericResultType,
+                    case BinaryOperatorCall.Addition:
+                    case BinaryOperatorCall.Subtraction:
+                    case BinaryOperatorCall.Multiplication:
+                    case BinaryOperatorCall.Division:
+                    case BinaryOperatorCall.Modulo:
+                        result = isFloat ? BuiltinType.F32 : numericResultType;
+                        break;
 
-                    _ => throw (new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile)),
-                });
+                    default:
+                        Diagnostics?.Add(Diagnostic.Critical($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile));
+                        result = BuiltinType.Void;
+                        break;
+                }
+                return OnGotStatementType(@operator, result);
             }
         }
 
@@ -2193,7 +2261,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         CompiledValue predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
 
-        BuiltinType result = new(predictedValue.Type);
+        result = new BuiltinType(predictedValue.Type);
 
         if (expectedType is not null)
         {
@@ -2214,13 +2282,26 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         GeneralType leftType = FindStatementType(@operator.Left);
 
-        GeneralType result = @operator.Operator.Content switch
+        GeneralType result;
+        switch (@operator.Operator.Content)
         {
-            UnaryOperatorCall.LogicalNOT => BooleanType,
-            UnaryOperatorCall.BinaryNOT => leftType,
-
-            _ => throw new CompilerException($"Unknown operator {@operator.Operator.Content}", @operator.Operator, CurrentFile),
-        };
+            case UnaryOperatorCall.LogicalNOT:
+            {
+                result = BooleanType;
+                break;
+            }
+            case UnaryOperatorCall.BinaryNOT:
+            {
+                result = leftType;
+                break;
+            }
+            default:
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Unknown operator {@operator.Operator.Content}", @operator.Operator, CurrentFile));
+                result = BuiltinType.Void;
+                break;
+            }
+        }
 
         if (expectedType is not null && expectedType.Is<PointerType>() && result.SameAs(BasicType.I32))
         { return OnGotStatementType(@operator, expectedType); }
@@ -2278,14 +2359,14 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (GetLiteralType(literal.Type, out GeneralType? literalType))
                 { return literalType; }
 
-                AnalysisCollection?.Warnings.Add(new Warning($"No type defined for integer literals, using the default i32", literal, CurrentFile));
+                Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"No type defined for integer literals, using the default i32", literal, CurrentFile));
                 return OnGotStatementType(literal, BuiltinType.I32);
             case LiteralType.Float:
 
                 if (GetLiteralType(literal.Type, out literalType))
                 { return literalType; }
 
-                AnalysisCollection?.Warnings.Add(new Warning($"No type defined for float literals, using the default f32", literal, CurrentFile));
+                Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"No type defined for float literals, using the default f32", literal, CurrentFile));
                 return OnGotStatementType(literal, BuiltinType.F32);
             case LiteralType.String:
                 if (expectedType is not null &&
@@ -2297,8 +2378,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (GetLiteralType(literal.Type, out literalType))
                 { return literalType; }
 
-                AnalysisCollection?.Warnings.Add(new Warning($"No type defined for string literals, using the default u16[]*", literal, CurrentFile));
-                return OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, Literal.CreateAnonymous(literal.Value.Length + 1, literal), literal.Value.Length + 1)));
+                Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"No type defined for string literals, using the default u16[]*", literal, CurrentFile));
+                return OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, Literal.CreateAnonymous(literal.Value.Length + 1, literal.Position, literal.File), literal.Value.Length + 1)));
             case LiteralType.Char:
                 if (expectedType is not null)
                 {
@@ -2332,7 +2413,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 if (GetLiteralType(literal.Type, out literalType))
                 { return literalType; }
 
-                AnalysisCollection?.Warnings.Add(new Warning($"No type defined for character literals, using the default u16", literal, CurrentFile));
+                Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"No type defined for character literals, using the default u16", literal, CurrentFile));
                 return OnGotStatementType(literal, BuiltinType.Char);
             default:
                 throw new UnreachableException($"Unknown literal type {literal.Type}");
@@ -2340,7 +2421,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     }
     protected GeneralType FindStatementType(Identifier identifier, GeneralType? expectedType = null)
     {
-        if (GetConstant(identifier.Content, identifier.File, out IConstant? constant, out WillBeCompilerException? constantNotFoundError))
+        if (GetConstant(identifier.Content, identifier.File, out IConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
             identifier.Reference = constant;
             identifier.Token.AnalyzedType = TokenAnalyzedType.ConstantName;
@@ -2384,7 +2465,9 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         if (FindType(identifier.Token, identifier.File, out GeneralType? result))
         { return OnGotStatementType(identifier, result); }
 
-        throw new CompilerException($"Symbol \"{identifier.Content}\" not found", identifier, CurrentFile);
+        Diagnostics?.Add(Diagnostic.Critical($"Symbol \"{identifier.Content}\" not found", identifier, CurrentFile));
+        Diagnostics?.Add(constantNotFoundError.InstantiateError(identifier, identifier.File));
+        return BuiltinType.Void;
     }
     protected PointerType FindStatementType(AddressGetter addressGetter)
     {
@@ -2409,13 +2492,14 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         GeneralType type = GeneralType.From(constructorCall.Type, FindType);
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
-        if (GetConstructor(type, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound))
+        if (GetConstructor(type, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructor>? result, out PossibleDiagnostic? notFound))
         {
             constructorCall.Type.SetAnalyzedType(result.Function.Type);
             return OnGotStatementType(constructorCall, result.Function.Type);
         }
 
-        throw notFound.Instantiate(constructorCall.Keyword, CurrentFile);
+        Diagnostics?.Add(notFound.InstantiateError(constructorCall.Keyword, constructorCall.File));
+        return BuiltinType.Void;
     }
     protected GeneralType FindStatementType(Field field)
     {
@@ -2443,10 +2527,11 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 return GeneralType.InsertTypeParameters(definedField.Type, structType.TypeArguments) ?? definedField.Type;
             }
 
-            throw new CompilerException($"Field definition \"{field.Identifier}\" not found in type \"{prevStatementType}\"", field.Identifier, CurrentFile);
+            Diagnostics?.Add(Diagnostic.Critical($"Field definition \"{field.Identifier}\" not found in type \"{prevStatementType}\"", field.Identifier, CurrentFile));
         }
 
-        throw new CompilerException($"Type \"{prevStatementType}\" does not have a field \"{field.Identifier}\"", field, CurrentFile);
+        Diagnostics?.Add(Diagnostic.Critical($"Type \"{prevStatementType}\" does not have a field \"{field.Identifier}\"", field, CurrentFile));
+        return BuiltinType.Void;
     }
     protected GeneralType FindStatementType(BasicTypeCast @as)
     {
@@ -2472,7 +2557,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             return OnGotStatementType(modifiedStatement, FindStatementType(modifiedStatement.Statement, expectedType));
         }
 
-        throw new CompilerException($"Unimplemented modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
+        Diagnostics?.Add(Diagnostic.Critical($"Unimplemented modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile));
+        return OnGotStatementType(modifiedStatement, FindStatementType(modifiedStatement.Statement, expectedType));
     }
 
     [return: NotNullIfNotNull(nameof(statement))]
@@ -2482,27 +2568,31 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     [return: NotNullIfNotNull(nameof(statement))]
     protected GeneralType? FindStatementType(StatementWithValue? statement, GeneralType? expectedType)
     {
-        return statement switch
+        switch (statement)
         {
-            null => null,
-            FunctionCall v => FindStatementType(v),
-            BinaryOperatorCall v => FindStatementType(v, expectedType),
-            UnaryOperatorCall v => FindStatementType(v, expectedType),
-            LiteralStatement v => FindStatementType(v, expectedType),
-            Identifier v => FindStatementType(v, expectedType),
-            AddressGetter v => FindStatementType(v),
-            Pointer v => FindStatementType(v),
-            NewInstance v => FindStatementType(v),
-            ConstructorCall v => FindStatementType(v),
-            Field v => FindStatementType(v),
-            BasicTypeCast v => FindStatementType(v),
-            ManagedTypeCast v => FindStatementType(v),
-            KeywordCall v => FindStatementType(v),
-            IndexCall v => FindStatementType(v),
-            ModifiedStatement v => FindStatementType(v, expectedType),
-            AnyCall v => FindStatementType(v),
-            _ => throw new CompilerException($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile)
-        };
+            case null: return null;
+            case FunctionCall v: return FindStatementType(v);
+            case BinaryOperatorCall v: return FindStatementType(v, expectedType);
+            case UnaryOperatorCall v: return FindStatementType(v, expectedType);
+            case LiteralStatement v: return FindStatementType(v, expectedType);
+            case Identifier v: return FindStatementType(v, expectedType);
+            case AddressGetter v: return FindStatementType(v);
+            case Pointer v: return FindStatementType(v);
+            case NewInstance v: return FindStatementType(v);
+            case ConstructorCall v: return FindStatementType(v);
+            case Field v: return FindStatementType(v);
+            case BasicTypeCast v: return FindStatementType(v);
+            case ManagedTypeCast v: return FindStatementType(v);
+            case KeywordCall v: return FindStatementType(v);
+            case IndexCall v: return FindStatementType(v);
+            case ModifiedStatement v: return FindStatementType(v, expectedType);
+            case AnyCall v: return FindStatementType(v);
+            default:
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile));
+                return BuiltinType.Void;
+            }
+        }
     }
 
     protected ImmutableArray<GeneralType> FindStatementTypes(ImmutableArray<StatementWithValue> statements)
@@ -2586,7 +2676,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 keywordCall.Identifier.Equals(StatementKeywords.Return))
             { break; }
         }
-        inlined = new Block(statements.ToArray(), block.Brackets)
+        inlined = new Block(statements.ToArray(), block.Brackets, block.File)
         {
             Semicolon = block.Semicolon,
         };
@@ -2619,7 +2709,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     static KeywordCall InlineMacro(KeywordCall keywordCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             identifier: keywordCall.Identifier,
-            arguments: InlineMacro(keywordCall.Arguments, parameters))
+            arguments: InlineMacro(keywordCall.Arguments, parameters),
+            file: keywordCall.File)
         {
             SaveValue = keywordCall.SaveValue,
             Semicolon = keywordCall.Semicolon,
@@ -2671,7 +2762,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     static LiteralList InlineMacro(LiteralList literalList, Dictionary<string, StatementWithValue> parameters)
         => new(
             values: literalList.Values.Select(v => InlineMacro(v, parameters)),
-            brackets: literalList.Brackets)
+            brackets: literalList.Brackets,
+            file: literalList.File)
         {
             SaveValue = literalList.SaveValue,
             Semicolon = literalList.Semicolon,
@@ -2784,7 +2876,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             { return false; }
             branches[i] = inlinedBranch;
         }
-        inlined = new IfContainer(branches)
+        inlined = new IfContainer(branches, statement.File)
         { Semicolon = statement.Semicolon, };
         return true;
     }
@@ -2809,7 +2901,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         inlined = new IfBranch(
              keyword: statement.Keyword,
              condition: condition,
-             block: block)
+             block: block,
+             file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2826,9 +2919,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         { return false; }
 
         inlined = new ElseIfBranch(
-             keyword: statement.Keyword,
-              condition: condition,
-              block: block)
+            keyword: statement.Keyword,
+            condition: condition,
+            block: block,
+            file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2844,7 +2938,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         inlined = new ElseBranch(
             keyword: statement.Keyword,
-            block: block)
+            block: block,
+            file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2863,7 +2958,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         inlined = new WhileLoop(
             keyword: statement.Keyword,
             condition: condition,
-            block: block)
+            block: block,
+            file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -2890,7 +2986,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             variableDeclaration: variableDeclaration,
             condition: condition,
             expression: expression,
-            block: block)
+            block: block,
+            file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -3011,7 +3108,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     static Pointer InlineMacro(Pointer statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             operatorToken: statement.Operator,
-            prevStatement: InlineMacro(statement.PrevStatement, parameters))
+            prevStatement: InlineMacro(statement.PrevStatement, parameters),
+            file: statement.File)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
@@ -3020,7 +3118,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     static AddressGetter InlineMacro(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             operatorToken: statement.Operator,
-            prevStatement: InlineMacro(statement.PrevStatement, parameters))
+            prevStatement: InlineMacro(statement.PrevStatement, parameters),
+            file: statement.File)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
@@ -3034,15 +3133,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     }
 
     static LiteralStatement InlineMacro(LiteralStatement statement, Dictionary<string, StatementWithValue> _)
-        => new(
-            type: statement.Type,
-            value: statement.Value,
-            valueToken: statement.ValueToken)
-        {
-            ImaginaryPosition = statement.ImaginaryPosition,
-            SaveValue = statement.SaveValue,
-            Semicolon = statement.Semicolon,
-        };
+        => statement;
 
     static Field InlineMacro(Field statement, Dictionary<string, StatementWithValue> parameters)
         => new(
@@ -3069,7 +3160,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
             keyword: statement.Keyword,
-            type: statement.Type)
+            type: statement.Type,
+            file: statement.File)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
@@ -3080,18 +3172,22 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     static ManagedTypeCast InlineMacro(ManagedTypeCast statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
-            type: statement.Type)
+            type: statement.Type,
+            brackets: statement.Brackets,
+            file: statement.File)
         {
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
 
             CompiledType = statement.CompiledType,
+            SurroundingBracelet = statement.SurroundingBracelet,
         };
 
     static ModifiedStatement InlineMacro(ModifiedStatement modifiedStatement, Dictionary<string, StatementWithValue> parameters)
         => new(
             modifier: modifiedStatement.Modifier,
-            statement: InlineMacro(modifiedStatement.Statement, parameters))
+            statement: InlineMacro(modifiedStatement.Statement, parameters),
+            file: modifiedStatement.File)
         {
             SaveValue = modifiedStatement.SaveValue,
             Semicolon = modifiedStatement.Semicolon,
@@ -3550,7 +3646,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             else
             { paramType = FindStatementType(param); }
 
-            if (!FindSize(paramType, out int size))
+            if (!FindSize(paramType, out int size, out PossibleDiagnostic? findSizeError))
             {
                 value = CompiledValue.Null;
                 return false;
@@ -4173,7 +4269,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         string iteratorVariable = loop.VariableDeclaration.Identifier.Content;
         Dictionary<string, StatementWithValue> _params = new()
         {
-            { iteratorVariable, Literal.CreateAnonymous(new CompiledValue(0), loop.VariableDeclaration) }
+            { iteratorVariable, Literal.CreateAnonymous(new CompiledValue(0), loop.VariableDeclaration, loop.VariableDeclaration.File) }
         };
 
         StatementWithValue condition = loop.Condition;
@@ -4204,20 +4300,24 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         AnyAssignment iteratorExpression = loop.Expression;
 
         CompiledValue iterator;
-        if (iteratorVariable.InitialValue is not null)
+        if (iteratorVariable.InitialValue is null)
         {
-            if (!TryCompute(iteratorVariable.InitialValue, EvaluationContext.Empty, out iterator))
-            { throw new CompilerException($"Failed to compute the iterator initial value (\"{iteratorVariable.InitialValue}\") for loop unrolling", iteratorVariable.InitialValue, CurrentFile); }
-        }
-        else
-        {
+            // FIXME: unitialized variable is undefined behavior
             GeneralType iteratorType = GeneralType.From(iteratorVariable.Type, FindType, TryCompute);
             iteratorVariable.Type.SetAnalyzedType(iteratorType);
             iterator = GetInitialValue(iteratorType);
         }
+        else
+        {
+            if (!TryCompute(iteratorVariable.InitialValue, EvaluationContext.Empty, out iterator))
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Failed to compute the iterator initial value (\"{iteratorVariable.InitialValue}\") for loop unrolling", iteratorVariable.InitialValue, CurrentFile));
+                return default;
+            }
+        }
 
         KeyValuePair<string, StatementWithValue> GetIteratorStatement()
-            => new(iteratorVariable.Identifier.Content, Literal.CreateAnonymous(iterator, Position.UnknownPosition));
+            => new(iteratorVariable.Identifier.Content, Literal.CreateAnonymous(iterator, Position.UnknownPosition, null));
 
         CompiledValue ComputeIterator()
         {
@@ -4228,7 +4328,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             });
 
             if (!TryCompute(_condition, new EvaluationContext(values, null), out CompiledValue result))
-            { throw new CompilerException($"Failed to compute the condition value (\"{_condition}\") for loop unrolling", condition, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Failed to compute the condition value (\"{_condition}\") for loop unrolling", condition, CurrentFile));
+                return default;
+            }
 
             return result;
         }
@@ -4239,7 +4342,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             Assignment assignment = iteratorExpression.ToAssignment();
 
             if (assignment.Left is not Identifier leftIdentifier)
-            { throw new CompilerException($"Failed to unroll for loop", assignment.Left, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Failed to unroll for loop", assignment.Left, CurrentFile));
+                return default;
+            }
 
             StatementWithValue _value = InlineMacro(assignment.Right, new Dictionary<string, StatementWithValue>()
             {
@@ -4247,7 +4353,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             });
 
             if (!TryCompute(_value, new EvaluationContext(values, null), out CompiledValue result))
-            { throw new CompilerException($"Failed to compute the condition value (\"{_value}\") for loop unrolling", condition, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Failed to compute the condition value (\"{_value}\") for loop unrolling", condition, CurrentFile));
+                return default;
+            }
 
             return result;
         }
@@ -4263,7 +4372,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             };
 
             if (!InlineMacro(loop.Block, parameters, out Block? subBlock))
-            { throw new CompilerException($"Failed to inline", loop.Block, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Failed to inline", loop.Block, CurrentFile));
+                return default;
+            }
 
             statements.Add(subBlock);
 
@@ -4277,51 +4389,64 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     #region Find Size
 
-    protected bool FindSize(GeneralType type, out int size) => type switch
+    protected bool FindSize(GeneralType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => type switch
     {
-        PointerType v => FindSize(v, out size),
-        ArrayType v => FindSize(v, out size),
-        FunctionType v => FindSize(v, out size),
-        StructType v => FindSize(v, out size),
-        GenericType v => FindSize(v, out size),
-        BuiltinType v => FindSize(v, out size),
-        AliasType v => FindSize(v, out size),
+        PointerType v => FindSize(v, out size, out error),
+        ArrayType v => FindSize(v, out size, out error),
+        FunctionType v => FindSize(v, out size, out error),
+        StructType v => FindSize(v, out size, out error),
+        GenericType v => FindSize(v, out size, out error),
+        BuiltinType v => FindSize(v, out size, out error),
+        AliasType v => FindSize(v, out size, out error),
         _ => throw new NotImplementedException(),
     };
 
-    protected abstract bool FindSize(PointerType type, out int size);
+    protected abstract bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error);
 
-    protected virtual bool FindSize(ArrayType type, out int size)
+    protected virtual bool FindSize(ArrayType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = default;
 
-        if (type.Length is null) return false;
-        if (!FindSize(type.Of, out int elementSize)) return false;
-        if (!TryCompute(type.Length, out CompiledValue sizeValue)) return false;
+        if (type.Length is null)
+        {
+            error = new PossibleDiagnostic($"Array type doesn't have a size");
+            return false;
+        }
+
+        if (!FindSize(type.Of, out int elementSize, out error)) return false;
+
+        if (!TryCompute(type.Length, out CompiledValue sizeValue))
+        {
+            error = new PossibleDiagnostic($"Can't compute the array type's length");
+            return false;
+        }
 
         size = elementSize * (int)sizeValue;
+        error = null;
         return true;
     }
 
-    protected abstract bool FindSize(FunctionType type, out int size);
+    protected abstract bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error);
 
-    protected virtual bool FindSize(StructType type, out int size)
+    protected virtual bool FindSize(StructType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = 0;
 
         foreach (CompiledField field in type.Struct.Fields)
         {
-            GeneralType fieldType = type.ReplaceType(field.Type);
-            if (!FindSize(fieldType, out int fieldSize)) return false;
+            GeneralType fieldType = type.ReplaceType(field.Type, out error);
+            if (error is not null) return false;
+            if (!FindSize(fieldType, out int fieldSize, out error)) return false;
             size += fieldSize;
         }
 
+        error = null;
         return true;
     }
 
-    protected virtual bool FindSize(GenericType type, out int size) => throw new InvalidOperationException($"Generic type doesn't have a size");
+    protected virtual bool FindSize(GenericType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => throw new InvalidOperationException($"Generic type doesn't have a size");
 
-    protected virtual bool FindSize(BuiltinType type, out int size)
+    protected virtual bool FindSize(BuiltinType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = type.Type switch
         {
@@ -4336,10 +4461,11 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             BasicType.F32 => 4,
             _ => throw new UnreachableException(),
         };
+        error = null;
         return true;
     }
 
-    protected virtual bool FindSize(AliasType type, out int size) => FindSize(type.Value, out size);
+    protected virtual bool FindSize(AliasType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => FindSize(type.Value, out size, out error);
 
     #endregion
 }

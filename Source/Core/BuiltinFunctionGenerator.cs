@@ -352,7 +352,7 @@ public readonly struct ExternalFunctionAsync : IExternalFunction
 [SuppressMessage("Style", "IDE0059:Unnecessary assignment of a value")]
 public static unsafe class ExternalFunctionGenerator
 {
-    public static bool TryGet(this IReadOnlyList<IExternalFunction> externalFunctions, string name, [NotNullWhen(true)] out IExternalFunction? result, [NotNullWhen(false)] out WillBeCompilerException? exception)
+    public static bool TryGet(this IReadOnlyList<IExternalFunction> externalFunctions, string name, [NotNullWhen(true)] out IExternalFunction? result, [NotNullWhen(false)] out PossibleDiagnostic? exception)
     {
         result = null;
         exception = null;
@@ -363,7 +363,7 @@ public static unsafe class ExternalFunctionGenerator
             {
                 if (result is not null)
                 {
-                    exception = new WillBeCompilerException($"External function with name \"{name}\" not found: duplicated function names");
+                    exception = new PossibleDiagnostic($"External function with name \"{name}\" not found: duplicated function names");
                     return false;
                 }
 
@@ -373,7 +373,7 @@ public static unsafe class ExternalFunctionGenerator
 
         if (result is null)
         {
-            exception = new WillBeCompilerException($"External function with name \"{name}\" not found");
+            exception = new PossibleDiagnostic($"External function with name \"{name}\" not found");
             return false;
         }
 

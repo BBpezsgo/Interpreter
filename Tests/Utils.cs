@@ -315,14 +315,14 @@ public static class Utils
 
         externalFunctionAdder?.Invoke(externalFunctions);
 
-        AnalysisCollection analysisCollection = new();
+        Diagnostics diagnostics = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null, AdditionalImports);
-        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
-        compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, analysisCollection, null, null, AdditionalImports);
-        BBLangGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings) { DontOptimize = true }, null, analysisCollection);
+        CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, diagnostics, null, null, AdditionalImports);
+        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
+        compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, diagnostics, null, null, AdditionalImports);
+        BBLangGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings) { DontOptimize = true }, null, diagnostics);
 
-        analysisCollection.Throw();
+        diagnostics.Throw();
 
         (BytecodeProcessorEx, MainResult) Execute(BBLangGeneratorResult code, string input)
         {
@@ -380,16 +380,16 @@ public static class Utils
         void OutputCallback(byte data) => stdOutput.Append(LanguageCore.Brainfuck.CharCode.GetChar(data));
         byte InputCallback() => LanguageCore.Brainfuck.CharCode.GetByte(inputBuffer.Read());
 
-        AnalysisCollection analysisCollection = new();
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection, null, null, AdditionalImports);
-        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, analysisCollection);
-        analysisCollection.Throw();
+        Diagnostics diagnostics = new();
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, diagnostics, null, null, AdditionalImports);
+        LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, diagnostics);
+        diagnostics.Throw();
 
-        analysisCollection = new AnalysisCollection();
-        CompilerResult compiledUnoptimized = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, analysisCollection, null, null, AdditionalImports);
+        diagnostics = new Diagnostics();
+        CompilerResult compiledUnoptimized = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, diagnostics, null, null, AdditionalImports);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generatedUnoptimized = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiledUnoptimized, new LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings(BrainfuckGeneratorSettings)
-        { DontOptimize = true }, null, analysisCollection);
-        analysisCollection.Throw();
+        { DontOptimize = true }, null, diagnostics);
+        diagnostics.Throw();
 
         {
             inputBuffer = new(input);
@@ -432,11 +432,11 @@ public static class Utils
 
     public static AssemblyResult RunAssembly(Uri file, string input)
     {
-        AnalysisCollection analysisCollection = new();
+        Diagnostics diagnostics = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, Enumerable.Empty<string>(), null, analysisCollection, null, null, AdditionalImports);
-        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, analysisCollection);
-        analysisCollection.Throw();
+        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, Enumerable.Empty<string>(), null, diagnostics, null, null, AdditionalImports);
+        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
+        diagnostics.Throw();
 
         string asm = LanguageCore.ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, BitWidth._32);
 

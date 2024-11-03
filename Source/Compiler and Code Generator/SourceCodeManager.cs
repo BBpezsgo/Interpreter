@@ -28,15 +28,15 @@ public readonly struct CollectedAST
 public class SourceCodeManager
 {
     readonly Dictionary<Uri, CollectedAST> AlreadyLoadedCodes;
-    readonly AnalysisCollection? AnalysisCollection;
+    readonly Diagnostics? Diagnostics;
     readonly PrintCallback? Print;
     readonly IEnumerable<string> PreprocessorVariables;
     readonly FileParser? FileParser;
 
-    public SourceCodeManager(AnalysisCollection? analysisCollection, PrintCallback? printCallback, IEnumerable<string> preprocessorVariables, FileParser? fileParser)
+    public SourceCodeManager(Diagnostics? diagnostics, PrintCallback? printCallback, IEnumerable<string> preprocessorVariables, FileParser? fileParser)
     {
         AlreadyLoadedCodes = new Dictionary<Uri, CollectedAST>();
-        AnalysisCollection = analysisCollection;
+        Diagnostics = diagnostics;
         Print = printCallback;
         PreprocessorVariables = preprocessorVariables;
         FileParser = fileParser;
@@ -84,11 +84,11 @@ public class SourceCodeManager
             tokens = StreamTokenizer.Tokenize(res.Content.ReadAsStream(), PreprocessorVariables, uri, tokenizerSettings);
         }
 
-        AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
+        Diagnostics?.AddRange(tokens.Diagnostics);
 
         ast = Parser.Parser.Parse(tokens.Tokens, uri);
 
-        AnalysisCollection?.Errors.AddRange(ast.Errors);
+        Diagnostics?.AddRange(ast.Errors);
 
         return true;
     }
@@ -110,10 +110,10 @@ public class SourceCodeManager
         Print?.Invoke($"  Load local file \"{path}\" ...", LogType.Debug);
 
         TokenizerResult tokens = StreamTokenizer.Tokenize(path, PreprocessorVariables, tokenizerSettings);
-        AnalysisCollection?.Warnings.AddRange(tokens.Warnings);
+        Diagnostics?.AddRange(tokens.Diagnostics);
 
         ast = Parser.Parser.Parse(tokens.Tokens, Utils.ToFileUri(path));
-        AnalysisCollection?.Errors.AddRange(ast.Errors);
+        Diagnostics?.AddRange(ast.Errors);
 
         return true;
     }
@@ -236,7 +236,7 @@ public class SourceCodeManager
     {
         if (!FromAnywhere(@using, GetSearches(@using.PathString, parent, basePath), tokenizerSettings, out ParserResult? ast, out Uri? path))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"File \"{@using.PathString}\" not found", new Position(@using.Path.As<IPositioned>().Or(@using)), parent));
+            Diagnostics?.Add(Diagnostic.Error($"File \"{@using.PathString}\" not found", new Position(@using.Path.As<IPositioned>().Or(@using)), parent));
             return new Dictionary<Uri, CollectedAST>();
         }
 
@@ -260,7 +260,7 @@ public class SourceCodeManager
     {
         if (!FromAnywhere(null, GetSearches(file, parent, basePath), tokenizerSettings, out ParserResult? ast, out Uri? uri))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"File \"{@file}\" not found", Position.UnknownPosition, null));
+            Diagnostics?.Add(LanguageCore.Diagnostic.Error($"File \"{file}\" not found", Position.UnknownPosition, null));
             return new Dictionary<Uri, CollectedAST>();
         }
 
@@ -303,7 +303,7 @@ public class SourceCodeManager
             { collectedASTs.AddRange(ProcessAdditionalImport(additionalImport, file, basePath, tokenizerSettings)); }
         }
 
-        AnalysisCollection?.Throw();
+        Diagnostics?.Throw();
 
         return collectedASTs.ToImmutableDictionary();
     }
@@ -312,13 +312,13 @@ public class SourceCodeManager
         Uri file,
         PrintCallback? printCallback,
         string? basePath,
-        AnalysisCollection? analysisCollection,
+        Diagnostics? diagnostics,
         IEnumerable<string> preprocessorVariables,
         TokenizerSettings? tokenizerSettings,
         FileParser? fileParser,
         IEnumerable<string>? additionalImports)
     {
-        SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables, fileParser);
+        SourceCodeManager sourceCodeManager = new(diagnostics, printCallback, preprocessorVariables, fileParser);
         return sourceCodeManager.Entry(file, basePath, tokenizerSettings, additionalImports);
     }
 
@@ -327,12 +327,12 @@ public class SourceCodeManager
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,
         string? basePath,
-        AnalysisCollection? analysisCollection,
+        Diagnostics? diagnostics,
         TokenizerSettings? tokenizerSettings,
         FileParser? fileParser,
         IEnumerable<string>? additionalImports)
     {
-        SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback, preprocessorVariables, fileParser);
+        SourceCodeManager sourceCodeManager = new(diagnostics, printCallback, preprocessorVariables, fileParser);
         return sourceCodeManager.Entry(new Uri(file.FullName, UriKind.Absolute), basePath, tokenizerSettings, additionalImports);
     }
 }

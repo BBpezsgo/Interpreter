@@ -21,7 +21,9 @@ public class StructType : GeneralType,
         {
             result.Add(field, offset);
             GeneralType fieldType = field.Type;
-            fieldType = ReplaceType(fieldType);
+            fieldType = ReplaceType(fieldType, out PossibleDiagnostic? error);
+            if (error is not null)
+            { error.InstantiateError(null, null).Throw(); }
             offset += fieldType.GetSize(runtime);
         }
 
@@ -31,7 +33,7 @@ public class StructType : GeneralType,
     CompiledStruct? IReferenceableTo<CompiledStruct>.Reference
     {
         get => Struct;
-        set => throw null!;
+        set => throw new InvalidOperationException();
     }
 
     StructType(CompiledStruct @struct, Uri file, IEnumerable<KeyValuePair<string, GeneralType>> typeArguments)
@@ -88,7 +90,9 @@ public class StructType : GeneralType,
         foreach (CompiledField field in Struct.Fields)
         {
             GeneralType fieldType = field.Type;
-            fieldType = ReplaceType(fieldType);
+            fieldType = ReplaceType(fieldType, out PossibleDiagnostic? error);
+            if (error is not null)
+            { error.InstantiateError(null, null).Throw(); }
             size += fieldType.GetSize(runtime);
         }
         return size;
@@ -111,7 +115,9 @@ public class StructType : GeneralType,
             }
 
             GeneralType fieldType = _field.Type;
-            fieldType = ReplaceType(fieldType);
+            fieldType = ReplaceType(fieldType, out PossibleDiagnostic? error);
+            if (error is not null)
+            { error.InstantiateError(null, null).Throw(); }
 
             offset += fieldType.GetSize(runtime);
         }
@@ -134,13 +140,18 @@ public class StructType : GeneralType,
         return false;
     }
 
-    public GeneralType ReplaceType(GeneralType type)
+    public GeneralType ReplaceType(GeneralType type, out PossibleDiagnostic? error)
     {
+        error = null;
+
         if (!type.Is(out GenericType? genericType))
         { return type; }
 
         if (!TypeArguments.TryGetValue(genericType.Identifier, out GeneralType? result))
-        { throw new CompilerException($"Type argument \"{genericType.Identifier}\" not found", null, null); }
+        {
+            error = new PossibleDiagnostic($"Type argument \"{genericType.Identifier}\" not found");
+            return type;
+        }
 
         return result;
     }

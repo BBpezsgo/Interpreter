@@ -84,7 +84,7 @@ public abstract partial class Tokenizer
                 }
 
                 if (token.TokenType == TokenType.PreprocessIdentifier)
-                { return new PreprocessorTag(token, argument); }
+                { return new PreprocessorTag(token, argument, File); }
 
                 break;
             }

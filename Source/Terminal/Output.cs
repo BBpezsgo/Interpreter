@@ -5,7 +5,7 @@ public delegate void PrintCallback(string message, LogType logType);
 [ExcludeFromCodeCoverage]
 public static class Output
 {
-    public static bool LogDebugs { get; set;} = false;
+    public static bool LogDebugs { get; set; } = false;
     public static bool LogInfos { get; set; } = false;
     public static bool LogWarnings { get; set; } = false;
 
@@ -36,7 +36,7 @@ public static class Output
     public static void LogInfo(string message)
     { if (LogInfos) Log(message, InfoColor); }
 
-    public static void LogInfo(Information information)
+    public static void LogInfo(Diagnostic information)
     {
         if (!LogInfos) return;
 
@@ -44,19 +44,6 @@ public static class Output
         Console.WriteLine(information.ToString());
 
         string? arrows = information.GetArrows();
-        if (arrows != null)
-        { Console.WriteLine(arrows); }
-        Console.ResetColor();
-    }
-
-    public static void LogInfo(Hint hint)
-    {
-        if (!LogInfos) return;
-
-        Console.ForegroundColor = InfoColor;
-        Console.WriteLine(hint.ToString());
-
-        string? arrows = hint.GetArrows();
         if (arrows != null)
         { Console.WriteLine(arrows); }
         Console.ResetColor();
@@ -76,7 +63,7 @@ public static class Output
         Console.ResetColor();
     }
 
-    public static void LogError(LanguageError error)
+    public static void LogError(Diagnostic error)
     {
         Console.ForegroundColor = ErrorColor;
         Console.WriteLine(error.ToString());
@@ -97,7 +84,7 @@ public static class Output
     public static void LogWarning(string message)
     { if (LogWarnings) Log(message, WarningColor); }
 
-    public static void LogWarning(Warning warning)
+    public static void LogWarning(Diagnostic warning)
     {
         if (!LogWarnings) return;
 

@@ -11,7 +11,7 @@ using LiteralStatement = LanguageCore.Parser.Statement.Literal;
 
 namespace LanguageCore.BBLang.Generator;
 
-public record struct ParameterCleanupItem(int Size, bool CanDeallocate, GeneralType Type, Position Position) { }
+public record struct ParameterCleanupItem(int Size, bool CanDeallocate, GeneralType Type, Position Position, Uri File) { }
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
@@ -62,19 +62,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(size);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, parameters, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? error, AddCompilable))
-        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found: {error}", size, CurrentFile); }
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, parameters, size.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? error, AddCompilable))
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found: {error}", size, size.File));
+            return;
+        }
 
         CompiledFunction? allocator = result.Function;
 
         if (!allocator.ReturnSomething)
-        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size, CurrentFile); }
-
-        allocator.References.Add(size, CurrentFile);
-
-        if (!allocator.CanUse(CurrentFile))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", size, CurrentFile));
+            Diagnostics?.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size, size.File));
+            return;
+        }
+
+        allocator.References.AddReference(size, size.File);
+
+        if (!allocator.CanUse(size.File))
+        {
+            Diagnostics?.Add(Diagnostic.Error($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", size, size.File));
             return;
         }
 
@@ -88,9 +94,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (allocator.IsExternal)
         {
-            if (!ExternalFunctions.TryGet(allocator.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
+            if (!ExternalFunctions.TryGet(allocator.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
             {
-                AnalysisCollection?.Errors.Add(exception.InstantiateError(size, CurrentFile));
+                Diagnostics?.Add(exception.InstantiateError(allocator, allocator.File));
                 AddComment("}");
                 return;
             }
@@ -117,7 +123,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(allocator.InstructionOffset);
 
         if (allocator.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, size, allocator, CurrentFile)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, size, allocator, size.File)); }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -128,15 +134,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameters, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
-        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, CurrentFile); }
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameters, value.File, out FunctionQueryResult<CompiledFunction>? result, out _, AddCompilable))
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, value.File));
+            return;
+        }
         CompiledFunction? deallocator = result.Function;
 
-        deallocator.References.Add(new Reference<StatementWithValue?>(value, CurrentFile));
+        deallocator.References.Add(new Reference<StatementWithValue?>(value, value.File));
 
-        if (!deallocator.CanUse(CurrentFile))
+        if (!deallocator.CanUse(value.File))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", value, CurrentFile));
+            Diagnostics?.Add(LanguageCore.Diagnostic.Error($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", value, value.File));
             return;
         }
 
@@ -150,9 +159,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (deallocator.IsExternal)
         {
-            if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
+            if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
             {
-                AnalysisCollection?.Errors.Add(exception.InstantiateError(value, CurrentFile));
+                Diagnostics?.Add(exception.InstantiateError(deallocator, deallocator.File));
                 AddComment("}");
                 return;
             }
@@ -179,7 +188,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(deallocator.InstructionOffset);
 
         if (deallocator.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, value, deallocator, CurrentFile)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, value, deallocator, value.File)); }
 
         if (deallocator.ReturnSomething)
         {
@@ -192,27 +201,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("}");
     }
 
-    void GenerateDeallocator(GeneralType deallocateableType, Position position)
+    void GenerateDeallocator(GeneralType deallocateableType, Position position, Uri file)
     {
         ImmutableArray<GeneralType> parameterTypes = ImmutableArray.Create(deallocateableType);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, CurrentFile, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFoundError, AddCompilable))
-        { throw new CompilerException($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found ({notFoundError.Message})", position, CurrentFile); }
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, file, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFoundError, AddCompilable))
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found ({notFoundError.Message})", position, file));
+            return;
+        }
         CompiledFunction? deallocator = result.Function;
 
         deallocator.References.Add(new Reference<StatementWithValue?>(null));
 
-        if (!deallocator.CanUse(CurrentFile))
+        if (!deallocator.CanUse(file))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", position, CurrentFile));
+            Diagnostics?.Add(LanguageCore.Diagnostic.Error($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", position, file));
             return;
         }
 
         if (deallocator.IsExternal)
         {
-            if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out _, out WillBeCompilerException? exception))
+            if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out _, out PossibleDiagnostic? exception))
             {
-                AnalysisCollection?.Errors.Add(exception.InstantiateError(position, CurrentFile));
+                Diagnostics?.Add(exception.InstantiateError(deallocator, deallocator.File));
                 AddComment("}");
                 return;
             }
@@ -225,14 +237,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (deallocator.ReturnSomething)
         { throw new NotImplementedException(); }
 
-        Stack<ParameterCleanupItem> parameterCleanup = new() { new(deallocateableType.GetSize(this), false, deallocateableType, position) };
+        Stack<ParameterCleanupItem> parameterCleanup = new() { new(deallocateableType.GetSize(this), false, deallocateableType, position, file) };
 
         AddComment(" .:");
 
         int jumpInstruction = Call(deallocator.InstructionOffset);
 
         if (deallocator.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, position, deallocator, CurrentFile)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, position, deallocator, file)); }
 
         if (deallocator.ReturnSomething)
         {
@@ -248,23 +260,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("}");
     }
 
-    void GenerateDestructor(GeneralType deallocateableType, Position position)
+    void GenerateDestructor(GeneralType deallocateableType, Position position, Uri file)
     {
         ImmutableArray<GeneralType> argumentTypes = ImmutableArray.Create<GeneralType>(deallocateableType);
         FunctionQueryResult<CompiledGeneralFunction>? result;
 
         if (deallocateableType.Is(out PointerType? deallocateablePointerType))
         {
-            if (!GetGeneralFunction(deallocateablePointerType.To, argumentTypes, BuiltinFunctionIdentifiers.Destructor, CurrentFile, out result, out WillBeCompilerException? error, AddCompilable))
+            if (!GetGeneralFunction(deallocateablePointerType.To, argumentTypes, BuiltinFunctionIdentifiers.Destructor, file, out result, out PossibleDiagnostic? error, AddCompilable))
             {
                 AddComment($"Pointer value should be already there");
-                GenerateDeallocator(deallocateableType, position);
+                GenerateDeallocator(deallocateableType, position, file);
                 AddComment("}");
 
                 if (!deallocateablePointerType.To.Is<BuiltinType>())
                 {
-                    AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deallocateableType}\" not found", position, CurrentFile));
-                    AnalysisCollection?.Warnings.Add(error.InstantiateWarning(position, CurrentFile));
+                    Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"Destructor for type \"{deallocateableType}\" not found", position, file));
+                    Diagnostics?.Add(error.InstantiateWarning(position, file));
                 }
 
                 return;
@@ -272,10 +284,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            if (!GetGeneralFunction(deallocateableType, argumentTypes, BuiltinFunctionIdentifiers.Destructor, CurrentFile, out result, out WillBeCompilerException? error, AddCompilable))
+            if (!GetGeneralFunction(deallocateableType, argumentTypes, BuiltinFunctionIdentifiers.Destructor, file, out result, out PossibleDiagnostic? error, AddCompilable))
             {
-                AnalysisCollection?.Warnings.Add(new Warning($"Destructor for type \"{deallocateableType}\" not found", position, CurrentFile));
-                AnalysisCollection?.Warnings.Add(error.InstantiateWarning(position, CurrentFile));
+                Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"Destructor for type \"{deallocateableType}\" not found", position, file));
+                Diagnostics?.Add(error.InstantiateWarning(position, file));
                 return;
             }
         }
@@ -284,9 +296,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         destructor.References.Add(new Reference<Statement?>(null));
 
-        if (!destructor.CanUse(CurrentFile))
+        if (!destructor.CanUse(file))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"Destructor for type \"{deallocateableType}\" function cannot be called due to its protection level", position, CurrentFile));
+            Diagnostics?.Add(LanguageCore.Diagnostic.Error($"Destructor for type \"{deallocateableType}\" function cannot be called due to its protection level", position, file));
             AddComment("}");
             return;
         }
@@ -298,13 +310,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(destructor.InstructionOffset);
 
         if (destructor.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, position, destructor, CurrentFile)); }
+        { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, position, destructor, file)); }
 
         AddComment(" Clear Param0:");
 
         if (deallocateableType.Is<PointerType>())
         {
-            GenerateDeallocator(deallocateableType, position);
+            GenerateDeallocator(deallocateableType, position, file);
         }
         else
         {
@@ -316,15 +328,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Find Size
 
-    protected override bool FindSize(PointerType type, out int size)
+    protected override bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = PointerSize;
+        error = null;
         return true;
     }
 
-    protected override bool FindSize(FunctionType type, out int size)
+    protected override bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = PointerSize;
+        error = null;
         return true;
     }
 
@@ -353,22 +367,36 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateSize(ArrayType type, Register result)
     {
-        if (FindSize(type, out int size))
+        if (FindSize(type, out int size, out _))
         {
             AddInstruction(Opcode.MathAdd, result, size);
             return;
         }
+
         if (type.Length is null)
-        { throw new CompilerException($"Array type doesn't have a size", null, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Array type doesn't have a size", null, CurrentFile));
+            return;
+        }
 
         GeneralType lengthType = FindStatementType(type.Length);
         if (!lengthType.Is<BuiltinType>())
-        { throw new CompilerException($"Array length must be a builtin type and not {lengthType}", type.Length, CurrentFile); }
-        if (lengthType.GetBitWidth(this) != BitWidth._32)
-        { throw new CompilerException($"Array length must be a 32 bit integer and not {lengthType}", type.Length, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Array length must be a builtin type and not {lengthType}", type.Length, type.Length.File));
+            return;
+        }
 
-        if (!FindSize(type.Of, out int elementSize))
-        { throw new NotImplementedException(); }
+        if (lengthType.GetBitWidth(this) != BitWidth._32)
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Array length must be a 32 bit integer and not {lengthType}", type.Length, type.Length.File));
+            return;
+        }
+
+        if (!FindSize(type.Of, out int elementSize, out PossibleDiagnostic? findSizeError))
+        {
+            Diagnostics?.Add(findSizeError.InstantiateError(null, CurrentFile));
+            return;
+        }
 
         GenerateCodeForStatement(type.Length);
         using (RegisterUsage.Auto lengthRegister = Registers.GetFree())
@@ -384,15 +412,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateSize(StructType type, Register result)
     {
-        if (!FindSize(type, out int size))
-        { throw new NotImplementedException(); }
+        if (!FindSize(type, out int size, out PossibleDiagnostic? findSizeError))
+        { Diagnostics?.Add(findSizeError.InstantiateError(null, CurrentFile)); }
         AddInstruction(Opcode.MathAdd, result, size);
     }
     void GenerateSize(GenericType type, Register result) => throw new InvalidOperationException($"Generic type doesn't have a size");
     void GenerateSize(BuiltinType type, Register result)
     {
-        if (!FindSize(type, out int size))
-        { throw new NotImplementedException(); }
+        if (!FindSize(type, out int size, out PossibleDiagnostic? findSizeError))
+        { Diagnostics?.Add(findSizeError.InstantiateError(null, CurrentFile)); }
         AddInstruction(Opcode.MathAdd, result, size);
     }
     void GenerateSize(AliasType type, Register result) => GenerateSize(type.Value, result);
@@ -408,7 +436,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
         if (GetConstant(newVariable.Identifier.Content, newVariable.File, out _, out _))
-        { throw new CompilerException($"Symbol name \"{newVariable.Identifier}\" conflicts with an another symbol name", newVariable.Identifier, newVariable.File); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Symbol name \"{newVariable.Identifier}\" conflicts with an another symbol name", newVariable.Identifier, newVariable.File));
+            return;
+        }
 
         if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable))
         { throw new InternalException($"Variable \"{newVariable.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.Identifier, newVariable.File); }
@@ -422,7 +453,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment($"New Variable \"{newVariable.Identifier.Content}\" {{");
 
         if (GetConstant(newVariable.Identifier.Content, newVariable.File, out _, out _))
-        { throw new CompilerException($"Can not set constant value: it is readonly", newVariable, newVariable.File); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Can not set constant value: it is readonly", newVariable, newVariable.File));
+            return;
+        }
 
         Identifier variableIdentifier = new(newVariable.Identifier, newVariable.File);
         if (newVariable.InitialValue is LiteralList literalList)
@@ -430,7 +464,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             for (int i = 0; i < literalList.Values.Length; i++)
             {
                 StatementWithValue value = literalList.Values[i];
-                GenerateCodeForValueSetter(new IndexCall(variableIdentifier, LiteralStatement.CreateAnonymous(i, variableIdentifier.Position.After()), TokenPair.CreateAnonymous(variableIdentifier.Position.After(), "[", "]"), variableIdentifier.File), value);
+                GenerateCodeForValueSetter(new IndexCall(variableIdentifier, LiteralStatement.CreateAnonymous(i, variableIdentifier.Position.After(), variableIdentifier.File), TokenPair.CreateAnonymous(variableIdentifier.Position.After(), "[", "]"), variableIdentifier.File), value);
             }
             AddComment("}");
             return;
@@ -446,10 +480,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (keywordCall.Identifier.Content == StatementKeywords.Return)
         {
             if (keywordCall.Arguments.Length > 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {keywordCall.Arguments.Length}", keywordCall, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {keywordCall.Arguments.Length}", keywordCall, keywordCall.File));
+                return;
+            }
 
             if (!CanReturn)
-            { throw new CompilerException($"Can't return for some reason", keywordCall.Identifier, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Can't return for some reason", keywordCall.Identifier, keywordCall.File));
+                return;
+            }
 
             if (keywordCall.Arguments.Length == 1)
             {
@@ -493,7 +533,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (keywordCall.Identifier.Content == StatementKeywords.Crash)
         {
             if (keywordCall.Arguments.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Crash}\": required {1} passed {keywordCall.Arguments}", keywordCall, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{StatementKeywords.Crash}\": required {1} passed {keywordCall.Arguments}", keywordCall, keywordCall.File));
+                return;
+            }
 
             AddComment(" Param 0:");
 
@@ -513,7 +556,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (keywordCall.Identifier.Content == StatementKeywords.Break)
         {
             if (BreakInstructions.Count == 0)
-            { throw new CompilerException($"The keyword \"{StatementKeywords.Break}\" does not available in the current context", keywordCall.Identifier, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"The keyword \"{StatementKeywords.Break}\" does not available in the current context", keywordCall.Identifier, keywordCall.File));
+                return;
+            }
 
             BreakInstructions.Last.Add(GeneratedCode.Count);
             AddInstruction(Opcode.Jump, 0);
@@ -526,17 +572,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (keywordCall.Identifier.Content == StatementKeywords.Delete)
         {
             if (keywordCall.Arguments.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{StatementKeywords.Delete}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{StatementKeywords.Delete}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall, keywordCall.File));
+                return;
+            }
 
             GenerateCodeForStatement(keywordCall.Arguments[0]);
 
             GeneralType deletableType = FindStatementType(keywordCall.Arguments[0]);
-            GenerateDestructor(deletableType, keywordCall.Arguments[0].Position);
+            GenerateDestructor(deletableType, keywordCall.Arguments[0].Position, keywordCall.Arguments[0].File);
 
             return;
         }
 
-        throw new CompilerException($"Unknown keyword \"{keywordCall.Identifier}\"", keywordCall.Identifier, CurrentFile);
+        Diagnostics?.Add(Diagnostic.Critical($"Unknown keyword \"{keywordCall.Identifier}\"", keywordCall.Identifier, keywordCall.File));
+        return;
     }
 
     Stack<ParameterCleanupItem> GenerateCodeForArguments(IReadOnlyList<StatementWithValue> arguments, ICompiledFunction compiledFunction, int alreadyPassed = 0)
@@ -564,14 +614,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (callerAllowsTemp)
             {
                 if (explicitDeallocate && !calleeAllowsTemp)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", argument, CurrentFile)); }
+                { Diagnostics?.Add(Diagnostic.Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", argument, argument.File)); }
                 if (explicitDeallocate && !typeAllowsTemp)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this type", argument, CurrentFile)); }
+                { Diagnostics?.Add(Diagnostic.Warning($"Can not deallocate this type", argument, argument.File)); }
             }
             else
             {
                 if (explicitDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", argument, CurrentFile)); }
+                { Diagnostics?.Add(Diagnostic.Warning($"Can not deallocate this value", argument, argument.File)); }
             }
 
             if (argument is AddressGetter addressGetter &&
@@ -583,7 +633,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(argument, parameterType);
 
-            argumentCleanup.Push(new ParameterCleanupItem(argumentType.GetSize(this), calleeAllowsTemp && callerAllowsTemp && typeAllowsTemp, argumentType, argument.Position));
+            argumentCleanup.Push(new ParameterCleanupItem(argumentType.GetSize(this), calleeAllowsTemp && callerAllowsTemp && typeAllowsTemp, argumentType, argument.Position, argument.File));
         }
 
         return argumentCleanup;
@@ -608,18 +658,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, CurrentFile)); }
+                { Diagnostics?.Add(Diagnostic.Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passedParameter, passedParameter.File)); }
             }
             else
             {
                 if (explicitDeallocate)
-                { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                { Diagnostics?.Add(Diagnostic.Warning($"Can not deallocate this value", passedParameter, passedParameter.File)); }
                 canDeallocate = false;
             }
 
             GenerateCodeForStatement(passedParameter, definedParameterType);
 
-            parameterCleanup.Push(new ParameterCleanupItem(passedParameterType.GetSize(this), canDeallocate, passedParameterType, passedParameter.Position));
+            parameterCleanup.Push(new ParameterCleanupItem(passedParameterType.GetSize(this), canDeallocate, passedParameterType, passedParameter.Position, passedParameter.File));
         }
 
         return parameterCleanup;
@@ -634,7 +684,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (passedParameter.CanDeallocate)
             {
-                GenerateDestructor(passedParameter.Type, passedParameter.Position);
+                GenerateDestructor(passedParameter.Type, passedParameter.Position, passedParameter.File);
                 continue;
             }
 
@@ -645,7 +695,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForFunctionCall_External<TFunction>(IReadOnlyList<StatementWithValue> parameters, bool saveValue, TFunction compiledFunction, IExternalFunction externalFunction)
         where TFunction : FunctionThingDefinition, ICompiledFunction, ISimpleReadable
     {
-        Compiler.Compiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction);
+        Compiler.Compiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction, Diagnostics);
 
         AddComment($"Call {compiledFunction.ToReadable()} {{");
 
@@ -686,23 +736,26 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
     {
-        compiledFunction.References.Add(new Reference<StatementWithValue?>(functionCall, CurrentFile));
+        compiledFunction.References.Add(new Reference<StatementWithValue?>(functionCall, functionCall.File));
         OnGotStatementType(functionCall, compiledFunction.Type);
 
-        if (!compiledFunction.CanUse(functionCall.File ?? CurrentFile))
+        if (!compiledFunction.CanUse(functionCall.File))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
+            Diagnostics?.Add(LanguageCore.Diagnostic.Error($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, functionCall.File));
             return;
         }
 
         if (functionCall.MethodArguments.Length != compiledFunction.ParameterCount)
-        { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodArguments.Length}", functionCall, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodArguments.Length}", functionCall, functionCall.File));
+            return;
+        }
 
         if (compiledFunction.IsExternal)
         {
-            if (!ExternalFunctions.TryGet(compiledFunction.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
+            if (!ExternalFunctions.TryGet(compiledFunction.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
             {
-                AnalysisCollection?.Errors.Add(exception.InstantiateError(functionCall.Identifier, CurrentFile));
+                Diagnostics?.Add(exception.InstantiateError(functionCall.Identifier, functionCall.File));
                 AddComment("}");
                 return;
             }
@@ -729,7 +782,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(compiledFunction.InstructionOffset);
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, functionCall, compiledFunction, CurrentFile)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, functionCall, compiledFunction, functionCall.File)); }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -750,7 +803,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             _identifier.Token.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (anyCall.Arguments.Length != 1)
-            { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {anyCall.Arguments.Length}", anyCall, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"sizeof\": required {1} passed {anyCall.Arguments.Length}", anyCall, anyCall.File));
+                return;
+            }
 
             StatementWithValue param = anyCall.Arguments[0];
             GeneralType paramType;
@@ -763,7 +819,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             OnGotStatementType(anyCall, BuiltinType.I32);
 
-            if (FindSize(paramType, out int size))
+            if (FindSize(paramType, out int size, out PossibleDiagnostic? findSizeError))
             {
                 Push(size);
                 anyCall.PredictedValue = size;
@@ -779,7 +835,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetFunction(anyCall, out FunctionQueryResult<CompiledFunction>? result, out WillBeCompilerException? notFound, AddCompilable) &&
+        if (GetFunction(anyCall, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFound, AddCompilable) &&
             anyCall.ToFunctionCall(out FunctionCall? functionCall))
         {
             CompiledFunction compiledFunction = result.Function;
@@ -812,9 +868,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!prevType.Is(out FunctionType? functionType))
         {
             if (notFound is not null)
-            { throw notFound.Instantiate(anyCall.PrevStatement, CurrentFile); }
+            {
+                Diagnostics?.Add(notFound.InstantiateError(anyCall.PrevStatement, anyCall.PrevStatement.File));
+            }
+            else
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"This isn't a function", anyCall.PrevStatement, anyCall.PrevStatement.File));
+            }
 
-            throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile);
+            return;
         }
 
         /*
@@ -837,7 +899,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         OnGotStatementType(anyCall, functionType.ReturnType);
 
         if (anyCall.Arguments.Length != functionType.Parameters.Length)
-        { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {anyCall.Arguments.Length}", new Position(anyCall.Arguments.As<IPositioned>().Or(anyCall.Brackets)), CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {anyCall.Arguments.Length}", new Position(anyCall.Arguments.As<IPositioned>().Or(anyCall.Brackets)), anyCall.File));
+            return;
+        }
 
         AddComment($"Call (runtime) {functionType} {{");
 
@@ -875,29 +940,32 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out WillBeCompilerException? notFoundError))
+        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out PossibleDiagnostic? notFoundError))
         {
             CompiledOperator? operatorDefinition = result.Function;
 
-            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, CurrentFile));
+            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File));
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
 
-            if (!operatorDefinition.CanUse(CurrentFile))
+            if (!operatorDefinition.CanUse(@operator.File))
             {
-                AnalysisCollection?.Errors.Add(new LanguageError($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
+                Diagnostics?.Add(Diagnostic.Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, @operator.File));
                 return;
             }
 
             if (BinaryOperatorCall.ParameterCount != operatorDefinition.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {BinaryOperatorCall.ParameterCount}", @operator, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {BinaryOperatorCall.ParameterCount}", @operator, @operator.File));
+                return;
+            }
 
             if (operatorDefinition.IsExternal)
             {
-                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
+                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
                 {
-                    AnalysisCollection?.Errors.Add(exception.InstantiateError(@operator.Operator, CurrentFile));
+                    Diagnostics?.Add(exception.InstantiateError(@operator.Operator, @operator.File));
                     AddComment("}");
                     return;
                 }
@@ -917,7 +985,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             int jumpInstruction = Call(operatorDefinition.InstructionOffset);
 
             if (operatorDefinition.InstructionOffset == InvalidFunctionAddress)
-            { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, CurrentFile)); }
+            { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, @operator.File)); }
 
             GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -943,7 +1011,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 !rightType.TryGetNumericType(out NumericType rightNType))
             {
                 // AnalysisCollection?.Warnings.Add(notFoundError.InstantiateWarning(@operator, @operator.File));
-                throw notFoundError.Instantiate(@operator, @operator.File);
+                Diagnostics?.Add(notFoundError.InstantiateError(@operator, @operator.File));
+                return;
             }
 
             BitWidth leftBitWidth = leftType.GetBitWidth(this);
@@ -1004,7 +1073,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if ((leftNType == NumericType.Float) != (rightNType == NumericType.Float))
             {
-                throw notFoundError.Instantiate(@operator, @operator.File);
+                Diagnostics?.Add(notFoundError.InstantiateError(@operator, @operator.File));
+                return;
             }
 
             bool isFloat = leftType.SameAs(BasicType.F32) || rightType.SameAs(BasicType.F32);
@@ -1132,7 +1202,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForValueSetter(@operator.Left, @operator.Right);
         }
         else
-        { throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
+        }
     }
     void GenerateCodeForStatement(UnaryOperatorCall @operator)
     {
@@ -1145,29 +1217,32 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetOperator(@operator, CurrentFile, out FunctionQueryResult<CompiledOperator>? result, out _))
+        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out _))
         {
             CompiledOperator? operatorDefinition = result.Function;
 
-            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, CurrentFile));
+            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File));
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
 
-            if (!operatorDefinition.CanUse(CurrentFile))
+            if (!operatorDefinition.CanUse(@operator.File))
             {
-                AnalysisCollection?.Errors.Add(new LanguageError($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
+                Diagnostics?.Add(LanguageCore.Diagnostic.Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, @operator.File));
                 return;
             }
 
             if (UnaryOperatorCall.ParameterCount != operatorDefinition.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {UnaryOperatorCall.ParameterCount}", @operator, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {UnaryOperatorCall.ParameterCount}", @operator, @operator.File));
+                return;
+            }
 
             if (operatorDefinition.IsExternal)
             {
-                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out WillBeCompilerException? exception))
+                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
                 {
-                    AnalysisCollection?.Errors.Add(exception.InstantiateError(@operator.Operator, CurrentFile));
+                    Diagnostics?.Add(exception.InstantiateError(@operator.Operator, @operator.File));
                     AddComment("}");
                     return;
                 }
@@ -1187,7 +1262,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             int jumpInstruction = Call(operatorDefinition.InstructionOffset);
 
             if (operatorDefinition.InstructionOffset == InvalidFunctionAddress)
-            { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, CurrentFile)); }
+            { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, @operator.File)); }
 
             GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -1235,11 +1310,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     return;
                 }
-                default: throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile);
+                default:
+                {
+                    Diagnostics?.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
+                    return;
+                }
             }
         }
         else
-        { throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
+        }
     }
     void GenerateCodeForStatement(Assignment setter) => GenerateCodeForValueSetter(setter.Left, setter.Right);
     void GenerateCodeForStatement(LiteralStatement literal, GeneralType? expectedType = null)
@@ -1327,19 +1408,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     pointerType.To.Is(out ArrayType? arrayType) &&
                     arrayType.Of.SameAs(BasicType.U8))
                 {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.U8, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal), literal.Value.Length + 1)));
-                    GenerateCodeForLiteralString(literal.Value, true);
+                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.U8, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal, literal.File), literal.Value.Length + 1)));
+                    GenerateCodeForLiteralString(literal.Value, literal.Position, literal.File, true);
                 }
                 else
                 {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal), literal.Value.Length + 1)));
-                    GenerateCodeForLiteralString(literal.Value, false);
+                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal, literal.File), literal.Value.Length + 1)));
+                    GenerateCodeForLiteralString(literal.Value, literal.Position, literal.File, false);
                 }
                 break;
             }
             case LiteralType.Char:
             {
-                if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, CurrentFile);
+                if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, literal.File);
 
                 if (expectedType is not null)
                 {
@@ -1410,7 +1491,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void GenerateCodeForLiteralString(string literal, bool withBytes)
+    void GenerateCodeForLiteralString(string literal, Position position, Uri file, bool withBytes)
     {
         BuiltinType type = withBytes ? BuiltinType.U8 : BuiltinType.Char;
 
@@ -1418,7 +1499,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Allocate String object {");
 
-        GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Length) * type.GetSize(this), Position.UnknownPosition));
+        GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Length) * type.GetSize(this), position, file));
 
         AddComment("}");
 
@@ -1456,7 +1537,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForStatement(Identifier variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        if (GetConstant(variable.Content, variable.File, out IConstant? constant, out WillBeCompilerException? constantNotFoundError))
+        if (GetConstant(variable.Content, variable.File, out IConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
             OnGotStatementType(variable, constant.Type);
             variable.PredictedValue = constant.Value;
@@ -1491,9 +1572,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             OnGotStatementType(variable, val.Type);
 
             if (!val.IsInitialized)
-            { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {val.Identifier} but its aint initialized.", variable, variable.File)); }
+            { Diagnostics?.Add(Diagnostic.Warning($"U are using the variable {val.Identifier} but its aint initialized.", variable, variable.File)); }
 
             PushFrom(GetLocalVariableAddress(val), val.Type.GetSize(this));
+
             return;
         }
 
@@ -1504,6 +1586,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             OnGotStatementType(variable, globalVariable.Type);
 
             PushFrom(GetGlobalVariableAddress(globalVariable), globalVariable.Type.GetSize(this));
+
             return;
         }
 
@@ -1511,25 +1594,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             CompiledFunction? compiledFunction = result.Function;
 
-            compiledFunction.References.Add(variable, CurrentFile);
+            compiledFunction.References.AddReference(variable, variable.File);
             variable.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
             variable.Reference = compiledFunction;
             OnGotStatementType(variable, new FunctionType(compiledFunction));
 
             if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-            { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction, CurrentFile)); }
+            { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction, variable.File)); }
 
             Push(compiledFunction.InstructionOffset);
 
             return;
         }
 
-        throw new CompilerException($"Symbol \"{variable.Content}\" not found", variable, CurrentFile);
+        Diagnostics?.Add(Diagnostic.Critical($"Symbol \"{variable.Content}\" not found", variable, variable.File));
+        Diagnostics?.Add(constantNotFoundError.InstantiateError(variable, variable.File));
     }
     void GenerateCodeForStatement(AddressGetter addressGetter)
     {
-        StatementWithValue statement = addressGetter.PrevStatement;
-        Address address = GetDataAddress(statement);
+        if (!GetDataAddress(addressGetter.PrevStatement, out Address? address, out PossibleDiagnostic? error))
+        {
+            Diagnostics?.Add(error.InstantiateError(addressGetter.PrevStatement, addressGetter.PrevStatement.File));
+            return;
+        }
         GenerateAddressResolver(address);
     }
     void GenerateCodeForStatement(Pointer pointer)
@@ -1538,7 +1625,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GeneralType addressType = FindStatementType(pointer.PrevStatement);
         if (!addressType.Is(out PointerType? pointerType))
-        { throw new CompilerException($"This isn't a pointer", pointer.PrevStatement, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", pointer.PrevStatement, pointer.PrevStatement.File));
+            return;
+        }
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
@@ -1568,7 +1658,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 FinishJumpInstructions(BreakInstructions.Last);
 
-                OnScopeExit(whileLoop.Block.Brackets.End.Position);
+                OnScopeExit(whileLoop.Block.Brackets.End.Position, whileLoop.Block.File);
 
                 BreakInstructions.Pop();
 
@@ -1610,7 +1700,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GeneratedCode[conditionJumpOffset].Operand1 = GeneratedCode.Count - conditionJumpOffset;
 
-        OnScopeExit(whileLoop.Block.Brackets.End.Position);
+        OnScopeExit(whileLoop.Block.Brackets.End.Position, whileLoop.Block.File);
 
         AddComment("}");
 
@@ -1645,13 +1735,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 FinishJumpInstructions(BreakInstructions.Pop());
 
-                OnScopeExit(forLoop.Position.After());
+                OnScopeExit(forLoop.Position.After(), forLoop.File);
 
                 AddComment("}");
             }
             else
             {
-                OnScopeExit(forLoop.Position.After());
+                OnScopeExit(forLoop.Position.After(), forLoop.File);
 
                 AddComment("}");
             }
@@ -1686,7 +1776,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         FinishJumpInstructions(BreakInstructions.Pop());
 
-        OnScopeExit(forLoop.Position.After());
+        OnScopeExit(forLoop.Position.After(), forLoop.File);
 
         AddComment("}");
     }
@@ -1801,25 +1891,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GeneratedCode[item].Operand1 = GeneratedCode.Count - item;
         }
     }
-    void GenerateCodeForStatement(NewInstance newObject)
+    void GenerateCodeForStatement(NewInstance newInstance)
     {
-        AddComment($"new {newObject.Type} {{");
+        AddComment($"new {newInstance.Type} {{");
 
-        GeneralType instanceType = GeneralType.From(newObject.Type, FindType, TryCompute);
+        GeneralType instanceType = GeneralType.From(newInstance.Type, FindType, TryCompute);
 
-        newObject.Type.SetAnalyzedType(instanceType);
-        OnGotStatementType(newObject, instanceType);
+        newInstance.Type.SetAnalyzedType(instanceType);
+        OnGotStatementType(newInstance, instanceType);
 
         switch (instanceType)
         {
             case PointerType pointerType:
             {
                 GenerateAllocator(new AnyCall(
-                    new Identifier(Token.CreateAnonymous("sizeof"), newObject.File),
-                    new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To) },
+                    new Identifier(Token.CreateAnonymous("sizeof"), newInstance.File),
+                    new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To, newInstance.File) },
                     Array.Empty<Token>(),
                     TokenPair.CreateAnonymous(Position.UnknownPosition, "(", ")"),
-                    newObject.File));
+                    newInstance.File));
 
                 // using (RegisterUsage.Auto reg = Registers.GetFree())
                 // {
@@ -1834,7 +1924,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             case StructType structType:
             {
-                structType.Struct.References.Add(newObject.Type, CurrentFile);
+                structType.Struct.References.AddReference(newInstance.Type, newInstance.File);
 
                 StackAlloc(structType.GetSize(this), true);
                 break;
@@ -1847,7 +1937,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             default:
-                throw new CompilerException($"Unknown type definition {instanceType}", newObject.Type, CurrentFile);
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Unknown type definition {instanceType}", newInstance.Type, newInstance.File));
+                break;
+            }
         }
 
         AddComment("}");
@@ -1857,17 +1950,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute);
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
-        if (!GetConstructor(instanceType, parameters, CurrentFile, out FunctionQueryResult<CompiledConstructor>? result, out WillBeCompilerException? notFound, AddCompilable))
-        { throw notFound.Instantiate(constructorCall.Type, CurrentFile); }
+        if (!GetConstructor(instanceType, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructor>? result, out PossibleDiagnostic? notFound, AddCompilable))
+        {
+            Diagnostics?.Add(notFound.InstantiateError(constructorCall.Type, constructorCall.File));
+            return;
+        }
 
         CompiledConstructor? compiledFunction = result.Function;
 
-        compiledFunction.References.Add(constructorCall, CurrentFile);
+        compiledFunction.References.AddReference(constructorCall);
         OnGotStatementType(constructorCall, compiledFunction.Type);
 
-        if (!compiledFunction.CanUse(CurrentFile))
+        if (!compiledFunction.CanUse(constructorCall.File))
         {
-            AnalysisCollection?.Errors.Add(new LanguageError($"Constructor {compiledFunction.ToReadable()} could not be called due to its protection level", constructorCall.Type, CurrentFile));
+            Diagnostics?.Add(Diagnostic.Error($"Constructor {compiledFunction.ToReadable()} could not be called due to its protection level", constructorCall.Type, constructorCall.File));
             return;
         }
 
@@ -1887,7 +1983,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(compiledFunction.InstructionOffset);
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructor>(jumpInstruction, false, constructorCall, compiledFunction, CurrentFile)); }
+        { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructor>(jumpInstruction, false, constructorCall, compiledFunction, constructorCall.File)); }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -1902,10 +1998,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Equals("Length"))
         {
             if (arrayType.Length is null)
-            { throw new CompilerException("Array type's length isn't defined", field, field.File); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical("Array type's length isn't defined", field, field.File));
+                return;
+            }
 
             if (!arrayType.ComputedLength.HasValue)
-            { throw new CompilerException("I will eventually implement this", field, field.File); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical("I will eventually implement this", field, field.File));
+                return;
+            }
 
             OnGotStatementType(field, ArrayLengthType);
             field.PredictedValue = arrayType.ComputedLength.Value;
@@ -1917,18 +2019,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (prevType.Is(out PointerType? pointerType))
         {
             if (!pointerType.To.Is(out StructType? structPointerType))
-            { throw new CompilerException($"Could not get the field offsets of type {pointerType}", field.PrevStatement, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Could not get the field offsets of type {pointerType}", field.PrevStatement, field.PrevStatement.File));
+                return;
+            }
 
             if (!structPointerType.GetField(field.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset))
-            { throw new InternalException($"Field \"{field.Identifier}\" not found", field.Identifier, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Field \"{field.Identifier}\" not found", field.Identifier, field.File));
+                return;
+            }
 
             field.CompiledType = fieldDefinition.Type;
             field.Reference = fieldDefinition;
-            fieldDefinition.References.Add(field, CurrentFile);
+            fieldDefinition.References.AddReference(field);
 
             GenerateCodeForStatement(field.PrevStatement);
 
-            CheckPointerNull();
+            CheckPointerNull(field.PrevStatement.Position, field.PrevStatement.File);
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
@@ -1947,11 +2055,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType type = FindStatementType(field);
 
         if (!structType.GetField(field.Identifier.Content, this, out CompiledField? compiledField, out _))
-        { throw new CompilerException($"Field definition \"{field.Identifier}\" not found in type \"{structType}\"", field, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Field definition \"{field.Identifier}\" not found in type \"{structType}\"", field.Identifier, field.File));
+            return;
+        }
 
         field.CompiledType = compiledField.Type;
         field.Reference = compiledField;
-        compiledField.References.Add(field, CurrentFile);
+        compiledField.References.AddReference(field);
 
         // if (CurrentContext?.Context != null)
         // {
@@ -1959,7 +2070,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     {
         //         case Protection.Private:
         //             if (CurrentContext.Context.Identifier.Content != compiledField.Class.Identifier.Content)
-        //             { throw new CompilerException($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Identifier}\" due to it's protection level", field, CurrentFile); }
+        //             { Diagnostics?.Add(Diagnostic.Critical($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Identifier}\" due to it's protection level", field.Identifier, field.File); }
         //             break;
         //         case Protection.Public:
         //             break;
@@ -1971,12 +2082,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (dereference is null)
         {
-            Address offset = GetDataAddress(field);
+            if (!GetDataAddress(field, out Address? offset, out PossibleDiagnostic? error))
+            {
+                Diagnostics?.Add(error.InstantiateError(field, field.File));
+                return;
+            }
             PushFrom(offset, compiledField.Type.GetSize(this));
         }
         else
         {
-            int offset = GetDataOffset(field, dereference);
+            if (!GetDataOffset(field, out int offset, out PossibleDiagnostic? error, dereference))
+            {
+                Diagnostics?.Add(error.InstantiateError(field, field.File));
+                return;
+            }
             HeapLoad(dereference, offset, type.GetSize(this));
         }
     }
@@ -1985,7 +2104,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType prevType = FindStatementType(index.PrevStatement);
         GeneralType indexType = FindStatementType(index.Index);
 
-        if (GetIndexGetter(prevType, indexType, index.File, out FunctionQueryResult<CompiledFunction>? indexer, out WillBeCompilerException? notFoundError, AddCompilable))
+        if (GetIndexGetter(prevType, indexType, index.File, out FunctionQueryResult<CompiledFunction>? indexer, out PossibleDiagnostic? notFoundError, AddCompilable))
         {
             GenerateCodeForFunctionCall_Function(new FunctionCall(
                     index.PrevStatement,
@@ -2000,14 +2119,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (prevType.Is(out ArrayType? arrayType))
         {
             if (index.PrevStatement is not Identifier identifier)
-            { throw new NotSupportedException($"Only variables/parameters supported by now", index.PrevStatement, CurrentFile); }
+            { throw new NotSupportedException($"Only variables/parameters supported by now", index.PrevStatement, index.PrevStatement.File); }
 
             if (TryCompute(index.Index, out CompiledValue computedIndexData))
             {
                 index.Index.PredictedValue = computedIndexData;
 
                 if (computedIndexData < 0 || (arrayType.ComputedLength.HasValue && computedIndexData >= arrayType.ComputedLength.Value))
-                { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", index.Index, CurrentFile)); }
+                { Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"Index out of range", index.Index, index.Index.File)); }
 
                 if (GetParameter(identifier.Content, out CompiledParameter? param))
                 {
@@ -2027,7 +2146,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     // TODO: this
                     // if (!val.IsInitialized)
-                    // { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {val.Identifier} but its aint initialized.", identifier, identifier.File)); }
+                    // { AnalysisCollection?.Warnings.Add(Diagnostic.Warning($"U are using the variable {val.Identifier} but its aint initialized.", identifier, identifier.File)); }
 
                     int offset = (int)computedIndexData * arrayType.Of.GetSize(this);
                     Address address = GetLocalVariableAddress(val);
@@ -2041,14 +2160,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 using (RegisterUsage.Auto regPtr = Registers.GetFree())
                 {
-                    Address address = GetDataAddress(identifier);
+                    if (!GetDataAddress(identifier, out Address? address, out PossibleDiagnostic? error))
+                    {
+                        Diagnostics?.Add(error.InstantiateError(identifier, identifier.File));
+                        return;
+                    }
                     GenerateAddressResolver(address);
                     PopTo(regPtr.Get(PointerBitWidth));
 
                     GenerateCodeForStatement(index.Index);
 
                     if (!indexType.Is<BuiltinType>())
-                    { throw new CompilerException($"Index must be a builtin type (i.e. int) and not {indexType}", index.Index, CurrentFile); }
+                    {
+                        Diagnostics?.Add(Diagnostic.Critical($"Index must be a builtin type (i.e. int) and not {indexType}", index.Index, index.Index.File));
+                        return;
+                    }
 
                     using (RegisterUsage.Auto regIndex = Registers.GetFree())
                     {
@@ -2070,7 +2196,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForStatement(index.PrevStatement);
 
             if (!indexType.Is<BuiltinType>())
-            { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", index.Index, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"i32\") and not {indexType}", index.Index, index.Index.File));
+                return;
+            }
 
             GenerateCodeForStatement(index.Index);
 
@@ -2087,7 +2216,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 Push(regIndex.Get(indexType.GetBitWidth(this)));
 
-                CheckPointerNull();
+                CheckPointerNull(index.Position, index.File);
 
                 PopTo(regIndex.Get(indexType.GetBitWidth(this)));
 
@@ -2097,7 +2226,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        throw new CompilerException($"Index getter for type {prevType} not found", index, CurrentFile);
+        Diagnostics?.Add(Diagnostic.Critical($"Index getter for type {prevType} not found", index, index.File));
     }
 
     void GenerateAddressResolver(Address address)
@@ -2136,7 +2265,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (modifier.Equals(ModifierKeywords.Ref))
         {
-            throw null!;
+            throw new NotImplementedException();
         }
 
         if (modifier.Equals(ModifierKeywords.Temp))
@@ -2155,10 +2284,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType targetType = GeneralType.From(typeCast.Type, FindType, TryCompute);
 
         if (statementType.SameAs(targetType))
-        { AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", typeCast.Keyword, CurrentFile)); }
+        { Diagnostics?.Add(LanguageCore.Diagnostic.Hint($"Redundant type conversion", typeCast.Keyword, typeCast.File)); }
 
         if (statementType.GetSize(this) != targetType.GetSize(this))
-        { throw new CompilerException($"Can't convert {statementType} ({statementType.GetSize(this)} bytes) to {targetType} ({statementType.GetSize(this)} bytes)", typeCast.Keyword, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Can't convert {statementType} ({statementType.GetSize(this)} bytes) to {targetType} ({statementType.GetSize(this)} bytes)", typeCast.Keyword, typeCast.File));
+            return;
+        }
 
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
@@ -2174,7 +2306,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (statementType.SameAs(targetType))
         {
-            AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", typeCast.Type, CurrentFile));
+            Diagnostics?.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Type, typeCast.File));
             GenerateCodeForStatement(typeCast.PrevStatement);
             return;
         }
@@ -2256,7 +2388,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return;
             }
 
-            throw new CompilerException($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.GetSize(this)}) to {targetType} (size of {targetType.GetSize(this)})", typeCast, CurrentFile);
+            Diagnostics?.Add(Diagnostic.Critical($"Can't modify the size of the value. You tried to convert from {statementType} (size of {statementType.GetSize(this)}) to {targetType} (size of {targetType.GetSize(this)})", typeCast, typeCast.File));
+            return;
         }
 
         GenerateCodeForStatement(typeCast.PrevStatement, targetType);
@@ -2292,7 +2425,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { GenerateCodeForStatement(block.Statements[i]); }
         AddComment("}");
 
-        OnScopeExit(block.Brackets.End.Position);
+        OnScopeExit(block.Brackets.End.Position, block.File);
     }
 
     void GenerateCodeForStatement(Statement statement, GeneralType? expectedType = null, bool resolveReference = true)
@@ -2330,7 +2463,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Instructions = (startInstruction, GeneratedCode.Count - 1),
             SourcePosition = statement.Position,
-            Uri = CurrentFile,
+            Uri = statement.File,
         });
     }
 
@@ -2353,7 +2486,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return result.ToImmutable();
     }
 
-    void CleanupVariables(ImmutableArray<CleanupItem> cleanupItems, Position position)
+    void CleanupVariables(ImmutableArray<CleanupItem> cleanupItems, Position position, Uri file)
     {
         if (cleanupItems.Length == 0) return;
         AddComment("Clear Variables");
@@ -2364,7 +2497,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (item.ShouldDeallocate)
             {
                 if (item.Type is null) throw new InternalException();
-                GenerateDestructor(item.Type, position);
+                GenerateDestructor(item.Type, position, file);
             }
             else
             {
@@ -2375,7 +2508,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void CleanupGlobalVariables(ImmutableArray<CleanupItem> cleanupItems, Position position)
+    void CleanupGlobalVariables(ImmutableArray<CleanupItem> cleanupItems, Position position, Uri file)
     {
         if (cleanupItems.Length == 0) return;
         AddComment("Clear Global Variables");
@@ -2387,7 +2520,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 if (item.SizeOnStack != PointerSize) throw new InternalException();
                 if (item.Type is null) throw new InternalException();
-                GenerateDestructor(item.Type, position);
+                GenerateDestructor(item.Type, position, file);
             }
             else
             {
@@ -2406,7 +2539,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case Field v: GenerateCodeForValueSetter(v, value); break;
             case IndexCall v: GenerateCodeForValueSetter(v, value); break;
             case Pointer v: GenerateCodeForValueSetter(v, value); break;
-            default: throw new CompilerException($"The left side of the assignment operator should be a variable, field or memory address. Passed {statementToSet.GetType().Name}", statementToSet, CurrentFile);
+            default:
+                Diagnostics?.Add(Diagnostic.Critical($"The left side of the assignment operator should be a variable, field or memory address. Passed {statementToSet.GetType().Name}", statementToSet, statementToSet.File));
+                return;
         }
     }
     void GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value)
@@ -2414,7 +2549,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (GetConstant(statementToSet.Content, statementToSet.File, out _, out _))
         {
             statementToSet.Token.AnalyzedType = TokenAnalyzedType.ConstantName;
-            throw new CompilerException($"Can not set constant value: it is readonly", statementToSet, CurrentFile);
+            Diagnostics?.Add(Diagnostic.Critical($"Can not set constant value: it is readonly", statementToSet, statementToSet.File));
+            return;
         }
 
         if (GetParameter(statementToSet.Content, out CompiledParameter? parameter))
@@ -2468,7 +2604,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            throw new CompilerException($"Symbol \"{statementToSet.Content}\" not found", statementToSet, CurrentFile);
+            Diagnostics?.Add(Diagnostic.Critical($"Symbol \"{statementToSet.Content}\" not found", statementToSet, statementToSet.File));
+            return;
         }
     }
     void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
@@ -2480,14 +2617,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (prevType.Is(out PointerType? pointerType))
         {
             if (!pointerType.To.Is(out StructType? structType))
-            { throw new CompilerException($"Failed to get the field offsets of type {pointerType.To}", statementToSet.PrevStatement, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Failed to get the field offsets of type {pointerType.To}", statementToSet.PrevStatement, statementToSet.PrevStatement.File));
+                return;
+            }
 
             if (!structType.GetField(statementToSet.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset))
-            { throw new CompilerException($"Failed to get the field offset for \"{statementToSet.Identifier}\" in type {pointerType.To}", statementToSet.Identifier, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Failed to get the field offset for \"{statementToSet.Identifier}\" in type {pointerType.To}", statementToSet.Identifier, statementToSet.File));
+                return;
+            }
 
             statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
             statementToSet.Reference = fieldDefinition;
-            fieldDefinition.References.Add(statementToSet, CurrentFile);
+            fieldDefinition.References.AddReference(statementToSet);
 
             GenerateCodeForStatement(value, type);
             HeapStore(statementToSet.PrevStatement, fieldOffset, valueType.GetSize(this));
@@ -2505,12 +2648,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (dereference is null)
         {
-            Address offset = GetDataAddress(statementToSet);
+            if (!GetDataAddress(statementToSet, out Address? offset, out PossibleDiagnostic? error))
+            {
+                Diagnostics?.Add(error.InstantiateError(statementToSet, statementToSet.File));
+                return;
+            }
             PopTo(offset, valueType.GetSize(this));
         }
         else
         {
-            int offset = GetDataOffset(statementToSet, dereference);
+            if (!GetDataOffset(statementToSet, out int offset, out PossibleDiagnostic? error, dereference))
+            {
+                Diagnostics?.Add(error.InstantiateError(statementToSet, statementToSet.File));
+                return;
+            }
             HeapStore(dereference, offset, valueType.GetSize(this));
         }
     }
@@ -2520,7 +2671,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType indexType = FindStatementType(statementToSet.Index);
         GeneralType valueType = FindStatementType(value);
 
-        if (GetIndexSetter(prevType, valueType, indexType, CurrentFile, out FunctionQueryResult<CompiledFunction>? indexer, out _, AddCompilable))
+        if (GetIndexSetter(prevType, valueType, indexType, statementToSet.File, out FunctionQueryResult<CompiledFunction>? indexer, out _, AddCompilable))
         {
             GenerateCodeForFunctionCall_Function(new FunctionCall(
                 statementToSet.PrevStatement,
@@ -2535,14 +2686,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (prevType.Is(out ArrayType? arrayType))
         {
             if (statementToSet.PrevStatement is not Identifier identifier)
-            { throw new NotSupportedException($"Only variables/parameters supported by now", statementToSet.PrevStatement, CurrentFile); }
+            { throw new NotSupportedException($"Only variables/parameters supported by now", statementToSet.PrevStatement, statementToSet.PrevStatement.File); }
 
             if (TryCompute(statementToSet.Index, out CompiledValue computedIndexData))
             {
                 statementToSet.Index.PredictedValue = computedIndexData;
 
                 if (computedIndexData < 0 || (arrayType.ComputedLength.HasValue && computedIndexData >= arrayType.ComputedLength.Value))
-                { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", statementToSet.Index, CurrentFile)); }
+                { Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"Index out of range", statementToSet.Index, statementToSet.Index.File)); }
 
                 GenerateCodeForStatement(value);
 
@@ -2556,7 +2707,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     // TODO: this
                     // if (!variable.IsInitialized)
-                    // { AnalysisCollection?.Warnings.Add(new Warning($"U are using the variable {variable.Identifier} but its aint initialized.", identifier, identifier.File)); }
+                    // { AnalysisCollection?.Add(Diagnostic.Warning($"U are using the variable {variable.Identifier} but its aint initialized.", identifier, identifier.File)); }
 
                     int offset = (int)computedIndexData * arrayType.Of.GetSize(this);
                     PopTo(new AddressOffset(GetLocalVariableAddress(variable), offset), arrayType.Of.GetSize(this));
@@ -2572,7 +2723,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateAddressResolver(GetDataAddress(identifier));
 
             if (!indexType.Is<BuiltinType>())
-            { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", statementToSet.Index, CurrentFile); }
+            { Diagnostics?.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"i32\") and not {indexType}", statementToSet.Index, statementToSet.Index.File); }
 
             GenerateCodeForStatement(statementToSet.Index);
 
@@ -2610,7 +2761,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
             if (!indexType.Is<BuiltinType>())
-            { throw new CompilerException($"Index type must be builtin (ie. \"int\") and not {indexType}", statementToSet.Index, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"int\") and not {indexType}", statementToSet.Index, statementToSet.Index.File));
+                return;
+            }
 
             GenerateCodeForStatement(statementToSet.Index);
 
@@ -2627,7 +2781,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     Push(regPtr.Get(PointerBitWidth));
 
-                    CheckPointerNull(false);
+                    CheckPointerNull(statementToSet.Position, statementToSet.File, false);
 
                     PopTo(new AddressRegisterPointer(regPtr.Get(PointerBitWidth)), valueType.GetSize(this));
                 }
@@ -2645,7 +2799,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AssignTypeCheck(targetType, valueType, value);
 
         if (pointerValueType.GetBitWidth(this) != PointerBitWidth)
-        { throw new CompilerException($"Type {pointerValueType} cant be a pointer", statementToSet.PrevStatement, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Type {pointerValueType} cant be a pointer", statementToSet.PrevStatement, statementToSet.PrevStatement.File));
+            return;
+        }
 
         GenerateCodeForStatement(value, targetType);
 
@@ -2683,14 +2840,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions.Push(new List<int>());
     }
 
-    void OnScopeExit(Position position)
+    void OnScopeExit(Position position, Uri file)
     {
         AddComment("Scope exit");
 
         FinishJumpInstructions(ReturnInstructions.Last);
         ReturnInstructions.Pop();
 
-        CleanupVariables(CleanupStack.Pop(), position);
+        CleanupVariables(CleanupStack.Pop(), position, file);
 
         if (CanReturn)
         {
@@ -2720,20 +2877,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-        for (int i = 0; i < CompiledVariables.Count; i++)
+        foreach (CompiledVariable other in CompiledVariables)
         {
-            if (CompiledVariables[i].Identifier.Content == newVariable.Identifier.Content)
-            {
-                AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].Identifier}\" already defined", CompiledVariables[i].Identifier, CurrentFile));
-                return CleanupItem.Null;
-            }
+            if (other.Identifier.Content != newVariable.Identifier.Content) continue;
+            Diagnostics?.Add(Diagnostic.Warning($"Variable \"{other.Identifier}\" already defined", newVariable.Identifier, newVariable.File));
         }
 
         GeneralType type;
         if (newVariable.Type == StatementKeywords.Var)
         {
             if (newVariable.InitialValue == null)
-            { throw new CompilerException($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.File); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.File));
+                return default;
+            }
 
             type = FindStatementType(newVariable.InitialValue);
         }
@@ -2784,7 +2941,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             compiledVariable.IsInitialized = true;
 
             if (size <= 0)
-            { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Variable has a size of {size}", newVariable, newVariable.File));
+                return default;
+            }
 
             AddComment("}");
         }
@@ -2811,7 +2971,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             StackAlloc(size, false);
 
             if (size <= 0)
-            { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"Variable has a size of {size}", newVariable, newVariable.File));
+                return default;
+            }
 
             AddComment("}");
         }
@@ -2879,7 +3042,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             compiledVariable.IsInitialized = true;
 
             if (size <= 0)
-            { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
+            { Diagnostics?.Add(Diagnostic.Critical($"Variable has a size of {size}", newVariable, newVariable.File); }
 
             AddComment("}");
         }
@@ -2905,7 +3068,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             StackAlloc(size);
 
             if (size <= 0)
-            { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
+            { Diagnostics?.Add(Diagnostic.Critical($"Variable has a size of {size}", newVariable, newVariable.File); }
 
             AddComment("}");
         }
@@ -2973,7 +3136,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (function.Identifier is not null &&
             LanguageConstants.KeywordList.Contains(function.Identifier.ToString()))
-        { throw new CompilerException($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.File); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.File));
+            return default;
+        }
 
         if (function.Identifier is not null)
         { function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName; }
@@ -3016,7 +3182,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("Return flag");
         Push(ReturnFlagFalse);
 
-        OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body", function, function.File));
+        if (function.Block is null)
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have a body", function, function.File));
+            return default;
+        }
+
+        OnScopeEnter(function.Block);
 
         if (function is IHaveCompiledType returnType && !returnType.Type.SameAs(BasicType.Void))
         {
@@ -3096,7 +3268,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentReturnType = null;
 
-        OnScopeExit(function.Block.Brackets.End.Position);
+        OnScopeExit(function.Block.Brackets.End.Position, function.Block.File);
 
         AddComment("Pop return flag");
         Pop(ReturnFlagType.GetSize(this));
@@ -3192,7 +3364,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void GenerateCodeForTopLevelStatements(ImmutableArray<Statement> statements)
+    void GenerateCodeForTopLevelStatements(ImmutableArray<Statement> statements, Uri file)
     {
         if (statements.IsDefaultOrEmpty) return;
 
@@ -3202,7 +3374,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 Instructions = (GeneratedCode.Count, GeneratedCode.Count),
                 SourcePosition = new Position(statements),
-                Uri = CurrentFile,
+                Uri = file,
             },
             Stack = new List<StackElementInformation>(),
         });
@@ -3254,7 +3426,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions.Pop();
 
         CompiledGlobalVariables.AddRange(CompiledVariables);
-        CleanupVariables(CleanupStack.Pop(), statements[^1].Position.NextLine());
+        CleanupVariables(CleanupStack.Pop(), statements[^1].Position.NextLine(), statements[^1].File);
 
         CurrentReturnType = null;
         AddComment("Pop return flag");
@@ -3353,16 +3525,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[i];
             CurrentFile = file;
-            Print?.Invoke($"Generating top level statements for file {file?.ToString() ?? "null"} ...", LogType.Debug);
-            GenerateCodeForTopLevelStatements(statements);
+            Print?.Invoke($"Generating top level statements for file {file} ...", LogType.Debug);
+            GenerateCodeForTopLevelStatements(statements, file);
             CurrentFile = null;
         }
 
         if (compilerResult.TopLevelStatements.Length > 0)
         {
-            CurrentFile = compilerResult.File;
-            Print?.Invoke($"Generating top level statements for file {compilerResult.TopLevelStatements[^1].File?.ToString() ?? "null"} ...", LogType.Debug);
-            GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements[^1].Statements);
+            (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[^1];
+            CurrentFile = file;
+            Print?.Invoke($"Generating top level statements for file {file} ...", LogType.Debug);
+            GenerateCodeForTopLevelStatements(statements, file);
             CurrentFile = null;
         }
 

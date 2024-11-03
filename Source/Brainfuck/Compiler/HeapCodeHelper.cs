@@ -123,10 +123,23 @@ public class HeapCodeHelper
         _code += "- ] +";
     }
 
-    public void Init()
+    public void Init(out PossibleDiagnostic? error)
     {
-        if (Size <= 0) return;
-        if (Size > 126) throw new CompilerException($"HEAP size must be smaller than 127", null, null);
+        error = null;
+
+        if (Size == 0) return;
+
+        if (Size < 0)
+        {
+            error = new PossibleDiagnostic($"HEAP size must be larger than 0");
+            return;
+        }
+
+        if (Size > 126)
+        {
+            error = new PossibleDiagnostic($"HEAP size must be smaller than 127");
+            return;
+        }
 
         _code.StartBlock("Initialize HEAP");
 
@@ -136,10 +149,23 @@ public class HeapCodeHelper
         _code.EndBlock();
     }
 
-    public string? LateInit()
+    public string? LateInit(out PossibleDiagnostic? diagnostic)
     {
-        if (Size <= 0) return null;
-        if (Size > 126) throw new CompilerException($"HEAP size must be smaller than 127", null, null);
+        diagnostic = null;
+
+        if (Size == 0) return null;
+
+        if (Size < 0)
+        {
+            diagnostic = new PossibleDiagnostic($"HEAP size must be larger than 0");
+            return null;
+        }
+
+        if (Size > 126)
+        {
+            diagnostic = new PossibleDiagnostic($"HEAP size must be smaller than 127");
+            return null;
+        }
 
         CodeHelper code = new()
         {

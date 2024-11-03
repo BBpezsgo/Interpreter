@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore;
 
-public interface IDiagnostics
+public interface IDiagnostic
 {
     public string Message { get; }
     public Position Position { get; }

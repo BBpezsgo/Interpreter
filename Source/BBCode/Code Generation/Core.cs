@@ -148,7 +148,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, AnalysisCollection? analysisCollection, PrintCallback? print) : base(compilerResult, analysisCollection, print)
+    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, Diagnostics? diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
     {
         ExternalFunctions = compilerResult.ExternalFunctions;
         GeneratedCode = new List<PreparationInstruction>();
@@ -212,9 +212,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompilerResult compilerResult,
         MainGeneratorSettings settings,
         PrintCallback? printCallback = null,
-        AnalysisCollection? analysisCollection = null)
+        Diagnostics? diagnostics = null)
     {
-        CodeGeneratorForMain generator = new(compilerResult, settings, analysisCollection, printCallback);
+        CodeGeneratorForMain generator = new(compilerResult, settings, diagnostics, printCallback);
         return generator.GenerateCode(compilerResult, settings);
     }
 }

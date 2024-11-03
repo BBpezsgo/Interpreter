@@ -94,8 +94,12 @@ readonly struct UndefinedOffset<TFunction>
 
 public static class ReferenceExtensions
 {
-    public static void Add(this List<Reference> references, Uri? sourceFile) => references.Add(new Reference(sourceFile));
-    public static void Add<TSource>(this List<Reference<TSource>> references, TSource source, Uri? sourceFile = null) => references.Add(new Reference<TSource>(source, sourceFile));
+    public static void AddReference<TSource>(this List<Reference<TSource>> references, TSource source, Uri sourceFile)
+        => references.Add(new Reference<TSource>(source, sourceFile));
+
+    public static void AddReference<TSource>(this List<Reference<TSource>> references, TSource source)
+        where TSource : IInFile
+        => references.Add(new Reference<TSource>(source, source.File));
 }
 
 public readonly struct Reference

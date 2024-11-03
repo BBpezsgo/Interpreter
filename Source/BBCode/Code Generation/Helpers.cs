@@ -8,12 +8,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
 {
     #region Helper Functions
 
-    int CallRuntime(StatementWithValue address)
+    void CallRuntime(StatementWithValue address)
     {
         GeneralType addressType = FindStatementType(address);
 
         if (!addressType.Is<FunctionType>())
-        { throw new CompilerException($"This should be a function pointer and not {addressType}", address, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"This should be a function pointer and not {addressType}", address, address.File));
+            return;
+        }
 
         int returnToValueInstruction = GeneratedCode.Count;
         Push(0);
@@ -34,7 +37,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddInstruction(Opcode.Jump, reg.Get(addressType.GetBitWidth(this)));
 
             GeneratedCode[returnToValueInstruction].Operand1 = GeneratedCode.Count;
-            return jumpInstruction;
         }
     }
 
@@ -68,52 +70,103 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Memory Helpers
 
-    Address GetDataAddress(StatementWithValue value) => value switch
+    bool GetDataAddress(StatementWithValue value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error) => value switch
     {
-        IndexCall v => GetDataAddress(v),
-        Identifier v => GetDataAddress(v),
-        Field v => GetDataAddress(v),
+        IndexCall v => GetDataAddress(v, out address, out error),
+        Identifier v => GetDataAddress(v, out address, out error),
+        Field v => GetDataAddress(v, out address, out error),
         _ => throw new NotImplementedException()
     };
-    Address GetDataAddress(Identifier variable)
+    bool GetDataAddress(Identifier variable, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
+        address = null;
+        error = null;
+
         if (GetConstant(variable.Content, variable.File, out _, out _))
-        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
+        {
+            error = new PossibleDiagnostic($"Constant does not have a memory address");
+            return false;
+        }
 
         if (GetParameter(variable.Content, out CompiledParameter? parameter))
-        { return GetParameterAddress(parameter); }
+        {
+            address = GetParameterAddress(parameter);
+            return true;
+        }
 
         if (GetVariable(variable.Content, out CompiledVariable? localVariable))
-        { return GetLocalVariableAddress(localVariable); }
+        {
+            address = GetLocalVariableAddress(localVariable);
+            return true;
+        }
 
         if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out _))
-        { return GetGlobalVariableAddress(globalVariable); }
+        {
+            address = GetGlobalVariableAddress(globalVariable);
+            return true;
+        }
 
-        throw new CompilerException($"Local symbol \"{variable.Content}\" not found", variable, CurrentFile);
+        error = new PossibleDiagnostic($"Local symbol \"{variable.Content}\" not found");
+        return false;
     }
-    Address GetDataAddress(Field field)
+    bool GetDataAddress(Field field, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        Address @base = GetBaseAddress(field);
-        int offset = GetDataOffset(field);
-        return new AddressOffset(@base, offset);
+        if (!GetBaseAddress(field, out Address? @base, out error))
+        {
+            address = null;
+            return false;
+        }
+
+        if (!GetDataOffset(field, out int offset, out error))
+        {
+            address = null;
+            return false;
+        }
+
+        address = new AddressOffset(@base, offset);
+        return true;
     }
-    Address GetDataAddress(IndexCall indexCall)
+    bool GetDataAddress(IndexCall indexCall, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        Address @base = GetBaseAddress(indexCall.PrevStatement);
-        int offset = GetDataOffset(indexCall);
-        return new AddressOffset(@base, offset);
+        if (!GetBaseAddress(indexCall.PrevStatement, out Address? @base, out error))
+        {
+            address = null;
+            return false;
+        }
+
+        if (!GetDataOffset(indexCall, out int offset, out error))
+        {
+            address = null;
+            return false;
+        }
+
+        address = new AddressOffset(@base, offset);
+        return true;
     }
 
-    int GetDataOffset(StatementWithValue value, StatementWithValue? until = null) => value switch
+    bool GetDataOffset(StatementWithValue value, out int offset, [NotNullWhen(false)] out PossibleDiagnostic? error, StatementWithValue? until = null) => value switch
     {
-        IndexCall v => GetDataOffset(v, until),
-        Field v => GetDataOffset(v, until),
-        Identifier => 0,
+        IndexCall v => GetDataOffset(v, out offset, out error, until),
+        Field v => GetDataOffset(v, out offset, out error, until),
+        Identifier v => GetDataOffset(v, out offset, out error, until),
         _ => throw new NotImplementedException()
     };
-    int GetDataOffset(Field field, StatementWithValue? until = null)
+    bool GetDataOffset(Identifier value, out int offset, [NotNullWhen(false)] out PossibleDiagnostic? error, StatementWithValue? until = null)
     {
-        if (field.PrevStatement == until) return 0;
+        error = null;
+        offset = 0;
+        return true;
+    }
+    bool GetDataOffset(Field field, out int offset, [NotNullWhen(false)] out PossibleDiagnostic? error, StatementWithValue? until = null)
+    {
+        error = default;
+        offset = default;
+
+        if (field.PrevStatement == until)
+        {
+            offset = 0;
+            return true;
+        }
 
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
@@ -121,26 +174,52 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new NotImplementedException(); }
 
         if (!structType.GetField(field.Identifier.Content, this, out _, out int fieldOffset))
-        { throw new CompilerException($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, CurrentFile); }
+        {
+            error = new PossibleDiagnostic($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, field.File);
+            return false;
+        }
 
-        int prevOffset = GetDataOffset(field.PrevStatement, until);
-        return prevOffset + fieldOffset;
+        if (!GetDataOffset(field.PrevStatement, out int prevOffset, out error, until))
+        {
+            return false;
+        }
+
+        offset = prevOffset + fieldOffset;
+        return true;
     }
-    int GetDataOffset(IndexCall indexCall, StatementWithValue? until = null)
+    bool GetDataOffset(IndexCall indexCall, out int offset, [NotNullWhen(false)] out PossibleDiagnostic? error, StatementWithValue? until = null)
     {
-        if (indexCall.PrevStatement == until) return 0;
+        offset = default;
+        error = default;
+
+        if (indexCall.PrevStatement == until)
+        {
+            offset = 0;
+            return true;
+        }
 
         GeneralType prevType = FindStatementType(indexCall.PrevStatement);
 
         if (!prevType.Is(out ArrayType? arrayType))
-        { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
+        {
+            error = new PossibleDiagnostic($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, indexCall.PrevStatement.File);
+            return false;
+        }
 
         if (!TryCompute(indexCall.Index, out CompiledValue index))
-        { throw new CompilerException($"Can't compute the index value", indexCall.Index, CurrentFile); }
+        {
+            error = new PossibleDiagnostic($"Can't compute the index value", indexCall.Index, indexCall.Index.File);
+            return false;
+        }
 
-        int prevOffset = GetDataOffset(indexCall.PrevStatement, until);
-        int offset = (int)index * arrayType.Of.GetSize(this);
-        return prevOffset + offset;
+        if (!GetDataOffset(indexCall.PrevStatement, out int prevOffset, out error, until))
+        {
+            return false;
+        }
+
+        int _offset = (int)index * arrayType.Of.GetSize(this);
+        offset = prevOffset + _offset;
+        return true;
     }
 
     AddressOffset GetGlobalVariableAddress(CompiledVariable variable)
@@ -185,40 +264,77 @@ public partial class CodeGeneratorForMain : CodeGenerator
         // + 1 // Stack pointer offset (???)
         );
 
-    Address GetBaseAddress(StatementWithValue statement) => statement switch
+    bool GetBaseAddress(StatementWithValue statement, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error) => statement switch
     {
-        Identifier v => GetBaseAddress(v),
-        Field v => GetBaseAddress(v),
-        IndexCall v => GetBaseAddress(v),
+        Identifier v => GetBaseAddress(v, out address, out error),
+        Field v => GetBaseAddress(v, out address, out error),
+        IndexCall v => GetBaseAddress(v, out address, out error),
         _ => throw new NotImplementedException()
     };
-    Address GetBaseAddress(Identifier variable)
+    bool GetBaseAddress(Identifier variable, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
+        error = null;
+        address = null;
+
         if (GetConstant(variable.Content, variable.File, out _, out _))
-        { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
+        {
+            error = new PossibleDiagnostic($"Constant does not have a memory address", variable, variable.File);
+            return false;
+        }
 
         if (GetParameter(variable.Content, out CompiledParameter? parameter))
-        { return GetParameterAddress(parameter); }
+        {
+            address = GetParameterAddress(parameter);
+            return true;
+        }
 
         if (GetVariable(variable.Content, out CompiledVariable? localVariable))
-        { return GetLocalVariableAddress(localVariable); }
+        {
+            address = GetLocalVariableAddress(localVariable);
+            return true;
+        }
 
         if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out _))
-        { return GetGlobalVariableAddress(globalVariable); }
+        {
+            address = GetGlobalVariableAddress(globalVariable);
+            return true;
+        }
 
-        throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
+        error = new PossibleDiagnostic($"Variable \"{variable.Content}\" not found", variable, variable.File);
+        return false;
     }
-    Address GetBaseAddress(Field statement)
+    bool GetBaseAddress(Field statement, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        Address address = GetBaseAddress(statement.PrevStatement);
-        if (FindStatementType(statement.PrevStatement).Is<PointerType>()) throw null!;
-        return address;
+        address = null;
+
+        if (!GetBaseAddress(statement.PrevStatement, out Address? _address, out error))
+        {
+            return false;
+        }
+
+        if (FindStatementType(statement.PrevStatement).Is<PointerType>())
+        {
+            throw null!;
+        }
+
+        address = _address;
+        return true;
     }
-    Address GetBaseAddress(IndexCall statement)
+    bool GetBaseAddress(IndexCall statement, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        Address address = GetBaseAddress(statement.PrevStatement);
-        if (FindStatementType(statement.PrevStatement).Is<PointerType>()) throw null!;
-        return address;
+        if (!GetBaseAddress(statement.PrevStatement, out Address? _address, out error))
+        {
+            address = null;
+            return false;
+        }
+
+        if (FindStatementType(statement.PrevStatement).Is<PointerType>())
+        {
+            throw null!;
+        }
+
+        address = _address;
+        return true;
     }
 
     StatementWithValue? NeedDerefernce(StatementWithValue value) => value switch
@@ -601,7 +717,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void CheckPointerNull(bool preservePointer = true)
+    void CheckPointerNull(Position position, Uri file, bool preservePointer = true)
     {
         if (!Settings.CheckNullPointers)
         {
@@ -623,7 +739,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = GeneratedCode.Count - 1;
 
-        GenerateCodeForLiteralString("null pointer", false);
+        GenerateCodeForLiteralString("null pointer", position, file, false);
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(PointerBitWidth));
@@ -641,12 +757,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (pointer is not Identifier identifier ||
                 !GetParameter(identifier.Content, out CompiledParameter? parameter) ||
                 !parameter.IsRef)
-            { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
+            {
+                Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", pointer, pointer.File));
+                return;
+            }
         }
 
         GenerateCodeForStatement(pointer, resolveReference: false);
 
-        CheckPointerNull();
+        CheckPointerNull(pointer.Position, pointer.File);
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
@@ -659,11 +778,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void HeapStore(StatementWithValue pointer, int offset, int size)
     {
         if (!FindStatementType(pointer).Is<PointerType>())
-        { throw new CompilerException($"This isn't a pointer", pointer, CurrentFile); }
+        {
+            Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", pointer, pointer.File));
+            return;
+        }
 
         GenerateCodeForStatement(pointer, resolveReference: false);
 
-        CheckPointerNull();
+        CheckPointerNull(pointer.Position, pointer.File);
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {

@@ -7,7 +7,7 @@ public class PreprocessorTag : Statement
     public Token Identifier { get; }
     public Token? Argument { get; }
 
-    public PreprocessorTag(Token identifier, Token? argument)
+    public PreprocessorTag(Token identifier, Token? argument, Uri file) : base(file)
     {
         Identifier = identifier;
         Argument = argument;

@@ -126,7 +126,10 @@ public abstract class GeneralType :
         }
 
         if (!typeFinder.Invoke(type.Identifier, type.File, out result))
-        { throw new CompilerException($"Can't parse \"{type}\" to {nameof(GeneralType)}", type, uri); }
+        {
+            Diagnostic.Critical($"Can't parse \"{type}\" to {nameof(GeneralType)}", type, uri).Throw();
+            return default;
+        }
 
         if (result.Is(out StructType? resultStructType) &&
             resultStructType.Struct.Template is not null)

@@ -82,7 +82,7 @@ class InteractiveCompiler
     public CompilerResult Compiled { get; private set; }
     public BBLangGeneratorResult Generated => _generated;
     public ParserResult InteractiveAST => new(
-        Enumerable.Empty<LanguageError>(),
+        Enumerable.Empty<Diagnostic>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),
@@ -125,7 +125,7 @@ class InteractiveCompiler
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
-            { parsed2 = new KeywordCall((Token)StatementKeywords.Return, ImmutableArray.Create<StatementWithValue>(statementWithValue)); }
+            { parsed2 = new KeywordCall((Token)StatementKeywords.Return, ImmutableArray.Create<StatementWithValue>(statementWithValue), statementWithValue.File); }
 
             Compiled = Compiler.CompileInteractive(
                 parsed2,
@@ -169,7 +169,7 @@ class InteractiveCompiler
 
             Statement parsed2 = Statement;
             if (parsed2 is StatementWithValue statementWithValue)
-            { parsed2 = new KeywordCall((Token)StatementKeywords.Return, ImmutableArray.Create<StatementWithValue>(statementWithValue)); }
+            { parsed2 = new KeywordCall((Token)StatementKeywords.Return, ImmutableArray.Create<StatementWithValue>(statementWithValue), statementWithValue.File); }
 
             Compiled = Compiler.CompileInteractive(
                 parsed2,

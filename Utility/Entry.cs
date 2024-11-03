@@ -107,33 +107,33 @@ public static class Entry
                 List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
-                AnalysisCollection analysisCollection = new();
+                Diagnostics diagnostics = new();
 
                 if (arguments.ThrowErrors)
                 {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
-                    generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, analysisCollection);
-                    analysisCollection.Throw();
-                    analysisCollection.Print();
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, diagnostics, null, null, additionalImports);
+                    generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
+                    diagnostics.Throw();
+                    diagnostics.Print();
                 }
                 else
                 {
                     try
                     {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
-                        generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, analysisCollection);
-                        analysisCollection.Throw();
-                        analysisCollection.Print();
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, diagnostics, null, null, additionalImports);
+                        generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
+                        diagnostics.Throw();
+                        diagnostics.Print();
                     }
                     catch (LanguageException ex)
                     {
-                        analysisCollection.Print();
+                        diagnostics.Print();
                         Output.LogError(ex);
                         return 1;
                     }
                     catch (Exception ex)
                     {
-                        analysisCollection.Print();
+                        diagnostics.Print();
                         Output.LogError(ex);
                         return 1;
                     }
@@ -334,14 +334,14 @@ public static class Entry
                 BrainfuckGeneratorResult generated;
                 ImmutableArray<Token> tokens;
 
-                AnalysisCollection analysisCollection = new();
+                Diagnostics diagnostics = new();
                 if (arguments.ThrowErrors)
                 {
                     tokens = AnyTokenizer.Tokenize(arguments.Source, PreprocessorVariables.Brainfuck).Tokens;
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null, additionalImports);
-                    generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, analysisCollection);
-                    analysisCollection.Throw();
-                    analysisCollection.Print();
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, Output.Log, diagnostics, null, null, additionalImports);
+                    generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
+                    diagnostics.Throw();
+                    diagnostics.Print();
                     Output.LogDebug($"Optimized {generated.Optimizations} statements");
                     Output.LogDebug($"Precomputed {generated.Precomputations} statements");
                     Output.LogDebug($"Evaluated {generated.FunctionEvaluations} functions");
@@ -351,23 +351,23 @@ public static class Entry
                     try
                     {
                         tokens = AnyTokenizer.Tokenize(arguments.Source, PreprocessorVariables.Brainfuck).Tokens;
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, Output.Log, analysisCollection, null, null, additionalImports);
-                        generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, analysisCollection);
-                        analysisCollection.Throw();
-                        analysisCollection.Print();
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, Output.Log, diagnostics, null, null, additionalImports);
+                        generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
+                        diagnostics.Throw();
+                        diagnostics.Print();
                         Output.LogDebug($"Optimized {generated.Optimizations} statements");
                         Output.LogDebug($"Precomputed {generated.Precomputations} statements");
                         Output.LogDebug($"Evaluated {generated.FunctionEvaluations} functions");
                     }
                     catch (LanguageException exception)
                     {
-                        analysisCollection.Print();
+                        diagnostics.Print();
                         Output.LogError(exception);
                         return 1;
                     }
                     catch (Exception exception)
                     {
-                        analysisCollection.Print();
+                        diagnostics.Print();
                         Output.LogError(exception);
                         return 1;
                     }
@@ -569,7 +569,7 @@ public static class Entry
                 List<IExternalFunction> externalFunctions = Runtime.BytecodeProcessorEx.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
-                AnalysisCollection analysisCollection = new();
+                Diagnostics diagnostics = new();
 
                 BitWidth bits = BitWidth._64;
 
@@ -577,29 +577,29 @@ public static class Entry
 
                 if (arguments.ThrowErrors)
                 {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
-                    generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, analysisCollection);
-                    analysisCollection.Throw();
-                    analysisCollection.Print();
+                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, diagnostics, null, null, additionalImports);
+                    generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
+                    diagnostics.Throw();
+                    diagnostics.Print();
                 }
                 else
                 {
                     try
                     {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, analysisCollection, null, null, additionalImports);
-                        generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, analysisCollection);
-                        analysisCollection.Throw();
-                        analysisCollection.Print();
+                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, diagnostics, null, null, additionalImports);
+                        generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
+                        diagnostics.Throw();
+                        diagnostics.Print();
                     }
                     catch (LanguageException ex)
                     {
-                        analysisCollection.Print();
+                        diagnostics.Print();
                         Output.LogError(ex);
                         return 1;
                     }
                     catch (Exception ex)
                     {
-                        analysisCollection.Print();
+                        diagnostics.Print();
                         Output.LogError(ex);
                         return 1;
                     }

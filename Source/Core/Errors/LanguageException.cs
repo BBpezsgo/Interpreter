@@ -1,7 +1,7 @@
 ﻿namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
-public class LanguageException : Exception, IDiagnostics
+public class LanguageException : Exception, IDiagnostic
 {
     public Position Position { get; protected set; }
     public Uri? File { get; protected set; }

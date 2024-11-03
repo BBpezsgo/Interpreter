@@ -68,10 +68,10 @@ public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStack
     public StatementWithValue? StackArraySize { get; }
     public TypeInstance StackArrayOf { get; }
 
-    public TypeInstanceStackArray(TypeInstance stackArrayOf, StatementWithValue? sizeValue) : base()
+    public TypeInstanceStackArray(TypeInstance stackArrayOf, StatementWithValue? sizeValue)
     {
-        this.StackArrayOf = stackArrayOf;
-        this.StackArraySize = sizeValue;
+        StackArrayOf = stackArrayOf;
+        StackArraySize = sizeValue;
     }
 
     public override bool Equals(object? obj) => obj is TypeInstanceStackArray other && Equals(other);
@@ -166,18 +166,18 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>,
 {
     public Token Identifier { get; }
     public ImmutableArray<TypeInstance>? TypeArguments { get; }
+    public object? Reference { get; set; }
+    public Uri File { get; }
+
     public override Position Position =>
         new Position(Identifier)
         .Union(TypeArguments);
 
-    public object? Reference { get; set; }
-    public Uri File { get; }
-
-    public TypeInstanceSimple(Token identifier, Uri file, IEnumerable<TypeInstance>? typeArguments = null) : base()
+    public TypeInstanceSimple(Token identifier, Uri file, IEnumerable<TypeInstance>? typeArguments = null)
     {
-        this.Identifier = identifier;
-        this.File = file;
-        this.TypeArguments = typeArguments?.ToImmutableArray();
+        Identifier = identifier;
+        File = file;
+        TypeArguments = typeArguments?.ToImmutableArray();
     }
 
     public override bool Equals(object? obj) => obj is TypeInstanceSimple other && Equals(other);
@@ -267,12 +267,13 @@ public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?
 {
     public TypeInstance To { get; }
     public Token Operator { get; }
+
     public override Position Position => new(To, Operator);
 
-    public TypeInstancePointer(TypeInstance to, Token @operator) : base()
+    public TypeInstancePointer(TypeInstance to, Token @operator)
     {
-        this.To = to;
-        this.Operator = @operator;
+        To = to;
+        Operator = @operator;
     }
 
     public override bool Equals(object? obj) => obj is TypeInstancePointer other && Equals(other);

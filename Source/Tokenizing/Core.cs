@@ -31,7 +31,7 @@ public abstract partial class Tokenizer
 
     protected readonly List<Token> Tokens;
     protected readonly List<SimpleToken> UnicodeCharacters;
-    protected readonly List<Warning> Warnings;
+    protected readonly List<Diagnostic> Warnings;
     protected readonly TokenizerSettings Settings;
     protected readonly Uri? File;
 

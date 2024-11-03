@@ -99,7 +99,7 @@ public sealed class Parser
 #pragma warning restore RCS1213, IDE0052, CA1823
 
     // === Result ===
-    readonly List<LanguageError> Errors = new();
+    readonly Diagnostics Diagnostics = new();
     readonly List<FunctionDefinition> Functions = new();
     readonly List<FunctionDefinition> Operators = new();
     readonly Dictionary<string, StructDefinition> Structs = new();
@@ -162,7 +162,7 @@ public sealed class Parser
         }
 
         return new ParserResult(
-            Errors,
+            Diagnostics,
             Functions,
             Operators,
             Structs.Values,
@@ -177,7 +177,7 @@ public sealed class Parser
     {
         if (ExpectStatementUnchecked(out Statement.Statement? statement))
         {
-            if (Errors.Count > 0) { throw Errors[0]; }
+            Diagnostics.Throw();
             return statement;
         }
         else
@@ -227,7 +227,7 @@ public sealed class Parser
             }
             else
             {
-                Errors.Add(new LanguageError($"Expected library name after \"{DeclarationKeywords.Using}\"", keyword, File));
+                Diagnostics.Add(Diagnostic.Error($"Expected library name after \"{DeclarationKeywords.Using}\"", keyword, File));
             }
             return false;
         }
@@ -543,7 +543,7 @@ public sealed class Parser
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
-        { Errors.Add(new LanguageError($"Body is required for general function definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
+        { Diagnostics.Add(Diagnostic.Error($"Body is required for general function definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
 
         function = new GeneralFunctionDefinition(
             possibleNameT,
@@ -603,7 +603,7 @@ public sealed class Parser
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
-        { Errors.Add(new LanguageError($"Body is required for constructor definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
+        { Diagnostics.Add(Diagnostic.Error($"Body is required for constructor definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
 
         function = new ConstructorDefinition(
             type,
@@ -747,7 +747,7 @@ public sealed class Parser
             if (endlessSafe >= 50) { throw new EndlessLoopException(); }
         }
 
-        listValue = new LiteralList(values, new TokenPair(bracketStart, bracketEnd));
+        listValue = new LiteralList(values, new TokenPair(bracketStart, bracketEnd), File);
         return true;
     }
 
@@ -763,7 +763,7 @@ public sealed class Parser
         {
             v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
-            Literal literal = new(LiteralType.Float, v, CurrentToken);
+            Literal literal = new(LiteralType.Float, v, CurrentToken, File);
 
             CurrentTokenIndex++;
 
@@ -774,7 +774,7 @@ public sealed class Parser
         {
             v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
-            Literal literal = new(LiteralType.Integer, v, CurrentToken);
+            Literal literal = new(LiteralType.Integer, v, CurrentToken, File);
 
             CurrentTokenIndex++;
 
@@ -786,7 +786,7 @@ public sealed class Parser
             v = v[2..];
             v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
-            Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 16).ToString(CultureInfo.InvariantCulture), CurrentToken);
+            Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 16).ToString(CultureInfo.InvariantCulture), CurrentToken, File);
 
             CurrentTokenIndex++;
 
@@ -798,7 +798,7 @@ public sealed class Parser
             v = v[2..];
             v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
-            Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 2).ToString(CultureInfo.InvariantCulture), CurrentToken);
+            Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 2).ToString(CultureInfo.InvariantCulture), CurrentToken, File);
 
             CurrentTokenIndex++;
 
@@ -807,7 +807,7 @@ public sealed class Parser
         }
         else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralString)
         {
-            Literal literal = new(LiteralType.String, v, CurrentToken);
+            Literal literal = new(LiteralType.String, v, CurrentToken, File);
 
             CurrentTokenIndex++;
 
@@ -816,7 +816,7 @@ public sealed class Parser
         }
         else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralCharacter)
         {
-            Literal literal = new(LiteralType.Char, v, CurrentToken);
+            Literal literal = new(LiteralType.Char, v, CurrentToken, File);
 
             CurrentTokenIndex++;
 
@@ -940,7 +940,7 @@ public sealed class Parser
                 ExpectType(AllowedType.FunctionPointer, out TypeInstance? typeInstance))
             {
                 simpleIdentifier.AnalyzedType = TokenAnalyzedType.Keyword;
-                statementWithValue = new TypeStatement(simpleIdentifier, typeInstance);
+                statementWithValue = new TypeStatement(simpleIdentifier, typeInstance, File);
             }
             else
             {
@@ -990,7 +990,7 @@ public sealed class Parser
                 if (!ExpectType(AllowedType.StackArrayWithoutLength, out TypeInstance? type))
                 { throw new SyntaxException($"Expected type after keyword \"{keyword}\"", keyword.Position.After(), File); }
 
-                statementWithValue = new BasicTypeCast(statementWithValue, keyword, type);
+                statementWithValue = new BasicTypeCast(statementWithValue, keyword, type, File);
             }
         }
 
@@ -1002,7 +1002,7 @@ public sealed class Parser
         int savedToken = CurrentTokenIndex;
         typeCast = default;
 
-        if (!ExpectOperator("(", out Token? leftTypeBracket))
+        if (!ExpectOperator("(", out Token? leftBracket))
         {
             CurrentTokenIndex = savedToken;
             return false;
@@ -1014,21 +1014,21 @@ public sealed class Parser
             return false;
         }
 
-        if (!ExpectOperator(")", out Token? rightTypeBracket))
-        {
-            CurrentTokenIndex = savedToken;
-            return false;
-        }
-
+        if (!ExpectOperator(")", out Token? rightBracket))
         // { throw new SyntaxException($"Expected ')' after type of the type cast", type.Position.After(), File); }
-        if (!ExpectOneValue(out StatementWithValue? value, false))
         {
             CurrentTokenIndex = savedToken;
             return false;
         }
-        // { throw new SyntaxException($"Expected one value for the type cast", rightTypeBracket.Position.After(), File); }
 
-        typeCast = new ManagedTypeCast(value, type);
+        if (!ExpectOneValue(out StatementWithValue? value, false))
+        // { throw new SyntaxException($"Expected one value for the type cast", rightTypeBracket.Position.After(), File); }
+        {
+            CurrentTokenIndex = savedToken;
+            return false;
+        }
+
+        typeCast = new ManagedTypeCast(value, type, new TokenPair(leftBracket, rightBracket), File);
         return true;
     }
 
@@ -1046,7 +1046,7 @@ public sealed class Parser
             return false;
         }
 
-        statement = new AddressGetter(refToken, prevStatement);
+        statement = new AddressGetter(refToken, prevStatement, File);
         return true;
     }
 
@@ -1064,7 +1064,7 @@ public sealed class Parser
             return false;
         }
 
-        statement = new Pointer(refToken, prevStatement);
+        statement = new Pointer(refToken, prevStatement, File);
         return true;
     }
 
@@ -1120,7 +1120,7 @@ public sealed class Parser
             if (endlessSafe > 500) throw new EndlessLoopException();
         }
 
-        block = new Block(statements, new TokenPair(bracketStart, bracketEnd));
+        block = new Block(statements, new TokenPair(bracketStart, bracketEnd), File);
 
         if (ExpectOperator(";", out Token? semicolon))
         { block.Semicolon = semicolon; }
@@ -1201,7 +1201,7 @@ public sealed class Parser
         if (!ExpectBlock(out Block? block))
         { throw new SyntaxException($"Expected block", bracketEnd.Position.After(), File); }
 
-        forLoop = new ForLoop(keyword, variableDeclaration, condition, anyAssignment, block);
+        forLoop = new ForLoop(keyword, variableDeclaration, condition, anyAssignment, block, File);
         return true;
     }
 
@@ -1224,7 +1224,7 @@ public sealed class Parser
         if (!ExpectBlock(out Block? block))
         { throw new SyntaxException("Expected block", bracketEnd.Position.After(), File); }
 
-        whileLoop = new WhileLoop(keyword, condition, block);
+        whileLoop = new WhileLoop(keyword, condition, block, File);
         return true;
     }
 
@@ -1253,7 +1253,7 @@ public sealed class Parser
             branches.Add(elseStatement);
         }
 
-        ifContainer = new IfContainer(branches);
+        ifContainer = new IfContainer(branches, File);
         return true;
     }
 
@@ -1290,9 +1290,9 @@ public sealed class Parser
 
         baseBranch = ifSegmentType switch
         {
-            BaseBranch.IfPart.If => new IfBranch(keyword, condition ?? throw new InternalException(), block),
-            BaseBranch.IfPart.ElseIf => new ElseIfBranch(keyword, condition ?? throw new InternalException(), block),
-            BaseBranch.IfPart.Else => new ElseBranch(keyword, block),
+            BaseBranch.IfPart.If => new IfBranch(keyword, condition ?? throw new InternalException(), block, File),
+            BaseBranch.IfPart.ElseIf => new ElseIfBranch(keyword, condition ?? throw new InternalException(), block, File),
+            BaseBranch.IfPart.Else => new ElseBranch(keyword, block, File),
             _ => throw new UnreachableException(),
         };
         return true;
@@ -1311,7 +1311,7 @@ public sealed class Parser
         if (NeedSemicolon(statement))
         {
             if (!ExpectOperator(";", out semicolon))
-            { Errors.Add(new LanguageError($"Please put a \";\" here (after {statement.GetType().Name})", statement.Position.After(), File)); }
+            { Diagnostics.Add(Diagnostic.Error($"Please put a \";\" here (after {statement.GetType().Name})", statement.Position.After(), File)); }
         }
         else
         { ExpectOperator(";", out semicolon); }
@@ -1571,7 +1571,7 @@ public sealed class Parser
         if (!ExpectOneValue(out StatementWithValue? value))
         { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.Position.After(), File); }
 
-        oneValue = new ModifiedStatement(modifier, value);
+        oneValue = new ModifiedStatement(modifier, value, File);
         return true;
     }
 
@@ -1592,7 +1592,7 @@ public sealed class Parser
         if (!ExpectOneValue(out StatementWithValue? value))
         { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.Position.After(), File); }
 
-        modifiedStatement = new ModifiedStatement(modifier, value);
+        modifiedStatement = new ModifiedStatement(modifier, value, File);
         return true;
     }
 
@@ -1695,13 +1695,13 @@ public sealed class Parser
             parameters.Add(parameter);
         }
 
-        keywordCall = new(possibleFunctionName, parameters);
+        keywordCall = new(possibleFunctionName, parameters, File);
 
         if (keywordCall.Arguments.Length < minParameterCount)
-        { Errors.Add(new LanguageError($"This keyword-call (\"{possibleFunctionName}\") requires minimum {minParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
+        { Diagnostics.Add(Diagnostic.Error($"This keyword-call (\"{possibleFunctionName}\") requires minimum {minParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
 
         if (keywordCall.Arguments.Length > maxParameterCount)
-        { Errors.Add(new LanguageError($"This keyword-call (\"{possibleFunctionName}\") requires maximum {maxParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
+        { Diagnostics.Add(Diagnostic.Error($"This keyword-call (\"{possibleFunctionName}\") requires maximum {maxParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
 
         return true;
     }
@@ -1813,11 +1813,11 @@ public sealed class Parser
         foreach (Token modifier in modifiers)
         {
             if (!validModifiers.Contains(modifier.Content))
-            { Errors.Add(new LanguageError($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
+            { Diagnostics.Add(Diagnostic.Error($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
 
             if (modifier.Content == ModifierKeywords.This &&
                 parameterIndex != 0)
-            { Errors.Add(new LanguageError($"Modifier \"{ModifierKeywords.This}\" only valid on the first parameter", modifier, File)); }
+            { Diagnostics.Add(Diagnostic.Error($"Modifier \"{ModifierKeywords.This}\" only valid on the first parameter", modifier, File)); }
         }
     }
 
@@ -1827,7 +1827,7 @@ public sealed class Parser
         foreach (Token modifier in modifiers)
         {
             if (!validModifiers.Contains(modifier.Content))
-            { Errors.Add(new LanguageError($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
+            { Errors.Add(Diagnostic.Error($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
         }
     }
     void CheckModifiers(IEnumerable<Token> modifiers, params string[] validModifiers)
@@ -1838,7 +1838,7 @@ public sealed class Parser
         foreach (Token modifier in modifiers)
         {
             if (!validModifiers.Contains(modifier.Content))
-            { Errors.Add(new LanguageError($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
+            { Diagnostics.Add(Diagnostic.Error($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
         }
     }
 
@@ -1932,14 +1932,14 @@ public sealed class Parser
 
     bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type)
     {
-        if (ExpectType(flags, out type, out LanguageError? error))
+        if (ExpectType(flags, out type, out Diagnostic? error))
         { return true; }
         if (error is not null)
-        { Errors.Add(error.Break()); }
+        { Diagnostics.Add(error.Break()); }
         return false;
     }
 
-    bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type, [MaybeNullWhen(true)] out LanguageError? error)
+    bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type, [MaybeNullWhen(true)] out Diagnostic? error)
     {
         type = default;
         error = null;
@@ -1956,7 +1956,7 @@ public sealed class Parser
             possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (ExpectOperator(TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType, out Token? illegalT))
-            { Errors.Add(new LanguageError($"This is not allowed", illegalT, File)); }
+            { Diagnostics.Add(Diagnostic.Error($"This is not allowed", illegalT, File)); }
 
             if (ExpectOperator("*", out Token? pointerOperator))
             {
@@ -1966,7 +1966,7 @@ public sealed class Parser
             {
                 if ((flags & AllowedType.Any) == 0)
                 {
-                    error = new LanguageError($"Type {TypeKeywords.Any} is not valid in the current context", possibleType, File, false);
+                    error = Diagnostic.Error($"Type {TypeKeywords.Any} is not valid in the current context", possibleType, File, false);
                     return false;
                 }
             }

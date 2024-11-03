@@ -16,7 +16,7 @@ public class GenericType : GeneralType,
     Token? IReferenceableTo<Token>.Reference
     {
         get => Definition;
-        set => throw null!;
+        set => throw new InvalidOperationException();
     }
 
     public GenericType(GenericType other)

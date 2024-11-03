@@ -26,6 +26,11 @@ public readonly struct TokenPair :
         Token.CreateAnonymous(start, TokenType.Operator, surround.Before()),
         Token.CreateAnonymous(end, TokenType.Operator, surround.Before())
     );
+
+    public static TokenPair CreateAnonymous(string start, string end) => new(
+        Token.CreateAnonymous(start, TokenType.Operator),
+        Token.CreateAnonymous(end, TokenType.Operator)
+    );
 }
 
 public static class StatementExtensions
@@ -50,7 +55,7 @@ public static class StatementExtensions
         => (result = GetStatement(statement, condition)) is not null;
 }
 
-public abstract class Statement : IPositioned
+public abstract class Statement : IPositioned, IInFile
 {
     /// <summary>
     /// Set by the <see cref="Parser"/>
@@ -58,15 +63,18 @@ public abstract class Statement : IPositioned
     public Token? Semicolon { get; internal set; }
 
     public abstract Position Position { get; }
+    public Uri File { get; }
 
-    protected Statement()
+    protected Statement(Uri file)
     {
         Semicolon = null;
+        File = file;
     }
 
     protected Statement(Statement other)
     {
         Semicolon = other.Semicolon;
+        File = other.File;
     }
 
     public override string ToString()
@@ -77,6 +85,11 @@ public abstract class Statement : IPositioned
 
 public abstract class AnyAssignment : Statement
 {
+    protected AnyAssignment(Uri file) : base(file)
+    {
+
+    }
+
     public abstract Assignment ToAssignment();
 }
 
@@ -100,7 +113,7 @@ public abstract class StatementWithValue : Statement
     /// </summary>
     public TokenPair? SurroundingBracelet { get; internal set; }
 
-    protected StatementWithValue()
+    protected StatementWithValue(Uri file) : base(file)
     {
         SaveValue = true;
         CompiledType = null;
@@ -113,14 +126,20 @@ public abstract class StatementWithBlock : Statement
 {
     public Block Block { get; }
 
-    protected StatementWithBlock(Block block) => Block = block;
+    protected StatementWithBlock(Block block, Uri file) : base(file)
+    {
+        Block = block;
+    }
 }
 
 public abstract class StatementWithAnyBlock : Statement
 {
     public Statement Block { get; }
 
-    protected StatementWithAnyBlock(Statement block) => Block = block;
+    protected StatementWithAnyBlock(Statement block, Uri file) : base(file)
+    {
+        Block = block;
+    }
 }
 
 public class Block : Statement
@@ -130,7 +149,7 @@ public class Block : Statement
 
     public override Position Position => new(Brackets);
 
-    public Block(IEnumerable<Statement> statements, TokenPair brackets)
+    public Block(IEnumerable<Statement> statements, TokenPair brackets, Uri file) : base(file)
     {
         Statements = statements.ToImmutableArray();
         Brackets = brackets;
@@ -175,7 +194,9 @@ public class Block : Statement
         if (statement is Block block) return block;
         return new Block(
             new Statement[] { statement },
-            TokenPair.CreateAnonymous(statement.Position, "{", "}"));
+            TokenPair.CreateAnonymous(statement.Position, "{", "}"),
+            statement.File
+        );
     }
 }
 
@@ -183,7 +204,7 @@ public abstract class LinkedIfThing : StatementWithAnyBlock
 {
     public Token Keyword { get; }
 
-    protected LinkedIfThing(Token keyword, Statement block) : base(block)
+    protected LinkedIfThing(Token keyword, Statement block, Uri file) : base(block, file)
     {
         Keyword = keyword;
     }
@@ -196,7 +217,7 @@ public class LinkedIf : LinkedIfThing
 
     public override Position Position => new(Keyword, Condition, Block);
 
-    public LinkedIf(Token keyword, StatementWithValue condition, Statement block) : base(keyword, block)
+    public LinkedIf(Token keyword, StatementWithValue condition, Statement block, Uri file) : base(keyword, block, file)
     {
         Condition = condition;
     }
@@ -226,7 +247,7 @@ public class LinkedElse : LinkedIfThing
 {
     public override Position Position => new(Keyword, Block);
 
-    public LinkedElse(Token keyword, Statement block) : base(keyword, block)
+    public LinkedElse(Token keyword, Statement block, Uri file) : base(keyword, block, file)
     { }
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
@@ -245,7 +266,7 @@ public class LiteralList : StatementWithValue
 
     public override Position Position => new(Brackets);
 
-    public LiteralList(IEnumerable<StatementWithValue> values, TokenPair brackets)
+    public LiteralList(IEnumerable<StatementWithValue> values, TokenPair brackets, Uri file) : base(file)
     {
         Brackets = brackets;
         Values = values.ToImmutableArray();
@@ -305,7 +326,6 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
     public Token Identifier { get; }
     public StatementWithValue? InitialValue { get; }
     public ImmutableArray<Token> Modifiers { get; }
-    public Uri File { get; }
 
     public override Position Position =>
         new Position(Type, Identifier, InitialValue)
@@ -318,7 +338,6 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
         Identifier = other.Identifier;
         InitialValue = other.InitialValue;
         Modifiers = other.Modifiers;
-        File = other.File;
         CompiledType = other.CompiledType;
     }
 
@@ -327,13 +346,12 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
         TypeInstance type,
         Token variableName,
         StatementWithValue? initialValue,
-        Uri file)
+        Uri file) : base(file)
     {
         Type = type;
         Identifier = variableName;
         InitialValue = initialValue;
         Modifiers = modifiers.ToImmutableArray();
-        File = file;
     }
 
     public override string ToString()
@@ -358,7 +376,7 @@ public class TypeStatement : StatementWithValue
 
     public override Position Position => new(Keyword, Type);
 
-    public TypeStatement(Token keyword, TypeInstance type)
+    public TypeStatement(Token keyword, TypeInstance type, Uri file) : base(file)
     {
         Keyword = keyword;
         Type = type;
@@ -390,7 +408,7 @@ public class CompiledTypeStatement : StatementWithValue
 
     public override Position Position => new(Keyword);
 
-    public CompiledTypeStatement(Token keyword, GeneralType type)
+    public CompiledTypeStatement(Token keyword, GeneralType type, Uri file) : base(file)
     {
         Keyword = keyword;
         Type = type;
@@ -426,7 +444,6 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
     public TokenPair Brackets { get; }
     public ImmutableArray<StatementWithValue> Arguments { get; }
     public ImmutableArray<Token> Commas { get; }
-    public Uri File { get; }
 
     public override Position Position => new(PrevStatement, Brackets);
 
@@ -435,13 +452,12 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
         IEnumerable<StatementWithValue> parameters,
         IEnumerable<Token> commas,
         TokenPair brackets,
-        Uri file)
+        Uri file) : base(file)
     {
         PrevStatement = prevStatement;
         Arguments = parameters.ToImmutableArray();
         Commas = commas.ToImmutableArray();
         Brackets = brackets;
-        File = file;
     }
 
     public override string ToString()
@@ -548,7 +564,6 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
     public ImmutableArray<StatementWithValue> Arguments { get; }
     public StatementWithValue? PrevStatement { get; }
     public TokenPair Brackets { get; }
-    public Uri File { get; }
 
     public bool IsMethodCall => PrevStatement != null;
     public ImmutableArray<StatementWithValue> MethodArguments
@@ -568,13 +583,12 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
         Token identifier,
         IEnumerable<StatementWithValue> arguments,
         TokenPair brackets,
-        Uri file)
+        Uri file) : base(file)
     {
         PrevStatement = prevStatement;
         Identifier = identifier;
         Arguments = arguments.ToImmutableArray();
         Brackets = brackets;
-        File = file;
     }
 
     public override string ToString()
@@ -656,7 +670,10 @@ public class KeywordCall : StatementWithValue, IReadable
         new Position(Identifier)
         .Union(Arguments);
 
-    public KeywordCall(Token identifier, IEnumerable<StatementWithValue> arguments)
+    public KeywordCall(
+        Token identifier,
+        IEnumerable<StatementWithValue> arguments,
+        Uri file) : base(file)
     {
         Identifier = identifier;
         Arguments = arguments.ToImmutableArray();
@@ -750,7 +767,6 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
     /// </summary>
     public StatementWithValue Right { get; set; }
     public CompiledOperator? Reference { get; set; }
-    public Uri File { get; }
 
     public override Position Position => new(Operator, Left, Right);
     public ImmutableArray<StatementWithValue> Arguments => ImmutableArray.Create(Left, Right);
@@ -759,12 +775,11 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
         Token op,
         StatementWithValue left,
         StatementWithValue right,
-        Uri file)
+        Uri file) : base(file)
     {
         Operator = op;
         Left = left;
         Right = right;
-        File = file;
     }
 
     public override string ToString()
@@ -835,7 +850,6 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 
     public Token Operator { get; }
     public StatementWithValue Left { get; }
-    public Uri File { get; }
 
     public override Position Position => new(Operator, Left);
     public ImmutableArray<StatementWithValue> Arguments => ImmutableArray.Create(Left);
@@ -843,11 +857,10 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
     public UnaryOperatorCall(
         Token op,
         StatementWithValue left,
-        Uri file)
+        Uri file) : base(file)
     {
         Operator = op;
         Left = left;
-        File = file;
     }
 
     public override string ToString()
@@ -905,7 +918,6 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
     /// </summary>
     public Token Operator { get; }
     public StatementWithValue Left { get; }
-    public Uri File { get; }
 
     public ImmutableArray<StatementWithValue> Arguments => ImmutableArray.Create(Left);
     public override Position Position => new(Operator, Left);
@@ -913,11 +925,10 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
     public ShortOperatorCall(
         Token op,
         StatementWithValue left,
-        Uri file)
+        Uri file) : base(file)
     {
         Operator = op;
         Left = left;
-        File = file;
     }
 
     public override string ToString()
@@ -976,13 +987,13 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
         {
             case "++":
             {
-                Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
+                Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position, File);
                 return new BinaryOperatorCall(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one, File);
             }
 
             case "--":
             {
-                Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
+                Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position, File);
                 return new BinaryOperatorCall(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one, File);
             }
 
@@ -999,7 +1010,6 @@ public class Assignment : AnyAssignment
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; }
-    public Uri File { get; }
 
     public override Position Position => new(Operator, Left, Right);
 
@@ -1007,12 +1017,11 @@ public class Assignment : AnyAssignment
         Token @operator,
         StatementWithValue left,
         StatementWithValue right,
-        Uri file)
+        Uri file) : base(file)
     {
         Operator = @operator;
         Left = left;
         Right = right;
-        File = file;
     }
 
     public override string ToString()
@@ -1065,7 +1074,6 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo<CompiledOperat
     public Token Operator { get; }
     public StatementWithValue Left { get; }
     public StatementWithValue Right { get; }
-    public Uri File { get; }
 
     public override Position Position => new(Operator, Left, Right);
 
@@ -1073,12 +1081,11 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo<CompiledOperat
         Token @operator,
         StatementWithValue left,
         StatementWithValue right,
-        Uri file)
+        Uri file) : base(file)
     {
         Operator = @operator;
         Left = left;
         Right = right;
-        File = file;
     }
 
     public override string ToString()
@@ -1139,14 +1146,21 @@ public class Literal : StatementWithValue
     public override Position Position
         => ValueToken is null ? ImaginaryPosition : new Position(ValueToken);
 
-    public Literal(LiteralType type, string value, Token valueToken)
+    public Literal(
+        LiteralType type,
+        string value,
+        Token valueToken,
+        Uri file) : base(file)
     {
         Type = type;
         Value = value;
         ValueToken = valueToken;
     }
 
-    public Literal(LiteralType type, Token value)
+    public Literal(
+        LiteralType type,
+        Token value,
+        Uri file) : base(file)
     {
         Type = type;
         Value = value.Content;
@@ -1154,7 +1168,10 @@ public class Literal : StatementWithValue
     }
 
     /// <exception cref="NotImplementedException"/>
-    Literal(CompiledValue value, Token token)
+    Literal(
+        CompiledValue value,
+        Token token,
+        Uri file) : base(file)
     {
         Type = value.Type switch
         {
@@ -1171,10 +1188,10 @@ public class Literal : StatementWithValue
         ValueToken = token;
     }
 
-    public static Literal CreateAnonymous(LiteralType type, string value, IPositioned position)
-        => Literal.CreateAnonymous(type, value, position.Position);
+    public static Literal CreateAnonymous(LiteralType type, string value, IPositioned position, Uri file)
+        => Literal.CreateAnonymous(type, value, position.Position, file);
 
-    public static Literal CreateAnonymous(LiteralType type, string value, Position position)
+    public static Literal CreateAnonymous(LiteralType type, string value, Position position, Uri file)
     {
         TokenType tokenType = type switch
         {
@@ -1184,18 +1201,18 @@ public class Literal : StatementWithValue
             LiteralType.Char => TokenType.LiteralCharacter,
             _ => TokenType.Identifier,
         };
-        return new Literal(type, value, Token.CreateAnonymous(value, tokenType))
+        return new Literal(type, value, Token.CreateAnonymous(value, tokenType), file)
         {
             ImaginaryPosition = position,
         };
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static Literal CreateAnonymous(CompiledValue value, IPositioned position)
-        => Literal.CreateAnonymous(value, position.Position);
+    public static Literal CreateAnonymous(CompiledValue value, IPositioned position, Uri file)
+        => Literal.CreateAnonymous(value, position.Position, file);
 
     /// <exception cref="NotImplementedException"/>
-    public static Literal CreateAnonymous(CompiledValue value, Position position)
+    public static Literal CreateAnonymous(CompiledValue value, Position position, Uri file)
     {
         TokenType tokenType = value.Type switch
         {
@@ -1208,7 +1225,7 @@ public class Literal : StatementWithValue
             RuntimeType.F32 => TokenType.LiteralFloat,
             _ => TokenType.Identifier,
         };
-        return new Literal(value, Token.CreateAnonymous(value.ToString(), tokenType))
+        return new Literal(value, Token.CreateAnonymous(value.ToString(), tokenType), file)
         {
             ImaginaryPosition = position,
         };
@@ -1219,7 +1236,7 @@ public class Literal : StatementWithValue
         =>
         values
         .Zip(positions, (a, b) => (First: a, Second: b))
-        .Select(item => Literal.CreateAnonymous(item.First, item.Second));
+        .Select(item => Literal.CreateAnonymous(item.First, item.Second, null));
 
     public override string ToString()
     {
@@ -1315,17 +1332,15 @@ public class Identifier : StatementWithValue, IReferenceableTo
     public object? Reference { get; set; }
 
     public Token Token { get; }
-    public Uri File { get; }
 
     public string Content => Token.Content;
     public override Position Position => Token.Position;
 
     public Identifier(
         Token token,
-        Uri file)
+        Uri file) : base(file)
     {
         Token = token;
-        File = file;
     }
 
     public override string ToString() => Token.Content;
@@ -1343,7 +1358,10 @@ public class AddressGetter : StatementWithValue
 
     public override Position Position => new(Operator, PrevStatement);
 
-    public AddressGetter(Token operatorToken, StatementWithValue prevStatement)
+    public AddressGetter(
+        Token operatorToken,
+        StatementWithValue prevStatement,
+        Uri file) : base(file)
     {
         Operator = operatorToken;
         PrevStatement = prevStatement;
@@ -1368,7 +1386,10 @@ public class Pointer : StatementWithValue
 
     public override Position Position => new(Operator, PrevStatement);
 
-    public Pointer(Token operatorToken, StatementWithValue prevStatement)
+    public Pointer(
+        Token operatorToken,
+        StatementWithValue prevStatement,
+        Uri file) : base(file)
     {
         Operator = operatorToken;
         PrevStatement = prevStatement;
@@ -1393,8 +1414,11 @@ public class WhileLoop : StatementWithBlock
 
     public override Position Position => new(Keyword, Block);
 
-    public WhileLoop(Token keyword, StatementWithValue condition, Block block)
-        : base(block)
+    public WhileLoop(
+        Token keyword,
+        StatementWithValue condition,
+        Block block,
+        Uri file) : base(block, file)
     {
         Keyword = keyword;
         Condition = condition;
@@ -1424,8 +1448,14 @@ public class ForLoop : StatementWithBlock
 
     public override Position Position => new(Keyword, Block);
 
-    public ForLoop(Token keyword, VariableDeclaration variableDeclaration, StatementWithValue condition, AnyAssignment expression, Block block)
-        : base(block)
+    public ForLoop(
+        Token keyword,
+        VariableDeclaration variableDeclaration,
+        StatementWithValue condition,
+        AnyAssignment expression,
+        Block block,
+        Uri file)
+        : base(block, file)
     {
         Keyword = keyword;
         VariableDeclaration = variableDeclaration;
@@ -1460,7 +1490,9 @@ public class IfContainer : Statement
 
     public override Position Position => new(Branches);
 
-    public IfContainer(IEnumerable<BaseBranch> parts)
+    public IfContainer(
+        IEnumerable<BaseBranch> parts,
+        Uri file) : base(file)
     {
         Branches = parts.ToImmutableArray();
     }
@@ -1473,7 +1505,11 @@ public class IfContainer : Statement
 
         if (Branches[i] is ElseIfBranch elseIfBranch)
         {
-            return new LinkedIf(elseIfBranch.Keyword, elseIfBranch.Condition, elseIfBranch.Block)
+            return new LinkedIf(
+                elseIfBranch.Keyword,
+                elseIfBranch.Condition,
+                elseIfBranch.Block,
+                elseIfBranch.File)
             {
                 NextLink = ToLinks(i + 1),
             };
@@ -1481,7 +1517,10 @@ public class IfContainer : Statement
 
         if (Branches[i] is ElseBranch elseBranch)
         {
-            return new LinkedElse(elseBranch.Keyword, elseBranch.Block);
+            return new LinkedElse(
+                elseBranch.Keyword,
+                elseBranch.Block,
+                elseBranch.File);
         }
 
         throw new NotImplementedException();
@@ -1493,7 +1532,11 @@ public class IfContainer : Statement
     {
         if (Branches.Length == 0) throw new InternalException();
         if (Branches[0] is not IfBranch ifBranch) throw new InternalException();
-        return new LinkedIf(ifBranch.Keyword, ifBranch.Condition, ifBranch.Block)
+        return new LinkedIf(
+            ifBranch.Keyword,
+            ifBranch.Condition,
+            ifBranch.Block,
+            ifBranch.File)
         {
             NextLink = ToLinks(1),
         };
@@ -1524,8 +1567,12 @@ public abstract class BaseBranch : StatementWithAnyBlock
 
     public override Position Position => new(Keyword, Block);
 
-    protected BaseBranch(Token keyword, IfPart type, Statement block)
-        : base(block)
+    protected BaseBranch(
+        Token keyword,
+        IfPart type,
+        Statement block,
+        Uri file)
+        : base(block, file)
     {
         Keyword = keyword;
         Type = type;
@@ -1546,8 +1593,12 @@ public class IfBranch : BaseBranch
 {
     public StatementWithValue Condition { get; }
 
-    public IfBranch(Token keyword, StatementWithValue condition, Statement block)
-        : base(keyword, IfPart.If, block)
+    public IfBranch(
+        Token keyword,
+        StatementWithValue condition,
+        Statement block,
+        Uri file)
+        : base(keyword, IfPart.If, block, file)
     {
         Condition = condition;
     }
@@ -1568,8 +1619,12 @@ public class ElseIfBranch : BaseBranch
 {
     public StatementWithValue Condition { get; }
 
-    public ElseIfBranch(Token keyword, StatementWithValue condition, Statement block)
-        : base(keyword, IfPart.ElseIf, block)
+    public ElseIfBranch(
+        Token keyword,
+        StatementWithValue condition,
+        Statement block,
+        Uri file)
+        : base(keyword, IfPart.ElseIf, block, file)
     {
         Condition = condition;
     }
@@ -1588,8 +1643,11 @@ public class ElseIfBranch : BaseBranch
 
 public class ElseBranch : BaseBranch
 {
-    public ElseBranch(Token keyword, Statement block)
-        : base(keyword, IfPart.Else, block)
+    public ElseBranch(
+        Token keyword,
+        Statement block,
+        Uri file)
+        : base(keyword, IfPart.Else, block, file)
     { }
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
@@ -1605,15 +1663,16 @@ public class NewInstance : StatementWithValue, IHaveType, IInFile
 {
     public Token Keyword { get; }
     public TypeInstance Type { get; }
-    public Uri File { get; }
 
     public override Position Position => new(Keyword, Type);
 
-    public NewInstance(Token keyword, TypeInstance typeName, Uri file)
+    public NewInstance(
+        Token keyword,
+        TypeInstance typeName,
+        Uri file) : base(file)
     {
         Keyword = keyword;
         Type = typeName;
-        File = file;
     }
 
     public override string ToString()
@@ -1636,7 +1695,6 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
     public TypeInstance Type { get; }
     public ImmutableArray<StatementWithValue> Arguments { get; }
     public TokenPair Brackets { get; }
-    public Uri File { get; }
 
     public override Position Position =>
         new Position(Keyword, Type, Brackets)
@@ -1647,13 +1705,12 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
         TypeInstance typeName,
         IEnumerable<StatementWithValue> arguments,
         TokenPair brackets,
-        Uri file)
+        Uri file) : base(file)
     {
         Keyword = keyword;
         Type = typeName;
         Arguments = arguments.ToImmutableArray();
         Brackets = brackets;
-        File = file;
     }
 
     public override string ToString()
@@ -1730,7 +1787,6 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<Compile
     public StatementWithValue PrevStatement { get; }
     public StatementWithValue Index { get; }
     public TokenPair Brackets { get; }
-    public Uri File { get; }
 
     public override Position Position => new(PrevStatement, Index);
 
@@ -1738,12 +1794,11 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<Compile
         StatementWithValue prevStatement,
         StatementWithValue indexStatement,
         TokenPair brackets,
-        Uri file)
+        Uri file) : base(file)
     {
         PrevStatement = prevStatement;
         Index = indexStatement;
         Brackets = brackets;
-        File = file;
     }
 
     public override string ToString()
@@ -1786,18 +1841,16 @@ public class Field : StatementWithValue, IReferenceableTo<CompiledField>
 
     public Token Identifier { get; }
     public StatementWithValue PrevStatement { get; }
-    public Uri File { get; }
 
     public override Position Position => new(PrevStatement, Identifier);
 
     public Field(
         StatementWithValue prevStatement,
         Token fieldName,
-        Uri file)
+        Uri file) : base(file)
     {
         PrevStatement = prevStatement;
         Identifier = fieldName;
-        File = file;
     }
 
     public override string ToString()
@@ -1820,7 +1873,11 @@ public class BasicTypeCast : StatementWithValue, IHaveType
 
     public override Position Position => new(PrevStatement, Keyword, Type);
 
-    public BasicTypeCast(StatementWithValue prevStatement, Token keyword, TypeInstance type)
+    public BasicTypeCast(
+        StatementWithValue prevStatement,
+        Token keyword,
+        TypeInstance type,
+        Uri file) : base(file)
     {
         PrevStatement = prevStatement;
         Keyword = keyword;
@@ -1843,13 +1900,19 @@ public class ManagedTypeCast : StatementWithValue, IHaveType
 {
     public StatementWithValue PrevStatement { get; }
     public TypeInstance Type { get; }
+    public TokenPair Brackets { get; }
 
     public override Position Position => new(PrevStatement, Type);
 
-    public ManagedTypeCast(StatementWithValue prevStatement, TypeInstance type)
+    public ManagedTypeCast(
+        StatementWithValue prevStatement,
+        TypeInstance type,
+        TokenPair brackets,
+        Uri file) : base(file)
     {
         PrevStatement = prevStatement;
         Type = type;
+        Brackets = brackets;
     }
 
     public override string ToString()
@@ -1872,7 +1935,10 @@ public class ModifiedStatement : StatementWithValue
     public override Position Position
         => new(Modifier, Statement);
 
-    public ModifiedStatement(Token modifier, StatementWithValue statement)
+    public ModifiedStatement(
+        Token modifier,
+        StatementWithValue statement,
+        Uri file) : base(file)
     {
         Statement = statement;
         Modifier = modifier;

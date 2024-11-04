@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.Parser;
+namespace LanguageCore.Parser;
 
 using Statement;
 using Tokenizing;
@@ -1827,7 +1827,7 @@ public sealed class Parser
         foreach (Token modifier in modifiers)
         {
             if (!validModifiers.Contains(modifier.Content))
-            { Errors.Add(Diagnostic.Error($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
+            { Diagnostics.Add(Diagnostic.Error($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
         }
     }
     void CheckModifiers(IEnumerable<Token> modifiers, params string[] validModifiers)

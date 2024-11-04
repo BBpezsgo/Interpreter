@@ -107,7 +107,7 @@ public static class Entry
                 List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
-                Diagnostics diagnostics = new();
+                DiagnosticsCollection diagnostics = new();
 
                 if (arguments.ThrowErrors)
                 {
@@ -334,7 +334,7 @@ public static class Entry
                 BrainfuckGeneratorResult generated;
                 ImmutableArray<Token> tokens;
 
-                Diagnostics diagnostics = new();
+                DiagnosticsCollection diagnostics = new();
                 if (arguments.ThrowErrors)
                 {
                     tokens = AnyTokenizer.Tokenize(arguments.Source, PreprocessorVariables.Brainfuck).Tokens;
@@ -569,7 +569,7 @@ public static class Entry
                 List<IExternalFunction> externalFunctions = Runtime.BytecodeProcessorEx.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
-                Diagnostics diagnostics = new();
+                DiagnosticsCollection diagnostics = new();
 
                 BitWidth bits = BitWidth._64;
 

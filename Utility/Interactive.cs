@@ -82,7 +82,7 @@ class InteractiveCompiler
     public CompilerResult Compiled { get; private set; }
     public BBLangGeneratorResult Generated => _generated;
     public ParserResult InteractiveAST => new(
-        Enumerable.Empty<Diagnostic>(),
+        new DiagnosticsCollection(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),

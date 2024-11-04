@@ -1,12 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using LanguageCore.Compiler;
 
-#if UNITY
-using unsafe FunctionPointer = delegate* unmanaged[Cdecl]<nint, nint, nint, void>;
-#else
-using unsafe FunctionPointer = delegate*<nint, System.ReadOnlySpan<byte>, System.Span<byte>, void>;
-#endif
-
 namespace LanguageCore.Runtime;
 
 public delegate void ExternalFunctionSyncCallback(ReadOnlySpan<byte> arguments, Span<byte> returnValue);
@@ -39,20 +33,24 @@ public unsafe struct ExternalFunctionScopedSync
     public nint Scope { get; set; }
 #if UNITY
     readonly nint _callback;
-    public FunctionPointer Callback => (FunctionPointer)_callback;
+    public readonly delegate* unmanaged[Cdecl]<nint, nint, nint, void> Callback => (delegate* unmanaged[Cdecl]<nint, nint, nint, void>)_callback;
 #else
-    public FunctionPointer Callback { get; }
+    public delegate*<nint, System.ReadOnlySpan<byte>, System.Span<byte>, void> Callback { get; }
 #endif
 
     public ExternalFunctionScopedSync(
-        FunctionPointer callback,
+        #if UNITY
+        delegate* unmanaged[Cdecl]<nint, nint, nint, void> callback,
+        #else
+        delegate*<nint, System.ReadOnlySpan<byte>, System.Span<byte>, void> callback,
+        #endif
         int id,
         int parametersSize,
         int returnValueSize,
         nint scope)
     {
 #if UNITY
-        _callback = callback;
+        _callback = (nint)callback;
 #else
         Callback = callback;
 #endif

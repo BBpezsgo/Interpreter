@@ -315,7 +315,7 @@ public static class Utils
 
         externalFunctionAdder?.Invoke(externalFunctions);
 
-        Diagnostics diagnostics = new();
+        DiagnosticsCollection diagnostics = new();
 
         CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, null, diagnostics, null, null, AdditionalImports);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
@@ -380,12 +380,12 @@ public static class Utils
         void OutputCallback(byte data) => stdOutput.Append(LanguageCore.Brainfuck.CharCode.GetChar(data));
         byte InputCallback() => LanguageCore.Brainfuck.CharCode.GetByte(inputBuffer.Read());
 
-        Diagnostics diagnostics = new();
+        DiagnosticsCollection diagnostics = new();
         CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, diagnostics, null, null, AdditionalImports);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, diagnostics);
         diagnostics.Throw();
 
-        diagnostics = new Diagnostics();
+        diagnostics = new DiagnosticsCollection();
         CompilerResult compiledUnoptimized = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, null, diagnostics, null, null, AdditionalImports);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generatedUnoptimized = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiledUnoptimized, new LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings(BrainfuckGeneratorSettings)
         { DontOptimize = true }, null, diagnostics);
@@ -432,7 +432,7 @@ public static class Utils
 
     public static AssemblyResult RunAssembly(Uri file, string input)
     {
-        Diagnostics diagnostics = new();
+        DiagnosticsCollection diagnostics = new();
 
         CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, Enumerable.Empty<string>(), null, diagnostics, null, null, AdditionalImports);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);

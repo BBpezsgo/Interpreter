@@ -27,9 +27,8 @@ public abstract class GeneralType :
         _ => throw new NotImplementedException()
     };
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="ArgumentNullException"/>
-    /// <exception cref="CompilerException"/>
     public static GeneralType From(
         TypeInstance type,
         FindType typeFinder,
@@ -43,7 +42,7 @@ public abstract class GeneralType :
             _ => throw new UnreachableException(),
         };
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="ArgumentNullException"/>
     public static ArrayType From(
         TypeInstanceStackArray type,
@@ -75,7 +74,7 @@ public abstract class GeneralType :
         return result;
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="ArgumentNullException"/>
     public static FunctionType From(
         TypeInstanceFunction type,
@@ -92,7 +91,7 @@ public abstract class GeneralType :
         return result;
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="ArgumentNullException"/>
     public static PointerType From(
         TypeInstancePointer type,
@@ -108,7 +107,7 @@ public abstract class GeneralType :
         return result;
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="ArgumentNullException"/>
     public static GeneralType From(
         TypeInstanceSimple type,
@@ -147,7 +146,7 @@ public abstract class GeneralType :
         else
         {
             if (type.TypeArguments.HasValue)
-            { throw new InternalException($"Asd"); }
+            { throw new InternalExceptionWithoutContext($"Asd"); }
         }
 
         type.SetAnalyzedType(result);
@@ -342,7 +341,7 @@ public abstract class GeneralType :
             case GenericType genericType:
             {
                 if (!typeArguments.TryGetValue(genericType.Identifier, out GeneralType? passedTypeArgument))
-                { throw new InternalException(); }
+                { throw new InternalExceptionWithoutContext(); }
                 return passedTypeArgument;
             }
 

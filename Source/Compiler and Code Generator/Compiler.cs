@@ -31,42 +31,30 @@ public readonly struct CompilerResult
 
             foreach (CompiledFunction function in Functions)
             {
-                Uri? file = function.File;
-                if (file is not null && !alreadyExists.Contains(file))
-                {
-                    alreadyExists.Add(file);
-                    yield return file;
-                }
+                Uri file = function.File;
+                if (!alreadyExists.Add(file))
+                { yield return file; }
             }
 
             foreach (CompiledGeneralFunction generalFunction in GeneralFunctions)
             {
-                Uri? file = generalFunction.File;
-                if (file is not null && !alreadyExists.Contains(file))
-                {
-                    alreadyExists.Add(file);
-                    yield return file;
-                }
+                Uri file = generalFunction.File;
+                if (!alreadyExists.Add(file))
+                { yield return file; }
             }
 
             foreach (CompiledOperator @operator in Operators)
             {
-                Uri? file = @operator.File;
-                if (file is not null && !alreadyExists.Contains(file))
-                {
-                    alreadyExists.Add(file);
-                    yield return file;
-                }
+                Uri file = @operator.File;
+                if (!alreadyExists.Add(file))
+                { yield return file; }
             }
 
             foreach (CompiledStruct @struct in Structs)
             {
-                Uri? file = @struct.File;
-                if (file is not null && !alreadyExists.Contains(file))
-                {
-                    alreadyExists.Add(file);
-                    yield return file;
-                }
+                Uri file = @struct.File;
+                if (!alreadyExists.Add(file))
+                { yield return file; }
             }
         }
     }
@@ -100,7 +88,7 @@ public readonly struct CompilerResult
 
     public readonly IEnumerable<Statement> StatementsIn(Uri file)
     {
-        foreach ((ImmutableArray<Statement> topLevelStatements, Uri? _file) in TopLevelStatements)
+        foreach ((ImmutableArray<Statement> topLevelStatements, Uri _file) in TopLevelStatements)
         {
             if (file != _file) continue;
             foreach (Statement statement in topLevelStatements)
@@ -260,10 +248,10 @@ public sealed class Compiler
     readonly ImmutableArray<IExternalFunction> ExternalFunctions;
     readonly PrintCallback? PrintCallback;
 
-    readonly Diagnostics? Diagnostics;
+    readonly DiagnosticsCollection? Diagnostics;
     readonly IEnumerable<string> PreprocessorVariables;
 
-    Compiler(IEnumerable<IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, Diagnostics? diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings)
+    Compiler(IEnumerable<IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, DiagnosticsCollection? diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings)
     {
         ExternalFunctions = (externalFunctions ?? new List<IExternalFunction>()).ToImmutableArray();
         Settings = settings;
@@ -367,11 +355,11 @@ public sealed class Compiler
         @struct.SetFields(compiledFields);
     }
 
-    public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, IExternalFunction externalFunction, Diagnostics? diagnostics)
+    public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, IExternalFunction externalFunction, DiagnosticsCollection? diagnostics)
         where TFunction : FunctionThingDefinition, ICompiledFunction
         => CheckExternalFunctionDeclaration(runtime, definition, externalFunction, definition.Type, definition.ParameterTypes, diagnostics);
 
-    public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, IExternalFunction externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes, Diagnostics? diagnostics)
+    public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, IExternalFunction externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes, DiagnosticsCollection? diagnostics)
     {
         if (externalFunction.ParametersSize != parameterTypes.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.GetSize(runtime)))
         {
@@ -408,13 +396,13 @@ public sealed class Compiler
                 {
                     if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics?.Add(LanguageCore.Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute, function.File));
+                        Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
 
                     if (attribute.Parameters[0].Type != LiteralType.String)
                     {
-                        Diagnostics?.Add(LanguageCore.Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute, function.File));
+                        Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute));
                         break;
                     }
 
@@ -434,13 +422,13 @@ public sealed class Compiler
                 {
                     if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics?.Add(LanguageCore.Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute, function.File));
+                        Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
 
                     if (attribute.Parameters[0].Type != LiteralType.String)
                     {
-                        Diagnostics?.Add(LanguageCore.Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute, function.File));
+                        Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute));
                         break;
                     }
 
@@ -473,13 +461,13 @@ public sealed class Compiler
                         if (definedParameterType.Invoke(passedParameterType))
                         { continue; }
 
-                        Diagnostics?.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.File));
+                        Diagnostics?.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.Parameters[i].File));
                     }
                     break;
                 }
                 default:
                 {
-                    Diagnostics?.Add(LanguageCore.Diagnostic.Warning($"Unknown attribute {attribute.Identifier}", attribute.Identifier, function.File));
+                    Diagnostics?.Add(Diagnostic.Warning($"Unknown attribute {attribute.Identifier}", attribute));
                     break;
                 }
             }
@@ -507,13 +495,13 @@ public sealed class Compiler
         if (function.Attributes.TryGetAttribute(AttributeConstants.ExternalIdentifier, out AttributeUsage? attribute) &&
             attribute.TryGetValue(out string? name))
         {
-            if (ExternalFunctions.TryGet(name, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
+            if (ExternalFunctions.TryGet(name, out IExternalFunction? externalFunction, out PossibleDiagnostic? error))
             {
                 // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
             }
             else
             {
-                Diagnostics?.Add(exception.InstantiateError(attribute.Identifier, function.File));
+                Diagnostics?.Add(error.ToError(attribute));
             }
         }
 
@@ -951,7 +939,7 @@ public sealed class Compiler
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback = null,
-        Diagnostics? diagnostics = null,
+        DiagnosticsCollection? diagnostics = null,
         TokenizerSettings? tokenizerSettings = null,
         FileParser? fileParser = null,
         IEnumerable<string>? additionalImports = null)
@@ -972,7 +960,7 @@ public sealed class Compiler
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,
-        Diagnostics? diagnostics,
+        DiagnosticsCollection? diagnostics,
         TokenizerSettings? tokenizerSettings,
         Uri file)
     {

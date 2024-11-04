@@ -19,7 +19,7 @@ public readonly struct StackAddress : IDisposable
     {
         if (!IsSomething) { return; }
         if (Stack.LastAddress != Address)
-        { throw new InternalException(); }
+        { throw new InternalExceptionWithoutContext(); }
         Stack.Pop();
     }
 
@@ -46,17 +46,18 @@ public class StackCodeHelper
         }
     }
     public int MaxUsedSize { get; private set; }
-    public bool WillOverflow { get; private set; }
 
     readonly CodeHelper _code;
     readonly List<int> _stack;
+    readonly DiagnosticsCollection? _diagnostics;
 
-    public StackCodeHelper(CodeHelper code, int start, int size)
+    public StackCodeHelper(CodeHelper code, int start, int size, DiagnosticsCollection? diagnostics)
     {
         _code = code;
         _stack = new List<int>();
         Start = start;
         MaxSize = size;
+        _diagnostics = diagnostics;
     }
 
     public StackCodeHelper(CodeHelper code, StackCodeHelper other)
@@ -64,26 +65,25 @@ public class StackCodeHelper
         _code = code;
         _stack = new List<int>(other._stack);
         MaxUsedSize = other.MaxUsedSize;
-        WillOverflow = other.WillOverflow;
         Start = other.Start;
         MaxSize = other.MaxSize;
     }
 
-    public StackAddress GetTemporaryAddress(int size = 1) => PushVirtual(size);
+    public StackAddress GetTemporaryAddress(int size, ILocated location) => PushVirtual(size, location);
 
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
     /// <exception cref="NotSupportedException"/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     public StackAddress Push(CompiledValue v) => Push(CodeHelper.GetInteger(v));
 
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public StackAddress Push(int v)
+    public StackAddress Push(int v, ILocated location)
     {
-        StackAddress address = PushVirtual(1);
+        StackAddress address = PushVirtual(1, location);
 
         _code.SetValue(address, v);
         return address;
@@ -92,9 +92,9 @@ public class StackCodeHelper
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public StackAddress Push(char v)
+    public StackAddress Push(char v, ILocated location)
     {
-        StackAddress address = PushVirtual(1);
+        StackAddress address = PushVirtual(1, location);
 
         _code.SetValue(address, v);
         return address;
@@ -166,14 +166,17 @@ public class StackCodeHelper
         { Pop(); }
     }
 
-    public StackAddress PushVirtual(int size)
+    public StackAddress PushVirtual(int size, ILocated location)
     {
         int address = NextAddress;
 
         if (Size >= MaxSize)
         {
             _code.CRASH(address, "Stack overflow");
-            WillOverflow = true;
+            if (location is not null)
+            {
+                _diagnostics?.Add(Diagnostic.Warning("The stack will overflow here", location));
+            }
             // Debugger.Break();
         }
 

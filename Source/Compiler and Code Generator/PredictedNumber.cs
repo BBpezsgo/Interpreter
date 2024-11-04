@@ -5,11 +5,11 @@ public readonly struct PredictedNumber<T> :
     ISubtractionOperators<PredictedNumber<T>, PredictedNumber<T>, PredictedNumber<T>>,
     IEquatable<PredictedNumber<T>>,
     IEquatable<T>
-    #if NET_STANDARD
+#if NET_STANDARD
     where T : struct
-    #else
+#else
     where T : struct, INumberBase<T>
-    #endif
+#endif
 {
     [MemberNotNullWhen(true, nameof(Value))]
     public bool IsUnknown { get; }

@@ -6,13 +6,11 @@ public class LanguageException : Exception, IDiagnostic
     public Position Position { get; protected set; }
     public Uri? File { get; protected set; }
 
-    protected LanguageException(string message, Position position, Uri? uri) : base(message)
+    public LanguageException(string message, Position position, Uri? uri) : base(message)
     {
         Position = position;
         File = uri;
     }
-
-    public LanguageException(string message, Exception inner) : base(message, inner) { }
 
     public override string ToString()
     {

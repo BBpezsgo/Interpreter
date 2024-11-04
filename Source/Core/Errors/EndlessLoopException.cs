@@ -1,7 +1,7 @@
 ﻿namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
-public sealed class EndlessLoopException : InternalException
+public sealed class EndlessLoopException : InternalExceptionWithoutContext
 {
-    public EndlessLoopException() : base("Endless loop", Position.UnknownPosition, null) { }
+    public EndlessLoopException() : base("Endless loop") { }
 }

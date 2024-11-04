@@ -6,19 +6,25 @@ namespace LanguageCore.Parser;
 
 public class AttributeUsage :
     IPositioned,
-    IIdentifiable<Token>
+    IIdentifiable<Token>,
+    IInFile,
+    ILocated
 {
     public Token Identifier { get; }
     public ImmutableArray<Literal> Parameters { get; }
+    public Uri File { get; }
 
     public Position Position =>
         new Position(Parameters.As<IPositioned>().Or(Identifier))
         .Union(Identifier);
 
-    public AttributeUsage(Token identifier, IEnumerable<Literal> parameters)
+    public Location Location => new(Position, File);
+
+    public AttributeUsage(Token identifier, IEnumerable<Literal> parameters, Uri file)
     {
         Identifier = identifier;
         Parameters = parameters.ToImmutableArray();
+        File = file;
     }
 
     public bool TryGetValue<T>(int index, [NotNullWhen(true)] out T? value)

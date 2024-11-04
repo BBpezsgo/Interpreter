@@ -2,7 +2,10 @@
 
 namespace LanguageCore.Parser;
 
-public class UsingDefinition : IPositioned
+public class UsingDefinition :
+    IPositioned,
+    IInFile,
+    ILocated
 {
     /// <summary>
     /// Set by the compiler
@@ -11,6 +14,7 @@ public class UsingDefinition : IPositioned
 
     public ImmutableArray<Token> Path { get; }
     public Token Keyword { get; }
+    public Uri File { get; }
 
     public string PathString
     {
@@ -25,14 +29,18 @@ public class UsingDefinition : IPositioned
             return result.ToString();
         }
     }
+
     public Position Position =>
         new Position(Path.Or(Keyword))
         .Union(Keyword);
 
-    public UsingDefinition(Token keyword, IEnumerable<Token> path)
+    public Location Location => new(Position, File);
+
+    public UsingDefinition(Token keyword, IEnumerable<Token> path, Uri file)
     {
         Path = path.ToImmutableArray();
         Keyword = keyword;
+        File = file;
     }
 
     public override string ToString() => $"{Keyword} {string.Join('.', Path.Select(token => token.ToOriginalString()))};";

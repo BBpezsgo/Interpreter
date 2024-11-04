@@ -3,7 +3,7 @@
 namespace LanguageCore.Runtime;
 
 [ExcludeFromCodeCoverage]
-public class RuntimeException : LanguageException, IDisposable
+public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
 {
     const int CallStackIndent = 1;
 
@@ -15,8 +15,8 @@ public class RuntimeException : LanguageException, IDisposable
         DebugInformation.IsEmpty ? ReadOnlySpan<int>.Empty :
         DebugUtils.TraceCalls(Context.Value.Memory.AsSpan(), Context.Value.Registers.BasePointer, DebugInformation.StackOffsets);
 
-    public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
-    public RuntimeException(string message, RuntimeContext context, CompiledDebugInformation debugInformation) : base(message, Position.UnknownPosition, null)
+    public RuntimeException(string message) : base(message) { }
+    public RuntimeException(string message, RuntimeContext context, CompiledDebugInformation debugInformation) : base(message)
     {
         Context = context;
         DebugInformation = debugInformation;
@@ -32,30 +32,33 @@ public class RuntimeException : LanguageException, IDisposable
         if (!Context.HasValue) return Message + " (no context)";
         RuntimeContext context = Context.Value;
 
+        Uri? file = null;
         string? arrows = null;
+        Position position;
+
         if (!DebugInformation.IsEmpty && DebugInformation.TryGetSourceLocation(context.Registers.CodePointer, out SourceCodeLocation sourcePosition))
         {
-            Position = sourcePosition.SourcePosition;
-            File = sourcePosition.Uri;
+            position = sourcePosition.SourcePosition;
+            file = sourcePosition.Uri;
             if (sourcePosition.Uri is not null &&
                 DebugInformation.OriginalFiles.TryGetValue(sourcePosition.Uri, out ImmutableArray<Tokenizing.Token> tokens))
-            { arrows = GetArrows(sourcePosition.SourcePosition, tokens); }
+            { arrows = LanguageException.GetArrows(sourcePosition.SourcePosition, tokens); }
         }
         else
-        { Position = Position.UnknownPosition; }
+        { position = Position.UnknownPosition; }
 
         ImmutableArray<FunctionInformation> callStack = DebugInformation.IsEmpty ? ImmutableArray<FunctionInformation>.Empty : DebugInformation.GetFunctionInformation(CallTrace);
 
-        File ??= callStack.LastOrDefault().Function?.File;
+        file ??= callStack.LastOrDefault().Function?.File;
 
         StringBuilder result = new();
 
         result.Append(Message);
 
-        result.Append(Position.ToStringCool().Surround(" (at ", ")"));
+        result.Append(position.ToStringCool().Surround(" (at ", ")"));
 
-        if (File != null)
-        { result.Append($" (in {File})"); }
+        if (file != null)
+        { result.Append($" (in {file})"); }
 
         result.AppendLine();
 

@@ -71,24 +71,21 @@ readonly struct UndefinedOffset<TFunction>
     public int InstructionIndex { get; }
     public bool IsAbsoluteAddress { get; }
 
-    public Position CallerPosition { get; }
-    public Uri? CallerFile { get; }
+    public Location CallerLocation { get; }
 
     public TFunction Called { get; }
 
-    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, IPositioned? caller, TFunction called, Uri? file)
-        : this(callInstructionIndex, isAbsoluteAddress, caller?.Position ?? Position.UnknownPosition, called, file)
+    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, ILocated caller, TFunction called)
+        : this(callInstructionIndex, isAbsoluteAddress, caller.Location, called)
     { }
 
-    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Position callerPosition, TFunction called, Uri? file)
+    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Location callerLocation, TFunction called)
     {
         InstructionIndex = callInstructionIndex;
         IsAbsoluteAddress = isAbsoluteAddress;
 
-        CallerPosition = callerPosition;
+        CallerLocation = callerLocation;
         Called = called;
-
-        CallerFile = file;
     }
 }
 
@@ -104,9 +101,9 @@ public static class ReferenceExtensions
 
 public readonly struct Reference
 {
-    public Uri? SourceFile { get; }
+    public Uri SourceFile { get; }
 
-    public Reference(Uri? sourceFile = null)
+    public Reference(Uri sourceFile)
     {
         SourceFile = sourceFile;
     }
@@ -115,9 +112,9 @@ public readonly struct Reference
 public readonly struct Reference<TSource>
 {
     public TSource Source { get; }
-    public Uri? SourceFile { get; }
+    public Uri SourceFile { get; }
 
-    public Reference(TSource source, Uri? sourceFile = null)
+    public Reference(TSource source, Uri sourceFile)
     {
         Source = source;
         SourceFile = sourceFile;

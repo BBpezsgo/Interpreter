@@ -19,7 +19,7 @@ public class BuiltinType : GeneralType,
 
     public BasicType Type { get; }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="NotImplementedException"/>
     public RuntimeType RuntimeType => Type switch
     {
@@ -63,8 +63,8 @@ public class BuiltinType : GeneralType,
 
     public override int GetSize(IRuntimeInfoProvider runtime) => Type switch
     {
-        BasicType.Void => throw new InternalException($"Type {this} does not have a size"),
-        BasicType.Any => throw new InternalException($"Type {this} does not have a size"),
+        BasicType.Void => throw new InternalExceptionWithoutContext($"Type {this} does not have a size"),
+        BasicType.Any => throw new InternalExceptionWithoutContext($"Type {this} does not have a size"),
         BasicType.U8 => 1,
         BasicType.I8 => 1,
         BasicType.Char => 2,

@@ -99,7 +99,7 @@ public sealed class Parser
 #pragma warning restore RCS1213, IDE0052, CA1823
 
     // === Result ===
-    readonly Diagnostics Diagnostics = new();
+    readonly DiagnosticsCollection Diagnostics = new();
     readonly List<FunctionDefinition> Functions = new();
     readonly List<FunctionDefinition> Operators = new();
     readonly Dictionary<string, StructDefinition> Structs = new();
@@ -126,7 +126,7 @@ public sealed class Parser
 
     /// <exception cref="EndlessLoopException"/>
     /// <exception cref="SyntaxException"/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="TokenizerException"/>
     public static ParserResult ParseFile(string file, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings = null, ConsoleProgressBar? tokenizerProgressBar = null)
     {
@@ -181,7 +181,7 @@ public sealed class Parser
             return statement;
         }
         else
-        { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken, File); }
+        { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken!, File); }
     }
 
     #region Parse top level
@@ -235,7 +235,7 @@ public sealed class Parser
         if (!ExpectOperator(";"))
         { throw new SyntaxException($"Please put a \";\" here (after \"{DeclarationKeywords.Using}\")", keyword.Position.After(), File); }
 
-        usingDefinition = new UsingDefinition(keyword, tokens);
+        usingDefinition = new UsingDefinition(keyword, tokens, File);
 
         return true;
     }
@@ -263,7 +263,7 @@ public sealed class Parser
         else if (ExpectStatement(out Statement.Statement? statement))
         { TopLevelStatements.Add(statement); }
         else
-        { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken, File); }
+        { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken!, File); }
     }
 
     bool ExpectOperatorDefinition([NotNullWhen(true)] out FunctionDefinition? function)
@@ -296,7 +296,7 @@ public sealed class Parser
             CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.This, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
-            { throw new SyntaxException("Expected a type (the parameter's type)", PreviousToken?.Position.After(), File); }
+            { throw new SyntaxException("Expected a type (the parameter's type)", PreviousToken!.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
             { throw new SyntaxException("Expected an identifier (the parameter's name)", parameterType.Position.After(), File); }
@@ -310,7 +310,7 @@ public sealed class Parser
             { break; }
 
             if (!ExpectOperator(","))
-            { throw new SyntaxException($"Expected \",\" or \")\" (not \"{CurrentToken}\")", PreviousToken?.Position.After(), File); }
+            { throw new SyntaxException($"Expected \",\" or \")\" (not \"{CurrentToken}\")", PreviousToken!.Position.After(), File); }
             else
             { expectParameter = true; }
         }
@@ -320,7 +320,7 @@ public sealed class Parser
         Block? block = null;
 
         if (!ExpectOperator(";") && !ExpectBlock(out block))
-        { throw new SyntaxException($"Expected \";\" or block", PreviousToken?.Position.After(), File); }
+        { throw new SyntaxException($"Expected \";\" or block", PreviousToken!.Position.After(), File); }
 
         function = new FunctionDefinition(
             attributes,
@@ -393,7 +393,7 @@ public sealed class Parser
         while (!ExpectOperator(">", out endBracket) || expectParameter)
         {
             if (!ExpectIdentifier(out Token? parameter))
-            { throw new SyntaxException("Expected identifier or \">\"", PreviousToken?.Position.After(), File); }
+            { throw new SyntaxException("Expected identifier or \">\"", PreviousToken!.Position.After(), File); }
 
             parameters.Add(parameter);
 
@@ -448,7 +448,7 @@ public sealed class Parser
 #endif
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
-            { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
+            { throw new SyntaxException("Expected parameter type", PreviousToken!.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
             { throw new SyntaxException("Expected a parameter name", parameterType.Position.After(), File); }
@@ -520,7 +520,7 @@ public sealed class Parser
             CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
-            { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
+            { throw new SyntaxException("Expected parameter type", PreviousToken!.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
             { throw new SyntaxException("Expected a parameter name", parameterType.Position.After(), File); }
@@ -534,7 +534,7 @@ public sealed class Parser
             { break; }
 
             if (!ExpectOperator(","))
-            { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken?.Position.After(), File); }
+            { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken!.Position.After(), File); }
             else
             { expectParameter = true; }
         }
@@ -580,7 +580,7 @@ public sealed class Parser
             CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.Temp);
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
-            { throw new SyntaxException("Expected parameter type", PreviousToken?.Position.After(), File); }
+            { throw new SyntaxException("Expected parameter type", PreviousToken!.Position.After(), File); }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
             { throw new SyntaxException("Expected a parameter name", parameterType.Position.After(), File); }
@@ -594,7 +594,7 @@ public sealed class Parser
             { break; }
 
             if (!ExpectOperator(","))
-            { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken?.Position.After(), File); }
+            { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken!.Position.After(), File); }
             else
             { expectParameter = true; }
         }
@@ -673,7 +673,7 @@ public sealed class Parser
             }
             else
             {
-                throw new SyntaxException("Expected field definition or \"}\"", CurrentToken?.Position ?? PreviousToken?.Position.After(), File);
+                throw new SyntaxException("Expected field definition or \"}\"", CurrentToken?.Position ?? PreviousToken!.Position.After(), File);
             }
 
             endlessSafe++;
@@ -1290,8 +1290,8 @@ public sealed class Parser
 
         baseBranch = ifSegmentType switch
         {
-            BaseBranch.IfPart.If => new IfBranch(keyword, condition ?? throw new InternalException(), block, File),
-            BaseBranch.IfPart.ElseIf => new ElseIfBranch(keyword, condition ?? throw new InternalException(), block, File),
+            BaseBranch.IfPart.If => new IfBranch(keyword, condition ?? throw new InternalExceptionWithoutContext(), block, File),
+            BaseBranch.IfPart.ElseIf => new ElseIfBranch(keyword, condition ?? throw new InternalExceptionWithoutContext(), block, File),
             BaseBranch.IfPart.Else => new ElseBranch(keyword, block, File),
             _ => throw new UnreachableException(),
         };
@@ -1612,7 +1612,7 @@ public sealed class Parser
     {
         if (LanguageOperators.Precedencies.TryGetValue(@operator, out int precedence))
         { return precedence; }
-        throw new InternalException($"Precedence for operator \"{@operator}\" not found");
+        throw new InternalExceptionWithoutContext($"Precedence for operator \"{@operator}\" not found");
     }
 
     bool ExpectAnyCall(StatementWithValue prevStatement, [NotNullWhen(true)] out AnyCall? anyCall)
@@ -1646,7 +1646,7 @@ public sealed class Parser
                 parameter = simpleParameter;
             }
             else
-            { throw new SyntaxException("Expected expression as a parameter", CurrentToken?.Position ?? PreviousToken?.Position.After(), File); }
+            { throw new SyntaxException("Expected expression as a parameter", CurrentToken?.Position ?? PreviousToken!.Position.After(), File); }
 
             parameters.Add(parameter);
 
@@ -1743,7 +1743,7 @@ public sealed class Parser
         if (!ExpectOperator("]"))
         { throw new SyntaxException("Unbalanced ]", bracketStart, File); }
 
-        attribute = new AttributeUsage(attributeT, parameters);
+        attribute = new AttributeUsage(attributeT, parameters, File);
         return true;
     }
     AttributeUsage[] ExpectAttributes()
@@ -2007,7 +2007,7 @@ public sealed class Parser
                     {
                         (Token? newA, Token? newB) = doubleEnd.Slice(1);
                         if (newA == null || newB == null)
-                        { throw new InternalException($"I failed at token splitting :("); }
+                        { throw new InternalExceptionWithoutContext($"I failed at token splitting :("); }
                         CurrentTokenIndex--;
                         Tokens[CurrentTokenIndex] = newB;
                         break;

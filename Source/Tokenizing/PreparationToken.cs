@@ -28,19 +28,19 @@ sealed class PreparationToken :
     public bool EndsWith(char v) => Content.Length != 0 && Content[^1] == v;
     public bool Contains(char v) => Content.Contains(v);
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     public Token Instantiate() => new(this);
 
     /// <exception cref="NotImplementedException"/>
     /// <exception cref="ArgumentOutOfRangeException"/>
     public (PreparationToken?, PreparationToken?) Slice(int at)
     {
-        #if NET_STANDARD
+#if NET_STANDARD
         if (at < 0 || at >= Content.Length) throw new ArgumentOutOfRangeException(nameof(at));
-        #else
+#else
         ArgumentOutOfRangeException.ThrowIfNegative(at);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(at, Content.Length);
-        #endif
+#endif
 
         if (Content.Length == 0)
         { return (null, null); }

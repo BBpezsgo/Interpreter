@@ -14,7 +14,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!addressType.Is<FunctionType>())
         {
-            Diagnostics?.Add(Diagnostic.Critical($"This should be a function pointer and not {addressType}", address, address.File));
+            Diagnostics?.Add(Diagnostic.Critical($"This should be a function pointer and not {addressType}", address));
             return;
         }
 
@@ -202,13 +202,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!prevType.Is(out ArrayType? arrayType))
         {
-            error = new PossibleDiagnostic($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, indexCall.PrevStatement.File);
+            error = new PossibleDiagnostic($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement);
             return false;
         }
 
         if (!TryCompute(indexCall.Index, out CompiledValue index))
         {
-            error = new PossibleDiagnostic($"Can't compute the index value", indexCall.Index, indexCall.Index.File);
+            error = new PossibleDiagnostic($"Can't compute the index value", indexCall.Index);
             return false;
         }
 
@@ -278,7 +278,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (GetConstant(variable.Content, variable.File, out _, out _))
         {
-            error = new PossibleDiagnostic($"Constant does not have a memory address", variable, variable.File);
+            error = new PossibleDiagnostic($"Constant does not have a memory address", variable);
             return false;
         }
 
@@ -300,7 +300,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return true;
         }
 
-        error = new PossibleDiagnostic($"Variable \"{variable.Content}\" not found", variable, variable.File);
+        error = new PossibleDiagnostic($"Variable \"{variable.Content}\" not found", variable);
         return false;
     }
     bool GetBaseAddress(Field statement, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -758,7 +758,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 !GetParameter(identifier.Content, out CompiledParameter? parameter) ||
                 !parameter.IsRef)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", pointer, pointer.File));
+                Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", pointer));
                 return;
             }
         }
@@ -779,7 +779,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (!FindStatementType(pointer).Is<PointerType>())
         {
-            Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", pointer, pointer.File));
+            Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", pointer));
             return;
         }
 

@@ -84,7 +84,7 @@ public abstract partial class Tokenizer
                 }
 
                 if (token.TokenType == TokenType.PreprocessIdentifier)
-                { return new PreprocessorTag(token, argument, File); }
+                { return new PreprocessorTag(token, argument); }
 
                 break;
             }
@@ -239,7 +239,7 @@ public abstract partial class Tokenizer
         }
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="TokenizerException"/>
     protected void ProcessCharacter(char currChar, int offsetTotal)
     {
@@ -247,7 +247,7 @@ public abstract partial class Tokenizer
 
         if (CurrentToken.TokenType == PreparationTokenType.STRING_UnicodeCharacter)
         {
-            if (SavedUnicode == null) throw new InternalException($"{nameof(SavedUnicode)} is null");
+            if (SavedUnicode == null) throw new InternalExceptionWithoutContext($"{nameof(SavedUnicode)} is null");
             if (SavedUnicode.Length == 4)
             {
                 string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(SavedUnicode, 16));
@@ -278,7 +278,7 @@ public abstract partial class Tokenizer
         }
         else if (CurrentToken.TokenType == PreparationTokenType.CHAR_UnicodeCharacter)
         {
-            if (SavedUnicode == null) throw new InternalException($"{nameof(SavedUnicode)} is null");
+            if (SavedUnicode == null) throw new InternalExceptionWithoutContext($"{nameof(SavedUnicode)} is null");
             if (SavedUnicode.Length == 4)
             {
                 string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(SavedUnicode, 16));
@@ -768,7 +768,7 @@ public abstract partial class Tokenizer
         }
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="TokenizerException"/>
     protected void EndToken(int offsetTotal, bool inFuture = false)
     {
@@ -812,7 +812,7 @@ public abstract partial class Tokenizer
                 (PreparationToken? number, PreparationToken? op) = CurrentToken.Slice(CurrentToken.Content.Length - 1);
 
                 if (number is null || op is null)
-                { throw new InternalException($"I failed at token splitting :("); }
+                { throw new InternalExceptionWithoutContext($"I failed at token splitting :("); }
 
                 number.TokenType = PreparationTokenType.LiteralNumber;
                 op.TokenType = PreparationTokenType.Operator;

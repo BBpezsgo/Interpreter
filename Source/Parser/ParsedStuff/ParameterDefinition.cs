@@ -8,7 +8,8 @@ public class ParameterDefinition :
     IHaveType,
     IInContext<FunctionThingDefinition>,
     IIdentifiable<Token>,
-    IInFile
+    IInFile,
+    ILocated
 {
     /// <summary>
     /// Set by the <see cref="FunctionThingDefinition"/>
@@ -24,6 +25,8 @@ public class ParameterDefinition :
         new Position(Identifier, Type)
         .Union(Modifiers);
     public Uri File => Context?.File ?? throw new NullReferenceException($"{nameof(Context.File)} is null");
+
+    public Location Location => new(Position, File);
 
     public ParameterDefinition(ParameterDefinition other)
     {

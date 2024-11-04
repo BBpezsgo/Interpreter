@@ -28,12 +28,12 @@ public readonly struct CollectedAST
 public class SourceCodeManager
 {
     readonly Dictionary<Uri, CollectedAST> AlreadyLoadedCodes;
-    readonly Diagnostics? Diagnostics;
+    readonly DiagnosticsCollection? Diagnostics;
     readonly PrintCallback? Print;
     readonly IEnumerable<string> PreprocessorVariables;
     readonly FileParser? FileParser;
 
-    public SourceCodeManager(Diagnostics? diagnostics, PrintCallback? printCallback, IEnumerable<string> preprocessorVariables, FileParser? fileParser)
+    public SourceCodeManager(DiagnosticsCollection? diagnostics, PrintCallback? printCallback, IEnumerable<string> preprocessorVariables, FileParser? fileParser)
     {
         AlreadyLoadedCodes = new Dictionary<Uri, CollectedAST>();
         Diagnostics = diagnostics;
@@ -191,7 +191,7 @@ public class SourceCodeManager
             FileInfo file = new(parent.AbsolutePath);
 
             if (file.Directory is null)
-            { throw new InternalException($"File \"{file}\" doesn't have a directory"); }
+            { throw new InternalExceptionWithoutContext($"File \"{file}\" doesn't have a directory"); }
 
             if (basePath != null)
             { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, file.Directory.FullName), @using), UriKind.Absolute); }
@@ -236,7 +236,7 @@ public class SourceCodeManager
     {
         if (!FromAnywhere(@using, GetSearches(@using.PathString, parent, basePath), tokenizerSettings, out ParserResult? ast, out Uri? path))
         {
-            Diagnostics?.Add(Diagnostic.Error($"File \"{@using.PathString}\" not found", new Position(@using.Path.As<IPositioned>().Or(@using)), parent));
+            Diagnostics?.Add(Diagnostic.Error($"File \"{@using.PathString}\" not found", new Position(@using.Path.As<IPositioned>().Or(@using)), @using.File));
             return new Dictionary<Uri, CollectedAST>();
         }
 
@@ -260,7 +260,7 @@ public class SourceCodeManager
     {
         if (!FromAnywhere(null, GetSearches(file, parent, basePath), tokenizerSettings, out ParserResult? ast, out Uri? uri))
         {
-            Diagnostics?.Add(LanguageCore.Diagnostic.Error($"File \"{file}\" not found", Position.UnknownPosition, null));
+            Diagnostics?.Add(DiagnosticWithoutContext.Error($"File \"{file}\" not found"));
             return new Dictionary<Uri, CollectedAST>();
         }
 
@@ -283,10 +283,10 @@ public class SourceCodeManager
         IEnumerable<string>? additionalImports)
     {
         if (!FromAnywhere(null, file, tokenizerSettings, out ParserResult? ast))
-        { throw new InternalException($"File \"{file}\" not found"); }
+        { throw new InternalExceptionWithoutContext($"File \"{file}\" not found"); }
 
         if (!ast.HasValue)
-        { throw new InternalException(); }
+        { throw new InternalExceptionWithoutContext(); }
 
         if (ast.Value.Usings.Any())
         { Print?.Invoke("Loading used files ...", LogType.Debug); }
@@ -312,7 +312,7 @@ public class SourceCodeManager
         Uri file,
         PrintCallback? printCallback,
         string? basePath,
-        Diagnostics? diagnostics,
+        DiagnosticsCollection? diagnostics,
         IEnumerable<string> preprocessorVariables,
         TokenizerSettings? tokenizerSettings,
         FileParser? fileParser,
@@ -327,7 +327,7 @@ public class SourceCodeManager
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,
         string? basePath,
-        Diagnostics? diagnostics,
+        DiagnosticsCollection? diagnostics,
         TokenizerSettings? tokenizerSettings,
         FileParser? fileParser,
         IEnumerable<string>? additionalImports)

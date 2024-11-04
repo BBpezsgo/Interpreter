@@ -8,7 +8,7 @@ public struct SourceCodeLocation
 {
     public MutableRange<int> Instructions;
     public Position SourcePosition;
-    public Uri? Uri;
+    public Uri Uri;
 
     public readonly bool Contains(int instruction) =>
         Instructions.Start <= instruction &&

@@ -72,7 +72,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     }
 
     /// <exception cref="NotImplementedException"/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     public static int GetInteger(CompiledValue v)
     {
         return v.Type switch
@@ -85,7 +85,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
             RuntimeType.I32 => v.I32,
 
             RuntimeType.F32 => throw new NotImplementedException("Floats not supported by brainfuck :("),
-            RuntimeType.Null => throw new InternalException(),
+            RuntimeType.Null => throw new InternalExceptionWithoutContext(),
             _ => throw new UnreachableException(),
         };
     }
@@ -288,7 +288,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     /// <inheritdoc cref="AddValue(int, int)"/>
     /// <exception cref="NotSupportedException"/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     public void AddValue(CompiledValue value) => AddValue(GetInteger(value));
 
     /// <summary>
@@ -355,7 +355,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     /// <inheritdoc cref="SetValue(int, int)"/>
     /// <exception cref="NotSupportedException"/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     public void SetValue(int address, CompiledValue value) => SetValue(address, GetInteger(value));
 
     /// <summary>

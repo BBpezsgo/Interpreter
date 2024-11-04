@@ -148,7 +148,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, Diagnostics? diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
+    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, DiagnosticsCollection? diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
     {
         ExternalFunctions = compilerResult.ExternalFunctions;
         GeneratedCode = new List<PreparationInstruction>();
@@ -183,9 +183,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     throw generalFunction.Identifier.Content switch
                     {
-                        BuiltinFunctionIdentifiers.Destructor => new InternalException($"Destructor for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CallerFile),
-                        BuiltinFunctionIdentifiers.IndexerGet => new InternalException($"Index getter for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CallerFile),
-                        BuiltinFunctionIdentifiers.IndexerSet => new InternalException($"Index setter for {generalFunction.Context} does not have instruction offset", item.CallerPosition, item.CallerFile),
+                        BuiltinFunctionIdentifiers.Destructor => new InternalException($"Destructor for {generalFunction.Context} does not have instruction offset", item.CallerLocation),
+                        BuiltinFunctionIdentifiers.IndexerGet => new InternalException($"Index getter for {generalFunction.Context} does not have instruction offset", item.CallerLocation),
+                        BuiltinFunctionIdentifiers.IndexerSet => new InternalException($"Index setter for {generalFunction.Context} does not have instruction offset", item.CallerLocation),
                         _ => new NotImplementedException(),
                     };
                 }
@@ -198,9 +198,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 };
 
                 if (item.Called is ISimpleReadable simpleReadable)
-                { throw new InternalException($"{thingName} {simpleReadable.ToReadable()} does not have instruction offset", item.CallerPosition, item.CallerFile); }
+                { throw new InternalException($"{thingName} {simpleReadable.ToReadable()} does not have instruction offset", item.CallerLocation); }
 
-                throw new InternalException($"{thingName} {item.Called} does not have instruction offset", item.CallerPosition, item.CallerFile);
+                throw new InternalException($"{thingName} {item.Called} does not have instruction offset", item.CallerLocation);
             }
 
             int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
@@ -212,7 +212,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompilerResult compilerResult,
         MainGeneratorSettings settings,
         PrintCallback? printCallback = null,
-        Diagnostics? diagnostics = null)
+        DiagnosticsCollection? diagnostics = null)
     {
         CodeGeneratorForMain generator = new(compilerResult, settings, diagnostics, printCallback);
         return generator.GenerateCode(compilerResult, settings);

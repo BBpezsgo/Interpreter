@@ -41,7 +41,7 @@ public class StreamTokenizer : Tokenizer,
         { return tokenizer.TokenizeInternal(); }
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="TokenizerException"/>
     TokenizerResult TokenizeInternal()
     {

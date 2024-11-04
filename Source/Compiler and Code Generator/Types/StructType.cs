@@ -22,8 +22,7 @@ public class StructType : GeneralType,
             result.Add(field, offset);
             GeneralType fieldType = field.Type;
             fieldType = ReplaceType(fieldType, out PossibleDiagnostic? error);
-            if (error is not null)
-            { error.InstantiateError(null, null).Throw(); }
+            error?.Throw();
             offset += fieldType.GetSize(runtime);
         }
 
@@ -72,7 +71,7 @@ public class StructType : GeneralType,
             Dictionary<string, GeneralType> result = new(@struct.Template.Parameters.Length);
 
             if (@struct.Template.Parameters.Length != typeArguments.Count)
-            { throw new InternalException("Length of type parameters doesn't matching with length of type arguments"); }
+            { throw new InternalExceptionWithoutContext("Length of type parameters doesn't matching with length of type arguments"); }
 
             for (int i = 0; i < @struct.Template.Parameters.Length; i++)
             { result.Add(@struct.Template.Parameters[i].Content, typeArguments[i]); }
@@ -91,8 +90,7 @@ public class StructType : GeneralType,
         {
             GeneralType fieldType = field.Type;
             fieldType = ReplaceType(fieldType, out PossibleDiagnostic? error);
-            if (error is not null)
-            { error.InstantiateError(null, null).Throw(); }
+            error?.Throw();
             size += fieldType.GetSize(runtime);
         }
         return size;
@@ -116,8 +114,7 @@ public class StructType : GeneralType,
 
             GeneralType fieldType = _field.Type;
             fieldType = ReplaceType(fieldType, out PossibleDiagnostic? error);
-            if (error is not null)
-            { error.InstantiateError(null, null).Throw(); }
+            error?.Throw();
 
             offset += fieldType.GetSize(runtime);
         }

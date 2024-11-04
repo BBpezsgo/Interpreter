@@ -7,7 +7,8 @@ public abstract class FunctionThingDefinition :
     IExportable,
     IPositioned,
     ISimpleReadable,
-    IIdentifiable<Token>
+    IIdentifiable<Token>,
+    ILocated
 {
     public ImmutableArray<Token> Modifiers { get; }
     public Token Identifier { get; }
@@ -16,6 +17,7 @@ public abstract class FunctionThingDefinition :
     public TemplateInfo? Template { get; }
     public Uri File { get; }
 
+    public Location Location => new(Position, File);
     /// <summary>
     /// The first parameter is labeled as "this"
     /// </summary>

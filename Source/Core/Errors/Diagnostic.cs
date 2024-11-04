@@ -21,7 +21,7 @@ public class Diagnostic : IDiagnostic
     bool _isDebugged;
 #endif
 
-    public Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, bool @break)
+    Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, bool @break)
     {
         Level = level;
         Message = message;
@@ -46,7 +46,7 @@ public class Diagnostic : IDiagnostic
     }
 
     [DoesNotReturn]
-    public void Throw() => throw new CompilerException(Message, Position, File);
+    public void Throw() => throw new LanguageException(Message, Position, File);
 
     public static Diagnostic Critical(string message, IPositioned? position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break);
@@ -89,6 +89,21 @@ public class Diagnostic : IDiagnostic
 
     public static Diagnostic Hint(string message, Position? position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Hint, message, position ?? Position.UnknownPosition, file, @break);
+
+    public static Diagnostic Critical(string message, ILocated location, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break);
+
+    public static Diagnostic Error(string message, ILocated location, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break);
+
+    public static Diagnostic Warning(string message, ILocated location, bool @break = true)
+        => new(DiagnosticsLevel.Warning, message, location.Location.Position, location.Location.File, @break);
+
+    public static Diagnostic Information(string message, ILocated location, bool @break = true)
+        => new(DiagnosticsLevel.Information, message, location.Location.Position, location.Location.File, @break);
+
+    public static Diagnostic Hint(string message, ILocated location, bool @break = true)
+        => new(DiagnosticsLevel.Hint, message, location.Location.Position, location.Location.File, @break);
 
     public Diagnostic Break()
     {

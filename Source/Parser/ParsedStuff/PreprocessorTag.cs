@@ -2,22 +2,22 @@
 
 namespace LanguageCore.Parser.Statement;
 
-public class PreprocessorTag : Statement
+public class PreprocessorTag :
+    IPositioned
 {
+    /// <summary>
+    /// Set by the <see cref="Parser"/>
+    /// </summary>
+    public Token? Semicolon { get; internal set; }
     public Token Identifier { get; }
     public Token? Argument { get; }
 
-    public PreprocessorTag(Token identifier, Token? argument, Uri file) : base(file)
+    public Position Position => new(Identifier, Argument, Semicolon);
+
+    public PreprocessorTag(Token identifier, Token? argument)
     {
         Identifier = identifier;
         Argument = argument;
-    }
-
-    public override Position Position => new(Identifier, Argument);
-
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
-    {
-        if (includeThis) yield return this;
     }
 
     public override string ToString() => $"{Identifier} {Argument}".Trim();

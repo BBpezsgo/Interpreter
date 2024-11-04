@@ -42,7 +42,7 @@ public class GenericType : GeneralType,
 
     [DoesNotReturn]
     public override int GetSize(IRuntimeInfoProvider runtime)
-        => throw new InternalException($"Can not get the size of a generic type");
+        => throw new InternalExceptionWithoutContext($"Can not get the size of a generic type");
     public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
         => throw new InvalidOperationException($"Can not get the size of a generic type");
 

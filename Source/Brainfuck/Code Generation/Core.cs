@@ -82,23 +82,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         readonly CodeHelper Code;
         readonly DebugInformation? DebugInfo;
         readonly Position Position;
-        readonly Uri? CurrentFile;
+        readonly Uri File;
 
-        public DebugInfoBlock(CodeHelper code, DebugInformation? debugInfo, Position position, Uri? currentFile)
+        public DebugInfoBlock(CodeHelper code, DebugInformation? debugInfo, Position position, Uri currentFile)
         {
             Code = code;
             DebugInfo = debugInfo;
             Position = position;
-
-            if (debugInfo is null) return;
-            if (position == Position.UnknownPosition) return;
-
             InstructionStart = code.Length;
-            CurrentFile = currentFile;
+            File = currentFile;
         }
 
-        public DebugInfoBlock(CodeHelper code, DebugInformation? debugInfo, IPositioned? position, Uri? currentFile)
-            : this(code, debugInfo, position?.Position ?? Position.UnknownPosition, currentFile)
+        public DebugInfoBlock(CodeHelper code, DebugInformation? debugInfo, IPositioned position, Uri currentFile)
+            : this(code, debugInfo, position.Position, currentFile)
         { }
 
         void IDisposable.Dispose()
@@ -112,7 +108,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             {
                 Instructions = (InstructionStart, end),
                 SourcePosition = Position,
-                Uri = CurrentFile,
+                Uri = File,
             });
         }
     }
@@ -210,6 +206,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         public readonly CodeHelper Code;
         public readonly HeapCodeHelper Heap;
         public readonly StackCodeHelper Stack;
+        public readonly DiagnosticsCollection? Diagnostics;
 
         public CodeSnapshot(CodeGeneratorForBrainfuck generator)
         {
@@ -219,6 +216,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
                 AddSmallComments = generator.Heap.AddSmallComments,
             };
             Stack = new StackCodeHelper(Code, generator.Stack);
+            Diagnostics = generator.Diagnostics is null ? null : new DiagnosticsCollection(generator.Diagnostics);
         }
 
         public void Restore(CodeGeneratorForBrainfuck generator)
@@ -226,6 +224,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             generator.Code = Code;
             generator.Heap = Heap;
             generator.Stack = Stack;
+            if (Diagnostics is not null)
+            {
+                generator.Diagnostics?.Clear();
+                generator.Diagnostics?.AddRange(Diagnostics.Diagnostics);
+                generator.Diagnostics?.AddRange(Diagnostics.DiagnosticsWithoutContext);
+            }
         }
     }
 
@@ -234,7 +238,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         public ImmutableDictionary<string, GeneralType>? SavedTypeArguments { get; init; }
         public ImmutableArray<ControlFlowBlock> SavedBreaks { get; init; }
         public ImmutableArray<BrainfuckVariable> SavedVariables { get; init; }
-        public Uri? SavedFile { get; init; }
         public ImmutableArray<IConstant> SavedConstants { get; init; }
     }
 
@@ -274,7 +277,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     public CodeGeneratorForBrainfuck(
         CompilerResult compilerResult,
         BrainfuckGeneratorSettings brainfuckSettings,
-        Diagnostics? diagnostics,
+        DiagnosticsCollection? diagnostics,
         PrintCallback? print) : base(compilerResult, diagnostics, print)
     {
         CompiledVariables = new Stack<BrainfuckVariable>();
@@ -283,7 +286,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             AddSmallComments = brainfuckSettings.GenerateSmallComments,
             AddComments = brainfuckSettings.GenerateComments,
         };
-        Stack = new StackCodeHelper(Code, 0, brainfuckSettings.StackSize);
+        Stack = new StackCodeHelper(Code, 0, brainfuckSettings.StackSize, Diagnostics);
         Heap = new HeapCodeHelper(Code, brainfuckSettings.HeapStart, brainfuckSettings.HeapSize)
         {
             AddSmallComments = brainfuckSettings.GenerateSmallComments,
@@ -323,8 +326,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             { CompiledVariables[i] = new BrainfuckVariable(CompiledVariables[i].Name, CompiledVariables[i].File, CompiledVariables[i].Address, CompiledVariables[i].IsReference, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size); }
         }
 
-        Uri? savedFile = CurrentFile;
-
         ImmutableArray<IConstant> savedConstants = CompiledLocalConstants.ToImmutableArray();
         CompiledLocalConstants.Clear();
 
@@ -333,20 +334,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             SavedBreaks = savedBreaks,
             SavedVariables = savedVariables,
             SavedConstants = savedConstants,
-            SavedFile = savedFile,
             SavedTypeArguments = savedTypeArguments?.ToImmutableDictionary(),
         };
     }
     void PopStackFrame(GeneratorStackFrame frame)
     {
-        CurrentFile = frame.SavedFile;
-
         CompiledVariables.Set(frame.SavedVariables);
 
         CompiledLocalConstants.Set(frame.SavedConstants);
 
         if (Breaks.Count > 0)
-        { throw new InternalException(); }
+        { throw new InternalExceptionWithoutContext(); }
 
         Breaks.Set(frame.SavedBreaks);
 
@@ -354,9 +352,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         { SetTypeArguments(frame.SavedTypeArguments); }
     }
 
-    DebugInfoBlock DebugBlock(Statement statement) => new(Code, DebugInfo, statement.Position, statement.File);
-    DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, DebugInfo, position, CurrentFile);
-    DebugInfoBlock DebugBlock(Position position) => new(Code, DebugInfo, position, CurrentFile);
+    DebugInfoBlock DebugBlock(ILocated location) => new(Code, DebugInfo, location.Location.Position, location.Location.File);
+    DebugInfoBlock DebugBlock(IPositioned position, Uri file) => new(Code, DebugInfo, position, file);
+    DebugInfoBlock DebugBlock(Position position, Uri file) => new(Code, DebugInfo, position, file);
 
     DebugFunctionBlock<CompiledFunction> FunctionBlock(CompiledFunction function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
@@ -382,18 +380,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         function,
         typeArguments);
 
-    protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out GeneralType? type)
+    protected override bool GetLocalSymbolType(Identifier symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
-        if (GetVariable(symbolName, out BrainfuckVariable? variable, out _))
+        if (GetVariable(symbolName.Content, out BrainfuckVariable? variable, out _))
         {
             type = variable.Type;
             return true;
         }
 
-        if (CurrentFile is null)
-        { throw new InternalException($"{nameof(CurrentFile)} is null"); }
-
-        if (GetConstant(symbolName, CurrentFile, out IConstant? constant, out _))
+        if (GetConstant(symbolName.Content, symbolName.File, out IConstant? constant, out _))
         {
             type = GeneralType.From(constant.Type);
             return true;
@@ -438,13 +433,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         if (!prevType.Is(out ArrayType? arrayType))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, indexCall.PrevStatement.File));
+            Diagnostics?.Add(Diagnostic.Critical($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement));
             return default;
         }
 
         if (!TryCompute(indexCall.Index, out CompiledValue index))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Can't compute the index value", indexCall.Index, indexCall.Index.File));
+            Diagnostics?.Add(Diagnostic.Critical($"Can't compute the index value", indexCall.Index));
             return default;
         }
 
@@ -486,7 +481,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             case Field field: return TryGetAddress(field, out address, out size, until);
             default:
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Unknown statement {statement.GetType().Name}", statement, statement.File));
+                Diagnostics?.Add(Diagnostic.Critical($"Unknown statement {statement.GetType().Name}", statement));
                 address = default;
                 size = default;
                 return false;
@@ -497,7 +492,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     {
         if (index.PrevStatement is not Identifier arrayIdentifier)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"This must be an identifier", index.PrevStatement, index.PrevStatement.File));
+            Diagnostics?.Add(Diagnostic.Critical($"This must be an identifier", index.PrevStatement));
             address = default;
             size = default;
             return default;
@@ -505,7 +500,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         if (!GetVariable(arrayIdentifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
-            Diagnostics?.Add(notFoundError.InstantiateError(arrayIdentifier, arrayIdentifier.File));
+            Diagnostics?.Add(notFoundError.ToError(arrayIdentifier));
             address = default;
             size = default;
             return false;
@@ -517,7 +512,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             address = variable.Address;
 
             if (size != 1)
-            { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", index, index.File); }
+            { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", index); }
 
             if (TryCompute(index.Index, out CompiledValue indexValue))
             {
@@ -528,7 +523,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             return false;
         }
 
-        Diagnostics?.Add(Diagnostic.Critical($"Variable is not an array", arrayIdentifier, arrayIdentifier.File));
+        Diagnostics?.Add(Diagnostic.Critical($"Variable is not an array", arrayIdentifier));
         address = default;
         size = default;
         return default;
@@ -568,11 +563,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     bool TryGetAddress(Pointer pointer, out int address, out int size, StatementWithValue? until)
     {
         if (!TryCompute(pointer.PrevStatement, out CompiledValue addressToSet))
-        { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.PrevStatement, pointer.PrevStatement.File); }
+        { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.PrevStatement); }
 
         if (!CompiledValue.TryShrinkTo8bit(ref addressToSet))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, pointer.PrevStatement.File));
+            Diagnostics?.Add(Diagnostic.Critical($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement));
             address = default;
             size = default;
             return default;
@@ -586,7 +581,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     {
         if (!GetVariable(identifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
-            Diagnostics?.Add(notFoundError.InstantiateError(identifier, identifier.File));
+            Diagnostics?.Add(notFoundError.ToError(identifier));
             address = default;
             size = default;
             return false;
@@ -731,19 +726,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     void GenerateTopLevelStatements(ImmutableArray<Statement> statements, Uri file, bool isImported)
     {
+        if (statements.Length == 0) return;
+
         Print?.Invoke($"  Generating top level statements for file {file.ToString() ?? "null"} ...", LogType.Debug);
 
-        CurrentFile = file;
-
         if (!isImported)
-        { CompiledVariables.Add(new BrainfuckVariable(ReturnVariableName, file, Stack.PushVirtual(1), false, false, false, ExitCodeType, ExitCodeType.GetSize(this))); }
+        { CompiledVariables.Add(new BrainfuckVariable(ReturnVariableName, file, Stack.PushVirtual(1, new Location(statements[0].Position.Before(), statements[0].File)), false, false, false, ExitCodeType, ExitCodeType.GetSize(this))); }
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(statements)); }
         else
         { PrecompileVariables(statements); }
 
-        ControlFlowBlock? returnBlock = BeginReturnBlock(null, FindControlFlowUsage(statements));
+        ControlFlowBlock? returnBlock = BeginReturnBlock(new Location(statements[0].Position.Before(), file), FindControlFlowUsage(statements));
 
         using (ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress))
         {
@@ -759,14 +754,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         if (Returns.Count > 0 ||
             Breaks.Count > 0)
-        { throw new InternalException(); }
+        { throw new InternalExceptionWithoutContext(); }
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { CleanupVariables(VariableCleanupStack.Pop()); }
 
         Code.SetPointer(0);
-
-        CurrentFile = null;
     }
 
     BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
@@ -791,18 +784,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             { Heap.Destroy(); }
 
             string? heapInit = Heap.LateInit(out PossibleDiagnostic? heapInitError);
-            if (heapInitError is not null)
-            { Diagnostics?.Add(heapInitError.InstantiateError(null, null)); }
+            heapInitError?.Throw();
             Code.Insert(0, heapInit);
         }
 
         if (Code.BranchDepth != 0)
-        { throw new InternalException($"Unbalanced branches", compilerResult.File); }
+        { throw new InternalExceptionWithoutContext($"Unbalanced branches"); }
 
         Print?.Invoke($"Used stack size: {Stack.MaxUsedSize} bytes", LogType.Debug);
-
-        if (Stack.WillOverflow)
-        { Diagnostics?.Add(Diagnostic.Warning($"Stack will probably overflow", Position.UnknownPosition, null)); }
 
         return new BrainfuckGeneratorResult()
         {
@@ -818,7 +807,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         CompilerResult compilerResult,
         BrainfuckGeneratorSettings brainfuckSettings,
         PrintCallback? printCallback = null,
-        Diagnostics? diagnostics = null)
+        DiagnosticsCollection? diagnostics = null)
     => new CodeGeneratorForBrainfuck(
         compilerResult,
         brainfuckSettings,

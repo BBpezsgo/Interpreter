@@ -53,7 +53,7 @@ public enum LiteralType
 
 public readonly struct ParserResult
 {
-    public readonly ImmutableArray<Diagnostic> Errors;
+    public readonly DiagnosticsCollection Errors;
 
     public readonly ImmutableArray<FunctionDefinition> Functions;
     public readonly ImmutableArray<FunctionDefinition> Operators;
@@ -70,7 +70,7 @@ public readonly struct ParserResult
     public bool IsEmpty { get; private init; }
 
     public static ParserResult Empty => new(
-        Enumerable.Empty<Diagnostic>(),
+        new DiagnosticsCollection(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),
@@ -82,7 +82,7 @@ public readonly struct ParserResult
     { IsEmpty = true };
 
     public ParserResult(
-        IEnumerable<Diagnostic> errors,
+        DiagnosticsCollection errors,
         IEnumerable<FunctionDefinition> functions,
         IEnumerable<FunctionDefinition> operators,
         IEnumerable<StructDefinition> structs,
@@ -92,7 +92,7 @@ public readonly struct ParserResult
         IEnumerable<Token> originalTokens,
         IEnumerable<Token> tokens)
     {
-        Errors = errors.ToImmutableArray();
+        Errors = errors;
 
         Functions = functions.ToImmutableArray();
         Operators = operators.ToImmutableArray();

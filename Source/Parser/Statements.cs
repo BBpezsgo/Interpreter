@@ -55,15 +55,16 @@ public static class StatementExtensions
         => (result = GetStatement(statement, condition)) is not null;
 }
 
-public abstract class Statement : IPositioned, IInFile
+public abstract class Statement : IPositioned, IInFile, ILocated
 {
     /// <summary>
     /// Set by the <see cref="Parser"/>
     /// </summary>
     public Token? Semicolon { get; internal set; }
-
     public abstract Position Position { get; }
     public Uri File { get; }
+
+    public Location Location => new(Position, File);
 
     protected Statement(Uri file)
     {
@@ -1232,11 +1233,11 @@ public class Literal : StatementWithValue
     }
 
     /// <exception cref="NotImplementedException"/>
-    public static IEnumerable<Literal> CreateAnonymous(IEnumerable<CompiledValue> values, IEnumerable<IPositioned> positions)
+    public static IEnumerable<Literal> CreateAnonymous(IEnumerable<CompiledValue> values, IEnumerable<ILocated> positions)
         =>
         values
         .Zip(positions, (a, b) => (First: a, Second: b))
-        .Select(item => Literal.CreateAnonymous(item.First, item.Second, null));
+        .Select(item => Literal.CreateAnonymous(item.First, item.Second.Location.Position, item.Second.Location.File));
 
     public override string ToString()
     {
@@ -1526,12 +1527,12 @@ public class IfContainer : Statement
         throw new NotImplementedException();
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="NotImplementedException"/>
     public LinkedIf ToLinks()
     {
-        if (Branches.Length == 0) throw new InternalException();
-        if (Branches[0] is not IfBranch ifBranch) throw new InternalException();
+        if (Branches.Length == 0) throw new InternalExceptionWithoutContext();
+        if (Branches[0] is not IfBranch ifBranch) throw new InternalExceptionWithoutContext();
         return new LinkedIf(
             ifBranch.Keyword,
             ifBranch.Condition,

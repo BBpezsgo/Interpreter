@@ -13,7 +13,7 @@ public static class AnyTokenizer
     /// <exception cref="FileNotFoundException"/>
     /// <exception cref="System.NotSupportedException"/>
     /// <exception cref="IOException"/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="TokenizerException"/>
     /// <exception cref="InvalidOperationException"/>
     /// <exception cref="System.Threading.Tasks.TaskCanceledException"/>

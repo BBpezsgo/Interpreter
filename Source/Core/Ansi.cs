@@ -1,5 +1,3 @@
-using System.Runtime.Versioning;
-
 namespace LanguageCore;
 
 public static class Ansi

@@ -16,7 +16,7 @@ public partial struct CompiledValue :
     IShiftOperators<CompiledValue, int, CompiledValue>
 {
     /// <inheritdoc/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator +(CompiledValue a, CompiledValue b)
     {
@@ -35,7 +35,7 @@ public partial struct CompiledValue :
         };
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator -(CompiledValue a, CompiledValue b)
     {
@@ -123,7 +123,7 @@ public partial struct CompiledValue :
         };
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     public static void MakeSameType(ref CompiledValue x, ref CompiledValue y)
     {
         if (x.Type == y.Type) return;
@@ -135,16 +135,16 @@ public partial struct CompiledValue :
         y.TryCast(x.Type, out y);
 
         if (x.IsNull || y.IsNull)
-        { throw new InternalException(); }
+        { throw new InternalExceptionWithoutContext(); }
 
         if (!xBefore.Equals(x) && !yBefore.Equals(y))
-        { throw new InternalException(); }
+        { throw new InternalExceptionWithoutContext(); }
 
         if (x.Type != y.Type)
-        { throw new InternalException(); }
+        { throw new InternalExceptionWithoutContext(); }
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     public static (RuntimeType, RuntimeType) MakeSameTypeAndKeep(ref CompiledValue x, ref CompiledValue y)
     {
         (RuntimeType, RuntimeType) result = (x.Type, y.Type);
@@ -153,7 +153,7 @@ public partial struct CompiledValue :
     }
 
     /// <inheritdoc/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator *(CompiledValue a, CompiledValue b)
     {
@@ -172,7 +172,7 @@ public partial struct CompiledValue :
         };
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator /(CompiledValue a, CompiledValue b)
     {
@@ -191,7 +191,7 @@ public partial struct CompiledValue :
         };
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator %(CompiledValue a, CompiledValue b)
     {
@@ -345,7 +345,7 @@ public partial struct CompiledValue :
     };
 
     /// <inheritdoc/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator |(CompiledValue a, CompiledValue b)
     {
@@ -363,7 +363,7 @@ public partial struct CompiledValue :
         };
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator &(CompiledValue a, CompiledValue b)
     {
@@ -381,7 +381,7 @@ public partial struct CompiledValue :
         };
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator ^(CompiledValue a, CompiledValue b)
     {

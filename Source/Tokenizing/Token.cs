@@ -26,7 +26,7 @@ public class Token :
         AnalyzedType = TokenAnalyzedType.None;
     }
 
-    /// <exception cref="InternalException"/>
+    /// <exception cref="InternalExceptionWithoutContext"/>
     internal Token(PreparationToken preparationToken) : this(preparationToken.TokenType switch
     {
         PreparationTokenType.Whitespace => TokenType.Whitespace,
@@ -44,7 +44,7 @@ public class Token :
         PreparationTokenType.PREPROCESS_Identifier => TokenType.PreprocessIdentifier,
         PreparationTokenType.PREPROCESS_Argument => TokenType.PreprocessArgument,
         PreparationTokenType.PREPROCESS_Skipped => TokenType.PreprocessSkipped,
-        _ => throw new InternalException($"Token {preparationToken} isn't finished (type is {preparationToken.TokenType})"),
+        _ => throw new InternalExceptionWithoutContext($"Token {preparationToken} isn't finished (type is {preparationToken.TokenType})"),
     }, preparationToken.Content.ToString(), false, preparationToken.Position)
     { }
 

@@ -36,7 +36,7 @@ public class HeapCodeHelper
     void ThrowIfNotInitialized()
     {
         if (Size <= 0)
-        { throw new InternalException($"Heap size is {Size}"); }
+        { throw new InternalExceptionWithoutContext($"Heap size is {Size}"); }
     }
 
     /// <summary>

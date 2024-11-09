@@ -3,7 +3,7 @@ using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Compiler;
 
-public enum BasicType
+public enum BasicType : byte
 {
     Void,
     Any,

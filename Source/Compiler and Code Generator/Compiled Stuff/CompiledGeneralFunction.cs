@@ -6,7 +6,6 @@ namespace LanguageCore.Compiler;
 public class CompiledGeneralFunction : GeneralFunctionDefinition,
     IDefinition<CompiledGeneralFunction>,
     IReferenceable<Statement?>,
-    IDuplicatable<CompiledGeneralFunction>,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
     ITemplateable<CompiledGeneralFunction>,
@@ -50,8 +49,6 @@ public class CompiledGeneralFunction : GeneralFunctionDefinition,
 
         return true;
     }
-
-    public new CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, Context, this);
 
     public override string ToString()
     {

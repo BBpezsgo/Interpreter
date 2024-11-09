@@ -6,7 +6,6 @@ namespace LanguageCore.Compiler;
 public class CompiledConstructor : ConstructorDefinition,
     IDefinition<CompiledConstructor>,
     IReferenceable<ConstructorCall>,
-    IDuplicatable<CompiledConstructor>,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
     ITemplateable<CompiledConstructor>,
@@ -48,8 +47,6 @@ public class CompiledConstructor : ConstructorDefinition,
         if (!Utils.SequenceEquals(ParameterTypes, other.ParameterTypes)) return false;
         return true;
     }
-
-    public CompiledConstructor Duplicate() => new(Type, ParameterTypes, Context, this);
 
     public override string ToString()
     {

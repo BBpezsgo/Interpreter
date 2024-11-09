@@ -6,7 +6,6 @@ namespace LanguageCore.Compiler;
 public class CompiledOperator : FunctionDefinition,
     IDefinition<CompiledOperator>,
     IReferenceable<StatementWithValue>,
-    IDuplicatable<CompiledOperator>,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
     ITemplateable<CompiledOperator>,
@@ -41,8 +40,6 @@ public class CompiledOperator : FunctionDefinition,
     }
 
     public bool DefinitionEquals(CompiledOperator other) => Extensions.IsSame(this, other);
-
-    public new CompiledOperator Duplicate() => new(Type, new List<GeneralType>(ParameterTypes).ToArray(), Context, this);
 
     public CompiledOperator InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
     {

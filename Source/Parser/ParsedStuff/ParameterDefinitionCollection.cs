@@ -6,7 +6,6 @@ namespace LanguageCore.Parser;
 public class ParameterDefinitionCollection :
     IPositioned,
     IReadOnlyList<ParameterDefinition>,
-    IDuplicatable<ParameterDefinitionCollection>,
     IInContext<FunctionThingDefinition>,
     IInFile
 {
@@ -57,8 +56,6 @@ public class ParameterDefinitionCollection :
 
     public static ParameterDefinitionCollection CreateAnonymous(IEnumerable<ParameterDefinition> parameterDefinitions)
         => new(parameterDefinitions, TokenPair.CreateAnonymous(new Position(parameterDefinitions), "(", ")"));
-
-    public ParameterDefinitionCollection Duplicate() => new(this);
 
     public override string ToString()
     {

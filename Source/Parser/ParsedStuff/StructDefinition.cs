@@ -6,7 +6,8 @@ namespace LanguageCore.Parser;
 public class StructDefinition :
     IExportable,
     IPositioned,
-    IIdentifiable<Token>
+    IIdentifiable<Token>,
+    IHaveAttributes
 {
     public ImmutableArray<AttributeUsage> Attributes { get; }
     public Token Identifier { get; }

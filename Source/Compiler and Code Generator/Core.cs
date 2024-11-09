@@ -182,3 +182,8 @@ public interface IIdentifiable<TIdentifier>
 {
     public TIdentifier Identifier { get; }
 }
+
+public interface IHaveAttributes
+{
+    public ImmutableArray<AttributeUsage> Attributes { get; }
+}

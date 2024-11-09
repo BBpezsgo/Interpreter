@@ -1760,6 +1760,8 @@ public sealed class Parser
 
         int startTokenIndex = CurrentTokenIndex;
 
+        AttributeUsage[] attributes = ExpectAttributes();
+
         Token[] modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? possibleType))
@@ -1775,7 +1777,7 @@ public sealed class Parser
 
         CheckModifiers(modifiers, FieldModifiers.AsSpan());
 
-        field = new(possibleVariableName, possibleType, modifiers);
+        field = new(possibleVariableName, possibleType, modifiers, attributes);
 
         return true;
     }

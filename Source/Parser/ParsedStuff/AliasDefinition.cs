@@ -7,7 +7,8 @@ public class AliasDefinition :
     IPositioned,
     IIdentifiable<Token>,
     IDefinition<CompiledAlias>,
-    IExportable
+    IExportable,
+    IHaveAttributes
 {
     public ImmutableArray<AttributeUsage> Attributes { get; }
     public ImmutableArray<Token> Modifiers { get; }

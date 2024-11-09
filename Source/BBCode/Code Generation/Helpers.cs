@@ -248,9 +248,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 ParametersSize // Offset by the parameters
                 + StackFrameTags // Offset by the stack frame stuff
             ) * BytecodeProcessor.StackDirection)
-        // - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
-        // + 1 // Stack pointer offset (???)
-        );
+            // - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
+            // + 1 // Stack pointer offset (???)
+            );
 
     public AddressOffset GetParameterAddress(CompiledParameter parameter, int offset = 0)
         => new(
@@ -261,8 +261,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 + StackFrameTags // Offset by the stack frame stuff
             ) * BytecodeProcessor.StackDirection)
             + offset
-        // + 1 // Stack pointer offset (???)
-        );
+            // + 1 // Stack pointer offset (???)
+            );
 
     bool GetBaseAddress(StatementWithValue statement, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error) => statement switch
     {

@@ -6,7 +6,6 @@ namespace LanguageCore.Compiler;
 public class CompiledFunction : FunctionDefinition,
     IDefinition<CompiledFunction>,
     IReferenceable<StatementWithValue?>,
-    IDuplicatable<CompiledFunction>,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
     ITemplateable<CompiledFunction>,
@@ -53,8 +52,6 @@ public class CompiledFunction : FunctionDefinition,
 
         return true;
     }
-
-    public new CompiledFunction Duplicate() => new(Type, ParameterTypes, Context, this);
 
     public override string ToString()
     {

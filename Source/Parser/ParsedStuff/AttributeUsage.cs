@@ -89,4 +89,6 @@ public class AttributeUsage :
             TryGetValue(1, out param1) &&
             TryGetValue(2, out param2);
     }
+
+    public override string ToString() => $"[{Identifier}({string.Join(", ", Parameters)})]";
 }

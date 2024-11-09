@@ -6,13 +6,15 @@ namespace LanguageCore.Parser;
 public class FieldDefinition :
     IPositioned,
     IInContext<StructDefinition>,
-    IIdentifiable<Token>
+    IIdentifiable<Token>,
+    IHaveAttributes
 {
     /// <summary>
     /// Set by the <see cref="StructDefinition"/>
     /// </summary>
     [NotNull] public StructDefinition? Context { get; set; }
 
+    public ImmutableArray<AttributeUsage> Attributes { get; }
     public ImmutableArray<Token> Modifiers { get; }
     public TypeInstance Type { get; }
     public Token Identifier { get; }
@@ -42,13 +44,15 @@ public class FieldDefinition :
         Modifiers = other.Modifiers;
         Semicolon = other.Semicolon;
         Context = other.Context;
+        Attributes = other.Attributes;
     }
 
-    public FieldDefinition(Token identifier, TypeInstance type, IEnumerable<Token> modifiers)
+    public FieldDefinition(Token identifier, TypeInstance type, IEnumerable<Token> modifiers, AttributeUsage[] attributes)
     {
         Identifier = identifier;
         Type = type;
         Modifiers = modifiers.ToImmutableArray();
+        Attributes = attributes.ToImmutableArray();
     }
 
     public override string ToString() => $"{(Modifiers.IsEmpty ? string.Empty : $"{string.Join(' ', Modifiers)} ")}{Type} {Identifier}";

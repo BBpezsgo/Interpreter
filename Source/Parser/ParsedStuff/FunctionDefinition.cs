@@ -5,14 +5,15 @@ namespace LanguageCore.Parser;
 
 public class FunctionDefinition : FunctionThingDefinition,
     IHaveType,
-    IInContext<StructDefinition?>
+    IInContext<StructDefinition?>,
+    IHaveAttributes
 {
     /// <summary>
     /// Set by the <see cref="StructDefinition"/>
     /// </summary>
     public StructDefinition? Context { get; set; }
 
-    public ImmutableArray<AttributeUsage> Attributes { get; }
+    public override ImmutableArray<AttributeUsage> Attributes { get; }
     public TypeInstance Type { get; }
 
     public override Position Position => base.Position.Union(Type);
@@ -82,10 +83,4 @@ public class FunctionDefinition : FunctionThingDefinition,
 
         return result.ToString();
     }
-
-    public FunctionDefinition Duplicate() => new(Attributes, Modifiers, Type, Identifier, Parameters.Duplicate(), Template, File)
-    {
-        Block = Block,
-        Context = Context,
-    };
 }

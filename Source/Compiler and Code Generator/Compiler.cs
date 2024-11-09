@@ -225,6 +225,33 @@ public enum CompileLevel
     All,
 }
 
+[Flags]
+public enum CanUseOn
+{
+    Function,
+    Struct,
+    Field,
+    TypeAlias,
+}
+
+public delegate bool AttributeVerifier(IHaveAttributes context, AttributeUsage attribute, [NotNullWhen(false)] out PossibleDiagnostic? error);
+
+public class UserDefinedAttribute
+{
+    public string Name { get; }
+    public ImmutableArray<LiteralType> Parameters { get; }
+    public CanUseOn CanUseOn { get; }
+    public AttributeVerifier? Verifier { get; }
+
+    public UserDefinedAttribute(string name, IEnumerable<LiteralType>? parameters, CanUseOn canUseOn, AttributeVerifier? verifier)
+    {
+        Name = name;
+        Parameters = (parameters ?? Enumerable.Empty<LiteralType>()).ToImmutableArray();
+        CanUseOn = canUseOn;
+        Verifier = verifier;
+    }
+}
+
 public sealed class Compiler
 {
     readonly List<CompiledStruct> CompiledStructs = new();
@@ -247,18 +274,20 @@ public sealed class Compiler
     readonly TokenizerSettings? TokenizerSettings;
     readonly ImmutableArray<IExternalFunction> ExternalFunctions;
     readonly PrintCallback? PrintCallback;
+    readonly ImmutableArray<UserDefinedAttribute> UserDefinedAttributes;
 
     readonly DiagnosticsCollection? Diagnostics;
     readonly IEnumerable<string> PreprocessorVariables;
 
-    Compiler(IEnumerable<IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, DiagnosticsCollection? diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings)
+    Compiler(IEnumerable<IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, DiagnosticsCollection? diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
     {
-        ExternalFunctions = (externalFunctions ?? new List<IExternalFunction>()).ToImmutableArray();
+        ExternalFunctions = (externalFunctions ?? Enumerable.Empty<IExternalFunction>()).ToImmutableArray();
         Settings = settings;
         PrintCallback = printCallback;
         Diagnostics = diagnostics;
         PreprocessorVariables = preprocessorVariables;
         TokenizerSettings = tokenizerSettings;
+        UserDefinedAttributes = (userDefinedAttributes ?? Enumerable.Empty<UserDefinedAttribute>()).ToImmutableArray();
     }
 
     bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
@@ -332,6 +361,141 @@ public sealed class Compiler
         return new CompiledStruct(@struct.Fields.Select(v => new CompiledField(BuiltinType.Any, null!, v)), @struct);
     }
 
+    void CompileFunctionAttributes(FunctionThingDefinition function)
+    {
+        GeneralType? type = null;
+        TypeInstance? typeInstance = null;
+        if (function is IHaveType haveType)
+        {
+            type = GeneralType.From(typeInstance = haveType.Type, FindType);
+        }
+        GeneralType[] parameterTypes = GeneralType.FromArray(function.Parameters, FindType).ToArray();
+
+        foreach (AttributeUsage attribute in function.Attributes)
+        {
+            switch (attribute.Identifier.Content)
+            {
+                case AttributeConstants.ExternalIdentifier:
+                {
+                    if (attribute.Parameters.Length != 1)
+                    {
+                        Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute));
+                        break;
+                    }
+
+                    if (attribute.Parameters[0].Type != LiteralType.String)
+                    {
+                        Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute));
+                        break;
+                    }
+
+                    string externalName = attribute.Parameters[0].Value;
+
+                    if (!ExternalFunctions.TryGet(externalName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
+                    {
+                        Diagnostics?.Add(exception.ToWarning(attribute, function.File));
+                        break;
+                    }
+
+                    // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
+
+                    break;
+                }
+                case AttributeConstants.BuiltinIdentifier:
+                {
+                    if (attribute.Parameters.Length != 1)
+                    {
+                        Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute));
+                        break;
+                    }
+
+                    if (attribute.Parameters[0].Type != LiteralType.String)
+                    {
+                        Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute));
+                        break;
+                    }
+
+                    string builtinName = attribute.Parameters[0].Value;
+
+                    if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out BuiltinFunction? builtinFunction))
+                    {
+                        Diagnostics?.Add(Diagnostic.Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
+                        break;
+                    }
+
+                    if (builtinFunction.Parameters.Length != function.Parameters.Count)
+                    {
+                        Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File));
+                    }
+
+                    if (type is null)
+                    {
+                        Diagnostics?.Add(Diagnostic.Critical($"Can't use attribute \"{attribute.Identifier}\" on this function because its aint have a return type", typeInstance, function.File));
+                        continue;
+                    }
+
+                    if (!builtinFunction.Type.Invoke(type))
+                    {
+                        Diagnostics?.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", typeInstance, function.File));
+                    }
+
+                    for (int i = 0; i < builtinFunction.Parameters.Length; i++)
+                    {
+                        if (i >= function.Parameters.Count) break;
+
+                        Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
+                        GeneralType passedParameterType = parameterTypes[i];
+                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
+
+                        if (definedParameterType.Invoke(passedParameterType))
+                        { continue; }
+
+                        Diagnostics?.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.Parameters[i].File));
+                    }
+                    break;
+                }
+                default:
+                {
+                    CompileUserAttribute(function, attribute);
+                    break;
+                }
+            }
+        }
+    }
+
+    void CompileUserAttribute(IHaveAttributes context, AttributeUsage attribute)
+    {
+        foreach (UserDefinedAttribute userDefinedAttribute in UserDefinedAttributes)
+        {
+            if (userDefinedAttribute.Name != attribute.Identifier.Content) continue;
+
+            if (!userDefinedAttribute.CanUseOn.HasFlag(CanUseOn.Function))
+            { Diagnostics?.Add(Diagnostic.Error($"Can't use attribute \"{attribute.Identifier}\" on {context.GetType().Name}. Valid usages: {userDefinedAttribute.CanUseOn}", attribute)); }
+
+            if (attribute.Parameters.Length != userDefinedAttribute.Parameters.Length)
+            {
+                Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {userDefinedAttribute.Parameters.Length}, passed {attribute.Parameters.Length}", attribute));
+                break;
+            }
+
+            for (int i = 0; i < attribute.Parameters.Length; i++)
+            {
+                if (attribute.Parameters[i].Type != userDefinedAttribute.Parameters[i])
+                {
+                    Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[i].Type} for attribute {attribute.Identifier} at {i}: expected {userDefinedAttribute.Parameters[i]}", attribute));
+                }
+            }
+
+            if (userDefinedAttribute.Verifier is not null &&
+                !userDefinedAttribute.Verifier.Invoke(context, attribute, out PossibleDiagnostic? error))
+            {
+                Diagnostics?.Add(error.ToError(attribute));
+            }
+
+            break;
+        }
+    }
+
     void CompileStructFields(CompiledStruct @struct)
     {
         if (@struct.Template is not null)
@@ -346,6 +510,7 @@ public sealed class Compiler
         for (int i = 0; i < @struct.Fields.Length; i++)
         {
             FieldDefinition field = @struct.Fields[i];
+
             compiledFields[i] = new CompiledField(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field);
         }
 
@@ -388,90 +553,7 @@ public sealed class Compiler
 
         GeneralType[] parameterTypes = GeneralType.FromArray(function.Parameters, FindType).ToArray();
 
-        foreach (AttributeUsage attribute in function.Attributes)
-        {
-            switch (attribute.Identifier.Content)
-            {
-                case AttributeConstants.ExternalIdentifier:
-                {
-                    if (attribute.Parameters.Length != 1)
-                    {
-                        Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute));
-                        break;
-                    }
-
-                    if (attribute.Parameters[0].Type != LiteralType.String)
-                    {
-                        Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute));
-                        break;
-                    }
-
-                    string externalName = attribute.Parameters[0].Value;
-
-                    if (!ExternalFunctions.TryGet(externalName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
-                    {
-                        // AnalysisCollection?.Warnings.Add(exception.InstantiateWarning(attribute, function.File));
-                        break;
-                    }
-
-                    // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
-
-                    break;
-                }
-                case AttributeConstants.BuiltinIdentifier:
-                {
-                    if (attribute.Parameters.Length != 1)
-                    {
-                        Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute));
-                        break;
-                    }
-
-                    if (attribute.Parameters[0].Type != LiteralType.String)
-                    {
-                        Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute));
-                        break;
-                    }
-
-                    string builtinName = attribute.Parameters[0].Value;
-
-                    if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out BuiltinFunction? builtinFunction))
-                    {
-                        // AnalysisCollection?.Warnings.Add(Diagnostic.Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
-                        break;
-                    }
-
-                    if (builtinFunction.Parameters.Length != function.Parameters.Count)
-                    {
-                        Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File));
-                    }
-
-                    if (!builtinFunction.Type.Invoke(type))
-                    {
-                        Diagnostics?.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", function.Type, function.File));
-                    }
-
-                    for (int i = 0; i < builtinFunction.Parameters.Length; i++)
-                    {
-                        if (i >= function.Parameters.Count) break;
-
-                        Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
-                        GeneralType passedParameterType = parameterTypes[i];
-                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
-
-                        if (definedParameterType.Invoke(passedParameterType))
-                        { continue; }
-
-                        Diagnostics?.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.Parameters[i].File));
-                    }
-                    break;
-                }
-                default:
-                {
-                    Diagnostics?.Add(Diagnostic.Warning($"Unknown attribute {attribute.Identifier}", attribute));
-                    break;
-                }
-            }
-        }
+        CompileFunctionAttributes(function);
 
         CompiledFunction result = new(
             type,
@@ -490,30 +572,21 @@ public sealed class Compiler
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
-        GeneralType[] parametersType = GeneralType.FromArray(function.Parameters, FindType).ToArray();
+        GeneralType[] parameterTypes = GeneralType.FromArray(function.Parameters, FindType).ToArray();
 
-        if (function.Attributes.TryGetAttribute(AttributeConstants.ExternalIdentifier, out AttributeUsage? attribute) &&
-            attribute.TryGetValue(out string? name))
-        {
-            if (ExternalFunctions.TryGet(name, out IExternalFunction? externalFunction, out PossibleDiagnostic? error))
-            {
-                // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
-            }
-            else
-            {
-                Diagnostics?.Add(error.ToError(attribute));
-            }
-        }
+        CompileFunctionAttributes(function);
 
         return new CompiledOperator(
             type,
-            parametersType,
+            parameterTypes,
             context,
             function);
     }
 
     CompiledGeneralFunction CompileGeneralFunction(GeneralFunctionDefinition function, GeneralType returnType, CompiledStruct context)
     {
+        CompileFunctionAttributes(function);
+
         return new CompiledGeneralFunction(
             returnType,
             GeneralType.FromArray(function.Parameters, FindType),
@@ -533,6 +606,8 @@ public sealed class Compiler
 
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
+
+        CompileFunctionAttributes(function);
 
         CompiledConstructor result = new(
             type,
@@ -690,6 +765,22 @@ public sealed class Compiler
             CompileStructFields(@struct);
         }
 
+        foreach (CompiledStruct @struct in CompiledStructs)
+        {
+            foreach (AttributeUsage attribute in @struct.Attributes)
+            {
+                CompileUserAttribute(@struct, attribute);
+            }
+
+            foreach (CompiledField field in @struct.Fields)
+            {
+                foreach (AttributeUsage attribute in field.Attributes)
+                {
+                    CompileUserAttribute(field, attribute);
+                }
+            }
+        }
+
         foreach (FunctionDefinition @operator in Operators)
         {
             CompiledOperator compiled = CompileOperator(@operator, null);
@@ -818,10 +909,7 @@ public sealed class Compiler
                 foreach (ParameterDefinition parameter in method.Parameters)
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
-                    {
-                        Diagnostics?.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File));
-                        return;
-                    }
+                    { Diagnostics?.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File)); }
                 }
 
                 List<ParameterDefinition> parameters = method.Parameters.ToList();
@@ -942,7 +1030,8 @@ public sealed class Compiler
         DiagnosticsCollection? diagnostics = null,
         TokenizerSettings? tokenizerSettings = null,
         FileParser? fileParser = null,
-        IEnumerable<string>? additionalImports = null)
+        IEnumerable<string>? additionalImports = null,
+        IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
     {
         Compiler compiler = new(
             externalFunctions,
@@ -950,7 +1039,8 @@ public sealed class Compiler
             settings,
             diagnostics,
             preprocessorVariables,
-            tokenizerSettings);
+            tokenizerSettings,
+            userDefinedAttributes);
         return compiler.CompileMainFile(file, fileParser, additionalImports);
     }
 
@@ -962,7 +1052,8 @@ public sealed class Compiler
         PrintCallback? printCallback,
         DiagnosticsCollection? diagnostics,
         TokenizerSettings? tokenizerSettings,
-        Uri file)
+        Uri file,
+        IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
     {
         Compiler compiler = new(
             externalFunctions,
@@ -970,7 +1061,8 @@ public sealed class Compiler
             settings,
             diagnostics,
             preprocessorVariables,
-            tokenizerSettings);
+            tokenizerSettings,
+            userDefinedAttributes);
         return compiler.CompileInteractiveInternal(statement, file);
     }
 }

@@ -8,7 +8,8 @@ public abstract class FunctionThingDefinition :
     IPositioned,
     ISimpleReadable,
     IIdentifiable<Token>,
-    ILocated
+    ILocated,
+    IHaveAttributes
 {
     public ImmutableArray<Token> Modifiers { get; }
     public Token Identifier { get; }
@@ -16,6 +17,7 @@ public abstract class FunctionThingDefinition :
     public Statement.Block? Block { get; init; }
     public TemplateInfo? Template { get; }
     public Uri File { get; }
+    public abstract ImmutableArray<AttributeUsage> Attributes { get; }
 
     public Location Location => new(Position, File);
     /// <summary>

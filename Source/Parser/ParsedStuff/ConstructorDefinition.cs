@@ -14,6 +14,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
     [NotNull] public StructDefinition? Context { get; set; }
 
     public TypeInstance Type { get; }
+    public override ImmutableArray<AttributeUsage> Attributes { get; }
 
     public override bool IsTemplate
     {
@@ -30,6 +31,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
     {
         Type = other.Type;
         Context = other.Context;
+        Attributes = other.Attributes;
     }
 
     public ConstructorDefinition(
@@ -40,6 +42,7 @@ public class ConstructorDefinition : FunctionThingDefinition,
         : base(modifiers, Token.CreateAnonymous(type.ToString(), TokenType.Identifier, type.Position), parameters, null, file)
     {
         Type = type;
+        Attributes = ImmutableArray<AttributeUsage>.Empty;
     }
 
     public override string ToString()

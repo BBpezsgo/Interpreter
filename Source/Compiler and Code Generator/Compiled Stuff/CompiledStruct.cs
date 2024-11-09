@@ -3,8 +3,7 @@
 namespace LanguageCore.Compiler;
 
 public class CompiledStruct : StructDefinition,
-    IReferenceable<TypeInstance>,
-    IDuplicatable<CompiledStruct>
+    IReferenceable<TypeInstance>
 {
     public new ImmutableArray<CompiledField> Fields { get; private set; }
     public List<Reference<TypeInstance>> References { get; }
@@ -24,8 +23,6 @@ public class CompiledStruct : StructDefinition,
 
         References = new List<Reference<TypeInstance>>(other.References);
     }
-
-    public CompiledStruct Duplicate() => new(Fields, this);
 
     public void SetFields(IEnumerable<CompiledField> fields)
     {

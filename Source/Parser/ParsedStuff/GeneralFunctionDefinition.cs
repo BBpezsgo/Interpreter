@@ -10,6 +10,7 @@ public class GeneralFunctionDefinition : FunctionThingDefinition,
     /// Set by the <see cref="StructDefinition"/>
     /// </summary>
     [NotNull] public StructDefinition? Context { get; set; }
+    public override ImmutableArray<AttributeUsage> Attributes { get; }
 
     public override bool IsTemplate
     {
@@ -24,6 +25,7 @@ public class GeneralFunctionDefinition : FunctionThingDefinition,
     public GeneralFunctionDefinition(GeneralFunctionDefinition other) : base(other)
     {
         Context = other.Context;
+        Attributes = other.Attributes;
     }
 
     public GeneralFunctionDefinition(
@@ -32,13 +34,9 @@ public class GeneralFunctionDefinition : FunctionThingDefinition,
         ParameterDefinitionCollection parameters,
         Uri file)
         : base(modifiers, identifier, parameters, null, file)
-    { }
-
-    public GeneralFunctionDefinition Duplicate() => new(Identifier, Modifiers, Parameters.Duplicate(), File)
     {
-        Block = Block,
-        Context = Context,
-    };
+        Attributes = ImmutableArray<AttributeUsage>.Empty;
+    }
 
     public override string ToString()
     {

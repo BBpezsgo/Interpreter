@@ -49,9 +49,9 @@ public class StackCodeHelper
 
     readonly CodeHelper _code;
     readonly List<int> _stack;
-    readonly DiagnosticsCollection? _diagnostics;
+    readonly DiagnosticsCollection _diagnostics;
 
-    public StackCodeHelper(CodeHelper code, int start, int size, DiagnosticsCollection? diagnostics)
+    public StackCodeHelper(CodeHelper code, int start, int size, DiagnosticsCollection diagnostics)
     {
         _code = code;
         _stack = new List<int>();
@@ -67,21 +67,22 @@ public class StackCodeHelper
         MaxUsedSize = other.MaxUsedSize;
         Start = other.Start;
         MaxSize = other.MaxSize;
+        _diagnostics = new(other._diagnostics);
     }
 
-    public StackAddress GetTemporaryAddress(int size, ILocated location) => PushVirtual(size, location);
+    public StackAddress GetTemporaryAddress(int size, ILocated? location = null) => PushVirtual(size, location);
 
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
     /// <exception cref="NotSupportedException"/>
     /// <exception cref="InternalExceptionWithoutContext"/>
-    public StackAddress Push(CompiledValue v) => Push(CodeHelper.GetInteger(v));
+    public StackAddress Push(CompiledValue v, ILocated? location = null) => Push(CodeHelper.GetInteger(v), location);
 
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public StackAddress Push(int v, ILocated location)
+    public StackAddress Push(int v, ILocated? location = null)
     {
         StackAddress address = PushVirtual(1, location);
 
@@ -92,7 +93,7 @@ public class StackCodeHelper
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    public StackAddress Push(char v, ILocated location)
+    public StackAddress Push(char v, ILocated? location = null)
     {
         StackAddress address = PushVirtual(1, location);
 
@@ -166,7 +167,7 @@ public class StackCodeHelper
         { Pop(); }
     }
 
-    public StackAddress PushVirtual(int size, ILocated location)
+    public StackAddress PushVirtual(int size, ILocated? location = null)
     {
         int address = NextAddress;
 

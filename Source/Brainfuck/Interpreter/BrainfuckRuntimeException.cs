@@ -45,12 +45,9 @@ public class BrainfuckRuntimeException : Exception
 
         FunctionInformation currentFrame = DebugInfo.GetFunctionInformation(RuntimeContext.CodePointer);
 
-        StringBuilder result = new(Message);
+        StringBuilder result = new();
 
-        result.Append(position.ToStringCool().Surround(" (at ", ")"));
-
-        if (sourcePosition.Uri != null)
-        { result.Append($" (in {sourcePosition.Uri})"); }
+        result.Append(LanguageException.Format(Message, position, sourcePosition.Uri));
 
         result.AppendLine();
 

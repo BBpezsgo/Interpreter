@@ -23,18 +23,18 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, parameters, file, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? error, AddCompilable))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, file));
+            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", position, file));
             return;
         }
         if (!result.Function.ReturnSomething)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", position, file));
+            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", position, file));
             return;
         }
 
         if (!result.Function.CanUse(file))
         {
-            Diagnostics?.Add(Diagnostic.Error($"Function \"{result.Function.ToReadable()}\" cannot be called due to its protection level", position, file));
+            Diagnostics.Add(Diagnostic.Error($"Function \"{result.Function.ToReadable()}\" cannot be called due to its protection level", position, file));
             return;
         }
 
@@ -47,18 +47,18 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, parameters, size.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? error, AddCompilable))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", size));
+            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found", size));
             return;
         }
         if (!result.Function.ReturnSomething)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size));
+            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size));
             return;
         }
 
         if (!result.Function.CanUse(size.File))
         {
-            Diagnostics?.Add(Diagnostic.Error($"Function \"{result.Function.ToReadable()}\" cannot be called due to its protection level", size));
+            Diagnostics.Add(Diagnostic.Error($"Function \"{result.Function.ToReadable()}\" cannot be called due to its protection level", size));
             return;
         }
 
@@ -74,7 +74,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!deallocateableType.Is(out PointerType? deallocateablePointerType))
         {
-            Diagnostics?.Add(Diagnostic.Warning($"The \"delete\" keyword-function is only working on pointers so I skip this", value));
+            Diagnostics.Add(Diagnostic.Warning($"The \"delete\" keyword-function is only working on pointers so I skip this", value));
             return;
         }
 
@@ -84,8 +84,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (!deallocateablePointerType.To.Is<BuiltinType>())
             {
-                Diagnostics?.Add(Diagnostic.Warning($"Destructor for type \"{deallocateablePointerType}\" not found", value));
-                Diagnostics?.Add(error.ToWarning(value, value.File));
+                Diagnostics.Add(Diagnostic.Warning($"Destructor for type \"{deallocateablePointerType}\" not found", value));
+                Diagnostics.Add(error.ToWarning(value, value.File));
             }
 
             return;
@@ -95,7 +95,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!destructor.CanUse(value.File))
         {
-            Diagnostics?.Add(Diagnostic.Error($"Destructor for type {deallocateableType} cannot be called due to its protection level", value));
+            Diagnostics.Add(Diagnostic.Error($"Destructor for type \"{deallocateableType}\" cannot be called due to its protection level", value));
             return;
         }
 
@@ -111,9 +111,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameters, value.File, out FunctionQueryResult<CompiledFunction>? result, out _))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameters, value.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFoundError))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, value.File));
+            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, value.File));
+            Diagnostics.Add(notFoundError.ToError(value));
             return;
         }
 
@@ -142,7 +143,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     int PrecompileVariable(VariableDeclaration variableDeclaration)
     {
         if (GetVariable(variableDeclaration.Identifier.Content, out _))
-        { Diagnostics?.Add(Diagnostic.Critical($"Variable \"{variableDeclaration.Identifier.Content}\" already defined", variableDeclaration.Identifier, variableDeclaration.File)); }
+        { Diagnostics.Add(Diagnostic.Critical($"Variable \"{variableDeclaration.Identifier.Content}\" already defined", variableDeclaration.Identifier)); }
 
         if (variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
         { return 0; }
@@ -155,7 +156,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (initialValue == null)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Variable with implicit type must have an initial value", variableDeclaration));
+                Diagnostics.Add(Diagnostic.Critical($"Variable with implicit type must have an initial value", variableDeclaration));
                 return default;
             }
 
@@ -178,9 +179,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             GeneralType initialValueType = FindStatementType(initialValue, type);
 
-            if (initialValueType.GetSize(this) != type.GetSize(this))
+            if (initialValueType.GetSize(this, Diagnostics, initialValue) != type.GetSize(this, Diagnostics, location))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, initialValue.File));
+                Diagnostics.Add(Diagnostic.Critical($"Variable initial value type (\"{initialValueType}\") and variable type (\"{type}\") mismatch", initialValue, initialValue.File));
                 return default;
             }
 
@@ -195,12 +196,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         if (!arrayType.ComputedLength.HasValue)
                         {
-                            Diagnostics?.Add(Diagnostic.Critical($"Literal length {literal.Value.Length} must be equal to the stack array length <runtime value>", literal, literal.File));
+                            Diagnostics.Add(Diagnostic.Critical($"Literal length {literal.Value.Length} must be equal to the stack array length <runtime value>", literal, literal.File));
                             return default;
                         }
                         if (literal.Value.Length != arrayType.ComputedLength.Value)
                         {
-                            Diagnostics?.Add(Diagnostic.Critical($"Literal length {literal.Value.Length} must be equal to the stack array length {arrayType.ComputedLength.Value}", literal, literal.File));
+                            Diagnostics.Add(Diagnostic.Critical($"Literal length {literal.Value.Length} must be equal to the stack array length {arrayType.ComputedLength.Value}", literal, literal.File));
                             return default;
                         }
                     }
@@ -226,7 +227,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (!arrayType.ComputedLength.HasValue)
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"This aint supported", location));
+                        Diagnostics.Add(Diagnostic.Critical($"This aint supported", location));
                         return default;
                     }
 
@@ -240,8 +241,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                int address = Stack.PushVirtual(type.GetSize(this), location);
-                variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, type.GetSize(this)));
+                int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, location), location);
+                variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, type.GetSize(this, Diagnostics, location)));
             }
         }
         else
@@ -250,7 +251,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (!arrayType.ComputedLength.HasValue)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"This aint supported", location));
+                    Diagnostics.Add(Diagnostic.Critical($"This aint supported", location));
                     return default;
                 }
 
@@ -263,8 +264,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                int address = Stack.PushVirtual(type.GetSize(this), location);
-                variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, type.GetSize(this)));
+                int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, location), location);
+                variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, type.GetSize(this, Diagnostics, location)));
             }
         }
 
@@ -310,21 +311,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     protected override bool FindSize(BuiltinType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        size = type.Type switch
+        size = default;
+        error = default;
+        switch (type.Type)
         {
-            BasicType.Void => throw new InternalExceptionWithoutContext($"Type {type} does not have a size"),
-            BasicType.Any => throw new InternalExceptionWithoutContext($"Type {type} does not have a size"),
-            BasicType.U8 => 1,
-            BasicType.I8 => 1,
-            BasicType.Char => 1,
-            BasicType.I16 => 1,
-            BasicType.U32 => 1,
-            BasicType.I32 => 1,
-            BasicType.F32 => 1,
-            _ => throw new UnreachableException(),
-        };
-        error = null;
-        return true;
+            case BasicType.Void: error = new PossibleDiagnostic($"Type \"{type}\" does not have a size"); return false;
+            case BasicType.Any: error = new PossibleDiagnostic($"Type \"{type}\" does not have a size"); return false;
+            case BasicType.U8: size = 1; return true;
+            case BasicType.I8: size = 1; return true;
+            case BasicType.Char: size = 1; return true;
+            case BasicType.I16: size = 1; return true;
+            case BasicType.U32: size = 1; return true;
+            case BasicType.I32: size = 1; return true;
+            case BasicType.F32: size = 1; return true;
+            default: throw new UnreachableException();
+        }
     }
 
     #endregion
@@ -415,7 +416,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case IndexCall v: GenerateCodeForSetter(v, value); break;
             case Field v: GenerateCodeForSetter(v, value); break;
             default:
-                Diagnostics?.Add(Diagnostic.Critical($"Setter for statement {statement.GetType().Name} not implemented", statement, statement.File));
+                Diagnostics.Add(Diagnostic.Critical($"Setter for statement \"{statement.GetType().Name}\" not implemented", statement, statement.File));
                 return;
         }
     }
@@ -424,13 +425,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         if (GetConstant(statement.Content, statement.File, out _, out _))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"This is a constant so you can not modify it's value", statement, statement.File));
+            Diagnostics.Add(Diagnostic.Critical($"This is a constant so you can not modify it's value", statement, statement.File));
             return;
         }
 
         if (!GetVariable(statement.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
-            Diagnostics?.Add(notFoundError.ToError(statement));
+            Diagnostics.Add(notFoundError.ToError(statement));
             return;
         }
 
@@ -447,13 +448,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (!pointerType.To.Is(out StructType? structPointerType))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Could not get the field offsets of type {pointerType}", statementToSet.PrevStatement, statementToSet.PrevStatement.File));
+                Diagnostics.Add(Diagnostic.Critical($"Could not get the field offsets of type \"{pointerType}\"", statementToSet.PrevStatement, statementToSet.PrevStatement.File));
                 return;
             }
 
-            if (!structPointerType.GetField(statementToSet.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset))
+            if (!structPointerType.GetField(statementToSet.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset, out PossibleDiagnostic? error))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Could not get the field offset of field \"{statementToSet.Identifier}\"", statementToSet.Identifier, statementToSet.File));
+                Diagnostics.Add(error.ToError(statementToSet.Identifier, statementToSet.File));
                 return;
             }
 
@@ -461,9 +462,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             statementToSet.Reference = fieldDefinition;
             statementToSet.CompiledType = fieldDefinition.Type;
 
-            if (type.GetSize(this) != valueType.GetSize(this))
+            if (type.GetSize(this, Diagnostics, statementToSet) != valueType.GetSize(this, Diagnostics, value))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Field and value size mismatch", value, value.File));
+                Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", value, value.File));
                 return;
             }
 
@@ -490,7 +491,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!type.SameAs(valueType))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, value.File));
+            Diagnostics.Add(Diagnostic.Critical($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, value.File));
             return;
         }
 
@@ -504,13 +505,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            Diagnostics?.Add(Diagnostic.Critical($"Failed to get field address", statementToSet));
+            Diagnostics.Add(Diagnostic.Critical($"Failed to get field address", statementToSet));
             return;
         }
 
-        if (size != valueType.GetSize(this))
+        if (size != valueType.GetSize(this, Diagnostics, value))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Field and value size mismatch", value));
+            Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", value));
             return;
         }
 
@@ -531,16 +532,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (valueVariable.IsDiscarded)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Variable \"{valueVariable.Name}\" is discarded", _identifier));
+                Diagnostics.Add(Diagnostic.Critical($"Variable \"{valueVariable.Name}\" is discarded", _identifier));
                 return;
             }
 
             if (!valueVariable.IsInitialized)
-            { Diagnostics?.Add(Diagnostic.Warning($"Variable \"{valueVariable.Name}\" is not initialized", _identifier)); }
+            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{valueVariable.Name}\" is not initialized", _identifier)); }
 
             if (variable.Size != valueVariable.Size)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Variable and value size mismatch ({variable.Size} != {valueVariable.Size})", value));
+                Diagnostics.Add(Diagnostic.Critical($"Variable and value size mismatch ({variable.Size} != {valueVariable.Size})", value));
                 return;
             }
 
@@ -567,7 +568,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (VariableUses(value, variable) == 0)
         { VariableCanBeDiscarded = variable.Name; }
 
-        using (Code.Block(this, $"Set variable \"{variable.Name}\" (at {variable.Address}) to {value}"))
+        using (Code.Block(this, $"Set variable \"{variable.Name}\" (at {variable.Address}) to \"{value}\""))
         {
             if (AllowPrecomputing && TryCompute(value, out CompiledValue constantValue))
             {
@@ -586,7 +587,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
 
             GeneralType valueType = FindStatementType(value);
-            int valueSize = valueType.GetSize(this);
+            int valueSize = valueType.GetSize(this, Diagnostics, value);
 
             if (variable.Type.Is(out ArrayType? arrayType))
             {
@@ -688,24 +689,24 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (!GetVariable(variableIdentifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
-                Diagnostics?.Add(notFoundError.ToError(variableIdentifier));
+                Diagnostics.Add(notFoundError.ToError(variableIdentifier));
                 return;
             }
 
             if (variable.IsDiscarded)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", variableIdentifier));
+                Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", variableIdentifier));
                 return;
             }
 
             if (variable.Size != 1)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Bruh", variableIdentifier));
+                Diagnostics.Add(Diagnostic.Critical($"Bruh", variableIdentifier));
                 return;
             }
 
             if (!variable.IsInitialized)
-            { Diagnostics?.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", variableIdentifier)); }
+            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", variableIdentifier)); }
 
             if (variable.IsReference)
             {
@@ -719,7 +720,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void CompileSetter(int address, StatementWithValue value)
     {
-        using (Code.Block(this, $"Set value {value} to address {address}"))
+        using (Code.Block(this, $"Set value \"{value}\" to address {address}"))
         {
             if (AllowPrecomputing && TryCompute(value, out CompiledValue constantValue))
             {
@@ -750,7 +751,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!referenceType.Is(out PointerType? _))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", dereference, dereference.File));
+            Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", dereference, dereference.File));
             return;
         }
 
@@ -785,14 +786,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         int valueAddress = Stack.NextAddress;
         GenerateCodeForStatement(value);
 
-        if (valueType.GetSize(this) == 1 && AllowOtherOptimizations)
+        if (valueType.GetSize(this, Diagnostics, value) == 1 && AllowOtherOptimizations)
         {
             Heap.Set(pointerAddress, valueAddress);
         }
         else
         {
             using StackAddress tempPointerAddress = Stack.PushVirtual(1, value);
-            for (int i = 0; i < valueType.GetSize(this); i++)
+            for (int i = 0; i < valueType.GetSize(this, Diagnostics, value); i++)
             {
                 Code.CopyValue(pointerAddress, tempPointerAddress);
                 Heap.Set(tempPointerAddress, valueAddress + i);
@@ -810,13 +811,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType indexType = FindStatementType(statement.Index);
         GeneralType valueType = FindStatementType(value);
 
-        if (GetIndexSetter(prevType, valueType, indexType, statement.File, out FunctionQueryResult<CompiledFunction>? result, out _))
+        if (GetIndexSetter(prevType, valueType, indexType, statement.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? indexerNotFoundError))
         {
             (CompiledFunction? indexer, Dictionary<string, GeneralType>? typeArguments) = result;
 
             if (!indexer.CanUse(statement.File))
             {
-                Diagnostics?.Add(Diagnostic.Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", statement));
+                Diagnostics.Add(Diagnostic.Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", statement));
                 return;
             }
 
@@ -840,7 +841,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (!arrayType.Of.SameAs(valueType))
             {
-                Diagnostics?.Add(Diagnostic.Critical("Bruh", value));
+                Diagnostics.Add(Diagnostic.Critical("Bruh", value));
                 return;
             }
 
@@ -849,16 +850,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (!indexType.Is<BuiltinType>())
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Index type must be built-in (ie. \"i32\") and not {indexType}", statement.Index));
+                Diagnostics.Add(Diagnostic.Critical($"Index type must be built-in (ie. \"i32\") and not \"{indexType}\"", statement.Index));
                 return;
             }
 
             int indexAddress = Stack.NextAddress;
             GenerateCodeForStatement(statement.Index);
 
-            if (arrayType.Of.GetSize(this) != 1)
+            if (arrayType.Of.GetSize(this, Diagnostics, statement.PrevStatement) != 1)
             {
-                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this));
+                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this, Diagnostics, statement.PrevStatement));
                 Code.MULTIPLY(indexAddress, multiplierAddress, v => Stack.GetTemporaryAddress(v, value));
             }
 
@@ -873,28 +874,32 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
 
         if (statement.PrevStatement is not Identifier _variableIdentifier)
-        { throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement); }
-
-        if (!GetVariable(_variableIdentifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
-            Diagnostics?.Add(notFoundError.ToError(_variableIdentifier));
+            Diagnostics.Add(indexerNotFoundError.ToError(statement));
+            throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement);
+        }
+
+        if (!GetVariable(_variableIdentifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? variableNotFoundError))
+        {
+            Diagnostics.Add(variableNotFoundError.ToError(_variableIdentifier));
+            Diagnostics.Add(indexerNotFoundError.ToError(statement));
             return;
         }
 
         if (variable.IsDiscarded)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", _variableIdentifier));
+            Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", _variableIdentifier));
             return;
         }
 
         if (!variable.IsInitialized)
-        { Diagnostics?.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", _variableIdentifier)); }
+        { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", _variableIdentifier)); }
 
-        using (Code.Block(this, $"Set array (variable {variable.Name}) index ({statement.Index}) (at {variable.Address}) to {value}"))
+        using (Code.Block(this, $"Set array (variable \"{variable.Name}\") index (\"{statement.Index}\") (at {variable.Address}) to \"{value}\""))
         {
             if (!variable.Type.Is(out arrayType))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Index setter for type \"{variable.Type}\" not found", statement));
+                Diagnostics.Add(Diagnostic.Critical($"Index setter for type \"{variable.Type}\" not found", statement));
                 return;
             }
 
@@ -902,11 +907,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (!elementType.SameAs(valueType))
             {
-                Diagnostics?.Add(Diagnostic.Critical("Bruh", value));
+                Diagnostics.Add(Diagnostic.Critical("Bruh", value));
                 return;
             }
 
-            int elementSize = elementType.GetSize(this);
+            int elementSize = elementType.GetSize(this, Diagnostics, statement.PrevStatement);
 
             if (elementSize != 1)
             { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", value); }
@@ -935,7 +940,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             case RuntimeFunctionCall v: GenerateCodeForStatement(v); break;
             default:
-                Diagnostics?.Add(Diagnostic.Critical($"Unknown runtime statement \"{statement.GetType().Name}\"", statement, statement.File));
+                Diagnostics.Add(Diagnostic.Critical($"Unknown runtime statement \"{statement.GetType().Name}\"", statement, statement.File));
                 return;
         }
     }
@@ -945,7 +950,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!functionCall.Function.CanUse(functionCall.Original.File))
         {
-            Diagnostics?.Add(Diagnostic.Error($"Function \"{functionCall.Function.ToReadable()}\" cannot be called due to its protection level", functionCall.Original));
+            Diagnostics.Add(Diagnostic.Error($"Function \"{functionCall.Function.ToReadable()}\" cannot be called due to its protection level", functionCall.Original));
             return;
         }
 
@@ -984,7 +989,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case ModifiedStatement v: GenerateCodeForStatement(v); break;
             case Block v: GenerateCodeForStatement(v); break;
             default:
-                Diagnostics?.Add(Diagnostic.Critical($"Unknown statement \"{statement.GetType().Name}\"", statement));
+                Diagnostics.Add(Diagnostic.Critical($"Unknown statement \"{statement.GetType().Name}\"", statement));
                 return;
         }
     }
@@ -993,12 +998,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         StatementWithValue statement = modifiedStatement.Statement;
         Token modifier = modifiedStatement.Modifier;
 
-        if (modifier.Equals(ModifierKeywords.Ref))
+        if (modifier.Content == ModifierKeywords.Ref)
         {
             throw new NotImplementedException();
         }
 
-        if (modifier.Equals(ModifierKeywords.Temp))
+        if (modifier.Content == ModifierKeywords.Temp)
         {
             GenerateCodeForStatement(statement);
             return;
@@ -1027,7 +1032,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (!indexer.Function.CanUse(indexCall.File))
             {
-                Diagnostics?.Add(Diagnostic.Error($"Function \"{indexer.Function.ToReadable()}\" cannot be called due to its protection level", indexCall));
+                Diagnostics.Add(Diagnostic.Error($"Function \"{indexer.Function.ToReadable()}\" cannot be called due to its protection level", indexCall));
                 return;
             }
 
@@ -1042,17 +1047,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (!TryGetAddress(indexCall.PrevStatement, out int arrayAddress, out _))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Failed to get array address", indexCall.PrevStatement));
+                Diagnostics.Add(Diagnostic.Critical($"Failed to get array address", indexCall.PrevStatement));
                 return;
             }
 
             GeneralType elementType = arrayType.Of;
 
-            int elementSize = elementType.GetSize(this);
+            int elementSize = elementType.GetSize(this, Diagnostics, indexCall.PrevStatement);
 
             if (elementSize != 1)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Array element size must be 1 :(", indexCall));
+                Diagnostics.Add(Diagnostic.Critical($"Array element size must be 1 :(", indexCall));
                 return;
             }
 
@@ -1079,7 +1084,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (!indexType.Is<BuiltinType>())
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Index type must be built-in (ie. \"int\") and not {indexType}", indexCall.Index));
+                Diagnostics.Add(Diagnostic.Critical($"Index type must be built-in (ie. \"int\") and not \"{indexType}\"", indexCall.Index));
                 return;
             }
 
@@ -1087,7 +1092,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GenerateCodeForStatement(indexCall.Index);
 
             {
-                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this));
+                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this, Diagnostics, indexCall.PrevStatement));
                 Code.MULTIPLY(indexAddress, multiplierAddress, v => Stack.GetTemporaryAddress(v, indexCall.Index));
             }
 
@@ -1099,7 +1104,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        Diagnostics?.Add(Diagnostic.Critical($"Index getter for type {prevType} not found", indexCall));
+        Diagnostics.Add(Diagnostic.Critical($"Index getter for type \"{prevType}\" not found", indexCall));
         return;
     }
     void GenerateCodeForStatement(LinkedIf @if, bool linked = false)
@@ -1144,7 +1149,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
         }
 
-        using (Code.Block(this, $"If ({@if.Condition})"))
+        using (Code.Block(this, $"If (\"{@if.Condition}\")"))
         {
             int conditionAddress = Stack.NextAddress;
             using (Code.Block(this, "Compute condition"))
@@ -1157,7 +1162,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             Code.CommentLine($"Pointer: {Code.Pointer}");
 
-            using (DebugBlock(@if.Keyword, @if.File))
+            using (DebugBlock(@if.Keyword))
             {
                 Code.JumpStart(conditionAddress);
             }
@@ -1195,7 +1200,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     Code.MoveValue(conditionAddress + 1, conditionAddress);
                     // }
 
-                    using (DebugBlock(@if.NextLink.Keyword, @if.NextLink.File))
+                    using (DebugBlock(@if.NextLink.Keyword))
                     {
                         // using (Code.CommentBlock(this, $"Invert condition (at {conditionAddress}) result (to {conditionAddress + 1})"))
                         // { Code.LOGIC_NOT(conditionAddress, conditionAddress + 1); }
@@ -1262,7 +1267,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForStatement(WhileLoop @while)
     {
-        using (Code.Block(this, $"While ({@while.Condition})"))
+        using (Code.Block(this, $"While (\"{@while.Condition}\")"))
         {
             int conditionAddress = Stack.NextAddress;
             using (Code.Block(this, "Compute condition"))
@@ -1301,12 +1306,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     if (Breaks.Count > 0)
                     {
                         if (!Breaks.Last.FlagAddress.HasValue)
-                        { throw new InternalException($"Unexpected conditional jump in the depths (this is the compiler's fault)", @while, @while.File); }
-
-                        Code.CopyValue(Breaks.Last.FlagAddress.Value, tempAddress);
-                        Code.LOGIC_NOT(tempAddress, v => Stack.GetTemporaryAddress(v, @while));
-                        using (Code.ConditionalBlock(this, tempAddress))
-                        { Code.SetValue(conditionAddress, 0); }
+                        { Diagnostics.Add(Diagnostic.Internal($"Unexpected conditional jump in the depths (this is the compiler's fault)", @while)); }
+                        else
+                        {
+                            Code.CopyValue(Breaks.Last.FlagAddress.Value, tempAddress);
+                            Code.LOGIC_NOT(tempAddress, v => Stack.GetTemporaryAddress(v, @while));
+                            using (Code.ConditionalBlock(this, tempAddress))
+                            { Code.SetValue(conditionAddress, 0); }
+                        }
                     }
                 }
             }
@@ -1448,12 +1455,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     if (Breaks.Count > 0)
                     {
                         if (!Breaks.Last.FlagAddress.HasValue)
-                        { throw new InternalException($"Unexpected conditional jump in the depths (this is the compiler's fault)", @for, @for.File); }
-
-                        Code.CopyValue(Breaks.Last.FlagAddress.Value, tempAddress);
-                        Code.LOGIC_NOT(tempAddress, v => Stack.GetTemporaryAddress(v, @for));
-                        using (Code.ConditionalBlock(this, tempAddress))
-                        { Code.SetValue(conditionAddress, 0); }
+                        { Diagnostics.Add(Diagnostic.Internal($"Unexpected conditional jump in the depths (this is the compiler's fault)", @for)); }
+                        else
+                        {
+                            Code.CopyValue(Breaks.Last.FlagAddress.Value, tempAddress);
+                            Code.LOGIC_NOT(tempAddress, v => Stack.GetTemporaryAddress(v, @for));
+                            using (Code.ConditionalBlock(this, tempAddress))
+                            { Code.SetValue(conditionAddress, 0); }
+                        }
                     }
                 }
             }
@@ -1482,7 +1491,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (statement.Arguments.Length is not 0 and not 1)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Arguments.Length})", statement));
+                    Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Arguments.Length})", statement));
                     return;
                 }
 
@@ -1490,8 +1499,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (!GetVariable(ReturnVariableName, out BrainfuckVariable? returnVariable, out PossibleDiagnostic? notFoundError))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Can't return value for some reason :(", statement));
-                        Diagnostics?.Add(notFoundError.ToError(statement));
+                        Diagnostics.Add(Diagnostic.Critical($"Can't return value for some reason :(", statement));
+                        Diagnostics.Add(notFoundError.ToError(statement));
                         return;
                     }
 
@@ -1500,7 +1509,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (Returns.Count == 0)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Can't return for some reason :(", statement.Identifier, statement.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Can't return for some reason :(", statement.Identifier, statement.File));
                     return;
                 }
 
@@ -1523,19 +1532,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (statement.Arguments.Length != 0)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Arguments.Length})", statement));
+                    Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Arguments.Length})", statement));
                     return;
                 }
 
                 if (Breaks.Count == 0)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, statement.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, statement.File));
                     return;
                 }
 
                 if (!Breaks.Last.FlagAddress.HasValue)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, statement.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Looks like this \"{statement.Identifier}\" statement is not inside a loop", statement.Identifier, statement.File));
                     return;
                 }
 
@@ -1557,7 +1566,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (statement.Arguments.Length != 1)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement));
+                    Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement));
                     return;
                 }
 
@@ -1570,7 +1579,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (statement.Arguments.Length != 1)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement));
+                    Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Arguments.Length})", statement));
                     return;
                 }
                 GenerateCodeForPrinter(Ansi.Style(Ansi.BrightForegroundRed), statement.Arguments[0]);
@@ -1583,7 +1592,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
 
             default:
-                Diagnostics?.Add(Diagnostic.Critical($"Unknown keyword-call \"{statement.Identifier}\"", statement.Identifier, statement.File));
+                Diagnostics.Add(Diagnostic.Critical($"Unknown keyword-call \"{statement.Identifier}\"", statement.Identifier));
                 return;
         }
     }
@@ -1591,7 +1600,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         if (statement.Operator.Content != "=")
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, statement.File));
+            Diagnostics.Add(Diagnostic.Critical($"Unknown assignment operator \"{statement.Operator}\"", statement.Operator, statement.File));
             return;
         }
 
@@ -1622,24 +1631,24 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (variable.IsDiscarded)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement.Left));
+                    Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement.Left));
                     return;
                 }
 
                 if (variable.Size != 1)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Bruh", statement.Left));
+                    Diagnostics.Add(Diagnostic.Critical($"Bruh", statement.Left));
                     return;
                 }
 
                 if (statement.Right == null)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Value is required for '{statement.Operator}' assignment", statement));
+                    Diagnostics.Add(Diagnostic.Critical($"Value is required for \"{statement.Operator}\" assignment", statement));
                     return;
                 }
 
                 if (!variable.IsInitialized)
-                { Diagnostics?.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left)); }
+                { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left)); }
 
                 if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
                 {
@@ -1648,7 +1657,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     if (!variable.Type.SameAs(constantValue.Type))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right));
+                        Diagnostics.Add(Diagnostic.Critical($"Variable and value type mismatch (\"{variable.Type}\" != \"{constantValue.Type}\")", statement.Right));
                         return;
                     }
 
@@ -1658,7 +1667,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     return;
                 }
 
-                using (Code.Block(this, $"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
+                using (Code.Block(this, $"Add \"{statement.Right}\" to variable \"{variable.Name}\" (at {variable.Address})"))
                 {
                     using (Code.Block(this, $"Compute value"))
                     {
@@ -1683,24 +1692,24 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (variable.IsDiscarded)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement.Left));
+                    Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement.Left));
                     return;
                 }
 
                 if (variable.Size != 1)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Bruh", statement.Left));
+                    Diagnostics.Add(Diagnostic.Critical($"Bruh", statement.Left));
                     return;
                 }
 
                 if (statement.Right == null)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Value is required for '{statement.Operator}' assignment", statement));
+                    Diagnostics.Add(Diagnostic.Critical($"Value is required for \"{statement.Operator}\" assignment", statement));
                     return;
                 }
 
                 if (!variable.IsInitialized)
-                { Diagnostics?.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left)); }
+                { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left)); }
 
                 if (AllowPrecomputing && TryCompute(statement.Right, out CompiledValue constantValue))
                 {
@@ -1709,7 +1718,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     if (!variable.Type.SameAs(constantValue.Type))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right));
+                        Diagnostics.Add(Diagnostic.Critical($"Variable and value type mismatch (\"{variable.Type}\" != \"{constantValue.Type}\")", statement.Right));
                         return;
                     }
 
@@ -1719,7 +1728,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     return;
                 }
 
-                using (Code.Block(this, $"Add {statement.Right} to variable {variable.Name} (at {variable.Address})"))
+                using (Code.Block(this, $"Add \"{statement.Right}\" to variable \"{variable.Name}\" (at {variable.Address})"))
                 {
                     using (Code.Block(this, $"Compute value"))
                     {
@@ -1769,20 +1778,20 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (variable.IsDiscarded)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement.Left));
+                    Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement.Left));
                     return;
                 }
 
                 if (variable.Size != 1)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Bruh", statement.Left));
+                    Diagnostics.Add(Diagnostic.Critical($"Bruh", statement.Left));
                     return;
                 }
 
                 if (!variable.IsInitialized)
-                { Diagnostics?.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left)); }
+                { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left)); }
 
-                using (Code.Block(this, $"Increment variable {variable.Name} (at {variable.Address})"))
+                using (Code.Block(this, $"Increment variable \"{variable.Name}\" (at {variable.Address})"))
                 {
                     Code.AddValue(variable.Address, 1);
                 }
@@ -1800,18 +1809,18 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (variable.IsDiscarded)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement.Left));
+                    Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement.Left));
                     return;
                 }
 
                 if (variable.Size != 1)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Bruh", statement.Left));
+                    Diagnostics.Add(Diagnostic.Critical($"Bruh", statement.Left));
                     return;
                 }
 
                 if (!variable.IsInitialized)
-                { Diagnostics?.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left)); }
+                { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement.Left)); }
 
                 using (Code.Block(this, $"Decrement variable {variable.Name} (at {variable.Address})"))
                 {
@@ -1822,7 +1831,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
             default:
-                Diagnostics?.Add(Diagnostic.Critical($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, statement.File));
+                Diagnostics.Add(Diagnostic.Critical($"Unknown assignment operator \"{statement.Operator}\"", statement.Operator, statement.File));
                 return;
         }
     }
@@ -1835,7 +1844,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!GetVariable(statement.Identifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
-            Diagnostics?.Add(notFoundError.ToError(statement.Identifier, statement.File));
+            Diagnostics.Add(notFoundError.ToError(statement.Identifier, statement.File));
             return;
         }
 
@@ -1854,7 +1863,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (functionCall.Arguments.Length != 1)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Arguments.Length}", functionCall));
+                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Arguments.Length}", functionCall));
                 return;
             }
 
@@ -1879,7 +1888,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 StackAddress sizeAddress = Stack.Push(0);
 
                 if (!GenerateSize(paramType, sizeAddress, out PossibleDiagnostic? generateSizeError))
-                { Diagnostics?.Add(generateSizeError.ToError(param)); }
+                { Diagnostics.Add(generateSizeError.ToError(param)); }
 
                 if (!functionCall.SaveValue)
                 { Stack.Pop(); }
@@ -1890,7 +1899,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFound))
         {
-            Diagnostics?.Add(notFound.ToError(functionCall.Identifier, functionCall.File));
+            Diagnostics.Add(notFound.ToError(functionCall.Identifier, functionCall.File));
             return;
         }
 
@@ -1900,7 +1909,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!compiledFunction.CanUse(functionCall.File))
         {
-            Diagnostics?.Add(Diagnostic.Error($"Function \"{compiledFunction.ToReadable()}\" cannot be called due to its protection level", functionCall.Identifier, functionCall.File));
+            Diagnostics.Add(Diagnostic.Error($"Function \"{compiledFunction.ToReadable()}\" cannot be called due to its protection level", functionCall.Identifier));
             return;
         }
 
@@ -1921,7 +1930,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!GetConstructor(instanceType, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructor>? result, out PossibleDiagnostic? notFound))
         {
-            Diagnostics?.Add(notFound.ToError(constructorCall.Keyword, constructorCall.File));
+            Diagnostics.Add(notFound.ToError(constructorCall.Keyword, constructorCall.File));
             return;
         }
 
@@ -1934,7 +1943,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!constructor.CanUse(constructorCall.File))
         {
-            Diagnostics?.Add(Diagnostic.Error($"Constructor {constructor.ToReadable()} could not be called due to its protection level", constructorCall));
+            Diagnostics.Add(Diagnostic.Error($"Constructor \"{constructor.ToReadable()}\" could not be called due to its protection level", constructorCall));
             return;
         }
 
@@ -1944,7 +1953,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
-        using (Code.Block(this, $"Set {statement} to address {Stack.NextAddress}"))
+        using (Code.Block(this, $"Set \"{statement}\" to address {Stack.NextAddress}"))
         {
             switch (statement.Type)
             {
@@ -1979,7 +1988,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
 
                 default:
-                    Diagnostics?.Add(Diagnostic.Critical($"Unknown literal type {statement.Type}", statement));
+                    Diagnostics.Add(Diagnostic.Critical($"Unknown literal type \"{statement.Type}\"", statement));
                     return;
             }
         }
@@ -1988,7 +1997,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
-        if (GetVariable(statement.Content, out BrainfuckVariable? variable, out _))
+        if (GetVariable(statement.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? variableNotFoundError))
         {
             GenerateCodeForStatement(variable, statement);
             return;
@@ -1996,7 +2005,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (GetConstant(statement.Content, statement.File, out IConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
-            using (Code.Block(this, $"Load constant {statement.Content} (with value {constant.Value})"))
+            using (Code.Block(this, $"Load constant \"{statement.Content}\" (with value {constant.Value})"))
             {
                 Stack.Push(constant.Value);
             }
@@ -2004,28 +2013,31 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (GetFunction(FunctionQuery.Create<CompiledFunction>(statement.Token.Content), out _, out _))
+        if (GetFunction(FunctionQuery.Create<CompiledFunction>(statement.Content), out _, out PossibleDiagnostic? functionNotFoundError))
         { throw new NotSupportedException($"Function pointers not supported by brainfuck", statement); }
 
-        Diagnostics?.Add(Diagnostic.Critical($"Symbol \"{statement}\" not found", statement));
+        Diagnostics.Add(Diagnostic.Critical($"Symbol \"{statement}\" not found", statement));
+        Diagnostics.Add(variableNotFoundError.ToError(statement));
+        Diagnostics.Add(constantNotFoundError.ToError(statement));
+        Diagnostics.Add(functionNotFoundError.ToError(statement));
         return;
     }
     void GenerateCodeForStatement(BrainfuckVariable variable, ILocated statement)
     {
         if (variable.IsDiscarded)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement));
+            Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement));
             return;
         }
 
         if (!variable.IsInitialized)
-        { Diagnostics?.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement)); }
+        { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement)); }
 
         int variableSize = variable.Size;
 
         if (variableSize <= 0)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Can't load variable \"{variable.Name}\" because it's size is {variableSize} (bruh)", statement));
+            Diagnostics.Add(Diagnostic.Critical($"Can't load variable \"{variable.Name}\" because it's size is {variableSize} (bruh)", statement));
             return;
         }
 
@@ -2057,25 +2069,23 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
+        if (GetOperator(statement, statement.File, out FunctionQueryResult<CompiledOperator>? operatorQueryResult, out PossibleDiagnostic? operatorNotFoundError))
         {
-            if (GetOperator(statement, statement.File, out FunctionQueryResult<CompiledOperator>? result, out _))
+            (CompiledOperator? compiledOperator, Dictionary<string, GeneralType>? typeArguments) = operatorQueryResult;
+
+            statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
+
+            if (!compiledOperator.CanUse(statement.File))
             {
-                (CompiledOperator? compiledOperator, Dictionary<string, GeneralType>? typeArguments) = result;
-
-                statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-                if (!compiledOperator.CanUse(statement.File))
-                {
-                    Diagnostics?.Add(Diagnostic.Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, statement.File));
-                    return;
-                }
-
-                GenerateCodeForFunction(compiledOperator, statement.Arguments, typeArguments, statement);
-
-                if (!statement.SaveValue)
-                { Stack.Pop(); }
+                Diagnostics.Add(Diagnostic.Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, statement.File));
                 return;
             }
+
+            GenerateCodeForFunction(compiledOperator, statement.Arguments, typeArguments, statement);
+
+            if (!statement.SaveValue)
+            { Stack.Pop(); }
+            return;
         }
 
         if (AllowPrecomputing && TryCompute(statement, out CompiledValue computed))
@@ -2085,7 +2095,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        using (Code.Block(this, $"Expression {statement.Left} {statement.Operator} {statement.Right}"))
+        using (Code.Block(this, $"Expression \"{statement.Left}\" \"{statement.Operator}\" \"{statement.Right}\""))
         {
             switch (statement.Operator.Content)
             {
@@ -2134,7 +2144,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             right.Type == RuntimeType.U8)
                         {
                             if (!left.IsInitialized)
-                            { Diagnostics?.Add(Diagnostic.Warning($"Variable \"{left.Name}\" is not initialized", _left)); }
+                            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{left.Name}\" is not initialized", _left)); }
 
                             int resultAddress = Stack.PushVirtual(1, statement);
 
@@ -2384,7 +2394,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     if (!TryCompute(statement.Right, out CompiledValue offsetConst))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
+                        Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
                         return;
                     }
 
@@ -2392,7 +2402,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         if (!Utils.PowerOf2(offsetConst.I32))
                         {
-                            Diagnostics?.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
+                            Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
                             return;
                         }
 
@@ -2412,7 +2422,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     if (!TryCompute(statement.Right, out CompiledValue offsetConst))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
+                        Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
                         return;
                     }
 
@@ -2420,7 +2430,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         if (!Utils.PowerOf2(offsetConst.I32))
                         {
-                            Diagnostics?.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
+                            Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
                             return;
                         }
 
@@ -2479,11 +2489,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         }
                     }
 
-                    Diagnostics?.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
+                    Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
                     return;
                 }
                 default:
-                    Diagnostics?.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
+                    Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
+                    Diagnostics.Add(operatorNotFoundError.ToError(statement));
                     return;
             }
         }
@@ -2492,25 +2503,23 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
+        if (GetOperator(statement, statement.File, out FunctionQueryResult<CompiledOperator>? operatorQueryResult, out PossibleDiagnostic? operatorNotFoundError))
         {
-            if (GetOperator(statement, statement.File, out FunctionQueryResult<CompiledOperator>? result, out _))
+            (CompiledOperator? compiledOperator, Dictionary<string, GeneralType>? typeArguments) = operatorQueryResult;
+
+            statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
+
+            if (!compiledOperator.CanUse(statement.File))
             {
-                (CompiledOperator? compiledOperator, Dictionary<string, GeneralType>? typeArguments) = result;
-
-                statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-                if (!compiledOperator.CanUse(statement.File))
-                {
-                    Diagnostics?.Add(Diagnostic.Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, statement.File));
-                    return;
-                }
-
-                GenerateCodeForFunction(compiledOperator, statement.Arguments, typeArguments, statement);
-
-                if (!statement.SaveValue)
-                { Stack.Pop(); }
+                Diagnostics.Add(Diagnostic.Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, statement.File));
                 return;
             }
+
+            GenerateCodeForFunction(compiledOperator, statement.Arguments, typeArguments, statement);
+
+            if (!statement.SaveValue)
+            { Stack.Pop(); }
+            return;
         }
 
         if (AllowPrecomputing && TryCompute(statement, out CompiledValue computed))
@@ -2520,7 +2529,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        using (Code.Block(this, $"Expression {statement.Left} {statement.Operator}"))
+        using (Code.Block(this, $"Expression \"{statement.Left}\" \"{statement.Operator}\""))
         {
             switch (statement.Operator.Content)
             {
@@ -2535,7 +2544,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     break;
                 }
                 default:
-                    Diagnostics?.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
+                    Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
+                    Diagnostics.Add(operatorNotFoundError.ToError(statement));
                     return;
             }
         }
@@ -2587,11 +2597,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             CleanupVariables(VariableCleanupStack.Pop());
         }
         if (branchDepth != Code.BranchDepth)
-        { throw new InternalException($"Unbalanced branches", block, block.File); }
+        { Diagnostics.Add(Diagnostic.Internal($"Unbalanced branches", block)); }
     }
     void GenerateCodeForStatement(AddressGetter addressGetter)
     {
-        Diagnostics?.Add(Diagnostic.Critical($"This is when pointers to the stack isn't work in brainfuck", addressGetter));
+        Diagnostics.Add(Diagnostic.Critical($"This is when pointers to the stack isn't work in brainfuck", addressGetter));
         return;
     }
     void GenerateCodeForStatement(Pointer pointer)
@@ -2602,13 +2612,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (!GetVariable(variableIdentifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
-                Diagnostics?.Add(notFoundError.ToError(variableIdentifier));
+                Diagnostics.Add(notFoundError.ToError(variableIdentifier));
                 return;
             }
 
             if (variable.Size != 1)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Bruh", variableIdentifier));
+                Diagnostics.Add(Diagnostic.Critical($"Bruh", variableIdentifier));
                 return;
             }
 
@@ -2671,9 +2681,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 structType.Struct.References.AddReference(newInstance.Type, newInstance.File);
 
-                int address = Stack.PushVirtual(structType.GetSize(this), newInstance);
+                int address = Stack.PushVirtual(structType.GetSize(this, Diagnostics, newInstance), newInstance);
 
-                foreach ((CompiledField field, int offset) in structType.GetFields(this))
+                if (!structType.GetFields(this, out ImmutableDictionary<CompiledField, int>? fields, out PossibleDiagnostic? error))
+                {
+                    Diagnostics.Add(error.ToError(newInstance));
+                    break;
+                }
+
+                foreach ((CompiledField field, int offset) in fields)
                 {
                     if (!field.Type.Is(out BuiltinType? builtinType))
                     { throw new NotSupportedException($"Not supported :(", field.Identifier, field.Context.File); }
@@ -2687,27 +2703,27 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             break;
                         case BasicType.I8:
                             Code.SetValue(offsettedAddress, 0);
-                            Diagnostics?.Add(Diagnostic.Warning($"Signed bytes not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
+                            Diagnostics.Add(Diagnostic.Warning($"Signed bytes not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
                             break;
                         case BasicType.Char:
                             Code.SetValue(offsettedAddress, '\0');
                             break;
                         case BasicType.I16:
                             Code.SetValue(offsettedAddress, 0);
-                            Diagnostics?.Add(Diagnostic.Warning($"Shorts not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
+                            Diagnostics.Add(Diagnostic.Warning($"Shorts not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
                             break;
                         case BasicType.U32:
                             Code.SetValue(offsettedAddress, 0);
-                            Diagnostics?.Add(Diagnostic.Warning($"Unsigned integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
+                            Diagnostics.Add(Diagnostic.Warning($"Unsigned integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
                             break;
                         case BasicType.I32:
                             Code.SetValue(offsettedAddress, 0);
-                            Diagnostics?.Add(Diagnostic.Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
+                            Diagnostics.Add(Diagnostic.Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
                             break;
                         case BasicType.F32:
                             throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, field.Context.File);
                         default:
-                            Diagnostics?.Add(Diagnostic.Critical($"Unknown field type \"{builtinType}\"", field.Identifier, field.Context.File));
+                            Diagnostics.Add(Diagnostic.Critical($"Unknown field type \"{builtinType}\"", field.Identifier, field.Context.File));
                             return;
                     }
                 }
@@ -2716,7 +2732,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
 
             default:
-                Diagnostics?.Add(Diagnostic.Critical($"Unknown type definition {instanceType}", newInstance.Type, newInstance.File));
+                Diagnostics.Add(Diagnostic.Critical($"Unknown type \"{instanceType}\"", newInstance.Type, newInstance.File));
                 return;
         }
     }
@@ -2726,11 +2742,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         GeneralType prevType = FindStatementType(field.PrevStatement);
 
-        if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Equals("Length"))
+        if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Content == "Length")
         {
             if (!arrayType.ComputedLength.HasValue)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"I will eventually implement this", field.Identifier, field.File));
+                Diagnostics.Add(Diagnostic.Critical($"I will eventually implement this", field.Identifier, field.File));
                 return;
             }
 
@@ -2748,27 +2764,27 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (!pointerType.To.Is(out StructType? structPointerType))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Could not get the field offsets of type {prevType}", field.PrevStatement));
+                Diagnostics.Add(Diagnostic.Critical($"Could not get the field offsets of type \"{prevType}\"", field.PrevStatement));
                 return;
             }
 
-            if (!structPointerType.GetField(field.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset))
+            if (!structPointerType.GetField(field.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset, out PossibleDiagnostic? error))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Could not get the field \"{field.Identifier}\"", field.Identifier, field.File));
+                Diagnostics.Add(error.ToError(field.Identifier, field.File));
                 return;
             }
 
             field.Reference = fieldDefinition;
             field.CompiledType = fieldDefinition.Type;
 
-            int resultAddress = Stack.Push(fieldDefinition.Type.GetSize(this));
+            int resultAddress = Stack.Push(fieldDefinition.Type.GetSize(this, Diagnostics, fieldDefinition));
 
             int pointerAddress = Stack.NextAddress;
             GenerateCodeForStatement(field.PrevStatement);
 
             Code.AddValue(pointerAddress, fieldOffset);
 
-            Heap.Get(pointerAddress, resultAddress, fieldDefinition.Type.GetSize(this));
+            Heap.Get(pointerAddress, resultAddress, fieldDefinition.Type.GetSize(this, Diagnostics, fieldDefinition));
 
             Stack.Pop();
 
@@ -2781,7 +2797,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (dereferencePointer is not null)
             {
                 int offset = GetDataOffset(field, dereferencePointer);
-                using (Code.Block(this, $"Load field {field} (dereferenced from {dereferencePointer} + {offset})"))
+                using (Code.Block(this, $"Load field \"{field}\" (dereferenced from \"{dereferencePointer}\" + {offset})"))
                 {
                     int pointerAddress = Stack.NextAddress;
                     GenerateCodeForStatement(dereferencePointer);
@@ -2792,17 +2808,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
             }
 
-            Diagnostics?.Add(Diagnostic.Critical($"Failed to get field memory address", field));
+            Diagnostics.Add(Diagnostic.Critical($"Failed to get field memory address", field));
             return;
         }
 
         if (size <= 0)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Can't load field \"{field}\" because it's size is {size} (bruh)", field));
+            Diagnostics.Add(Diagnostic.Critical($"Can't load field \"{field}\" because it's size is {size} (bruh)", field));
             return;
         }
 
-        using (Code.Block(this, $"Load field {field} (from {address})"))
+        using (Code.Block(this, $"Load field \"{field}\" (from {address})"))
         {
             int loadTarget = Stack.PushVirtual(size, field);
 
@@ -2823,11 +2839,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         OnGotStatementType(typeCast, targetType);
 
         if (statementType.SameAs(targetType))
-        { Diagnostics?.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Keyword, typeCast.File)); }
+        { Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Keyword, typeCast.File)); }
 
-        if (statementType.GetSize(this) != targetType.GetSize(this))
+        if (statementType.GetSize(this, Diagnostics, typeCast.PrevStatement) != targetType.GetSize(this, Diagnostics, typeCast))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Can't convert {statementType} ({statementType.GetSize(this)} bytes) to {targetType} ({statementType.GetSize(this)} bytes)", typeCast.Keyword, typeCast.File));
+            Diagnostics.Add(Diagnostic.Critical($"Can't convert \"{statementType}\" ({statementType.GetSize(this, Diagnostics, typeCast.PrevStatement)} bytes) to \"{targetType}\" ({targetType.GetSize(this, Diagnostics, typeCast.PrevStatement)} bytes)", typeCast.Keyword, typeCast.File));
             return;
         }
 
@@ -2840,9 +2856,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
 
-        if (statementType.GetSize(this) != targetType.GetSize(this))
+        if (statementType.GetSize(this, Diagnostics, typeCast.PrevStatement) != targetType.GetSize(this, Diagnostics, typeCast))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Type-cast is not supported at the moment", typeCast));
+            Diagnostics.Add(Diagnostic.Critical($"Type-cast is not supported at the moment", typeCast));
             return;
         }
 
@@ -2928,13 +2944,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (valueType.GetSize(this) != 1)
-        { throw new NotSupportedException($"Only value of size 1 (not {valueType.GetSize(this)}) supported by the output printer in brainfuck", value); }
+        if (valueType.GetSize(this, Diagnostics, value) != 1)
+        { throw new NotSupportedException($"Only value of size 1 (not {valueType.GetSize(this, Diagnostics, value)}) supported by the output printer in brainfuck", value); }
 
         if (!valueType.Is<BuiltinType>())
         { throw new NotSupportedException($"Only built-in types or string literals (not \"{valueType}\") supported by the output printer in brainfuck", value); }
 
-        using (Code.Block(this, $"Print value {value} as text"))
+        using (Code.Block(this, $"Print value \"{value}\" as text"))
         {
             int address = Stack.NextAddress;
 
@@ -3041,7 +3057,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     void CompileRawPrinter(Variable variable, IThingWithPosition symbolPosition)
     {
         if (variable.IsDiscarded)
-        { Diagnostics?.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", symbolPosition, CurrentFile); }
+        { Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", symbolPosition, CurrentFile); }
 
         using (Code.CommentBlock(this, $"Print variable (\"{variable.Name}\") (from {variable.Address}) value"))
         {
@@ -3228,9 +3244,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GeneralType definedType = function.ParameterTypes[i];
             GeneralType passedType = FindStatementType(passed, definedType);
 
-            if (passedType.GetSize(this) != definedType.GetSize(this))
+            if (passedType.GetSize(this, Diagnostics, passed) != definedType.GetSize(this, Diagnostics, defined))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed));
+                Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{passedType}\"", passed));
                 return;
             }
 
@@ -3238,7 +3254,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (compiledParameter.Name == defined.Identifier.Content)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, defined.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, defined.File));
                     return;
                 }
             }
@@ -3247,14 +3263,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (constantParameter.Identifier == defined.Identifier.Content)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Parameter \"{defined}\" already defined as constant", defined.Identifier, defined.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Parameter \"{defined}\" already defined as constant", defined.Identifier, defined.File));
                     return;
                 }
             }
 
             if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains(ModifierKeywords.Const))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Bruh", defined.Identifier, defined.File));
+                Diagnostics.Add(Diagnostic.Critical($"Bruh", defined.Identifier, defined.File));
                 return;
             }
 
@@ -3265,12 +3281,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (StatementCanBeDeallocated(passed, out bool explicitDeallocate))
             {
                 if (explicitDeallocate && !canDeallocate)
-                { Diagnostics?.Add(Diagnostic.Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passed)); }
+                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", passed)); }
             }
             else
             {
                 if (explicitDeallocate)
-                { Diagnostics?.Add(Diagnostic.Warning($"Can not deallocate this value", passed)); }
+                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value", passed)); }
                 canDeallocate = false;
             }
 
@@ -3278,7 +3294,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, modifiedStatement.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, modifiedStatement.File));
                     return;
                 }
 
@@ -3290,13 +3306,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                         if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
                         {
-                            Diagnostics?.Add(notFoundError.ToError(modifiedVariable));
+                            Diagnostics.Add(notFoundError.ToError(modifiedVariable));
                             return;
                         }
 
                         if (!v.Type.SameAs(definedType))
                         {
-                            Diagnostics?.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed));
+                            Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{v.Type}\"", passed));
                             return;
                         }
 
@@ -3308,7 +3324,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         StatementWithValue valueStatement = modifiedStatement.Statement;
                         if (!TryCompute(valueStatement, out CompiledValue constValue))
                         {
-                            Diagnostics?.Add(Diagnostic.Critical($"Constant parameter must have a constant value", valueStatement));
+                            Diagnostics.Add(Diagnostic.Critical($"Constant parameter must have a constant value", valueStatement));
                             return;
                         }
 
@@ -3335,7 +3351,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         break;
                     }
                     default:
-                        Diagnostics?.Add(Diagnostic.Critical($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, modifiedStatement.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, modifiedStatement.File));
                         return;
                 }
             }
@@ -3346,31 +3362,31 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
                 {
-                    Diagnostics?.Add(notFoundError.ToError(modifiedVariable));
+                    Diagnostics.Add(notFoundError.ToError(modifiedVariable));
                     return;
                 }
 
                 if (!definedType.Is(out PointerType? pointerType) ||
                     !v.Type.SameAs(pointerType.To))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {new PointerType(v.Type)}", passed));
+                    Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{new PointerType(v.Type)}\"", passed));
                     return;
                 }
 
                 PointerType parameterType = new(v.Type);
-                compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, parameterType, parameterType.GetSize(this)));
+                compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, parameterType, parameterType.GetSize(this, Diagnostics, modifiedVariable)));
                 continue;
             }
 
             if (defined.Modifiers.Contains(ModifierKeywords.Ref))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed));
+                Diagnostics.Add(Diagnostic.Critical($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed));
                 return;
             }
 
             if (defined.Modifiers.Contains(ModifierKeywords.Const))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed));
+                Diagnostics.Add(Diagnostic.Critical($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed));
                 return;
             }
 
@@ -3388,17 +3404,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (compiledParameter is null)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Parameter \"{defined}\" not found", defined.Identifier, defined.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Parameter \"{defined}\" not found", defined.Identifier, defined.File));
                     return;
                 }
 
                 if (!compiledParameter.Type.SameAs(definedType))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed));
+                    Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{compiledParameter.Type}\"", passed));
                     return;
                 }
 
-                using (Code.Block(this, $"SET {defined.Identifier.Content} TO _something_"))
+                using (Code.Block(this, $"SET \"{defined.Identifier.Content}\" TO _something_"))
                 {
                     GenerateCodeForStatement(passed, definedType);
 
@@ -3445,9 +3461,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                if (function.Type.GetSize(this) != 1)
+                if (function.Type.GetSize(this, Diagnostics, function) != 1)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File));
                     return;
                 }
                 Code += ',';
@@ -3458,13 +3474,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ParameterCount != parameters.Length)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
             return;
         }
 
         if (function.Block is null)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have any body definition", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have any body definition", callerPosition));
             return;
         }
 
@@ -3477,7 +3493,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (function.ReturnSomething)
         {
             GeneralType returnType = function.Type;
-            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.GetSize(this), callerPosition), false, false, false, returnType, returnType.GetSize(this));
+            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.GetSize(this, Diagnostics, function), callerPosition), false, false, false, returnType, returnType.GetSize(this, Diagnostics, function));
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -3510,7 +3526,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     using (Code.Block(this, $"Finish \"return\" block"))
                     {
                         if (returnBlock.Value.FlagAddress.Value != Stack.LastAddress)
-                        { throw new InternalException("I don't know what happened here", function.Block, function.File); }
+                        { Diagnostics.Add(Diagnostic.Internal("I don't know what happened here", function.Block)); }
                         Stack.Pop();
                     }
                 }
@@ -3527,7 +3543,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         GenerateDestructor(new ManagedTypeCast(
                             new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
-                            new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, variable.File), Token.CreateAnonymous("*", TokenType.Operator)),
+                            new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, variable.File), Token.CreateAnonymous("*", TokenType.Operator), variable.File),
                             TokenPair.CreateAnonymous("(", ")"),
                             variable.File
                         ));
@@ -3588,9 +3604,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                if (function.Type.GetSize(this) != 1)
+                if (function.Type.GetSize(this, Diagnostics, function) != 1)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Function with attribute \"StandardInput\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Function with attribute \"StandardInput\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File));
                     return;
                 }
                 Code += ',';
@@ -3601,13 +3617,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ParameterCount != parameters.Length)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
             return;
         }
 
         if (function.Block is null)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have any body definition", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have any body definition", callerPosition));
             return;
         }
 
@@ -3620,7 +3636,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (true) // always returns something
         {
             GeneralType returnType = function.Type;
-            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.GetSize(this), callerPosition), false, false, false, returnType, returnType.GetSize(this));
+            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.GetSize(this, Diagnostics, function), callerPosition), false, false, false, returnType, returnType.GetSize(this, Diagnostics, function));
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -3651,7 +3667,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 using (DebugBlock(function.Block.Brackets.End, function.Block.File))
                 {
                     if (returnBlock.Value.FlagAddress.Value != Stack.LastAddress)
-                    { throw new InternalException("I don't know what happened here", function.Block, function.File); }
+                    { Diagnostics.Add(Diagnostic.Internal("I don't know what happened here", function.Block)); }
                     Stack.Pop();
                 }
             }
@@ -3670,7 +3686,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         GenerateDestructor(new ManagedTypeCast(
                             new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
-                            new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, variable.File), Token.CreateAnonymous("*", TokenType.Operator)),
+                            new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, variable.File), Token.CreateAnonymous("*", TokenType.Operator), variable.File),
                             TokenPair.CreateAnonymous("(", ")"),
                             variable.File
                         ));
@@ -3704,7 +3720,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ParameterCount != parameters.Length)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
             return;
         }
 
@@ -3713,7 +3729,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (function.ReturnSomething)
         {
             GeneralType returnType = GeneralType.InsertTypeParameters(function.Type, typeArguments) ?? function.Type;
-            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.GetSize(this), callerPosition), false, false, false, returnType, returnType.GetSize(this));
+            returnVariable = new BrainfuckVariable(ReturnVariableName, function.File, Stack.PushVirtual(returnType.GetSize(this, Diagnostics, function), callerPosition), false, false, false, returnType, returnType.GetSize(this, Diagnostics, function));
         }
 
         if (!DoRecursivityStuff(function, callerPosition))
@@ -3734,7 +3750,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.Block is null)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have a body", function));
+            Diagnostics.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have a body", function));
             return;
         }
 
@@ -3789,13 +3805,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ParameterCount - 1 != parameters.Length)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to constructor \"{function.ToReadable()}\" (required {function.ParameterCount - 1} passed {parameters.Length})", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to constructor \"{function.ToReadable()}\" (required {function.ParameterCount - 1} passed {parameters.Length})", callerPosition));
             return;
         }
 
         if (function.Block is null)
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Constructor \"{function.ToReadable()}\" does not have any body definition", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Constructor \"{function.ToReadable()}\" does not have any body definition", callerPosition));
             return;
         }
 
@@ -3819,11 +3835,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!newInstanceType.SameAs(function.ParameterTypes[0]))
         {
-            Diagnostics?.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {0}: Expected {function.ParameterTypes[0]}, passed {newInstanceType}", newInstance));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {0}: Expected \"{function.ParameterTypes[0]}\", passed \"{newInstanceType}\"", newInstance));
             return;
         }
 
-        compiledParameters.Add(new BrainfuckVariable(function.Parameters[0].Identifier.Content, function.Parameters[0].File, newInstanceAddress, false, false, false, newInstanceType, newInstanceType.GetSize(this)));
+        compiledParameters.Add(new BrainfuckVariable(function.Parameters[0].Identifier.Content, function.Parameters[0].File, newInstanceAddress, false, false, false, newInstanceType, newInstanceType.GetSize(this, Diagnostics, newInstance)));
 
         for (int i = 1; i < function.Parameters.Count; i++)
         {
@@ -3835,7 +3851,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (!passedType.SameAs(definedType))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed));
+                Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{passedType}\"", passed));
                 return;
             }
 
@@ -3843,7 +3859,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (compiledParameter.Name == defined.Identifier.Content)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, defined.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, defined.File));
                     return;
                 }
             }
@@ -3852,14 +3868,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (constantParameter.Identifier == defined.Identifier.Content)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Parameter \"{defined}\" already defined as constant", defined.Identifier, defined.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Parameter \"{defined}\" already defined as constant", defined.Identifier, defined.File));
                     return;
                 }
             }
 
             if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains(ModifierKeywords.Const))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Bruh", defined.Identifier, defined.File));
+                Diagnostics.Add(Diagnostic.Critical($"Bruh", defined.Identifier, defined.File));
                 return;
             }
 
@@ -3869,7 +3885,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, modifiedStatement.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, modifiedStatement.File));
                     return;
                 }
 
@@ -3881,13 +3897,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                         if (!GetVariable(modifiedVariable.Content, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
                         {
-                            Diagnostics?.Add(notFoundError.ToError(modifiedVariable));
+                            Diagnostics.Add(notFoundError.ToError(modifiedVariable));
                             return;
                         }
 
                         if (!v.Type.SameAs(definedType))
                         {
-                            Diagnostics?.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed));
+                            Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{v.Type}\"", passed));
                             return;
                         }
 
@@ -3900,7 +3916,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                         if (!TryCompute(valueStatement, out CompiledValue constValue))
                         {
-                            Diagnostics?.Add(Diagnostic.Critical($"Constant parameter must have a constant value", valueStatement));
+                            Diagnostics.Add(Diagnostic.Critical($"Constant parameter must have a constant value", valueStatement));
                             return;
                         }
 
@@ -3928,7 +3944,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         break;
                     }
                     default:
-                        Diagnostics?.Add(Diagnostic.Critical($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, modifiedStatement.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, modifiedStatement.File));
                         return;
                 }
             }
@@ -3937,13 +3953,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (defined.Modifiers.Contains(ModifierKeywords.Ref))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed));
+                    Diagnostics.Add(Diagnostic.Critical($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Ref}\" modifier", passed));
                     return;
                 }
 
                 if (defined.Modifiers.Contains(ModifierKeywords.Const))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed));
+                    Diagnostics.Add(Diagnostic.Critical($"You must pass the parameter \"{passed}\" with a \"{ModifierKeywords.Const}\" modifier", passed));
                     return;
                 }
 
@@ -3960,17 +3976,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (compiledParameter is null)
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Parameter \"{defined}\" not found", defined.Identifier, defined.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Parameter \"{defined}\" not found", defined.Identifier, defined.File));
                     return;
                 }
 
                 if (!compiledParameter.Type.SameAs(definedType))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed));
+                    Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{compiledParameter.Type}\"", passed));
                     return;
                 }
 
-                using (Code.Block(this, $"SET {defined.Identifier.Content} TO _something_"))
+                using (Code.Block(this, $"SET \"{defined.Identifier.Content}\" TO _something_"))
                 {
                     GenerateCodeForStatement(value);
 
@@ -3980,7 +3996,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 continue;
             }
 
-            throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
+            throw new NotImplementedException($"Unimplemented invocation parameter \"{passed.GetType().Name}\"");
         }
 
         GeneratorStackFrame frame = PushStackFrame(typeArguments);
@@ -4001,7 +4017,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 using (Code.Block(this, $"Finish \"return\" block"))
                 {
                     if (returnBlock.Value.FlagAddress.Value != Stack.LastAddress)
-                    { throw new InternalException("I don't know what happened here", function.Block, function.File); }
+                    { Diagnostics.Add(Diagnostic.Internal("I don't know what happened here", function.Block)); }
                     Stack.Pop();
                 }
             }
@@ -4020,7 +4036,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         GenerateDestructor(new ManagedTypeCast(
                             new Identifier(Token.CreateAnonymous(variable.Name), variable.File),
-                            new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, variable.File), Token.CreateAnonymous("*", TokenType.Operator)),
+                            new TypeInstancePointer(TypeInstanceSimple.CreateAnonymous(TypeKeywords.Any, variable.File), Token.CreateAnonymous("*", TokenType.Operator), variable.File),
                             TokenPair.CreateAnonymous("(", ")"),
                             variable.File
                         ));
@@ -4113,7 +4129,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         using (Code.Block(this, $"Continue \"{kind}\" statements"))
         {
             if (!controlFlowBlocks.Last.FlagAddress.HasValue)
-            { throw new InternalException($"Unexpected conditional jump continuation in the depths (this is the compiler's fault)", controlFlowBlocks.Last.Location.Location.Position, controlFlowBlocks.Last.Location.Location.File); }
+            { Diagnostics.Add(Diagnostic.Internal($"Unexpected conditional jump continuation in the depths (this is the compiler's fault)", controlFlowBlocks.Last.Location)); }
 
             Code.CopyValue(controlFlowBlocks.Last.FlagAddress.Value, Stack.NextAddress);
             Code.JumpStart(Stack.NextAddress);

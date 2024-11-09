@@ -31,7 +31,7 @@ public class BuiltinType : GeneralType,
         BasicType.I32 => RuntimeType.I32,
         BasicType.F32 => RuntimeType.F32,
 
-        _ => throw new NotImplementedException($"Type conversion for {Type} is not implemented"),
+        _ => throw new NotImplementedException($"Type conversion for \"{Type}\" is not implemented"),
     };
 
     public BuiltinType(BuiltinType other)
@@ -61,22 +61,36 @@ public class BuiltinType : GeneralType,
         };
     }
 
-    public override int GetSize(IRuntimeInfoProvider runtime) => Type switch
+    public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        BasicType.Void => throw new InternalExceptionWithoutContext($"Type {this} does not have a size"),
-        BasicType.Any => throw new InternalExceptionWithoutContext($"Type {this} does not have a size"),
-        BasicType.U8 => 1,
-        BasicType.I8 => 1,
-        BasicType.Char => 2,
-        BasicType.I16 => 2,
-        BasicType.U32 => 4,
-        BasicType.I32 => 4,
-        BasicType.F32 => 4,
-        _ => throw new UnreachableException(),
-    };
+        size = default;
+        error = default;
 
-    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
-        => (BitWidth)GetSize(runtime);
+        switch (Type)
+        {
+            case BasicType.Void: error = new PossibleDiagnostic($"Type \"{this}\" does not have a size"); return false;
+            case BasicType.Any: error = new PossibleDiagnostic($"Type \"{this}\" does not have a size"); return false;
+            case BasicType.U8: size = 1; return true;
+            case BasicType.I8: size = 1; return true;
+            case BasicType.Char: size = 2; return true;
+            case BasicType.I16: size = 2; return true;
+            case BasicType.U32: size = 4; return true;
+            case BasicType.I32: size = 4; return true;
+            case BasicType.F32: size = 4; return true;
+            default: throw new UnreachableException();
+        }
+    }
+
+    public override bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        bitWidth = default;
+        if (!GetSize(runtime, out int size, out error))
+        {
+            return false;
+        }
+        bitWidth = (BitWidth)size;
+        return true;
+    }
 
     public static BuiltinType CreateNumeric(NumericType type, BitWidth size) => type switch
     {

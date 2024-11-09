@@ -203,11 +203,13 @@ public class Block : Statement
 
 public abstract class LinkedIfThing : StatementWithAnyBlock
 {
-    public Token Keyword { get; }
+    public Token KeywordToken { get; }
+
+    public Identifier Keyword => new(KeywordToken, File);
 
     protected LinkedIfThing(Token keyword, Statement block, Uri file) : base(block, file)
     {
-        Keyword = keyword;
+        KeywordToken = keyword;
     }
 }
 
@@ -216,7 +218,7 @@ public class LinkedIf : LinkedIfThing
     public StatementWithValue Condition { get; }
     public LinkedIfThing? NextLink { get; init; }
 
-    public override Position Position => new(Keyword, Condition, Block);
+    public override Position Position => new(KeywordToken, Condition, Block);
 
     public LinkedIf(Token keyword, StatementWithValue condition, Statement block, Uri file) : base(keyword, block, file)
     {
@@ -224,7 +226,7 @@ public class LinkedIf : LinkedIfThing
     }
 
     public override string ToString()
-        => $"{Keyword} ({Condition}) {Block}{(NextLink != null ? " ..." : string.Empty)}{Semicolon}";
+        => $"{KeywordToken} ({Condition}) {Block}{(NextLink != null ? " ..." : string.Empty)}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -246,7 +248,7 @@ public class LinkedIf : LinkedIfThing
 
 public class LinkedElse : LinkedIfThing
 {
-    public override Position Position => new(Keyword, Block);
+    public override Position Position => new(KeywordToken, Block);
 
     public LinkedElse(Token keyword, Statement block, Uri file) : base(keyword, block, file)
     { }
@@ -316,7 +318,7 @@ public class LiteralList : StatementWithValue
     }
 }
 
-public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifiable<Token>
+public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifiable<Identifier>
 {
     /// <summary>
     /// Set by the compiler
@@ -324,7 +326,7 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
     public GeneralType? CompiledType { get; set; }
 
     public TypeInstance Type { get; }
-    public Token Identifier { get; }
+    public Identifier Identifier { get; }
     public StatementWithValue? InitialValue { get; }
     public ImmutableArray<Token> Modifiers { get; }
 
@@ -345,7 +347,7 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
     public VariableDeclaration(
         IEnumerable<Token> modifiers,
         TypeInstance type,
-        Token variableName,
+        Identifier variableName,
         StatementWithValue? initialValue,
         Uri file) : base(file)
     {
@@ -510,7 +512,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
 
         if (PrevStatement is Identifier functionIdentifier)
         {
-            functionCall = new FunctionCall(null, functionIdentifier.Token, Arguments, Brackets, File)
+            functionCall = new FunctionCall(null, functionIdentifier, Arguments, Brackets, File)
             {
                 Semicolon = Semicolon,
                 SaveValue = SaveValue,
@@ -561,7 +563,7 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
     /// </summary>
     public CompiledFunction? Reference { get; set; }
 
-    public Token Identifier { get; }
+    public Identifier Identifier { get; }
     public ImmutableArray<StatementWithValue> Arguments { get; }
     public StatementWithValue? PrevStatement { get; }
     public TokenPair Brackets { get; }
@@ -581,7 +583,7 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
 
     public FunctionCall(
         StatementWithValue? prevStatement,
-        Token identifier,
+        Identifier identifier,
         IEnumerable<StatementWithValue> arguments,
         TokenPair brackets,
         Uri file) : base(file)
@@ -664,11 +666,13 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
 
 public class KeywordCall : StatementWithValue, IReadable
 {
-    public Token Identifier { get; }
+    public Token IdentifierToken { get; }
     public ImmutableArray<StatementWithValue> Arguments { get; }
 
+    public Identifier Identifier => new(IdentifierToken, File);
+
     public override Position Position =>
-        new Position(Identifier)
+        new Position(IdentifierToken)
         .Union(Arguments);
 
     public KeywordCall(
@@ -676,7 +680,7 @@ public class KeywordCall : StatementWithValue, IReadable
         IEnumerable<StatementWithValue> arguments,
         Uri file) : base(file)
     {
-        Identifier = identifier;
+        IdentifierToken = identifier;
         Arguments = arguments.ToImmutableArray();
     }
 
@@ -685,7 +689,7 @@ public class KeywordCall : StatementWithValue, IReadable
         StringBuilder result = new();
         result.Append(SurroundingBracelet?.Start);
 
-        result.Append(Identifier);
+        result.Append(IdentifierToken);
 
         if (Arguments.Length > 0)
         {
@@ -709,7 +713,7 @@ public class KeywordCall : StatementWithValue, IReadable
     public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
     {
         StringBuilder result = new();
-        result.Append(Identifier.Content);
+        result.Append(IdentifierToken.Content);
         result.Append('(');
         for (int i = 0; i < Arguments.Length; i++)
         {
@@ -1334,6 +1338,11 @@ public class Identifier : StatementWithValue, IReferenceableTo
 
     public Token Token { get; }
 
+    public TokenAnalyzedType AnalyzedType
+    {
+        get => Token.AnalyzedType;
+        set => Token.AnalyzedType = value;
+    }
     public string Content => Token.Content;
     public override Position Position => Token.Position;
 
@@ -1410,10 +1419,11 @@ public class Pointer : StatementWithValue
 
 public class WhileLoop : StatementWithBlock
 {
-    public Token Keyword { get; }
+    public Token KeywordToken { get; }
     public StatementWithValue Condition { get; }
 
-    public override Position Position => new(Keyword, Block);
+    public Identifier Keyword => new(KeywordToken, File);
+    public override Position Position => new(KeywordToken, Block);
 
     public WhileLoop(
         Token keyword,
@@ -1421,12 +1431,12 @@ public class WhileLoop : StatementWithBlock
         Block block,
         Uri file) : base(block, file)
     {
-        Keyword = keyword;
+        KeywordToken = keyword;
         Condition = condition;
     }
 
     public override string ToString()
-        => $"{Keyword} ({Condition}) {Block}{Semicolon}";
+        => $"{KeywordToken} ({Condition}) {Block}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -1442,12 +1452,13 @@ public class WhileLoop : StatementWithBlock
 
 public class ForLoop : StatementWithBlock
 {
-    public Token Keyword { get; }
+    public Token KeywordToken { get; }
     public VariableDeclaration VariableDeclaration { get; }
     public StatementWithValue Condition { get; }
     public AnyAssignment Expression { get; }
 
-    public override Position Position => new(Keyword, Block);
+    public Identifier Identifier => new(KeywordToken, File);
+    public override Position Position => new(KeywordToken, Block);
 
     public ForLoop(
         Token keyword,
@@ -1458,14 +1469,14 @@ public class ForLoop : StatementWithBlock
         Uri file)
         : base(block, file)
     {
-        Keyword = keyword;
+        KeywordToken = keyword;
         VariableDeclaration = variableDeclaration;
         Condition = condition;
         Expression = expression;
     }
 
     public override string ToString()
-        => $"{Keyword} (...) {Block}{Semicolon}";
+        => $"{KeywordToken} (...) {Block}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -1662,22 +1673,23 @@ public class ElseBranch : BaseBranch
 
 public class NewInstance : StatementWithValue, IHaveType, IInFile
 {
-    public Token Keyword { get; }
+    public Token KeywordToken { get; }
     public TypeInstance Type { get; }
 
-    public override Position Position => new(Keyword, Type);
+    public Identifier Keyword => new(KeywordToken, File);
+    public override Position Position => new(KeywordToken, Type);
 
     public NewInstance(
         Token keyword,
         TypeInstance typeName,
         Uri file) : base(file)
     {
-        Keyword = keyword;
+        KeywordToken = keyword;
         Type = typeName;
     }
 
     public override string ToString()
-        => $"{SurroundingBracelet?.Start}{Keyword} {Type}{SurroundingBracelet?.End}{Semicolon}";
+        => $"{SurroundingBracelet?.Start}{KeywordToken} {Type}{SurroundingBracelet?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
@@ -1840,18 +1852,18 @@ public class Field : StatementWithValue, IReferenceableTo<CompiledField>
     /// </summary>
     public CompiledField? Reference { get; set; }
 
-    public Token Identifier { get; }
+    public Identifier Identifier { get; }
     public StatementWithValue PrevStatement { get; }
 
     public override Position Position => new(PrevStatement, Identifier);
 
     public Field(
         StatementWithValue prevStatement,
-        Token fieldName,
+        Identifier identifier,
         Uri file) : base(file)
     {
         PrevStatement = prevStatement;
-        Identifier = fieldName;
+        Identifier = identifier;
     }
 
     public override string ToString()

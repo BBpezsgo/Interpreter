@@ -9,7 +9,7 @@ public static class CompiledAttributes
         value = null;
         foreach (AttributeUsage attribute in attributes)
         {
-            if (!attribute.Identifier.Content.Equals(key)) continue;
+            if (attribute.Identifier.Content != key) continue;
             if (value is not null) return false;
             value = attribute;
         }

@@ -40,11 +40,19 @@ public class GenericType : GeneralType,
         File = originalFile;
     }
 
-    [DoesNotReturn]
-    public override int GetSize(IRuntimeInfoProvider runtime)
-        => throw new InternalExceptionWithoutContext($"Can not get the size of a generic type");
-    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
-        => throw new InvalidOperationException($"Can not get the size of a generic type");
+    public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        error = new PossibleDiagnostic($"Can not get the size of a generic type");
+        size = default;
+        return false;
+    }
+
+    public override bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        error = new PossibleDiagnostic($"Can not get the size of a generic type");
+        bitWidth = default;
+        return false;
+    }
 
     public override bool Equals(object? other) => Equals(other as GenericType);
     public override bool Equals(GeneralType? other) => Equals(other as GenericType);

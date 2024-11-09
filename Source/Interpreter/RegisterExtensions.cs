@@ -89,6 +89,7 @@ public static class RegisterExtensions
 
     public static BitWidth BitWidth(this Register register) => register switch
     {
+        0 => 0,
         Register.CodePointer => Runtime.BitWidth._32,
         Register.StackPointer => Runtime.BitWidth._32,
         Register.BasePointer => Runtime.BitWidth._32,

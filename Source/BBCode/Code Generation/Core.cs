@@ -12,6 +12,7 @@ class RegisterUsage
 
         public Register Register32 => _register switch
         {
+            0 => default,
             Register.EAX => Register.EAX,
             Register.EBX => Register.EBX,
             Register.ECX => Register.ECX,
@@ -20,6 +21,7 @@ class RegisterUsage
         };
         public Register Register64 => _register switch
         {
+            0 => default,
             Register.EAX => Register.RAX,
             Register.EBX => Register.RBX,
             Register.ECX => Register.RCX,
@@ -28,6 +30,7 @@ class RegisterUsage
         };
         public Register Register16 => _register switch
         {
+            0 => default,
             Register.EAX => Register.AX,
             Register.EBX => Register.BX,
             Register.ECX => Register.CX,
@@ -36,6 +39,7 @@ class RegisterUsage
         };
         public Register Register8H => _register switch
         {
+            0 => default,
             Register.EAX => Register.AH,
             Register.EBX => Register.BH,
             Register.ECX => Register.CH,
@@ -44,6 +48,7 @@ class RegisterUsage
         };
         public Register Register8L => _register switch
         {
+            0 => default,
             Register.EAX => Register.AL,
             Register.EBX => Register.BL,
             Register.ECX => Register.CL,
@@ -61,6 +66,7 @@ class RegisterUsage
 
         public Register Get(BitWidth bitWidth) => bitWidth switch
         {
+            0 => default,
             BitWidth._8 => Register8L,
             BitWidth._16 => Register16,
             BitWidth._32 => Register32,
@@ -148,7 +154,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, DiagnosticsCollection? diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
+    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
     {
         ExternalFunctions = compilerResult.ExternalFunctions;
         GeneratedCode = new List<PreparationInstruction>();
@@ -162,7 +168,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Settings = settings;
         Registers = new RegisterUsage();
         PointerSize = settings.PointerSize;
-        DebugInfo = new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Key, v.Value.Tokens)))
+        DebugInfo = new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Key, v.Value.Tokens.Tokens)))
         {
             StackOffsets = new StackOffsets()
             {
@@ -181,13 +187,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 if (item.Called is Parser.GeneralFunctionDefinition generalFunction)
                 {
-                    throw generalFunction.Identifier.Content switch
+                    Diagnostics.Add(generalFunction.Identifier.Content switch
                     {
-                        BuiltinFunctionIdentifiers.Destructor => new InternalException($"Destructor for {generalFunction.Context} does not have instruction offset", item.CallerLocation),
-                        BuiltinFunctionIdentifiers.IndexerGet => new InternalException($"Index getter for {generalFunction.Context} does not have instruction offset", item.CallerLocation),
-                        BuiltinFunctionIdentifiers.IndexerSet => new InternalException($"Index setter for {generalFunction.Context} does not have instruction offset", item.CallerLocation),
-                        _ => new NotImplementedException(),
-                    };
+                        BuiltinFunctionIdentifiers.Destructor => Diagnostic.Internal($"Destructor for \"{generalFunction.Context}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation),
+                        BuiltinFunctionIdentifiers.IndexerGet => Diagnostic.Internal($"Index getter for \"{generalFunction.Context}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation),
+                        BuiltinFunctionIdentifiers.IndexerSet => Diagnostic.Internal($"Index setter for \"{generalFunction.Context}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation),
+                        _ => throw new NotImplementedException(),
+                    });
+                    continue;
                 }
 
                 string thingName = item.Called switch
@@ -198,9 +205,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 };
 
                 if (item.Called is ISimpleReadable simpleReadable)
-                { throw new InternalException($"{thingName} {simpleReadable.ToReadable()} does not have instruction offset", item.CallerLocation); }
+                {
+                    Diagnostics.Add(Diagnostic.Internal($"{thingName} \"{simpleReadable.ToReadable()}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation));
+                    continue;
+                }
 
-                throw new InternalException($"{thingName} {item.Called} does not have instruction offset", item.CallerLocation);
+                Diagnostics.Add(Diagnostic.Internal($"{thingName} \"{item.Called}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation));
+                continue;
             }
 
             int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
@@ -211,8 +222,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public static BBLangGeneratorResult Generate(
         CompilerResult compilerResult,
         MainGeneratorSettings settings,
-        PrintCallback? printCallback = null,
-        DiagnosticsCollection? diagnostics = null)
+        PrintCallback? printCallback,
+        DiagnosticsCollection diagnostics)
     {
         CodeGeneratorForMain generator = new(compilerResult, settings, diagnostics, printCallback);
         return generator.GenerateCode(compilerResult, settings);

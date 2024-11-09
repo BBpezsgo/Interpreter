@@ -8,7 +8,7 @@ public class StreamTokenizer : Tokenizer,
     readonly Stream Stream;
     bool IsDisposed;
 
-    StreamTokenizer(TokenizerSettings settings, Stream stream, Uri? file, IEnumerable<string>? preprocessorVariables) : base(settings, file, preprocessorVariables)
+    StreamTokenizer(TokenizerSettings settings, Stream stream, Uri? file, IEnumerable<string>? preprocessorVariables, DiagnosticsCollection diagnostics) : base(settings, file, preprocessorVariables, diagnostics)
     {
         Stream = stream;
     }
@@ -22,18 +22,18 @@ public class StreamTokenizer : Tokenizer,
     /// <exception cref="System.NotSupportedException"/>
     /// <exception cref="IOException"/>
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(string file, IEnumerable<string>? preprocessorVariables = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null)
+    public static TokenizerResult Tokenize(string file, DiagnosticsCollection diagnostics, IEnumerable<string>? preprocessorVariables = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null)
     {
         FileStream stream = System.IO.File.OpenRead(file);
-        return StreamTokenizer.Tokenize(stream, preprocessorVariables, new Uri(file), settings, progress, (int)stream.Length);
+        return StreamTokenizer.Tokenize(stream, diagnostics, preprocessorVariables, new Uri(file), settings, progress, (int)stream.Length);
     }
 
     /// <inheritdoc cref="TokenizeInternal"/>
-    public static TokenizerResult Tokenize(Stream stream, IEnumerable<string>? preprocessorVariables = null, Uri? file = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null, int? totalBytes = null)
+    public static TokenizerResult Tokenize(Stream stream, DiagnosticsCollection diagnostics, IEnumerable<string>? preprocessorVariables = null, Uri? file = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null, int? totalBytes = null)
     {
         settings ??= TokenizerSettings.Default;
 
-        using StreamTokenizer tokenizer = new(settings.Value, stream, file, preprocessorVariables);
+        using StreamTokenizer tokenizer = new(settings.Value, stream, file, preprocessorVariables, diagnostics);
 
         if (progress.HasValue && totalBytes.HasValue)
         { return tokenizer.TokenizeInternal(progress.Value, totalBytes.Value); }
@@ -66,7 +66,7 @@ public class StreamTokenizer : Tokenizer,
 
         EndToken(offsetTotal);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters, Warnings);
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters);
     }
 
     TokenizerResult TokenizeInternal(ConsoleProgressBar progress, int total)
@@ -99,7 +99,7 @@ public class StreamTokenizer : Tokenizer,
 
         progress.Print(1f);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters, Warnings);
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters);
     }
 
     protected virtual void Dispose(bool disposing)

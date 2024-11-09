@@ -53,12 +53,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
 
         StringBuilder result = new();
 
-        result.Append(Message);
-
-        result.Append(position.ToStringCool().Surround(" (at ", ")"));
-
-        if (file != null)
-        { result.Append($" (in {file})"); }
+        result.Append(LanguageException.Format(Message, position, file));
 
         result.AppendLine();
 
@@ -227,17 +222,24 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             else if (type is StructType structType)
             {
                 result.Append("{ ");
-                KeyValuePair<CompiledField, int>[] fields = structType.GetFields(runtimeInfoProvider).ToArray();
-                for (int i = 0; i < fields.Length; i++)
+                if (!structType.GetFields(runtimeInfoProvider, out ImmutableDictionary<CompiledField, int>? _fields, out _))
                 {
-                    if (i > 0) result.Append(", ");
-                    (CompiledField field, int offset) = fields[i];
-                    result.Append(field.Identifier.Content);
-                    result.Append(": ");
-                    Range<int> fieldRange = new(range.Start + offset, range.Start + offset + field.Type.GetSize(runtimeInfoProvider));
-                    AppendValue(fieldRange, field.Type);
+                    result.Append("<invalid type> ");
                 }
-                if (fields.Length > 0) result.Append(' ');
+                else
+                {
+                    KeyValuePair<CompiledField, int>[] fields = _fields.ToArray();
+                    for (int i = 0; i < fields.Length; i++)
+                    {
+                        if (i > 0) result.Append(", ");
+                        (CompiledField field, int offset) = fields[i];
+                        result.Append(field.Identifier.Content);
+                        result.Append(": ");
+                        Range<int> fieldRange = new(range.Start + offset, range.Start + offset + field.Type.GetSize(runtimeInfoProvider));
+                        AppendValue(fieldRange, field.Type);
+                    }
+                    if (fields.Length > 0) result.Append(' ');
+                }
                 result.Append('}');
             }
             else
@@ -336,11 +338,8 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             result.Append(')');
             result.Append(' ');
 
-            if (function.Identifier.Position != Position.UnknownPosition)
-            { result.Append(function.Identifier.Position.ToStringCool().Surround(" (at ", ")")); }
+            result.Append(LanguageException.Format(null, function.Identifier.Position, function.File));
 
-            if (function.File is not null)
-            { result.Append($" (in {function.File})"); }
             return true;
         }
 

@@ -39,7 +39,7 @@ public class IOHandler
 
         externalFunctions.AddExternalFunction(new ExternalFunctionAsync((ref ProcessorState processor, ReadOnlySpan<byte> parameters) =>
         {
-            if (ioHandler.OnNeedInput == null) throw new RuntimeException($"Event {ioHandler.OnNeedInput} does not have listeners");
+            if (ioHandler.OnNeedInput == null) throw new RuntimeException($"Event \"{ioHandler.OnNeedInput}\" does not have listeners");
             ProcessorState _processor = processor;
             char? consumedKey = null;
             ioHandler._keyConsumer = (char key) => consumedKey = key;

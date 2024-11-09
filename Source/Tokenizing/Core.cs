@@ -31,7 +31,7 @@ public abstract partial class Tokenizer
 
     protected readonly List<Token> Tokens;
     protected readonly List<SimpleToken> UnicodeCharacters;
-    protected readonly List<Diagnostic> Warnings;
+    protected readonly DiagnosticsCollection Diagnostics;
     protected readonly TokenizerSettings Settings;
     protected readonly Uri? File;
 
@@ -40,7 +40,7 @@ public abstract partial class Tokenizer
     int CurrentLine;
     string? SavedUnicode;
 
-    protected Tokenizer(TokenizerSettings settings, Uri? file, IEnumerable<string>? preprocessorVariables)
+    protected Tokenizer(TokenizerSettings settings, Uri? file, IEnumerable<string>? preprocessorVariables, DiagnosticsCollection diagnostics)
     {
         CurrentToken = new(default);
         CurrentColumn = 0;
@@ -48,7 +48,7 @@ public abstract partial class Tokenizer
 
         Tokens = new();
         UnicodeCharacters = new();
-        Warnings = new();
+        Diagnostics = diagnostics;
 
         Settings = settings;
         SavedUnicode = null;

@@ -116,11 +116,7 @@ public struct FunctionInformation
 
         result.Append(ReadableIdentifier);
 
-        if (SourcePosition != Position.UnknownPosition)
-        { result.Append(SourcePosition.ToStringCool().Surround(" (at ", ")")); }
-
-        if (File != null)
-        { result.Append($" (in {File})"); }
+        result.Append(LanguageException.Format(ReadableIdentifier, SourcePosition, File));
 
         return result.ToString();
     }

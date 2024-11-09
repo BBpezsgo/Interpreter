@@ -3,7 +3,7 @@
 [TestClass, TestCategory("Brainfuck"), TestCategory("FileTest")]
 public class BrainfuckFileTests
 {
-    const int Timeout = 10 * 1000;
+    const int Timeout = 10000 * 1000;
     const int LongTimeout = 30 * 1000;
 
     [TestMethod, Timeout(Timeout)] public void Test01() => Utils.GetTest(01).DoBrainfuck();

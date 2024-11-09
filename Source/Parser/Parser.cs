@@ -99,7 +99,7 @@ public sealed class Parser
 #pragma warning restore RCS1213, IDE0052, CA1823
 
     // === Result ===
-    readonly DiagnosticsCollection Diagnostics = new();
+    readonly DiagnosticsCollection Diagnostics;
     readonly List<FunctionDefinition> Functions = new();
     readonly List<FunctionDefinition> Operators = new();
     readonly Dictionary<string, StructDefinition> Structs = new();
@@ -108,7 +108,7 @@ public sealed class Parser
     readonly List<Statement.Statement> TopLevelStatements = new();
     // === ===
 
-    Parser(ImmutableArray<Token> tokens, Uri file)
+    Parser(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
     {
         OriginalTokens = tokens;
         Tokens = tokens
@@ -122,27 +122,32 @@ public sealed class Parser
                 and not TokenType.PreprocessSkipped)
             .ToArray();
         File = file;
+        Diagnostics = diagnostics;
     }
 
     /// <exception cref="EndlessLoopException"/>
     /// <exception cref="SyntaxException"/>
     /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="TokenizerException"/>
-    public static ParserResult ParseFile(string file, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings = null, ConsoleProgressBar? tokenizerProgressBar = null)
+    public static ParserResult ParseFile(string file, DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings = null, ConsoleProgressBar? tokenizerProgressBar = null)
     {
-        TokenizerResult tokens = StreamTokenizer.Tokenize(file, preprocessorVariables, tokenizerSettings, tokenizerProgressBar);
+        TokenizerResult tokens = StreamTokenizer.Tokenize(file, diagnostics, preprocessorVariables, tokenizerSettings, tokenizerProgressBar);
         Uri uri = new(file, UriKind.Absolute);
-        ParserResult result = new Parser(tokens.Tokens, uri).ParseInternal();
+        ParserResult result = new Parser(
+            tokens.Tokens,
+            uri,
+            diagnostics)
+            .ParseInternal();
         return result;
     }
 
     /// <exception cref="EndlessLoopException"/>
     /// <exception cref="SyntaxException"/>
-    public static ParserResult Parse(ImmutableArray<Token> tokens, Uri file)
-        => new Parser(tokens, file).ParseInternal();
+    public static ParserResult Parse(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
+        => new Parser(tokens, file, diagnostics).ParseInternal();
 
-    public static Statement.Statement ParseStatement(ImmutableArray<Token> tokens, Uri file)
-        => new Parser(tokens, file).ParseStatementInternal();
+    public static Statement.Statement ParseStatement(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
+        => new Parser(tokens, file, diagnostics).ParseStatementInternal();
 
     ParserResult ParseInternal()
     {
@@ -162,7 +167,6 @@ public sealed class Parser
         }
 
         return new ParserResult(
-            Diagnostics,
             Functions,
             Operators,
             Structs.Values,
@@ -963,7 +967,10 @@ public sealed class Parser
                 if (!ExpectIdentifier(out Token? fieldName))
                 { throw new SyntaxException("Expected a symbol after \".\"", tokenDot.Position.After(), File); }
 
-                statementWithValue = new Field(statementWithValue, fieldName, File);
+                statementWithValue = new Field(
+                    statementWithValue,
+                    new(fieldName, File),
+                    File);
 
                 continue;
             }
@@ -1079,13 +1086,13 @@ public sealed class Parser
         }
 
         if (statement is Literal)
-        { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement, File); }
+        { throw new SyntaxException($"Unexpected kind of statement \"{statement.GetType().Name}\"", statement, File); }
 
         if (statement is Identifier)
-        { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement, File); }
+        { throw new SyntaxException($"Unexpected kind of statement \"{statement.GetType().Name}\"", statement, File); }
 
         if (statement is NewInstance)
-        { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement, File); }
+        { throw new SyntaxException($"Unexpected kind of statement \"{statement.GetType().Name}\"", statement, File); }
 
         if (statement is StatementWithValue statementWithReturnValue)
         { statementWithReturnValue.SaveValue = false; }
@@ -1164,7 +1171,12 @@ public sealed class Parser
             { throw new SyntaxException("Initial value for variable declaration with implicit type is required", possibleType, File); }
         }
 
-        variableDeclaration = new VariableDeclaration(modifiers, possibleType, possibleVariableName, initialValue, File);
+        variableDeclaration = new VariableDeclaration(
+            modifiers,
+            possibleType,
+            new(possibleVariableName, File),
+            initialValue,
+            File);
         return true;
     }
 
@@ -1311,7 +1323,7 @@ public sealed class Parser
         if (NeedSemicolon(statement))
         {
             if (!ExpectOperator(";", out semicolon))
-            { Diagnostics.Add(Diagnostic.Error($"Please put a \";\" here (after {statement.GetType().Name})", statement.Position.After(), File)); }
+            { Diagnostics.Add(Diagnostic.Error($"Please put a \";\" here (after \"{statement.GetType().Name}\")", statement.Position.After(), File)); }
         }
         else
         { ExpectOperator(";", out semicolon); }
@@ -1962,13 +1974,13 @@ public sealed class Parser
 
             if (ExpectOperator("*", out Token? pointerOperator))
             {
-                type = new TypeInstancePointer(type, pointerOperator);
+                type = new TypeInstancePointer(type, pointerOperator, File);
             }
             else
             {
                 if ((flags & AllowedType.Any) == 0)
                 {
-                    error = Diagnostic.Error($"Type {TypeKeywords.Any} is not valid in the current context", possibleType, File, false);
+                    error = Diagnostic.Error($"Type \"{TypeKeywords.Any}\" is not valid in the current context", possibleType, File, false);
                     return false;
                 }
             }
@@ -1983,7 +1995,7 @@ public sealed class Parser
         {
             if (ExpectOperator("*", out Token? pointerOperator))
             {
-                type = new TypeInstancePointer(type, pointerOperator);
+                type = new TypeInstancePointer(type, pointerOperator, File);
             }
             else if (ExpectOperator("<"))
             {
@@ -2048,7 +2060,7 @@ public sealed class Parser
                     { continue; }
                 }
 
-                type = new TypeInstanceFunction(type, parameterTypes);
+                type = new TypeInstanceFunction(type, parameterTypes, File);
             }
             else if (ExpectOperator("[", out _))
             {
@@ -2057,7 +2069,7 @@ public sealed class Parser
                 if (!ExpectOperator("]"))
                 { return false; }
 
-                type = new TypeInstanceStackArray(type, sizeValue);
+                type = new TypeInstanceStackArray(type, sizeValue, File);
             }
             else
             { break; }

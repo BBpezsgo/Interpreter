@@ -1,7 +1,17 @@
 ﻿namespace LanguageCore;
 
+public interface IReadOnlyDiagnosticsCollection
+{
+    public IReadOnlyCollection<Diagnostic> Diagnostics { get; }
+    public IReadOnlyCollection<DiagnosticWithoutContext> DiagnosticsWithoutContext { get; }
+    public bool HasErrors { get; }
+
+    public void Throw();
+    public void Print();
+}
+
 [ExcludeFromCodeCoverage]
-public class DiagnosticsCollection
+public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
 {
     readonly List<Diagnostic> _diagnostics;
     readonly List<DiagnosticWithoutContext> _diagnosticsWithoutContext;
@@ -89,13 +99,27 @@ public class DiagnosticsCollection
 
     public void AddRange(DiagnosticsCollection other)
     {
-        _diagnostics.AddRange(other._diagnostics);
-        _diagnosticsWithoutContext.AddRange(other._diagnosticsWithoutContext);
+        AddRange(other._diagnostics);
+        AddRange(other._diagnosticsWithoutContext);
     }
 
-    public void Add(Diagnostic diagnostic) => _diagnostics.Add(diagnostic);
-    public void AddRange(IEnumerable<Diagnostic> diagnostic) => _diagnostics.AddRange(diagnostic);
+    public void Add(Diagnostic diagnostic)
+    {
+        if (_diagnostics.Any(v => v.Equals(diagnostic)))
+        { return; }
+        _diagnostics.Add(diagnostic);
+    }
 
-    public void Add(DiagnosticWithoutContext diagnostic) => _diagnosticsWithoutContext.Add(diagnostic);
-    public void AddRange(IEnumerable<DiagnosticWithoutContext> diagnostic) => _diagnosticsWithoutContext.AddRange(diagnostic);
+    public void AddRange(IEnumerable<Diagnostic> diagnostic)
+    { foreach (Diagnostic item in diagnostic) Add(item); }
+
+    public void Add(DiagnosticWithoutContext diagnostic)
+    {
+        if (_diagnosticsWithoutContext.Any(v => v.Equals(diagnostic)))
+        { return; }
+        _diagnosticsWithoutContext.Add(diagnostic);
+    }
+
+    public void AddRange(IEnumerable<DiagnosticWithoutContext> diagnostic)
+    { foreach (DiagnosticWithoutContext item in diagnostic) Add(item); }
 }

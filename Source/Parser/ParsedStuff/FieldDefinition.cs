@@ -7,7 +7,8 @@ public class FieldDefinition :
     IPositioned,
     IInContext<StructDefinition>,
     IIdentifiable<Token>,
-    IHaveAttributes
+    IHaveAttributes,
+    ILocated
 {
     /// <summary>
     /// Set by the <see cref="StructDefinition"/>
@@ -36,6 +37,8 @@ public class FieldDefinition :
             return Protection.Public;
         }
     }
+
+    public Location Location => new(Position, Context.File);
 
     public FieldDefinition(FieldDefinition other)
     {

@@ -10,7 +10,8 @@ public enum DiagnosticsLevel
 }
 
 [ExcludeFromCodeCoverage]
-public class Diagnostic : IDiagnostic
+public class Diagnostic :
+    IEquatable<Diagnostic>
 {
     public DiagnosticsLevel Level { get; }
     public string Message { get; }
@@ -48,6 +49,9 @@ public class Diagnostic : IDiagnostic
     [DoesNotReturn]
     public void Throw() => throw new LanguageException(Message, Position, File);
 
+    public static Diagnostic Internal(string message, IPositioned? position, Uri? file, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break);
+
     public static Diagnostic Critical(string message, IPositioned? position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break);
 
@@ -62,6 +66,9 @@ public class Diagnostic : IDiagnostic
 
     public static Diagnostic Hint(string message, IPositioned position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Hint, message, position.Position, file, @break);
+
+    public static Diagnostic Internal(string message, Position position, Uri? file, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, position, file, @break);
 
     public static Diagnostic Critical(string message, Position position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position, file, @break);
@@ -78,6 +85,9 @@ public class Diagnostic : IDiagnostic
     public static Diagnostic Hint(string message, Position position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Hint, message, position, file, @break);
 
+    public static Diagnostic Internal(string message, Position? position, Uri? file, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, position ?? Position.UnknownPosition, file, @break);
+
     public static Diagnostic Error(string message, Position? position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position ?? Position.UnknownPosition, file, @break);
 
@@ -89,6 +99,9 @@ public class Diagnostic : IDiagnostic
 
     public static Diagnostic Hint(string message, Position? position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Hint, message, position ?? Position.UnknownPosition, file, @break);
+
+    public static Diagnostic Internal(string message, ILocated location, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break);
 
     public static Diagnostic Critical(string message, ILocated location, bool @break = true)
         => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break);
@@ -123,14 +136,14 @@ public class Diagnostic : IDiagnostic
     }
 
     public override string ToString()
+        => LanguageException.Format(Message, Position, File);
+
+    public bool Equals([NotNullWhen(true)] Diagnostic? other)
     {
-        StringBuilder result = new(Message);
-
-        result.Append(Position.ToStringCool().Surround(" (at ", ")"));
-
-        if (File != null)
-        { result.Append($" (in {File})"); }
-
-        return result.ToString();
+        if (other is null) return false;
+        if (Message != other.Message) return false;
+        if (Position != other.Position) return false;
+        if (File != other.File) return false;
+        return true;
     }
 }

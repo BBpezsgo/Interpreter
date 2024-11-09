@@ -40,5 +40,6 @@ public class AliasDefinition :
         File = other.File;
     }
 
-    public bool DefinitionEquals(CompiledAlias other) => Identifier.Content.Equals(other.Identifier.Content);
+    public bool DefinitionEquals(CompiledAlias other)
+        => Identifier.Content == other.Identifier.Content;
 }

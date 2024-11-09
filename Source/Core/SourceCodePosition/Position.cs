@@ -77,18 +77,6 @@ public readonly struct Position :
         return $"{Range.Start.ToStringMin()}-{Range.End.ToStringMin()}";
     }
 
-    public string? ToStringCool()
-    {
-        if (Range.Start.Line < 0 ||
-            this == Position.UnknownPosition)
-        { return null; }
-
-        if (Range.Start.Character < 0)
-        { return $"line {Range.Start.Line}"; }
-
-        return $"line {Range.Start.Line + 1} and column {Range.Start.Character}";
-    }
-
     string GetDebuggerDisplay()
     {
         if (this == Position.UnknownPosition)

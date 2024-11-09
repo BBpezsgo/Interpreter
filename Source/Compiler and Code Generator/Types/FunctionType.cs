@@ -31,11 +31,19 @@ public class FunctionType : GeneralType,
         Parameters = parameters.ToImmutableArray();
     }
 
-    public override int GetSize(IRuntimeInfoProvider runtime)
-        => runtime.PointerSize;
+    public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        size = runtime.PointerSize;
+        error = default;
+        return true;
+    }
 
-    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
-        => (BitWidth)runtime.PointerSize;
+    public override bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        bitWidth = (BitWidth)runtime.PointerSize;
+        error = default;
+        return true;
+    }
 
     public override bool Equals(object? other) => Equals(other as FunctionType);
     public override bool Equals(GeneralType? other) => Equals(other as FunctionType);

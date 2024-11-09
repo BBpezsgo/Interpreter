@@ -12,8 +12,36 @@ public abstract class GeneralType :
 {
     public virtual GeneralType FinalValue => this;
 
-    public abstract int GetSize(IRuntimeInfoProvider runtime);
-    public abstract BitWidth GetBitWidth(IRuntimeInfoProvider runtime);
+    public int GetSize(IRuntimeInfoProvider runtime)
+    {
+        if (!GetSize(runtime, out int size, out PossibleDiagnostic? error))
+        { error.Throw(); }
+        return size;
+    }
+
+    public BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
+    {
+        if (!GetBitWidth(runtime, out BitWidth bitWidth, out PossibleDiagnostic? error))
+        { error.Throw(); }
+        return bitWidth;
+    }
+
+    public int GetSize(IRuntimeInfoProvider runtime, DiagnosticsCollection diagnostics, ILocated location)
+    {
+        if (!GetSize(runtime, out int size, out PossibleDiagnostic? error))
+        { diagnostics?.Add(error.ToError(location)); }
+        return size;
+    }
+
+    public BitWidth GetBitWidth(IRuntimeInfoProvider runtime, DiagnosticsCollection diagnostics, ILocated location)
+    {
+        if (!GetBitWidth(runtime, out BitWidth bitWidth, out PossibleDiagnostic? error))
+        { diagnostics?.Add(error.ToError(location)); }
+        return bitWidth;
+    }
+
+    public abstract bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error);
+    public abstract bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error);
 
     public static GeneralType From(GeneralType other) => other switch
     {
@@ -33,12 +61,12 @@ public abstract class GeneralType :
         TypeInstance type,
         FindType typeFinder,
         ComputeValue? constComputer = null,
-        Uri? uri = null) => type switch
+        Uri? file = null) => type switch
         {
-            TypeInstanceSimple simpleType => GeneralType.From(simpleType, typeFinder, constComputer, uri),
-            TypeInstanceFunction functionType => GeneralType.From(functionType, typeFinder, constComputer, uri),
-            TypeInstanceStackArray stackArrayType => GeneralType.From(stackArrayType, typeFinder, constComputer, uri),
-            TypeInstancePointer pointerType => GeneralType.From(pointerType, typeFinder, constComputer, uri),
+            TypeInstanceSimple simpleType => GeneralType.From(simpleType, typeFinder, constComputer, file),
+            TypeInstanceFunction functionType => GeneralType.From(functionType, typeFinder, constComputer, file),
+            TypeInstanceStackArray stackArrayType => GeneralType.From(stackArrayType, typeFinder, constComputer, file),
+            TypeInstancePointer pointerType => GeneralType.From(pointerType, typeFinder, constComputer, file),
             _ => throw new UnreachableException(),
         };
 
@@ -48,7 +76,7 @@ public abstract class GeneralType :
         TypeInstanceStackArray type,
         FindType typeFinder,
         ComputeValue? constComputer = null,
-        Uri? uri = null)
+        Uri? file = null)
     {
         CompiledValue? stackArraySize = default;
 
@@ -66,7 +94,7 @@ public abstract class GeneralType :
             }
         }
 
-        GeneralType? of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer, uri);
+        GeneralType? of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer, file);
 
         ArrayType result = new(of, type.StackArraySize, (int?)stackArraySize);
         type.SetAnalyzedType(result);
@@ -80,10 +108,10 @@ public abstract class GeneralType :
         TypeInstanceFunction type,
         FindType typeFinder,
         ComputeValue? constComputer = null,
-        Uri? uri = null)
+        Uri? file = null)
     {
-        GeneralType returnType = GeneralType.From(type.FunctionReturnType, typeFinder, constComputer, uri);
-        IEnumerable<GeneralType> parameters = GeneralType.FromArray(type.FunctionParameterTypes, typeFinder, constComputer, uri);
+        GeneralType returnType = GeneralType.From(type.FunctionReturnType, typeFinder, constComputer, file);
+        IEnumerable<GeneralType> parameters = GeneralType.FromArray(type.FunctionParameterTypes, typeFinder, constComputer, file);
 
         FunctionType result = new(returnType, parameters);
         type.SetAnalyzedType(result);
@@ -97,9 +125,9 @@ public abstract class GeneralType :
         TypeInstancePointer type,
         FindType typeFinder,
         ComputeValue? constComputer = null,
-        Uri? uri = null)
+        Uri? file = null)
     {
-        GeneralType to = GeneralType.From(type.To, typeFinder, constComputer, uri);
+        GeneralType to = GeneralType.From(type.To, typeFinder, constComputer, file);
 
         PointerType result = new(to);
         type.SetAnalyzedType(result);
@@ -113,7 +141,7 @@ public abstract class GeneralType :
         TypeInstanceSimple type,
         FindType typeFinder,
         ComputeValue? constComputer = null,
-        Uri? uri = null)
+        Uri? file = null)
     {
         GeneralType? result;
 
@@ -126,7 +154,7 @@ public abstract class GeneralType :
 
         if (!typeFinder.Invoke(type.Identifier, type.File, out result))
         {
-            Diagnostic.Critical($"Can't parse \"{type}\" to {nameof(GeneralType)}", type, uri).Throw();
+            Diagnostic.Critical($"Can't parse \"{type}\" to \"{nameof(GeneralType)}\"", type, file).Throw();
             return default;
         }
 
@@ -135,7 +163,7 @@ public abstract class GeneralType :
         {
             if (type.TypeArguments.HasValue)
             {
-                IEnumerable<GeneralType> typeParameters = GeneralType.FromArray(type.TypeArguments.Value, typeFinder, constComputer, uri);
+                IEnumerable<GeneralType> typeParameters = GeneralType.FromArray(type.TypeArguments.Value, typeFinder, constComputer, file);
                 result = new StructType(resultStructType.Struct, type.File, typeParameters.ToImmutableList());
             }
             else
@@ -157,20 +185,20 @@ public abstract class GeneralType :
         IEnumerable<TypeInstance>? types,
         FindType typeFinder,
         ComputeValue? constComputer = null,
-        Uri? uri = null)
+        Uri? file = null)
     {
         if (types is null) yield break;
 
         foreach (TypeInstance item in types)
-        { yield return GeneralType.From(item, typeFinder, constComputer, uri); }
+        { yield return GeneralType.From(item, typeFinder, constComputer, file); }
     }
 
     public static IEnumerable<GeneralType> FromArray(
         IEnumerable<IHaveType>? types,
         FindType typeFinder,
         ComputeValue? constComputer = null,
-        Uri? uri = null)
-        => GeneralType.FromArray(types?.Select(v => v.Type), typeFinder, constComputer, uri);
+        Uri? file = null)
+        => GeneralType.FromArray(types?.Select(v => v.Type), typeFinder, constComputer, file);
 
     [Obsolete]
     public static bool operator ==(GeneralType? a, GeneralType? b)

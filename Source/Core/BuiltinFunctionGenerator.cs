@@ -484,7 +484,7 @@ public static unsafe class ExternalFunctionGenerator
         if (type_ == typeof(UIntPtr))
         { return RuntimeType.I32; }
 
-        throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
+        throw new NotImplementedException($"Type conversion for type \"{typeof(T)}\" not implemented");
     }
 
     #endregion

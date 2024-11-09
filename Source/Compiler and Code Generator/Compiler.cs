@@ -276,10 +276,10 @@ public sealed class Compiler
     readonly PrintCallback? PrintCallback;
     readonly ImmutableArray<UserDefinedAttribute> UserDefinedAttributes;
 
-    readonly DiagnosticsCollection? Diagnostics;
+    readonly DiagnosticsCollection Diagnostics;
     readonly IEnumerable<string> PreprocessorVariables;
 
-    Compiler(IEnumerable<IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, DiagnosticsCollection? diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
+    Compiler(IEnumerable<IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
     {
         ExternalFunctions = (externalFunctions ?? Enumerable.Empty<IExternalFunction>()).ToImmutableArray();
         Settings = settings;
@@ -343,7 +343,7 @@ public sealed class Compiler
     CompiledStruct CompileStructNoFields(StructDefinition @struct)
     {
         if (LanguageConstants.KeywordList.Contains(@struct.Identifier.Content))
-        { Diagnostics?.Add(Diagnostic.Critical($"Illegal struct name \"{@struct.Identifier.Content}\"", @struct.Identifier, @struct.File)); }
+        { Diagnostics.Add(Diagnostic.Critical($"Illegal struct name \"{@struct.Identifier.Content}\"", @struct.Identifier, @struct.File)); }
 
         @struct.Identifier.AnalyzedType = TokenAnalyzedType.Struct;
 
@@ -379,13 +379,13 @@ public sealed class Compiler
                 {
                     if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute));
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
 
                     if (attribute.Parameters[0].Type != LiteralType.String)
                     {
-                        Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute));
+                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
                         break;
                     }
 
@@ -393,7 +393,7 @@ public sealed class Compiler
 
                     if (!ExternalFunctions.TryGet(externalName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
                     {
-                        Diagnostics?.Add(exception.ToWarning(attribute, function.File));
+                        Diagnostics.Add(exception.ToWarning(attribute, function.File));
                         break;
                     }
 
@@ -405,13 +405,13 @@ public sealed class Compiler
                 {
                     if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {1}, passed {attribute.Parameters.Length}", attribute));
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
 
                     if (attribute.Parameters[0].Type != LiteralType.String)
                     {
-                        Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[0].Type} for attribute {attribute.Identifier} at {0}: expected {LiteralType.String}", attribute));
+                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
                         break;
                     }
 
@@ -419,24 +419,24 @@ public sealed class Compiler
 
                     if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out BuiltinFunction? builtinFunction))
                     {
-                        Diagnostics?.Add(Diagnostic.Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
+                        Diagnostics.Add(Diagnostic.Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
                         break;
                     }
 
                     if (builtinFunction.Parameters.Length != function.Parameters.Count)
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File));
                     }
 
                     if (type is null)
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Can't use attribute \"{attribute.Identifier}\" on this function because its aint have a return type", typeInstance, function.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Can't use attribute \"{attribute.Identifier}\" on this function because its aint have a return type", typeInstance, function.File));
                         continue;
                     }
 
                     if (!builtinFunction.Type.Invoke(type))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", typeInstance, function.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", typeInstance, function.File));
                     }
 
                     for (int i = 0; i < builtinFunction.Parameters.Length; i++)
@@ -450,7 +450,7 @@ public sealed class Compiler
                         if (definedParameterType.Invoke(passedParameterType))
                         { continue; }
 
-                        Diagnostics?.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType} Passed: {passedParameterType}", function.Parameters[i].Type, function.Parameters[i].File));
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: \"{definedParameterType}\" Passed: \"{passedParameterType}\"", function.Parameters[i].Type, function.Parameters[i].File));
                     }
                     break;
                 }
@@ -470,11 +470,11 @@ public sealed class Compiler
             if (userDefinedAttribute.Name != attribute.Identifier.Content) continue;
 
             if (!userDefinedAttribute.CanUseOn.HasFlag(CanUseOn.Function))
-            { Diagnostics?.Add(Diagnostic.Error($"Can't use attribute \"{attribute.Identifier}\" on {context.GetType().Name}. Valid usages: {userDefinedAttribute.CanUseOn}", attribute)); }
+            { Diagnostics.Add(Diagnostic.Error($"Can't use attribute \"{attribute.Identifier}\" on \"{context.GetType().Name}\". Valid usages: {userDefinedAttribute.CanUseOn}", attribute)); }
 
             if (attribute.Parameters.Length != userDefinedAttribute.Parameters.Length)
             {
-                Diagnostics?.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute {attribute.Identifier}: required {userDefinedAttribute.Parameters.Length}, passed {attribute.Parameters.Length}", attribute));
+                Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {userDefinedAttribute.Parameters.Length}, passed {attribute.Parameters.Length}", attribute));
                 break;
             }
 
@@ -482,14 +482,14 @@ public sealed class Compiler
             {
                 if (attribute.Parameters[i].Type != userDefinedAttribute.Parameters[i])
                 {
-                    Diagnostics?.Add(Diagnostic.Error($"Invalid parameter type {attribute.Parameters[i].Type} for attribute {attribute.Identifier} at {i}: expected {userDefinedAttribute.Parameters[i]}", attribute));
+                    Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[i].Type}\" for attribute \"{attribute.Identifier}\" at {i}: expected \"{userDefinedAttribute.Parameters[i]}\"", attribute));
                 }
             }
 
             if (userDefinedAttribute.Verifier is not null &&
                 !userDefinedAttribute.Verifier.Invoke(context, attribute, out PossibleDiagnostic? error))
             {
-                Diagnostics?.Add(error.ToError(attribute));
+                Diagnostics.Add(error.ToError(attribute));
             }
 
             break;
@@ -520,11 +520,11 @@ public sealed class Compiler
         @struct.SetFields(compiledFields);
     }
 
-    public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, IExternalFunction externalFunction, DiagnosticsCollection? diagnostics)
+    public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, IExternalFunction externalFunction, DiagnosticsCollection diagnostics)
         where TFunction : FunctionThingDefinition, ICompiledFunction
         => CheckExternalFunctionDeclaration(runtime, definition, externalFunction, definition.Type, definition.ParameterTypes, diagnostics);
 
-    public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, IExternalFunction externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes, DiagnosticsCollection? diagnostics)
+    public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, IExternalFunction externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes, DiagnosticsCollection diagnostics)
     {
         if (externalFunction.ParametersSize != parameterTypes.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.GetSize(runtime)))
         {
@@ -624,12 +624,12 @@ public sealed class Compiler
     void AddAST(CollectedAST collectedAST, bool addTopLevelStatements = true)
     {
         if (addTopLevelStatements)
-        { TopLevelStatements.Add((collectedAST.ParserResult.TopLevelStatements, collectedAST.Uri)); }
+        { TopLevelStatements.Add((collectedAST.AST.TopLevelStatements, collectedAST.Uri)); }
 
-        Functions.AddRange(collectedAST.ParserResult.Functions);
-        Operators.AddRange(collectedAST.ParserResult.Operators);
-        Structs.AddRange(collectedAST.ParserResult.Structs);
-        AliasDefinitions.AddRange(collectedAST.ParserResult.AliasDefinitions);
+        Functions.AddRange(collectedAST.AST.Functions);
+        Operators.AddRange(collectedAST.AST.Operators);
+        Structs.AddRange(collectedAST.AST.Structs);
+        AliasDefinitions.AddRange(collectedAST.AST.AliasDefinitions);
     }
 
     CompilerResult CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
@@ -642,7 +642,7 @@ public sealed class Compiler
         foreach ((Uri file_, CollectedAST ast) in files)
         {
             if (file_ == file)
-            { TopLevelStatements.Add((ast.ParserResult.TopLevelStatements, file_)); }
+            { TopLevelStatements.Add((ast.AST.TopLevelStatements, file_)); }
         }
 
         CompileInternal();
@@ -699,7 +699,7 @@ public sealed class Compiler
             where TThing1 : IIdentifiable<Token>, IInFile
             where TThing2 : IIdentifiable<Token>, IInFile
         {
-            if (!a.Identifier.Content.Equals(b.Identifier.Content)) return false;
+            if (a.Identifier.Content != b.Identifier.Content) return false;
             if (a.File != b.File) return false;
             return true;
         }
@@ -732,7 +732,7 @@ public sealed class Compiler
         {
             if (IsThingExists(@aliasDefinition))
             {
-                Diagnostics?.Add(Diagnostic.Critical("Symbol already exists", @aliasDefinition.Identifier, @aliasDefinition.File));
+                Diagnostics.Add(Diagnostic.Critical("Symbol already exists", @aliasDefinition.Identifier, @aliasDefinition.File));
                 return;
             }
 
@@ -751,7 +751,7 @@ public sealed class Compiler
         {
             if (IsThingExists(@struct))
             {
-                Diagnostics?.Add(Diagnostic.Critical("Symbol already exists", @struct.Identifier, @struct.File));
+                Diagnostics.Add(Diagnostic.Critical("Symbol already exists", @struct.Identifier, @struct.File));
                 return;
             }
 
@@ -787,7 +787,7 @@ public sealed class Compiler
 
             if (CompiledOperators.Any(other => FunctionEquality(compiled, other)))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Operator {compiled.ToReadable()} already defined", @operator.Identifier, @operator.File));
+                Diagnostics.Add(Diagnostic.Critical($"Operator \"{compiled.ToReadable()}\" already defined", @operator.Identifier, @operator.File));
                 return;
             }
 
@@ -800,7 +800,7 @@ public sealed class Compiler
 
             if (CompiledFunctions.Any(other => FunctionEquality(compiled, other)))
             {
-                Diagnostics?.Add(Diagnostic.Critical($"Function {compiled.ToReadable()} already defined", function.Identifier, function.File));
+                Diagnostics.Add(Diagnostic.Critical($"Function \"{compiled.ToReadable()}\" already defined", function.Identifier, function.File));
                 return;
             }
 
@@ -822,7 +822,7 @@ public sealed class Compiler
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File));
                         return;
                     }
                 }
@@ -856,7 +856,7 @@ public sealed class Compiler
                     parameters = method.Parameters.ToList();
                     parameters.Insert(0, new ParameterDefinition(
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
-                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters)),
+                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)
                     );
@@ -875,13 +875,13 @@ public sealed class Compiler
 
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Function with name \'{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
                         return;
                     }
 
                     if (CompiledGeneralFunctions.Any(methodWithPointer.IsSame))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Function with name \'{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
                         return;
                     }
 
@@ -896,7 +896,7 @@ public sealed class Compiler
 
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
                         return;
                     }
 
@@ -909,7 +909,7 @@ public sealed class Compiler
                 foreach (ParameterDefinition parameter in method.Parameters)
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
-                    { Diagnostics?.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File)); }
+                    { Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File)); }
                 }
 
                 List<ParameterDefinition> parameters = method.Parameters.ToList();
@@ -939,7 +939,7 @@ public sealed class Compiler
                 parameters.Insert(0,
                     new ParameterDefinition(
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
-                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters)),
+                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
                         Token.CreateAnonymous(StatementKeywords.This),
                         method)
                     );
@@ -961,13 +961,13 @@ public sealed class Compiler
 
                 if (CompiledFunctions.Any(methodWithRef.IsSame))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
                     return;
                 }
 
                 if (CompiledFunctions.Any(methodWithPointer.IsSame))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Function with name \"{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
                     return;
                 }
 
@@ -981,7 +981,7 @@ public sealed class Compiler
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
                     {
-                        Diagnostics?.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File));
                         return;
                     }
                 }
@@ -1009,7 +1009,7 @@ public sealed class Compiler
 
                 if (CompiledConstructors.Any(compiledConstructor.IsSame))
                 {
-                    Diagnostics?.Add(Diagnostic.Critical($"Constructor \"{compiledConstructor.ToReadable()}\" already defined", constructor.Type, compiledStruct.File));
+                    Diagnostics.Add(Diagnostic.Critical($"Constructor \"{compiledConstructor.ToReadable()}\" already defined", constructor.Type, compiledStruct.File));
                     return;
                 }
 
@@ -1026,8 +1026,8 @@ public sealed class Compiler
         IEnumerable<IExternalFunction>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback = null,
-        DiagnosticsCollection? diagnostics = null,
+        PrintCallback? printCallback,
+        DiagnosticsCollection diagnostics,
         TokenizerSettings? tokenizerSettings = null,
         FileParser? fileParser = null,
         IEnumerable<string>? additionalImports = null,
@@ -1050,7 +1050,7 @@ public sealed class Compiler
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,
-        DiagnosticsCollection? diagnostics,
+        DiagnosticsCollection diagnostics,
         TokenizerSettings? tokenizerSettings,
         Uri file,
         IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)

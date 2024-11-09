@@ -113,8 +113,8 @@ public static class Entry
                 {
                     CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, diagnostics, null, null, additionalImports);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
-                    diagnostics.Throw();
                     diagnostics.Print();
+                    diagnostics.Throw();
                 }
                 else
                 {
@@ -122,8 +122,8 @@ public static class Entry
                     {
                         CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, Output.Log, diagnostics, null, null, additionalImports);
                         generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
-                        diagnostics.Throw();
                         diagnostics.Print();
+                        if (diagnostics.HasErrors) return 1;
                     }
                     catch (LanguageException ex)
                     {
@@ -337,7 +337,7 @@ public static class Entry
                 DiagnosticsCollection diagnostics = new();
                 if (arguments.ThrowErrors)
                 {
-                    tokens = AnyTokenizer.Tokenize(arguments.Source, PreprocessorVariables.Brainfuck).Tokens;
+                    tokens = AnyTokenizer.Tokenize(arguments.Source, diagnostics, PreprocessorVariables.Brainfuck).Tokens;
                     CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, Output.Log, diagnostics, null, null, additionalImports);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Throw();
@@ -350,7 +350,7 @@ public static class Entry
                 {
                     try
                     {
-                        tokens = AnyTokenizer.Tokenize(arguments.Source, PreprocessorVariables.Brainfuck).Tokens;
+                        tokens = AnyTokenizer.Tokenize(arguments.Source, diagnostics, PreprocessorVariables.Brainfuck).Tokens;
                         CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, Output.Log, diagnostics, null, null, additionalImports);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                         diagnostics.Throw();

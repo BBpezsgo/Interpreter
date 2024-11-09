@@ -18,6 +18,9 @@ public readonly struct Location : IEquatable<Location>, ILocated
     public override int GetHashCode() => HashCode.Combine(Position, File);
     public override bool Equals([NotNullWhen(true)] object? obj) => obj is Location other && Equals(other);
     public bool Equals(Location other) => Position.Equals(other.Position) && File.Equals(other.File);
+    internal Location After() => new(Position.After(), File);
+    internal Location Before() => new(Position.Before(), File);
+    internal Location NextLine() => new(Position.NextLine(), File);
 
     public static bool operator ==(Location left, Location right) => left.Equals(right);
     public static bool operator !=(Location left, Location right) => !left.Equals(right);

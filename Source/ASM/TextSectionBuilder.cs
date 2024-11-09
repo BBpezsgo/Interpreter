@@ -14,9 +14,9 @@ public class TextSectionBuilder : SectionBuilder
 
     bool HasLabel(string dataLabel)
     {
-        for (int i = 0; i < Labels.Count; i++)
+        foreach (string label in Labels)
         {
-            if (string.Equals(Labels[i], dataLabel, StringComparison.Ordinal))
+            if (label == dataLabel)
             {
                 return true;
             }

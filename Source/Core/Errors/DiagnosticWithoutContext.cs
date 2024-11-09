@@ -2,7 +2,8 @@
 namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
-public class DiagnosticWithoutContext
+public class DiagnosticWithoutContext :
+    IEquatable<DiagnosticWithoutContext>
 {
     public DiagnosticsLevel Level { get; }
     public string Message { get; }
@@ -60,4 +61,11 @@ public class DiagnosticWithoutContext
     }
 
     public override string ToString() => Message;
+
+    public bool Equals([NotNullWhen(true)] DiagnosticWithoutContext? other)
+    {
+        if (other is null) return false;
+        if (Message != other.Message) return false;
+        return true;
+    }
 }

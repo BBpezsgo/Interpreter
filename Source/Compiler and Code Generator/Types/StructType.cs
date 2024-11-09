@@ -12,21 +12,25 @@ public class StructType : GeneralType,
     public ImmutableDictionary<string, GeneralType> TypeArguments { get; }
     public Uri File { get; }
 
-    public ImmutableDictionary<CompiledField, int> GetFields(IRuntimeInfoProvider runtime)
+    public bool GetFields(IRuntimeInfoProvider runtime, [NotNullWhen(true)] out ImmutableDictionary<CompiledField, int>? fields, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         Dictionary<CompiledField, int> result = new(Struct.Fields.Length);
+        fields = default;
 
         int offset = 0;
         foreach (CompiledField field in Struct.Fields)
         {
             result.Add(field, offset);
             GeneralType fieldType = field.Type;
-            fieldType = ReplaceType(fieldType, out PossibleDiagnostic? error);
-            error?.Throw();
-            offset += fieldType.GetSize(runtime);
+            fieldType = ReplaceType(fieldType, out error);
+            if (error is not null) return false;
+            if (!fieldType.GetSize(runtime, out int fieldSize, out error)) return false;
+            offset += fieldSize;
         }
 
-        return result.ToImmutableDictionary();
+        fields = result.ToImmutableDictionary();
+        error = null;
+        return true;
     }
 
     CompiledStruct? IReferenceableTo<CompiledStruct>.Reference
@@ -83,26 +87,30 @@ public class StructType : GeneralType,
         File = originalFile;
     }
 
-    public override int GetSize(IRuntimeInfoProvider runtime)
+    public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        int size = 0;
+        size = 0;
+        error = default;
+
         foreach (CompiledField field in Struct.Fields)
         {
             GeneralType fieldType = field.Type;
-            fieldType = ReplaceType(fieldType, out PossibleDiagnostic? error);
-            error?.Throw();
-            size += fieldType.GetSize(runtime);
+            fieldType = ReplaceType(fieldType, out error);
+            if (error is not null) return false;
+            if (!fieldType.GetSize(runtime, out int fieldSize, out error)) return false;
+            size += fieldSize;
         }
-        return size;
+        return true;
     }
 
-    public override BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
+    public override bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error)
         => throw new InvalidOperationException();
 
-    public bool GetField(string name, IRuntimeInfoProvider runtime, [NotNullWhen(true)] out CompiledField? field, [NotNullWhen(true)] out int offset)
+    public bool GetField(string name, IRuntimeInfoProvider runtime, [NotNullWhen(true)] out CompiledField? field, [NotNullWhen(true)] out int offset, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        offset = 0;
-        field = null;
+        offset = default;
+        field = default;
+        error = default;
 
         foreach (CompiledField _field in Struct.Fields)
         {
@@ -113,12 +121,14 @@ public class StructType : GeneralType,
             }
 
             GeneralType fieldType = _field.Type;
-            fieldType = ReplaceType(fieldType, out PossibleDiagnostic? error);
-            error?.Throw();
+            fieldType = ReplaceType(fieldType, out error);
+            if (error is not null) return false;
+            if (!fieldType.GetSize(runtime, out int fieldSize, out error)) return false;
 
-            offset += fieldType.GetSize(runtime);
+            offset += fieldSize;
         }
 
+        error = new PossibleDiagnostic($"Field \"{name}\" not found in struct \"{Struct}\"");
         return false;
     }
 

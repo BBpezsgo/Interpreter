@@ -657,7 +657,7 @@ public ref partial struct ProcessorState
         Crash = functionId;
         Signal = Signal.UndefinedExternalFunction;
 #if !UNITY
-        throw new RuntimeException($"Undefined external function {functionId}");
+        throw new RuntimeException($"Undefined external function \"{functionId}\"");
 #endif
     }
 

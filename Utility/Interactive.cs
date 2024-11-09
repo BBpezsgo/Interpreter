@@ -82,7 +82,6 @@ class InteractiveCompiler
     public CompilerResult Compiled { get; private set; }
     public BBLangGeneratorResult Generated => _generated;
     public ParserResult InteractiveAST => new(
-        new DiagnosticsCollection(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<FunctionDefinition>(),
         Enumerable.Empty<StructDefinition>(),
@@ -112,14 +111,15 @@ class InteractiveCompiler
         { return; }
 
         _text = text;
-        Tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive, Utils.AssemblyFile).Tokens;
+        Tokens = StringTokenizer.Tokenize(_text, new(), PreprocessorVariables.Interactive, Utils.AssemblyFile).Tokens;
         Statement = default;
         Compiled = default;
         _generated = default;
+        DiagnosticsCollection diagnostics = new();
 
         if (Tokens.Length != 0)
         {
-            Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
+            Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile, diagnostics);
 
             List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
@@ -133,11 +133,15 @@ class InteractiveCompiler
                 new CompilerSettings() { BasePath = _basePath },
                 PreprocessorVariables.Interactive,
                 null,
-                null,
+                diagnostics,
                 null,
                 Utils.AssemblyFile);
 
-            _generated = CodeGeneratorForMain.Generate(Compiled, MainGeneratorSettings.Default);
+            _generated = CodeGeneratorForMain.Generate(
+                Compiled,
+                MainGeneratorSettings.Default,
+                null,
+                diagnostics);
         }
     }
 
@@ -156,14 +160,15 @@ class InteractiveCompiler
 
     void CompileTask()
     {
-        Tokens = StringTokenizer.Tokenize(_text, PreprocessorVariables.Interactive, Utils.AssemblyFile).Tokens;
+        Tokens = StringTokenizer.Tokenize(_text, new(), PreprocessorVariables.Interactive, Utils.AssemblyFile).Tokens;
         Statement = default;
         Compiled = default;
         _generated = default;
+        DiagnosticsCollection diagnostics = new();
 
         if (Tokens.Length != 0)
         {
-            Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile);
+            Statement = Parser.ParseStatement(Tokens, Utils.AssemblyFile, diagnostics);
 
             List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
@@ -177,11 +182,15 @@ class InteractiveCompiler
                 new CompilerSettings() { BasePath = _basePath },
                 PreprocessorVariables.Interactive,
                 null,
-                null,
+                diagnostics,
                 null,
                 Utils.AssemblyFile);
 
-            _generated = CodeGeneratorForMain.Generate(Compiled, MainGeneratorSettings.Default);
+            _generated = CodeGeneratorForMain.Generate(
+                Compiled,
+                MainGeneratorSettings.Default,
+                null,
+                diagnostics);
         }
     }
 
@@ -703,6 +712,7 @@ public class Interactive
         source ??= string.Empty;
 
         BytecodeProcessorEx interpreter;
+        DiagnosticsCollection diagnostics = new();
 
         try
         {
@@ -712,7 +722,11 @@ public class Interactive
 
             List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
-            BBLangGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, MainGeneratorSettings.Default);
+            BBLangGeneratorResult generated = CodeGeneratorForMain.Generate(
+                CompilerCache.Compiled,
+                MainGeneratorSettings.Default,
+                null,
+                diagnostics);
 
             interpreter = new(BytecodeInterpreterSettings.Default, generated.Code, null, generated.DebugInfo);
 

@@ -14,38 +14,38 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!addressType.Is<FunctionType>())
         {
-            Diagnostics?.Add(Diagnostic.Critical($"This should be a function pointer and not {addressType}", address));
+            Diagnostics.Add(Diagnostic.Critical($"This should be a function pointer and not \"{addressType}\"", address));
             return;
         }
 
         int returnToValueInstruction = GeneratedCode.Count;
         Push(0);
 
-        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this));
+        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, address));
         Push(Register.BasePointer);
 
         GenerateCodeForStatement(address);
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Get(addressType.GetBitWidth(this)));
-            AddInstruction(Opcode.MathSub, reg.Get(addressType.GetBitWidth(this)), GeneratedCode.Count + 2);
+            PopTo(reg.Get(addressType.GetBitWidth(this, Diagnostics, address)));
+            AddInstruction(Opcode.MathSub, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)), GeneratedCode.Count + 2);
 
             AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
             int jumpInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.Jump, reg.Get(addressType.GetBitWidth(this)));
+            AddInstruction(Opcode.Jump, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)));
 
             GeneratedCode[returnToValueInstruction].Operand1 = GeneratedCode.Count;
         }
     }
 
-    int Call(int absoluteAddress)
+    int Call(int absoluteAddress, ILocated callerLocation)
     {
         int returnToValueInstruction = GeneratedCode.Count;
         Push(0);
 
-        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this));
+        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, callerLocation));
         Push(Register.BasePointer);
 
         AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
@@ -58,10 +58,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return jumpInstruction;
     }
 
-    void Return()
+    void Return(ILocated location)
     {
         PopTo(Register.BasePointer);
-        Pop(AbsGlobalAddressType.GetSize(this)); // Pop AbsoluteGlobalOffset
+        Pop(AbsGlobalAddressType.GetSize(this, Diagnostics, location)); // Pop AbsoluteGlobalOffset
         AddInstruction(Opcode.Return);
         ScopeSizes.LastRef -= PointerSize;
     }
@@ -100,7 +100,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return true;
         }
 
-        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out _))
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? constantNotFoundError))
         {
             address = GetGlobalVariableAddress(globalVariable);
             return true;
@@ -173,9 +173,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!prevType.Is(out StructType? structType))
         { throw new NotImplementedException(); }
 
-        if (!structType.GetField(field.Identifier.Content, this, out _, out int fieldOffset))
+        if (!structType.GetField(field.Identifier.Content, this, out _, out int fieldOffset, out error))
         {
-            error = new PossibleDiagnostic($"Field \"{field.Identifier}\" not found in struct \"{structType.Struct.Identifier}\"", field.Identifier, field.File);
             return false;
         }
 
@@ -217,7 +216,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return false;
         }
 
-        int _offset = (int)index * arrayType.Of.GetSize(this);
+        int _offset = (int)index * arrayType.Of.GetSize(this, Diagnostics, indexCall);
         offset = prevOffset + _offset;
         return true;
     }
@@ -294,7 +293,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return true;
         }
 
-        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out _))
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? constantNotFoundError))
         {
             address = GetGlobalVariableAddress(globalVariable);
             return true;
@@ -451,6 +450,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddInstruction(size switch
         {
+            0 => default,
             BitWidth._8 => Opcode.PopTo8,
             BitWidth._16 => Opcode.PopTo16,
             BitWidth._32 => Opcode.PopTo32,
@@ -464,6 +464,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         AddInstruction(destination.BitWidth() switch
         {
+            0 => default,
             BitWidth._8 => Opcode.PopTo8,
             BitWidth._16 => Opcode.PopTo16,
             BitWidth._32 => Opcode.PopTo32,
@@ -758,7 +759,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 !GetParameter(identifier.Content, out CompiledParameter? parameter) ||
                 !parameter.IsRef)
             {
-                Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", pointer));
+                Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", pointer));
                 return;
             }
         }
@@ -779,7 +780,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (!FindStatementType(pointer).Is<PointerType>())
         {
-            Diagnostics?.Add(Diagnostic.Critical($"This isn't a pointer", pointer));
+            Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", pointer));
             return;
         }
 
@@ -845,7 +846,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             foreach (CompiledParameter parameter in CompiledParameters)
             {
-                sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this);
+                sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this, Diagnostics, parameter);
             }
 
             return sum;
@@ -859,7 +860,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         foreach (CompiledParameter parameter in CompiledParameters)
         {
             if (parameter.Index <= beforeThis) continue;
-            sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this);
+            sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this, Diagnostics, parameter);
         }
 
         return sum;

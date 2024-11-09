@@ -19,17 +19,17 @@ public static class AnyTokenizer
     /// <exception cref="System.Threading.Tasks.TaskCanceledException"/>
     /// <exception cref="HttpRequestException"/>
     /// <exception cref="AggregateException"/>
-    public static TokenizerResult Tokenize(Uri uri, IEnumerable<string>? preprocessorVariables = null, TokenizerSettings? settings = null)
+    public static TokenizerResult Tokenize(Uri file, DiagnosticsCollection diagnostics, IEnumerable<string>? preprocessorVariables = null, TokenizerSettings? settings = null)
     {
-        if (uri.IsFile)
-        { return StreamTokenizer.Tokenize(uri.AbsolutePath, preprocessorVariables, settings); }
+        if (file.IsFile)
+        { return StreamTokenizer.Tokenize(file.AbsolutePath, diagnostics, preprocessorVariables, settings); }
         else
         {
             using HttpClient client = new();
-            using HttpResponseMessage res = client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead).Result;
+            using HttpResponseMessage res = client.GetAsync(file, HttpCompletionOption.ResponseHeadersRead).Result;
             res.EnsureSuccessStatusCode();
 
-            return StreamTokenizer.Tokenize(res.Content.ReadAsStream(), preprocessorVariables, uri, settings);
+            return StreamTokenizer.Tokenize(res.Content.ReadAsStream(), diagnostics, preprocessorVariables, file, settings);
         }
     }
 }

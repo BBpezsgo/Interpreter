@@ -4,9 +4,21 @@ using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser;
 
-public abstract class TypeInstance : IEquatable<TypeInstance>, IPositioned
+public abstract class TypeInstance :
+    IEquatable<TypeInstance>,
+    IPositioned,
+    IInFile,
+    ILocated
 {
     public abstract Position Position { get; }
+
+    public Uri File { get; }
+    public Location Location => new(Position, File);
+
+    protected TypeInstance(Uri file)
+    {
+        File = file;
+    }
 
     public static bool operator ==(TypeInstance? a, string? b)
     {
@@ -68,7 +80,7 @@ public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStack
     public StatementWithValue? StackArraySize { get; }
     public TypeInstance StackArrayOf { get; }
 
-    public TypeInstanceStackArray(TypeInstance stackArrayOf, StatementWithValue? sizeValue)
+    public TypeInstanceStackArray(TypeInstance stackArrayOf, StatementWithValue? sizeValue, Uri file) : base(file)
     {
         StackArrayOf = stackArrayOf;
         StackArraySize = sizeValue;
@@ -109,7 +121,7 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
         new Position(FunctionReturnType)
         .Union(FunctionParameterTypes);
 
-    public TypeInstanceFunction(TypeInstance returnType, IEnumerable<TypeInstance> parameters) : base()
+    public TypeInstanceFunction(TypeInstance returnType, IEnumerable<TypeInstance> parameters, Uri file) : base(file)
     {
         FunctionReturnType = returnType;
         FunctionParameterTypes = parameters.ToImmutableArray();
@@ -167,16 +179,14 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>,
     public Token Identifier { get; }
     public ImmutableArray<TypeInstance>? TypeArguments { get; }
     public object? Reference { get; set; }
-    public Uri File { get; }
 
     public override Position Position =>
         new Position(Identifier)
         .Union(TypeArguments);
 
-    public TypeInstanceSimple(Token identifier, Uri file, IEnumerable<TypeInstance>? typeArguments = null)
+    public TypeInstanceSimple(Token identifier, Uri file, IEnumerable<TypeInstance>? typeArguments = null) : base(file)
     {
         Identifier = identifier;
-        File = file;
         TypeArguments = typeArguments?.ToImmutableArray();
     }
 
@@ -270,7 +280,7 @@ public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?
 
     public override Position Position => new(To, Operator);
 
-    public TypeInstancePointer(TypeInstance to, Token @operator)
+    public TypeInstancePointer(TypeInstance to, Token @operator, Uri file) : base(file)
     {
         To = to;
         Operator = @operator;
@@ -295,5 +305,5 @@ public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?
     public override string ToString() => $"{To}{Operator}";
     public override string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments) => $"{To.ToString(typeArguments)}{Operator}";
 
-    public static TypeInstancePointer CreateAnonymous(TypeInstance to) => new(to, Token.CreateAnonymous("*", TokenType.Operator));
+    public static TypeInstancePointer CreateAnonymous(TypeInstance to, Uri file) => new(to, Token.CreateAnonymous("*", TokenType.Operator), file);
 }

@@ -31,7 +31,7 @@ public partial struct CompiledValue :
             RuntimeType.U32 => new CompiledValue((uint)(a.U32 + b.U32)),
             RuntimeType.I32 => new CompiledValue((int)(a.I32 + b.I32)),
             RuntimeType.F32 => new CompiledValue((float)(a.F32 + b.F32)),
-            _ => throw new RuntimeException($"Can't do + operation with type {a_} and {b_}"),
+            _ => throw new RuntimeException($"Can't do + operation with type \"{a_}\" and \"{b_}\""),
         };
     }
     /// <inheritdoc/>
@@ -50,7 +50,7 @@ public partial struct CompiledValue :
             RuntimeType.U32 => new CompiledValue((uint)(a.U32 - b.U32)),
             RuntimeType.I32 => new CompiledValue((int)(a.I32 - b.I32)),
             RuntimeType.F32 => new CompiledValue((float)(a.F32 - b.F32)),
-            _ => throw new RuntimeException($"Can't do - operation with type {a_} and {b_}"),
+            _ => throw new RuntimeException($"Can't do - operation with type \"{a_}\" and \"{b_}\""),
         };
     }
 

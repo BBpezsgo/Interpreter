@@ -30,9 +30,12 @@ public class TokenizerTests
     public void Test01()
     {
         string text = "a";
+        DiagnosticsCollection diagnostics = new();
 
         {
-            ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            diagnostics.Throw();
+
             Position[] positions = new Position[]
             {
                 new(
@@ -47,7 +50,9 @@ public class TokenizerTests
 
         {
             using MemoryStream stream = new(Encoding.ASCII.GetBytes(text));
-            ImmutableArray<Token> tokens = StreamTokenizer.Tokenize(stream, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            ImmutableArray<Token> tokens = StreamTokenizer.Tokenize(stream, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            diagnostics.Throw();
+
             Position[] positions = new Position[]
             {
                 new(
@@ -65,9 +70,12 @@ public class TokenizerTests
     public void Test02()
     {
         string text = "ab";
+        DiagnosticsCollection diagnostics = new();
 
         {
-            ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            diagnostics.Throw();
+
             Position[] positions = new Position[]
             {
                 new(
@@ -82,7 +90,9 @@ public class TokenizerTests
 
         {
             using MemoryStream stream = new(Encoding.ASCII.GetBytes(text));
-            ImmutableArray<Token> tokens = StreamTokenizer.Tokenize(stream, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            ImmutableArray<Token> tokens = StreamTokenizer.Tokenize(stream, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+            diagnostics.Throw();
+
             Position[] positions = new Position[]
             {
                 new(
@@ -100,8 +110,11 @@ public class TokenizerTests
     public void Test03()
     {
         string text = "";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -112,8 +125,11 @@ public class TokenizerTests
     public void Test04()
     {
         string text = string.Empty;
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -124,8 +140,11 @@ public class TokenizerTests
     public void Test05()
     {
         string text = " a";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -142,8 +161,11 @@ public class TokenizerTests
     public void Test06()
     {
         string text = "a\r\n";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -160,8 +182,11 @@ public class TokenizerTests
     public void Test07()
     {
         string text = " \r\n";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -172,8 +197,11 @@ public class TokenizerTests
     public void Test08()
     {
         string text = " a\r\n";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -190,8 +218,11 @@ public class TokenizerTests
     public void Test09()
     {
         string text = "\r\na";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -208,8 +239,11 @@ public class TokenizerTests
     public void Test10()
     {
         string text = "\r\n a";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -226,8 +260,11 @@ public class TokenizerTests
     public void Test11()
     {
         string text = "\r";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -238,8 +275,11 @@ public class TokenizerTests
     public void Test12()
     {
         string text = "\n";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -250,8 +290,11 @@ public class TokenizerTests
     public void Test13()
     {
         string text = " ";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = Array.Empty<Position>();
 
         AssertUtils.PositionEquals(tokens, positions);
@@ -262,8 +305,11 @@ public class TokenizerTests
     public void Test14()
     {
         string text = "\ra";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -280,8 +326,11 @@ public class TokenizerTests
     public void Test15()
     {
         string text = "\r a";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -298,8 +347,11 @@ public class TokenizerTests
     public void Test16()
     {
         string text = "\na";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -316,8 +368,11 @@ public class TokenizerTests
     public void Test17()
     {
         string text = "\n a";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -334,8 +389,11 @@ public class TokenizerTests
     public void Test18()
     {
         string text = @"""""";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -352,8 +410,11 @@ public class TokenizerTests
     public void Test19()
     {
         string text = @"""a""";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -370,8 +431,11 @@ public class TokenizerTests
     public void Test20()
     {
         string text = "'a'";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -388,8 +452,11 @@ public class TokenizerTests
     public void Test21()
     {
         string text = "563";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -406,8 +473,11 @@ public class TokenizerTests
     public void Test22()
     {
         string text = ".563";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -424,8 +494,11 @@ public class TokenizerTests
     public void Test23()
     {
         string text = ".563f";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -442,8 +515,11 @@ public class TokenizerTests
     public void Test24()
     {
         string text = @"""\n""";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -461,8 +537,11 @@ public class TokenizerTests
     public void Test25()
     {
         string text = @"""\u4685""";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -480,8 +559,11 @@ public class TokenizerTests
     public void Test26()
     {
         string text = @"'\n'";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -499,8 +581,11 @@ public class TokenizerTests
     public void Test27()
     {
         string text = @"'\u4685'";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -515,12 +600,15 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(TokenizerException))]
+    [ExpectedException(typeof(Exception), AllowDerivedTypes = true)]
     public void Test28()
     {
         string text = @"'\7'";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -534,12 +622,15 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(TokenizerException))]
+    [ExpectedException(typeof(Exception), AllowDerivedTypes = true)]
     public void Test29()
     {
         string text = "''";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -556,8 +647,11 @@ public class TokenizerTests
     public void Test30()
     {
         string text = "// hello";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -575,8 +669,11 @@ public class TokenizerTests
     public void Test31()
     {
         string text = "// hello\n";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -594,8 +691,11 @@ public class TokenizerTests
     public void Test32()
     {
         string text = "/* hello */";
+        DiagnosticsCollection diagnostics = new();
 
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(text, diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
+
         Position[] positions = new Position[]
         {
             new(
@@ -612,7 +712,10 @@ public class TokenizerTests
     [TestMethod]
     public void Test33()
     {
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(";;", Enumerable.Empty<string>(), settings: Settings).Tokens;
+        DiagnosticsCollection diagnostics = new();
+
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize(";;", diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
 
         Position[] positions = new Position[]
         {
@@ -632,10 +735,13 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(TokenizerException))]
+    [ExpectedException(typeof(Exception), AllowDerivedTypes = true)]
     public void Test34()
     {
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("0x64_4g", Enumerable.Empty<string>(), settings: Settings).Tokens;
+        DiagnosticsCollection diagnostics = new();
+
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("0x64_4g", diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
 
         Position[] positions = new Position[]
         {
@@ -650,10 +756,13 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(TokenizerException))]
+    [ExpectedException(typeof(Exception), AllowDerivedTypes = true)]
     public void Test35()
     {
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("\"\\ubruh\"", Enumerable.Empty<string>(), settings: Settings).Tokens;
+        DiagnosticsCollection diagnostics = new();
+
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("\"\\ubruh\"", diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
 
         Position[] positions = new Position[]
         {
@@ -668,10 +777,13 @@ public class TokenizerTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(TokenizerException))]
+    [ExpectedException(typeof(Exception), AllowDerivedTypes = true)]
     public void Test36()
     {
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("\'\\ubruh\'", Enumerable.Empty<string>(), settings: Settings).Tokens;
+        DiagnosticsCollection diagnostics = new();
+
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("\'\\ubruh\'", diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
 
         Position[] positions = new Position[]
         {
@@ -688,7 +800,10 @@ public class TokenizerTests
     [TestMethod]
     public void Test37()
     {
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/=", Enumerable.Empty<string>(), settings: Settings).Tokens;
+        DiagnosticsCollection diagnostics = new();
+
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/=", diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
 
         Position[] positions = new Position[]
         {
@@ -705,7 +820,10 @@ public class TokenizerTests
     [TestMethod]
     public void Test38()
     {
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/**/", Enumerable.Empty<string>(), settings: Settings).Tokens;
+        DiagnosticsCollection diagnostics = new();
+
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/**/", diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
 
         Position[] positions = new Position[]
         {
@@ -722,7 +840,10 @@ public class TokenizerTests
     [TestMethod]
     public void Test39()
     {
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/-", Enumerable.Empty<string>(), settings: Settings).Tokens;
+        DiagnosticsCollection diagnostics = new();
+
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/-", diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
 
         Position[] positions = new Position[]
         {
@@ -743,7 +864,10 @@ public class TokenizerTests
     [TestMethod, Ignore("I'm tired")]
     public void Test40()
     {
-        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/***/", Enumerable.Empty<string>(), settings: Settings).Tokens;
+        DiagnosticsCollection diagnostics = new();
+
+        ImmutableArray<Token> tokens = StringTokenizer.Tokenize("/***/", diagnostics, Enumerable.Empty<string>(), settings: Settings).Tokens;
+        diagnostics.Throw();
 
         Position[] positions = new Position[]
         {
@@ -764,7 +888,10 @@ public class TokenTests
     [TestMethod]
     public void Test01()
     {
-        Token token = StringTokenizer.Tokenize("ab", Enumerable.Empty<string>()).Tokens[0];
+        DiagnosticsCollection diagnostics = new();
+
+        Token token = StringTokenizer.Tokenize("ab", diagnostics, Enumerable.Empty<string>()).Tokens[0];
+        diagnostics.Throw();
 
         (Token? a, Token? b) = token.Slice(1);
 
@@ -784,7 +911,10 @@ public class TokenTests
     [TestMethod]
     public void Test02()
     {
-        Token token = StringTokenizer.Tokenize("a", Enumerable.Empty<string>()).Tokens[0];
+        DiagnosticsCollection diagnostics = new();
+
+        Token token = StringTokenizer.Tokenize("a", diagnostics, Enumerable.Empty<string>()).Tokens[0];
+        diagnostics.Throw();
 
         (Token? a, Token? b) = token.Slice(1);
 
@@ -812,7 +942,10 @@ public class TokenTests
     [TestMethod]
     public void Test04()
     {
-        Token token = StringTokenizer.Tokenize("abcd", Enumerable.Empty<string>()).Tokens[0];
+        DiagnosticsCollection diagnostics = new();
+
+        Token token = StringTokenizer.Tokenize("abcd", diagnostics, Enumerable.Empty<string>()).Tokens[0];
+        diagnostics.Throw();
 
         (Token? a, Token? b) = token.Slice(2);
 
@@ -832,7 +965,10 @@ public class TokenTests
     [TestMethod]
     public void Test05()
     {
-        Token token = StringTokenizer.Tokenize("abc", Enumerable.Empty<string>()).Tokens[0];
+        DiagnosticsCollection diagnostics = new();
+
+        Token token = StringTokenizer.Tokenize("abc", diagnostics, Enumerable.Empty<string>()).Tokens[0];
+        diagnostics.Throw();
 
         (Token? a, Token? b) = token.Slice(1);
 
@@ -852,13 +988,19 @@ public class TokenTests
     [TestMethod]
     public void Test06()
     {
-        Token token = StringTokenizer.Tokenize("0x545fadf3", Enumerable.Empty<string>()).Tokens[0];
+        DiagnosticsCollection diagnostics = new();
+
+        _ = StringTokenizer.Tokenize("0x545fadf3", diagnostics, Enumerable.Empty<string>()).Tokens[0];
+        diagnostics.Throw();
     }
 
     [TestMethod]
     public void Test07()
     {
-        Token token = StringTokenizer.Tokenize("abc", Enumerable.Empty<string>()).Tokens[0];
+        DiagnosticsCollection diagnostics = new();
+
+        Token token = StringTokenizer.Tokenize("abc", diagnostics, Enumerable.Empty<string>()).Tokens[0];
+        diagnostics.Throw();
 
         (Token? a, Token? b) = token.Slice(3);
 

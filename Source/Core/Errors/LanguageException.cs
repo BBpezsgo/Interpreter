@@ -1,28 +1,58 @@
 ﻿namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
-public class LanguageException : Exception, IDiagnostic
+public class LanguageException : Exception
 {
     public Position Position { get; protected set; }
     public Uri? File { get; protected set; }
 
-    public LanguageException(string message, Position position, Uri? uri) : base(message)
+    public LanguageException(string message, Position position, Uri? file) : base(message)
     {
         Position = position;
-        File = uri;
+        File = file;
     }
 
     public override string ToString()
     {
-        StringBuilder result = new(Message);
-
-        result.Append(Position.ToStringCool().Surround(" (at ", ")"));
-
-        if (File != null)
-        { result.Append($" (in {File})"); }
+        StringBuilder result = new(LanguageException.Format(Message, Position, File));
 
         if (InnerException != null)
         { result.Append($" {InnerException}"); }
+
+        return result.ToString();
+    }
+
+    public static string Format(string message, Location location)
+        => LanguageException.Format(message, location.Position, location.File);
+
+    public static string Format(string? message, Position position, Uri? file)
+    {
+        StringBuilder result = new();
+        if (!string.IsNullOrEmpty(message))
+        {
+            result.Append(message);
+        }
+
+        if (file is not null)
+        {
+            if (result.Length > 0) result.Append(' ');
+            result.Append("(at ");
+            result.Append(file);
+
+            if (position.Range.Start.Line >= 0)
+            {
+                result.Append(':');
+                result.Append(position.Range.Start.Line + 1);
+
+                if (position.Range.Start.Character >= 0)
+                {
+                    result.Append(':');
+                    result.Append(position.Range.Start.Character + 1);
+                }
+            }
+
+            result.Append(')');
+        }
 
         return result.ToString();
     }
@@ -113,4 +143,7 @@ public class LanguageException : Exception, IDiagnostic
         result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
         return result.ToString();
     }
+
+    public static explicit operator Diagnostic(LanguageException exception)
+        => new(DiagnosticsLevel.Error, exception.Message, exception.Position, exception.File);
 }

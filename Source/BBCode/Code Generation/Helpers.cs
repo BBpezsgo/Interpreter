@@ -70,6 +70,125 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Memory Helpers
 
+    bool GetAddress(StatementWithValue value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error) => value switch
+    {
+        IndexCall v => GetAddress(v, out address, out error),
+        Identifier v => GetAddress(v, out address, out error),
+        Field v => GetAddress(v, out address, out error),
+        _ => throw new NotImplementedException()
+    };
+    bool GetAddress(Identifier variable, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        address = null;
+        error = null;
+
+        if (GetConstant(variable.Content, variable.File, out _, out _))
+        {
+            error = new PossibleDiagnostic($"Constant does not have a memory address");
+            return false;
+        }
+
+        if (GetParameter(variable.Content, out CompiledParameter? parameter))
+        {
+            address = GetParameterAddress(parameter);
+            return true;
+        }
+
+        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+        {
+            address = GetLocalVariableAddress(localVariable);
+            return true;
+        }
+
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? constantNotFoundError))
+        {
+            address = GetGlobalVariableAddress(globalVariable);
+            return true;
+        }
+
+        error = new PossibleDiagnostic($"Local symbol \"{variable.Content}\" not found");
+        return false;
+    }
+    bool GetAddress(Field field, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        address = default;
+
+        GeneralType prevType = FindStatementType(field.PrevStatement);
+        StructType? @struct;
+        Address? baseAddress;
+
+        if (prevType.Is(out PointerType? prevPointerType))
+        {
+            if (!prevPointerType.To.Is(out @struct))
+            {
+                error = new PossibleDiagnostic($"Multiple dereference is not supported at the moment", field.PrevStatement);
+                return false;
+            }
+
+            baseAddress = new AddressRuntimePointer(field.PrevStatement);
+        }
+        else if (!prevType.Is(out @struct))
+        {
+            error = new PossibleDiagnostic($"This is not a struct", field.PrevStatement);
+            return false;
+        }
+        else if (!GetAddress(field.PrevStatement, out baseAddress, out error))
+        {
+            return false;
+        }
+
+        if (!@struct.GetField(field.Identifier.Content, this, out _, out int fieldOffset, out error))
+        {
+            return false;
+        }
+
+        address = new AddressOffset(baseAddress, fieldOffset);
+        return true;
+    }
+    bool GetAddress(IndexCall indexCall, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        error = default;
+        address = default;
+
+        GeneralType prevType = FindStatementType(indexCall.PrevStatement);
+        ArrayType? array;
+        Address? baseAddress;
+
+        if (prevType.Is(out PointerType? prevPointerType))
+        {
+            if (!prevPointerType.To.Is(out array))
+            {
+                error = new PossibleDiagnostic($"Multiple dereference is not supported at the moment", indexCall.PrevStatement);
+                return false;
+            }
+
+            baseAddress = new AddressRuntimePointer(indexCall.PrevStatement);
+        }
+        else if (!prevType.Is(out array))
+        {
+            error = new PossibleDiagnostic($"Can't index a non-array type", indexCall.PrevStatement);
+            return false;
+        }
+        else if (!GetAddress(indexCall.PrevStatement, out baseAddress, out error))
+        {
+            return false;
+        }
+
+        int elementSize = array.Of.GetSize(this, Diagnostics, indexCall);
+
+        if (TryCompute(indexCall.Index, out CompiledValue index))
+        {
+            int offset = (int)index * array.Of.GetSize(this, Diagnostics, indexCall);
+            address = new AddressOffset(baseAddress, offset);
+            return true;
+        }
+        else
+        {
+            address = new AddressRuntimeIndex(baseAddress, indexCall.Index, elementSize);
+            return true;
+        }
+    }
+
     bool GetDataAddress(StatementWithValue value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error) => value switch
     {
         IndexCall v => GetDataAddress(v, out address, out error),
@@ -223,7 +342,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     AddressOffset GetGlobalVariableAddress(CompiledVariable variable)
         => new(
-            new AddressRuntimePointer(AbsoluteGlobalAddress),
+            new AddressPointer(AbsoluteGlobalAddress),
             0
             + variable.MemoryAddress
             + ((
@@ -442,6 +561,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { Push(new CompiledValue((byte)0)); }
     }
 
+    void PopTo(Address address, int size)
+    {
+        switch (address)
+        {
+            case AddressOffset v: PopTo(v, size); break;
+            case AddressPointer v: PopTo(v, size); break;
+            case AddressRegisterPointer v: PopTo(v, size); break;
+            case AddressRuntimePointer v: PopTo(v, size); break;
+            case AddressRuntimeIndex v: PopTo(v, size); break;
+            default: throw new NotImplementedException();
+        }
+    }
+
     void PopTo(InstructionOperand destination, BitWidth size)
     {
         if (PointerBitWidth == BitWidth._64 &&
@@ -478,7 +610,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         switch (address.Base)
         {
-            case AddressRuntimePointer addressPointer:
+            case AddressPointer addressPointer:
             {
                 PushFrom(addressPointer.PointerAddress, PointerSize);
                 using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -504,11 +636,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             default:
-                throw new NotImplementedException();
+            {
+                GenerateAddressResolver(address);
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    PopTo(reg.Get(PointerBitWidth));
+                    PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+                }
+                break;
+            }
         }
     }
 
-    void PopTo(AddressRuntimePointer address, int size)
+    void PopTo(AddressPointer address, int size)
     {
         PushFrom(address.PointerAddress, PointerSize);
         using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -546,30 +686,40 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PopTo(Address address, int size)
+    void PopTo(AddressRuntimePointer address, int size)
+    {
+        GenerateAddressResolver(address);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            PopTo(reg.Get(PointerBitWidth));
+            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+        }
+    }
+
+    void PopTo(AddressRuntimeIndex address, int size)
+    {
+        AddComment($"Resolver address {{");
+        GenerateAddressResolver(address);
+        AddComment($"}}");
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            AddComment($"Pop address:");
+            PopTo(reg.Get(PointerBitWidth));
+            AddComment($"Pop value:");
+            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+        }
+    }
+
+    void PushFrom(Address address, int size)
     {
         switch (address)
         {
-            case AddressOffset addressOffset:
-            {
-                PopTo(addressOffset, size);
-                break;
-            }
-
-            case AddressRuntimePointer runtimePointer:
-            {
-                PopTo(runtimePointer, size);
-                break;
-            }
-
-            case AddressRegisterPointer registerPointer:
-            {
-                PopTo(registerPointer, size);
-                break;
-            }
-
-            default:
-                throw new NotImplementedException();
+            case AddressOffset v: PushFrom(v, size); break;
+            case AddressPointer v: PushFrom(v, size); break;
+            case AddressRegisterPointer v: PushFrom(v, size); break;
+            case AddressRuntimePointer v: PushFrom(v, size); break;
+            case AddressRuntimeIndex v: PushFrom(v, size); break;
+            default: throw new NotImplementedException();
         }
     }
 
@@ -577,7 +727,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         switch (address.Base)
         {
-            case AddressRuntimePointer addressPointer:
+            case AddressPointer addressPointer:
             {
                 PushFrom(addressPointer.PointerAddress, PointerSize);
                 using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -626,11 +776,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             default:
-                throw new NotImplementedException();
+            {
+                GenerateAddressResolver(address);
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    PopTo(reg.Get(PointerBitWidth));
+                    PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+                }
+                break;
+            }
         }
     }
 
-    void PushFrom(AddressRuntimePointer address, int size)
+    void PushFrom(AddressPointer address, int size)
     {
         PushFrom(address.PointerAddress, PointerSize);
         using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -679,29 +837,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PushFrom(Address address, int size)
+    void PushFrom(AddressRuntimePointer address, int size)
     {
-        switch (address)
+        GenerateAddressResolver(address);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            case AddressOffset addressOffset:
-            {
-                PushFrom(addressOffset, size);
-                break;
-            }
-            case AddressRuntimePointer runtimePointer:
-            {
-                PushFrom(runtimePointer, size);
-                break;
-            }
+            PopTo(reg.Get(PointerBitWidth));
+            PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+        }
+    }
 
-            case AddressRegisterPointer registerPointer:
-            {
-                PushFrom(registerPointer, size);
-                break;
-            }
-
-            default:
-                throw new NotImplementedException();
+    void PushFrom(AddressRuntimeIndex address, int size)
+    {
+        GenerateAddressResolver(address);
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            PopTo(reg.Get(PointerBitWidth));
+            PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
         }
     }
 
@@ -718,7 +870,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void CheckPointerNull(Position position, Uri file, bool preservePointer = true)
+    void CheckPointerNull(Location location, bool preservePointer = true)
     {
         if (!Settings.CheckNullPointers)
         {
@@ -740,7 +892,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int jumpInstruction = GeneratedCode.Count - 1;
 
-        GenerateCodeForLiteralString("null pointer", position, file, false);
+        GenerateCodeForLiteralString("null pointer", location, false);
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(PointerBitWidth));
@@ -751,32 +903,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment($"}}");
     }
 
-    void HeapLoad(StatementWithValue pointer, int offset, int size)
+    void PushFrom(Address address, int size, Location location)
     {
-        if (!FindStatementType(pointer).Is<PointerType>())
-        {
-            if (pointer is not Identifier identifier ||
-                !GetParameter(identifier.Content, out CompiledParameter? parameter) ||
-                !parameter.IsRef)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", pointer));
-                return;
-            }
-        }
+        GenerateAddressResolver(address);
 
-        GenerateCodeForStatement(pointer, resolveReference: false);
-
-        CheckPointerNull(pointer.Position, pointer.File);
+        CheckPointerNull(location);
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(PointerBitWidth));
             for (int i = size - 1; i >= 0; i--)
-            { Push(reg.Get(PointerBitWidth).ToPtr(i + offset, BitWidth._8)); }
+            { Push(reg.Get(PointerBitWidth).ToPtr(i, BitWidth._8)); }
         }
     }
 
-    void HeapStore(StatementWithValue pointer, int offset, int size)
+    void PopTo(StatementWithValue pointer, int offset, int size)
     {
         if (!FindStatementType(pointer).Is<PointerType>())
         {
@@ -786,12 +927,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GenerateCodeForStatement(pointer, resolveReference: false);
 
-        CheckPointerNull(pointer.Position, pointer.File);
+        CheckPointerNull(pointer.Location);
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(PointerBitWidth));
             PopTo(new AddressOffset(new AddressRegisterPointer(reg.Get(PointerBitWidth)), offset), size);
+        }
+    }
+
+    void PopTo(Address address, int size, Location location)
+    {
+        GenerateAddressResolver(address);
+        CheckPointerNull(location);
+
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            PopTo(reg.Get(PointerBitWidth));
+            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
         }
     }
 
@@ -828,7 +981,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         new AddressRegisterPointer(Register.StackPointer),
         0);
     public Address ExitCodeAddress => new AddressOffset(
-        new AddressRuntimePointer(AbsoluteGlobalAddress),
+        new AddressPointer(AbsoluteGlobalAddress),
         0);
 
     public int ReturnFlagOffset => ReturnFlagType.GetSize(this) * BytecodeProcessor.StackDirection;

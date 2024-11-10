@@ -58,13 +58,13 @@ public class Diagnostic :
     public static Diagnostic Error(string message, IPositioned position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position.Position, file, @break);
 
-    public static Diagnostic Warning(string message, IPositioned position, Uri? file, bool @break = true)
+    public static Diagnostic Warning(string message, IPositioned position, Uri? file, bool @break = false)
         => new(DiagnosticsLevel.Warning, message, position.Position, file, @break);
 
-    public static Diagnostic Information(string message, IPositioned position, Uri? file, bool @break = true)
+    public static Diagnostic Information(string message, IPositioned position, Uri? file, bool @break = false)
         => new(DiagnosticsLevel.Information, message, position.Position, file, @break);
 
-    public static Diagnostic Hint(string message, IPositioned position, Uri? file, bool @break = true)
+    public static Diagnostic Hint(string message, IPositioned position, Uri? file, bool @break = false)
         => new(DiagnosticsLevel.Hint, message, position.Position, file, @break);
 
     public static Diagnostic Internal(string message, Position position, Uri? file, bool @break = true)
@@ -76,13 +76,13 @@ public class Diagnostic :
     public static Diagnostic Error(string message, Position position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position, file, @break);
 
-    public static Diagnostic Warning(string message, Position position, Uri? file, bool @break = true)
+    public static Diagnostic Warning(string message, Position position, Uri? file, bool @break = false)
         => new(DiagnosticsLevel.Warning, message, position, file, @break);
 
-    public static Diagnostic Information(string message, Position position, Uri? file, bool @break = true)
+    public static Diagnostic Information(string message, Position position, Uri? file, bool @break = false)
         => new(DiagnosticsLevel.Information, message, position, file, @break);
 
-    public static Diagnostic Hint(string message, Position position, Uri? file, bool @break = true)
+    public static Diagnostic Hint(string message, Position position, Uri? file, bool @break = false)
         => new(DiagnosticsLevel.Hint, message, position, file, @break);
 
     public static Diagnostic Internal(string message, Position? position, Uri? file, bool @break = true)
@@ -91,13 +91,13 @@ public class Diagnostic :
     public static Diagnostic Error(string message, Position? position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position ?? Position.UnknownPosition, file, @break);
 
-    public static Diagnostic Warning(string message, Position? position, Uri? file, bool @break = true)
+    public static Diagnostic Warning(string message, Position? position, Uri? file, bool @break = false)
         => new(DiagnosticsLevel.Warning, message, position ?? Position.UnknownPosition, file, @break);
 
-    public static Diagnostic Information(string message, Position? position, Uri? file, bool @break = true)
+    public static Diagnostic Information(string message, Position? position, Uri? file, bool @break = false)
         => new(DiagnosticsLevel.Information, message, position ?? Position.UnknownPosition, file, @break);
 
-    public static Diagnostic Hint(string message, Position? position, Uri? file, bool @break = true)
+    public static Diagnostic Hint(string message, Position? position, Uri? file, bool @break = false)
         => new(DiagnosticsLevel.Hint, message, position ?? Position.UnknownPosition, file, @break);
 
     public static Diagnostic Internal(string message, ILocated location, bool @break = true)
@@ -109,13 +109,13 @@ public class Diagnostic :
     public static Diagnostic Error(string message, ILocated location, bool @break = true)
         => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break);
 
-    public static Diagnostic Warning(string message, ILocated location, bool @break = true)
+    public static Diagnostic Warning(string message, ILocated location, bool @break = false)
         => new(DiagnosticsLevel.Warning, message, location.Location.Position, location.Location.File, @break);
 
-    public static Diagnostic Information(string message, ILocated location, bool @break = true)
+    public static Diagnostic Information(string message, ILocated location, bool @break = false)
         => new(DiagnosticsLevel.Information, message, location.Location.Position, location.Location.File, @break);
 
-    public static Diagnostic Hint(string message, ILocated location, bool @break = true)
+    public static Diagnostic Hint(string message, ILocated location, bool @break = false)
         => new(DiagnosticsLevel.Hint, message, location.Location.Position, location.Location.File, @break);
 
     public Diagnostic Break()

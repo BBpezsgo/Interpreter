@@ -5,14 +5,14 @@ temp List<int> yeah = new List<int>(8);
 
 void Bruh(int index, int value)
 {
-    (&yeah)[index] = (&yeah)[index] + value;
+    (&yeah)[index] += value;
 }
 
 void Bruh2()
 {
     for (int i = 0; i < (&yeah).Length(); i++)
     {
-        (&yeah)[i] = (&yeah)[i] + 1;
+        (&yeah)[i] += 1;
         if ((&yeah)[i] == 82) { break; }
     }
 }

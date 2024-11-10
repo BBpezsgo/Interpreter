@@ -40,11 +40,11 @@ public class AddressOffset : Address
     };
 }
 
-public class AddressRuntimePointer : Address
+public class AddressPointer : Address
 {
     public Address PointerAddress { get; }
 
-    public AddressRuntimePointer(Address pointerAddress)
+    public AddressPointer(Address pointerAddress)
     {
         PointerAddress = pointerAddress;
     }
@@ -64,6 +64,36 @@ public class AddressRegisterPointer : Address
 
     [ExcludeFromCodeCoverage]
     public override string ToString() => $"{Register}";
+}
+
+public class AddressRuntimePointer : Address
+{
+    public StatementWithValue PointerValue { get; }
+
+    public AddressRuntimePointer(StatementWithValue pointerValue)
+    {
+        PointerValue = pointerValue;
+    }
+
+    [ExcludeFromCodeCoverage]
+    public override string ToString() => $"*[{PointerValue}]";
+}
+
+public class AddressRuntimeIndex : Address
+{
+    public Address Base { get; }
+    public StatementWithValue IndexValue { get; }
+    public int ElementSize { get; }
+
+    public AddressRuntimeIndex(Address @base, StatementWithValue indexValue, int elementSize)
+    {
+        Base = @base;
+        IndexValue = indexValue;
+        ElementSize = elementSize;
+    }
+
+    [ExcludeFromCodeCoverage]
+    public override string ToString() => $"({Base} + {IndexValue} * {ElementSize})";
 }
 
 readonly struct UndefinedOffset<TFunction>

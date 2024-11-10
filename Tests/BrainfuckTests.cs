@@ -3,7 +3,7 @@
 [TestClass, TestCategory("Brainfuck"), TestCategory("FileTest")]
 public class BrainfuckFileTests
 {
-    const int Timeout = 10000 * 1000;
+    const int Timeout = 10 * 1000;
     const int LongTimeout = 30 * 1000;
 
     [TestMethod, Timeout(Timeout)] public void Test01() => Utils.GetTest(01).DoBrainfuck();
@@ -91,13 +91,13 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout), Ignore("i32 not supported")] public void Test83() => Utils.GetTest(83).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Floats not supported")] public void Test84() => Utils.GetTest(84).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test85() => Utils.GetTest(85).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test86() => Utils.GetTest(86).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test87() => Utils.GetTest(87).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test88() => Utils.GetTest(88).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test89() => Utils.GetTest(89).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test90() => Utils.GetTest(90).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test91() => Utils.GetTest(91).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test92() => Utils.GetTest(92).DoBrainfuck();
+    [TestMethod, Timeout(Timeout), Ignore("Floats not supported")] public void Test86() => Utils.GetTest(86).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test87() => Utils.GetTest(87).DoBrainfuck();
+    [TestMethod, Timeout(Timeout), Ignore("Stack pointers not supported")] public void Test88() => Utils.GetTest(88).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test89() => Utils.GetTest(89).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test90() => Utils.GetTest(90).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test91() => Utils.GetTest(91).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test92() => Utils.GetTest(92).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test93() => Utils.GetTest(93).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test94() => Utils.GetTest(94).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test95() => Utils.GetTest(95).DoBrainfuck();

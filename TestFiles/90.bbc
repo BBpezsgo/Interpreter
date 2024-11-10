@@ -4,7 +4,7 @@ int[5] yeah;
 
 void Modify(int[]* ptr, int index, int value)
 {
-    ptr[index] = ptr[index] + value;
+    ptr[index] += value;
 }
 
 void Bruh()

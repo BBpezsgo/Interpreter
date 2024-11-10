@@ -266,6 +266,14 @@ public readonly struct InstructionOperand
         AddressOffset addressOffset => (InstructionOperand)addressOffset,
         _ => throw new NotImplementedException()
     };
+
+    public static bool operator ==(InstructionOperand a, InstructionOperand b) =>
+        a.Type == b.Type &&
+        a.Value == b.Value;
+
+    public static bool operator !=(InstructionOperand a, InstructionOperand b) =>
+        a.Type != b.Type ||
+        a.Value != b.Value;
 }
 
 [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]

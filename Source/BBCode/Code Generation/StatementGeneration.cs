@@ -17,7 +17,50 @@ public partial class CodeGeneratorForMain : CodeGenerator
 {
     #region AddInstruction()
 
-    void AddInstruction(PreparationInstruction instruction) => GeneratedCode.Add(instruction);
+    void AddInstruction(PreparationInstruction instruction)
+    {
+        if (!Settings.DontOptimize)
+        {
+            if ((instruction.Opcode is
+                Opcode.Jump or
+                Opcode.JumpIfEqual or
+                Opcode.JumpIfGreater or
+                Opcode.JumpIfGreaterOrEqual or
+                Opcode.JumpIfLess or
+                Opcode.JumpIfLessOrEqual or
+                Opcode.JumpIfNotEqual) &&
+                instruction.Operand1 == 1)
+            { return; }
+
+            if ((instruction.Opcode is
+                Opcode.MathAdd or
+                Opcode.MathSub) &&
+                instruction.Operand2 == 0)
+            { return; }
+        }
+
+        // if (GeneratedCode.Count > 0)
+        // {
+        //     PreparationInstruction last = GeneratedCode[^1];
+        //     if (last.Opcode == Opcode.Move &&
+        //         instruction.Opcode == Opcode.Push)
+        //     {
+        //         if (instruction.Operand1.Type == InstructionOperandType.PointerEAX32 &&
+        //             last.Operand1 == Register.EAX &&
+        //             last.Operand2 == Register.BasePointer)
+        //         {
+        //             GeneratedCode[^1] = new(
+        //                 instruction.Opcode,
+        //                 new(instruction.Operand1.Value, InstructionOperandType.PointerBP32)
+        //             );
+        //             return;
+        //         }
+        //         // Debugger.Break();
+        //     }
+        // }
+
+        GeneratedCode.Add(instruction);
+    }
 
     void AddInstruction(
         Opcode opcode)
@@ -1086,11 +1129,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             bool isFloat = leftType.SameAs(BasicType.F32) || rightType.SameAs(BasicType.F32);
-            // bool isUnsigned = false;
-            // if (!isFloat)
-            // {
-            //     isUnsigned = leftNType == NumericType.UnsignedInteger && rightNType == NumericType.UnsignedInteger;
-            // }
 
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
             using (RegisterUsage.Auto regRight = Registers.GetFree())
@@ -1418,12 +1456,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     arrayType.Of.SameAs(BasicType.U8))
                 {
                     OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.U8, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal, literal.File), literal.Value.Length + 1)));
-                    GenerateCodeForLiteralString(literal.Value, literal.Position, literal.File, true);
+                    GenerateCodeForLiteralString(literal.Value, literal.Location, true);
                 }
                 else
                 {
                     OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal, literal.File), literal.Value.Length + 1)));
-                    GenerateCodeForLiteralString(literal.Value, literal.Position, literal.File, false);
+                    GenerateCodeForLiteralString(literal.Value, literal.Location, false);
                 }
                 break;
             }
@@ -1504,7 +1542,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void GenerateCodeForLiteralString(string literal, Position position, Uri file, bool withBytes)
+    void GenerateCodeForLiteralString(string literal, Location location, bool withBytes)
     {
         BuiltinType type = withBytes ? BuiltinType.U8 : BuiltinType.Char;
 
@@ -1512,7 +1550,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Allocate String object {");
 
-        GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Length) * type.GetSize(this), position, file));
+        GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Length) * type.GetSize(this), location.Position, location.File));
 
         AddComment("}");
 
@@ -1571,7 +1609,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Address address = GetParameterAddress(param);
 
             if (param.IsRef && resolveReference)
-            { address = new AddressRuntimePointer(address); }
+            { address = new AddressPointer(address); }
 
             PushFrom(address, param.Type.GetSize(this, Diagnostics, param));
 
@@ -2052,7 +2090,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GenerateCodeForStatement(field.PrevStatement);
 
-            CheckPointerNull(field.PrevStatement.Position, field.PrevStatement.File);
+            CheckPointerNull(field.PrevStatement.Location);
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
@@ -2107,12 +2145,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            if (!GetDataOffset(field, out int offset, out PossibleDiagnostic? error, dereference))
+            if (!GetAddress(field, out Address? address, out PossibleDiagnostic? error))
             {
                 Diagnostics.Add(error.ToError(field));
                 return;
             }
-            HeapLoad(dereference, offset, type.GetSize(this, Diagnostics, field));
+            PushFrom(address, type.GetSize(this, Diagnostics, field), dereference.Location);
         }
     }
     void GenerateCodeForStatement(IndexCall index)
@@ -2209,36 +2247,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (prevType.Is(out PointerType? pointerType) && pointerType.To.Is(out arrayType))
         {
-            GenerateCodeForStatement(index.PrevStatement);
-
-            if (!indexType.Is<BuiltinType>())
+            int elementSize = arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement);
+            if (!GetAddress(index, out Address? _address, out PossibleDiagnostic? _error))
             {
-                Diagnostics.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"i32\") and not \"{indexType}\"", index.Index));
+                Diagnostics.Add(_error.ToError(index));
                 return;
             }
-
-            GenerateCodeForStatement(index.Index);
-
-            using (RegisterUsage.Auto regIndex = Registers.GetFree())
-            {
-                PopTo(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
-                AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)), arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement));
-
-                using (RegisterUsage.Auto regPtr = Registers.GetFree())
-                {
-                    PopTo(regPtr.Get(PointerBitWidth));
-                    AddInstruction(Opcode.MathAdd, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)), regPtr.Get(PointerBitWidth));
-                }
-
-                Push(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
-
-                CheckPointerNull(index.Position, index.File);
-
-                PopTo(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
-
-                PushFrom(new AddressRegisterPointer(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index))), arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement));
-            }
-
+            PushFrom(_address, elementSize);
             return;
         }
 
@@ -2249,7 +2264,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         switch (address)
         {
-            case AddressRuntimePointer runtimePointer:
+            case AddressPointer runtimePointer:
             {
                 PushFrom(runtimePointer.PointerAddress, PointerSize);
                 break;
@@ -2261,13 +2276,47 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             case AddressOffset addressOffset:
             {
+                GenerateAddressResolver(addressOffset.Base);
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    GenerateAddressResolver(addressOffset.Base);
                     PopTo(reg.Get(PointerBitWidth));
                     AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), addressOffset.Offset);
                     Push(reg.Get(PointerBitWidth));
                 }
+                break;
+            }
+            case AddressRuntimePointer runtimePointer:
+            {
+                GenerateCodeForStatement(runtimePointer.PointerValue);
+                CheckPointerNull(runtimePointer.PointerValue.Location);
+                break;
+            }
+            case AddressRuntimeIndex runtimeIndex:
+            {
+                GenerateAddressResolver(runtimeIndex.Base);
+
+                GeneralType indexType = FindStatementType(runtimeIndex.IndexValue);
+
+                if (!indexType.Is<BuiltinType>())
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"int\") and not \"{indexType}\"", runtimeIndex.IndexValue));
+                    return;
+                }
+
+                GenerateCodeForStatement(runtimeIndex.IndexValue);
+
+                using (RegisterUsage.Auto regIndex = Registers.GetFree())
+                {
+                    PopTo(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)));
+                    AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)), runtimeIndex.ElementSize);
+                    using (RegisterUsage.Auto regBase = Registers.GetFree())
+                    {
+                        PopTo(regBase.Get(PointerBitWidth));
+                        AddInstruction(Opcode.MathAdd, regBase.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)));
+                        Push(regBase.Get(PointerBitWidth));
+                    }
+                }
+
                 break;
             }
             default: throw new NotImplementedException();
@@ -2588,7 +2637,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Address address = GetParameterAddress(parameter);
 
             if (parameter.IsRef)
-            { address = new AddressRuntimePointer(address); }
+            { address = new AddressPointer(address); }
 
             PopTo(address, parameter.Type.GetSize(this, Diagnostics, statementToSet));
         }
@@ -2653,7 +2702,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             fieldDefinition.References.AddReference(statementToSet);
 
             GenerateCodeForStatement(value, type);
-            HeapStore(statementToSet.PrevStatement, fieldOffset, valueType.GetSize(this, Diagnostics, value));
+            PopTo(statementToSet.PrevStatement, fieldOffset, valueType.GetSize(this, Diagnostics, value));
             return;
         }
 
@@ -2668,21 +2717,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (dereference is null)
         {
-            if (!GetDataAddress(statementToSet, out Address? offset, out PossibleDiagnostic? error))
+            if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error2))
             {
-                Diagnostics.Add(error.ToError(statementToSet));
+                Diagnostics.Add(error2.ToError(statementToSet));
                 return;
             }
-            PopTo(offset, valueType.GetSize(this, Diagnostics, value));
+            PopTo(address, valueType.GetSize(this, Diagnostics, value));
         }
         else
         {
-            if (!GetDataOffset(statementToSet, out int offset, out PossibleDiagnostic? error, dereference))
+            if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error))
             {
                 Diagnostics.Add(error.ToError(statementToSet));
                 return;
             }
-            HeapStore(dereference, offset, valueType.GetSize(this, Diagnostics, value));
+            PopTo(address, valueType.GetSize(this, Diagnostics, value), dereference.Location);
         }
     }
     void GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value)
@@ -2703,114 +2752,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (prevType.Is(out ArrayType? arrayType))
+        if (!GetAddress(statementToSet, out Address? _address, out PossibleDiagnostic? _error))
         {
-            if (statementToSet.PrevStatement is not Identifier identifier)
-            { throw new NotSupportedException($"Only variables/parameters supported by now", statementToSet.PrevStatement); }
-
-            if (TryCompute(statementToSet.Index, out CompiledValue computedIndexData))
-            {
-                statementToSet.Index.PredictedValue = computedIndexData;
-
-                if (computedIndexData < 0 || (arrayType.ComputedLength.HasValue && computedIndexData >= arrayType.ComputedLength.Value))
-                { Diagnostics.Add(Diagnostic.Warning($"Index out of range", statementToSet.Index)); }
-
-                GenerateCodeForStatement(value);
-
-                if (GetParameter(identifier.Content, out _))
-                { throw new NotImplementedException(); }
-
-                if (GetVariable(identifier.Content, out CompiledVariable? variable))
-                {
-                    if (!variable.Type.SameAs(arrayType))
-                    { throw new NotImplementedException(); }
-
-                    // TODO: this
-                    // if (!variable.IsInitialized)
-                    // { AnalysisCollection?.Add(Diagnostic.Warning($"U are using the variable \"{variable.Identifier}\" but its aint initialized.", identifier, identifier.File)); }
-
-                    int offset = (int)computedIndexData * arrayType.Of.GetSize(this, Diagnostics, statementToSet);
-                    PopTo(new AddressOffset(GetLocalVariableAddress(variable), offset), arrayType.Of.GetSize(this, Diagnostics, statementToSet));
-                    return;
-                }
-            }
-
-            /*
-            AssignTypeCheck(arrayType.Of, valueType, value);
-
-            GenerateCodeForStatement(value);
-
-            GenerateAddressResolver(GetDataAddress(identifier));
-
-            if (!indexType.Is<BuiltinType>())
-            { Diagnostics.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"i32\") and not \"{indexType}\"", statementToSet.Index, statementToSet.Index.File); }
-
-            GenerateCodeForStatement(statementToSet.Index);
-
-            using (RegisterUsage.Auto regIndex = Registers.GetFree())
-            {
-                PopTo(regIndex.Get(indexType.GetBitWidth(this)));
-                AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this)), arrayType.Of.GetSize(this));
-
-                using (RegisterUsage.Auto regPtr = Registers.GetFree())
-                {
-                    PopTo(regPtr.Get(PointerBitWidth));
-
-                    AddInstruction(Opcode.MathAdd, regPtr.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this)));
-
-                    Push(regPtr.Get(PointerBitWidth));
-
-                    CheckPointerNull(false);
-
-                    PopTo(new AddressRegisterPointer(regPtr.Get(PointerBitWidth)), valueType.GetSize(this));
-                }
-            }
-
-            return;
-            */
-
-            throw new NotImplementedException();
-        }
-
-        if (prevType.Is(out PointerType? pointerType) && pointerType.To.Is(out arrayType))
-        {
-            AssignTypeCheck(arrayType.Of, valueType, value);
-
-            GenerateCodeForStatement(value);
-
-            GenerateCodeForStatement(statementToSet.PrevStatement);
-
-            if (!indexType.Is<BuiltinType>())
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"int\") and not \"{indexType}\"", statementToSet.Index));
-                return;
-            }
-
-            GenerateCodeForStatement(statementToSet.Index);
-
-            using (RegisterUsage.Auto regIndex = Registers.GetFree())
-            {
-                PopTo(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, statementToSet.Index)));
-                AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, statementToSet.Index)), arrayType.Of.GetSize(this, Diagnostics, statementToSet));
-
-                using (RegisterUsage.Auto regPtr = Registers.GetFree())
-                {
-                    PopTo(regPtr.Get(PointerBitWidth));
-
-                    AddInstruction(Opcode.MathAdd, regPtr.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this, Diagnostics, statementToSet.Index)));
-
-                    Push(regPtr.Get(PointerBitWidth));
-
-                    CheckPointerNull(statementToSet.Position, statementToSet.File, false);
-
-                    PopTo(new AddressRegisterPointer(regPtr.Get(PointerBitWidth)), valueType.GetSize(this, Diagnostics, statementToSet));
-                }
-            }
-
+            Diagnostics.Add(_error.ToError(statementToSet));
+            Diagnostics.Add(indexerNotFoundError.ToError(statementToSet));
             return;
         }
-
-        Diagnostics.Add(indexerNotFoundError.ToError(statementToSet));
+        GenerateCodeForStatement(value);
+        PopTo(_address, valueType.GetSize(this, Diagnostics, value));
+        return;
     }
     void GenerateCodeForValueSetter(Pointer statementToSet, StatementWithValue value)
     {

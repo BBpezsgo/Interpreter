@@ -4,7 +4,7 @@ int yeah = 59;
 
 void Modify(int* ptr)
 {
-    *ptr = *ptr + 22;
+    *ptr += 22;
 }
 
 void Bruh()

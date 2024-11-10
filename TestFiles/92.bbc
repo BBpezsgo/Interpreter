@@ -1,0 +1,26 @@
+using System.Console;
+
+struct A
+{
+    int a;
+    int b;
+    B c;
+}
+
+struct B
+{
+    int d;
+    int e;
+}
+
+temp A* _a = new A*;
+
+_a.a = 11;
+_a.b = 22;
+_a.c = new B;
+_a.c.d = 33;
+_a.c.e = 44;
+
+int sum = 0;
+sum += _a.a;
+return sum;

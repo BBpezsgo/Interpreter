@@ -2683,49 +2683,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 int address = Stack.PushVirtual(structType.GetSize(this, Diagnostics, newInstance), newInstance);
 
-                if (!structType.GetFields(this, out ImmutableDictionary<CompiledField, int>? fields, out PossibleDiagnostic? error))
-                {
-                    Diagnostics.Add(error.ToError(newInstance));
-                    break;
-                }
+                int structSize = structType.GetSize(this);
 
-                foreach ((CompiledField field, int offset) in fields)
+                for (int offset = 0; offset < structSize; offset++)
                 {
-                    if (!field.Type.Is(out BuiltinType? builtinType))
-                    { throw new NotSupportedException($"Not supported :(", field.Identifier, field.Context.File); }
-
                     int offsettedAddress = address + offset;
-
-                    switch (builtinType.Type)
-                    {
-                        case BasicType.U8:
-                            Code.SetValue(offsettedAddress, 0);
-                            break;
-                        case BasicType.I8:
-                            Code.SetValue(offsettedAddress, 0);
-                            Diagnostics.Add(Diagnostic.Warning($"Signed bytes not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
-                            break;
-                        case BasicType.Char:
-                            Code.SetValue(offsettedAddress, '\0');
-                            break;
-                        case BasicType.I16:
-                            Code.SetValue(offsettedAddress, 0);
-                            Diagnostics.Add(Diagnostic.Warning($"Shorts not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
-                            break;
-                        case BasicType.U32:
-                            Code.SetValue(offsettedAddress, 0);
-                            Diagnostics.Add(Diagnostic.Warning($"Unsigned integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
-                            break;
-                        case BasicType.I32:
-                            Code.SetValue(offsettedAddress, 0);
-                            Diagnostics.Add(Diagnostic.Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, field.Context.File));
-                            break;
-                        case BasicType.F32:
-                            throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, field.Context.File);
-                        default:
-                            Diagnostics.Add(Diagnostic.Critical($"Unknown field type \"{builtinType}\"", field.Identifier, field.Context.File));
-                            return;
-                    }
+                    Code.SetValue(offsettedAddress, 0);
                 }
 
                 break;
@@ -3369,8 +3332,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (!definedType.Is(out PointerType? pointerType) ||
                     !v.Type.SameAs(pointerType.To))
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{new PointerType(v.Type)}\"", passed));
-                    return;
+                    if (pointerType is not null &&
+                        v.Type.Is(out ArrayType? v1) &&
+                        pointerType.To.Is(out ArrayType? v2) &&
+                        v2.Length is null &&
+                        v1.Length is not null)
+                    { }
+                    else
+                    {
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{new PointerType(v.Type)}\"", passed));
+                        return;
+                    }
                 }
 
                 PointerType parameterType = new(v.Type);

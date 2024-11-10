@@ -118,7 +118,7 @@ public class LanguageException : Exception
             if (prevToken is null)
             { lineBuilder.Append(' ', token.Position.Range.Start.Character); }
             else
-            { lineBuilder.Append(' ', token.Position.Range.Start.Character - lineBuilder.Length); }
+            { lineBuilder.Append(' ', Math.Max(0, token.Position.Range.Start.Character - lineBuilder.Length)); }
 
             lineBuilder.Append(token.ToOriginalString());
 

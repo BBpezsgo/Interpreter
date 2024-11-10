@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=316&f=4&s=136)](#)
-[![](https://img.shields.io/badge/Passing-316-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-4-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-136-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=318&f=4&s=134)](#)
+[![](https://img.shields.io/badge/Passing-318-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-4-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-134-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -95,3 +95,4 @@
 | [90](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/90.bbc) | ✅ | ❌ Standard output isn't what is expected: Expected: "59\r\n81\r\n103\r\n" Actual:   "59\r\n59\r\n59\r\n" |
 | [91](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/91.bbc) | ✅ | ❌ Test 'Test91' exceeded execution timeout period. |
 | [92](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/92.bbc) | ✅ | ❌ Exit code isn't what is expected: Expected: 11 Actual:   33 |
+| [93](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/93.bbc) | ✅ | ✅ |

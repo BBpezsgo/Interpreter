@@ -1,0 +1,42 @@
+using System.Memory;
+
+struct A
+{
+    int a;
+    B b;
+    B* c;
+}
+
+struct B
+{
+    int a;
+}
+
+A*[]* yeah = new A*[2]*;
+
+for (int i = 0; i < 2; i++)
+{
+    yeah[i] = new A*;
+    yeah[i].c = new B*;
+}
+
+int j = 1;
+yeah[j].b.a = 66;
+
+A* bruh = yeah[j];
+
+bruh.b.a += 1;
+
+bruh.c.a = bruh.b.a;
+
+int result = yeah[j].c.a;
+
+for (int i = 0; i < 2; i++)
+{
+    delete yeah[i].c;
+    delete yeah[i];
+}
+
+delete yeah;
+
+return result;

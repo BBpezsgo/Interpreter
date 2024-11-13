@@ -979,7 +979,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         new AddressPointer(AbsoluteGlobalAddress),
         0);
 
-    public int ReturnFlagOffset => ReturnFlagType.GetSize(this) * BytecodeProcessor.StackDirection;
     public int SavedBasePointerOffset => 0 * BytecodeProcessor.StackDirection;
     public int AbsoluteGlobalOffset => ExitCodeType.GetSize(this) * -BytecodeProcessor.StackDirection;
     public int SavedCodePointerOffset => (AbsGlobalAddressSize + CodePointerSize) * -BytecodeProcessor.StackDirection;

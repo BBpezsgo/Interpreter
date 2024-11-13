@@ -29,7 +29,7 @@ export string ToString(this u8 number)
     int i = numberLength - 2;
 	while (v > 0)
 	{
-        u8 rem = v % 10;
+        u8 rem = v % (u8)10;
         result[i] = ((char)rem) + '0';
 		v = v / 10;
         i--;
@@ -106,7 +106,7 @@ export inline byte ParseByte(temp string v)
     if (v.IsNullOrEmpty())
     { return (byte)0; }
 
-    byte result = 0;
+    byte result = (byte)0;
     
     for (int i = 0; v[i]; i++)
     {

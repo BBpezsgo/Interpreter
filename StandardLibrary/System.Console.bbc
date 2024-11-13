@@ -51,7 +51,7 @@ inline i8 _FindMaxPowOf10(i8 num)
 inline u16 _FindMaxPowOf10(u16 num)
 {
     u16 result = (u16)1;
-    num /= ((u16)10);
+    num /= (u16)10;
     while (num)
     {
         result *= (u16)10;
@@ -135,7 +135,7 @@ export inline void Print(u8 message)
     while (pow10)
     {
         u8 digit = message / pow10;
-        Print((char)(digit + ((u8)'0')));
+        Print((char)(digit + (u8)'0'));
         message -= digit * pow10;
         pow10 /= (u8)10;
     }
@@ -149,14 +149,14 @@ export inline void Print(i8 message)
     if (message < (i8)0)
     {
         Print('-');
-        message = message * ((i8)(-1));
+        message = message * (i8)(-1);
     }
     
     i8 pow10 = _FindMaxPowOf10(message);
     while (pow10)
     {
         i8 digit = message / pow10;
-        Print((char)(digit + ((i8)'0')));
+        Print((char)(digit + (i8)'0'));
         message -= digit * pow10;
         pow10 /= (i8)10;
     }
@@ -171,7 +171,7 @@ export inline void Print(u16 message)
     while (pow10)
     {
         u16 digit = message / pow10;
-        Print((char)(digit + ((u16)'0')));
+        Print((char)(digit + (u16)'0'));
         message -= digit * pow10;
         pow10 /= (u16)10;
     }
@@ -192,7 +192,7 @@ export inline void Print(i16 message)
     while (pow10)
     {
         i16 digit = message / pow10;
-        Print((char)(digit + ((i16)'0')));
+        Print((char)(digit + (i16)'0'));
         message -= digit * pow10;
         pow10 /= (i16)10;
     }
@@ -207,7 +207,7 @@ export inline void Print(u32 message)
     while (pow10)
     {
         u32 digit = message / pow10;
-        Print((char)(digit + ((u32)'0')));
+        Print((char)(digit + (u32)'0'));
         message -= digit * pow10;
         pow10 /= (u32)10;
     }

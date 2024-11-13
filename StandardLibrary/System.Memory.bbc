@@ -1,9 +1,10 @@
 alias BlockHeader u8;
 alias bool u8;
 
-const byte StatusFlag  = 0b_1_0000000;
-const byte SizeMask = 0b_0_1111111;
-const byte MaxHeapSize = 0b_0_1111111;
+const byte StatusFlag = 0x80;
+const byte SizeMask = 0x7f;
+const byte MaxHeapSize = SizeMask;
+const byte InitialHeapSize = SizeMask;
 const int HeaderSize = sizeof(BlockHeader);
 
 const bool true = (bool)1;
@@ -11,7 +12,7 @@ const bool false = (bool)0;
 
 #if BRAINFUCK
 #else
-*0 = MaxHeapSize;
+*0 = (BlockHeader)InitialHeapSize;
 #endif
 
 export void GetHeader(BlockHeader* headerPtr, int* size, bool* allocated)
@@ -29,14 +30,12 @@ export void GetHeader(BlockHeader* headerPtr, int* size, bool* allocated)
     }
 }
 
-export void SetHeaderUsed(BlockHeader* headerPtr, int size)
+export inline void SetHeaderUsed(BlockHeader* headerPtr, int size)
 {
-    BlockHeader header = (BlockHeader)size;
-    header += StatusFlag; // value |= (byte)StatusFlag
-    *headerPtr = header;
+    *headerPtr = (BlockHeader)size + StatusFlag;
 }
 
-export void SetHeaderFree(BlockHeader* headerPtr, int size)
+export inline void SetHeaderFree(BlockHeader* headerPtr, int size)
 {
     *headerPtr = (BlockHeader)size;
 }
@@ -55,9 +54,9 @@ bool JoinFreeBlocks()
         {
             BlockHeader* prevOffset = (headerPointer - (int)prevBlockSize - HeaderSize) as BlockHeader*;
 
-            int temp;
+            int _temp;
             bool prevBlockUsed;
-            GetHeader(prevOffset, &temp, &prevBlockUsed);
+            GetHeader(prevOffset, &_temp, &prevBlockUsed);
 
             if (prevBlockUsed == 0)
             {

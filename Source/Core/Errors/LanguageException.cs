@@ -144,6 +144,13 @@ public class LanguageException : Exception
         return result.ToString();
     }
 
-    public static explicit operator Diagnostic(LanguageException exception)
-        => new(DiagnosticsLevel.Error, exception.Message, exception.Position, exception.File);
+    public static explicit operator Diagnostic(LanguageException exception) => new(
+        DiagnosticsLevel.Error,
+        exception.Message,
+        exception.Position,
+        exception.File,
+        exception.InnerException is LanguageException innerLanguageException
+            ? [(Diagnostic)innerLanguageException]
+            : Enumerable.Empty<Diagnostic>()
+    );
 }

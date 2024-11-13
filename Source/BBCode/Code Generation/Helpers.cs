@@ -1,4 +1,5 @@
-﻿using LanguageCore.Compiler;
+﻿using LanguageCore.Brainfuck;
+using LanguageCore.Compiler;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 
@@ -667,7 +668,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 #if NET_STANDARD
                 CompatibilityUtils.GetEnumValues<BitWidth>().Reverse()
 #else
-                Enum.GetValues<BitWidth>().Reverse()
+                ((IEnumerable<BitWidth>)Enum.GetValues<BitWidth>()).Reverse()
 #endif
             )
             {
@@ -754,7 +755,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 #if NET_STANDARD
                             CompatibilityUtils.GetEnumValues<BitWidth>().Reverse()
 #else
-                            Enum.GetValues<BitWidth>().Reverse()
+                            ((IEnumerable<BitWidth>)Enum.GetValues<BitWidth>()).Reverse()
 #endif
                         )
                         {

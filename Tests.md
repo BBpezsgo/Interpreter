@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=318&f=4&s=134)](#)
-[![](https://img.shields.io/badge/Passing-318-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-4-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-134-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=302&f=4&s=150)](#)
+[![](https://img.shields.io/badge/Passing-302-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-4-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-150-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -64,14 +64,6 @@
 | [59](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/59.bbc) | ✅ | ✖ Arrays with big element size not implemented |
 | [60](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/60.bbc) | ✅ | ✅ |
 | [61](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/61.bbc) | ✅ | ✅ |
-| [62](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/62.bbc) | ✅ | ✅ |
-| [63](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/63.bbc) | ✅ | ✅ |
-| [64](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/64.bbc) | ✅ | ✅ |
-| [65](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/65.bbc) | ✅ | ✅ |
-| [66](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/66.bbc) | ✅ | ✅ |
-| [67](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/67.bbc) | ✅ | ✅ |
-| [68](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/68.bbc) | ✅ | ✅ |
-| [69](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/69.bbc) | ✅ | ✅ |
 | [70](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/70.bbc) | ✅ | ✅ |
 | [71](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/71.bbc) | ✅ | ✅ |
 | [72](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/72.bbc) | ✅ | ✅ |

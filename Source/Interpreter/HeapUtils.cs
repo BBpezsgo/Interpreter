@@ -41,13 +41,10 @@ public static class HeapImplementation
 {
     const byte BlockSizeMask = 0b_0_1111111;
     const byte BlockStatusMask = 0b_1_0000000;
-    public const int HeaderSize = 1;
+    public const int HeaderSize = sizeof(byte);
 
-    public static (byte Size, bool Allocated) GetHeader(byte header)
-    {
-        if ((header & BlockStatusMask) != 0)
-        { return ((byte)(header & ~BlockStatusMask), true); }
-        else
-        { return (header, false); }
-    }
+    public static (int Size, bool Allocated) GetHeader(byte header) => (
+        header & BlockSizeMask,
+        (header & BlockStatusMask) != 0
+    );
 }

@@ -551,7 +551,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 GenerateCodeForStatement(returnValue);
 
-                AssignTypeCheck(CurrentReturnType, returnValueType, returnValue);
+                if (!CanCastImplicitly(returnValueType, CurrentReturnType, returnValue, out PossibleDiagnostic? castError))
+                {
+                    Diagnostics.Add(castError.ToError(returnValue));
+                }
 
                 if (InFunction)
                 {
@@ -2630,7 +2633,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GeneralType valueType = FindStatementType(value, parameter.Type);
 
-            AssignTypeCheck(parameter.Type, valueType, value);
+            if (!CanCastImplicitly(valueType, parameter.Type, value, out PossibleDiagnostic? castError))
+            {
+                Diagnostics.Add(castError.ToError(value));
+            }
 
             GenerateCodeForStatement(value, parameter.Type);
 
@@ -2649,7 +2655,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GeneralType valueType = FindStatementType(value, variable.Type);
 
-            AssignTypeCheck(variable.Type, valueType, value);
+            if (!CanCastImplicitly(valueType, variable.Type, value, out PossibleDiagnostic? castError))
+            {
+                Diagnostics.Add(castError.ToError(value));
+            }
 
             GenerateCodeForStatement(value, variable.Type);
 
@@ -2664,7 +2673,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GeneralType valueType = FindStatementType(value, globalVariable.Type);
 
-            AssignTypeCheck(globalVariable.Type, valueType, value);
+            if (!CanCastImplicitly(valueType, globalVariable.Type, value, out PossibleDiagnostic? castError))
+            {
+                Diagnostics.Add(castError.ToError(value));
+            }
 
             GenerateCodeForStatement(value, globalVariable.Type);
 
@@ -2701,6 +2713,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             statementToSet.Reference = fieldDefinition;
             fieldDefinition.References.AddReference(statementToSet);
 
+            if (!CanCastImplicitly(valueType, fieldDefinition.Type, value, out PossibleDiagnostic? castError1))
+            {
+                Diagnostics.Add(castError1.ToError(value));
+            }
+
             GenerateCodeForStatement(value, type);
             PopTo(statementToSet.PrevStatement, fieldOffset, valueType.GetSize(this, Diagnostics, value));
             return;
@@ -2709,7 +2726,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!prevType.Is<StructType>())
         { throw new NotImplementedException(); }
 
-        AssignTypeCheck(type, valueType, value);
+        if (!CanCastImplicitly(valueType, type, value, out PossibleDiagnostic? castError2))
+        {
+            Diagnostics.Add(castError2.ToError(value));
+        }
 
         GenerateCodeForStatement(value, type);
 
@@ -2736,6 +2756,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value)
     {
+        GeneralType itemType = FindStatementType(statementToSet);
         GeneralType prevType = FindStatementType(statementToSet.PrevStatement);
         GeneralType indexType = FindStatementType(statementToSet.Index);
         GeneralType valueType = FindStatementType(value);
@@ -2750,6 +2771,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 statementToSet.File
             ), indexer.Function);
             return;
+        }
+
+        if (!CanCastImplicitly(valueType, itemType, value, out PossibleDiagnostic? castError))
+        {
+            Diagnostics.Add(castError.ToError(value));
         }
 
         if (!GetAddress(statementToSet, out Address? _address, out PossibleDiagnostic? _error))
@@ -2768,7 +2794,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType valueType = FindStatementType(value, targetType);
         GeneralType pointerValueType = FindStatementType(statementToSet.PrevStatement);
 
-        AssignTypeCheck(targetType, valueType, value);
+        if (!CanCastImplicitly(valueType, targetType, value, out PossibleDiagnostic? castError))
+        {
+            Diagnostics.Add(castError.ToError(value));
+        }
 
         if (pointerValueType.GetBitWidth(this, Diagnostics, statementToSet.PrevStatement) != PointerBitWidth)
         {
@@ -2918,6 +2947,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return default;
             }
 
+            if (newVariable.InitialValue is not null)
+            {
+                GeneralType initialValueType = FindStatementType(newVariable.InitialValue);
+                if (!CanCastImplicitly(initialValueType, type, newVariable.InitialValue, out PossibleDiagnostic? castError))
+                { Diagnostics.Add(castError.ToError(newVariable.InitialValue)); }
+            }
+
             AddComment("}");
         }
         else if (compiledVariable.Type.Is(out ArrayType? arrayType) &&
@@ -2946,6 +2982,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 Diagnostics.Add(Diagnostic.Critical($"Variable has a size of {size}", newVariable));
                 return default;
+            }
+
+            if (newVariable.InitialValue is not null)
+            {
+                GeneralType initialValueType = FindStatementType(newVariable.InitialValue);
+                if (!CanCastImplicitly(initialValueType, type, newVariable.InitialValue, out PossibleDiagnostic? castError))
+                { Diagnostics.Add(castError.ToError(newVariable.InitialValue)); }
             }
 
             AddComment("}");

@@ -1,5 +1,5 @@
 using System.Console;
 
-i32 a = -55;
-i32 b = 55;
+i32 a = (i32)(-55);
+i32 b = (i32)55;
 Print(a + b);

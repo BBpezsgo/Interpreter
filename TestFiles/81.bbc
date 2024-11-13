@@ -1,5 +1,5 @@
 using System.Console;
 
-i16 a = -55;
-i16 b = 55;
+i16 a = (i16)(-55);
+i16 b = (i16)55;
 Print(a + b);

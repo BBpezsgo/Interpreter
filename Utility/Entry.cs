@@ -182,16 +182,16 @@ public static class Entry
                     {
                         int endlessSafe = interpreter.Processor.Memory.Length;
                         int i = 0;
-                        int blockIndex = 0;
                         while (i + 1 < 127)
                         {
-                            (int blockSize, bool blockIsUsed) = HeapImplementation.GetHeader(interpreter.Processor.Memory[i]);
+                            byte header = interpreter.Processor.Memory.AsSpan().Get<byte>(i);
+                            var (size, status) = HeapImplementation.GetHeader(header);
 
                             Console.Write($"BLOCK {i}: ");
 
-                            Console.Write($"SIZE: {blockSize} ");
+                            Console.Write($"SIZE: {size} ");
 
-                            if (blockIsUsed)
+                            if (status)
                             {
                                 Console.ForegroundColor = ConsoleColor.Yellow;
                                 Console.Write("USED");
@@ -199,12 +199,15 @@ public static class Entry
                                 Console.Write(" :");
                                 Console.WriteLine();
 
-                                for (int j = i + 1; j < (blockSize + i + 1); j++)
+                                for (int j = 0; j < size; j++)
                                 {
+                                    int address = i + HeapImplementation.HeaderSize + j;
+                                    if (address >= interpreter.Processor.Memory.Length) break;
                                     Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Write(interpreter.Processor.Memory.AsSpan().Get<byte>(j));
+                                    Console.Write(interpreter.Processor.Memory.AsSpan().Get<byte>(address));
                                     Console.Write(" ");
                                 }
+                                Console.ResetColor();
                                 Console.WriteLine();
                                 Console.WriteLine();
                             }
@@ -216,8 +219,7 @@ public static class Entry
                                 Console.WriteLine();
                             }
 
-                            i += blockSize + 1;
-                            blockIndex++;
+                            i += size + HeapImplementation.HeaderSize;
 
                             if (endlessSafe-- < 0) throw new EndlessLoopException();
                         }
@@ -241,11 +243,18 @@ public static class Entry
                     }
 #pragma warning restore CS0162 // Unreachable code detected
 
+                    int n = 0;
                     foreach (byte item in stack)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.Write(item);
                         Console.WriteLine();
+                        if (n++ > 200)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Gray;
+                            Console.WriteLine("...");
+                            break;
+                        }
                     }
 
                     Console.ResetColor();

@@ -575,7 +575,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (constantValue.TryCast(variable.Type, out CompiledValue castedValue))
                 { constantValue = castedValue; }
 
-                AssignTypeCheck(variable.Type, constantValue, value);
+                if (variable.IsReference &&
+                    variable.Type.Is(out PointerType? pointerType))
+                {
+                    if (!CanCastImplicitly(constantValue, pointerType.To, value, out PossibleDiagnostic? castError))
+                    { Diagnostics.Add(castError.ToError(value)); }
+                }
+                else
+                {
+                    if (!CanCastImplicitly(constantValue, variable.Type, value, out PossibleDiagnostic? castError))
+                    { Diagnostics.Add(castError.ToError(value)); }
+                }
 
                 Code.SetValue(variable.Address, constantValue);
 
@@ -663,9 +673,33 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             else
             {
                 if (TryComputeSimple(value, out CompiledValue compiledValue))
-                { AssignTypeCheck(variable.Type, compiledValue, value); }
+                {
+                    if (variable.IsReference &&
+                        variable.Type.Is(out PointerType? pointerType))
+                    {
+                        if (!CanCastImplicitly(compiledValue, pointerType.To, value, out PossibleDiagnostic? castError))
+                        { Diagnostics.Add(castError.ToError(value)); }
+                    }
+                    else
+                    {
+                        if (!CanCastImplicitly(compiledValue, variable.Type, value, out PossibleDiagnostic? castError))
+                        { Diagnostics.Add(castError.ToError(value)); }
+                    }
+                }
                 else
-                { AssignTypeCheck(variable.Type, valueType, value); }
+                {
+                    if (variable.IsReference &&
+                        variable.Type.Is(out PointerType? pointerType))
+                    {
+                        if (!CanCastImplicitly(valueType, pointerType.To, value, out PossibleDiagnostic? castError))
+                        { Diagnostics.Add(castError.ToError(value)); }
+                    }
+                    else
+                    {
+                        if (!CanCastImplicitly(valueType, variable.Type, value, out PossibleDiagnostic? castError))
+                        { Diagnostics.Add(castError.ToError(value)); }
+                    }
+                }
             }
 
             using (Code.Block(this, $"Compute value"))

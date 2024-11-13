@@ -874,25 +874,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         static FunctionPerfectus Max(FunctionPerfectus a, FunctionPerfectus b) => a > b ? a : b;
 
-        static bool CheckTypeConversion(GeneralType from, GeneralType to)
-        {
-            if (from.SameAs(to))
-            { return true; }
-
-            if (to.Is<PointerType>() && from.SameAs(BasicType.I32))
-            { return true; }
-
-            if (to.Is(out PointerType? toPtr) && from.Is<PointerType>() && toPtr.To.SameAs(BasicType.Any))
-            { return true; }
-
-            if (from.Is(out PointerType? fromPtr) && to.Is(out toPtr) &&
-                fromPtr.To.Is(out ArrayType? fromPtrArray) && toPtr.To.Is(out ArrayType? toPtrArray) &&
-                toPtrArray.Length is null)
-            { return true; }
-
-            return false;
-        }
-
         bool HandleIdentifier(TFunction function)
         {
             if (query.Identifier is not null &&
@@ -925,6 +906,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             if (query.Arguments.HasValue)
             {
                 GeneralType[] _checkedParameterTypes = new GeneralType[query.Arguments.Value.Length];
+                List<PossibleDiagnostic> errors = new();
                 if (!Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (i, defined, passed) =>
                     {
                         GeneralType _passed = query.Converter.Invoke(passed, defined);
@@ -934,9 +916,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                         if (_passed.Equals(defined))
                         { return true; }
 
-                        if (CheckTypeConversion(_passed, defined))
+                        if (CodeGenerator.CanCastImplicitly(_passed, defined, null, null, out PossibleDiagnostic? error1))
                         { return true; }
 
+                        errors.Add(error1);
                         return false;
                     }))
                 {
@@ -953,7 +936,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? checkedQuery.ToReadable()}\" not found: parameter types of caller \"{checkedQuery.ToReadable()}\" doesn't match with callee \"{function.ToReadable()}\"");
+                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? checkedQuery.ToReadable()}\" not found: parameter types of caller \"{checkedQuery.ToReadable()}\" doesn't match with callee \"{function.ToReadable()}\"", errors.ToArray());
                     }
                     return false;
                 }
@@ -1053,12 +1036,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         bool HandleReturnType(TFunction function)
         {
-            if (query.ReturnType is not null && !CheckTypeConversion(function.Type, query.ReturnType))
+            if (query.ReturnType is not null &&
+                !CodeGenerator.CanCastImplicitly(function.Type, query.ReturnType, null, null, out PossibleDiagnostic? error1))
             {
                 if (perfectus < FunctionPerfectus.ReturnType)
                 {
                     result_ = function;
-                    error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: return type of caller \"{query}\" doesn't match with callee \"{function.ToReadable()}\"");
+                    error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: return type of caller \"{query}\" doesn't match with callee \"{function.ToReadable()}\"", error1);
                 }
                 return false;
             }
@@ -1694,109 +1678,29 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         return false;
     }
 
-    public static bool CanImplicitlyCast(GeneralType source, GeneralType destination, IRuntimeInfoProvider runtimeInfoProvider)
+    protected static bool CanCastImplicitly(GeneralType source, GeneralType destination, StatementWithValue? value, IRuntimeInfoProvider? runtime, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
+        error = null;
+
         if (destination.SameAs(source))
         { return true; }
 
         if (destination.SameAs(BasicType.Any))
         { return true; }
 
-        if (destination.Is<PointerType>() && (
-            source.SameAs(BasicType.U8) ||
-            source.SameAs(BasicType.I8) ||
-            source.SameAs(BasicType.Char) ||
-            source.SameAs(BasicType.I16) ||
-            source.SameAs(BasicType.U32) ||
-            source.SameAs(BasicType.I32)))
-        { return true; }
-
-        if (destination.GetSize(runtimeInfoProvider) != source.GetSize(runtimeInfoProvider))
-        { return false; }
-
-        if (destination.Is(out PointerType? destPointerType) &&
-            source.Is<PointerType>() &&
-            destPointerType.To.SameAs(BasicType.Any))
-        { return true; }
-
-        if (destination.Is(out PointerType? dstPointer) &&
-            source.Is(out PointerType? srcPointer))
+        if (runtime is not null)
         {
-            if (dstPointer.To.Is(out ArrayType? dstArray) &&
-                srcPointer.To.Is(out ArrayType? srcArray))
-            {
-                if (dstArray.ComputedLength.HasValue &&
-                    srcArray.ComputedLength.HasValue &&
-                    dstArray.ComputedLength.Value != srcArray.ComputedLength.Value)
-                { return false; }
+            if (!destination.GetSize(runtime, out int destinationSize, out error))
+            { return false; }
 
-                if (dstArray.Length is null)
-                { return true; }
+            if (!source.GetSize(runtime, out int sourceSize, out error))
+            { return false; }
+
+            if (sourceSize != destinationSize)
+            {
+                error = new($"Can't cast \"{source}\" (size of {sourceSize} bytes) value to \"{destination}\" (size of {destinationSize} bytes)");
+                return false;
             }
-        }
-
-        return false;
-    }
-
-    public static bool CanImplicitlyCast(GeneralType source, GeneralType destination, IRuntimeInfoProvider runtimeInfoProvider, CompiledValue value)
-    {
-        if (CanImplicitlyCast(source, destination, runtimeInfoProvider)) return true;
-
-        if (destination.Is(out BuiltinType? builtinType))
-        { return value.TryCast(builtinType.RuntimeType, out _); }
-
-        if (destination.Is<PointerType>() || destination.Is<BuiltinType>())
-        {
-            return destination.GetBitWidth(runtimeInfoProvider) switch
-            {
-                0 => default,
-                BitWidth._8 => value >= byte.MinValue && value <= byte.MaxValue,
-                BitWidth._16 => value >= char.MinValue && value <= char.MaxValue,
-                BitWidth._32 => value >= int.MinValue && value <= int.MaxValue,
-                BitWidth._64 => value >= long.MinValue && value <= long.MaxValue,
-                _ => throw new UnreachableException(),
-            };
-        }
-
-        return false;
-    }
-
-    protected void AssignTypeCheck(GeneralType destination, GeneralType valueType, ILocated value)
-    {
-        if (destination.SameAs(valueType))
-        { return; }
-
-        if (destination.SameAs(BasicType.Any))
-        { return; }
-
-        if (destination.Is<PointerType>() &&
-            valueType.SameAs(BasicType.U8))
-        { return; }
-
-        if (destination.Is<PointerType>() &&
-            valueType.SameAs(BasicType.I8))
-        { return; }
-
-        if (destination.Is<PointerType>() &&
-            valueType.SameAs(BasicType.Char))
-        { return; }
-
-        if (destination.Is<PointerType>() &&
-            valueType.SameAs(BasicType.I16))
-        { return; }
-
-        if (destination.Is<PointerType>() &&
-            valueType.SameAs(BasicType.U32))
-        { return; }
-
-        if (destination.Is<PointerType>() &&
-            valueType.SameAs(BasicType.I32))
-        { return; }
-
-        if (destination.GetSize(this) != valueType.GetSize(this, Diagnostics, value))
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Can not set \"{valueType}\" (size of {valueType.GetSize(this, Diagnostics, value)} bytes) value to \"{destination}\" (size of {destination.GetSize(this)} bytes)", value));
-            return;
         }
 
         if (value is LiteralStatement literal &&
@@ -1808,20 +1712,23 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 string literalValue = literal.Value;
                 if (destArrayType.Length is null)
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array \"{destination}\" (without length)", value));
-                    return;
+                    error = new($"Can't cast literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array \"{destination}\" (without length)");
+                    return false;
                 }
+
                 if (!destArrayType.ComputedLength.HasValue)
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array \"{destination}\" (length of <runtime value>)", value));
-                    return;
+                    error = new($"Can't cast literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array \"{destination}\" (length of <runtime value>)");
+                    return false;
                 }
+
                 if (literalValue.Length != destArrayType.ComputedLength.Value)
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"Can not set literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array \"{destination}\" (length of \"{destArrayType.Length?.ToString() ?? "null"}\")", value));
-                    return;
+                    error = new($"Can't cast literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array \"{destination}\" (length of \"{destArrayType.Length?.ToString() ?? "null"}\")");
+                    return false;
                 }
-                return;
+
+                return true;
             }
 
             if (destination.Is(out PointerType? pointerType) &&
@@ -1832,30 +1739,28 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 {
                     if (!arrayType.ComputedLength.HasValue)
                     {
-                        Diagnostics.Add(Diagnostic.Critical($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array \"{destination}\" (length of <runtime value>)", value));
-                        return;
+                        error = new($"Can't cast literal value \"{literal.Value}\" (length of {literal.Value.Length}) to array \"{destination}\" (length of <runtime value>)");
+                        return false;
                     }
+
                     if (literal.Value.Length != arrayType.ComputedLength.Value)
                     {
-                        Diagnostics.Add(Diagnostic.Critical($"Can not set literal value \"{literal.Value}\" (length of {literal.Value.Length}) to stack array \"{destination}\" (length of \"{arrayType.Length?.ToString() ?? "null"}\")", value));
-                        return;
+                        error = new($"Can't cast literal value \"{literal.Value}\" (length of {literal.Value.Length}) to array \"{destination}\" (length of \"{arrayType.Length?.ToString() ?? "null"}\")");
+                        return false;
                     }
                 }
-                return;
+
+                return true;
             }
         }
 
         {
-            if (destination.Is(out PointerType? destPointerType) &&
-                valueType.Is<PointerType>() &&
-                destPointerType.To.SameAs(BasicType.Any))
-            { return; }
-        }
-
-        {
             if (destination.Is(out PointerType? dstPointer) &&
-                valueType.Is(out PointerType? srcPointer))
+                source.Is(out PointerType? srcPointer))
             {
+                if (dstPointer.To.SameAs(BasicType.Any))
+                { return true; }
+
                 if (dstPointer.To.Is(out ArrayType? dstArray) &&
                     srcPointer.To.Is(out ArrayType? srcArray))
                 {
@@ -1863,25 +1768,30 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                         srcArray.ComputedLength.HasValue &&
                         dstArray.ComputedLength.Value != srcArray.ComputedLength.Value)
                     {
-                        Diagnostics.Add(Diagnostic.Critical($"Can not set an array pointer with length of {dstArray.ComputedLength.Value} to an array pointer with length of {srcArray.ComputedLength.Value}", value));
-                        return;
+                        error = new($"Can't cast an array pointer with length of {dstArray.ComputedLength.Value} to an array pointer with length of {srcArray.ComputedLength.Value}");
+                        return false;
                     }
 
                     if (dstArray.Length is null)
-                    { return; }
+                    { return true; }
                 }
             }
         }
 
-        Diagnostics.Add(Diagnostic.Critical($"Can not set a \"{valueType}\" type value to the \"{destination}\" type", value));
-        return;
+        error = new($"Can't cast \"{source}\" to \"{destination}\" implicitly");
+        return false;
     }
 
-    protected void AssignTypeCheck(GeneralType destination, CompiledValue value, ILocated valuePosition)
+    protected bool CanCastImplicitly(GeneralType source, GeneralType destination, StatementWithValue? value, [NotNullWhen(false)] out PossibleDiagnostic? error)
+        => CodeGenerator.CanCastImplicitly(source, destination, value, this, out error);
+
+    protected bool CanCastImplicitly(CompiledValue source, GeneralType destination, StatementWithValue? value, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
+        error = null;
+
         if (destination.TryGetNumericType(out NumericType numericType))
         {
-            if (numericType == NumericType.Float) return;
+            if (numericType == NumericType.Float) return true;
             (CompiledValue min, CompiledValue max) = destination.GetBitWidth(this) switch
             {
                 BitWidth._8 => numericType switch
@@ -1914,10 +1824,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 },
                 _ => default,
             };
-            if (value >= min && value <= max) return;
+            if (source >= min && source <= max) return true;
         }
 
-        AssignTypeCheck(destination, new BuiltinType(value.Type), valuePosition);
+        return CanCastImplicitly(new BuiltinType(source.Type), destination, value, out error);
     }
 
     protected static BitWidth MaxBitWidth(BitWidth a, BitWidth b) => a > b ? a : b;
@@ -2218,7 +2128,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
                 if (!leftBType.TryGetNumericType(out NumericType leftNType) ||
                     !rightBType.TryGetNumericType(out NumericType rightNType))
-                { throw new UnreachableException(); }
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{leftType}\" \"{@operator.Operator.Content}\" \"{rightType}\"", @operator.Operator, @operator.File));
+                    return BuiltinType.Void;
+                }
                 NumericType numericType = leftNType > rightNType ? leftNType : rightNType;
 
                 BuiltinType numericResultType = BuiltinType.CreateNumeric(numericType, bitWidth);

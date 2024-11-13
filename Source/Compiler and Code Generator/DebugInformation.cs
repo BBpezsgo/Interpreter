@@ -169,11 +169,7 @@ public readonly struct CompiledDebugInformation
             ScopeInformation = debugInformation.ScopeInformation.ToImmutableArray();
             CodeComments = debugInformation.CodeComments.Select(v => new KeyValuePair<int, ImmutableArray<string>>(v.Key, v.Value.ToImmutableArray())).ToFrozenDictionary();
             OriginalFiles = debugInformation.OriginalFiles.ToFrozenDictionary();
-            StackOffsets = new StackOffsets()
-            {
-                SavedBasePointer = 0,
-                SavedCodePointer = 0,
-            };
+            StackOffsets = debugInformation.StackOffsets;
             HasValue = true;
         }
     }
@@ -217,7 +213,7 @@ public readonly struct CompiledDebugInformation
         => GetFunctionInformation(FunctionInformation.AsSpan(), codePointers);
     public static ImmutableArray<FunctionInformation> GetFunctionInformation(ReadOnlySpan<FunctionInformation> functionInformation, ReadOnlySpan<int> codePointers)
     {
-        FunctionInformation[] result = new FunctionInformation[functionInformation.Length];
+        FunctionInformation[] result = new FunctionInformation[codePointers.Length];
         for (int i = 0; i < codePointers.Length; i++)
         {
             result[i] = GetFunctionInformation(functionInformation, codePointers[i]);

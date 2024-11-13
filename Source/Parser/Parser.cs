@@ -1980,7 +1980,7 @@ public sealed class Parser
             {
                 if ((flags & AllowedType.Any) == 0)
                 {
-                    error = Diagnostic.Error($"Type \"{TypeKeywords.Any}\" is not valid in the current context", possibleType, File, false);
+                    error = Diagnostic.Error($"Type \"{TypeKeywords.Any}\" is not valid in the current context", possibleType, File);
                     return false;
                 }
             }

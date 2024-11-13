@@ -99,7 +99,7 @@ struct List
         if (this._capacity < capacity)
         {
             var old = this._ptr;
-            this._ptr = Alloc(capacity * sizeof(T));
+            this._ptr = Alloc(capacity * sizeof(T)) as T[]*;
             this._capacity = capacity;
 
             if (old)

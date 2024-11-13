@@ -1,4 +1,4 @@
 using System.Console;
 
-u32 v = 55;
+u32 v = (u32)55;
 Print(v);

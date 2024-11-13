@@ -1,4 +1,4 @@
 using System.Console;
 
-i32 v = -55;
+i32 v = (i32)(-55);
 Print(v);

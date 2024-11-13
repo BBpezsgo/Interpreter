@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -572,8 +572,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (CanReturn)
             {
-                Push(ReturnFlagTrue);
-                PopTo(ReturnFlagAddress, ReturnFlagType.GetSize(this));
+                AddComment("Cleanup function scopes {");
+                for (int i = CleanupStack.Count - 1; i >= 0; i--)
+                {
+                    Scope item = CleanupStack[i];
+
+                    CleanupVariables(item.Variables, keywordCall.Location, true);
+
+                    if (item.IsFunction) break;
+                }
+                AddComment("}");
             }
 
             ReturnInstructions.Last.Add(GeneratedCode.Count);
@@ -1701,7 +1709,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 AddComment("while (1) {");
 
-                OnScopeEnter(whileLoop.Block);
+                OnScopeEnter(whileLoop.Block, false);
 
                 int beginOffset = GeneratedCode.Count;
 
@@ -1729,7 +1737,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("while (...) {");
 
-        OnScopeEnter(whileLoop.Block);
+        OnScopeEnter(whileLoop.Block, false);
 
         AddComment("Condition");
         int conditionOffset = GeneratedCode.Count;
@@ -1766,7 +1774,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         AddComment("for (...) {");
 
-        OnScopeEnter(forLoop.Position, forLoop.File, Enumerable.Repeat(forLoop.VariableDeclaration, 1));
+        OnScopeEnter(forLoop.Position, forLoop.File, Enumerable.Repeat(forLoop.VariableDeclaration, 1), false);
 
         AddComment("For-loop variable");
         GenerateCodeForStatement(forLoop.VariableDeclaration);
@@ -2489,7 +2497,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        OnScopeEnter(block);
+        OnScopeEnter(block, false);
 
         AddComment("Statements {");
         for (int i = 0; i < block.Statements.Length; i++)
@@ -2557,7 +2565,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return result.ToImmutable();
     }
 
-    void CleanupVariables(ImmutableArray<CleanupItem> cleanupItems, Location location)
+    void CleanupVariables(ImmutableArray<CleanupItem> cleanupItems, Location location, bool justGenerateCode)
     {
         if (cleanupItems.Length == 0) return;
         AddComment("Clear Variables");
@@ -2575,7 +2583,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Pop(item.SizeOnStack);
             }
 
-            CompiledVariables.Pop();
+            if (!justGenerateCode) CompiledVariables.Pop();
         }
     }
 
@@ -2818,9 +2826,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    void OnScopeEnter(Block block) => OnScopeEnter(block.Position, block.File, block.Statements.OfType<VariableDeclaration>());
+    void OnScopeEnter(Block block, bool isFunction) => OnScopeEnter(block.Position, block.File, block.Statements.OfType<VariableDeclaration>(), isFunction);
 
-    void OnScopeEnter(Position position, Uri file, IEnumerable<VariableDeclaration> variables)
+    void OnScopeEnter(Position position, Uri file, IEnumerable<VariableDeclaration> variables, bool isFunction)
     {
         CurrentScopeDebug.Push(new ScopeInformation()
         {
@@ -2837,31 +2845,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CompileLocalConstants(variables);
 
-        CleanupStack.Push(CompileVariables(variables, CurrentContext is null));
-        ReturnInstructions.Push(new List<int>());
+        CleanupStack.Push(new Scope(
+            CompileVariables(variables, CurrentContext is null),
+            isFunction
+        ));
     }
 
     void OnScopeExit(Position position, Uri file)
     {
         AddComment("Scope exit");
 
-        FinishJumpInstructions(ReturnInstructions.Last);
-        ReturnInstructions.Pop();
-
-        CleanupVariables(CleanupStack.Pop(), new Location(position, file));
-
-        if (CanReturn)
-        {
-            PushFrom(ReturnFlagAddress, ReturnFlagType.GetSize(this));
-
-            using (RegisterUsage.Auto reg = Registers.GetFree())
-            {
-                PopTo(reg.Get(ReturnFlagType.GetBitWidth(this)));
-                AddInstruction(Opcode.Compare, reg.Get(ReturnFlagType.GetBitWidth(this)), 0);
-                ReturnInstructions.Last.Add(GeneratedCode.Count);
-                AddInstruction(Opcode.JumpIfNotEqual, 0);
-            }
-        }
+        CleanupVariables(CleanupStack.Pop().Variables, new Location(position, file), false);
 
         CleanupLocalConstants();
 
@@ -2903,7 +2897,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             newVariable.CompiledType = type;
         }
 
-        int offset = (VariablesSize + ReturnFlagType.GetSize(this) + type.GetSize(this, Diagnostics, newVariable)) * BytecodeProcessor.StackDirection;
+        int offset = (VariablesSize + type.GetSize(this, Diagnostics, newVariable)) * BytecodeProcessor.StackDirection;
 
         CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
@@ -3192,16 +3186,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         else
         { CurrentReturnType = BuiltinType.Void; }
 
-        AddComment("Return flag");
-        Push(ReturnFlagFalse);
-
         if (function.Block is null)
         {
             Diagnostics.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have a body", function));
             return default;
         }
 
-        OnScopeEnter(function.Block);
+        OnScopeEnter(function.Block, true);
 
         if (function is IHaveCompiledType returnType && !returnType.Type.SameAs(BasicType.Void))
         {
@@ -3215,16 +3206,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Type = returnType.Type,
             });
         }
-
-        CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
-        {
-            Address = ReturnFlagOffset,
-            BasePointerRelative = true,
-            Kind = StackElementKind.Internal,
-            Size = ReturnFlagType.GetSize(this),
-            Tag = "Return Flag",
-            Type = ReturnFlagType,
-        });
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
@@ -3272,6 +3253,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CurrentScopeDebug.Last.Stack.Add(debugInfo);
         }
 
+        ReturnInstructions.Push(new List<int>());
+
         AddComment("Statements {");
         for (int i = 0; i < function.Block.Statements.Length; i++)
         { GenerateCodeForStatement(function.Block.Statements[i]); }
@@ -3281,8 +3264,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         OnScopeExit(function.Block.Brackets.End.Position, function.Block.File);
 
-        AddComment("Pop return flag");
-        Pop(ReturnFlagType.GetSize(this));
+        FinishJumpInstructions(ReturnInstructions.Last);
+        ReturnInstructions.Pop();
 
         AddComment("Return");
         Return(function.Block.Location.After());
@@ -3413,35 +3396,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentReturnType = ExitCodeType;
 
-        AddComment("Return flag");
-        Push(ReturnFlagFalse);
-        CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
-        {
-            Address = ReturnFlagOffset,
-            BasePointerRelative = true,
-            Kind = StackElementKind.Internal,
-            Size = ReturnFlagType.GetSize(this),
-            Tag = "Return Flag",
-            Type = ReturnFlagType,
-        });
-
         AddComment("Variables");
-        CleanupStack.Push(GenerateCodeForLocalVariable(statements));
+        CleanupStack.Push(new Scope(
+            GenerateCodeForLocalVariable(statements),
+            true
+        ));
 
         AddComment("Statements {");
         foreach (Statement statement in statements)
         { GenerateCodeForStatement(statement); }
         AddComment("}");
 
+        CompiledGlobalVariables.AddRange(CompiledVariables);
+        CleanupVariables(CleanupStack.Pop().Variables, new Location(statements[^1].Position.NextLine(), statements[^1].File), false);
+
         FinishJumpInstructions(ReturnInstructions.Last);
         ReturnInstructions.Pop();
 
-        CompiledGlobalVariables.AddRange(CompiledVariables);
-        CleanupVariables(CleanupStack.Pop(), new Location(statements[^1].Position.NextLine(), statements[^1].File));
-
         CurrentReturnType = null;
-        AddComment("Pop return flag");
-        Pop(ReturnFlagType.GetSize(this));
 
         AddComment("Pop stack frame");
         PopTo(Register.BasePointer);

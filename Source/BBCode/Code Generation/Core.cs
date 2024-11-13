@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.BBLang.Generator;
@@ -117,13 +117,15 @@ class RegisterUsage
     }
 }
 
+record struct Scope(ImmutableArray<CleanupItem> Variables, bool IsFunction);
+
 public partial class CodeGeneratorForMain : CodeGenerator
 {
     #region Fields
 
     readonly ImmutableArray<IExternalFunction> ExternalFunctions;
 
-    readonly Stack<ImmutableArray<CleanupItem>> CleanupStack;
+    readonly Stack<Scope> CleanupStack;
     IDefinition? CurrentContext;
 
     readonly Stack<List<int>> ReturnInstructions;
@@ -158,7 +160,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         ExternalFunctions = compilerResult.ExternalFunctions;
         GeneratedCode = new List<PreparationInstruction>();
-        CleanupStack = new Stack<ImmutableArray<CleanupItem>>();
+        CleanupStack = new Stack<Scope>();
         ReturnInstructions = new Stack<List<int>>();
         BreakInstructions = new Stack<List<int>>();
         UndefinedFunctionOffsets = new List<UndefinedOffset<CompiledFunction>>();

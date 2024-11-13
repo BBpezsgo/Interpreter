@@ -2964,7 +2964,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         inlined = new Assignment(
             @operator: statement.Operator,
-            left: statement.Left,
+            left: InlineMacro(statement.Left, parameters),
             right: InlineMacro(statement.Right, parameters),
             file: statement.File)
         {
@@ -2981,9 +2981,9 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         { return false; }
 
         inlined = new ShortOperatorCall(
-             op: statement.Operator,
-             left: statement.Left,
-             file: statement.File)
+            op: statement.Operator,
+            left: statement.Left,
+            file: statement.File)
         {
             Semicolon = statement.Semicolon,
         };
@@ -3626,6 +3626,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         if (GetConstant(identifier.Content, identifier.File, out IConstant? constantValue, out _))
         {
             identifier.Reference = constantValue;
+            identifier.AnalyzedType = TokenAnalyzedType.ConstantName;
             value = constantValue.Value;
             return true;
         }
@@ -4389,6 +4390,121 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     }
 
     protected virtual bool FindSize(AliasType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => FindSize(type.Value, out size, out error);
+
+    #endregion
+
+    #region IsObservable
+
+    protected bool IsObservable(CompiledFunction function)
+    {
+        return true;
+    }
+    protected bool IsObservable(ICompiledFunction function)
+    {
+        return true;
+    }
+    protected bool IsObservable(WhileLoop whileLoop)
+    {
+        return true;
+    }
+    protected bool IsObservable(ForLoop forLoop)
+    {
+        return true;
+    }
+    protected bool IsObservable(IfContainer ifContainer)
+    {
+        return true;
+    }
+    protected bool IsObservable(Block block)
+    {
+        foreach (Statement item in block.Statements)
+        {
+            if (IsObservable(item))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    protected bool IsObservable(VariableDeclaration variableDeclaration)
+    {
+        return true;
+    }
+    protected bool IsObservable(AnyAssignment anyAssignment)
+    {
+        return true;
+    }
+    protected bool IsObservable(KeywordCall keywordCall)
+    {
+        return true;
+    }
+    protected bool IsObservable(Identifier identifier)
+    {
+        return false;
+    }
+    protected bool IsObservable(BinaryOperatorCall binaryOperatorCall)
+    {
+        if (TryCompute(binaryOperatorCall, out _))
+        { return false; }
+        return true;
+    }
+    protected bool IsObservable(LiteralStatement literal)
+    {
+        if (literal.Type == LiteralType.String) return true;
+        return false;
+    }
+    protected bool IsObservable(ModifiedStatement modifiedStatement)
+    {
+        return true;
+    }
+    protected bool IsObservable(Field field)
+    {
+        if (IsObservable(field.PrevStatement))
+        { return true; }
+
+        return false;
+    }
+    protected bool IsObservable(IndexCall indexCall)
+    {
+        return true;
+    }
+    protected bool IsObservable(AnyCall anyCall)
+    {
+        return true;
+    }
+    protected bool IsObservable(Pointer pointer)
+    {
+        if (IsObservable(pointer.PrevStatement))
+        { return true; }
+
+        return false;
+    }
+    protected bool IsObservable(AddressGetter addressGetter)
+    {
+        if (IsObservable(addressGetter.PrevStatement))
+        { return true; }
+
+        return false;
+    }
+    protected bool IsObservable(Statement statement) => statement switch
+    {
+        Block v => IsObservable(v),
+        VariableDeclaration v => IsObservable(v),
+        WhileLoop v => IsObservable(v),
+        ForLoop v => IsObservable(v),
+        AnyAssignment v => IsObservable(v),
+        KeywordCall v => IsObservable(v),
+        IfContainer v => IsObservable(v),
+        Identifier v => IsObservable(v),
+        BinaryOperatorCall v => IsObservable(v),
+        LiteralStatement v => IsObservable(v),
+        ModifiedStatement v => IsObservable(v),
+        Field v => IsObservable(v),
+        IndexCall v => IsObservable(v),
+        AnyCall v => IsObservable(v),
+        Pointer v => IsObservable(v),
+        _ => throw new NotImplementedException(statement.GetType().ToString()),
+    };
 
     #endregion
 }

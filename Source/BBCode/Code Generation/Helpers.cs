@@ -1,4 +1,4 @@
-using LanguageCore.Brainfuck;
+﻿using LanguageCore.Brainfuck;
 using LanguageCore.Compiler;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;

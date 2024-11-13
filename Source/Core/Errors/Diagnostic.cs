@@ -7,6 +7,7 @@ public enum DiagnosticsLevel
     Warning,
     Information,
     Hint,
+    OptimizationNotice,
 }
 
 [ExcludeFromCodeCoverage]
@@ -121,6 +122,9 @@ public class Diagnostic :
 
     public static Diagnostic Hint(string message, ILocated location, params Diagnostic[] suberrors)
         => new(DiagnosticsLevel.Hint, message, location.Location.Position, location.Location.File, false, suberrors);
+
+    public static Diagnostic OptimizationNotice(string message, ILocated location, params Diagnostic[] suberrors)
+        => new(DiagnosticsLevel.OptimizationNotice, message, location.Location.Position, location.Location.File, false, suberrors);
 
     public Diagnostic Break()
     {

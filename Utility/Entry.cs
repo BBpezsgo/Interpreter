@@ -314,7 +314,7 @@ public static class Entry
                     }
                     catch (UserException error)
                     {
-                        Output.LogError($"User Exception: {error}");
+                        Output.LogError($"User Exception: {error.ToString(true)}");
                         if (arguments.ThrowErrors) throw;
                     }
                     catch (RuntimeException error)

@@ -1,4 +1,6 @@
-﻿namespace LanguageCore.Runtime;
+﻿using LanguageCore.Brainfuck;
+
+namespace LanguageCore.Runtime;
 
 #if UNITY
 [Unity.Burst.BurstCompile]
@@ -127,5 +129,82 @@ public static class ALU
         // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit32) == (long)SignBit32);
 
         return unchecked((int)result);
+    }
+
+    public static int DivideI(int a, int b, ref Flags flags, BitWidth bitWidth)
+    {
+        return bitWidth switch
+        {
+            BitWidth._8 => ((byte)(a.U8() / b.U8())).I32(),
+            BitWidth._16 => ((char)(a.U16() / b.U16())).I32(),
+            BitWidth._32 => ((int)(a.I32() / b.I32())).I32(),
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    public static int MultiplyI(int a, int b, ref Flags flags, BitWidth bitWidth)
+    {
+        return bitWidth switch
+        {
+            BitWidth._8 => ((byte)(a.U8() * b.U8())).I32(),
+            BitWidth._16 => ((char)(a.U16() * b.U16())).I32(),
+            BitWidth._32 => ((int)(a.I32() * b.I32())).I32(),
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    public static int ModuloI(int a, int b, ref Flags flags, BitWidth bitWidth)
+    {
+        return bitWidth switch
+        {
+            BitWidth._8 => ((byte)(a.U8() % b.U8())).I32(),
+            BitWidth._16 => ((char)(a.U16() % b.U16())).I32(),
+            BitWidth._32 => ((int)(a.I32() % b.I32())).I32(),
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    public static int BitwiseAnd(int a, int b, ref Flags flags, BitWidth bitWidth)
+    {
+        int result = (a.U32() & b.U32()).I32();
+
+        flags.SetSign(result, bitWidth);
+        flags.SetZero(result, bitWidth);
+        flags.Set(Flags.Carry, false);
+
+        return result;
+    }
+
+    public static int BitwiseOr(int a, int b, ref Flags flags, BitWidth bitWidth)
+    {
+        int result = (a.U32() | b.U32()).I32();
+
+        flags.SetSign(result, bitWidth);
+        flags.SetZero(result, bitWidth);
+        flags.Set(Flags.Carry, false);
+
+        return result;
+    }
+
+    public static int BitwiseXor(int a, int b, ref Flags flags, BitWidth bitWidth)
+    {
+        int result = (a.U32() ^ b.U32()).I32();
+
+        flags.SetSign(result, bitWidth);
+        flags.SetZero(result, bitWidth);
+        flags.Set(Flags.Carry, false);
+
+        return result;
+    }
+
+    public static int BitwiseNot(int a, ref Flags flags, BitWidth bitWidth)
+    {
+        int result = (~a.U32()).I32();
+
+        flags.SetSign(result, bitWidth);
+        flags.SetZero(result, bitWidth);
+        flags.Set(Flags.Carry, false);
+
+        return result;
     }
 }

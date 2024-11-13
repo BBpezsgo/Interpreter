@@ -349,65 +349,43 @@ public partial struct CompiledValue :
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator |(CompiledValue a, CompiledValue b)
     {
-        (RuntimeType a_, RuntimeType b_) = CompiledValue.MakeSameTypeAndKeep(ref a, ref b);
+        if (a.Type != b.Type)
+        { throw new RuntimeException($"Can't do | operation with type {a.Type} and {b.Type}"); }
 
-        return a.Type switch
-        {
-            RuntimeType.U8 => new CompiledValue((byte)(a.U8 | b.U8)),
-            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 | b.I8)),
-            RuntimeType.Char => new CompiledValue((ushort)(a.Char | b.Char)),
-            RuntimeType.I16 => new CompiledValue((short)(a.I16 | b.I16)),
-            RuntimeType.U32 => new CompiledValue((uint)(a.U32 | b.U32)),
-            RuntimeType.I32 => new CompiledValue((int)(a.I32 | b.I32)),
-            _ => throw new RuntimeException($"Can't do | operation with type {a_} and {b_}"),
-        };
+        Flags flags = default;
+        int result = ALU.BitwiseOr(a.I32, b.I32, ref flags, a.BitWidth);
+        return new CompiledValue(result, a.Type);
     }
     /// <inheritdoc/>
     /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator &(CompiledValue a, CompiledValue b)
     {
-        (RuntimeType a_, RuntimeType b_) = CompiledValue.MakeSameTypeAndKeep(ref a, ref b);
+        if (a.Type != b.Type)
+        { throw new RuntimeException($"Can't do & operation with type {a.Type} and {b.Type}"); }
 
-        return a.Type switch
-        {
-            RuntimeType.U8 => new CompiledValue((byte)(a.U8 & b.U8)),
-            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 & b.I8)),
-            RuntimeType.Char => new CompiledValue((ushort)(a.Char & b.Char)),
-            RuntimeType.I16 => new CompiledValue((short)(a.I16 & b.I16)),
-            RuntimeType.U32 => new CompiledValue((uint)(a.U32 & b.U32)),
-            RuntimeType.I32 => new CompiledValue((int)(a.I32 & b.I32)),
-            _ => throw new RuntimeException($"Can't do & operation with type {a_} and {b_}"),
-        };
+        Flags flags = default;
+        int result = ALU.BitwiseAnd(a.I32, b.I32, ref flags, a.BitWidth);
+        return new CompiledValue(result, a.Type);
     }
     /// <inheritdoc/>
     /// <exception cref="InternalExceptionWithoutContext"/>
     /// <exception cref="RuntimeException"/>
     public static CompiledValue operator ^(CompiledValue a, CompiledValue b)
     {
-        (RuntimeType a_, RuntimeType b_) = CompiledValue.MakeSameTypeAndKeep(ref a, ref b);
+        if (a.Type != b.Type)
+        { throw new RuntimeException($"Can't do ^ operation with type {a.Type} and {b.Type}"); }
 
-        return a.Type switch
-        {
-            RuntimeType.U8 => new CompiledValue((byte)(a.U8 ^ b.U8)),
-            RuntimeType.I8 => new CompiledValue((sbyte)(a.I8 ^ b.I8)),
-            RuntimeType.Char => new CompiledValue((ushort)(a.Char ^ b.Char)),
-            RuntimeType.I16 => new CompiledValue((short)(a.I16 ^ b.I16)),
-            RuntimeType.U32 => new CompiledValue((uint)(a.U32 ^ b.U32)),
-            RuntimeType.I32 => new CompiledValue((int)(a.I32 ^ b.I32)),
-            _ => throw new RuntimeException($"Can't do ^ operation with type {a_} and {b_}"),
-        };
+        Flags flags = default;
+        int result = ALU.BitwiseXor(a.I32, b.I32, ref flags, a.BitWidth);
+        return new CompiledValue(result, a.Type);
     }
     /// <inheritdoc/>
     /// <exception cref="RuntimeException"/>
-    public static CompiledValue operator ~(CompiledValue value) => value.Type switch
+    public static CompiledValue operator ~(CompiledValue value)
     {
-        RuntimeType.U8 => new CompiledValue((byte)~value.U8),
-        RuntimeType.I8 => new CompiledValue((sbyte)~value.I8),
-        RuntimeType.Char => new CompiledValue((char)~value.Char),
-        RuntimeType.I16 => new CompiledValue((short)~value.I16),
-        RuntimeType.U32 => new CompiledValue((uint)~value.U32),
-        RuntimeType.I32 => new CompiledValue((int)~value.I32),
-        _ => throw new RuntimeException($"Can't do ~ operation with type {value.Type}"),
-    };
+        Flags flags = default;
+        int result = ALU.BitwiseNot(value.I32, ref flags, value.BitWidth);
+        return new CompiledValue(result, value.Type);
+    }
 }

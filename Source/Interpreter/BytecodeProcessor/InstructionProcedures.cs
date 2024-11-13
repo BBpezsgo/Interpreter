@@ -272,13 +272,10 @@ public ref partial struct ProcessorState
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
-        int dst = GetData(CurrentInstruction.Operand1);
-        int src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst | src);
-
-        Registers.Flags.SetSign(dst, CurrentInstruction.BitWidth);
-        Registers.Flags.SetZero(dst, CurrentInstruction.BitWidth);
-        Registers.Flags.Set(Flags.Carry, false);
+        int a = GetData(CurrentInstruction.Operand1);
+        int b = GetData(CurrentInstruction.Operand2);
+        a = ALU.BitwiseOr(a, b, ref Registers.Flags, CurrentInstruction.BitWidth);
+        SetData(CurrentInstruction.Operand1, a);
 
         Step();
     }
@@ -289,13 +286,10 @@ public ref partial struct ProcessorState
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
-        int dst = GetData(CurrentInstruction.Operand1);
-        int src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst ^ src);
-
-        Registers.Flags.SetSign(dst, CurrentInstruction.BitWidth);
-        Registers.Flags.SetZero(dst, CurrentInstruction.BitWidth);
-        Registers.Flags.Set(Flags.Carry, false);
+        int a = GetData(CurrentInstruction.Operand1);
+        int b = GetData(CurrentInstruction.Operand2);
+        a = ALU.BitwiseXor(a, b, ref Registers.Flags, CurrentInstruction.BitWidth);
+        SetData(CurrentInstruction.Operand1, a);
 
         Step();
     }
@@ -306,8 +300,9 @@ public ref partial struct ProcessorState
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
-        int dst = GetData(CurrentInstruction.Operand1);
-        SetData(CurrentInstruction.Operand1, ~dst);
+        int a = GetData(CurrentInstruction.Operand1);
+        a = ALU.BitwiseNot(a, ref Registers.Flags, CurrentInstruction.BitWidth);
+        SetData(CurrentInstruction.Operand1, a);
 
         Step();
     }
@@ -318,13 +313,10 @@ public ref partial struct ProcessorState
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
-        int dst = GetData(CurrentInstruction.Operand1);
-        int src = GetData(CurrentInstruction.Operand2);
-        SetData(CurrentInstruction.Operand1, dst & src);
-
-        Registers.Flags.SetSign(dst, CurrentInstruction.BitWidth);
-        Registers.Flags.SetZero(dst, CurrentInstruction.BitWidth);
-        Registers.Flags.Set(Flags.Carry, false);
+        int a = GetData(CurrentInstruction.Operand1);
+        int b = GetData(CurrentInstruction.Operand2);
+        a = ALU.BitwiseAnd(a, b, ref Registers.Flags, CurrentInstruction.BitWidth);
+        SetData(CurrentInstruction.Operand1, a);
 
         Step();
     }
@@ -358,13 +350,7 @@ public ref partial struct ProcessorState
         int a = GetData(CurrentInstruction.Operand1);
         int b = GetData(CurrentInstruction.Operand2);
 
-        a = CurrentInstruction.BitWidth switch
-        {
-            BitWidth._8 => ((byte)(a.U8() / b.U8())).I32(),
-            BitWidth._16 => ((char)(a.U16() / b.U16())).I32(),
-            BitWidth._32 => ((int)(a.I32() / b.I32())).I32(),
-            _ => throw new UnreachableException(),
-        };
+        a = ALU.DivideI(a, b, ref Registers.Flags, CurrentInstruction.BitWidth);
         SetData(CurrentInstruction.Operand1, a);
 
         Step();
@@ -395,13 +381,7 @@ public ref partial struct ProcessorState
         int a = GetData(CurrentInstruction.Operand1);
         int b = GetData(CurrentInstruction.Operand2);
 
-        a = CurrentInstruction.BitWidth switch
-        {
-            BitWidth._8 => ((byte)(a.U8() * b.U8())).I32(),
-            BitWidth._16 => ((char)(a.U16() * b.U16())).I32(),
-            BitWidth._32 => ((int)(a.I32() * b.I32())).I32(),
-            _ => throw new UnreachableException(),
-        };
+        a = ALU.MultiplyI(a, b, ref Registers.Flags, CurrentInstruction.BitWidth);
         SetData(CurrentInstruction.Operand1, a);
 
         Registers.Flags.SetCarry(a, CurrentInstruction.BitWidth);
@@ -415,17 +395,11 @@ public ref partial struct ProcessorState
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMath.Auto();
 #endif
 
-        int dst = GetData(CurrentInstruction.Operand1);
-        int src = GetData(CurrentInstruction.Operand2);
+        int a = GetData(CurrentInstruction.Operand1);
+        int b = GetData(CurrentInstruction.Operand2);
 
-        dst = CurrentInstruction.BitWidth switch
-        {
-            BitWidth._8 => ((byte)(dst.U8() % src.U8())).I32(),
-            BitWidth._16 => ((char)(dst.U16() % src.U16())).I32(),
-            BitWidth._32 => ((int)(dst.I32() % src.I32())).I32(),
-            _ => throw new UnreachableException(),
-        };
-        SetData(CurrentInstruction.Operand1, dst);
+        a = ALU.ModuloI(a, b, ref Registers.Flags, CurrentInstruction.BitWidth);
+        SetData(CurrentInstruction.Operand1, a);
 
         Step();
     }

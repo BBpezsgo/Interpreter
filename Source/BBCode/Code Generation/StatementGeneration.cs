@@ -1,4 +1,4 @@
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -15,11 +15,18 @@ public record struct ParameterCleanupItem(int Size, bool CanDeallocate, GeneralT
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
+    bool AllowLoopUnrolling => !Settings.DontOptimize;
+    bool AllowFunctionInlining => !Settings.DontOptimize;
+    bool AllowPrecomputing => !Settings.DontOptimize;
+    bool AllowEvaluating => !Settings.DontOptimize;
+    bool AllowOtherOptimizations => !Settings.DontOptimize;
+    bool AllowInstructionLevelOptimizations => !Settings.DontOptimize;
+
     #region AddInstruction()
 
     void AddInstruction(PreparationInstruction instruction)
     {
-        if (!Settings.DontOptimize)
+        if (AllowInstructionLevelOptimizations)
         {
             if ((instruction.Opcode is
                 Opcode.Jump or
@@ -68,17 +75,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void AddInstruction(
         Opcode opcode,
-        CompiledValue operand)
-        => AddInstruction(new PreparationInstruction(opcode, new InstructionOperand(operand)));
-
-    void AddInstruction(
-        Opcode opcode,
         int operand)
-        => AddInstruction(new PreparationInstruction(opcode, new InstructionOperand(new CompiledValue(operand))));
-
-    void AddInstruction(
-        Opcode opcode,
-        bool operand)
         => AddInstruction(new PreparationInstruction(opcode, new InstructionOperand(new CompiledValue(operand))));
 
     void AddInstruction(Opcode opcode,
@@ -826,6 +823,54 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
+        if (AllowEvaluating &&
+            TryEvaluate(compiledFunction, functionCall.MethodArguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
+            returnValue.HasValue &&
+            runtimeStatements.Length == 0)
+        {
+            functionCall.PredictedValue = returnValue.Value;
+            if (!functionCall.SaveValue)
+            {
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Function call fully trimmed", functionCall));
+            }
+            else
+            {
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Function evaluated with result \"{returnValue.Value}\"", functionCall));
+                Push(returnValue.Value);
+            }
+            return;
+        }
+
+        if (AllowFunctionInlining &&
+            compiledFunction.IsInlineable &&
+            InlineMacro(compiledFunction, functionCall.MethodArguments, out Statement? inlined))
+        {
+            bool bad = false;
+            foreach (StatementWithValue argument in functionCall.MethodArguments)
+            {
+                if (IsObservable(argument))
+                {
+                    bad = true;
+                    // Debugger.Break();
+                    break;
+                }
+            }
+
+            if (!bad)
+            {
+                if (!compiledFunction.ReturnSomething)
+                {
+                    Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", functionCall));
+                    GenerateCodeForStatement(inlined);
+                    return;
+                }
+                else
+                {
+                    // Debugger.Break();
+                }
+            }
+        }
+
         AddComment($"Call \"{compiledFunction.ToReadable()}\" {{");
 
         Stack<ParameterCleanupItem> parameterCleanup;
@@ -909,16 +954,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (anyCall.PrevStatement is IReferenceableTo<CompiledFunction> _ref1)
             { _ref1.Reference = compiledFunction; }
 
-            if (!Settings.DontOptimize &&
-                TryEvaluate(compiledFunction, functionCall.MethodArguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
-                returnValue.HasValue &&
-                runtimeStatements.Length == 0)
-            {
-                anyCall.PredictedValue = returnValue.Value;
-                Push(returnValue.Value);
-                return;
-            }
-
             GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
 
             if (functionCall.CompiledType is not null)
@@ -994,8 +1029,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(BinaryOperatorCall @operator, GeneralType? expectedType = null)
     {
-        if (!Settings.DontOptimize && TryCompute(@operator, out CompiledValue predictedValue))
+        if (AllowEvaluating &&
+            TryCompute(@operator, out CompiledValue predictedValue))
         {
+            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{predictedValue}\"", @operator));
             OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
             @operator.PredictedValue = predictedValue;
 
@@ -1265,8 +1302,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(UnaryOperatorCall @operator)
     {
-        if (!Settings.DontOptimize && TryCompute(@operator, out CompiledValue predictedValue))
+        if (AllowEvaluating &&
+            TryCompute(@operator, out CompiledValue predictedValue))
         {
+            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{predictedValue}\"", @operator));
             OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
             @operator.PredictedValue = predictedValue;
 
@@ -1702,11 +1741,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(WhileLoop whileLoop)
     {
-        if (!Settings.DontOptimize &&
+        if (AllowEvaluating &&
             TryCompute(whileLoop.Condition, out CompiledValue condition))
         {
             if (condition)
             {
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"While loop condition evaluated as true", whileLoop.Condition));
                 AddComment("while (1) {");
 
                 OnScopeEnter(whileLoop.Block, false);
@@ -1730,6 +1770,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else
             {
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"While loop fully trimmed", whileLoop));
                 AddComment("while (0) { }");
             }
             return;
@@ -1779,11 +1820,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("For-loop variable");
         GenerateCodeForStatement(forLoop.VariableDeclaration);
 
-        if (!Settings.DontOptimize &&
+        if (AllowEvaluating &&
             TryCompute(forLoop.Condition, out CompiledValue condition))
         {
             if (condition)
             {
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop condition evaluated as true", forLoop.Condition));
+
                 AddComment("For-loop condition");
                 int beginOffset = GeneratedCode.Count;
 
@@ -1805,6 +1848,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else
             {
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop fully trimmed", forLoop));
+
                 OnScopeExit(forLoop.Position.After(), forLoop.File);
 
                 AddComment("}");
@@ -1852,16 +1897,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (ifSegment is IfBranch partIf)
             {
-                if (!Settings.DontOptimize &&
+                if (AllowEvaluating &&
                     TryCompute(partIf.Condition, out CompiledValue condition))
                 {
                     if (!condition)
                     {
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"If branch fully trimmed", partIf));
+
                         AddComment("if (0) { }");
                         continue;
                     }
                     else
                     {
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"If condition evaluated as true", partIf.Condition));
+
                         AddComment("if (1) {");
                         GenerateCodeForStatement(partIf.Block);
                         AddComment("}");
@@ -1897,16 +1946,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else if (ifSegment is ElseIfBranch partElseif)
             {
-                if (!Settings.DontOptimize &&
+                if (AllowEvaluating &&
                     TryCompute(partElseif.Condition, out CompiledValue condition))
                 {
                     if (!condition)
                     {
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Else-if branch fully trimmed", partElseif));
+
                         AddComment("elseif (0) { }");
                         continue;
                     }
                     else
                     {
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Else-if condition evaluated as ture", partElseif.Condition));
+
                         AddComment("elseif (1) {");
                         GenerateCodeForStatement(partElseif.Block);
                         AddComment("}");
@@ -2387,12 +2440,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (!Settings.DontOptimize &&
+        if (AllowEvaluating &&
             targetType.Is(out BuiltinType? targetBuiltinType) &&
             TryComputeSimple(typeCast.PrevStatement, out CompiledValue prevValue) &&
-            prevValue.TryCast(targetBuiltinType.RuntimeType, out prevValue))
+            prevValue.TryCast(targetBuiltinType.RuntimeType, out CompiledValue castedValue))
         {
-            Push(prevValue);
+            Diagnostics.Add(Diagnostic.OptimizationNotice($"Type cast evaluated, converting {prevValue} to {castedValue}", typeCast));
+
+            Push(castedValue);
             return;
         }
 
@@ -2483,6 +2538,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!Settings.DontOptimize &&
             block.Statements.Length == 0)
         {
+            Diagnostics.Add(Diagnostic.OptimizationNotice($"Empty block", block));
             AddComment("Statements { }");
             return;
         }
@@ -2920,11 +2976,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int size;
 
-        if (!Settings.DontOptimize &&
+        if (AllowEvaluating &&
             TryCompute(newVariable.InitialValue, out CompiledValue computedInitialValue))
         {
             if (computedInitialValue.TryCast(compiledVariable.Type, out CompiledValue castedInitialValue))
             { computedInitialValue = castedInitialValue; }
+
+            Diagnostics.Add(Diagnostic.OptimizationNotice($"Variable initial value evaluated as {castedInitialValue}", newVariable.InitialValue));
 
             newVariable.InitialValue.PredictedValue = computedInitialValue;
 

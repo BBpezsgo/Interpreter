@@ -98,6 +98,12 @@ public static class LanguageConstants
         DeclarationKeywords.Template,
         DeclarationKeywords.Alias,
 
+        ModifierKeywords.Temp,
+        ModifierKeywords.Ref,
+        ModifierKeywords.This,
+        ModifierKeywords.Const,
+        ModifierKeywords.Inline,
+
         TypeKeywords.Void,
         TypeKeywords.Any,
 

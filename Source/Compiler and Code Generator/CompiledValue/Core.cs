@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using LanguageCore.Runtime;
 
 namespace LanguageCore.Compiler;
 
@@ -19,6 +20,18 @@ public readonly partial struct CompiledValue
     [FieldOffset(1)] public readonly uint U32;
 
     public bool IsNull => Type == RuntimeType.Null;
+
+    public BitWidth BitWidth => Type switch
+    {
+        RuntimeType.U8 => BitWidth._8,
+        RuntimeType.I8 => BitWidth._8,
+        RuntimeType.Char => BitWidth._16,
+        RuntimeType.I16 => BitWidth._16,
+        RuntimeType.U32 => BitWidth._32,
+        RuntimeType.I32 => BitWidth._32,
+        RuntimeType.F32 => BitWidth._32,
+        _ => default,
+    };
 
     #region Constructors
 

@@ -25,7 +25,7 @@ public partial class InterpreterElement
         else
         { stackDebugInfo = CollectedScopeInfo.Empty; }
 
-        ReadOnlySpan<int> savedBasePointers = DebugUtils.TraceBasePointers(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation.IsEmpty ? null : Interpreter.DebugInformation.StackOffsets);
+        ReadOnlySpan<CallTraceItem> callTrace = DebugUtils.TraceStack(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation.IsEmpty ? null : Interpreter.DebugInformation.StackOffsets);
 
         List<DataMovement> loadIndicators = new();
         List<DataMovement> storeIndicators = new();
@@ -33,7 +33,7 @@ public partial class InterpreterElement
         if (Interpreter.Processor.NextInstruction.HasValue)
         { GetDataMovementIndicators(Interpreter.Processor.NextInstruction.Value, loadIndicators, storeIndicators); }
 
-        void DrawElement(int address, byte item, ReadOnlySpan<int> savedBasePointers)
+        void DrawElement(int address, byte item, ReadOnlySpan<CallTraceItem> callTrace)
         {
             if (Interpreter.Processor.Registers.BasePointer == address)
             {
@@ -41,7 +41,7 @@ public partial class InterpreterElement
                 b.AddText('►');
                 b.ForegroundColor = CharColor.Silver;
             }
-            else if (savedBasePointers.Contains(address))
+            else if (callTrace.Contains(v => v.BasePointer == address))
             {
                 b.ForegroundColor = CharColor.Silver;
                 b.AddText('►');
@@ -218,7 +218,7 @@ public partial class InterpreterElement
             }
         }
 
-        void DrawElementWInfo(int address, byte item, ReadOnlySpan<int> savedBasePointers, StackElementInformation info)
+        void DrawElementWInfo(int address, byte item, ReadOnlySpan<CallTraceItem> callTrace, StackElementInformation info)
         {
             Range<int> range = info.GetRange(Interpreter.Processor.Registers.BasePointer, Interpreter.Processor.StackStart);
 
@@ -226,7 +226,7 @@ public partial class InterpreterElement
             {
                 b.ForegroundColor = CharColor.Silver;
 
-                DrawElement(address, item, savedBasePointers);
+                DrawElement(address, item, callTrace);
 
                 b.ForegroundColor = CharColor.Gray;
                 b.AddText($" ({info.Kind}) ");
@@ -267,11 +267,11 @@ public partial class InterpreterElement
                 b.FinishLine();
                 b.ForegroundColor = CharColor.Silver;
 
-                DrawElement(address, item, savedBasePointers);
+                DrawElement(address, item, callTrace);
             }
             else if (range.End == address)
             {
-                DrawElement(address, item, savedBasePointers);
+                DrawElement(address, item, callTrace);
 
                 b.BackgroundColor = CharColor.Black;
                 b.FinishLine();
@@ -281,7 +281,7 @@ public partial class InterpreterElement
             }
             else
             {
-                DrawElement(address, item, savedBasePointers);
+                DrawElement(address, item, callTrace);
             }
         }
 
@@ -299,9 +299,9 @@ public partial class InterpreterElement
             byte item = Interpreter.Processor.Memory[i];
 
             if (stackDebugInfo.TryGet(Interpreter.Processor.Registers.BasePointer, Interpreter.Processor.StackStart, i, out StackElementInformation itemDebugInfo))
-            { DrawElementWInfo(i, item, savedBasePointers, itemDebugInfo); }
+            { DrawElementWInfo(i, item, callTrace, itemDebugInfo); }
             else
-            { DrawElement(i, item, savedBasePointers); }
+            { DrawElement(i, item, callTrace); }
 
             b.BackgroundColor = CharColor.Black;
             b.FinishLine();
@@ -334,9 +334,9 @@ public partial class InterpreterElement
             byte item = Interpreter.Processor.Memory[nextEmpty];
 
             if (stackDebugInfo.TryGet(Interpreter.Processor.Registers.BasePointer, Interpreter.Processor.StackStart, nextEmpty, out StackElementInformation itemDebugInfo))
-            { DrawElementWInfo(nextEmpty, item, savedBasePointers, itemDebugInfo); }
+            { DrawElementWInfo(nextEmpty, item, callTrace, itemDebugInfo); }
             else
-            { DrawElement(nextEmpty, item, savedBasePointers); }
+            { DrawElement(nextEmpty, item, callTrace); }
 
             b.BackgroundColor = CharColor.Black;
             b.FinishLine();

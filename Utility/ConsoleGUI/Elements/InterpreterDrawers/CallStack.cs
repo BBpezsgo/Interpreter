@@ -16,7 +16,7 @@ public partial class InterpreterElement
 
         sender.DrawBuffer.ResetColor();
 
-        ReadOnlySpan<int> callTraceRaw = DebugUtils.TraceCalls(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation.IsEmpty ? null : Interpreter.DebugInformation.StackOffsets);
+        ReadOnlySpan<CallTraceItem> callTraceRaw = DebugUtils.TraceStack(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation.IsEmpty ? null : Interpreter.DebugInformation.StackOffsets);
 
         FunctionInformation[] callStack;
         if (!Interpreter.DebugInformation.IsEmpty)
@@ -43,7 +43,7 @@ public partial class InterpreterElement
             if (!callFrame.IsValid)
             {
                 sender.DrawBuffer.ForegroundColor = CharColor.BrightCyan;
-                sender.DrawBuffer.AddText(callTraceRaw[i].ToString(CultureInfo.InvariantCulture));
+                sender.DrawBuffer.AddText(callTraceRaw[i].InstructionPointer.ToString(CultureInfo.InvariantCulture));
             }
             else
             {

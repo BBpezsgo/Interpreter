@@ -1,4 +1,4 @@
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.BBLang.Generator;

@@ -10,10 +10,10 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
     bool IsDisposed;
     public RuntimeContext? Context { get; set; }
     public CompiledDebugInformation DebugInformation { get; set; }
-    public ReadOnlySpan<int> CallTrace =>
-        Context is null ? ReadOnlySpan<int>.Empty :
-        DebugInformation.IsEmpty ? ReadOnlySpan<int>.Empty :
-        DebugUtils.TraceCalls(Context.Value.Memory.AsSpan(), Context.Value.Registers.BasePointer, DebugInformation.StackOffsets);
+    public ReadOnlySpan<CallTraceItem> CallTrace =>
+        Context is null ? ReadOnlySpan<CallTraceItem>.Empty :
+        DebugInformation.IsEmpty ? ReadOnlySpan<CallTraceItem>.Empty :
+        DebugUtils.TraceStack(Context.Value.Memory.AsSpan(), Context.Value.Registers.BasePointer, DebugInformation.StackOffsets);
 
     public RuntimeException(string message) : base(message) { }
     public RuntimeException(string message, RuntimeContext context, CompiledDebugInformation debugInformation) : base(message)
@@ -150,16 +150,8 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
 
                     break;
                 case AliasType aliasType:
-                    if (aliasType.FinalValue is BuiltinType)
-                    {
-                        if (colored) result.SetGraphics(Ansi.BrightForegroundBlue);
-                        result.Append(type.ToString());
-                    }
-                    else
-                    {
-                        if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
-                        result.Append(type.ToString());
-                    }
+                    if (colored) result.SetGraphics(Ansi.ForegroundGreen);
+                    result.Append(type.ToString());
                     break;
                 default:
                     if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
@@ -183,21 +175,21 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                 return;
             }
             ReadOnlySpan<byte> value = context.Memory.AsSpan()[range.Start..(range.End + 1)];
-            if (type.Equals(BasicType.F32))
+            if (type.SameAs(BasicType.F32))
             { result.Append(value.To<float>() + "f"); }
-            else if (type.Equals(BasicType.U8))
+            else if (type.SameAs(BasicType.U8))
             { result.Append(value.To<byte>()); }
-            else if (type.Equals(BasicType.I8))
+            else if (type.SameAs(BasicType.I8))
             { result.Append(value.To<sbyte>()); }
-            else if (type.Equals(BasicType.Char))
+            else if (type.SameAs(BasicType.Char))
             { result.Append($"'{value.To<char>().Escape()}'"); }
-            else if (type.Equals(BasicType.I16))
+            else if (type.SameAs(BasicType.I16))
             { result.Append(value.To<short>()); }
-            else if (type.Equals(BasicType.U32))
+            else if (type.SameAs(BasicType.U32))
             { result.Append(value.To<uint>()); }
-            else if (type.Equals(BasicType.I32))
+            else if (type.SameAs(BasicType.I32))
             { result.Append(value.To<int>()); }
-            else if (type is PointerType pointerType)
+            else if (type.Is(out PointerType? pointerType))
             {
                 result.Append('*');
                 result.Append(value.To<int>());
@@ -205,12 +197,14 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                 if (pointerType.To is ArrayType toArrayType &&
                     !toArrayType.ComputedLength.HasValue)
                 {
+                    result.Append(" -> ");
                     result.Append("[ ? ]");
                 }
                 else if (pointerType.To is BuiltinType toBuiltinType &&
-                    toBuiltinType.Equals(BasicType.Any))
+                    toBuiltinType.SameAs(BasicType.Any))
                 {
-                    result.Append("?");
+                    result.Append(" -> ");
+                    result.Append('?');
                 }
                 else
                 {
@@ -219,7 +213,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                     AppendValue(pointerTo, pointerType.To);
                 }
             }
-            else if (type is StructType structType)
+            else if (type.Is(out StructType? structType))
             {
                 result.Append("{ ");
                 if (!structType.GetFields(runtimeInfoProvider, out ImmutableDictionary<CompiledField, int>? _fields, out _))
@@ -246,10 +240,10 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             { result.AppendJoin(' ', value.ToArray()); }
         }
 
-        void AppendScope(int codePointer)
+        void AppendScope(CallTraceItem tracedScope)
         {
             if (DebugInformation.IsEmpty) return;
-            ImmutableArray<ScopeInformation> scopes = DebugInformation.GetScopes(codePointer);
+            ImmutableArray<ScopeInformation> scopes = DebugInformation.GetScopes(tracedScope.InstructionPointer);
             if (scopes.IsEmpty) return;
 
             int scopeDepth = 0;
@@ -270,9 +264,12 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                     // { value = context.Memory.Slice(0 - item.Address, item.Size); }
                     result.Append(' ', CallStackIndent);
                     result.Append(' ', scopeDepth);
-                    result.Append("(");
+                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
+                    result.Append('(');
                     result.Append(range.Start);
-                    result.Append(") ");
+                    result.Append(')');
+                    result.Append(' ');
+                    if (colored) result.ResetStyle();
                     AppendType(item.Type);
                     result.Append(' ');
                     if (item.Kind == StackElementKind.Internal)
@@ -378,7 +375,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                         result.Append(' ', CallStackIndent);
 
                         if (!AppendFrame(callStack[i]))
-                        { result.Append($"<unknown> {CallTrace[i]}"); }
+                        { result.Append($"<unknown> {CallTrace[i].InstructionPointer}"); }
 
                         result.AppendLine();
 
@@ -395,7 +392,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
         result.Append(" (current)");
         result.AppendLine();
 
-        AppendScope(context.Registers.CodePointer);
+        AppendScope(new CallTraceItem(context.Registers.BasePointer, context.Registers.CodePointer));
 
         return result.ToString();
     }

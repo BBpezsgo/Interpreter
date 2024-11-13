@@ -151,16 +151,12 @@ public readonly struct InstructionOperand
 
     public InstructionOperand(CompiledValue value)
     {
-        (Value, Type) = value.Type switch
+        (Value, Type) = value.BitWidth switch
         {
-            RuntimeType.Null => (default(int), InstructionOperandType.Immediate32),
-            RuntimeType.U8 => (value.U8.I32(), InstructionOperandType.Immediate8),
-            RuntimeType.I8 => (value.I8.I32(), InstructionOperandType.Immediate8),
-            RuntimeType.Char => (value.Char.I32(), InstructionOperandType.Immediate16),
-            RuntimeType.I16 => (value.I16.I32(), InstructionOperandType.Immediate16),
-            RuntimeType.U32 => (value.U32.I32(), InstructionOperandType.Immediate32),
-            RuntimeType.I32 => (value.I32.I32(), InstructionOperandType.Immediate32),
-            RuntimeType.F32 => (value.F32.I32(), InstructionOperandType.Immediate32),
+            default(BitWidth) => (default(int), InstructionOperandType.Immediate32),
+            BitWidth._8 => (value.U8.I32(), InstructionOperandType.Immediate8),
+            BitWidth._16 => (value.Char.I32(), InstructionOperandType.Immediate16),
+            BitWidth._32 => (value.U32.I32(), InstructionOperandType.Immediate32),
             _ => throw new UnreachableException(),
         };
     }

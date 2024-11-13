@@ -85,6 +85,18 @@ public static class GeneralExtensions
 #endif
     }
 
+    public static bool Contains<T>(this ReadOnlySpan<T> collection, Predicate<T> predicate)
+    {
+        for (int i = 0; i < collection.Length; i++)
+        {
+            if (predicate.Invoke(collection[i]))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static bool Contains(this StringBuilder stringBuilder, char value)
     {
 #if NET_STANDARD

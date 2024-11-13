@@ -209,14 +209,14 @@ public readonly struct CompiledDebugInformation
         return success;
     }
 
-    public ImmutableArray<FunctionInformation> GetFunctionInformation(ReadOnlySpan<int> codePointers)
-        => GetFunctionInformation(FunctionInformation.AsSpan(), codePointers);
-    public static ImmutableArray<FunctionInformation> GetFunctionInformation(ReadOnlySpan<FunctionInformation> functionInformation, ReadOnlySpan<int> codePointers)
+    public ImmutableArray<FunctionInformation> GetFunctionInformation(ReadOnlySpan<CallTraceItem> callTrace)
+        => GetFunctionInformation(FunctionInformation.AsSpan(), callTrace);
+    public static ImmutableArray<FunctionInformation> GetFunctionInformation(ReadOnlySpan<FunctionInformation> functionInformation, ReadOnlySpan<CallTraceItem> callTrace)
     {
-        FunctionInformation[] result = new FunctionInformation[codePointers.Length];
-        for (int i = 0; i < codePointers.Length; i++)
+        FunctionInformation[] result = new FunctionInformation[callTrace.Length];
+        for (int i = 0; i < callTrace.Length; i++)
         {
-            result[i] = GetFunctionInformation(functionInformation, codePointers[i]);
+            result[i] = GetFunctionInformation(functionInformation, callTrace[i].InstructionPointer);
         }
         return result.ToImmutableArray();
     }

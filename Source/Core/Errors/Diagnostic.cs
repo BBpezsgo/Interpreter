@@ -24,13 +24,13 @@ public class Diagnostic :
     bool _isDebugged;
 #endif
 
-    Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, bool _break, IEnumerable<Diagnostic?> suberrors)
+    Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, bool _break, IEnumerable<Diagnostic?>? suberrors)
     {
         Level = level;
         Message = message;
         Position = position;
         File = file;
-        SubErrors = suberrors.Where(v => v is not null).ToImmutableArray()!;
+        SubErrors = suberrors is null ? ImmutableArray<Diagnostic>.Empty : suberrors.Where(v => v is not null).ToImmutableArray()!;
 
         _isDebugged = false;
 
@@ -38,13 +38,13 @@ public class Diagnostic :
         { Break(); }
     }
 
-    public Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, IEnumerable<Diagnostic?> suberrors)
+    public Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, IEnumerable<Diagnostic?>? suberrors)
     {
         Level = level;
         Message = message;
         Position = position;
         File = file;
-        SubErrors = suberrors.Where(v => v is not null).ToImmutableArray()!;
+        SubErrors = suberrors is null ? ImmutableArray<Diagnostic>.Empty : suberrors.Where(v => v is not null).ToImmutableArray()!;
         _isDebugged = false;
 
         if (level == DiagnosticsLevel.Error)

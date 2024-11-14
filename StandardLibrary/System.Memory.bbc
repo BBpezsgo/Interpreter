@@ -1,10 +1,16 @@
+#if BRAINFUCK
 alias BlockHeader u8;
+const BlockHeader StatusFlag = 0x80;
+const BlockHeader SizeMask = 0x7f;
+#else
+alias BlockHeader u32;
+const BlockHeader StatusFlag = 0x80000000;
+const BlockHeader SizeMask = 0x7fffffff;
+#endif
+
 alias bool u8;
 
-const byte StatusFlag = 0x80;
-const byte SizeMask = 0x7f;
-const byte MaxHeapSize = SizeMask;
-const byte InitialHeapSize = SizeMask;
+const int HeapSize = 127;
 const int HeaderSize = sizeof(BlockHeader);
 
 const bool true = (bool)1;
@@ -12,7 +18,7 @@ const bool false = (bool)0;
 
 #if BRAINFUCK
 #else
-*0 = (BlockHeader)InitialHeapSize;
+*0 = (BlockHeader)HeapSize;
 #endif
 
 export void GetHeader(BlockHeader* headerPtr, int* size, bool* allocated)
@@ -44,13 +50,13 @@ bool JoinFreeBlocks()
 {
     BlockHeader* headerPointer = 0 as BlockHeader*;
     int prevBlockSize = 0;
-    while (headerPointer < (int)MaxHeapSize)
+    while (headerPointer < HeapSize)
     {
         int blockSize;
         bool blockUsed;
         GetHeader(headerPointer, &blockSize, &blockUsed);
 
-        if (headerPointer != 0 && blockUsed == 0)
+        if (headerPointer != 0 && blockUsed == false)
         {
             BlockHeader* prevOffset = (headerPointer - prevBlockSize - HeaderSize) as BlockHeader*;
 
@@ -58,7 +64,7 @@ bool JoinFreeBlocks()
             bool prevBlockUsed;
             GetHeader(prevOffset, &_temp, &prevBlockUsed);
 
-            if (prevBlockUsed == 0)
+            if (prevBlockUsed == false)
             {
                 SetHeaderFree(prevOffset, blockSize + prevBlockSize + HeaderSize);
                 *headerPointer = (BlockHeader)0;
@@ -84,14 +90,14 @@ export any* Alloc(int sizeNeed)
     BlockHeader* headerPointer = 0 as BlockHeader*;
     while (true)
     {
-        if (headerPointer >= (int)MaxHeapSize) { crash "Out of memory"; }
+        if (headerPointer >= HeapSize) { crash "Out of memory"; }
 
         int blockSize;
         bool blockUsed;
         GetHeader(headerPointer, &blockSize, &blockUsed);
         any* dataPointer = (headerPointer + HeaderSize) as any*;
 
-        if (blockUsed == 0)
+        if (blockUsed == false)
         {
             if (blockSize == sizeNeed)
             {
@@ -134,7 +140,7 @@ export void Dealloc(any* pointer)
 
     GetHeader(headerPtr, &size, &allocated);
 
-    if (allocated == 0)
+    if (allocated == false)
     { return; }
 
     SetHeaderFree(headerPtr, size);

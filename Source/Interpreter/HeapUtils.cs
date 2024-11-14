@@ -1,50 +1,59 @@
-﻿namespace LanguageCore.Runtime;
+﻿using BytecodeHeapHeader = System.UInt32;
+using BrainfuckHeapHeader = System.Byte;
+
+namespace LanguageCore.Runtime;
 
 public static class HeapUtils
 {
     public static int GetUsedSize(ReadOnlySpan<byte> heap)
     {
         int used = 0;
-
-        int endlessSafe = heap.Length;
         int i = 0;
-        int blockIndex = 0;
-        while (i + 1 < 127)
+        while (i + BytecodeHeapImplementation.HeaderSize < 127)
         {
-            (int blockSize, bool blockIsUsed) = HeapImplementation.GetHeader(heap[i]);
-
-            if (blockIsUsed)
-            { used += blockSize; }
-
-            i += blockSize + 1;
-            blockIndex++;
-
-            if (endlessSafe-- < 0) throw new EndlessLoopException();
+            (int blockSize, bool blockIsUsed) = BytecodeHeapImplementation.GetHeader(heap, i);
+            if (blockIsUsed) used += blockSize;
+            i += blockSize + BytecodeHeapImplementation.HeaderSize;
         }
-
         return used;
     }
 
     public static string? GetString(ReadOnlySpan<byte> heap, int pointer)
     {
-        if (pointer == 0)
+        if (pointer <= 0 || pointer > heap.Length)
         { return null; }
         StringBuilder result = new();
         for (int i = pointer; heap[i] != 0; i += sizeof(char))
-        { result.Append((char)heap[i]); }
+        {
+            if (i >= heap.Length) return null;
+            result.Append((char)heap[i]);
+        }
         return result.ToString();
     }
 }
 
 [ExcludeFromCodeCoverage]
-public static class HeapImplementation
+public static class BytecodeHeapImplementation
 {
-    const byte BlockSizeMask = 0b_0_1111111;
-    const byte BlockStatusMask = 0b_1_0000000;
-    public const int HeaderSize = sizeof(byte);
+    const BytecodeHeapHeader BlockSizeMask = 0x80000000;
+    const BytecodeHeapHeader BlockStatusMask = 0x7fffffff;
+    public const int HeaderSize = sizeof(BytecodeHeapHeader);
 
-    public static (int Size, bool Allocated) GetHeader(byte header) => (
-        header & BlockSizeMask,
-        (header & BlockStatusMask) != 0
+    public static (int Size, bool Allocated) GetHeader(ReadOnlySpan<byte> memory, int headerPointer) => (
+        (memory.Get<BytecodeHeapHeader>(headerPointer) & BlockSizeMask).I32(),
+        (memory.Get<BytecodeHeapHeader>(headerPointer) & BlockStatusMask) != 0
+    );
+}
+
+[ExcludeFromCodeCoverage]
+public static class BrainfuckHeapImplementation
+{
+    const BrainfuckHeapHeader BlockSizeMask = 0x80;
+    const BrainfuckHeapHeader BlockStatusMask = 0x7f;
+    public const int HeaderSize = sizeof(BrainfuckHeapHeader);
+
+    public static (int Size, bool Allocated) GetHeader(ReadOnlySpan<byte> memory, int headerPointer) => (
+        (memory.Get<BrainfuckHeapHeader>(headerPointer) & BlockSizeMask).I32(),
+        (memory.Get<BrainfuckHeapHeader>(headerPointer) & BlockStatusMask) != 0
     );
 }

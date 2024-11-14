@@ -147,7 +147,7 @@ public class LanguageException : Exception
         exception.Position,
         exception.File,
         exception.InnerException is LanguageException innerLanguageException
-            ? [(Diagnostic)innerLanguageException]
+            ? Enumerable.Repeat((Diagnostic)innerLanguageException, 1)
             : Enumerable.Empty<Diagnostic>()
     );
 }

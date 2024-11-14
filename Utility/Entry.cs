@@ -182,10 +182,9 @@ public static class Entry
                     {
                         int endlessSafe = interpreter.Processor.Memory.Length;
                         int i = 0;
-                        while (i + 1 < 127)
+                        while (i + BytecodeHeapImplementation.HeaderSize < 127)
                         {
-                            byte header = interpreter.Processor.Memory.AsSpan().Get<byte>(i);
-                            (int size, bool status) = HeapImplementation.GetHeader(header);
+                            (int size, bool status) = BytecodeHeapImplementation.GetHeader(interpreter.Processor.Memory, i);
 
                             Console.Write($"BLOCK {i}: ");
 
@@ -201,7 +200,7 @@ public static class Entry
 
                                 for (int j = 0; j < size; j++)
                                 {
-                                    int address = i + HeapImplementation.HeaderSize + j;
+                                    int address = i + BytecodeHeapImplementation.HeaderSize + j;
                                     if (address >= interpreter.Processor.Memory.Length) break;
                                     Console.ForegroundColor = ConsoleColor.Green;
                                     Console.Write(interpreter.Processor.Memory.AsSpan().Get<byte>(address));
@@ -219,7 +218,7 @@ public static class Entry
                                 Console.WriteLine();
                             }
 
-                            i += size + HeapImplementation.HeaderSize;
+                            i += size + BytecodeHeapImplementation.HeaderSize;
 
                             if (endlessSafe-- < 0) throw new EndlessLoopException();
                         }

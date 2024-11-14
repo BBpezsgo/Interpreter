@@ -30,12 +30,12 @@ public partial class InterpreterElement
         {
             byte item = Interpreter.Processor.Memory[i];
             bool isHeader = (nextHeader == i) && (Interpreter.Processor.Memory[i] != 0);
-            (int, bool) header = (default, default);
+            (int, bool) header = default;
 
             if (isHeader)
             {
-                header = HeapImplementation.GetHeader(item);
-                nextHeader += header.Item1 + HeapImplementation.HeaderSize;
+                header = BytecodeHeapImplementation.GetHeader(Interpreter.Processor.Memory, i);
+                nextHeader += header.Item1 + BytecodeHeapImplementation.HeaderSize;
             }
 
             if (i < HeapScrollBar.Offset) continue;

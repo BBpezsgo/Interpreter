@@ -68,8 +68,8 @@ public class BuiltinType : GeneralType,
 
         switch (Type)
         {
-            case BasicType.Void: error = new PossibleDiagnostic($"Type \"{this}\" does not have a size"); return false;
-            case BasicType.Any: error = new PossibleDiagnostic($"Type \"{this}\" does not have a size"); return false;
+            case BasicType.Void: error = new PossibleDiagnostic($"Can't get the size of type \"{this}\""); return false;
+            case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{this}\""); return false;
             case BasicType.U8: size = 1; return true;
             case BasicType.I8: size = 1; return true;
             case BasicType.Char: size = 2; return true;

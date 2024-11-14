@@ -72,23 +72,7 @@ public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
         }
 
         foreach (Diagnostic diagnostic in _diagnostics)
-        {
-            switch (diagnostic.Level)
-            {
-                case DiagnosticsLevel.Error:
-                    Output.LogError(diagnostic);
-                    break;
-                case DiagnosticsLevel.Warning:
-                    Output.LogWarning(diagnostic);
-                    break;
-                case DiagnosticsLevel.Information:
-                    Output.LogInfo(diagnostic);
-                    break;
-                case DiagnosticsLevel.Hint:
-                    Output.LogInfo(diagnostic);
-                    break;
-            }
-        }
+        { Output.LogDiagnostic(diagnostic); }
     }
 
     public void Clear()

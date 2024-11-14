@@ -571,11 +571,13 @@ public class Interactive
 
             if (ex is LanguageException languageException)
             {
-                string? arrows = LanguageException.GetArrows(languageException.Position, Input.ToString());
+                (string SourceCode, string Arrows)? arrows = LanguageException.GetArrows(languageException.Position, Input.ToString());
 
-                if (arrows != null)
+                if (arrows.HasValue)
                 {
-                    output.Append(arrows);
+                    output.Append(arrows.Value.SourceCode);
+                    output.AppendLine();
+                    output.Append(arrows.Value.Arrows);
                     output.AppendLine();
                 }
 
@@ -741,11 +743,13 @@ public class Interactive
             AnsiBuilder output = new()
             { ForegroundColor = InteractiveColors.Error };
 
-            string? arrows = LanguageException.GetArrows(ex.Position, source);
+            (string SourceCode, string Arrows)? arrows = LanguageException.GetArrows(ex.Position, source);
 
-            if (arrows != null)
+            if (arrows.HasValue)
             {
-                output.Append(arrows);
+                output.Append(arrows.Value.SourceCode);
+                output.AppendLine();
+                output.Append(arrows.Value.Arrows);
                 output.AppendLine();
             }
 

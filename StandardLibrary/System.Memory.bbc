@@ -52,7 +52,7 @@ bool JoinFreeBlocks()
 
         if (headerPointer != 0 && blockUsed == 0)
         {
-            BlockHeader* prevOffset = (headerPointer - (int)prevBlockSize - HeaderSize) as BlockHeader*;
+            BlockHeader* prevOffset = (headerPointer - prevBlockSize - HeaderSize) as BlockHeader*;
 
             int _temp;
             bool prevBlockUsed;

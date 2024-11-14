@@ -185,7 +185,7 @@ public static class Entry
                         while (i + 1 < 127)
                         {
                             byte header = interpreter.Processor.Memory.AsSpan().Get<byte>(i);
-                            var (size, status) = HeapImplementation.GetHeader(header);
+                            (int size, bool status) = HeapImplementation.GetHeader(header);
 
                             Console.Write($"BLOCK {i}: ");
 

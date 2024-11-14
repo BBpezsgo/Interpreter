@@ -5,9 +5,9 @@ public delegate void PrintCallback(string message, LogType logType);
 [ExcludeFromCodeCoverage]
 public static class Output
 {
-    public static bool LogDebugs { get; set; } = false;
-    public static bool LogInfos { get; set; } = false;
-    public static bool LogWarnings { get; set; } = false;
+    public static bool LogDebugs { get; set; }
+    public static bool LogInfos { get; set; }
+    public static bool LogWarnings { get; set; }
 
     const ConsoleColor InfoColor = ConsoleColor.Blue;
     const ConsoleColor WarningColor = ConsoleColor.DarkYellow;
@@ -36,42 +36,69 @@ public static class Output
     public static void LogInfo(string message)
     { if (LogInfos) Log(message, InfoColor); }
 
-    public static void LogInfo(Diagnostic information)
-    {
-        if (!LogInfos) return;
-
-        Console.ForegroundColor = InfoColor;
-        Console.WriteLine(information.ToString());
-
-        string? arrows = information.GetArrows();
-        if (arrows != null)
-        { Console.WriteLine(arrows); }
-        Console.ResetColor();
-    }
-
-    public static void LogError(string message)
-    { Log(message, ErrorColor); }
+    public static void LogError(string message) => Log(message, ErrorColor);
 
     public static void LogError(LanguageException exception)
     {
         Console.ForegroundColor = ErrorColor;
         Console.WriteLine(exception.ToString());
 
-        string? arrows = exception.GetArrows();
-        if (arrows != null)
-        { Console.WriteLine(arrows); }
+        (string SourceCode, string Arrows)? arrows = exception.GetArrows();
+        if (arrows.HasValue)
+        {
+            Console.WriteLine(arrows.Value.SourceCode);
+            Console.WriteLine(arrows.Value.Arrows);
+        }
         Console.ResetColor();
     }
 
-    public static void LogError(Diagnostic error)
-    {
-        Console.ForegroundColor = ErrorColor;
-        Console.WriteLine(error.ToString());
+    public static void LogDiagnostic(Diagnostic diagnostic)
+        => LogDiagnostic(diagnostic, 0);
 
-        string? arrows = error.GetArrows();
-        if (arrows != null)
-        { Console.WriteLine(arrows); }
+    static void LogDiagnostic(Diagnostic diagnostic, int depth)
+    {
+        if (!(diagnostic.Level switch
+        {
+            DiagnosticsLevel.Error => true,
+            DiagnosticsLevel.Warning => LogWarnings,
+            DiagnosticsLevel.Information => LogInfos,
+            DiagnosticsLevel.Hint => LogInfos,
+            DiagnosticsLevel.OptimizationNotice => false,
+            _ => false,
+        }))
+        { return; }
+
+        Console.ForegroundColor = diagnostic.Level switch
+        {
+            DiagnosticsLevel.Error => ErrorColor,
+            DiagnosticsLevel.Warning => WarningColor,
+            DiagnosticsLevel.Information => InfoColor,
+            DiagnosticsLevel.Hint => InfoColor,
+            DiagnosticsLevel.OptimizationNotice => DebugColor,
+            _ => DebugColor,
+        };
+
+        Console.Write(new string(' ', depth * 2));
+        Console.WriteLine(diagnostic.ToString());
+        (string SourceCode, string Arrows)? arrows = diagnostic.GetArrows();
+        if (arrows.HasValue)
+        {
+            Console.Write(new string(' ', depth * 2));
+            Console.WriteLine(arrows.Value.SourceCode);
+            Console.Write(new string(' ', depth * 2));
+            Console.WriteLine(arrows.Value.Arrows);
+        }
+
+        if (diagnostic.SubErrors.Length > 0)
+        {
+            Console.Write(new string(' ', depth * 2));
+            Console.WriteLine("-->");
+        }
+
         Console.ResetColor();
+
+        foreach (Diagnostic subdiagnostic in diagnostic.SubErrors)
+        { LogDiagnostic(subdiagnostic, depth + 1); }
     }
 
     public static void LogError(Exception exception)
@@ -84,19 +111,6 @@ public static class Output
     public static void LogWarning(string message)
     { if (LogWarnings) Log(message, WarningColor); }
 
-    public static void LogWarning(Diagnostic warning)
-    {
-        if (!LogWarnings) return;
-
-        Console.ForegroundColor = WarningColor;
-        Console.WriteLine(warning.ToString());
-
-        string? arrows = warning.GetArrows();
-        if (arrows != null)
-        { Console.WriteLine(arrows); }
-        Console.ResetColor();
-    }
-
     public static void LogDebug(string message)
     { if (LogDebugs) Log(message, DebugColor); }
 
@@ -108,12 +122,10 @@ public static class Output
     }
 }
 
-[Flags]
 public enum LogType
 {
-    None = 0x0,
-    Normal = 0x1,
-    Warning = 0x2,
-    Error = 0x4,
-    Debug = 0x8,
+    Normal,
+    Warning,
+    Error,
+    Debug,
 }

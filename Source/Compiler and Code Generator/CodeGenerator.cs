@@ -324,13 +324,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     protected virtual bool GetLocalSymbolType(Identifier symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
-        if (GetVariable(symbolName.Content, out CompiledVariable? variable))
+        if (GetVariable(symbolName.Content, out CompiledVariable? variable, out _))
         {
             type = variable.Type;
             return true;
         }
 
-        if (GetParameter(symbolName.Content, out CompiledParameter? parameter))
+        if (GetParameter(symbolName.Content, out CompiledParameter? parameter, out _))
         {
             type = parameter.Type;
             return true;
@@ -919,6 +919,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                         if (CodeGenerator.CanCastImplicitly(_passed, defined, null, null, out PossibleDiagnostic? error1))
                         { return true; }
 
+                        if (passed is ILocated located &&
+                            error_ is not null)
+                        { error_ = error_.TrySetLocation(located); }
+
                         errors.Add(error1);
                         return false;
                     }))
@@ -964,6 +968,10 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                         fromPtr.To.Is(out ArrayType? fromPtrArray) && toPtr.To.Is(out ArrayType? toPtrArray) &&
                         toPtrArray.Length is null)
                     { return true; }
+
+                    if (passed is ILocated located &&
+                        error_ is not null)
+                    { error_ = error_.TrySetLocation(located); }
 
                     return false;
                 }))
@@ -1577,16 +1585,19 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         File,
     }
 
-    protected bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
+    protected bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         foreach (CompiledVariable compiledVariable_ in CompiledVariables)
         {
             if (compiledVariable_.Identifier.Content == variableName)
             {
                 compiledVariable = compiledVariable_;
+                error = null;
                 return true;
             }
         }
+
+        error = new PossibleDiagnostic($"Variable \"{variableName}\" not found");
         compiledVariable = null;
         return false;
     }
@@ -1664,16 +1675,19 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         return false;
     }
 
-    protected bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
+    protected bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         foreach (CompiledParameter compiledParameter_ in CompiledParameters)
         {
             if (compiledParameter_.Identifier.Content == parameterName)
             {
                 parameter = compiledParameter_;
+                error = null;
                 return true;
             }
         }
+
+        error = new PossibleDiagnostic($"Parameter \"{parameterName}\" not found");
         parameter = null;
         return false;
     }
@@ -1900,13 +1914,15 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         }
     }
 
-    protected static CompiledValue GetInitialValue(GeneralType type) => type.FinalValue switch
+    protected static CompiledValue GetInitialValue(NumericType type, BitWidth bitWidth) => (type, bitWidth) switch
     {
-        GenericType => throw new NotImplementedException($"Initial value for type arguments is bruh moment"),
-        StructType => throw new NotImplementedException($"Initial value for structs is not implemented"),
-        FunctionType => new CompiledValue(0),
-        BuiltinType builtinType => GetInitialValue(builtinType.Type),
-        PointerType => new CompiledValue(0),
+        (NumericType.Float, _) => new CompiledValue(default(float)),
+        (NumericType.SignedInteger, BitWidth._8) => new CompiledValue(default(sbyte)),
+        (NumericType.SignedInteger, BitWidth._16) => new CompiledValue(default(short)),
+        (NumericType.SignedInteger, BitWidth._32) => new CompiledValue(default(int)),
+        (NumericType.UnsignedInteger, BitWidth._8) => new CompiledValue(default(byte)),
+        (NumericType.UnsignedInteger, BitWidth._16) => new CompiledValue(default(ushort)),
+        (NumericType.UnsignedInteger, BitWidth._32) => new CompiledValue(default(uint)),
         _ => throw new NotImplementedException(),
     };
 
@@ -2126,13 +2142,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 BitWidth rightBitWidth = rightType.GetBitWidth(this, Diagnostics, @operator.Right);
                 BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
 
-                if (!leftBType.TryGetNumericType(out NumericType leftNType) ||
-                    !rightBType.TryGetNumericType(out NumericType rightNType))
+                if (!leftBType.TryGetNumericType(out NumericType leftNType1) ||
+                    !rightBType.TryGetNumericType(out NumericType rightNType1))
                 {
                     Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{leftType}\" \"{@operator.Operator.Content}\" \"{rightType}\"", @operator.Operator, @operator.File));
                     return BuiltinType.Void;
                 }
-                NumericType numericType = leftNType > rightNType ? leftNType : rightNType;
+                NumericType numericType = leftNType1 > rightNType1 ? leftNType1 : rightNType1;
 
                 BuiltinType numericResultType = BuiltinType.CreateNumeric(numericType, bitWidth);
 
@@ -2174,10 +2190,42 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             }
         }
 
-        CompiledValue leftValue = GetInitialValue(leftType);
-        CompiledValue rightValue = GetInitialValue(rightType);
+        bool ok = true;
 
-        CompiledValue predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
+        if (!leftType.TryGetNumericType(out NumericType leftNType))
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Type \"{leftType}\" aint a numeric type", @operator.Left));
+            ok = false;
+        }
+
+        if (!rightType.TryGetNumericType(out NumericType rightNType))
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Type \"{rightType}\" aint a numeric type", @operator.Right));
+            ok = false;
+        }
+
+        if (!leftType.GetBitWidth(this, out BitWidth leftBitwidth, out PossibleDiagnostic? error))
+        {
+            Diagnostics.Add(error.ToError(@operator.Left));
+            ok = false;
+        }
+
+        if (!rightType.GetBitWidth(this, out BitWidth rightBitwidth, out error))
+        {
+            Diagnostics.Add(error.ToError(@operator.Right));
+            ok = false;
+        }
+
+        if (!ok) { return BuiltinType.Void; }
+
+        CompiledValue leftValue = GetInitialValue(leftNType, leftBitwidth);
+        CompiledValue rightValue = GetInitialValue(rightNType, rightBitwidth);
+
+        if (!TryCompute(@operator.Operator.Content, leftValue, rightValue, out CompiledValue predictedValue, out PossibleDiagnostic evaluateError))
+        {
+            Diagnostics.Add(evaluateError.ToError(@operator));
+            return BuiltinType.Void;
+        }
 
         result = new BuiltinType(predictedValue.Type);
 
@@ -2346,25 +2394,30 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             return OnGotStatementType(identifier, constant.Type);
         }
 
+        if (GetParameter(identifier.Content, out CompiledParameter? parameter, out PossibleDiagnostic? parameterNotFoundError))
+        {
+            if (identifier.Content != StatementKeywords.This)
+            { identifier.AnalyzedType = TokenAnalyzedType.ParameterName; }
+            identifier.Reference = parameter;
+            return OnGotStatementType(identifier, parameter.Type);
+        }
+
+        if (GetVariable(identifier.Content, out CompiledVariable? variable, out PossibleDiagnostic? variableNotFoundError))
+        {
+            identifier.AnalyzedType = TokenAnalyzedType.VariableName;
+            identifier.Reference = variable;
+            return OnGotStatementType(identifier, variable.Type);
+        }
+
+        if (GetGlobalVariable(identifier.Content, identifier.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
+        {
+            identifier.AnalyzedType = TokenAnalyzedType.VariableName;
+            identifier.Reference = globalVariable;
+            return OnGotStatementType(identifier, globalVariable.Type);
+        }
+
         if (GetLocalSymbolType(identifier, out GeneralType? type))
         {
-            if (GetParameter(identifier.Content, out CompiledParameter? parameter))
-            {
-                if (identifier.Content != StatementKeywords.This)
-                { identifier.AnalyzedType = TokenAnalyzedType.ParameterName; }
-                identifier.Reference = parameter;
-            }
-            else if (GetVariable(identifier.Content, out CompiledVariable? variable))
-            {
-                identifier.AnalyzedType = TokenAnalyzedType.VariableName;
-                identifier.Reference = variable;
-            }
-            else if (GetGlobalVariable(identifier.Content, identifier.File, out CompiledVariable? globalVariable, out _))
-            {
-                identifier.AnalyzedType = TokenAnalyzedType.VariableName;
-                identifier.Reference = globalVariable;
-            }
-
             return OnGotStatementType(identifier, type);
         }
 
@@ -2383,9 +2436,14 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         if (FindType(identifier.Token, identifier.File, out GeneralType? result))
         { return OnGotStatementType(identifier, result); }
 
-        Diagnostics.Add(Diagnostic.Critical($"Symbol \"{identifier.Content}\" not found", identifier));
-        Diagnostics.Add(constantNotFoundError.ToError(identifier));
-        Diagnostics.Add(functionNotFoundError.ToError(identifier));
+        Diagnostics.Add(Diagnostic.Critical(
+            $"Symbol \"{identifier.Content}\" not found",
+            identifier,
+            parameterNotFoundError.ToError(identifier),
+            variableNotFoundError.ToError(identifier),
+            globalVariableNotFoundError.ToError(identifier),
+            constantNotFoundError.ToError(identifier),
+            functionNotFoundError.ToError(identifier)));
         return BuiltinType.Void;
     }
     protected PointerType FindStatementType(AddressGetter addressGetter)
@@ -3350,36 +3408,55 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         }
     }
 
-    public static CompiledValue Compute(string @operator, CompiledValue left, CompiledValue right) => @operator switch
+    public static bool TryCompute(string @operator, CompiledValue left, CompiledValue right, [NotNullWhen(true)] out CompiledValue result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        UnaryOperatorCall.LogicalNOT => !left,
-        UnaryOperatorCall.BinaryNOT => ~left,
+        // TODO: wtf
+        try
+        {
+            error = null;
+            result = @operator switch
+            {
+                UnaryOperatorCall.LogicalNOT => !left,
+                UnaryOperatorCall.BinaryNOT => ~left,
 
-        BinaryOperatorCall.Addition => left + right,
-        BinaryOperatorCall.Subtraction => left - right,
-        BinaryOperatorCall.Multiplication => left * right,
-        BinaryOperatorCall.Division => left / right,
-        BinaryOperatorCall.Modulo => left % right,
+                BinaryOperatorCall.Addition => left + right,
+                BinaryOperatorCall.Subtraction => left - right,
+                BinaryOperatorCall.Multiplication => left * right,
+                BinaryOperatorCall.Division => left / right,
+                BinaryOperatorCall.Modulo => left % right,
 
-        BinaryOperatorCall.LogicalAND => new CompiledValue((bool)left && (bool)right),
-        BinaryOperatorCall.LogicalOR => new CompiledValue((bool)left || (bool)right),
+                BinaryOperatorCall.LogicalAND => new CompiledValue((bool)left && (bool)right),
+                BinaryOperatorCall.LogicalOR => new CompiledValue((bool)left || (bool)right),
 
-        BinaryOperatorCall.BitwiseAND => left & right,
-        BinaryOperatorCall.BitwiseOR => left | right,
-        BinaryOperatorCall.BitwiseXOR => left ^ right,
+                BinaryOperatorCall.BitwiseAND => left & right,
+                BinaryOperatorCall.BitwiseOR => left | right,
+                BinaryOperatorCall.BitwiseXOR => left ^ right,
 
-        BinaryOperatorCall.BitshiftLeft => left << right,
-        BinaryOperatorCall.BitshiftRight => left >> right,
+                BinaryOperatorCall.BitshiftLeft => left << right,
+                BinaryOperatorCall.BitshiftRight => left >> right,
 
-        BinaryOperatorCall.CompLT => new CompiledValue(left < right),
-        BinaryOperatorCall.CompGT => new CompiledValue(left > right),
-        BinaryOperatorCall.CompEQ => new CompiledValue(left == right),
-        BinaryOperatorCall.CompNEQ => new CompiledValue(left != right),
-        BinaryOperatorCall.CompLEQ => new CompiledValue(left <= right),
-        BinaryOperatorCall.CompGEQ => new CompiledValue(left >= right),
+                BinaryOperatorCall.CompLT => new CompiledValue(left < right),
+                BinaryOperatorCall.CompGT => new CompiledValue(left > right),
+                BinaryOperatorCall.CompEQ => new CompiledValue(left == right),
+                BinaryOperatorCall.CompNEQ => new CompiledValue(left != right),
+                BinaryOperatorCall.CompLEQ => new CompiledValue(left <= right),
+                BinaryOperatorCall.CompGEQ => new CompiledValue(left >= right),
 
-        _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
-    };
+                _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
+            };
+            return true;
+        }
+        catch (Exception)
+        {
+            if (left.Type != right.Type)
+            {
+                result = default;
+                error = new PossibleDiagnostic($"Can do {@operator} operator to type {left.Type} and {right.Type}");
+                return false;
+            }
+            throw;
+        }
+    }
 
     bool TryCompute(Pointer pointer, EvaluationContext context, out CompiledValue value)
     {
@@ -3417,9 +3494,9 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         string op = @operator.Operator.Content;
 
-        if (TryCompute(@operator.Right, context, out CompiledValue rightValue))
+        if (TryCompute(@operator.Right, context, out CompiledValue rightValue) &&
+            TryCompute(op, leftValue, rightValue, out value, out _))
         {
-            value = Compute(op, leftValue, rightValue);
             return true;
         }
 
@@ -3779,11 +3856,9 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         string op = @operator.Operator.Content;
 
-        if (TryComputeSimple(@operator.Right, out CompiledValue rightValue))
-        {
-            value = Compute(op, leftValue, rightValue);
-            return true;
-        }
+        if (TryComputeSimple(@operator.Right, out CompiledValue rightValue) &&
+            TryCompute(op, leftValue, rightValue, out value, out _))
+        { return true; }
 
         switch (op)
         {
@@ -4229,7 +4304,20 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             // FIXME: unitialized variable is undefined behavior
             GeneralType iteratorType = GeneralType.From(iteratorVariable.Type, FindType, TryCompute);
             iteratorVariable.Type.SetAnalyzedType(iteratorType);
-            iterator = GetInitialValue(iteratorType);
+            iterator = default;
+
+            if (!iteratorType.GetBitWidth(this, out BitWidth bitWidth, out PossibleDiagnostic? getBitwidthError))
+            {
+                Diagnostics.Add(getBitwidthError.ToError(iteratorVariable));
+            }
+            else if (!iteratorType.TryGetNumericType(out NumericType numericType))
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Type \"{iteratorType}\" aint a numeric type", iteratorVariable));
+            }
+            else
+            {
+                iterator = GetInitialValue(numericType, bitWidth);
+            }
         }
         else
         {
@@ -4376,8 +4464,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         error = default;
         switch (type.Type)
         {
-            case BasicType.Void: error = new PossibleDiagnostic($"Type \"{type}\" does not have a size"); return false;
-            case BasicType.Any: error = new PossibleDiagnostic($"Type \"{type}\" does not have a size"); return false;
+            case BasicType.Void: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
+            case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
             case BasicType.U8: size = 1; return true;
             case BasicType.I8: size = 1; return true;
             case BasicType.Char: size = 2; return true;

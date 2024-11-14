@@ -57,14 +57,14 @@ public class LanguageException : Exception
         return result.ToString();
     }
 
-    public string? GetArrows()
+    public (string SourceCode, string Arrows)? GetArrows()
     {
         if (File == null) return null;
         if (!File.IsFile) return null;
         return GetArrows(Position, System.IO.File.ReadAllText(File.AbsolutePath));
     }
 
-    public static string? GetArrows(Position position, string text)
+    public static (string SourceCode, string Arrows)? GetArrows(Position position, string text)
     {
         if (position.AbsoluteRange == 0) return null;
         if (position == Position.UnknownPosition) return null;
@@ -78,8 +78,6 @@ public class LanguageException : Exception
 
         string line = lines[position.Range.Start.Line];
 
-        StringBuilder result = new();
-
         line = line.Replace('\t', ' ');
 
         int removedLeadingWhitespaces;
@@ -89,11 +87,10 @@ public class LanguageException : Exception
             line = trimmedLine.Trim();
         }
 
-        result.Append(line);
-        result.AppendLine();
+        StringBuilder result = new();
         result.Append(' ', Math.Max(0, position.Range.Start.Character - removedLeadingWhitespaces));
         result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
-        return result.ToString();
+        return (line, result.ToString());
     }
 
     public static string? GetArrows(Position position, IEnumerable<Tokenizing.Token> text)

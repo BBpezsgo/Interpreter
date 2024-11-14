@@ -52,7 +52,7 @@ public abstract class GeneralType :
         ArrayType v => new ArrayType(v),
         PointerType v => new PointerType(v),
         AliasType v => new AliasType(v),
-        _ => throw new NotImplementedException()
+        _ => throw new UnreachableException()
     };
 
     /// <exception cref="InternalExceptionWithoutContext"/>

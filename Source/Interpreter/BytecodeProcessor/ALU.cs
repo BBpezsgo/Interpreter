@@ -1,6 +1,4 @@
-﻿using LanguageCore.Brainfuck;
-
-namespace LanguageCore.Runtime;
+﻿namespace LanguageCore.Runtime;
 
 #if UNITY
 [Unity.Burst.BurstCompile]

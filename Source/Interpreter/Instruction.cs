@@ -263,16 +263,20 @@ public readonly struct InstructionOperand
         _ => throw new NotImplementedException()
     };
 
-    public static bool operator ==(InstructionOperand a, InstructionOperand b) =>
-        a.Type == b.Type &&
-        a.Value == b.Value;
+    public static bool operator ==(InstructionOperand a, InstructionOperand b)
+        => a.Type == b.Type && a.Value == b.Value;
 
-    public static bool operator !=(InstructionOperand a, InstructionOperand b) =>
-        a.Type != b.Type ||
-        a.Value != b.Value;
+    public static bool operator !=(InstructionOperand a, InstructionOperand b)
+        => a.Type != b.Type || a.Value != b.Value;
+
+    public override bool Equals([NotNullWhen(true)] object? obj)
+        => obj is InstructionOperand other && Equals(other);
+    public bool Equals(InstructionOperand other)
+        => Type == other.Type && Value == other.Value;
+
+    public override int GetHashCode() => HashCode.Combine(Type, Value);
 }
 
-[DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
 public readonly struct Instruction
 {
     public readonly Opcode Opcode;

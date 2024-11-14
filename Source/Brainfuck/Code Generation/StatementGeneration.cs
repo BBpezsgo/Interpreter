@@ -74,7 +74,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!deallocateableType.Is(out PointerType? deallocateablePointerType))
         {
-            Diagnostics.Add(Diagnostic.Warning($"The \"delete\" keyword-function is only working on pointers so I skip this", value));
+            Diagnostics.Add(Diagnostic.Warning($"The \"{StatementKeywords.Delete}\" keyword-function is only working on pointers so I skip this", value));
             return;
         }
 
@@ -84,8 +84,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (!deallocateablePointerType.To.Is<BuiltinType>())
             {
-                Diagnostics.Add(Diagnostic.Warning($"Destructor for type \"{deallocateablePointerType}\" not found", value));
-                Diagnostics.Add(error.ToWarning(value, value.File));
+                Diagnostics.Add(Diagnostic.Warning(
+                    $"Destructor for type \"{deallocateablePointerType}\" not found",
+                    value,
+                    error.ToWarning(value, value.File)));
             }
 
             return;
@@ -113,8 +115,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameters, value.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFoundError))
         {
-            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value, value.File));
-            Diagnostics.Add(notFoundError.ToError(value));
+            Diagnostics.Add(Diagnostic.Critical(
+                $"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found",
+                value,
+                value.File,
+                notFoundError.ToError(value)));
             return;
         }
 
@@ -142,7 +147,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     int PrecompileVariable(VariableDeclaration variableDeclaration)
     {
-        if (GetVariable(variableDeclaration.Identifier.Content, out _))
+        if (GetVariable(variableDeclaration.Identifier.Content, out _, out _))
         { Diagnostics.Add(Diagnostic.Critical($"Variable \"{variableDeclaration.Identifier.Content}\" already defined", variableDeclaration.Identifier)); }
 
         if (variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
@@ -315,8 +320,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         error = default;
         switch (type.Type)
         {
-            case BasicType.Void: error = new PossibleDiagnostic($"Type \"{type}\" does not have a size"); return false;
-            case BasicType.Any: error = new PossibleDiagnostic($"Type \"{type}\" does not have a size"); return false;
+            case BasicType.Void: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
+            case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
             case BasicType.U8: size = 1; return true;
             case BasicType.I8: size = 1; return true;
             case BasicType.Char: size = 1; return true;
@@ -1533,8 +1538,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (!GetVariable(ReturnVariableName, out BrainfuckVariable? returnVariable, out PossibleDiagnostic? notFoundError))
                     {
-                        Diagnostics.Add(Diagnostic.Critical($"Can't return value for some reason :(", statement));
-                        Diagnostics.Add(notFoundError.ToError(statement));
+                        Diagnostics.Add(Diagnostic.Critical(
+                            $"Can't return value for some reason :(",
+                            statement,
+                            notFoundError.ToError(statement)));
                         return;
                     }
 
@@ -2050,10 +2057,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (GetFunction(FunctionQuery.Create<CompiledFunction>(statement.Content), out _, out PossibleDiagnostic? functionNotFoundError))
         { throw new NotSupportedException($"Function pointers not supported by brainfuck", statement); }
 
-        Diagnostics.Add(Diagnostic.Critical($"Symbol \"{statement}\" not found", statement));
-        Diagnostics.Add(variableNotFoundError.ToError(statement));
-        Diagnostics.Add(constantNotFoundError.ToError(statement));
-        Diagnostics.Add(functionNotFoundError.ToError(statement));
+        Diagnostics.Add(Diagnostic.Critical(
+            $"Symbol \"{statement}\" not found",
+            statement,
+            variableNotFoundError.ToError(statement),
+            constantNotFoundError.ToError(statement),
+            functionNotFoundError.ToError(statement)));
         return;
     }
     void GenerateCodeForStatement(BrainfuckVariable variable, ILocated statement)
@@ -2527,8 +2536,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     return;
                 }
                 default:
-                    Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
-                    Diagnostics.Add(operatorNotFoundError.ToError(statement));
+                    Diagnostics.Add(Diagnostic.Critical(
+                        $"I can't make \"{statement.Operator}\" operators to work in brainfuck",
+                        statement.Operator,
+                        statement.File,
+                        operatorNotFoundError.ToError(statement)));
                     return;
             }
         }
@@ -2578,8 +2590,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     break;
                 }
                 default:
-                    Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, statement.File));
-                    Diagnostics.Add(operatorNotFoundError.ToError(statement));
+                    Diagnostics.Add(Diagnostic.Critical(
+                        $"I can't make \"{statement.Operator}\" operators to work in brainfuck",
+                        statement.Operator,
+                        statement.File,
+                        operatorNotFoundError.ToError(statement)));
                     return;
             }
         }

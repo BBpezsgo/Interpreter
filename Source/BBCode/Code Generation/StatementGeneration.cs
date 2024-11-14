@@ -176,8 +176,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameters, value.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFoundError, AddCompilable))
         {
-            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", value));
-            Diagnostics.Add(notFoundError.ToError(value));
+            Diagnostics.Add(Diagnostic.Critical(
+                $"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found",
+                value,
+                notFoundError.ToError(value)));
             return;
         }
         CompiledFunction? deallocator = result.Function;
@@ -314,10 +316,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 GenerateDeallocator(deallocateableType, location);
                 AddComment("}");
 
-                if (!deallocateablePointerType.To.Is<BuiltinType>())
+                if (deallocateablePointerType.To.Is<StructType>())
                 {
-                    Diagnostics.Add(Diagnostic.Warning($"Destructor for type \"{deallocateableType}\" not found", location));
-                    Diagnostics.Add(error.ToWarning(location));
+                    Diagnostics.Add(Diagnostic.Warning(
+                        $"Destructor for type \"{deallocateableType}\" not found",
+                        location,
+                        error.ToWarning(location)));
                 }
 
                 return;
@@ -327,8 +331,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (!GetGeneralFunction(deallocateableType, argumentTypes, BuiltinFunctionIdentifiers.Destructor, location.File, out result, out PossibleDiagnostic? error, AddCompilable))
             {
-                Diagnostics.Add(Diagnostic.Warning($"Destructor for type \"{deallocateableType}\" not found", location));
-                Diagnostics.Add(error.ToWarning(location));
+                Diagnostics.Add(Diagnostic.Warning(
+                    $"Destructor for type \"{deallocateableType}\" not found",
+                    location,
+                    error.ToWarning(location)));
                 return;
             }
         }
@@ -487,7 +493,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable))
+        if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable, out _))
         {
             Diagnostics.Add(Diagnostic.Internal($"Variable \"{newVariable.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.Identifier));
             return;
@@ -685,7 +691,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (argument is AddressGetter addressGetter &&
                 addressGetter.PrevStatement is Identifier identifier &&
-                GetVariable(identifier.Content, out CompiledVariable? variable))
+                GetVariable(identifier.Content, out CompiledVariable? variable,
+                out _))
             {
                 variable.IsInitialized = true;
             }
@@ -998,7 +1005,32 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (anyCall.Arguments.Length != functionType.Parameters.Length)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{functionType}\": required {functionType.Parameters.Length} passed {anyCall.Arguments.Length}", new Position(anyCall.Arguments.As<IPositioned>().Or(anyCall.Brackets)), anyCall.File));
+            if (notFound is not null) Diagnostics.Add(notFound.ToError(anyCall.PrevStatement));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{functionType}\": required {functionType.Parameters.Length} passed {anyCall.Arguments.Length}", new Position(anyCall.Arguments.As<IPositioned>().Or(anyCall.Brackets)), anyCall.File));
+            return;
+        }
+
+        PossibleDiagnostic? argumentError = null;
+        if (!Utils.SequenceEquals(anyCall.Arguments, functionType.Parameters, (argument, parameter) =>
+        {
+            GeneralType argumentType = FindStatementType(argument, parameter);
+
+            if (argument.Equals(parameter))
+            { return true; }
+
+            if (CodeGenerator.CanCastImplicitly(argumentType, parameter, null, this, out argumentError))
+            { return true; }
+
+            argumentError = argumentError.TrySetLocation(argument);
+
+            return false;
+        }))
+        {
+            if (notFound is not null) Diagnostics.Add(notFound.ToError(anyCall.PrevStatement));
+            Diagnostics.Add(Diagnostic.Critical(
+                $"Argument types of caller \"{anyCall.ToReadable(FindStatementType)}\" doesn't match with callee \"{functionType}\"",
+                anyCall,
+                argumentError?.ToError(anyCall)));
             return;
         }
 
@@ -1415,8 +1447,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
-            Diagnostics.Add(operatorNotFoundError.ToError(@operator));
+            Diagnostics.Add(Diagnostic.Critical(
+                $"Unknown operator \"{@operator.Operator.Content}\"",
+                @operator.Operator,
+                @operator.File,
+                operatorNotFoundError.ToError(@operator)));
         }
     }
     void GenerateCodeForStatement(Assignment setter) => GenerateCodeForValueSetter(setter.Left, setter.Right);
@@ -1649,7 +1684,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetParameter(variable.Content, out CompiledParameter? param))
+        if (GetParameter(variable.Content, out CompiledParameter? param, out PossibleDiagnostic? parameterNotFoundError))
         {
             if (variable.Content != StatementKeywords.This)
             { variable.AnalyzedType = TokenAnalyzedType.ParameterName; }
@@ -1666,7 +1701,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetVariable(variable.Content, out CompiledVariable? val))
+        if (GetVariable(variable.Content, out CompiledVariable? val, out PossibleDiagnostic? variableNotFoundError))
         {
             variable.AnalyzedType = TokenAnalyzedType.VariableName;
             variable.Reference = val;
@@ -1708,10 +1743,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        Diagnostics.Add(Diagnostic.Critical($"Symbol \"{variable.Content}\" not found", variable));
-        Diagnostics.Add(constantNotFoundError.ToError(variable));
-        Diagnostics.Add(globalVariableNotFoundError.ToError(variable));
-        Diagnostics.Add(functionNotFoundError.ToError(variable));
+        Diagnostics.Add(Diagnostic.Critical(
+            $"Symbol \"{variable.Content}\" not found",
+            variable,
+            constantNotFoundError.ToError(variable),
+            parameterNotFoundError.ToError(variable),
+            variableNotFoundError.ToError(variable),
+            globalVariableNotFoundError.ToError(variable),
+            functionNotFoundError.ToError(variable)));
     }
     void GenerateCodeForStatement(AddressGetter addressGetter)
     {
@@ -2246,7 +2285,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (computedIndexData < 0 || (arrayType.ComputedLength.HasValue && computedIndexData >= arrayType.ComputedLength.Value))
                 { Diagnostics.Add(Diagnostic.Warning($"Index out of range", index.Index)); }
 
-                if (GetParameter(identifier.Content, out CompiledParameter? param))
+                if (GetParameter(identifier.Content, out CompiledParameter? param, out _))
                 {
                     if (!param.Type.SameAs(arrayType))
                     { throw new NotImplementedException(); }
@@ -2257,7 +2296,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     throw new NotImplementedException();
                 }
 
-                if (GetVariable(identifier.Content, out CompiledVariable? val))
+                if (GetVariable(identifier.Content, out CompiledVariable? val, out _))
                 {
                     if (!val.Type.SameAs(arrayType))
                     { throw new NotImplementedException(); }
@@ -2412,7 +2451,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType statementType = FindStatementType(typeCast.PrevStatement);
         GeneralType targetType = GeneralType.From(typeCast.Type, FindType, TryCompute);
 
-        if (statementType.SameAs(targetType))
+        if (statementType.Equals(targetType))
         { Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Keyword, typeCast.File)); }
 
         if (statementType.GetSize(this, Diagnostics, typeCast.PrevStatement) != targetType.GetSize(this, Diagnostics, typeCast))
@@ -2433,7 +2472,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
 
-        if (statementType.SameAs(targetType))
+        if (statementType.Equals(targetType))
         {
             Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Type, typeCast.File));
             GenerateCodeForStatement(typeCast.PrevStatement);
@@ -2688,7 +2727,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (GetParameter(statementToSet.Content, out CompiledParameter? parameter))
+        if (GetParameter(statementToSet.Content, out CompiledParameter? parameter, out PossibleDiagnostic? parameterNotFoundError))
         {
             if (statementToSet.Content != StatementKeywords.This)
             { statementToSet.AnalyzedType = TokenAnalyzedType.ParameterName; }
@@ -2710,8 +2749,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { address = new AddressPointer(address); }
 
             PopTo(address, parameter.Type.GetSize(this, Diagnostics, statementToSet));
+            return;
         }
-        else if (GetVariable(statementToSet.Content, out CompiledVariable? variable))
+
+        if (GetVariable(statementToSet.Content, out CompiledVariable? variable, out PossibleDiagnostic? variableNotFoundError))
         {
             statementToSet.AnalyzedType = TokenAnalyzedType.VariableName;
             statementToSet.CompiledType = variable.Type;
@@ -2728,8 +2769,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             PopTo(GetLocalVariableAddress(variable), variable.Type.GetSize(this, Diagnostics, statementToSet));
             variable.IsInitialized = true;
+            return;
         }
-        else if (GetGlobalVariable(statementToSet.Content, statementToSet.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
+
+        if (GetGlobalVariable(statementToSet.Content, statementToSet.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
         {
             statementToSet.AnalyzedType = TokenAnalyzedType.VariableName;
             statementToSet.CompiledType = globalVariable.Type;
@@ -2745,13 +2788,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForStatement(value, globalVariable.Type);
 
             PopTo(GetGlobalVariableAddress(globalVariable), globalVariable.Type.GetSize(this, Diagnostics, globalVariable));
-        }
-        else
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Symbol \"{statementToSet.Content}\" not found", statementToSet));
-            Diagnostics.Add(globalVariableNotFoundError.ToError(statementToSet));
             return;
         }
+
+        Diagnostics.Add(Diagnostic.Critical(
+            $"Symbol \"{statementToSet.Content}\" not found",
+            statementToSet,
+            parameterNotFoundError.ToError(statementToSet),
+            variableNotFoundError.ToError(statementToSet),
+            globalVariableNotFoundError.ToError(statementToSet)));
     }
     void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
     {

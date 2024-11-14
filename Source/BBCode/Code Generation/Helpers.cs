@@ -1,5 +1,4 @@
-﻿using LanguageCore.Brainfuck;
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 
@@ -89,25 +88,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return false;
         }
 
-        if (GetParameter(variable.Content, out CompiledParameter? parameter))
+        if (GetParameter(variable.Content, out CompiledParameter? parameter, out PossibleDiagnostic? parameterNotFoundError))
         {
             address = GetParameterAddress(parameter);
             return true;
         }
 
-        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+        if (GetVariable(variable.Content, out CompiledVariable? localVariable, out PossibleDiagnostic? variableNotFoundError))
         {
             address = GetLocalVariableAddress(localVariable);
             return true;
         }
 
-        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? constantNotFoundError))
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
         {
             address = GetGlobalVariableAddress(globalVariable);
             return true;
         }
 
-        error = new PossibleDiagnostic($"Local symbol \"{variable.Content}\" not found");
+        error = new PossibleDiagnostic(
+            $"Local symbol \"{variable.Content}\" not found",
+            parameterNotFoundError,
+            variableNotFoundError,
+            globalVariableNotFoundError);
         return false;
     }
     bool GetAddress(Field field, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -208,25 +211,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return false;
         }
 
-        if (GetParameter(variable.Content, out CompiledParameter? parameter))
+        if (GetParameter(variable.Content, out CompiledParameter? parameter, out PossibleDiagnostic? parameterNotFoundError))
         {
             address = GetParameterAddress(parameter);
             return true;
         }
 
-        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+        if (GetVariable(variable.Content, out CompiledVariable? localVariable, out PossibleDiagnostic? variableNotFoundError))
         {
             address = GetLocalVariableAddress(localVariable);
             return true;
         }
 
-        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? constantNotFoundError))
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
         {
             address = GetGlobalVariableAddress(globalVariable);
             return true;
         }
 
-        error = new PossibleDiagnostic($"Local symbol \"{variable.Content}\" not found");
+        error = new PossibleDiagnostic(
+            $"Local symbol \"{variable.Content}\" not found",
+            parameterNotFoundError,
+            variableNotFoundError,
+            globalVariableNotFoundError);
         return false;
     }
     bool GetDataAddress(Field field, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -401,25 +408,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return false;
         }
 
-        if (GetParameter(variable.Content, out CompiledParameter? parameter))
+        if (GetParameter(variable.Content, out CompiledParameter? parameter, out PossibleDiagnostic? parameterNotFoundError))
         {
             address = GetParameterAddress(parameter);
             return true;
         }
 
-        if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+        if (GetVariable(variable.Content, out CompiledVariable? localVariable, out PossibleDiagnostic? variableNotFoundError))
         {
             address = GetLocalVariableAddress(localVariable);
             return true;
         }
 
-        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? constantNotFoundError))
+        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
         {
             address = GetGlobalVariableAddress(globalVariable);
             return true;
         }
 
-        error = new PossibleDiagnostic($"Variable \"{variable.Content}\" not found", variable);
+        error = new PossibleDiagnostic(
+            $"Variable \"{variable.Content}\" not found",
+            variable,
+            parameterNotFoundError,
+            variableNotFoundError,
+            globalVariableNotFoundError);
         return false;
     }
     bool GetBaseAddress(Field statement, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -477,14 +489,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (field.PrevStatement is Identifier identifier)
         {
-            if (GetParameter(identifier.Content, out CompiledParameter? prevParameter))
+            if (GetParameter(identifier.Content, out CompiledParameter? prevParameter, out _))
             {
                 if (prevParameter.IsRef)
                 {
                     return field.PrevStatement;
                 }
             }
-            else if (GetVariable(identifier.Content, out _))
+            else if (GetVariable(identifier.Content, out _, out _))
             { }
             else if (GetGlobalVariable(identifier.Content, identifier.File, out _, out _))
             { }

@@ -44,9 +44,12 @@ public class ArrayType : GeneralType,
         return true;
     }
 
-    [DoesNotReturn]
     public override bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error)
-        => throw new InvalidOperationException();
+    {
+        bitWidth = default;
+        error = new PossibleDiagnostic("Arrays cannot have a bitwidth because they are not a primitive type");
+        return false;
+    }
 
     public override bool Equals(object? other) => Equals(other as ArrayType);
     public override bool Equals(GeneralType? other) => Equals(other as ArrayType);

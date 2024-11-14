@@ -42,6 +42,12 @@ public class PossibleDiagnostic
         { throw new LanguageExceptionWithoutContext(Message); }
     }
 
+    public PossibleDiagnostic TrySetLocation(ILocated location)
+    {
+        if (_isPopulated) return this;
+        return new(Message, location, _suberrors);
+    }
+
     public Diagnostic ToError(IPositioned position, Uri file) =>
         _isPopulated ?
         new(DiagnosticsLevel.Error, Message, _position, _file!, _suberrors.Select(v => v.ToError(position, file))) :

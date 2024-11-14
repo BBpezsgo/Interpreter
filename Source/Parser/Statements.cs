@@ -493,6 +493,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
     public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
     {
         StringBuilder result = new();
+        result.Append("...");
         result.Append('(');
         for (int i = 0; i < Arguments.Length; i++)
         {

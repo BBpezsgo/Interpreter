@@ -102,16 +102,18 @@ export any* Alloc(int sizeNeed)
 
             if (blockSize > sizeNeed)
             {
-                SetHeaderUsed(headerPointer, sizeNeed);
-
-                BlockHeader* nextHeaderPointer = (dataPointer + sizeNeed) as BlockHeader*;
-
                 int _remainingSize = blockSize - sizeNeed - HeaderSize;
 
-                if (_remainingSize >= 0)
+                if (_remainingSize > 0)
                 {
-                    SetHeaderFree(nextHeaderPointer, _remainingSize);
+                    SetHeaderFree((dataPointer + sizeNeed) as BlockHeader*, _remainingSize);
                 }
+                else
+                {
+                    sizeNeed = blockSize;
+                }
+
+                SetHeaderUsed(headerPointer, sizeNeed);
 
                 return dataPointer;
             }

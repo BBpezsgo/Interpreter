@@ -35,8 +35,8 @@ public static class HeapUtils
 [ExcludeFromCodeCoverage]
 public static class BytecodeHeapImplementation
 {
-    const BytecodeHeapHeader BlockSizeMask = 0x80000000;
-    const BytecodeHeapHeader BlockStatusMask = 0x7fffffff;
+    const BytecodeHeapHeader BlockStatusMask = 0x80000000;
+    const BytecodeHeapHeader BlockSizeMask = 0x7fffffff;
     public const int HeaderSize = sizeof(BytecodeHeapHeader);
 
     public static (int Size, bool Allocated) GetHeader(ReadOnlySpan<byte> memory, int headerPointer) => (
@@ -48,8 +48,8 @@ public static class BytecodeHeapImplementation
 [ExcludeFromCodeCoverage]
 public static class BrainfuckHeapImplementation
 {
-    const BrainfuckHeapHeader BlockSizeMask = 0x80;
-    const BrainfuckHeapHeader BlockStatusMask = 0x7f;
+    const BrainfuckHeapHeader BlockStatusMask = 0x80;
+    const BrainfuckHeapHeader BlockSizeMask = 0x7f;
     public const int HeaderSize = sizeof(BrainfuckHeapHeader);
 
     public static (int Size, bool Allocated) GetHeader(ReadOnlySpan<byte> memory, int headerPointer) => (

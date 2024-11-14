@@ -1754,7 +1754,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(AddressGetter addressGetter)
     {
-        if (!GetDataAddress(addressGetter.PrevStatement, out Address? address, out PossibleDiagnostic? error))
+        if (!GetAddress(addressGetter.PrevStatement, out Address? address, out PossibleDiagnostic? error))
         {
             Diagnostics.Add(error.ToError(addressGetter.PrevStatement));
             return;
@@ -2235,26 +2235,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     }
         // }
 
+        // TODO: what the hell is that
+
         StatementWithValue? dereference = NeedDereference(field);
 
+        if (!GetAddress(field, out Address? address, out PossibleDiagnostic? error))
+        {
+            Diagnostics.Add(error.ToError(field));
+            return;
+        }
+
         if (dereference is null)
-        {
-            if (!GetDataAddress(field, out Address? offset, out PossibleDiagnostic? error))
-            {
-                Diagnostics.Add(error.ToError(field));
-                return;
-            }
-            PushFrom(offset, compiledField.Type.GetSize(this, Diagnostics, compiledField));
-        }
+        { PushFrom(address, type.GetSize(this, Diagnostics, field)); }
         else
-        {
-            if (!GetAddress(field, out Address? address, out PossibleDiagnostic? error))
-            {
-                Diagnostics.Add(error.ToError(field));
-                return;
-            }
-            PushFrom(address, type.GetSize(this, Diagnostics, field), dereference.Location);
-        }
+        { PushFrom(address, type.GetSize(this, Diagnostics, field), dereference.Location); }
     }
     void GenerateCodeForStatement(IndexCall index)
     {
@@ -2317,7 +2311,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 using (RegisterUsage.Auto regPtr = Registers.GetFree())
                 {
-                    if (!GetDataAddress(identifier, out Address? address, out PossibleDiagnostic? error))
+                    if (!GetAddress(identifier, out Address? address, out PossibleDiagnostic? error))
                     {
                         Diagnostics.Add(error.ToError(identifier));
                         return;

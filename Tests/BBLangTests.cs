@@ -52,7 +52,7 @@ public class MainFileTests
     [TestMethod, Timeout(Timeout)] public void Test43() => Utils.GetTest(43).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test44() => Utils.GetTest(44).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test45() => Utils.GetTest(45).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore(":(")] public void Test46() => Utils.GetTest(46).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test46() => Utils.GetTest(46).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test47() => Utils.GetTest(47).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test48() => Utils.GetTest(48).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test49() => Utils.GetTest(49).DoMain();
@@ -100,7 +100,7 @@ public class MainFileTests
     [TestMethod, Timeout(Timeout)] public void Test81() => Utils.GetTest(81).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test82() => Utils.GetTest(82).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test83() => Utils.GetTest(83).DoMain();
-    [TestMethod, Timeout(Timeout)] public void Test84() => Utils.GetTest(84).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test84() => Utils.GetTest(84).DoMain(); // NOTE: Expected output modified because the square root algorithm is not accurate enough
     [TestMethod, Timeout(Timeout)] public void Test85() => Utils.GetTest(85).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test86() => Utils.GetTest(86).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test87() => Utils.GetTest(87).DoMain();

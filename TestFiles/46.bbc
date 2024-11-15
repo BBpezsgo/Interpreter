@@ -5,6 +5,8 @@ int yeah;
 
 yeah = 55;
 
-Bruh();
+SetBruh();
+
+yeah += GetBruh();
 
 return yeah;

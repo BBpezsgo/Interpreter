@@ -2221,7 +2221,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         CompiledValue leftValue = GetInitialValue(leftNType, leftBitwidth);
         CompiledValue rightValue = GetInitialValue(rightNType, rightBitwidth);
 
-        if (!TryCompute(@operator.Operator.Content, leftValue, rightValue, out CompiledValue predictedValue, out PossibleDiagnostic evaluateError))
+        if (!TryCompute(@operator.Operator.Content, leftValue, rightValue, out CompiledValue predictedValue, out PossibleDiagnostic? evaluateError))
         {
             Diagnostics.Add(evaluateError.ToError(@operator));
             return BuiltinType.Void;

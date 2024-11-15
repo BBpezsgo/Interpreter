@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=302&f=4&s=150)](#)
-[![](https://img.shields.io/badge/Passing-302-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-4-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-150-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=308&f=1&s=147)](#)
+[![](https://img.shields.io/badge/Passing-308-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-1-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-147-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -49,6 +49,7 @@
 | [43](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/43.bbc) | ✅ | ✖ Function pointers are not supported |
 | [44](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/44.bbc) | ✅ | ✅ |
 | [45](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/45.bbc) | ✅ | ✅ |
+| [46](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/46.bbc) | ✅ | ❌ Exit code isn't what is expected: Expected: 121 Actual:   132 |
 | [47](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/47.bbc) | ✅ | ✅ |
 | [48](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/48.bbc) | ✅ | ✅ |
 | [49](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/49.bbc) | ✅ | ✖ Floats not supported |
@@ -78,13 +79,13 @@
 | [81](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/81.bbc) | ✅ | ✖ i16 not supported |
 | [82](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/82.bbc) | ✅ | ✖ u32 not supported |
 | [83](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/83.bbc) | ✅ | ✖ i32 not supported |
-| [84](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/84.bbc) | ❌ Standard output isn't what is expected: Expected: "(8.0,0.0)\n(1.0,0.0)\n7.0\n7.0\n1.0\n" Actual:   "(8.000,0.000)\r\n(1.000,0.000)\r\n7.062\r\n7.062\r\n1.000\r\n" | ✖ Floats not supported |
+| [84](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/84.bbc) | ✅ | ✖ Floats not supported |
 | [85](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/85.bbc) | ✅ | ✅ |
 | [86](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/86.bbc) | ✅ | ✖ Floats not supported |
 | [87](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/87.bbc) | ✅ | ✅ |
-| [88](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/88.bbc) | ✅ | ✖ Stack pointers not supported |
+| [88](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/88.bbc) | ✅ | ✅ |
 | [89](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/89.bbc) | ✅ | ✅ |
-| [90](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/90.bbc) | ✅ | ❌ Standard output isn't what is expected: Expected: "59\r\n81\r\n103\r\n" Actual:   "59\r\n59\r\n59\r\n" |
-| [91](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/91.bbc) | ✅ | ❌ Test 'Test91' exceeded execution timeout period. |
-| [92](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/92.bbc) | ✅ | ❌ Exit code isn't what is expected: Expected: 11 Actual:   33 |
+| [90](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/90.bbc) | ✅ | ✅ |
+| [91](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/91.bbc) | ✅ | ✅ |
+| [92](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/92.bbc) | ✅ | ✅ |
 | [93](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/93.bbc) | ✅ | ✅ |

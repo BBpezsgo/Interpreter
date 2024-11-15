@@ -51,7 +51,7 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout), Ignore("Function pointers are not supported")] public void Test43() => Utils.GetTest(43).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test44() => Utils.GetTest(44).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test45() => Utils.GetTest(45).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore(":(")] public void Test46() => Utils.GetTest(46).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test46() => Utils.GetTest(46).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test47() => Utils.GetTest(47).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test48() => Utils.GetTest(48).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Floats not supported")] public void Test49() => Utils.GetTest(49).DoBrainfuck();
@@ -93,7 +93,7 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout)] public void Test85() => Utils.GetTest(85).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Floats not supported")] public void Test86() => Utils.GetTest(86).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test87() => Utils.GetTest(87).DoBrainfuck();
-    [TestMethod, Timeout(Timeout), Ignore("Stack pointers not supported")] public void Test88() => Utils.GetTest(88).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test88() => Utils.GetTest(88).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test89() => Utils.GetTest(89).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test90() => Utils.GetTest(90).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test91() => Utils.GetTest(91).DoBrainfuck();

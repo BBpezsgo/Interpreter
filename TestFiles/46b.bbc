@@ -2,7 +2,12 @@ using System;
 
 int yeah;
 
-export void Bruh()
+export void SetBruh()
 {
   yeah = 66;
+}
+
+export int GetBruh()
+{
+  return yeah;
 }

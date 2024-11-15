@@ -493,7 +493,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable, out _))
+        if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable, out _) &&
+            !GetGlobalVariable(newVariable.Identifier.Content, newVariable.File, out compiledVariable, out _))
         {
             Diagnostics.Add(Diagnostic.Internal($"Variable \"{newVariable.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.Identifier));
             return;
@@ -506,12 +507,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (newVariable.InitialValue == null) return;
 
         AddComment($"New Variable \"{newVariable.Identifier.Content}\" {{");
-
-        if (GetConstant(newVariable.Identifier.Content, newVariable.File, out _, out _))
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Can not set constant value: it is readonly", newVariable));
-            return;
-        }
 
         if (newVariable.InitialValue is LiteralList literalList)
         {
@@ -2635,6 +2630,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
         });
     }
 
+    static bool IsStringOnStack(GeneralType type, StatementWithValue? value, [NotNullWhen(true)] out LiteralStatement? literal, out PossibleDiagnostic? error)
+    {
+        error = null;
+        if (type.Is(out ArrayType? arrayType) &&
+            arrayType.Of.SameAs(BasicType.Char) &&
+            value is LiteralStatement literalStatement &&
+            literalStatement.Type == LiteralType.String &&
+            arrayType.ComputedLength.HasValue)
+        {
+            if (literalStatement.Value.Length != arrayType.ComputedLength.Value)
+            {
+                error = new PossibleDiagnostic($"String literal's length ({literalStatement.Value.Length}) aint match with the array's length ({arrayType.ComputedLength})", literalStatement);
+            }
+            literal = literalStatement;
+            return true;
+        }
+        else
+        {
+            literal = null;
+            return false;
+        }
+    }
+
     ImmutableArray<CleanupItem> CompileVariables(IEnumerable<VariableDeclaration> statements, bool addComments = true)
     {
         if (addComments) AddComment("Variables {");
@@ -2660,43 +2678,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("Clear Variables");
         for (int i = cleanupItems.Length - 1; i >= 0; i--)
         {
-            CleanupItem item = cleanupItems[i];
-
-            if (item.ShouldDeallocate)
-            {
-                if (item.Type is null) throw new InternalExceptionWithoutContext();
-                GenerateDestructor(item.Type, location);
-            }
-            else
-            {
-                Pop(item.SizeOnStack);
-            }
-
-            if (!justGenerateCode) CompiledVariables.Pop();
+            CleanupVariables(cleanupItems[i], location, justGenerateCode);
         }
     }
 
-    void CleanupGlobalVariables(ImmutableArray<CleanupItem> cleanupItems, Location location)
+    void CleanupVariables(CleanupItem cleanupItem, Location location, bool justGenerateCode)
     {
-        if (cleanupItems.Length == 0) return;
-        AddComment("Clear Global Variables");
-        for (int i = cleanupItems.Length - 1; i >= 0; i--)
+        if (cleanupItem.ShouldDeallocate)
         {
-            CleanupItem item = cleanupItems[i];
-
-            if (item.ShouldDeallocate)
-            {
-                if (item.SizeOnStack != PointerSize) throw new InternalExceptionWithoutContext();
-                if (item.Type is null) throw new InternalExceptionWithoutContext();
-                GenerateDestructor(item.Type, location);
-            }
-            else
-            {
-                Pop(item.SizeOnStack);
-            }
-
-            CompiledGlobalVariables.Pop();
+            if (cleanupItem.Type is null) throw new InternalExceptionWithoutContext();
+            GenerateDestructor(cleanupItem.Type, location);
         }
+        else
+        {
+            Pop(cleanupItem.SizeOnStack);
+        }
+
+        if (!justGenerateCode) CompiledVariables.Pop();
     }
 
     void GenerateCodeForValueSetter(Statement statementToSet, StatementWithValue value)
@@ -2754,12 +2752,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GeneralType valueType = FindStatementType(value, variable.Type);
 
-            if (!CanCastImplicitly(valueType, variable.Type, value, out PossibleDiagnostic? castError))
+            if (variable.InitialValue is not null &&
+                IsStringOnStack(variable.Type, variable.InitialValue, out LiteralStatement? literal, out PossibleDiagnostic? error))
             {
-                Diagnostics.Add(castError.ToError(value));
-            }
+                if (error is not null) Diagnostics.Add(error.ToError(value));
+                variable.IsInitialized = true;
 
-            GenerateCodeForStatement(value, variable.Type);
+                for (int i = 0; i < literal.Value.Length; i++)
+                { Push(new CompiledValue(literal.Value[i])); }
+            }
+            else
+            {
+                if (!CanCastImplicitly(valueType, variable.Type, value, out PossibleDiagnostic? castError))
+                {
+                    Diagnostics.Add(castError.ToError(value));
+                }
+
+                GenerateCodeForStatement(value, variable.Type);
+            }
 
             PopTo(GetLocalVariableAddress(variable), variable.Type.GetSize(this, Diagnostics, statementToSet));
             variable.IsInitialized = true;
@@ -2774,12 +2784,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GeneralType valueType = FindStatementType(value, globalVariable.Type);
 
-            if (!CanCastImplicitly(valueType, globalVariable.Type, value, out PossibleDiagnostic? castError))
+            if (globalVariable.InitialValue is not null &&
+                IsStringOnStack(globalVariable.Type, globalVariable.InitialValue, out LiteralStatement? literal, out PossibleDiagnostic? error))
             {
-                Diagnostics.Add(castError.ToError(value));
-            }
+                if (error is not null) Diagnostics.Add(error.ToError(literal));
 
-            GenerateCodeForStatement(value, globalVariable.Type);
+                globalVariable.IsInitialized = true;
+
+                for (int i = 0; i < literal.Value.Length; i++)
+                { Push(new CompiledValue(literal.Value[i])); }
+            }
+            else
+            {
+                if (!CanCastImplicitly(valueType, globalVariable.Type, value, out PossibleDiagnostic? castError))
+                {
+                    Diagnostics.Add(castError.ToError(value));
+                }
+
+                GenerateCodeForStatement(value, globalVariable.Type);
+            }
 
             PopTo(GetGlobalVariableAddress(globalVariable), globalVariable.Type.GetSize(this, Diagnostics, globalVariable));
             return;
@@ -3007,7 +3030,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         };
         newVariable.CompiledType = compiledVariable.Type;
 
-        CurrentScopeDebug.Last.Stack.Add(debugInfo);
+        if (CurrentScopeDebug.Count > 0) CurrentScopeDebug.Last.Stack.Add(debugInfo);
 
         CompiledVariables.Add(compiledVariable);
 
@@ -3493,19 +3516,35 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentReturnType = ExitCodeType;
 
+        /*
         AddComment("Variables");
         CleanupStack.Push(new Scope(
             GenerateCodeForLocalVariable(statements),
             true
         ));
+        */
 
         AddComment("Statements {");
         foreach (Statement statement in statements)
         { GenerateCodeForStatement(statement); }
         AddComment("}");
 
-        CompiledGlobalVariables.AddRange(CompiledVariables);
-        CleanupVariables(CleanupStack.Pop().Variables, new Location(statements[^1].Position.NextLine(), statements[^1].File), false);
+        /*
+        AddComment("Save global variables {");
+        foreach (CompiledVariable variable in CompiledVariables)
+        {
+            if (!GetGlobalVariable(variable.Identifier.Content, variable.File, out CompiledVariable? globalVariable, out _))
+            { continue; }
+            if (!variable.Type.Equals(globalVariable.Type))
+            { continue; }
+            PushFrom(GetLocalVariableAddress(variable), variable.Type.GetSize(this, Diagnostics, variable));
+            PopTo(GetGlobalVariableAddress(globalVariable), globalVariable.Type.GetSize(this, Diagnostics, globalVariable));
+        }
+        AddComment("}");
+        */
+
+        // CompiledGlobalVariables.AddRange(CompiledVariables);
+        // CleanupVariables(CleanupStack.Pop().Variables, new Location(statements[^1].Position.NextLine(), statements[^1].File), false);
 
         FinishJumpInstructions(ReturnInstructions.Last);
         ReturnInstructions.Pop();
@@ -3580,6 +3619,58 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
+        IEnumerable<VariableDeclaration> globalVariableDeclarations = compilerResult.TopLevelStatements
+            .Select(v => v.Statements)
+            .Aggregate(Enumerable.Empty<Statement>(), (a, b) => a.Concat(b))
+            .Select(v => v as VariableDeclaration)
+            .Where(v => v is not null)
+            .Where(v => !v!.Modifiers.Contains(ModifierKeywords.Const))!;
+
+        Stack<CleanupItem> globalVariablesCleanup = new();
+        foreach (VariableDeclaration variableDeclaration in globalVariableDeclarations)
+        {
+            GeneralType type;
+            if (variableDeclaration.Type == StatementKeywords.Var)
+            {
+                if (variableDeclaration.InitialValue == null)
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Initial value for variable declaration with implicit type is required", variableDeclaration));
+                    return default;
+                }
+
+                type = FindStatementType(variableDeclaration.InitialValue);
+            }
+            else
+            {
+                type = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
+
+                variableDeclaration.Type.SetAnalyzedType(type);
+                variableDeclaration.CompiledType = type;
+            }
+
+            int size = type.GetSize(this, Diagnostics, variableDeclaration);
+            int currentOffset = GlobalVariablesSize;
+
+            CompiledVariable variable = CompileVariable(variableDeclaration, currentOffset);
+            CompiledGlobalVariables.Add(variable);
+            CleanupItem cleanupItem = new(size, variable.Modifiers.Contains(ModifierKeywords.Temp), variable.Type);
+            globalVariablesCleanup.Insert(0, cleanupItem);
+
+            CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
+            {
+                Address = variable.MemoryAddress,
+                BasePointerRelative = false,
+                Kind = StackElementKind.Variable,
+                Size = size,
+                Tag = variable.Identifier.Content,
+                Type = variable.Type,
+            });
+        }
+
+        AddComment("Allocate global variables {");
+        StackAlloc(GlobalVariablesSize, false);
+        AddComment("}");
+
         {
             // Absolute global offset
 
@@ -3587,7 +3678,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                Push(Register.StackPointer);
+                AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), Register.StackPointer);
+                AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), GlobalVariablesSize);
+                AddInstruction(Opcode.Push, Register.StackPointer);
             }
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
@@ -3617,6 +3710,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Pop abs global address");
         Pop(AbsGlobalAddressType.GetSize(this)); // Pop abs global offset
+
+        AddComment("Cleanup global variables {");
+        CleanupVariables(globalVariablesCleanup.ToImmutableArray(), default, true);
+        AddComment("}");
 
         AddInstruction(Opcode.Exit); // Exit code already there
 

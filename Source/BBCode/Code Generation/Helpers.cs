@@ -198,10 +198,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             new AddressPointer(AbsoluteGlobalAddress),
             0
             + variable.MemoryAddress
-            + ((
-                AbsGlobalAddressSize
-                + BasePointerSize
-            ) * BytecodeProcessor.StackDirection)
+            // + ((
+            //     AbsGlobalAddressSize
+            //     + BasePointerSize
+            // ) * BytecodeProcessor.StackDirection)
         );
 
     static AddressOffset GetLocalVariableAddress(CompiledVariable variable)
@@ -756,7 +756,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         0);
     public Address ExitCodeAddress => new AddressOffset(
         new AddressPointer(AbsoluteGlobalAddress),
-        0);
+        GlobalVariablesSize);
 
     public int SavedBasePointerOffset => 0 * BytecodeProcessor.StackDirection;
     public int AbsoluteGlobalOffset => ExitCodeType.GetSize(this) * -BytecodeProcessor.StackDirection;

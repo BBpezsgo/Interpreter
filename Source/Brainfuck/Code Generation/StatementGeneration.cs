@@ -217,15 +217,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                         int size = Snippets.ARRAY_SIZE(arraySize);
 
-                        int address = Stack.PushVirtual(size, literal);
+                        int address2 = Stack.PushVirtual(size, literal);
 
-                        variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, size)
+                        variables.Push(new BrainfuckVariable(name, location.Location.File, address2, false, true, deallocateOnClean, type, size)
                         {
                             IsInitialized = true
                         });
 
                         for (int i = 0; i < literal.Value.Length; i++)
-                        { Code.ARRAY_SET_CONST(address, i, new CompiledValue(literal.Value[i])); }
+                        { Code.ARRAY_SET_CONST(address2, i, new CompiledValue(literal.Value[i])); }
                     }
                 }
                 else
@@ -240,15 +240,29 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
-                    int address = Stack.PushVirtual(size, location);
-                    variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, size));
+                    int address2 = Stack.PushVirtual(size, location);
+                    variables.Push(new BrainfuckVariable(name, location.Location.File, address2, false, true, deallocateOnClean, type, size));
                 }
+                return 1;
             }
-            else
+
+            if (initialValue is AddressGetter addressGetter &&
+                GetVariable(addressGetter.PrevStatement, out BrainfuckVariable? shadowingVariable, out _) &&
+                type.Is(out PointerType? pointerType))
             {
-                int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, location), location);
-                variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, type.GetSize(this, Diagnostics, location)));
+                if (!CanCastImplicitly(pointerType.To, shadowingVariable.Type, null, this, out PossibleDiagnostic? castError))
+                { Diagnostics.Add(castError.ToError(initialValue)); }
+
+                variables.Push(new BrainfuckVariable(name, location.Location.File, shadowingVariable.Address, true, false, false, type, type.GetSize(this, Diagnostics, location))
+                {
+                    IsInitialized = true
+                });
+                return 0;
             }
+
+            int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, location), location);
+            variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, type.GetSize(this, Diagnostics, location)));
+            return 1;
         }
         else
         {
@@ -264,17 +278,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 int size = Snippets.ARRAY_SIZE(arraySize);
 
-                int address = Stack.PushVirtual(size, location);
-                variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, size));
+                int address2 = Stack.PushVirtual(size, location);
+                variables.Push(new BrainfuckVariable(name, location.Location.File, address2, false, true, deallocateOnClean, type, size));
+                return 1;
             }
-            else
-            {
-                int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, location), location);
-                variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, type.GetSize(this, Diagnostics, location)));
-            }
-        }
 
-        return 1;
+            int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, location), location);
+            variables.Push(new BrainfuckVariable(name, location.Location.File, address, false, true, deallocateOnClean, type, type.GetSize(this, Diagnostics, location)));
+            return 1;
+        }
     }
     #endregion
 
@@ -449,6 +461,36 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType type = FindStatementType(statementToSet);
         GeneralType valueType = FindStatementType(value, type);
 
+        if ((
+            GetVariable(statementToSet.PrevStatement, out BrainfuckVariable? variable, out _) &&
+            variable.IsReference &&
+            prevType.Is(out PointerType? stackPointerType) &&
+            stackPointerType.To.Is<StructType>()
+        ) ||
+            prevType.Is<StructType>())
+        {
+            if (!type.SameAs(valueType))
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, value.File));
+                return;
+            }
+
+            if (!TryGetAddress(statementToSet, out Address? address, out int size))
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Failed to get field address", statementToSet));
+                return;
+            }
+
+            if (size != valueType.GetSize(this, Diagnostics, value))
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", value));
+                return;
+            }
+
+            CompileSetter(address, value);
+            return;
+        }
+
         if (prevType.Is(out PointerType? pointerType))
         {
             if (!pointerType.To.Is(out StructType? structPointerType))
@@ -491,43 +533,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (!prevType.Is<StructType>())
-        { throw new NotImplementedException(); }
-
-        if (!type.SameAs(valueType))
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, value.File));
-            return;
-        }
-
-        if (!TryGetAddress(statementToSet, out int address, out int size))
-        {
-            StatementWithValue? dereferencePointer = NeedDereference(statementToSet);
-            if (dereferencePointer is not null)
-            {
-                int offset = GetDataOffset(statementToSet, dereferencePointer);
-                CompileDereferencedSetter(dereferencePointer, offset, value);
-                return;
-            }
-
-            Diagnostics.Add(Diagnostic.Critical($"Failed to get field address", statementToSet));
-            return;
-        }
-
-        if (size != valueType.GetSize(this, Diagnostics, value))
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", value));
-            return;
-        }
-
-        CompileSetter(address, value);
+        throw new NotImplementedException();
     }
 
     void GenerateCodeForSetter(BrainfuckVariable variable, StatementWithValue value)
     {
         if (AllowOtherOptimizations &&
-            value is Identifier _identifier &&
-            GetVariable(_identifier.Content, out BrainfuckVariable? valueVariable, out _))
+            GetVariable(value, out BrainfuckVariable? valueVariable, out _))
         {
             if (variable.Address == valueVariable.Address)
             {
@@ -537,12 +549,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (valueVariable.IsDiscarded)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Variable \"{valueVariable.Name}\" is discarded", _identifier));
+                Diagnostics.Add(Diagnostic.Critical($"Variable \"{valueVariable.Name}\" is discarded", value));
                 return;
             }
 
             if (!valueVariable.IsInitialized)
-            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{valueVariable.Name}\" is not initialized", _identifier)); }
+            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{valueVariable.Name}\" is not initialized", value)); }
 
             if (variable.Size != valueVariable.Size)
             {
@@ -757,13 +769,23 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CompileDereferencedSetter(statement.PrevStatement, 0, value);
     }
 
-    void CompileSetter(int address, StatementWithValue value)
+    void CompileSetter(Address address, StatementWithValue value)
+    {
+        switch (address)
+        {
+            case AddressAbsolute v: CompileSetter(v, value); break;
+            case AddressOffset v: CompileSetter(v, value); break;
+            default: throw new NotImplementedException();
+        }
+    }
+
+    void CompileSetter(AddressAbsolute address, StatementWithValue value)
     {
         using (Code.Block(this, $"Set value \"{value}\" to address {address}"))
         {
             if (AllowPrecomputing && TryCompute(value, out CompiledValue constantValue))
             {
-                Code.SetValue(address, constantValue.U8);
+                Code.SetValue(address.Value, constantValue.U8);
 
                 Precomputations++;
 
@@ -780,7 +802,74 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             int variableSize = Stack.Size - stackSize;
 
             using (Code.Block(this, $"Store computed value (from {Stack.LastAddress}) to {address}"))
-            { Stack.PopAndStore(address); }
+            { Stack.PopAndStore(address.Value); }
+        }
+    }
+
+    void CompileSetter(AddressOffset address, StatementWithValue value)
+    {
+        if (address.Base is AddressRuntimePointer runtimePointer)
+        {
+            GeneralType referenceType = FindStatementType(runtimePointer.PointerValue);
+
+            if (!referenceType.Is(out PointerType? _))
+            {
+                Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", runtimePointer.PointerValue));
+                return;
+            }
+
+            int pointerAddress = Stack.NextAddress;
+            GenerateCodeForStatement(runtimePointer.PointerValue);
+
+            /*
+            {
+                using StackAddress checkResultAddress = Stack.PushVirtual(1);
+                {
+                    using StackAddress maxSizeAddress = Stack.Push(GeneratorSettings.HeapSize);
+                    using StackAddress pointerAddressCopy = Stack.PushVirtual(1);
+                    {
+                        Code.CopyValue(pointerAddress, pointerAddressCopy);
+
+                        Code.LOGIC_MT(pointerAddressCopy, maxSizeAddress, checkResultAddress, checkResultAddress + 1, checkResultAddress + 2);
+                    }
+
+                    using (Code.ConditionalBlock(this, checkResultAddress))
+                    { Code.OUT_STRING(checkResultAddress, "\nOut of memory range\n"); }
+                }
+            }
+            */
+
+            Code.AddValue(pointerAddress, address.Offset);
+
+            GeneralType valueType = FindStatementType(value);
+
+            // TODO: this
+            // AssignTypeCheck(pointerType.To, valueType, value);
+
+            int valueAddress = Stack.NextAddress;
+            GenerateCodeForStatement(value);
+
+            if (valueType.GetSize(this, Diagnostics, value) == 1 && AllowOtherOptimizations)
+            {
+                Heap.Set(pointerAddress, valueAddress);
+            }
+            else
+            {
+                using StackAddress tempPointerAddress = Stack.PushVirtual(1, value);
+                for (int i = 0; i < valueType.GetSize(this, Diagnostics, value); i++)
+                {
+                    Code.CopyValue(pointerAddress, tempPointerAddress);
+                    Heap.Set(tempPointerAddress, valueAddress + i);
+                    Code.AddValue(pointerAddress, 1);
+                }
+            }
+
+            Stack.PopVirtual();
+            Stack.PopVirtual();
+        }
+        else
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -872,8 +961,72 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
+        PossibleDiagnostic? variableNotFoundError = null;
+
+        if ((
+            GetVariable(statement.PrevStatement, out BrainfuckVariable? variable, out _) &&
+            variable.IsReference &&
+            prevType.Is(out PointerType? stackPointerType) &&
+            stackPointerType.To.Is(out ArrayType? arrayType)
+        ) ||
+            prevType.Is(out arrayType)
+        )
+        {
+            if (!TryGetAddress(statement.PrevStatement, out Address? arrayAddress, out _))
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Failed to get array address", statement.PrevStatement));
+                return;
+            }
+
+            if (variable is not null)
+            {
+                if (variable.IsDiscarded)
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", statement.PrevStatement));
+                    return;
+                }
+
+                if (!variable.IsInitialized)
+                { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", statement.PrevStatement)); }
+            }
+
+            using (Code.Block(this, $"Set array (\"{statement.PrevStatement}\") index (\"{statement.Index}\") (at {arrayAddress}) to \"{value}\""))
+            {
+                GeneralType elementType = arrayType.Of;
+
+                if (!elementType.SameAs(valueType))
+                {
+                    Diagnostics.Add(Diagnostic.Critical("Bruh", value));
+                    return;
+                }
+
+                int elementSize = elementType.GetSize(this, Diagnostics, statement.PrevStatement);
+
+                if (elementSize != 1)
+                { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", value); }
+
+                int indexAddress = Stack.NextAddress;
+                using (Code.Block(this, $"Compute index"))
+                { GenerateCodeForStatement(statement.Index); }
+
+                int valueAddress = Stack.NextAddress;
+                using (Code.Block(this, $"Compute value"))
+                { GenerateCodeForStatement(value); }
+
+                if (arrayAddress is not AddressAbsolute arrayAddressAbs)
+                { throw new NotImplementedException(); }
+
+                Code.ARRAY_SET(arrayAddressAbs.Value, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, statement));
+
+                Stack.Pop();
+                Stack.Pop();
+            }
+
+            return;
+        }
+
         if (prevType.Is(out PointerType? pointerType) &&
-            pointerType.To.Is(out ArrayType? arrayType))
+            pointerType.To.Is(out arrayType))
         {
             int valueAddress = Stack.NextAddress;
             GenerateCodeForStatement(value);
@@ -912,62 +1065,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (statement.PrevStatement is not Identifier _variableIdentifier)
-        {
-            Diagnostics.Add(indexerNotFoundError.ToError(statement));
-            throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement);
-        }
-
-        if (!GetVariable(_variableIdentifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? variableNotFoundError))
-        {
-            Diagnostics.Add(variableNotFoundError.ToError(_variableIdentifier));
-            Diagnostics.Add(indexerNotFoundError.ToError(statement));
-            return;
-        }
-
-        if (variable.IsDiscarded)
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Name}\" is discarded", _variableIdentifier));
-            return;
-        }
-
-        if (!variable.IsInitialized)
-        { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Name}\" is not initialized", _variableIdentifier)); }
-
-        using (Code.Block(this, $"Set array (variable \"{variable.Name}\") index (\"{statement.Index}\") (at {variable.Address}) to \"{value}\""))
-        {
-            if (!variable.Type.Is(out arrayType))
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Index setter for type \"{variable.Type}\" not found", statement));
-                return;
-            }
-
-            GeneralType elementType = arrayType.Of;
-
-            if (!elementType.SameAs(valueType))
-            {
-                Diagnostics.Add(Diagnostic.Critical("Bruh", value));
-                return;
-            }
-
-            int elementSize = elementType.GetSize(this, Diagnostics, statement.PrevStatement);
-
-            if (elementSize != 1)
-            { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", value); }
-
-            int indexAddress = Stack.NextAddress;
-            using (Code.Block(this, $"Compute index"))
-            { GenerateCodeForStatement(statement.Index); }
-
-            int valueAddress = Stack.NextAddress;
-            using (Code.Block(this, $"Compute value"))
-            { GenerateCodeForStatement(value); }
-
-            Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, statement));
-
-            Stack.Pop();
-            Stack.Pop();
-        }
+        if (variableNotFoundError is not null) Diagnostics.Add(variableNotFoundError.ToError(statement.PrevStatement));
+        Diagnostics.Add(indexerNotFoundError.ToError(statement));
     }
 
     #endregion
@@ -1082,9 +1181,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (prevType.Is(out ArrayType? arrayType))
+        if ((
+            GetVariable(indexCall.PrevStatement, out BrainfuckVariable? variable, out _) &&
+            variable.IsReference &&
+            prevType.Is(out PointerType? stackPointerType) &&
+            stackPointerType.To.Is(out ArrayType? arrayType)
+        ) ||
+            prevType.Is(out arrayType)
+        )
         {
-            if (!TryGetAddress(indexCall.PrevStatement, out int arrayAddress, out _))
+            if (!TryGetAddress(indexCall.PrevStatement, out Address? arrayAddress, out _))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Failed to get array address", indexCall.PrevStatement));
                 return;
@@ -1106,7 +1212,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             using (Code.Block(this, $"Compute index"))
             { GenerateCodeForStatement(indexCall.Index); }
 
-            Code.ARRAY_GET(arrayAddress, indexAddress, resultAddress);
+            if (arrayAddress is not AddressAbsolute arrayAddressAbs)
+            { throw new NotImplementedException(); }
+
+            Code.ARRAY_GET(arrayAddressAbs.Value, indexAddress, resultAddress);
 
             Stack.Pop();
 
@@ -2040,6 +2149,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (GetVariable(statement.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? variableNotFoundError))
         {
+            if (variable.IsReference)
+            { Diagnostics.Add(Diagnostic.Critical($"Can't get the value of variable \"{variable.Name}\" directly because its contains a stack pointer", statement)); }
+
             GenerateCodeForStatement(variable, statement);
             return;
         }
@@ -2180,14 +2292,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     {
                         if (AllowOtherOptimizations &&
-                            statement.Left is Identifier _left &&
-                            GetVariable(_left.Content, out BrainfuckVariable? left, out _) &&
+                            GetVariable(statement.Left, out BrainfuckVariable? left, out _) &&
                             !left.IsDiscarded &&
                             TryCompute(statement.Right, out CompiledValue right) &&
                             right.Type == RuntimeType.U8)
                         {
                             if (!left.IsInitialized)
-                            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{left.Name}\" is not initialized", _left)); }
+                            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{left.Name}\" is not initialized", statement.Left)); }
 
                             int resultAddress = Stack.PushVirtual(1, statement);
 
@@ -2772,6 +2883,38 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
+        if (GetVariable(field.PrevStatement, out BrainfuckVariable? prevVariable, out _) &&
+            prevVariable.IsReference &&
+            TryGetAddress(field, out Address? address, out int size))
+        {
+            if (size <= 0)
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Can't load field \"{field}\" because it's size is {size} (bruh)", field));
+                return;
+            }
+
+            using (Code.Block(this, $"Load field \"{field}\" (from {address})"))
+            {
+                int loadTarget = Stack.PushVirtual(size, field);
+
+                for (int offset = 0; offset < size; offset++)
+                {
+                    Address offsettedSource = address + offset;
+                    Address offsettedTarget = new AddressAbsolute(loadTarget) + offset;
+
+                    if (offsettedSource is not AddressAbsolute offsettedSourceAbs)
+                    { throw new NotImplementedException(); }
+
+                    if (offsettedTarget is not AddressAbsolute offsettedTargetAbs)
+                    { throw new NotImplementedException(); }
+
+                    Code.CopyValue(offsettedSourceAbs.Value, offsettedTargetAbs.Value);
+                }
+            }
+
+            return;
+        }
+
         if (prevType.Is(out PointerType? pointerType))
         {
             if (!pointerType.To.Is(out StructType? structPointerType))
@@ -2803,45 +2946,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (!TryGetAddress(field, out int address, out int size))
+        if (TryGetAddress(field, out address, out size))
         {
-            StatementWithValue? dereferencePointer = NeedDereference(field);
-            if (dereferencePointer is not null)
-            {
-                int offset = GetDataOffset(field, dereferencePointer);
-                using (Code.Block(this, $"Load field \"{field}\" (dereferenced from \"{dereferencePointer}\" + {offset})"))
-                {
-                    int pointerAddress = Stack.NextAddress;
-                    GenerateCodeForStatement(dereferencePointer);
-                    Code.AddValue(pointerAddress, offset);
-                    Heap.Get(pointerAddress, pointerAddress);
-
-                    return;
-                }
-            }
-
-            Diagnostics.Add(Diagnostic.Critical($"Failed to get field memory address", field));
+            PushFrom(address, size);
             return;
         }
 
-        if (size <= 0)
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Can't load field \"{field}\" because it's size is {size} (bruh)", field));
-            return;
-        }
-
-        using (Code.Block(this, $"Load field \"{field}\" (from {address})"))
-        {
-            int loadTarget = Stack.PushVirtual(size, field);
-
-            for (int offset = 0; offset < size; offset++)
-            {
-                int offsettedSource = address + offset;
-                int offsettedTarget = loadTarget + offset;
-
-                Code.CopyValue(offsettedSource, offsettedTarget);
-            }
-        }
+        Diagnostics.Add(Diagnostic.Critical($"Failed to get field memory address", field));
     }
     void GenerateCodeForStatement(BasicTypeCast typeCast)
     {
@@ -2877,6 +2988,56 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GenerateCodeForStatement(typeCast.PrevStatement);
     }
     #endregion
+
+    void PushFrom(Address address, int size)
+    {
+        switch (address)
+        {
+            case AddressAbsolute v: PushFrom(v, size); break;
+            case AddressOffset v: PushFrom(v, size); break;
+            default: throw new NotImplementedException();
+        }
+    }
+
+    void PushFrom(AddressAbsolute address, int size)
+    {
+        using (Code.Block(this, $"Load daata (from {address})"))
+        {
+            int loadTarget = Stack.PushVirtual(size);
+
+            for (int offset = 0; offset < size; offset++)
+            {
+                Address offsettedSource = address + offset;
+                Address offsettedTarget = new AddressAbsolute(loadTarget) + offset;
+
+                if (offsettedSource is not AddressAbsolute offsettedSourceAbs)
+                { throw new NotImplementedException(); }
+
+                if (offsettedTarget is not AddressAbsolute offsettedTargetAbs)
+                { throw new NotImplementedException(); }
+
+                Code.CopyValue(offsettedSourceAbs.Value, offsettedTargetAbs.Value);
+            }
+        }
+    }
+
+    void PushFrom(AddressOffset address, int size)
+    {
+        if (address.Base is AddressRuntimePointer runtimePointer)
+        {
+            using (Code.Block(this, $"Load data (dereferenced from \"{runtimePointer.PointerValue}\" + {address.Offset})"))
+            {
+                int pointerAddress = Stack.NextAddress;
+                GenerateCodeForStatement(runtimePointer.PointerValue);
+                Code.AddValue(pointerAddress, address.Offset);
+                Heap.Get(pointerAddress, pointerAddress);
+            }
+        }
+        else
+        {
+            throw new NotImplementedException();
+        }
+    }
 
     #region GenerateCodeForPrinter()
 
@@ -3396,6 +3557,22 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 PointerType parameterType = new(v.Type);
                 compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, v.Address, true, false, false, parameterType, parameterType.GetSize(this, Diagnostics, modifiedVariable)));
+                continue;
+            }
+
+            if (passed is Identifier identifier &&
+                GetVariable(identifier, out BrainfuckVariable? variable, out _) &&
+                variable.IsReference)
+            {
+                if (!CanCastImplicitly(variable.Type, definedType, null, this, out PossibleDiagnostic? castError))
+                {
+                    Diagnostics.Add(Diagnostic.Critical(
+                        $"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{variable.Type}\"",
+                        passed,
+                        castError.ToError(passed)));
+                }
+
+                compiledParameters.Push(new BrainfuckVariable(defined.Identifier.Content, defined.File, variable.Address, true, false, false, variable.Type, variable.Type.GetSize(this, Diagnostics, identifier)));
                 continue;
             }
 

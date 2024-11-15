@@ -13,7 +13,7 @@ public readonly struct CompilerResult
     public readonly ImmutableArray<CompiledConstructor> Constructors;
     public readonly ImmutableArray<CompiledAlias> Aliases;
 
-    public readonly ImmutableArray<CollectedAST> Raw;
+    public readonly ImmutableArray<ParsedFile> Raw;
 
     public readonly ImmutableArray<IExternalFunction> ExternalFunctions;
 
@@ -115,7 +115,7 @@ public readonly struct CompilerResult
     }
 
     public static CompilerResult MakeEmpty(Uri file) => new(
-        Enumerable.Empty<CollectedAST>(),
+        Enumerable.Empty<ParsedFile>(),
         Enumerable.Empty<CompiledFunction>(),
         Enumerable.Empty<CompiledGeneralFunction>(),
         Enumerable.Empty<CompiledOperator>(),
@@ -127,7 +127,7 @@ public readonly struct CompilerResult
         file);
 
     public CompilerResult(
-        IEnumerable<CollectedAST> tokens,
+        IEnumerable<ParsedFile> tokens,
         IEnumerable<CompiledFunction> functions,
         IEnumerable<CompiledGeneralFunction> generalFunctions,
         IEnumerable<CompiledOperator> operators,
@@ -621,10 +621,10 @@ public sealed class Compiler
         return result;
     }
 
-    void AddAST(CollectedAST collectedAST, bool addTopLevelStatements = true)
+    void AddAST(ParsedFile collectedAST, bool addTopLevelStatements = true)
     {
         if (addTopLevelStatements)
-        { TopLevelStatements.Add((collectedAST.AST.TopLevelStatements, collectedAST.Uri)); }
+        { TopLevelStatements.Add((collectedAST.AST.TopLevelStatements, collectedAST.File)); }
 
         Functions.AddRange(collectedAST.AST.Functions);
         Operators.AddRange(collectedAST.AST.Operators);
@@ -634,21 +634,21 @@ public sealed class Compiler
 
     CompilerResult CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
     {
-        ImmutableArray<CollectedAST> files = SourceCodeManager.Collect(file, PrintCallback, Settings.BasePath, Diagnostics, PreprocessorVariables, TokenizerSettings, fileParser, additionalImports);
+        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, PrintCallback, Settings.BasePath, Diagnostics, PreprocessorVariables, TokenizerSettings, fileParser, additionalImports);
 
-        foreach (CollectedAST ast in files)
-        { AddAST(ast, ast.Uri != file); }
+        foreach (ParsedFile parsedFile in parsedFiles)
+        { AddAST(parsedFile, parsedFile.File != file); }
 
-        foreach (CollectedAST ast in files)
+        foreach (ParsedFile parsedFile in parsedFiles)
         {
-            if (ast.Uri == file)
-            { TopLevelStatements.Add((ast.AST.TopLevelStatements, ast.Uri)); }
+            if (parsedFile.File != file) continue;
+            TopLevelStatements.Add((parsedFile.AST.TopLevelStatements, parsedFile.File));
         }
 
         CompileInternal();
 
         return new CompilerResult(
-            files,
+            parsedFiles,
             CompiledFunctions,
             CompiledGeneralFunctions,
             CompiledOperators,
@@ -662,7 +662,7 @@ public sealed class Compiler
 
     CompilerResult CompileInteractiveInternal(Statement statement, Uri file)
     {
-        ImmutableArray<CollectedAST> files = SourceCodeManager.Collect(
+        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(
             file,
             PrintCallback,
             Settings.BasePath,
@@ -673,15 +673,15 @@ public sealed class Compiler
             new string[] { "System" }
         );
 
-        foreach (CollectedAST file_ in files)
-        { AddAST(file_); }
+        foreach (ParsedFile parsedFile in parsedFiles)
+        { AddAST(parsedFile); }
 
         TopLevelStatements.Add((ImmutableArray.Create(statement), file));
 
         CompileInternal();
 
         return new CompilerResult(
-            files,
+            parsedFiles,
             CompiledFunctions,
             CompiledGeneralFunctions,
             CompiledOperators,

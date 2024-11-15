@@ -2625,8 +2625,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
         {
             Instructions = (startInstruction, GeneratedCode.Count - 1),
-            SourcePosition = statement.Position,
-            Uri = statement.File,
+            Location = statement.Location,
         });
     }
 
@@ -2953,8 +2952,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Location = new SourceCodeLocation()
             {
                 Instructions = (GeneratedCode.Count, GeneratedCode.Count),
-                SourcePosition = position,
-                Uri = file,
+                Location = new Location(position, file),
             },
             Stack = new List<StackElementInformation>(),
         });
@@ -3487,8 +3485,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Location = new SourceCodeLocation()
             {
                 Instructions = (GeneratedCode.Count, GeneratedCode.Count),
-                SourcePosition = new Position(statements),
-                Uri = file,
+                Location = new Location(new Position(statements), file),
             },
             Stack = new List<StackElementInformation>(),
         });
@@ -3596,8 +3593,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Location = new SourceCodeLocation()
             {
                 Instructions = (GeneratedCode.Count, GeneratedCode.Count),
-                SourcePosition = Position.UnknownPosition,
-                Uri = compilerResult.File,
+                Location = new Location(Position.UnknownPosition, compilerResult.File),
             },
             Stack = new List<StackElementInformation>(),
         });

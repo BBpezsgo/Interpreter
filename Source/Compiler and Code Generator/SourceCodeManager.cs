@@ -12,21 +12,11 @@ public delegate bool FileParser(
     Uri file,
     [NotNullWhen(true)] out string? content);
 
-public readonly struct CollectedAST
-{
-    public Uri Uri { get; }
-    public UsingDefinition? Using { get; }
-    public TokenizerResult Tokens { get; }
-    public ParserResult AST { get; }
-
-    public CollectedAST(Uri file, UsingDefinition? @using, TokenizerResult tokens, ParserResult aST)
-    {
-        Uri = file;
-        Using = @using;
-        Tokens = tokens;
-        AST = aST;
-    }
-}
+public readonly record struct ParsedFile(
+    Uri File,
+    UsingDefinition? Using,
+    TokenizerResult Tokens,
+    ParserResult AST);
 
 public class SourceCodeManager
 {
@@ -207,7 +197,7 @@ public class SourceCodeManager
         return false;
     }
 
-    List<CollectedAST> CollectAll(
+    List<ParsedFile> CollectAll(
         UsingDefinition? initiator,
         Stream content,
         Uri file,
@@ -228,8 +218,8 @@ public class SourceCodeManager
         if (ast.Usings.Any())
         { Print?.Invoke("Loading files ...", LogType.Debug); }
 
-        List<CollectedAST> collectedASTs = new();
-        collectedASTs.Add(new CollectedAST(file, initiator, tokens, ast));
+        List<ParsedFile> collectedASTs = new();
+        collectedASTs.Add(new ParsedFile(file, initiator, tokens, ast));
 
         foreach (UsingDefinition @using in ast.Usings)
         {
@@ -248,7 +238,7 @@ public class SourceCodeManager
         return collectedASTs;
     }
 
-    ImmutableArray<CollectedAST> Entry(
+    ImmutableArray<ParsedFile> Entry(
         Uri file,
         string? basePath,
         TokenizerSettings? tokenizerSettings,
@@ -258,7 +248,7 @@ public class SourceCodeManager
             content is null)
         { throw new InternalExceptionWithoutContext($"File \"{file}\" not found"); }
 
-        List<CollectedAST> collected = CollectAll(null, content, file, basePath, tokenizerSettings);
+        List<ParsedFile> collected = CollectAll(null, content, file, basePath, tokenizerSettings);
 
         if (additionalImports is not null)
         {
@@ -281,7 +271,7 @@ public class SourceCodeManager
         return collected.ToImmutableArray();
     }
 
-    public static ImmutableArray<CollectedAST> Collect(
+    public static ImmutableArray<ParsedFile> Collect(
         Uri file,
         PrintCallback? printCallback,
         string? basePath,
@@ -295,7 +285,7 @@ public class SourceCodeManager
         return sourceCodeManager.Entry(file, basePath, tokenizerSettings, additionalImports);
     }
 
-    public static ImmutableArray<CollectedAST> Collect(
+    public static ImmutableArray<ParsedFile> Collect(
         FileInfo file,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,

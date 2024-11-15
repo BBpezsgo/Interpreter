@@ -36,18 +36,18 @@ public class BrainfuckRuntimeException : Exception
         if (!DebugInfo.TryGetSourceLocation(RuntimeContext.CodePointer, out SourceCodeLocation sourcePosition))
         { position = Position.UnknownPosition; }
         else
-        { position = sourcePosition.SourcePosition; }
+        { position = sourcePosition.Location.Position; }
 
         string? arrows = null;
-        if (sourcePosition.Uri is not null &&
-            DebugInfo.OriginalFiles.TryGetValue(sourcePosition.Uri, out ImmutableArray<Tokenizing.Token> tokens))
-        { arrows = LanguageException.GetArrows(sourcePosition.SourcePosition, tokens); }
+        if (sourcePosition.Location.File is not null &&
+            DebugInfo.OriginalFiles.TryGetValue(sourcePosition.Location.File, out ImmutableArray<Tokenizing.Token> tokens))
+        { arrows = LanguageException.GetArrows(sourcePosition.Location.Position, tokens); }
 
         FunctionInformation currentFrame = DebugInfo.GetFunctionInformation(RuntimeContext.CodePointer);
 
         StringBuilder result = new();
 
-        result.Append(LanguageException.Format(Message, position, sourcePosition.Uri));
+        result.Append(LanguageException.Format(Message, position, sourcePosition.Location.File));
 
         result.AppendLine();
 

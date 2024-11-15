@@ -38,11 +38,11 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
 
         if (!DebugInformation.IsEmpty && DebugInformation.TryGetSourceLocation(context.Registers.CodePointer, out SourceCodeLocation sourcePosition))
         {
-            position = sourcePosition.SourcePosition;
-            file = sourcePosition.Uri;
-            if (sourcePosition.Uri is not null &&
-                DebugInformation.OriginalFiles.TryGetValue(sourcePosition.Uri, out ImmutableArray<Tokenizing.Token> tokens))
-            { arrows = LanguageException.GetArrows(sourcePosition.SourcePosition, tokens); }
+            position = sourcePosition.Location.Position;
+            file = sourcePosition.Location.File;
+            if (sourcePosition.Location.File is not null &&
+                DebugInformation.OriginalFiles.TryGetValue(sourcePosition.Location.File, out ImmutableArray<Tokenizing.Token> tokens))
+            { arrows = LanguageException.GetArrows(sourcePosition.Location.Position, tokens); }
         }
         else
         { position = Position.UnknownPosition; }

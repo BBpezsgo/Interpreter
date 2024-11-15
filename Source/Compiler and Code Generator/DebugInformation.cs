@@ -7,14 +7,13 @@ namespace LanguageCore.Runtime;
 public struct SourceCodeLocation
 {
     public MutableRange<int> Instructions;
-    public Position SourcePosition;
-    public Uri Uri;
+    public Location Location;
 
     public readonly bool Contains(int instruction) =>
         Instructions.Start <= instruction &&
         Instructions.End > instruction;
 
-    public override readonly string ToString() => $"({Instructions} -> {SourcePosition.ToStringRange()})";
+    public override readonly string ToString() => $"({Instructions} -> {Location.Position.ToStringRange()})";
     readonly string GetDebuggerDisplay() => ToString();
 }
 

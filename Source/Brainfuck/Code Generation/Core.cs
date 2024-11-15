@@ -107,8 +107,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
             {
                 Instructions = (InstructionStart, end),
-                SourcePosition = Position,
-                Uri = File,
+                Location = new Location(Position, File),
             });
         }
     }
@@ -295,7 +294,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         VariableCleanupStack = new Stack<int>();
         Returns = new Stack<ControlFlowBlock>();
         Breaks = new Stack<ControlFlowBlock>();
-        DebugInfo = brainfuckSettings.GenerateDebugInformation ? new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Uri, v.Tokens.Tokens))) : null;
+        DebugInfo = brainfuckSettings.GenerateDebugInformation ? new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.File, v.Tokens.Tokens))) : null;
         MaxRecursiveDepth = 4;
         Settings = brainfuckSettings;
     }

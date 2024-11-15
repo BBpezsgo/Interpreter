@@ -13,7 +13,7 @@ public readonly struct CompilerResult
     public readonly ImmutableArray<CompiledConstructor> Constructors;
     public readonly ImmutableArray<CompiledAlias> Aliases;
 
-    public readonly ImmutableDictionary<Uri, CollectedAST> Raw;
+    public readonly ImmutableArray<CollectedAST> Raw;
 
     public readonly ImmutableArray<IExternalFunction> ExternalFunctions;
 
@@ -115,7 +115,7 @@ public readonly struct CompilerResult
     }
 
     public static CompilerResult MakeEmpty(Uri file) => new(
-        Enumerable.Empty<KeyValuePair<Uri, CollectedAST>>(),
+        Enumerable.Empty<CollectedAST>(),
         Enumerable.Empty<CompiledFunction>(),
         Enumerable.Empty<CompiledGeneralFunction>(),
         Enumerable.Empty<CompiledOperator>(),
@@ -127,7 +127,7 @@ public readonly struct CompilerResult
         file);
 
     public CompilerResult(
-        IEnumerable<KeyValuePair<Uri, CollectedAST>> tokens,
+        IEnumerable<CollectedAST> tokens,
         IEnumerable<CompiledFunction> functions,
         IEnumerable<CompiledGeneralFunction> generalFunctions,
         IEnumerable<CompiledOperator> operators,
@@ -138,7 +138,7 @@ public readonly struct CompilerResult
         IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
         Uri file)
     {
-        Raw = tokens.ToImmutableDictionary();
+        Raw = tokens.ToImmutableArray();
         Functions = functions.ToImmutableArray();
         GeneralFunctions = generalFunctions.ToImmutableArray();
         Operators = operators.ToImmutableArray();
@@ -634,15 +634,15 @@ public sealed class Compiler
 
     CompilerResult CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
     {
-        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(file, PrintCallback, Settings.BasePath, Diagnostics, PreprocessorVariables, TokenizerSettings, fileParser, additionalImports);
+        ImmutableArray<CollectedAST> files = SourceCodeManager.Collect(file, PrintCallback, Settings.BasePath, Diagnostics, PreprocessorVariables, TokenizerSettings, fileParser, additionalImports);
 
-        foreach ((Uri file_, CollectedAST ast) in files)
-        { AddAST(ast, file_ != file); }
+        foreach (CollectedAST ast in files)
+        { AddAST(ast, ast.Uri != file); }
 
-        foreach ((Uri file_, CollectedAST ast) in files)
+        foreach (CollectedAST ast in files)
         {
-            if (file_ == file)
-            { TopLevelStatements.Add((ast.AST.TopLevelStatements, file_)); }
+            if (ast.Uri == file)
+            { TopLevelStatements.Add((ast.AST.TopLevelStatements, ast.Uri)); }
         }
 
         CompileInternal();
@@ -662,7 +662,7 @@ public sealed class Compiler
 
     CompilerResult CompileInteractiveInternal(Statement statement, Uri file)
     {
-        ImmutableDictionary<Uri, CollectedAST> files = SourceCodeManager.Collect(
+        ImmutableArray<CollectedAST> files = SourceCodeManager.Collect(
             file,
             PrintCallback,
             Settings.BasePath,
@@ -673,7 +673,7 @@ public sealed class Compiler
             new string[] { "System" }
         );
 
-        foreach (CollectedAST file_ in files.Values)
+        foreach (CollectedAST file_ in files)
         { AddAST(file_); }
 
         TopLevelStatements.Add((ImmutableArray.Create(statement), file));

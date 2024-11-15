@@ -170,7 +170,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Settings = settings;
         Registers = new RegisterUsage();
         PointerSize = settings.PointerSize;
-        DebugInfo = new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Key, v.Value.Tokens.Tokens)))
+        DebugInfo = new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.Uri, v.Tokens.Tokens)))
         {
             StackOffsets = new StackOffsets()
             {

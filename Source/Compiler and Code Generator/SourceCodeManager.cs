@@ -207,7 +207,7 @@ public class SourceCodeManager
         return false;
     }
 
-    Dictionary<Uri, CollectedAST> CollectAll(
+    List<CollectedAST> CollectAll(
         UsingDefinition? initiator,
         Stream content,
         Uri file,
@@ -228,8 +228,8 @@ public class SourceCodeManager
         if (ast.Usings.Any())
         { Print?.Invoke("Loading files ...", LogType.Debug); }
 
-        Dictionary<Uri, CollectedAST> collectedASTs = new();
-        collectedASTs.Add(file, new CollectedAST(file, initiator, tokens, ast));
+        List<CollectedAST> collectedASTs = new();
+        collectedASTs.Add(new CollectedAST(file, initiator, tokens, ast));
 
         foreach (UsingDefinition @using in ast.Usings)
         {
@@ -248,7 +248,7 @@ public class SourceCodeManager
         return collectedASTs;
     }
 
-    ImmutableDictionary<Uri, CollectedAST> Entry(
+    ImmutableArray<CollectedAST> Entry(
         Uri file,
         string? basePath,
         TokenizerSettings? tokenizerSettings,
@@ -258,7 +258,7 @@ public class SourceCodeManager
             content is null)
         { throw new InternalExceptionWithoutContext($"File \"{file}\" not found"); }
 
-        Dictionary<Uri, CollectedAST> collected = CollectAll(null, content, file, basePath, tokenizerSettings);
+        List<CollectedAST> collected = CollectAll(null, content, file, basePath, tokenizerSettings);
 
         if (additionalImports is not null)
         {
@@ -278,10 +278,10 @@ public class SourceCodeManager
 
         Diagnostics.Throw();
 
-        return collected.ToImmutableDictionary();
+        return collected.ToImmutableArray();
     }
 
-    public static ImmutableDictionary<Uri, CollectedAST> Collect(
+    public static ImmutableArray<CollectedAST> Collect(
         Uri file,
         PrintCallback? printCallback,
         string? basePath,
@@ -295,7 +295,7 @@ public class SourceCodeManager
         return sourceCodeManager.Entry(file, basePath, tokenizerSettings, additionalImports);
     }
 
-    public static ImmutableDictionary<Uri, CollectedAST> Collect(
+    public static ImmutableArray<CollectedAST> Collect(
         FileInfo file,
         IEnumerable<string> preprocessorVariables,
         PrintCallback? printCallback,

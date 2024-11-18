@@ -504,44 +504,6 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
         return result.ToString();
     }
 
-    public bool ToFunctionCall([NotNullWhen(true)] out FunctionCall? functionCall)
-    {
-        functionCall = null;
-
-        if (PrevStatement is null)
-        { return false; }
-
-        if (PrevStatement is Identifier functionIdentifier)
-        {
-            functionCall = new FunctionCall(null, functionIdentifier, Arguments, Brackets, File)
-            {
-                Semicolon = Semicolon,
-                SaveValue = SaveValue,
-                SurroundingBracelet = SurroundingBracelet,
-                CompiledType = CompiledType,
-                PredictedValue = PredictedValue,
-                Reference = Reference,
-            };
-            return true;
-        }
-
-        if (PrevStatement is Field field)
-        {
-            functionCall = new FunctionCall(field.PrevStatement, field.Identifier, Arguments, Brackets, File)
-            {
-                Semicolon = Semicolon,
-                SaveValue = SaveValue,
-                SurroundingBracelet = SurroundingBracelet,
-                CompiledType = CompiledType,
-                PredictedValue = PredictedValue,
-                Reference = Reference,
-            };
-            return true;
-        }
-
-        return false;
-    }
-
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
         if (includeThis) yield return this;
@@ -1510,51 +1472,6 @@ public class IfContainer : Statement
         Branches = parts.ToImmutableArray();
     }
 
-    /// <exception cref="NotImplementedException"/>
-    LinkedIfThing? ToLinks(int i)
-    {
-        if (i >= Branches.Length)
-        { return null; }
-
-        if (Branches[i] is ElseIfBranch elseIfBranch)
-        {
-            return new LinkedIf(
-                elseIfBranch.Keyword,
-                elseIfBranch.Condition,
-                elseIfBranch.Block,
-                elseIfBranch.File)
-            {
-                NextLink = ToLinks(i + 1),
-            };
-        }
-
-        if (Branches[i] is ElseBranch elseBranch)
-        {
-            return new LinkedElse(
-                elseBranch.Keyword,
-                elseBranch.Block,
-                elseBranch.File);
-        }
-
-        throw new NotImplementedException();
-    }
-
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="NotImplementedException"/>
-    public LinkedIf ToLinks()
-    {
-        if (Branches.Length == 0) throw new InternalExceptionWithoutContext();
-        if (Branches[0] is not IfBranch ifBranch) throw new InternalExceptionWithoutContext();
-        return new LinkedIf(
-            ifBranch.Keyword,
-            ifBranch.Condition,
-            ifBranch.Block,
-            ifBranch.File)
-        {
-            NextLink = ToLinks(1),
-        };
-    }
-
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
         if (includeThis) yield return this;
@@ -1782,13 +1699,6 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
             { yield return statement; }
         }
     }
-
-    public NewInstance ToInstantiation() => new(Keyword, Type, File)
-    {
-        CompiledType = CompiledType,
-        SaveValue = true,
-        Semicolon = Semicolon,
-    };
 }
 
 public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<CompiledGeneralFunction>

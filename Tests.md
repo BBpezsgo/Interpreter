@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=308&f=1&s=147)](#)
-[![](https://img.shields.io/badge/Passing-308-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-1-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-147-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=309&f=0&s=147)](#)
+[![](https://img.shields.io/badge/Passing-309-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-0-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-147-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -49,7 +49,7 @@
 | [43](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/43.bbc) | ✅ | ✖ Function pointers are not supported |
 | [44](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/44.bbc) | ✅ | ✅ |
 | [45](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/45.bbc) | ✅ | ✅ |
-| [46](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/46.bbc) | ✅ | ❌ Exit code isn't what is expected: Expected: 121 Actual:   132 |
+| [46](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/46.bbc) | ✅ | ✅ |
 | [47](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/47.bbc) | ✅ | ✅ |
 | [48](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/48.bbc) | ✅ | ✅ |
 | [49](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/49.bbc) | ✅ | ✖ Floats not supported |

@@ -301,23 +301,45 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     #region SetTypeArguments()
 
-    protected void SetTypeArguments(Dictionary<string, GeneralType> arguments)
+    protected void SetTypeArguments(Dictionary<string, GeneralType>? arguments)
     {
         TypeArguments.Clear();
-        TypeArguments.AddRange(arguments);
+        if (arguments is not null) TypeArguments.AddRange(arguments);
     }
 
-    protected void SetTypeArguments(ImmutableDictionary<string, GeneralType> arguments)
+    protected void SetTypeArguments(ImmutableDictionary<string, GeneralType>? arguments)
     {
         TypeArguments.Clear();
-        TypeArguments.AddRange(arguments);
+        if (arguments is not null) TypeArguments.AddRange(arguments);
     }
 
-    protected void SetTypeArguments(Dictionary<string, GeneralType> arguments, out Dictionary<string, GeneralType> old)
+    protected void SetTypeArguments(Dictionary<string, GeneralType>? arguments, out Dictionary<string, GeneralType> old)
     {
         old = new Dictionary<string, GeneralType>(TypeArguments);
         TypeArguments.Clear();
-        TypeArguments.AddRange(arguments);
+        if (arguments is not null) TypeArguments.AddRange(arguments);
+    }
+
+    protected TypeArgumentsScope SetTypeArgumentsScope(Dictionary<string, GeneralType>? arguments)
+    {
+        TypeArgumentsScope scope = new(this, TypeArguments);
+        TypeArguments.Clear();
+        if (arguments is not null) TypeArguments.AddRange(arguments);
+        return scope;
+    }
+
+    protected readonly struct TypeArgumentsScope : IDisposable
+    {
+        readonly CodeGenerator _codeGenerator;
+        readonly ImmutableDictionary<string, GeneralType> _prev;
+
+        public TypeArgumentsScope(CodeGenerator codeGenerator, IDictionary<string, GeneralType>? prev)
+        {
+            _codeGenerator = codeGenerator;
+            _prev = prev?.ToImmutableDictionary() ?? ImmutableDictionary<string, GeneralType>.Empty;
+        }
+
+        public void Dispose() => _codeGenerator.SetTypeArguments(_prev);
     }
 
     #endregion

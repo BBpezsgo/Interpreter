@@ -322,7 +322,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         {
             CompiledVariables.PushRange(savedVariables);
             for (int i = 0; i < CompiledVariables.Count; i++)
-            { CompiledVariables[i] = new BrainfuckVariable(CompiledVariables[i].Name, CompiledVariables[i].File, CompiledVariables[i].Address, CompiledVariables[i].IsReference, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size); }
+            { CompiledVariables[i] = new BrainfuckVariable(CompiledVariables[i].Address, CompiledVariables[i].IsReference, false, CompiledVariables[i].DeallocateOnClean, CompiledVariables[i].Type, CompiledVariables[i].Size, CompiledVariables[i]); }
         }
 
         ImmutableArray<IConstant> savedConstants = CompiledLocalConstants.ToImmutableArray();
@@ -381,7 +381,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     protected override bool GetLocalSymbolType(Identifier symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
-        if (GetVariable(symbolName.Content, out BrainfuckVariable? variable, out _))
+        if (GetVariable(symbolName, out BrainfuckVariable? variable, out _))
         {
             type = variable.Type;
             return true;
@@ -446,7 +446,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             return default;
         }
 
-        if (!GetVariable(arrayIdentifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
+        if (!GetVariable(arrayIdentifier, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
             Diagnostics.Add(notFoundError.ToError(arrayIdentifier));
             address = default;
@@ -551,7 +551,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     }
     bool TryGetAddress(Identifier identifier, [NotNullWhen(true)] out Address? address, out int size)
     {
-        if (!GetVariable(identifier.Content, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
+        if (!GetVariable(identifier, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
             Diagnostics.Add(notFoundError.ToError(identifier));
             address = default;
@@ -566,22 +566,74 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     #endregion
 
-    bool GetVariable(string name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(CompiledVariables, name, out variable, out notFoundError);
+    bool GetVariable(string name, Uri file, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(CompiledVariables, name, file, out variable, out notFoundError);
     bool GetVariable(StatementWithValue name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(CompiledVariables, name, out variable, out notFoundError);
 
-    static bool GetVariable(Stack<BrainfuckVariable> variables, string name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError)
+    static bool GetVariable(Stack<BrainfuckVariable> variables, string variableName, Uri relevantFile, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        for (int i = variables.Count - 1; i >= 0; i--)
-        {
-            if (variables[i].Name != name) continue;
+        BrainfuckVariable? result_ = default;
+        PossibleDiagnostic? error_ = null;
 
-            variable = variables[i];
-            notFoundError = null;
+        GlobalVariablePerfectus perfectus = GlobalVariablePerfectus.None;
+
+        static GlobalVariablePerfectus Max(GlobalVariablePerfectus a, GlobalVariablePerfectus b) => a > b ? a : b;
+
+        bool HandleIdentifier(BrainfuckVariable variable)
+        {
+            if (variableName is not null &&
+                variable.Identifier.Content != variableName)
+            { return false; }
+
+            perfectus = Max(perfectus, GlobalVariablePerfectus.Identifier);
             return true;
         }
 
-        variable = null;
-        notFoundError = new PossibleDiagnostic($"Variable \"{name}\" not found");
+        bool HandleFile(BrainfuckVariable variable)
+        {
+            if (relevantFile is null ||
+                variable.File != relevantFile)
+            {
+                // Not in the same file
+                return false;
+            }
+
+            if (perfectus >= GlobalVariablePerfectus.File)
+            {
+                error_ = new PossibleDiagnostic($"Global variable \"{variableName}\" not found: multiple variables matched in the same file");
+                // Debugger.Break();
+            }
+
+            perfectus = GlobalVariablePerfectus.File;
+            result_ = variable;
+            return true;
+        }
+
+        foreach (BrainfuckVariable variable in variables)
+        {
+            if (!HandleIdentifier(variable))
+            { continue; }
+
+            // MATCHED --> Searching for most relevant global variable
+
+            if (perfectus < GlobalVariablePerfectus.Good)
+            {
+                result_ = variable;
+                perfectus = GlobalVariablePerfectus.Good;
+            }
+
+            if (!HandleFile(variable))
+            { continue; }
+        }
+
+        if (result_ is not null && perfectus >= GlobalVariablePerfectus.Good)
+        {
+            result = result_;
+            error = error_;
+            return true;
+        }
+
+        error = error_ ?? new PossibleDiagnostic($"Global variable \"{variableName}\" not found");
+        result = null;
         return false;
     }
     static bool GetVariable(Stack<BrainfuckVariable> variables, StatementWithValue name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError)
@@ -595,7 +647,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             _ => false
         };
     }
-    static bool GetVariable(Stack<BrainfuckVariable> variables, Identifier name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(variables, name.Content, out variable, out notFoundError);
+    static bool GetVariable(Stack<BrainfuckVariable> variables, Identifier name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(variables, name.Content, name.File, out variable, out notFoundError);
     static bool GetVariable(Stack<BrainfuckVariable> variables, Pointer name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError)
     {
         if (name.PrevStatement is not Identifier identifier)
@@ -684,7 +736,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         {
             if (_statement is not Identifier identifier)
             { continue; }
-            if (!GetVariable(identifier.Content, out BrainfuckVariable? _variable, out _))
+            if (!GetVariable(identifier, out BrainfuckVariable? _variable, out _))
             { continue; }
             if (_variable.Name != variable.Name)
             { continue; }
@@ -700,14 +752,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         if (statements.Length == 0) return;
 
         Print?.Invoke($"  Generating top level statements for file \"{file.ToString() ?? "null"}\" ...", LogType.Debug);
-
-        if (!isImported)
-        { CompiledVariables.Add(new BrainfuckVariable(ReturnVariableName, file, Stack.PushVirtual(1, new Location(statements[0].Position.Before(), statements[0].File)), false, false, false, ExitCodeType, ExitCodeType.GetSize(this))); }
-
-        if (Settings.ClearGlobalVariablesBeforeExit)
-        { VariableCleanupStack.Push(PrecompileVariables(statements)); }
-        else
-        { PrecompileVariables(statements); }
 
         ControlFlowBlock? returnBlock = BeginReturnBlock(new Location(statements[0].Position.Before(), file), FindControlFlowUsage(statements));
 
@@ -727,9 +771,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             Breaks.Count > 0)
         { throw new InternalExceptionWithoutContext(); }
 
-        if (Settings.ClearGlobalVariablesBeforeExit)
-        { CleanupVariables(VariableCleanupStack.Pop()); }
-
         Code.SetPointer(0);
     }
 
@@ -743,11 +784,36 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             CompileGlobalConstants(statements);
         }
 
+        VariableDeclaration implicitReturnValueVariable = new(
+            Enumerable.Empty<Tokenizing.Token>(),
+            new TypeInstanceSimple(Tokenizing.Token.CreateAnonymous("u8"), compilerResult.File),
+            new Identifier(Tokenizing.Token.CreateAnonymous(ReturnVariableName), compilerResult.File),
+            null,
+            compilerResult.File
+        );
+
+        CompiledVariables.Add(new BrainfuckVariable(Stack.PushVirtual(1), false, false, false, ExitCodeType, ExitCodeType.GetSize(this), implicitReturnValueVariable));
+
+        IEnumerable<VariableDeclaration> globalVariableDeclarations = compilerResult.TopLevelStatements
+            .Select(v => v.Statements)
+            .Aggregate(Enumerable.Empty<Statement>(), (a, b) => a.Concat(b))
+            .Select(v => v as VariableDeclaration)
+            .Where(v => v is not null)
+            .Where(v => !v!.Modifiers.Contains(ModifierKeywords.Const))!;
+
+        if (Settings.ClearGlobalVariablesBeforeExit)
+        { VariableCleanupStack.Push(PrecompileVariables(globalVariableDeclarations, false)); }
+        else
+        { PrecompileVariables(globalVariableDeclarations, false); }
+
         for (int i = 0; i < compilerResult.TopLevelStatements.Length; i++)
         {
             (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[i];
             GenerateTopLevelStatements(statements, file, i < compilerResult.TopLevelStatements.Length - 1);
         }
+
+        if (Settings.ClearGlobalVariablesBeforeExit)
+        { CleanupVariables(VariableCleanupStack.Pop()); }
 
         if (Heap.IsUsed)
         {
@@ -758,6 +824,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             heapInitError?.Throw();
             Code.Insert(0, heapInit);
         }
+
+        Code.SetPointer(0);
 
         if (Code.BranchDepth != 0)
         { throw new InternalExceptionWithoutContext($"Unbalanced branches"); }

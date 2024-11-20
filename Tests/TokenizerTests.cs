@@ -16,13 +16,12 @@ public class TokenizerTests
         TokenizeWhitespaces = false,
     };
 
-    /// <exception cref="AssertFailedException"/>
     static void TokenSpecificAssert(ImmutableArray<Token> tokens)
     {
         for (int i = 0; i < tokens.Length; i++)
         { TokenSpecificAssert(tokens[i]); }
     }
-    /// <exception cref="AssertFailedException"/>
+
     static void TokenSpecificAssert(Token token)
         => Assert.AreEqual(token.ToOriginalString().Length, token.Position.AbsoluteRange.Size());
 

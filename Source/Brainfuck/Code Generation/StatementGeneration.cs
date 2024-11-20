@@ -3699,7 +3699,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             returnVariable = new BrainfuckVariable(Stack.PushVirtual(function.Type.GetSize(this, Diagnostics, function), callerPosition), false, false, false, function.Type, function.Type.GetSize(this, Diagnostics, function), variableDeclaration);
         }
 
-        if (!DoRecursivityStuff(function, callerPosition))
+        if (!IxMaxResursiveDepthReached(function, callerPosition))
         { return; }
 
         Stack<BrainfuckVariable> compiledParameters = new();
@@ -3848,7 +3848,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             returnVariable = new BrainfuckVariable(Stack.PushVirtual(function.Type.GetSize(this, Diagnostics, function), callerPosition), false, false, false, function.Type, function.Type.GetSize(this, Diagnostics, function), variableDeclaration);
         }
 
-        if (!DoRecursivityStuff(function, callerPosition))
+        if (!IxMaxResursiveDepthReached(function, callerPosition))
         { return; }
 
         Stack<BrainfuckVariable> compiledParameters = new();
@@ -3948,7 +3948,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             returnVariable = new BrainfuckVariable(Stack.PushVirtual(returnType.GetSize(this, Diagnostics, function), callerPosition), false, false, false, returnType, returnType.GetSize(this, Diagnostics, function), variableDeclaration);
         }
 
-        if (!DoRecursivityStuff(function, callerPosition))
+        if (!IxMaxResursiveDepthReached(function, callerPosition))
         { return; }
 
         Stack<BrainfuckVariable> compiledParameters = new();
@@ -4035,7 +4035,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         progressLabel.Print();
 
-        if (!DoRecursivityStuff(function, callerPosition))
+        if (!IxMaxResursiveDepthReached(function, callerPosition))
         { return; }
 
         Stack<BrainfuckVariable> compiledParameters = new();
@@ -4280,10 +4280,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CurrentMacro.Pop();
     }
 
-    /// <returns>
-    /// Returns <see langword="true"/> if the function can be generated.
-    /// </returns>
-    bool DoRecursivityStuff(FunctionThingDefinition function, ILocated callerPosition)
+    bool IxMaxResursiveDepthReached(FunctionThingDefinition function, ILocated callerPosition)
     {
         int depth = 0;
         for (int i = 0; i < CurrentMacro.Count; i++)

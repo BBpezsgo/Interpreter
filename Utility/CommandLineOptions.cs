@@ -43,12 +43,12 @@ public class CommandLineOptions
     [Option("dont-optimize",
         Required = false,
         HelpText = "Disable all optimization")]
-    public bool? DontOptimize { get; set; }
+    public bool DontOptimize { get; set; }
 
     [Option("no-debug-info",
         Required = false,
         HelpText = "Disables debug information generation (if you compiling into brainfuck, generating debug informations will take a lots of time)")]
-    public bool? NoDebugInfo { get; set; }
+    public bool NoDebugInfo { get; set; }
 
     [Option("stack-size",
         Required = false,
@@ -63,15 +63,15 @@ public class CommandLineOptions
     [Option("no-nullcheck",
         Required = false,
         HelpText = "Do not generate null-checks when dereferencing a pointer")]
-    public bool? NoNullcheck { get; set; }
+    public bool NoNullcheck { get; set; }
 
     [Option("print-instructions",
         Required = false,
         HelpText = "Prints the generated instructions before execution")]
-    public bool? PrintInstructions { get; set; }
+    public bool PrintInstructions { get; set; }
 
     [Option("print-memory",
         Required = false,
         HelpText = "Prints the memory after execution")]
-    public bool? PrintMemory { get; set; }
+    public bool PrintMemory { get; set; }
 }

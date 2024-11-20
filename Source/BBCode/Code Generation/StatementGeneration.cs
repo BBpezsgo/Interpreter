@@ -2557,11 +2557,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(typeCast.PrevStatement, targetType);
     }
 
-    /// <param name="silent">
-    /// If set to <see langword="true"/> then it will <b>ONLY</b> generate the statements and does not
-    /// generate variables or something like that.
-    /// </param>
-    void GenerateCodeForStatement(Block block, bool silent = false)
+    void GenerateCodeForStatement(Block block, bool ignoreScope = false)
     {
         if (!Settings.DontOptimize &&
             block.Statements.Length == 0)
@@ -2571,7 +2567,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (silent)
+        if (ignoreScope)
         {
             AddComment("Statements {");
             for (int i = 0; i < block.Statements.Length; i++)
@@ -2619,7 +2615,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case ModifiedStatement v: GenerateCodeForStatement(v); break;
             case AnyCall v: GenerateCodeForStatement(v); break;
             case Block v: GenerateCodeForStatement(v); break;
-            default: throw new InternalExceptionWithoutContext($"Unimplemented statement \"{statement.GetType().Name}\"");
+            default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
 
         DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()

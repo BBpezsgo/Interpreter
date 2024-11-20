@@ -27,7 +27,6 @@ public readonly struct TestFile
         InputFile = inputFile;
     }
 
-    /// <exception cref="AssertFailedException"/>
     public void DoMain(bool heapShouldBeEmpty = true, Action<List<IExternalFunction>>? externalFunctionAdder = null)
     {
         MainResult result = Utils.RunMain(LanguageCore.Utils.ToFileUri(SourceFile), GetInput(), externalFunctionAdder);
@@ -36,7 +35,6 @@ public readonly struct TestFile
         expected.Assert(result, heapShouldBeEmpty);
     }
 
-    /// <exception cref="AssertFailedException"/>
     public void DoBrainfuck(bool memoryShouldBeEmpty = true, int? expectedMemoryPointer = 0)
     {
         (BrainfuckResult result, BrainfuckResult resultCompact, BrainfuckResult resultUnoptimized) = Utils.RunBrainfuck(LanguageCore.Utils.ToFileUri(SourceFile), GetInput());
@@ -56,7 +54,6 @@ public readonly struct TestFile
         expected.Assert(resultUnoptimized, memoryShouldBeEmpty, expectedMemoryPointer);
     }
 
-    /// <exception cref="AssertFailedException"/>
     public void DoAssembly()
     {
         AssemblyResult result = Utils.RunAssembly(LanguageCore.Utils.ToFileUri(SourceFile), GetInput());
@@ -162,7 +159,6 @@ public readonly struct ExpectedResult
         }
     }
 
-    /// <exception cref="AssertFailedException"/>
     public ExpectedResult Assert(IResult other)
     {
         if (!string.Equals(StdOutput, other.StdOutput, StringComparison.Ordinal))
@@ -174,7 +170,6 @@ public readonly struct ExpectedResult
         return this;
     }
 
-    /// <exception cref="AssertFailedException"/>
     public ExpectedResult Assert(BrainfuckResult other)
     {
         if (!string.Equals(StdOutput, other.StdOutput, StringComparison.Ordinal))
@@ -186,7 +181,6 @@ public readonly struct ExpectedResult
         return this;
     }
 
-    /// <exception cref="AssertFailedException"/>
     public ExpectedResult Assert(MainResult other, bool heapShouldBeEmpty)
     {
         Assert(other);
@@ -197,7 +191,6 @@ public readonly struct ExpectedResult
         return this;
     }
 
-    /// <exception cref="AssertFailedException"/>
     public ExpectedResult Assert(BrainfuckResult other, bool memoryShouldBeEmpty, int? expectedMemoryPointer)
     {
         Assert(other);
@@ -217,7 +210,6 @@ public readonly struct ExpectedResult
         return this;
     }
 
-    /// <exception cref="AssertFailedException"/>
     public ExpectedResult Assert(AssemblyResult other)
     {
         Assert((IResult)other);
@@ -782,7 +774,6 @@ public static class AssertUtils
         return true;
     }
 
-    /// <exception cref="AssertFailedException"/>
     public static void PositionEquals(IReadOnlyList<IPositioned> positions, params ReadOnlySpan<Position> expected)
     {
         Assert.AreEqual(positions.Count, expected.Length);
@@ -800,7 +791,6 @@ public static class AssertUtils
         }
     }
 
-    /// <exception cref="AssertFailedException"/>
     public static void ContentEquals(IReadOnlyList<LanguageCore.Tokenizing.Token> tokens, params string[] expected)
     {
         Assert.AreEqual(tokens.Count, expected.Length);

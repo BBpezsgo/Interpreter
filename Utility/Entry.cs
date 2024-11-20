@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using CommandLine;
@@ -62,18 +62,18 @@ public static class Entry
         };
         MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
         {
-            CheckNullPointers = !arguments.NoNullcheck ?? MainGeneratorSettings.Default.CheckNullPointers,
-            DontOptimize = arguments.DontOptimize ?? MainGeneratorSettings.Default.DontOptimize,
-            PrintInstructions = arguments.PrintInstructions ?? MainGeneratorSettings.Default.PrintInstructions,
-            GenerateDebugInstructions = !arguments.NoDebugInfo ?? MainGeneratorSettings.Default.GenerateDebugInstructions,
+            CheckNullPointers = !arguments.NoNullcheck,
+            DontOptimize = arguments.DontOptimize,
+            PrintInstructions = arguments.PrintInstructions,
+            GenerateDebugInstructions = !arguments.NoDebugInfo,
             StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
         };
         BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)
         {
-            DontOptimize = arguments.DontOptimize ?? BrainfuckGeneratorSettings.Default.DontOptimize,
-            GenerateDebugInformation = !arguments.NoDebugInfo ?? BrainfuckGeneratorSettings.Default.GenerateDebugInformation,
-            GenerateComments = !arguments.NoDebugInfo ?? BrainfuckGeneratorSettings.Default.GenerateComments,
-            GenerateSmallComments = !arguments.NoDebugInfo ?? BrainfuckGeneratorSettings.Default.GenerateSmallComments,
+            DontOptimize = arguments.DontOptimize,
+            GenerateDebugInformation = !arguments.NoDebugInfo,
+            GenerateComments = !arguments.NoDebugInfo,
+            GenerateSmallComments = !arguments.NoDebugInfo,
             StackSize = arguments.StackSize ?? BrainfuckGeneratorSettings.Default.StackSize,
             HeapSize = arguments.HeapSize ?? BrainfuckGeneratorSettings.Default.HeapSize,
         };
@@ -458,7 +458,7 @@ public static class Entry
                 {
                     interpreter.Run();
 
-                    if (arguments.PrintMemory ?? false)
+                    if (arguments.PrintMemory)
                     {
                         Console.WriteLine();
                         Console.WriteLine();

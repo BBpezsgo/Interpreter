@@ -22,6 +22,7 @@ public interface IExternalFunction
 }
 
 #if UNITY
+[System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)] 
 public delegate void ExternalFunctionUnity(nint scope, nint arguments, nint returnValue);
 #endif
 

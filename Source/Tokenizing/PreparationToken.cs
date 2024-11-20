@@ -51,7 +51,7 @@ sealed class PreparationToken :
             return (left, null);
         }
 
-        (Position leftPosition, Position rightPosition) = Position.Slice(at);
+        (Position leftPosition, Position rightPosition) = Position.Cut(at);
 
         string content = Content.ToString();
 

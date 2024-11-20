@@ -114,7 +114,7 @@ public class Token :
         if (Content.Length == 1)
         { return (Duplicate(), null); }
 
-        (Position leftPosition, Position rightPosition) = Position.Slice(at);
+        (Position leftPosition, Position rightPosition) = Position.Cut(at);
 
         Token left = new(TokenType, Content[..at], IsAnonymous, leftPosition) { AnalyzedType = AnalyzedType };
         Token right = new(TokenType, Content[at..], IsAnonymous, rightPosition) { AnalyzedType = AnalyzedType };

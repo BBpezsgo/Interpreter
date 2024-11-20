@@ -11,6 +11,8 @@ public readonly struct Position :
     public readonly Range<int> AbsoluteRange;
     public readonly Range<SinglePosition> Range;
 
+    public Position this[Range range] => Slice(range);
+
     public Position(Range<SinglePosition> range, Range<int> absoluteRange)
     {
         Range = range;
@@ -95,7 +97,7 @@ public readonly struct Position :
 
     public override int GetHashCode() => HashCode.Combine(AbsoluteRange, Range);
 
-    public (Position Left, Position Right) Slice(int at)
+    public (Position Left, Position Right) Cut(int at)
     {
         if (Range.Start.Line != Range.End.Line)
         { throw new NotImplementedException($"Position slicing on different lines not implemented"); }
@@ -144,6 +146,40 @@ public readonly struct Position :
             );
 
         return (left, right);
+    }
+
+    public Position Slice(Range range)
+    {
+        if (Range.Start.Line != Range.End.Line)
+        { throw new InvalidOperationException($"The position is on multiple lines"); }
+
+        int absoluteLength = AbsoluteRange.End - AbsoluteRange.Start;
+
+        (int start, int length) = range.GetOffsetAndLength(absoluteLength);
+
+        return Slice(start, length);
+    }
+
+    public Position Slice(int start, int length)
+    {
+        if (Range.Start.Line != Range.End.Line)
+        { throw new InvalidOperationException($"The position is on multiple lines"); }
+
+        int absoluteStart = AbsoluteRange.Start + start;
+        int columnStart = Range.Start.Character + start;
+        int absoluteEnd = absoluteStart + length;
+        int columnEnd = absoluteEnd + length;
+
+        return new Position(
+            new Range<SinglePosition>(
+                new SinglePosition(Range.Start.Line, columnStart),
+                new SinglePosition(Range.End.Line, columnEnd)
+            ),
+            new Range<int>(
+                absoluteStart,
+                absoluteEnd
+            )
+        );
     }
 
     public static bool operator ==(Position left, Position right) => left.Equals(right);

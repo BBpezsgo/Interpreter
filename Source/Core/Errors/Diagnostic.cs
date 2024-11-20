@@ -32,8 +32,6 @@ public class Diagnostic :
         File = file;
         SubErrors = suberrors is null ? ImmutableArray<Diagnostic>.Empty : suberrors.Where(v => v is not null).ToImmutableArray()!;
 
-        _isDebugged = false;
-
         if (_break)
         { Break(); }
     }
@@ -45,7 +43,6 @@ public class Diagnostic :
         Position = position;
         File = file;
         SubErrors = suberrors is null ? ImmutableArray<Diagnostic>.Empty : suberrors.Where(v => v is not null).ToImmutableArray()!;
-        _isDebugged = false;
 
         if (level == DiagnosticsLevel.Error)
         { Break(); }

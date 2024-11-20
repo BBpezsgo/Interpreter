@@ -16,7 +16,6 @@ public class DiagnosticWithoutContext :
     {
         Level = level;
         Message = message;
-        _isDebugged = false;
 
         if (@break)
         { Break(); }
@@ -26,7 +25,6 @@ public class DiagnosticWithoutContext :
     {
         Level = level;
         Message = message;
-        _isDebugged = false;
 
         if (level == DiagnosticsLevel.Error)
         { Break(); }

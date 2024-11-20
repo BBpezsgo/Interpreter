@@ -177,8 +177,10 @@ public sealed class Parser
             Diagnostics.Throw();
             return statement;
         }
+        else if (CurrentToken is null)
+        { throw new SyntaxException($"Expected something but got nothing", PreviousToken?.Position.After() ?? Position.UnknownPosition, File); }
         else
-        { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken!, File); }
+        { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken, File); }
     }
 
     #region Parse top level
@@ -780,10 +782,24 @@ public sealed class Parser
         }
         else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralHex)
         {
-            v = v[2..];
-            v = v.Replace("_", string.Empty, StringComparison.Ordinal);
+            if (v.Length < 3)
+            {
+                Diagnostics.Add(Diagnostic.Error($"Invalid hex literal \"{CurrentToken}\"", CurrentToken, File));
+                v = "0";
+            }
+            else
+            {
+                v = v[2..];
+                v = v.Replace("_", string.Empty, StringComparison.Ordinal);
+            }
 
-            Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 16).ToString(CultureInfo.InvariantCulture), CurrentToken, File);
+            if (!int.TryParse(v, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int value))
+            {
+                Diagnostics.Add(Diagnostic.Error($"Invalid hex number \"{v}\"", CurrentToken.Position[2..], File));
+                value = 0;
+            }
+
+            Literal literal = new(LiteralType.Integer, value.ToString(CultureInfo.InvariantCulture), CurrentToken, File);
 
             CurrentTokenIndex++;
 
@@ -792,10 +808,24 @@ public sealed class Parser
         }
         else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralBinary)
         {
-            v = v[2..];
-            v = v.Replace("_", string.Empty, StringComparison.Ordinal);
+            if (v.Length < 3)
+            {
+                Diagnostics.Add(Diagnostic.Error($"Invalid binary literal \"{CurrentToken}\"", CurrentToken, File));
+                v = "0";
+            }
+            else
+            {
+                v = v[2..];
+                v = v.Replace("_", string.Empty, StringComparison.Ordinal);
+            }
 
-            Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 2).ToString(CultureInfo.InvariantCulture), CurrentToken, File);
+            if (!int.TryParse(v, NumberStyles.BinaryNumber, CultureInfo.InvariantCulture, out int value))
+            {
+                Diagnostics.Add(Diagnostic.Error($"Invalid binary number \"{v}\"", CurrentToken.Position[2..], File));
+                value = 0;
+            }
+
+            Literal literal = new(LiteralType.Integer, value.ToString(CultureInfo.InvariantCulture), CurrentToken, File);
 
             CurrentTokenIndex++;
 
@@ -1295,8 +1325,8 @@ public sealed class Parser
 
         baseBranch = ifSegmentType switch
         {
-            BaseBranch.IfPart.If => new IfBranch(keyword, condition ?? throw new InternalExceptionWithoutContext(), block, File),
-            BaseBranch.IfPart.ElseIf => new ElseIfBranch(keyword, condition ?? throw new InternalExceptionWithoutContext(), block, File),
+            BaseBranch.IfPart.If => new IfBranch(keyword, condition ?? throw new UnreachableException(), block, File),
+            BaseBranch.IfPart.ElseIf => new ElseIfBranch(keyword, condition ?? throw new UnreachableException(), block, File),
             BaseBranch.IfPart.Else => new ElseBranch(keyword, block, File),
             _ => throw new UnreachableException(),
         };
@@ -2014,7 +2044,7 @@ public sealed class Parser
                     {
                         (Token? newA, Token? newB) = doubleEnd.Slice(1);
                         if (newA == null || newB == null)
-                        { throw new InternalExceptionWithoutContext($"I failed at token splitting :("); }
+                        { throw new UnreachableException($"I failed at token splitting :("); }
                         CurrentTokenIndex--;
                         Tokens[CurrentTokenIndex] = newB;
                         break;

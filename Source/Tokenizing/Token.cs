@@ -26,7 +26,6 @@ public class Token :
         AnalyzedType = TokenAnalyzedType.None;
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
     internal Token(PreparationToken preparationToken) : this(preparationToken.TokenType switch
     {
         PreparationTokenType.Whitespace => TokenType.Whitespace,
@@ -100,8 +99,6 @@ public class Token :
         _ => Content.Escape(),
     };
 
-    /// <exception cref="NotImplementedException"/>
-    /// <exception cref="ArgumentOutOfRangeException"/>
     public (Token?, Token?) Slice(int at)
     {
 #if NET_STANDARD
@@ -125,7 +122,6 @@ public class Token :
         return (left, right);
     }
 
-    /// <exception cref="Exception"/>
     public static Token operator +(Token a, Token b)
     {
         if (a.TokenType != b.TokenType)

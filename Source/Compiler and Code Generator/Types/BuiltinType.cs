@@ -19,8 +19,6 @@ public class BuiltinType : GeneralType,
 
     public BasicType Type { get; }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="NotImplementedException"/>
     public RuntimeType RuntimeType => Type switch
     {
         BasicType.U8 => RuntimeType.U8,
@@ -44,7 +42,6 @@ public class BuiltinType : GeneralType,
         Type = type;
     }
 
-    /// <exception cref="NotImplementedException"/>
     public BuiltinType(RuntimeType type)
     {
         Type = type switch

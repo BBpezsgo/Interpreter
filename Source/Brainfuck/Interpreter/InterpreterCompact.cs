@@ -11,7 +11,6 @@ public class InterpreterCompact : InterpreterBase<CompactCodeSegment>
         return CompactCode.Generate(code, showProgress, debugInformation);
     }
 
-    /// <exception cref="BrainfuckRuntimeException"/>
     protected override void Evaluate(CompactCodeSegment instruction)
     {
         switch (instruction.OpCode)

@@ -125,10 +125,6 @@ public sealed class Parser
         Diagnostics = diagnostics;
     }
 
-    /// <exception cref="EndlessLoopException"/>
-    /// <exception cref="SyntaxException"/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="TokenizerException"/>
     public static ParserResult ParseFile(string file, DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings = null, ConsoleProgressBar? tokenizerProgressBar = null)
     {
         TokenizerResult tokens = StreamTokenizer.Tokenize(file, diagnostics, preprocessorVariables, tokenizerSettings, tokenizerProgressBar);
@@ -140,9 +136,6 @@ public sealed class Parser
             .ParseInternal();
         return result;
     }
-
-    /// <exception cref="EndlessLoopException"/>
-    /// <exception cref="SyntaxException"/>
     public static ParserResult Parse(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
         => new Parser(tokens, file, diagnostics).ParseInternal();
 

@@ -12,9 +12,6 @@ public class GolinkLinkerException : Exception
 [ExcludeFromCodeCoverage]
 public static class GolinkLinker
 {
-    /// <exception cref="ProcessException"/>
-    /// <exception cref="FileNotFoundException"/>
-    /// <exception cref="ProcessNotStartedException"/>
     public static void Link(string inputFile, string outputFile)
     {
         if (!File.Exists(inputFile))

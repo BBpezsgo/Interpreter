@@ -28,11 +28,8 @@ sealed class PreparationToken :
     public bool EndsWith(char v) => Content.Length != 0 && Content[^1] == v;
     public bool Contains(char v) => Content.Contains(v);
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
     public Token Instantiate() => new(this);
 
-    /// <exception cref="NotImplementedException"/>
-    /// <exception cref="ArgumentOutOfRangeException"/>
     public (PreparationToken?, PreparationToken?) Slice(int at)
     {
 #if NET_STANDARD

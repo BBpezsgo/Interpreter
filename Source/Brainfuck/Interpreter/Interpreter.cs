@@ -11,7 +11,6 @@ public class Interpreter : InterpreterBase<OpCodes>
         return CompactCode.ToOpCode(code);
     }
 
-    /// <exception cref="BrainfuckRuntimeException"/>
     protected override void Evaluate(OpCodes instruction)
     {
         switch (instruction)

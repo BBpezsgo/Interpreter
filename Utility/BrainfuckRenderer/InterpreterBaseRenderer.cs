@@ -21,7 +21,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     bool _isDisposed;
     protected RendererContext _rendererContext;
 
-    
+
     void Dispose(bool _)
     {
         if (_isDisposed) return;
@@ -29,16 +29,16 @@ public partial class InterpreterBase<TCode> : IDisposable
         ConsoleListener.Stop();
         _isDisposed = true;
     }
-    
+
     ~InterpreterBase() { Dispose(false); }
-    
+
     void IDisposable.Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
 
-    
+
     public void RunWithUI(bool autoTick = true, int wait = 0)
     {
         SetupUI();
@@ -86,7 +86,7 @@ public partial class InterpreterBase<TCode> : IDisposable
         ConsoleListener.Stop();
     }
 
-    
+
     void SetupUI()
     {
         _rendererContext.Renderer ??= new AnsiRenderer();
@@ -119,8 +119,6 @@ public partial class InterpreterBase<TCode> : IDisposable
         _rendererContext.CodeDisplayPosition = 0;
     }
 
-    /// <exception cref="NullReferenceException"/>
-    
     public void Draw()
     {
         if (_rendererContext.Renderer is null)
@@ -186,7 +184,7 @@ public partial class InterpreterBase<TCode> : IDisposable
     }
 
     int StartToken;
-    
+
     void DrawOriginalCode(IOnlySetterRenderer<ConsoleChar> renderer, SmallRect rect)
     {
         renderer.Fill(rect, default);
@@ -298,10 +296,10 @@ public partial class InterpreterBase<TCode> : IDisposable
         }
     }
 
-    
+
     protected abstract void DrawCode(IOnlySetterRenderer<ConsoleChar> renderer, Range<int> range, int x, int y, int width);
 
-    
+
     void DrawMemory(IOnlySetterRenderer<ConsoleChar> renderer, Range<int> range, SmallRect rect)
     {
         renderer.Fill(rect, default);
@@ -402,7 +400,7 @@ public partial class InterpreterBase<TCode> : IDisposable
         }
     }
 
-    
+
     static void DrawOutput(IOnlySetterRenderer<ConsoleChar> renderer, string text, SmallRect rect)
     {
         int x = rect.X;
@@ -436,7 +434,7 @@ public partial class InterpreterBase<TCode> : IDisposable
         }
     }
 
-    
+
     void DrawStackTrace(IOnlySetterRenderer<ConsoleChar> renderer, SmallRect rect)
     {
         if (DebugInfo == null)

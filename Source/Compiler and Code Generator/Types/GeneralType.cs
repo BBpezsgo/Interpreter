@@ -55,8 +55,6 @@ public abstract class GeneralType :
         _ => throw new UnreachableException()
     };
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="ArgumentNullException"/>
     public static GeneralType From(
         TypeInstance type,
         FindType typeFinder,
@@ -70,8 +68,6 @@ public abstract class GeneralType :
             _ => throw new UnreachableException(),
         };
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="ArgumentNullException"/>
     public static ArrayType From(
         TypeInstanceStackArray type,
         FindType typeFinder,
@@ -102,8 +98,6 @@ public abstract class GeneralType :
         return result;
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="ArgumentNullException"/>
     public static FunctionType From(
         TypeInstanceFunction type,
         FindType typeFinder,
@@ -119,8 +113,6 @@ public abstract class GeneralType :
         return result;
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="ArgumentNullException"/>
     public static PointerType From(
         TypeInstancePointer type,
         FindType typeFinder,
@@ -135,8 +127,6 @@ public abstract class GeneralType :
         return result;
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="ArgumentNullException"/>
     public static GeneralType From(
         TypeInstanceSimple type,
         FindType typeFinder,
@@ -257,11 +247,9 @@ public abstract class GeneralType :
         _ => false,
     };
 
-    /// <exception cref="NotImplementedException"/>
     public static bool TryGetTypeParameters(IEnumerable<GeneralType> definedParameters, IEnumerable<GeneralType> passedParameters, Dictionary<string, GeneralType> typeParameters)
         => GeneralType.TryGetTypeParameters(definedParameters.ToImmutableArray(), passedParameters.ToImmutableArray(), typeParameters);
 
-    /// <exception cref="NotImplementedException"/>
     public static bool TryGetTypeParameters(ImmutableArray<GeneralType> definedParameters, ImmutableArray<GeneralType> passedParameters, Dictionary<string, GeneralType> typeParameters)
     {
         if (definedParameters.Length != passedParameters.Length) return false;

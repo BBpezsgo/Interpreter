@@ -108,7 +108,6 @@ public abstract partial class Tokenizer
 
     readonly List<PreprocessorTag> UnprocessedPreprocessorTags = new();
 
-    /// <exception cref="TokenizerException"/>
     void HandlePreprocess(bool finished)
     {
         PreprocessorTag? last = LastPreprocess;
@@ -242,8 +241,6 @@ public abstract partial class Tokenizer
         }
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="TokenizerException"/>
     protected void ProcessCharacter(char currChar, int offsetTotal)
     {
     Again:
@@ -786,8 +783,6 @@ public abstract partial class Tokenizer
         }
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="TokenizerException"/>
     protected void EndToken(int offsetTotal, bool inFuture = false)
     {
         if (inFuture)

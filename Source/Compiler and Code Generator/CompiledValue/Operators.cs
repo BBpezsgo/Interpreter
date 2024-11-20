@@ -16,8 +16,6 @@ public partial struct CompiledValue :
     IShiftOperators<CompiledValue, int, CompiledValue>
 {
     /// <inheritdoc/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator +(CompiledValue a, CompiledValue b)
     {
         (RuntimeType a_, RuntimeType b_) = CompiledValue.MakeSameTypeAndKeep(ref a, ref b);
@@ -35,8 +33,6 @@ public partial struct CompiledValue :
         };
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator -(CompiledValue a, CompiledValue b)
     {
         (RuntimeType a_, RuntimeType b_) = CompiledValue.MakeSameTypeAndKeep(ref a, ref b);
@@ -55,20 +51,16 @@ public partial struct CompiledValue :
     }
 
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator <<(CompiledValue leftSide, CompiledValue rightSide)
         => leftSide << rightSide.I32;
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator >>(CompiledValue leftSide, CompiledValue rightSide)
         => leftSide >> rightSide.I32;
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator >>>(CompiledValue leftSide, CompiledValue rightSide)
         => leftSide >>> rightSide.I32;
 
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator <<(CompiledValue leftSide, int rightSide) => leftSide.Type switch
     {
         RuntimeType.U8 => new CompiledValue(unchecked((byte)(leftSide.U8 << rightSide))),
@@ -80,7 +72,6 @@ public partial struct CompiledValue :
         _ => throw new RuntimeException($"Can't do << operation with type {leftSide.Type}"),
     };
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator >>(CompiledValue leftSide, int rightSide) => leftSide.Type switch
     {
         RuntimeType.U8 => new CompiledValue(unchecked((byte)(leftSide.U8 >> rightSide))),
@@ -92,7 +83,6 @@ public partial struct CompiledValue :
         _ => throw new RuntimeException($"Can't do >> operation with type {leftSide.Type}"),
     };
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator >>>(CompiledValue leftSide, int rightSide) => leftSide.Type switch
     {
         RuntimeType.U8 => new CompiledValue(unchecked((byte)(leftSide.U8 >>> rightSide))),
@@ -123,7 +113,6 @@ public partial struct CompiledValue :
         };
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
     public static void MakeSameType(ref CompiledValue x, ref CompiledValue y)
     {
         if (x.Type == y.Type) return;
@@ -144,7 +133,6 @@ public partial struct CompiledValue :
         { throw new InternalExceptionWithoutContext(); }
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
     public static (RuntimeType, RuntimeType) MakeSameTypeAndKeep(ref CompiledValue x, ref CompiledValue y)
     {
         (RuntimeType, RuntimeType) result = (x.Type, y.Type);
@@ -153,8 +141,6 @@ public partial struct CompiledValue :
     }
 
     /// <inheritdoc/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator *(CompiledValue a, CompiledValue b)
     {
         (RuntimeType a_, RuntimeType b_) = CompiledValue.MakeSameTypeAndKeep(ref a, ref b);
@@ -172,8 +158,6 @@ public partial struct CompiledValue :
         };
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator /(CompiledValue a, CompiledValue b)
     {
         (RuntimeType a_, RuntimeType b_) = CompiledValue.MakeSameTypeAndKeep(ref a, ref b);
@@ -191,8 +175,6 @@ public partial struct CompiledValue :
         };
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator %(CompiledValue a, CompiledValue b)
     {
         (RuntimeType a_, RuntimeType b_) = CompiledValue.MakeSameTypeAndKeep(ref a, ref b);
@@ -303,7 +285,6 @@ public partial struct CompiledValue :
         => !(a == b);
 
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator !(CompiledValue value) => value.Type switch
     {
         RuntimeType.U8 => new CompiledValue(!(bool)value),
@@ -317,7 +298,6 @@ public partial struct CompiledValue :
     };
 
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator +(CompiledValue value) => value.Type switch
     {
         RuntimeType.U8 => new CompiledValue((byte)+value.U8),
@@ -331,7 +311,6 @@ public partial struct CompiledValue :
     };
 
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator -(CompiledValue value) => value.Type switch
     {
         RuntimeType.U8 => new CompiledValue((byte)-value.U8),
@@ -345,8 +324,6 @@ public partial struct CompiledValue :
     };
 
     /// <inheritdoc/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator |(CompiledValue a, CompiledValue b)
     {
         if (a.Type != b.Type)
@@ -357,8 +334,6 @@ public partial struct CompiledValue :
         return new CompiledValue(result, a.Type);
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator &(CompiledValue a, CompiledValue b)
     {
         if (a.Type != b.Type)
@@ -369,8 +344,6 @@ public partial struct CompiledValue :
         return new CompiledValue(result, a.Type);
     }
     /// <inheritdoc/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator ^(CompiledValue a, CompiledValue b)
     {
         if (a.Type != b.Type)
@@ -381,7 +354,6 @@ public partial struct CompiledValue :
         return new CompiledValue(result, a.Type);
     }
     /// <inheritdoc/>
-    /// <exception cref="RuntimeException"/>
     public static CompiledValue operator ~(CompiledValue value)
     {
         Flags flags = default;

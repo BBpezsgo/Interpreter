@@ -75,8 +75,6 @@ public class StackCodeHelper
     /// <summary>
     /// <b>Pointer:</b> Restored to the last state
     /// </summary>
-    /// <exception cref="NotSupportedException"/>
-    /// <exception cref="InternalExceptionWithoutContext"/>
     public StackAddress Push(CompiledValue v, ILocated? location = null) => Push(CodeHelper.GetInteger(v), location);
 
     /// <summary>

@@ -41,10 +41,8 @@ public abstract class InterpreterBase
         _isPaused = false;
     }
 
-    /// <exception cref="BrainfuckRuntimeException"/>
     public abstract bool Step();
 
-    /// <exception cref="BrainfuckRuntimeException"/>
     public void Run()
     { while (Step()) ; }
 
@@ -85,7 +83,6 @@ public abstract class InterpreterBase<TCode> : InterpreterBase
 
     protected abstract TCode[] ParseCode(string code, bool showProgress, DebugInformation? debugInfo);
 
-    /// <exception cref="BrainfuckRuntimeException"/>
     public override bool Step()
     {
         if (IsDone) return false;
@@ -96,6 +93,5 @@ public abstract class InterpreterBase<TCode> : InterpreterBase
         return !IsDone;
     }
 
-    /// <exception cref="BrainfuckRuntimeException"/>
     protected abstract void Evaluate(TCode instruction);
 }

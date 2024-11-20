@@ -12,9 +12,6 @@ public class GnuLinkerException : Exception
 [ExcludeFromCodeCoverage]
 public static class GnuLinker
 {
-    /// <exception cref="ProcessException"/>
-    /// <exception cref="FileNotFoundException"/>
-    /// <exception cref="ProcessNotStartedException"/>
     public static void Link(string inputFile, string outputFile)
     {
         if (!File.Exists(inputFile))

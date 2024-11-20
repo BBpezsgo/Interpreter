@@ -39,11 +39,11 @@ public unsafe struct ExternalFunctionScopedSync
 #endif
 
     public ExternalFunctionScopedSync(
-        #if UNITY
+#if UNITY
         delegate* unmanaged[Cdecl]<nint, nint, nint, void> callback,
-        #else
+#else
         delegate*<nint, System.ReadOnlySpan<byte>, System.Span<byte>, void> callback,
-        #endif
+#endif
         int id,
         int parametersSize,
         int returnValueSize,
@@ -82,7 +82,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
 
     #region Generators
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create(int id, string? name, Action callback)
     {
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
@@ -91,7 +90,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, 0, 0);
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0>(int id, string? name, Action<T0> callback)
         where T0 : unmanaged
     {
@@ -103,7 +101,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0>(), 0);
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1>(int id, string? name, Action<T0, T1> callback)
         where T0 : unmanaged
         where T1 : unmanaged
@@ -117,7 +114,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), 0);
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1, T2>(int id, string? name, Action<T0, T1, T2> callback)
         where T0 : unmanaged
         where T1 : unmanaged
@@ -133,7 +129,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), 0);
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1, T2, T3>(int id, string? name, Action<T0, T1, T2, T3> callback)
         where T0 : unmanaged
         where T1 : unmanaged
@@ -151,7 +146,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), 0);
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1, T2, T3, T4>(int id, string? name, Action<T0, T1, T2, T3, T4> callback)
         where T0 : unmanaged
         where T1 : unmanaged
@@ -171,7 +165,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), 0);
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1, T2, T3, T4, T5>(int id, string? name, Action<T0, T1, T2, T3, T4, T5> callback)
         where T0 : unmanaged
         where T1 : unmanaged
@@ -193,7 +186,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4, T5>(), 0);
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<TResult>(int id, string? name, Func<TResult> callback)
         where TResult : unmanaged
     {
@@ -204,7 +196,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, 0, ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, TResult>(int id, string? name, Func<T0, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
@@ -219,7 +210,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1, TResult>(int id, string? name, Func<T0, T1, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
@@ -236,7 +226,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1, T2, TResult>(int id, string? name, Func<T0, T1, T2, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
@@ -255,7 +244,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1, T2, T3, TResult>(int id, string? name, Func<T0, T1, T2, T3, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
@@ -276,7 +264,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1, T2, T3, T4, TResult>(int id, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
@@ -299,7 +286,6 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static ExternalFunctionSync Create<T0, T1, T2, T3, T4, T5, TResult>(int id, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
         where TResult : unmanaged
         where T0 : unmanaged
@@ -406,29 +392,28 @@ public static unsafe class ExternalFunctionGenerator
 
     #region GetTypes<>()
 
-    /// <exception cref="NotImplementedException"/>
     static ImmutableArray<RuntimeType> GetTypes<T0>() => ImmutableArray.Create(
         GetType<T0>()
     );
-    /// <exception cref="NotImplementedException"/>
+
     static ImmutableArray<RuntimeType> GetTypes<T0, T1>() => ImmutableArray.Create(
         GetType<T0>(),
         GetType<T1>()
     );
-    /// <exception cref="NotImplementedException"/>
+
     static ImmutableArray<RuntimeType> GetTypes<T0, T1, T2>() => ImmutableArray.Create(
         GetType<T0>(),
         GetType<T1>(),
         GetType<T2>()
     );
-    /// <exception cref="NotImplementedException"/>
+
     static ImmutableArray<RuntimeType> GetTypes<T0, T1, T2, T3>() => ImmutableArray.Create(
         GetType<T0>(),
         GetType<T1>(),
         GetType<T2>(),
         GetType<T3>()
     );
-    /// <exception cref="NotImplementedException"/>
+
     static ImmutableArray<RuntimeType> GetTypes<T0, T1, T2, T3, T4>() => ImmutableArray.Create(
         GetType<T0>(),
         GetType<T1>(),
@@ -436,7 +421,7 @@ public static unsafe class ExternalFunctionGenerator
         GetType<T3>(),
         GetType<T4>()
     );
-    /// <exception cref="NotImplementedException"/>
+
     static ImmutableArray<RuntimeType> GetTypes<T0, T1, T2, T3, T4, T5>() => ImmutableArray.Create(
         GetType<T0>(),
         GetType<T1>(),
@@ -446,7 +431,6 @@ public static unsafe class ExternalFunctionGenerator
         GetType<T5>()
     );
 
-    /// <exception cref="NotImplementedException"/>
     static RuntimeType GetType<T>()
     {
         Type type_ = typeof(T);

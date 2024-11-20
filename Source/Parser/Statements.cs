@@ -932,7 +932,6 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
         return result.ToString();
     }
 
-    /// <exception cref="NotImplementedException"/>
     public override Assignment ToAssignment()
     {
         BinaryOperatorCall operatorCall = GetOperatorCall();
@@ -948,7 +947,6 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
         { yield return statement; }
     }
 
-    /// <exception cref="NotImplementedException"/>
     public BinaryOperatorCall GetOperatorCall()
     {
         switch (Operator.Content)
@@ -1135,7 +1133,6 @@ public class Literal : StatementWithValue
         ValueToken = value;
     }
 
-    /// <exception cref="NotImplementedException"/>
     Literal(
         CompiledValue value,
         Token token,
@@ -1175,11 +1172,9 @@ public class Literal : StatementWithValue
         };
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static Literal CreateAnonymous(CompiledValue value, IPositioned position, Uri file)
         => Literal.CreateAnonymous(value, position.Position, file);
 
-    /// <exception cref="NotImplementedException"/>
     public static Literal CreateAnonymous(CompiledValue value, Position position, Uri file)
     {
         TokenType tokenType = value.Type switch
@@ -1199,7 +1194,6 @@ public class Literal : StatementWithValue
         };
     }
 
-    /// <exception cref="NotImplementedException"/>
     public static IEnumerable<Literal> CreateAnonymous(IEnumerable<CompiledValue> values, IEnumerable<ILocated> positions)
         =>
         values

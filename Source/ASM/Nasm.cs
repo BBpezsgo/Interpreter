@@ -97,11 +97,6 @@ public class NasmException : Exception
 [ExcludeFromCodeCoverage]
 public static class Nasm
 {
-    /// <exception cref="ProcessNotStartedException"/>
-    /// <exception cref="NotImplementedException"/>
-    /// <exception cref="NasmException"/>
-    /// <exception cref="FileNotFoundException"/>
-    /// <exception cref="ProcessException"/>
     public static void Assemble(string inputFile, string outputFile)
     {
         if (!File.Exists(inputFile))
@@ -139,11 +134,6 @@ public static class Nasm
         throw new ProcessException("nasm", process.ExitCode, stdOutput, stdError);
     }
 
-    /// <exception cref="ProcessNotStartedException"/>
-    /// <exception cref="NotImplementedException"/>
-    /// <exception cref="NasmException"/>
-    /// <exception cref="FileNotFoundException"/>
-    /// <exception cref="ProcessException"/>
     public static void AssembleRaw(string inputFile, string outputFile)
     {
         if (!File.Exists(inputFile))

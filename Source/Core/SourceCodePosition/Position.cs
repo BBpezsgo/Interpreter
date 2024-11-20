@@ -95,8 +95,6 @@ public readonly struct Position :
 
     public override int GetHashCode() => HashCode.Combine(AbsoluteRange, Range);
 
-    /// <exception cref="NotImplementedException"/>
-    /// <exception cref="ArgumentOutOfRangeException"/>
     public (Position Left, Position Right) Slice(int at)
     {
         if (Range.Start.Line != Range.End.Line)

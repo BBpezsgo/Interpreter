@@ -13,22 +13,12 @@ public class StreamTokenizer : Tokenizer,
         Stream = stream;
     }
 
-    /// <exception cref="ArgumentException"/>
-    /// <exception cref="ArgumentNullException"/>
-    /// <exception cref="PathTooLongException"/>
-    /// <exception cref="DirectoryNotFoundException"/>
-    /// <exception cref="UnauthorizedAccessException"/>
-    /// <exception cref="FileNotFoundException"/>
-    /// <exception cref="System.NotSupportedException"/>
-    /// <exception cref="IOException"/>
-    /// <inheritdoc cref="TokenizeInternal"/>
     public static TokenizerResult Tokenize(string file, DiagnosticsCollection diagnostics, IEnumerable<string>? preprocessorVariables = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null)
     {
         FileStream stream = System.IO.File.OpenRead(file);
         return StreamTokenizer.Tokenize(stream, diagnostics, preprocessorVariables, new Uri(file), settings, progress, (int)stream.Length);
     }
 
-    /// <inheritdoc cref="TokenizeInternal"/>
     public static TokenizerResult Tokenize(Stream stream, DiagnosticsCollection diagnostics, IEnumerable<string>? preprocessorVariables = null, Uri? file = null, TokenizerSettings? settings = null, ConsoleProgressBar? progress = null, int? totalBytes = null)
     {
         settings ??= TokenizerSettings.Default;
@@ -41,8 +31,6 @@ public class StreamTokenizer : Tokenizer,
         { return tokenizer.TokenizeInternal(); }
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="TokenizerException"/>
     TokenizerResult TokenizeInternal()
     {
         int offsetTotal = 0;

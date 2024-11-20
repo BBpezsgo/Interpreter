@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using CommandLine;
@@ -13,8 +13,6 @@ namespace LanguageCore;
 
 public static class Entry
 {
-    /// <exception cref="NotSupportedException"/>
-    /// <exception cref="NotImplementedException"/>
     public static int Run(params string[] arguments)
     {
         CommandLine.Parser parser = new(with => with.HelpWriter = null);
@@ -51,8 +49,6 @@ public static class Entry
         }
     }
 
-    /// <exception cref="NotSupportedException"/>
-    /// <exception cref="NotImplementedException"/>
     public static int Run(CommandLineOptions arguments)
     {
         Output.LogDebugs = arguments.Verbose;

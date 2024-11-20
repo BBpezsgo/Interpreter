@@ -43,7 +43,6 @@ public static class StatementConverters
         return false;
     }
 
-    /// <exception cref="NotImplementedException"/>
     static LinkedIfThing? ToLinks(this IfContainer ifContainer, int i)
     {
         if (i >= ifContainer.Branches.Length)
@@ -72,8 +71,6 @@ public static class StatementConverters
         throw new NotImplementedException();
     }
 
-    /// <exception cref="InternalExceptionWithoutContext"/>
-    /// <exception cref="NotImplementedException"/>
     public static LinkedIf ToLinks(this IfContainer ifContainer)
     {
         if (ifContainer.Branches.Length == 0) throw new InternalExceptionWithoutContext();

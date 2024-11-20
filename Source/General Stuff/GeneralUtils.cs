@@ -14,9 +14,7 @@ public static class Utils
 #if !NET_STANDARD
     public static Uri AssemblyFile => new(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, Process.GetCurrentProcess().ProcessName + ".exe"), UriKind.Absolute);
 
-    /// <exception cref="ArgumentOutOfRangeException"/>
     public static unsafe void Write<T>(this Span<byte> buffer, in T value) where T : unmanaged => MemoryMarshal.Write(buffer, in value);
-    /// <exception cref="ArgumentOutOfRangeException"/>
     public static unsafe T Read<T>(this Span<byte> buffer) where T : unmanaged => MemoryMarshal.Read<T>(buffer);
 #endif
 

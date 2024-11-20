@@ -139,14 +139,11 @@ public partial struct CompiledValue :
     }
 
     /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
     public static bool operator true(CompiledValue v) => (bool)v;
     /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
     public static bool operator false(CompiledValue v) => !(bool)v;
 
     /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
     public static explicit operator bool(CompiledValue v) => v.Type switch
     {
         RuntimeType.Null => false,
@@ -162,7 +159,6 @@ public partial struct CompiledValue :
     public static implicit operator CompiledValue(bool v) => new(v);
 
     /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
     public static explicit operator byte(CompiledValue v) => v.Type switch
     {
         RuntimeType.U8 => (byte)v.U8,
@@ -176,7 +172,6 @@ public partial struct CompiledValue :
     public static implicit operator CompiledValue(byte v) => new(v);
 
     /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
     public static explicit operator ushort(CompiledValue v) => v.Type switch
     {
         RuntimeType.U8 => (ushort)v.U8,
@@ -190,7 +185,6 @@ public partial struct CompiledValue :
     };
 
     /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
     public static explicit operator int(CompiledValue v) => v.Type switch
     {
         RuntimeType.U8 => (int)v.U8,
@@ -205,7 +199,6 @@ public partial struct CompiledValue :
     public static implicit operator CompiledValue(int v) => new(v);
 
     /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
     public static explicit operator float(CompiledValue v) => v.Type switch
     {
         RuntimeType.U8 => (float)v.U8,
@@ -220,7 +213,6 @@ public partial struct CompiledValue :
     public static implicit operator CompiledValue(float v) => new(v);
 
     /// <inheritdoc/>
-    /// <exception cref="InvalidCastException"/>
     public static explicit operator char(CompiledValue v) => v.Type switch
     {
         RuntimeType.U8 => (char)v.U8,

@@ -4,7 +4,6 @@ namespace LanguageCore;
 
 public class Stack<T> : List<T>
 {
-    /// <exception cref="InvalidOperationException"/>
     public T Last
     {
         get => Count > 0 ? this[^1] : throw new InvalidOperationException("Stack is empty");
@@ -13,7 +12,6 @@ public class Stack<T> : List<T>
 
     public T? LastOrDefault => Count > 0 ? this[^1] : default;
 
-    /// <exception cref="InvalidOperationException"/>
     public ref T LastRef
     {
         get
@@ -30,8 +28,6 @@ public class Stack<T> : List<T>
 
 public static class StackUtils
 {
-    /// <exception cref="InvalidOperationException"/>
-    /// <exception cref="NotSupportedException"/>
     public static void Pop<T>(this List<T> list, int count)
     {
         if (list.Count < count)
@@ -55,7 +51,6 @@ public static class StackUtils
         list.Add(item);
     }
 
-    /// <exception cref="InvalidOperationException"/>
     public static T Pop<T>(this List<T> list)
     {
         if (list.Count == 0)

@@ -847,28 +847,40 @@ public partial class CodeGeneratorForMain : CodeGenerator
             compiledFunction.IsInlineable &&
             InlineMacro(compiledFunction, functionCall.MethodArguments, out Statement? inlined))
         {
-            bool bad = false;
+            bool argumentsAreObservable = false;
             foreach (StatementWithValue argument in functionCall.MethodArguments)
             {
                 if (IsObservable(argument))
                 {
-                    bad = true;
-                    // Debugger.Break();
+                    argumentsAreObservable = true;
                     break;
                 }
             }
 
-            if (!bad)
+            if (!argumentsAreObservable)
             {
-                if (!compiledFunction.ReturnSomething)
+                ControlFlowUsage controlFlowUsage = inlined is Block _block2 ? FindControlFlowUsage(_block2.Statements) : FindControlFlowUsage(inlined);
+                if (!compiledFunction.ReturnSomething &&
+                    controlFlowUsage == ControlFlowUsage.None)
                 {
                     Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", functionCall));
                     GenerateCodeForStatement(inlined);
                     return;
                 }
+                else if (compiledFunction.ReturnSomething &&
+                         controlFlowUsage == ControlFlowUsage.None &&
+                         inlined is StatementWithValue statementWithValue)
+                {
+                    Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", functionCall));
+                    GeneralType type = FindStatementType(statementWithValue);
+                    if (!CanCastImplicitly(type, compiledFunction.Type, statementWithValue, this, out var castError))
+                    { Diagnostics.Add(castError.ToError(statementWithValue)); }
+                    GenerateCodeForStatement(inlined);
+                    return;
+                }
                 else
                 {
-                    // Debugger.Break();
+                    Debugger.Break();
                 }
             }
         }

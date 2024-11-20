@@ -3257,6 +3257,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         AnyCall => ControlFlowUsage.None,
         ShortOperatorCall => ControlFlowUsage.None,
         CompoundAssignment => ControlFlowUsage.None,
+        BinaryOperatorCall => ControlFlowUsage.None,
 
         _ => throw new NotImplementedException(statement.GetType().Name),
     };
@@ -4554,9 +4555,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     }
     protected bool IsObservable(BinaryOperatorCall binaryOperatorCall)
     {
+        if (GetOperator(binaryOperatorCall, binaryOperatorCall.File, out _, out _))
+        { return true; }
+
         if (TryCompute(binaryOperatorCall, out _))
         { return false; }
-        return true;
+
+        return false;
     }
     protected bool IsObservable(LiteralStatement literal)
     {

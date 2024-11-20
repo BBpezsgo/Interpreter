@@ -20,6 +20,9 @@
 		},
 		{
 			"path": "../Core.wiki"
+		},
+		{
+			"path": "../SpeedTests"
 		}
 	],
 	"settings": {

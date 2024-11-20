@@ -3697,6 +3697,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[^1];
             Print?.Invoke($"Generating top level statements for file \"{file}\" ...", LogType.Debug);
+            if (compilerResult.IsInteractive &&
+                statements.Length == 1 &&
+                statements[0] is StatementWithValue statementWithValue)
+            {
+                GeneralType type = FindStatementType(statementWithValue);
+                if (type.SameAs(BasicType.I32))
+                {
+                    statements = ImmutableArray.Create<Statement>(
+                        new KeywordCall(
+                            (Token)StatementKeywords.Return,
+                            [statementWithValue],
+                            statementWithValue.File
+                        )
+                    );
+                }
+            }
             GenerateCodeForTopLevelStatements(statements, file);
         }
 

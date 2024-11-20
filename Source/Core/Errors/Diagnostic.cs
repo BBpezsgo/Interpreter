@@ -136,11 +136,11 @@ public class Diagnostic :
         return this;
     }
 
-    public (string SourceCode, string Arrows)? GetArrows()
+    public (string SourceCode, string Arrows)? GetArrows(LanguageException.GetFileContent? getFileContent = null)
     {
         if (File == null) return null;
         if (!File.IsFile) return null;
-        return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(File.AbsolutePath));
+        return LanguageException.GetArrows(Position, getFileContent?.Invoke(File) ?? System.IO.File.ReadAllText(File.AbsolutePath));
     }
 
     public override string ToString()

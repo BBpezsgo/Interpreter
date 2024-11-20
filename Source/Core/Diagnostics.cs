@@ -7,7 +7,6 @@ public interface IReadOnlyDiagnosticsCollection
     public bool HasErrors { get; }
 
     public void Throw();
-    public void Print();
 }
 
 [ExcludeFromCodeCoverage]
@@ -50,31 +49,6 @@ public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
         }
     }
 
-    public void Print()
-    {
-        foreach (DiagnosticWithoutContext diagnostic in _diagnosticsWithoutContext)
-        {
-            switch (diagnostic.Level)
-            {
-                case DiagnosticsLevel.Error:
-                    Output.LogError(diagnostic.Message);
-                    break;
-                case DiagnosticsLevel.Warning:
-                    Output.LogWarning(diagnostic.Message);
-                    break;
-                case DiagnosticsLevel.Information:
-                    Output.LogInfo(diagnostic.Message);
-                    break;
-                case DiagnosticsLevel.Hint:
-                    Output.LogInfo(diagnostic.Message);
-                    break;
-            }
-        }
-
-        foreach (Diagnostic diagnostic in _diagnostics)
-        { Output.LogDiagnostic(diagnostic); }
-    }
-
     public void Clear()
     {
         _diagnostics.Clear();
@@ -106,4 +80,32 @@ public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
 
     public void AddRange(IEnumerable<DiagnosticWithoutContext> diagnostic)
     { foreach (DiagnosticWithoutContext item in diagnostic) Add(item); }
+}
+
+public static class DiagnosticsCollectionExtensions
+{
+    public static void Print(this IReadOnlyDiagnosticsCollection diagnosticsCollection, LanguageException.GetFileContent? getFileContent = null)
+    {
+        foreach (DiagnosticWithoutContext diagnostic in diagnosticsCollection.DiagnosticsWithoutContext)
+        {
+            switch (diagnostic.Level)
+            {
+                case DiagnosticsLevel.Error:
+                    Output.LogError(diagnostic.Message);
+                    break;
+                case DiagnosticsLevel.Warning:
+                    Output.LogWarning(diagnostic.Message);
+                    break;
+                case DiagnosticsLevel.Information:
+                    Output.LogInfo(diagnostic.Message);
+                    break;
+                case DiagnosticsLevel.Hint:
+                    Output.LogInfo(diagnostic.Message);
+                    break;
+            }
+        }
+
+        foreach (Diagnostic diagnostic in diagnosticsCollection.Diagnostics)
+        { Output.LogDiagnostic(diagnostic, getFileContent); }
+    }
 }

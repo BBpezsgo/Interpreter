@@ -23,6 +23,8 @@ public readonly struct CompilerResult
 
     public readonly Uri File;
 
+    public readonly bool IsInteractive;
+
     public readonly IEnumerable<Uri> Files
     {
         get
@@ -124,7 +126,8 @@ public readonly struct CompilerResult
         Enumerable.Empty<IExternalFunction>(),
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<(ImmutableArray<Statement>, Uri)>(),
-        file);
+        file,
+        false);
 
     public CompilerResult(
         IEnumerable<ParsedFile> tokens,
@@ -136,7 +139,8 @@ public readonly struct CompilerResult
         IEnumerable<IExternalFunction> externalFunctions,
         IEnumerable<CompiledStruct> structs,
         IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
-        Uri file)
+        Uri file,
+        bool isInteractive)
     {
         Raw = tokens.ToImmutableArray();
         Functions = functions.ToImmutableArray();
@@ -148,6 +152,7 @@ public readonly struct CompilerResult
         Structs = structs.ToImmutableArray();
         TopLevelStatements = topLevelStatements.ToImmutableArray();
         File = file;
+        IsInteractive = isInteractive;
     }
 
     public static bool GetThingAt<TThing, TIdentifier>(IEnumerable<TThing> things, Uri file, SinglePosition position, [NotNullWhen(true)] out TThing? result)
@@ -657,20 +662,21 @@ public sealed class Compiler
             ExternalFunctions,
             CompiledStructs,
             TopLevelStatements,
-            file);
+            file,
+            false);
     }
 
     CompilerResult CompileInteractiveInternal(Statement statement, Uri file)
     {
         ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(
-            file,
+            null,
             PrintCallback,
             Settings.BasePath,
             Diagnostics,
             PreprocessorVariables,
             TokenizerSettings,
             null,
-            new string[] { "System" }
+            new string[] { "Primitives", "System" }
         );
 
         foreach (ParsedFile parsedFile in parsedFiles)
@@ -690,7 +696,8 @@ public sealed class Compiler
             ExternalFunctions,
             CompiledStructs,
             TopLevelStatements,
-            file);
+            file,
+            true);
     }
 
     void CompileInternal()

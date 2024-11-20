@@ -85,7 +85,7 @@ public static class Entry
 
         if (arguments.Source is null)
         {
-            new Interactive.Interactive().Run();
+            Interactive.Run();
             return 0;
         }
 

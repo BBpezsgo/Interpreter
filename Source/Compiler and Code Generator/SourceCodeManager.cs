@@ -156,17 +156,14 @@ public class SourceCodeManager
         if (@using.StartsWith('~'))
         { @using = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "." + @using[1..]); }
 
-        if (parent != null)
+        string? directory = parent == null ? null : (new FileInfo(parent.AbsolutePath).Directory?.FullName);
+
+        if (directory is not null)
         {
-            FileInfo fileInfo = new(parent.AbsolutePath);
-
-            if (fileInfo.Directory is null)
-            { throw new InternalExceptionWithoutContext($"File \"{fileInfo}\" doesn't have a directory"); }
-
             if (basePath != null)
-            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, fileInfo.Directory.FullName), @using), UriKind.Absolute); }
+            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, directory), @using), UriKind.Absolute); }
 
-            yield return new Uri(Path.GetFullPath(@using, fileInfo.Directory.FullName), UriKind.Absolute);
+            yield return new Uri(Path.GetFullPath(@using, directory), UriKind.Absolute);
         }
         else
         {
@@ -239,16 +236,22 @@ public class SourceCodeManager
     }
 
     ImmutableArray<ParsedFile> Entry(
-        Uri file,
+        Uri? file,
         string? basePath,
         TokenizerSettings? tokenizerSettings,
         IEnumerable<string>? additionalImports)
     {
-        if (!FromAnywhere(null, file, out Stream? content) ||
-            content is null)
-        { throw new InternalExceptionWithoutContext($"File \"{file}\" not found"); }
+        List<ParsedFile> collected = new();
 
-        List<ParsedFile> collected = CollectAll(null, content, file, basePath, tokenizerSettings);
+        if (file is not null)
+        {
+            if (!FromAnywhere(null, file, out Stream? content) || content is null)
+            {
+                Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{file}\" not found"));
+                return ImmutableArray<ParsedFile>.Empty;
+            }
+            collected.AddRange(CollectAll(null, content, file, basePath, tokenizerSettings));
+        }
 
         if (additionalImports is not null)
         {
@@ -258,7 +261,7 @@ public class SourceCodeManager
                 if (!FromAnywhere(null, query, out Stream? subContent, out Uri? subFile) ||
                     subContent is null)
                 {
-                    Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{file}\" not found"));
+                    Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{additionalImport}\" not found"));
                     continue;
                 }
 
@@ -266,13 +269,11 @@ public class SourceCodeManager
             }
         }
 
-        Diagnostics.Throw();
-
         return collected.ToImmutableArray();
     }
 
     public static ImmutableArray<ParsedFile> Collect(
-        Uri file,
+        Uri? file,
         PrintCallback? printCallback,
         string? basePath,
         DiagnosticsCollection diagnostics,
@@ -283,19 +284,5 @@ public class SourceCodeManager
     {
         SourceCodeManager sourceCodeManager = new(diagnostics, printCallback, preprocessorVariables, fileParser);
         return sourceCodeManager.Entry(file, basePath, tokenizerSettings, additionalImports);
-    }
-
-    public static ImmutableArray<ParsedFile> Collect(
-        FileInfo file,
-        IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback,
-        string? basePath,
-        DiagnosticsCollection diagnostics,
-        TokenizerSettings? tokenizerSettings,
-        FileParser? fileParser,
-        IEnumerable<string>? additionalImports)
-    {
-        SourceCodeManager sourceCodeManager = new(diagnostics, printCallback, preprocessorVariables, fileParser);
-        return sourceCodeManager.Entry(new Uri(file.FullName, UriKind.Absolute), basePath, tokenizerSettings, additionalImports);
     }
 }

@@ -57,15 +57,16 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     protected ImmutableArray<CompiledOperator> CompiledOperators;
     protected ImmutableArray<CompiledConstructor> CompiledConstructors;
     protected ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
-    protected ImmutableArray<IConstant> CompiledGlobalConstants;
     protected ImmutableArray<CompiledAlias> CompiledAliases;
 
+    protected ImmutableArray<IConstant> CompiledGlobalConstants;
     protected readonly Stack<IConstant> CompiledLocalConstants;
     protected readonly Stack<int> LocalConstantsStack;
 
     protected readonly Stack<CompiledParameter> CompiledParameters;
-    protected readonly Stack<CompiledVariable> CompiledVariables;
+    protected readonly Stack<CompiledVariable> CompiledLocalVariables;
     protected readonly Stack<CompiledVariable> CompiledGlobalVariables;
+    protected readonly Stack<CompiledInstructionLabel> CompiledInstructionLabels;
 
     protected IReadOnlyList<CompliableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
     protected IReadOnlyList<CompliableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;
@@ -100,13 +101,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     protected CodeGenerator(CompilerResult compilerResult, DiagnosticsCollection diagnostics, PrintCallback? print)
     {
         CompiledGlobalConstants = ImmutableArray.Create<IConstant>();
-
         CompiledLocalConstants = new Stack<IConstant>();
         LocalConstantsStack = new Stack<int>();
 
         CompiledParameters = new Stack<CompiledParameter>();
-        CompiledVariables = new Stack<CompiledVariable>();
+        CompiledLocalVariables = new Stack<CompiledVariable>();
         CompiledGlobalVariables = new Stack<CompiledVariable>();
+        CompiledInstructionLabels = new Stack<CompiledInstructionLabel>();
 
         compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
         compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
@@ -1609,7 +1610,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     protected bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (CompiledVariable compiledVariable_ in CompiledVariables)
+        foreach (CompiledVariable compiledVariable_ in CompiledLocalVariables)
         {
             if (compiledVariable_.Identifier.Content == variableName)
             {
@@ -1711,6 +1712,21 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         error = new PossibleDiagnostic($"Parameter \"{parameterName}\" not found");
         parameter = null;
+        return false;
+    }
+
+    protected bool GetInstructionLabel(string identifier, [NotNullWhen(true)] out CompiledInstructionLabel? instructionLabel, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        foreach (CompiledInstructionLabel compiledInstructionLabel in CompiledInstructionLabels)
+        {
+            if (compiledInstructionLabel.Identifier.Content != identifier) continue;
+            instructionLabel = compiledInstructionLabel;
+            error = null;
+            return true;
+        }
+
+        error = new PossibleDiagnostic($"Instruction label \"{identifier}\" not found");
+        instructionLabel = null;
         return false;
     }
 
@@ -2409,6 +2425,16 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     }
     protected GeneralType FindStatementType(Identifier identifier, GeneralType? expectedType = null)
     {
+        if (identifier.Content == "SP")
+        {
+            return BuiltinType.I32;
+        }
+
+        if (identifier.Content == "IP")
+        {
+            return BuiltinType.I32;
+        }
+
         if (GetConstant(identifier.Content, identifier.File, out IConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
             identifier.Reference = constant;
@@ -2449,6 +2475,11 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             return OnGotStatementType(identifier, new FunctionType(function.Function));
         }
 
+        if (GetInstructionLabel(identifier.Content, out _, out PossibleDiagnostic? instructionLabelNotFound))
+        {
+            return OnGotStatementType(identifier, new FunctionType(BuiltinType.Void, Enumerable.Empty<GeneralType>()));
+        }
+
         for (int i = CurrentEvaluationContext.Count - 1; i >= 0; i--)
         {
             if (CurrentEvaluationContext[i].TryGetType(identifier, out GeneralType? _type))
@@ -2465,7 +2496,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             variableNotFoundError.ToError(identifier),
             globalVariableNotFoundError.ToError(identifier),
             constantNotFoundError.ToError(identifier),
-            functionNotFoundError.ToError(identifier)));
+            functionNotFoundError.ToError(identifier),
+            instructionLabelNotFound.ToError(identifier)));
         return BuiltinType.Void;
     }
     protected PointerType FindStatementType(AddressGetter addressGetter)

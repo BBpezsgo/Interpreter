@@ -26,7 +26,8 @@ public abstract partial class Tokenizer
 
     static readonly ImmutableArray<char> SimpleOperators = ImmutableArray.Create(
         ';',
-        ','
+        ',',
+        ':'
     );
 
     protected readonly List<Token> Tokens;

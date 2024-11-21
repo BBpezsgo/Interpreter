@@ -482,7 +482,7 @@ public ref partial struct ProcessorState
         SetData(Registers.StackPointer, data, size);
 
         if (Registers.StackPointer >= Memory.Length ||
-            Registers.StackPointer < Settings.HeapSize)
+            Registers.StackPointer < 0)
         {
             Signal = Signal.StackOverflow;
 #if !UNITY
@@ -494,7 +494,7 @@ public ref partial struct ProcessorState
     int Pop(BitWidth size)
     {
         if (Registers.StackPointer >= Memory.Length ||
-            Registers.StackPointer < Settings.HeapSize)
+            Registers.StackPointer < 0)
         {
             Signal = Signal.StackOverflow;
 #if !UNITY

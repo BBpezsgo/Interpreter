@@ -1318,6 +1318,39 @@ public class Identifier : StatementWithValue, IReferenceableTo
     }
 }
 
+public class InstructionLabel : StatementWithValue
+{
+    public Identifier Identifier { get; }
+    public Token Colon { get; }
+
+    public override Position Position => new(
+        Identifier,
+        Colon
+    );
+
+    public InstructionLabel(
+        Identifier identifier,
+        Token colon,
+        Uri file) : base(file)
+    {
+        Identifier = identifier;
+        Colon = colon;
+    }
+
+    public InstructionLabel(InstructionLabel other) : base(other.File)
+    {
+        Identifier = other.Identifier;
+        Colon = other.Colon;
+    }
+
+    public override string ToString() => $"{Identifier}{Colon}";
+
+    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    {
+        if (includeThis) yield return this;
+    }
+}
+
 public class AddressGetter : StatementWithValue
 {
     public Token Operator { get; }

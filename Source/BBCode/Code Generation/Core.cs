@@ -137,6 +137,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly List<UndefinedOffset<CompiledOperator>> UndefinedOperatorFunctionOffsets;
     readonly List<UndefinedOffset<CompiledGeneralFunction>> UndefinedGeneralFunctionOffsets;
     readonly List<UndefinedOffset<CompiledConstructor>> UndefinedConstructorOffsets;
+    readonly List<UndefinedOffset<CompiledInstructionLabel>> UndefinedInstructionLabels;
 
     readonly RegisterUsage Registers;
 
@@ -159,20 +160,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
     {
         ExternalFunctions = compilerResult.ExternalFunctions;
-        GeneratedCode = new List<PreparationInstruction>();
-        CleanupStack = new Stack<Scope>();
-        ReturnInstructions = new Stack<List<int>>();
-        BreakInstructions = new Stack<List<int>>();
-        UndefinedFunctionOffsets = new List<UndefinedOffset<CompiledFunction>>();
-        UndefinedOperatorFunctionOffsets = new List<UndefinedOffset<CompiledOperator>>();
-        UndefinedGeneralFunctionOffsets = new List<UndefinedOffset<CompiledGeneralFunction>>();
-        UndefinedConstructorOffsets = new List<UndefinedOffset<CompiledConstructor>>();
+        GeneratedCode = new();
+        CleanupStack = new();
+        ReturnInstructions = new();
+        BreakInstructions = new();
+        UndefinedFunctionOffsets = new();
+        UndefinedOperatorFunctionOffsets = new();
+        UndefinedGeneralFunctionOffsets = new();
+        UndefinedConstructorOffsets = new();
+        UndefinedInstructionLabels = new();
         Settings = settings;
-        Registers = new RegisterUsage();
+        Registers = new();
         PointerSize = settings.PointerSize;
-        DebugInfo = new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.File, v.Tokens.Tokens)))
+        DebugInfo = new(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.File, v.Tokens.Tokens)))
         {
-            StackOffsets = new StackOffsets()
+            StackOffsets = new()
             {
                 SavedBasePointer = SavedBasePointerOffset,
                 SavedCodePointer = SavedCodePointerOffset,
@@ -180,39 +182,32 @@ public partial class CodeGeneratorForMain : CodeGenerator
         };
     }
 
-    void SetUndefinedFunctionOffsets<TFunction>(IEnumerable<UndefinedOffset<TFunction>> undefinedOffsets)
+    void SetUndefinedFunctionOffsets<TFunction>(IEnumerable<UndefinedOffset<TFunction>> undefinedOffsets, bool addDiagnostics)
         where TFunction : IHaveInstructionOffset
     {
         foreach (UndefinedOffset<TFunction> item in undefinedOffsets)
         {
             if (item.Called.InstructionOffset == InvalidFunctionAddress)
             {
-                if (item.Called is Parser.GeneralFunctionDefinition generalFunction)
+                if (addDiagnostics)
                 {
-                    Diagnostics.Add(generalFunction.Identifier.Content switch
+                    string thingName = item.Called switch
                     {
-                        BuiltinFunctionIdentifiers.Destructor => Diagnostic.Internal($"Destructor for \"{generalFunction.Context}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation),
-                        BuiltinFunctionIdentifiers.IndexerGet => Diagnostic.Internal($"Index getter for \"{generalFunction.Context}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation),
-                        BuiltinFunctionIdentifiers.IndexerSet => Diagnostic.Internal($"Index setter for \"{generalFunction.Context}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation),
-                        _ => throw new NotImplementedException(),
-                    });
-                    continue;
+                        CompiledOperator => "Operator",
+                        CompiledConstructor => "Constructor",
+                        CompiledFunction => "Function",
+                        CompiledGeneralFunction v => v.Identifier.Content switch
+                        {
+                            BuiltinFunctionIdentifiers.Destructor => "Destructor",
+                            BuiltinFunctionIdentifiers.IndexerGet => "Index getter",
+                            BuiltinFunctionIdentifiers.IndexerSet => "Index setter",
+                            _ => "???",
+                        },
+                        _ => "???",
+                    };
+
+                    Diagnostics.Add(Diagnostic.Internal($"{thingName} \"{(item.Called is ISimpleReadable readable ? readable.ToReadable() : item.Called.ToString())}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation));
                 }
-
-                string thingName = item.Called switch
-                {
-                    CompiledOperator => "Operator",
-                    CompiledConstructor => "Constructor",
-                    _ => "Function",
-                };
-
-                if (item.Called is ISimpleReadable simpleReadable)
-                {
-                    Diagnostics.Add(Diagnostic.Internal($"{thingName} \"{simpleReadable.ToReadable()}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation));
-                    continue;
-                }
-
-                Diagnostics.Add(Diagnostic.Internal($"{thingName} \"{item.Called}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation));
                 continue;
             }
 

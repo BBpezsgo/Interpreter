@@ -1358,6 +1358,12 @@ public sealed class Parser
 
     bool ExpectStatementUnchecked([NotNullWhen(true)] out Statement.Statement? statement)
     {
+        if (ExpectInstructionLabel(out InstructionLabel? instructionLabel))
+        {
+            statement = instructionLabel;
+            return true;
+        }
+
         if (ExpectWhileStatement(out WhileLoop? whileLoop))
         {
             statement = whileLoop;
@@ -1373,6 +1379,12 @@ public sealed class Parser
         if (ExpectKeywordCall(StatementKeywords.Return, 0, 1, out KeywordCall? keywordCallReturn))
         {
             statement = keywordCallReturn;
+            return true;
+        }
+
+        if (ExpectKeywordCall("goto", 1, out KeywordCall? keywordCallGoto))
+        {
+            statement = keywordCallGoto;
             return true;
         }
 
@@ -1879,6 +1891,31 @@ public sealed class Parser
         }
     }
 
+    bool ExpectInstructionLabel([NotNullWhen(true)] out InstructionLabel? instructionLabel)
+    {
+        int parseStart = CurrentTokenIndex;
+        instructionLabel = null;
+
+        if (!ExpectIdentifier(out Token? identifier))
+        {
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
+
+        if (!ExpectOperator(":", out Token? colon))
+        {
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
+
+        instructionLabel = new InstructionLabel(
+            new Identifier(identifier, File),
+            colon,
+            File
+        );
+        return true;
+    }
+
     bool ExpectIdentifier([NotNullWhen(true)] out Token? result) => ExpectIdentifier("", out result);
     bool ExpectIdentifier(string name, [NotNullWhen(true)] out Token? result)
     {
@@ -2102,15 +2139,14 @@ public sealed class Parser
         return true;
     }
 
-    static bool NeedSemicolon(Statement.Statement statement) => statement switch
-    {
-        ForLoop => false,
-        WhileLoop => false,
-        Block => false,
-        IfContainer => false,
-        BaseBranch => false,
-        _ => true
-    };
+    static bool NeedSemicolon(Statement.Statement statement) => statement is not (
+        ForLoop or
+        WhileLoop or
+        Block or
+        IfContainer or
+        BaseBranch or
+        InstructionLabel
+    );
 
     #endregion
 }

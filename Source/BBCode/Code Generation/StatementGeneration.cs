@@ -522,6 +522,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForValueSetter(newVariable.Identifier, newVariable.InitialValue);
         AddComment("}");
     }
+
+    void GenerateCodeForStatement(InstructionLabel instructionLabel)
+    {
+        if (!GetInstructionLabel(instructionLabel.Identifier.Content, out CompiledInstructionLabel? compiledInstructionLabel, out _))
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Instruction label \"{instructionLabel.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", instructionLabel.Identifier));
+            return;
+        }
+
+        compiledInstructionLabel.InstructionOffset = GeneratedCode.Count;
+    }
+
     void GenerateCodeForStatement(KeywordCall keywordCall)
     {
         AddComment($"Call Keyword \"{keywordCall.Identifier}\" {{");
@@ -641,6 +653,40 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             GeneralType deletableType = FindStatementType(keywordCall.Arguments[0]);
             GenerateDestructor(deletableType, keywordCall.Arguments[0].Location);
+
+            return;
+        }
+
+        if (keywordCall.Identifier.Content == "goto")
+        {
+            if (keywordCall.Arguments.Length != 1)
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{"goto"}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall));
+                return;
+            }
+
+            if (keywordCall.Arguments[0] is not Identifier identifier)
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Keyword call \"{"goto"}\" requires one identifier as an argument", keywordCall.Arguments[1]));
+                return;
+            }
+
+            if (!GetInstructionLabel(identifier.Content, out CompiledInstructionLabel? instructionLabel, out PossibleDiagnostic? error))
+            {
+                Diagnostics.Add(error.ToError(identifier));
+                return;
+            }
+
+            GenerateCodeForStatement(identifier);
+
+            using (RegisterUsage.Auto reg = Registers.GetFree())
+            {
+                PopTo(reg.Get(PointerBitWidth));
+                AddInstruction(Opcode.MathSub, reg.Get(PointerBitWidth), GeneratedCode.Count + 1);
+
+                int jumpInstruction = GeneratedCode.Count;
+                AddInstruction(Opcode.Jump, reg.Get(PointerBitWidth));
+            }
 
             return;
         }
@@ -873,7 +919,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", functionCall));
                     GeneralType type = FindStatementType(statementWithValue);
-                    if (!CanCastImplicitly(type, compiledFunction.Type, statementWithValue, this, out var castError))
+                    if (!CanCastImplicitly(type, compiledFunction.Type, statementWithValue, this, out PossibleDiagnostic? castError))
                     { Diagnostics.Add(castError.ToError(statementWithValue)); }
                     GenerateCodeForStatement(inlined);
                     return;
@@ -1680,6 +1726,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForStatement(Identifier variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
+        if (variable.Content == "SP")
+        {
+            AddInstruction(Opcode.Push, Register.StackPointer);
+            return;
+        }
+
+        if (variable.Content == "IP")
+        {
+            AddInstruction(Opcode.Push, Register.CodePointer);
+            return;
+        }
+
         if (GetConstant(variable.Content, variable.File, out IConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
             OnGotStatementType(variable, constant.Type);
@@ -1746,6 +1804,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction)); }
 
             Push(compiledFunction.InstructionOffset);
+
+            return;
+        }
+
+        if (GetInstructionLabel(variable.Content, out CompiledInstructionLabel? instructionLabel, out _))
+        {
+            variable.Reference = instructionLabel;
+            OnGotStatementType(variable, CompiledInstructionLabel.Type);
+
+            if (instructionLabel.InstructionOffset == InvalidFunctionAddress)
+            { UndefinedInstructionLabels.Add(new UndefinedOffset<CompiledInstructionLabel>(GeneratedCode.Count, true, variable, instructionLabel)); }
+
+            Push(instructionLabel.InstructionOffset);
 
             return;
         }
@@ -2627,6 +2698,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case ModifiedStatement v: GenerateCodeForStatement(v); break;
             case AnyCall v: GenerateCodeForStatement(v); break;
             case Block v: GenerateCodeForStatement(v); break;
+            case InstructionLabel v: GenerateCodeForStatement(v); break;
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
 
@@ -2701,7 +2773,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Pop(cleanupItem.SizeOnStack);
         }
 
-        if (!justGenerateCode) CompiledVariables.Pop();
+        if (!justGenerateCode) CompiledLocalVariables.Pop();
     }
 
     void GenerateCodeForValueSetter(Statement statementToSet, StatementWithValue value)
@@ -2719,6 +2791,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value)
     {
+        if (statementToSet.Content == "SP")
+        {
+            GeneralType valueType = FindStatementType(value, BuiltinType.I32);
+
+            if (!CanCastImplicitly(valueType, BuiltinType.I32, value, out PossibleDiagnostic? castError))
+            { Diagnostics.Add(castError.ToError(value)); }
+
+            GenerateCodeForStatement(value, BuiltinType.I32);
+            AddInstruction(Opcode.PopTo32, Register.StackPointer);
+            return;
+        }
+
+        if (statementToSet.Content == "IP")
+        {
+            GeneralType valueType = FindStatementType(value, BuiltinType.I32);
+
+            if (!CanCastImplicitly(valueType, BuiltinType.I32, value, out PossibleDiagnostic? castError))
+            { Diagnostics.Add(castError.ToError(value)); }
+
+            GenerateCodeForStatement(value, BuiltinType.I32);
+            AddInstruction(Opcode.PopTo32, Register.CodePointer);
+            return;
+        }
+
         if (GetConstant(statementToSet.Content, statementToSet.File, out _, out _))
         {
             statementToSet.AnalyzedType = TokenAnalyzedType.ConstantName;
@@ -2996,7 +3092,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-        foreach (CompiledVariable other in CompiledVariables)
+        foreach (CompiledVariable other in CompiledLocalVariables)
         {
             if (other.Identifier.Content != newVariable.Identifier.Content) continue;
             Diagnostics.Add(Diagnostic.Warning($"Variable \"{other.Identifier}\" already defined", newVariable.Identifier));
@@ -3038,7 +3134,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (CurrentScopeDebug.Count > 0) CurrentScopeDebug.Last.Stack.Add(debugInfo);
 
-        CompiledVariables.Add(compiledVariable);
+        CompiledLocalVariables.Add(compiledVariable);
 
         newVariable.Type.SetAnalyzedType(compiledVariable.Type);
 
@@ -3142,95 +3238,34 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    #region GenerateCodeForGlobalVariable
-    /*
+    #region GenerateCodeForInstructionLabel
 
-    CleanupItem GenerateCodeForGlobalVariable(VariableDeclaration newVariable)
+    void GenerateCodeForInstructionLabel(InstructionLabel instructionLabel)
     {
-        if (newVariable.Modifiers.Contains(ModifierKeywords.Const)) return CleanupItem.Null;
-
-        newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
-
-        // TODO: handle tags, originally TagCount.LastOrDefault
-        int offset = GlobalVariablesSize + 1; // 1 = Stack pointer offset (???)
-
-        CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
-
-        newVariable.CompiledType = compiledVariable.Type;
-
-        CompiledGlobalVariables.Add(compiledVariable);
-
-        newVariable.Type.SetAnalyzedType(compiledVariable.Type);
-
-        int size;
-
-        if (!Settings.DontOptimize &&
-            TryCompute(newVariable.InitialValue, out CompiledValue computedInitialValue))
+        foreach (CompiledInstructionLabel other in CompiledInstructionLabels)
         {
-            newVariable.InitialValue.PredictedValue = computedInitialValue;
-
-            AddComment($"Initial value {{");
-
-            size = new BuiltinType(computedInitialValue.Type).SizeBytes;
-
-            Push(computedInitialValue);
-            compiledVariable.IsInitialized = true;
-
-            if (size <= 0)
-            { Diagnostics.Add(Diagnostic.Critical($"Variable has a size of {size}", newVariable, newVariable.File); }
-
-            AddComment("}");
-        }
-        else if (compiledVariable.Type.Is(out ArrayType? arrayType) &&
-            arrayType.Of == BasicType.Char &&
-            newVariable.InitialValue is LiteralStatement literalStatement &&
-            literalStatement.Type == LiteralType.String &&
-            literalStatement.Value.Length == arrayType.Length)
-        {
-            size = arrayType.SizeBytes;
-            compiledVariable.IsInitialized = true;
-
-            for (int i = 0; i < literalStatement.Value.Length; i++)
-            {
-                Push(new CompiledValue(literalStatement.Value[i]));
-            }
-        }
-        else
-        {
-            AddComment($"Initial value {{");
-
-            size = compiledVariable.Type.SizeBytes;
-            StackAlloc(size);
-
-            if (size <= 0)
-            { Diagnostics.Add(Diagnostic.Critical($"Variable has a size of {size}", newVariable, newVariable.File); }
-
-            AddComment("}");
+            if (other.Identifier.Content != instructionLabel.Identifier.Content) continue;
+            Diagnostics.Add(Diagnostic.Warning($"Instruction label \"{other.Identifier}\" already defined", instructionLabel.Identifier));
         }
 
-        if (size != compiledVariable.Type.SizeBytes)
-        { throw new InternalException($"Variable size ({compiledVariable.Type.SizeBytes}) and initial value size ({size}) mismatch"); }
-
-        return new CleanupItem(size, newVariable.Modifiers.Contains(ModifierKeywords.Temp), compiledVariable.Type);
+        CompiledInstructionLabels.Add(new CompiledInstructionLabel(
+            InvalidFunctionAddress,
+            instructionLabel
+        ));
     }
-    CleanupItem GenerateCodeForGlobalVariable(Statement st)
+    void GenerateCodeForInstructionLabel(Statement statement)
     {
-        if (st is VariableDeclaration newVariable)
-        { return GenerateCodeForGlobalVariable(newVariable); }
-        return CleanupItem.Null;
+        if (statement is InstructionLabel instructionLabel)
+        { GenerateCodeForInstructionLabel(instructionLabel); }
     }
-    void GenerateCodeForGlobalVariable(IEnumerable<Statement> statements, Stack<CleanupItem> cleanupStack)
+    void GenerateCodeForInstructionLabel(IEnumerable<Statement> statements)
     {
         foreach (Statement statement in statements)
         {
-            CleanupItem item = GenerateCodeForGlobalVariable(statement);
-            if (item.SizeOnStack == 0) continue;
-
-            cleanupStack.Push(item);
+            GenerateCodeForInstructionLabel(statement);
         }
     }
 
-    */
     #endregion
 
     #region GenerateCodeFor...
@@ -3240,7 +3275,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         get
         {
             int sum = 0;
-            foreach (CompiledVariable variable in CompiledVariables)
+            foreach (CompiledVariable variable in CompiledLocalVariables)
             { sum += variable.Type.GetSize(this, Diagnostics, variable); }
             return sum;
         }
@@ -3299,9 +3334,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         InFunction = true;
 
         CompiledParameters.Clear();
-        CompiledVariables.Clear();
+        CompiledLocalVariables.Clear();
         ReturnInstructions.Clear();
         ScopeSizes.Push(0);
+        int savedInstructionLabelCount = CompiledInstructionLabels.Count;
 
         CompileParameters(function.Parameters);
 
@@ -3317,6 +3353,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Diagnostics.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have a body", function));
             return default;
         }
+
+        GenerateCodeForInstructionLabel(function.Block.GetStatementsRecursively(false));
 
         OnScopeEnter(function.Block, true);
 
@@ -3409,8 +3447,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
+        SetUndefinedFunctionOffsets(UndefinedInstructionLabels, false);
+
+        while (CompiledInstructionLabels.Count > savedInstructionLabelCount)
+        {
+            CompiledInstructionLabels.Pop();
+        }
+
         CompiledParameters.Clear();
-        CompiledVariables.Clear();
+        CompiledLocalVariables.Clear();
         ReturnInstructions.Clear();
         if (ScopeSizes.Pop() != 0) { } // throw new InternalException("Bruh", function.Block!, function.File);
 
@@ -3623,6 +3668,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
+        IEnumerable<InstructionLabel> globalInstructionLabels = compilerResult.TopLevelStatements
+            .Select(v => v.Statements)
+            .Aggregate(Enumerable.Empty<Statement>(), (a, b) => a.Concat(b))
+            .Select(v => v as InstructionLabel)
+            .Where(v => v is not null)!;
+
+        GenerateCodeForInstructionLabel(globalInstructionLabels);
+
         IEnumerable<VariableDeclaration> globalVariableDeclarations = compilerResult.TopLevelStatements
             .Select(v => v.Statements)
             .Aggregate(Enumerable.Empty<Statement>(), (a, b) => a.Concat(b))
@@ -3770,10 +3823,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (!generatedAnything) break;
         }
 
-        SetUndefinedFunctionOffsets(UndefinedFunctionOffsets);
-        SetUndefinedFunctionOffsets(UndefinedConstructorOffsets);
-        SetUndefinedFunctionOffsets(UndefinedOperatorFunctionOffsets);
-        SetUndefinedFunctionOffsets(UndefinedGeneralFunctionOffsets);
+        SetUndefinedFunctionOffsets(UndefinedFunctionOffsets, true);
+        SetUndefinedFunctionOffsets(UndefinedConstructorOffsets, true);
+        SetUndefinedFunctionOffsets(UndefinedOperatorFunctionOffsets, true);
+        SetUndefinedFunctionOffsets(UndefinedGeneralFunctionOffsets, true);
+        SetUndefinedFunctionOffsets(UndefinedInstructionLabels, true);
 
         {
             ScopeInformation scope = CurrentScopeDebug.Pop();

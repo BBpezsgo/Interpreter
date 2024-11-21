@@ -82,15 +82,12 @@ bool JoinFreeBlocks()
 [Builtin("alloc")]
 export any* Alloc(int sizeNeed)
 {
-    if (sizeNeed == 0)
-    {
-        crash "What";
-    }
+    if (sizeNeed <= 0) { crash 0; }
 
     BlockHeader* headerPointer = 0 as BlockHeader*;
     while (true)
     {
-        if (headerPointer >= HeapSize) { crash "Out of memory"; }
+        if (headerPointer >= HeapSize) { crash 0; }
 
         int blockSize;
         bool blockUsed;

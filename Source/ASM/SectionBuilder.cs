@@ -1,6 +1,5 @@
-﻿namespace LanguageCore.ASM;
+﻿namespace LanguageCore.Assembly;
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 [ExcludeFromCodeCoverage]
 public class SectionBuilder
 {
@@ -35,8 +34,4 @@ public class SectionBuilder
         AppendComment(comment);
         Builder.Append(Environment.NewLine);
     }
-
-    public IndentBlock Block() => new(this);
-
-    string GetDebuggerDisplay() => Builder.ToString();
 }

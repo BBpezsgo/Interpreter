@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.ASM.emu8086;
+﻿namespace LanguageCore.Assembly.emu8086;
 
 /*
 < THE SYMBOL TABLE >  test.com  --  emu8086 assembler version: 4.08 

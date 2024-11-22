@@ -430,11 +430,11 @@ public static class Utils
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
         diagnostics.Throw();
 
-        string asm = LanguageCore.ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, BitWidth._32);
+        string asm = LanguageCore.Assembly.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, BitWidth._32);
 
         string outputFile = file.LocalPath + "_executable";
 
-        LanguageCore.ASM.Assembler.Assemble(asm, outputFile);
+        LanguageCore.Assembly.Assembler.Assemble(asm, outputFile);
 
         if (!File.Exists(outputFile)) throw new FileNotFoundException($"File not found", outputFile);
 

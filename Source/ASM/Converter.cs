@@ -1,18 +1,18 @@
 ﻿using LanguageCore.Runtime;
 
-namespace LanguageCore.ASM.Generator;
+namespace LanguageCore.Assembly.Generator;
 
 [ExcludeFromCodeCoverage]
 public static class ConverterForAsm
 {
-    public static string Convert(ReadOnlySpan<Runtime.Instruction> instructions, DebugInformation? debugInformation, BitWidth bits)
+    public static string Convert(ReadOnlySpan<Instruction> instructions, DebugInformation? debugInformation, BitWidth bits)
     {
         AssemblyCode builder = new();
 
         List<int> codeReferences = new();
         for (int i = 0; i < instructions.Length; i++)
         {
-            Runtime.Instruction instruction = instructions[i];
+            Instruction instruction = instructions[i];
             if (instruction.Opcode is Opcode.Jump)
             { codeReferences.Add(i + instruction.Operand1.Int); }
         }
@@ -42,7 +42,7 @@ public static class ConverterForAsm
                 builder.CodeBuilder.AppendLabel($"_{i}");
             }
 
-            Runtime.Instruction instruction = instructions[i];
+            Instruction instruction = instructions[i];
 
             builder.CodeBuilder.AppendText(' ', builder.CodeBuilder.Indent);
 
@@ -58,22 +58,22 @@ public static class ConverterForAsm
                     {
                         case BitWidth._32:
                         {
-                            builder.CodeBuilder.AppendInstruction(OpCode.Move, "EBX", "0");
-                            builder.CodeBuilder.AppendInstruction(OpCode.Move, "EAX", "1");
-                            builder.CodeBuilder.AppendInstruction(OpCode.SystemCall);
+                            builder.CodeBuilder.AppendInstruction("MOV", "EBX", "0");
+                            builder.CodeBuilder.AppendInstruction("MOV", "EAX", "1");
+                            builder.CodeBuilder.AppendInstruction("SYSCALL");
                             break;
                         }
                         case BitWidth._64:
                         {
-                            builder.CodeBuilder.AppendInstruction(OpCode.Move, "RDI", "0");
-                            builder.CodeBuilder.AppendInstruction(OpCode.Move, "RAX", "60");
-                            builder.CodeBuilder.AppendInstruction(OpCode.SystemCall);
+                            builder.CodeBuilder.AppendInstruction("MOV", "RDI", "0");
+                            builder.CodeBuilder.AppendInstruction("MOV", "RAX", "60");
+                            builder.CodeBuilder.AppendInstruction("SYSCALL");
                             break;
                         }
                         default: throw new NotImplementedException();
                     }
 
-                    builder.CodeBuilder.AppendInstruction(OpCode.Halt);
+                    builder.CodeBuilder.AppendInstruction("HLT");
                     continue;
                 case Opcode.Pop8:
                     builder.CodeBuilder.AppendTextLine($"ADD {registerBasePointer}, 1");
@@ -99,13 +99,13 @@ public static class ConverterForAsm
                     }
                     if (paramCount >= 2)
                     {
-                        Runtime.InstructionOperand op2 = instruction.Operand2;
+                        InstructionOperand op2 = instruction.Operand2;
 
                         if (instruction.Operand1.BitWidth == BitWidth._64 &&
                             instruction.Operand2.BitWidth < BitWidth._64 &&
-                            instruction.Operand2.Type == Runtime.InstructionOperandType.Immediate32)
+                            instruction.Operand2.Type == InstructionOperandType.Immediate32)
                         {
-                            op2 = new Runtime.InstructionOperand(op2.Value, Runtime.InstructionOperandType.Immediate64);
+                            op2 = new InstructionOperand(op2.Value, InstructionOperandType.Immediate64);
                         }
 
                         builder.CodeBuilder.Builder.Append(',');
@@ -124,22 +124,22 @@ public static class ConverterForAsm
         {
             case BitWidth._32:
             {
-                builder.CodeBuilder.AppendInstruction(OpCode.Move, "EBX", "0");
-                builder.CodeBuilder.AppendInstruction(OpCode.Move, "EAX", "1");
-                builder.CodeBuilder.AppendInstruction(OpCode.SystemCall);
+                builder.CodeBuilder.AppendInstruction("MOV", "EBX", "0");
+                builder.CodeBuilder.AppendInstruction("MOV", "EAX", "1");
+                builder.CodeBuilder.AppendInstruction("SYSCALL");
                 break;
             }
             case BitWidth._64:
             {
-                builder.CodeBuilder.AppendInstruction(OpCode.Move, "RDI", "0");
-                builder.CodeBuilder.AppendInstruction(OpCode.Move, "RAX", "60");
-                builder.CodeBuilder.AppendInstruction(OpCode.SystemCall);
+                builder.CodeBuilder.AppendInstruction("MOV", "RDI", "0");
+                builder.CodeBuilder.AppendInstruction("MOV", "RAX", "60");
+                builder.CodeBuilder.AppendInstruction("SYSCALL");
                 break;
             }
             default: throw new NotImplementedException();
         }
 
-        builder.CodeBuilder.AppendInstruction(OpCode.Halt);
+        builder.CodeBuilder.AppendInstruction("HLT");
         return builder.Make(bits);
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System.IO;
 
-namespace LanguageCore.ASM;
+namespace LanguageCore.Assembly;
 
 [ExcludeFromCodeCoverage]
 public class NasmException : Exception

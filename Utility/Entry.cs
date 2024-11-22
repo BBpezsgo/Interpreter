@@ -609,12 +609,12 @@ public static class Entry
                     }
                 }
 
-                string asm = ASM.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, bits);
+                string asm = Assembly.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, bits);
                 string outputFile = arguments.Source.LocalPath + "_executable";
 
                 Output.LogDebug("Assembling and linking ...");
 
-                ASM.Assembler.Assemble(asm, outputFile);
+                Assembly.Assembler.Assemble(asm, outputFile);
 
                 Output.LogInfo($"Output: \"{outputFile}\"");
 

@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.ASM;
+﻿namespace LanguageCore.Assembly;
 
 [ExcludeFromCodeCoverage]
 public class ProcessException : Exception

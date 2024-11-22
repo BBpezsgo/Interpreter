@@ -1,34 +1,13 @@
-﻿namespace LanguageCore.ASM;
+﻿namespace LanguageCore.Assembly;
 
 [ExcludeFromCodeCoverage]
 public class TextSectionBuilder : SectionBuilder
 {
-    readonly List<string> Labels;
     public readonly HashSet<string> Imports;
 
     public TextSectionBuilder() : base()
     {
-        Labels = new List<string>();
         Imports = new HashSet<string>();
-    }
-
-    bool HasLabel(string dataLabel)
-    {
-        foreach (string label in Labels)
-        {
-            if (label == dataLabel)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public string NewLabel(string? name = null, int labelLength = 16)
-    {
-        string label = AssemblyCode.GenerateLabel("t_" + name + "_", labelLength, HasLabel);
-        Labels.Add(label);
-        return label;
     }
 
     public void AppendLabel(string label)
@@ -36,47 +15,6 @@ public class TextSectionBuilder : SectionBuilder
         AppendText(' ', Indent);
         AppendTextLine($"{label}:");
     }
-
-    public static string StringifyInstruction(OpCode instruction) => (instruction switch
-    {
-        OpCode.Move => "mov",
-        OpCode.Push => "push",
-        OpCode.Pop => "pop",
-        OpCode.LoadEA => "lea",
-
-        OpCode.MathAdd => "add",
-        OpCode.MathSub => "sub",
-        OpCode.Compare => "cmp",
-        OpCode.MathMult => "mul",
-        OpCode.MathDiv => "div",
-        OpCode.IMathMult => "imul",
-        OpCode.IMathDiv => "idiv",
-        OpCode.Test => "test",
-        OpCode.BitsAND => "and",
-        OpCode.BitsXOR => "xor",
-        OpCode.BitsOR => "or",
-        OpCode.BitsShiftRight => "shr",
-        OpCode.BitsShiftLeft => "shl",
-
-        OpCode.SystemCall => "syscall",
-        OpCode.Call => "call",
-        OpCode.Return => "ret",
-
-        OpCode.Jump => "jmp",
-        OpCode.JumpIfZero => "jz",
-        OpCode.JumpIfNotEQ => "jne",
-        OpCode.JumpIfGEQ => "jge",
-        OpCode.JumpIfG => "jg",
-        OpCode.JumpIfLEQ => "jle",
-        OpCode.JumpIfL => "jl",
-        OpCode.JumpIfEQ => "je",
-
-        OpCode.ConvertByteToWord => "cbw",
-        OpCode.ConvertWordToDoubleword => "cwd",
-        OpCode.Halt => "hlt",
-
-        _ => throw new UnreachableException(),
-    }).ToUpperInvariant();
 
     public static string StringifyInstruction(Runtime.Opcode instruction) => (instruction switch
     {
@@ -117,22 +55,22 @@ public class TextSectionBuilder : SectionBuilder
         _ => throw new UnreachableException(),
     }).ToUpperInvariant();
 
-    void AppendInstructionNoEOL(OpCode keyword)
+    void AppendInstructionNoEOL(string keyword)
     {
         AppendText(' ', Indent);
-        AppendText(StringifyInstruction(keyword));
+        AppendText(keyword);
     }
 
-    public void AppendInstruction(OpCode keyword)
+    public void AppendInstruction(string keyword)
     {
         AppendInstructionNoEOL(keyword);
         AppendText(Environment.NewLine);
     }
 
 #if NET_STANDARD
-    public void AppendInstructionNoEOL(OpCode keyword, params string[] operands)
+    public void AppendInstructionNoEOL(string keyword, params string[] operands)
 #else
-    public void AppendInstructionNoEOL(OpCode keyword, params ReadOnlySpan<string> operands)
+    public void AppendInstructionNoEOL(string keyword, params ReadOnlySpan<string> operands)
 #endif
     {
         AppendInstructionNoEOL(keyword);
@@ -150,145 +88,12 @@ public class TextSectionBuilder : SectionBuilder
     }
 
 #if NET_STANDARD
-    public void AppendInstruction(OpCode keyword, params string[] operands)
+    public void AppendInstruction(string keyword, params string[] operands)
 #else
-    public void AppendInstruction(OpCode keyword, params ReadOnlySpan<string> operands)
+    public void AppendInstruction(string keyword, params ReadOnlySpan<string> operands)
 #endif
     {
         AppendInstructionNoEOL(keyword, operands);
         AppendText(Environment.NewLine);
     }
-
-    public void AppendInstructionNoEOL(OpCode keyword, InstructionOperand parameterA = default, InstructionOperand parameterB = default)
-    {
-        AppendInstructionNoEOL(new Instruction(keyword, parameterA, parameterB));
-    }
-
-    public void AppendInstruction(OpCode keyword, InstructionOperand parameterA = default, InstructionOperand parameterB = default)
-    {
-        AppendInstruction(new Instruction(keyword, parameterA, parameterB));
-    }
-
-    public void AppendInstruction(Instruction instruction)
-    {
-        AppendText(' ', Indent);
-        AppendText(instruction.ToString());
-        AppendText(Environment.NewLine);
-    }
-
-    public void AppendInstructionNoEOL(Instruction instruction)
-    {
-        AppendText(' ', Indent);
-        AppendText(instruction.ToString());
-    }
-
-    public void Import(string label)
-    {
-        Imports.Add(label);
-    }
-
-    #region Call_cdecl
-
-    /// <inheritdoc cref="Call_cdecl(string, int, ReadOnlySpan{string?})"/>
-    public void Call_cdecl(string label, int parametersSize, ReadOnlySpan<InstructionOperand> parameters)
-    {
-        string[] parametersString = new string[parameters.Length];
-        for (int i = 0; i < parameters.Length; i++)
-        { parametersString[i] = parameters[i].ToString(); }
-        Call_cdecl(label, parametersSize, parametersString);
-    }
-
-    /// <summary>
-    /// Return value: <see cref="Registers.AX"/>
-    /// </summary>
-    void Call_cdecl(string label, int parametersSize, ReadOnlySpan<string?> parameters)
-    {
-        if (label.StartsWith('_') && label.Contains('@'))
-        { Import(label); }
-
-        if (parameters.Length > 0)
-        {
-            AppendCommentLine("Arguments (in reverse)");
-
-            for (int i = parameters.Length - 1; i >= 0; i--)
-            {
-                AppendInstruction(OpCode.Push, parameters[i] ?? throw new ArgumentNullException(nameof(parameters), $"The {i}th parameter is null"));
-            }
-        }
-
-        AppendInstruction(OpCode.Call, label);
-
-        AppendCommentLine("Clear arguments");
-
-        AppendInstructionNoEOL(OpCode.MathAdd, Intel.Register.SP, parametersSize);
-        AppendComment("Remove call arguments from frame");
-        AppendText(Environment.NewLine);
-    }
-
-    /// <inheritdoc cref="Call_cdecl(string, int, ReadOnlySpan{string?})"/>
-    public void Call_cdecl(string label, int parametersSize)
-    {
-        if (label.StartsWith('_') && label.Contains('@'))
-        { Import(label); }
-
-        AppendInstruction(OpCode.Call, label);
-
-        AppendCommentLine("Clear arguments");
-
-        AppendInstructionNoEOL(OpCode.MathAdd, Intel.Register.SP, parametersSize);
-        AppendComment("Remove call arguments from frame");
-        AppendText(Environment.NewLine);
-    }
-
-    #endregion
-
-    #region Call_stdcall
-
-    /// <inheritdoc cref="Call_stdcall(string, ReadOnlySpan{string?})"/>
-#if NET_STANDARD
-    public void Call_stdcall(string label, params InstructionOperand[] parameters)
-#else
-    public void Call_stdcall(string label, params ReadOnlySpan<InstructionOperand> parameters)
-#endif
-    {
-        string[] parametersString = new string[parameters.Length];
-        for (int i = 0; i < parameters.Length; i++)
-        { parametersString[i] = parameters[i].ToString(); }
-        Call_stdcall(label, parametersString);
-    }
-
-    /// <summary>
-    /// <para>
-    /// Return value: <see cref="Registers.AX"/>
-    /// </para>
-    /// </summary>
-#if NET_STANDARD
-    void Call_stdcall(string label, params string?[] parameters)
-#else
-    void Call_stdcall(string label, params ReadOnlySpan<string?> parameters)
-#endif
-    {
-        if (label.StartsWith('_') && label.Contains('@'))
-        { Import(label); }
-
-        AppendCommentLine("Arguments (in reverse)");
-
-        for (int i = parameters.Length - 1; i >= 0; i--)
-        {
-            AppendInstruction(OpCode.Push, parameters[i] ?? throw new ArgumentNullException(nameof(parameters), $"The {i}th parameter is null"));
-        }
-
-        AppendInstruction(OpCode.Call, label);
-    }
-
-    /// <inheritdoc cref="Call_stdcall(string, ReadOnlySpan{string?})"/>
-    public void Call_stdcall(string label)
-    {
-        if (label.StartsWith('_') && label.Contains('@'))
-        { Import(label); }
-
-        AppendInstruction(OpCode.Call, label);
-    }
-
-    #endregion
 }

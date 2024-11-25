@@ -3357,9 +3357,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
 
         if (!AllowFunctionInlining ||
-            !IsFunctionInlineable(function, parameters) ||
-            !InlineMacro(function, parameters, out Statement? inlined))
+            !IsFunctionInlineable(function, parameters))
         {
+            GenerateCodeForFunction_(function, parameters, typeArguments, caller);
+            return;
+        }
+
+        if (!InlineMacro(function, parameters, out Statement? inlined))
+        {
+            Diagnostics.Add(Diagnostic.Warning($"Failed to inline \"{function.ToReadable()}\"", caller));
             GenerateCodeForFunction_(function, parameters, typeArguments, caller);
             return;
         }

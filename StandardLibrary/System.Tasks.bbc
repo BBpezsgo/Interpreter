@@ -1,0 +1,42 @@
+using System.Lists;
+using System.Memory;
+
+struct Task
+{
+    void(Task*) _work;
+    void(Task*) _callback;
+}
+
+temp List<Task> _tasks = new List<Task>(8);
+
+export void Schedule(void(Task*) task)
+{
+    Task _task = new Task;
+    _task._work = task;
+    (&_tasks).Add(_task);
+}
+
+export void Schedule(void(Task*) task, void(Task*) callback)
+{
+    Task _task = new Task;
+    _task._work = task;
+    _task._callback = callback;
+    (&_tasks).Add(_task);
+}
+
+u8 RunNext()
+{
+    int length = (&_tasks).Length();
+    if (length == 0) { return (u8)0; }
+    Task task = (&_tasks).Remove(0);
+
+    task._work(&task);
+
+    if (task._callback) Schedule(task._callback);
+    return (u8)1;
+}
+
+export void Run()
+{
+    while (RunNext()) { }
+}

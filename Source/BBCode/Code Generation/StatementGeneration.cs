@@ -665,19 +665,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return;
             }
 
-            if (keywordCall.Arguments[0] is not Identifier identifier)
+            GeneralType argumentType = FindStatementType(keywordCall.Arguments[0]);
+
+            if (!CanCastImplicitly(argumentType, CompiledInstructionLabel.Type, null, out PossibleDiagnostic? castError))
             {
-                Diagnostics.Add(Diagnostic.Critical($"Keyword call \"{"goto"}\" requires one identifier as an argument", keywordCall.Arguments[1]));
+                Diagnostics.Add(castError.ToError(keywordCall.Arguments[0]));
                 return;
             }
 
-            if (!GetInstructionLabel(identifier.Content, out CompiledInstructionLabel? instructionLabel, out PossibleDiagnostic? error))
-            {
-                Diagnostics.Add(error.ToError(identifier));
-                return;
-            }
-
-            GenerateCodeForStatement(identifier);
+            GenerateCodeForStatement(keywordCall.Arguments[0]);
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
@@ -1726,15 +1722,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForStatement(Identifier variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        if (variable.Content == "SP")
+        if (RegisterKeywords.TryGetValue(variable.Content, out (Register Register, BuiltinType Type) registerKeyword))
         {
-            AddInstruction(Opcode.Push, Register.StackPointer);
-            return;
-        }
-
-        if (variable.Content == "IP")
-        {
-            AddInstruction(Opcode.Push, Register.CodePointer);
+            AddInstruction(Opcode.Push, registerKeyword.Register);
             return;
         }
 
@@ -2791,27 +2781,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value)
     {
-        if (statementToSet.Content == "SP")
+        if (RegisterKeywords.TryGetValue(statementToSet.Content, out (Register Register, BuiltinType Type) registerKeyword))
         {
-            GeneralType valueType = FindStatementType(value, BuiltinType.I32);
+            GeneralType valueType = FindStatementType(value, registerKeyword.Type);
 
-            if (!CanCastImplicitly(valueType, BuiltinType.I32, value, out PossibleDiagnostic? castError))
+            if (!CanCastImplicitly(valueType, registerKeyword.Type, value, out PossibleDiagnostic? castError))
             { Diagnostics.Add(castError.ToError(value)); }
 
-            GenerateCodeForStatement(value, BuiltinType.I32);
-            AddInstruction(Opcode.PopTo32, Register.StackPointer);
-            return;
-        }
-
-        if (statementToSet.Content == "IP")
-        {
-            GeneralType valueType = FindStatementType(value, BuiltinType.I32);
-
-            if (!CanCastImplicitly(valueType, BuiltinType.I32, value, out PossibleDiagnostic? castError))
-            { Diagnostics.Add(castError.ToError(value)); }
-
-            GenerateCodeForStatement(value, BuiltinType.I32);
-            AddInstruction(Opcode.PopTo32, Register.CodePointer);
+            GenerateCodeForStatement(value, registerKeyword.Type);
+            PopTo(registerKeyword.Register);
             return;
         }
 
@@ -3772,7 +3750,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     statements = ImmutableArray.Create<Statement>(
                         new KeywordCall(
                             (Token)StatementKeywords.Return,
-                            [statementWithValue],
+                            Enumerable.Repeat(statementWithValue, 1),
                             statementWithValue.File
                         )
                     );

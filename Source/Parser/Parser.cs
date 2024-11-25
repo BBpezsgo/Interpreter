@@ -819,11 +819,12 @@ public sealed class Parser
                 v = v.Replace("_", string.Empty, StringComparison.Ordinal);
             }
 
-            if (!int.TryParse(v, NumberStyles.BinaryNumber, CultureInfo.InvariantCulture, out int value))
-            {
-                Diagnostics.Add(Diagnostic.Error($"Invalid binary number \"{v}\"", CurrentToken.Position[2..], File));
-                value = 0;
-            }
+            // if (!int.TryParse(v, NumberStyles.BinaryNumber, CultureInfo.InvariantCulture, out int value))
+            // {
+            //     Diagnostics.Add(Diagnostic.Error($"Invalid binary number \"{v}\"", CurrentToken.Position[2..], File));
+            //     value = 0;
+            // }
+            int value = Convert.ToInt32(v, 2);
 
             Literal literal = new(LiteralType.Integer, value.ToString(CultureInfo.InvariantCulture), CurrentToken, File);
 

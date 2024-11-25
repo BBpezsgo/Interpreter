@@ -247,7 +247,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     HeapCodeHelper Heap;
     CodeHelper IBrainfuckGenerator.Code => Code;
 
-    new readonly Stack<BrainfuckVariable> CompiledVariables;
+    readonly Stack<BrainfuckVariable> CompiledVariables;
 
     readonly Stack<int> VariableCleanupStack;
 

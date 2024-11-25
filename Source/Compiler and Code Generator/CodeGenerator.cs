@@ -2425,15 +2425,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     }
     protected GeneralType FindStatementType(Identifier identifier, GeneralType? expectedType = null)
     {
-        if (identifier.Content == "SP")
-        {
-            return BuiltinType.I32;
-        }
-
-        if (identifier.Content == "IP")
-        {
-            return BuiltinType.I32;
-        }
+        if (BBLang.Generator.CodeGeneratorForMain.RegisterKeywords.TryGetValue(identifier.Content, out (Register Register, BuiltinType Type) registerKeyword))
+        { return registerKeyword.Type; }
 
         if (GetConstant(identifier.Content, identifier.File, out IConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
@@ -3248,6 +3241,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         ManagedTypeCast v => InlineMacro(v, parameters),
         ModifiedStatement v => InlineMacro(v, parameters),
         TypeStatement v => v,
+        InstructionLabel v => v,
         ConstructorCall v => InlineMacro(v, parameters),
         NewInstance v => InlineMacro(v, parameters),
         LiteralList v => InlineMacro(v, parameters),

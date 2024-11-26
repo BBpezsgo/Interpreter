@@ -191,24 +191,44 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             { result.Append(value.To<int>()); }
             else if (type.Is(out PointerType? pointerType))
             {
-                result.Append('*');
-                result.Append(value.To<int>());
-
-                if (pointerType.To is ArrayType toArrayType &&
-                    !toArrayType.ComputedLength.HasValue)
+                if (pointerType.To is ArrayType toArrayType)
                 {
-                    result.Append(" -> ");
-                    result.Append("[ ? ]");
+                    if (toArrayType.Of.SameAs(BasicType.Char))
+                    {
+                        result.Append('"');
+                        int i = value.To<int>();
+                        while (i > 0 && i + 1 < context.Memory.Length)
+                        {
+                            char v = context.Memory.AsSpan()[i..].To<char>();
+                            i += sizeof(char);
+                            if (v == 0) break;
+                            result.Append(v);
+                        }
+                        result.Append('"');
+                    }
+                    else if (!toArrayType.ComputedLength.HasValue)
+                    {
+                        result.Append('*');
+                        result.Append(value.To<int>());
+                        result.Append(" -> ");
+                        result.Append("[ ? ]");
+                    }
+                    else
+                    {
+                        Range<int> pointerTo = new(value.To<int>(), value.To<int>() + pointerType.To.GetSize(runtimeInfoProvider));
+                        AppendValue(pointerTo, pointerType.To);
+                    }
                 }
                 else if (pointerType.To is BuiltinType toBuiltinType &&
                     toBuiltinType.SameAs(BasicType.Any))
                 {
+                    result.Append('*');
+                    result.Append(value.To<int>());
                     result.Append(" -> ");
                     result.Append('?');
                 }
                 else
                 {
-                    result.Append(" -> ");
                     Range<int> pointerTo = new(value.To<int>(), value.To<int>() + pointerType.To.GetSize(runtimeInfoProvider));
                     AppendValue(pointerTo, pointerType.To);
                 }
@@ -255,7 +275,10 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                 scopeDepth++;
                 foreach (StackElementInformation item in scope.Stack)
                 {
-                    Range<int> range = item.GetRange(context.Registers.BasePointer, context.StackStart);
+                    if (item.Kind == StackElementKind.Internal) continue;
+                    if (item.Kind == StackElementKind.Parameter) continue;
+
+                    Range<int> range = item.GetRange(tracedScope.BasePointer, context.StackStart);
                     if (range.Start > range.End)
                     { range = new Range<int>(range.End, range.Start); }
                     // if (item.BasePointerRelative)
@@ -264,23 +287,23 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                     // { value = context.Memory.Slice(0 - item.Address, item.Size); }
                     result.Append(' ', CallStackIndent);
                     result.Append(' ', scopeDepth);
-                    if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
-                    result.Append('(');
-                    result.Append(range.Start);
-                    result.Append(')');
-                    result.Append(' ');
-                    if (colored) result.ResetStyle();
+                    // if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
+                    // result.Append('(');
+                    // result.Append(range.Start);
+                    // result.Append(')');
+                    // result.Append(' ');
+                    // if (colored) result.ResetStyle();
                     AppendType(item.Type);
                     result.Append(' ');
                     if (item.Kind == StackElementKind.Internal)
                     {
                         if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
-                        result.Append(item.Tag);
+                        result.Append(item.Identifier);
                         if (colored) result.ResetStyle();
                     }
                     else
                     {
-                        result.Append(item.Tag);
+                        result.Append(item.Identifier);
                     }
                     if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append(" = ");
@@ -299,9 +322,12 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             result.AppendLine();
         }
 
-        bool AppendFrame(FunctionInformation frame)
+        bool AppendFrame(FunctionInformation frame, CallTraceItem callTraceItem)
         {
             if (frame.Function is null) return false;
+            if (DebugInformation.IsEmpty) return false;
+
+            ImmutableArray<ScopeInformation> scopes = DebugInformation.GetScopes(frame.Instructions.Start);
 
             Parser.FunctionThingDefinition function = frame.Function;
             if (colored) result.SetGraphics(Ansi.BrightForegroundYellow);
@@ -330,12 +356,34 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                 }
 
                 result.Append(' ');
-                result.Append(function.Parameters[j].Identifier.ToString());
+                result.Append(function.Parameters[j].Identifier.Content);
+
+                bool f = false;
+                foreach (ScopeInformation scope in scopes)
+                {
+                    if (f) break;
+                    foreach (StackElementInformation item in scope.Stack)
+                    {
+                        if (item.Kind != StackElementKind.Parameter) continue;
+                        if (item.Identifier != function.Parameters[j].Identifier.Content) continue;
+                        result.Append(" = ");
+                        AppendValue(item.GetRange(callTraceItem.BasePointer, context.StackStart), item.Type);
+                        f = true;
+                        break;
+                    }
+                }
             }
             result.Append(')');
             result.Append(' ');
 
-            result.Append(LanguageException.Format(null, function.Identifier.Position, function.File));
+            if (DebugInformation.TryGetSourceLocation(callTraceItem.InstructionPointer, out SourceCodeLocation sourceLocation))
+            {
+                result.Append(LanguageException.Format(null, sourceLocation.Location));
+            }
+            else
+            {
+                result.Append(LanguageException.Format(null, function.Identifier.Position, function.File));
+            }
 
             return true;
         }
@@ -374,8 +422,15 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                     {
                         result.Append(' ', CallStackIndent);
 
-                        if (!AppendFrame(callStack[i]))
-                        { result.Append($"<unknown> {CallTrace[i].InstructionPointer}"); }
+                        if (!AppendFrame(callStack[i], CallTrace[i]))
+                        {
+                            result.Append($"<unknown> {CallTrace[i].InstructionPointer}");
+                            if (DebugInformation.TryGetSourceLocation(CallTrace[i].InstructionPointer, out var sourceLocation))
+                            {
+                                result.Append(' ');
+                                result.Append(sourceLocation.Location.ToString());
+                            }
+                        }
 
                         result.AppendLine();
 
@@ -387,7 +442,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
 
         FunctionInformation currentFrame = DebugInformation.IsEmpty ? default : DebugInformation.GetFunctionInformation(context.Registers.CodePointer);
         result.Append(' ', CallStackIndent);
-        if (!AppendFrame(currentFrame))
+        if (!AppendFrame(currentFrame, new CallTraceItem(context.Registers.BasePointer, context.Registers.CodePointer)))
         { result.Append($"<unknown> {context.Registers.CodePointer}"); }
         result.Append(" (current)");
         result.AppendLine();

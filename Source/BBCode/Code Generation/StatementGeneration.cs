@@ -2699,11 +2699,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
 
-        DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
+        if (startInstruction != GeneratedCode.Count)
         {
-            Instructions = (startInstruction, GeneratedCode.Count - 1),
-            Location = statement.Location,
-        });
+            DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
+            {
+                Instructions = (startInstruction, GeneratedCode.Count - 1),
+                Location = statement.Location,
+            });
+        }
     }
 
     static bool IsStringOnStack(GeneralType type, StatementWithValue? value, [NotNullWhen(true)] out LiteralStatement? literal, out PossibleDiagnostic? error)
@@ -3109,7 +3112,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         StackElementInformation debugInfo = new()
         {
             Kind = StackElementKind.Variable,
-            Tag = compiledVariable.Identifier.Content,
+            Identifier = compiledVariable.Identifier.Content,
             Address = offset,
             BasePointerRelative = true,
             Size = compiledVariable.Type.GetSize(this, Diagnostics, compiledVariable),
@@ -3351,7 +3354,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = returnType.Type.GetSize(this, Diagnostics, function),
-                Tag = "Return Value",
+                Identifier = "Return Value",
                 Type = returnType.Type,
             });
         }
@@ -3362,7 +3365,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = BasePointerSize,
-            Tag = "Saved BasePointer",
+            Identifier = "Saved BasePointer",
             Type = BasePointerType,
         });
 
@@ -3372,7 +3375,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = CodePointerSize,
-            Tag = "Saved CodePointer",
+            Identifier = "Saved CodePointer",
             Type = CodePointerType,
         });
 
@@ -3382,7 +3385,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = AbsGlobalAddressSize,
-            Tag = "Absolute Global Offset",
+            Identifier = "Absolute Global Offset",
             Type = AbsGlobalAddressType,
         });
 
@@ -3396,7 +3399,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Kind = StackElementKind.Parameter,
                 BasePointerRelative = true,
                 Size = p.IsRef ? PointerSize : p.Type.GetSize(this, Diagnostics, p),
-                Tag = p.Identifier.Content,
+                Identifier = p.Identifier.Content,
                 Type = p.IsRef ? new PointerType(p.Type) : p.Type,
             };
             CurrentScopeDebug.Last.Stack.Add(debugInfo);
@@ -3542,7 +3545,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BasePointerRelative = true,
             Kind = StackElementKind.Internal,
             Size = BasePointerSize,
-            Tag = "Saved BasePointer",
+            Identifier = "Saved BasePointer",
             Type = BasePointerType,
         });
 
@@ -3648,7 +3651,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 BasePointerRelative = false,
                 Kind = StackElementKind.Internal,
                 Size = ExitCodeType.GetSize(this),
-                Tag = "Exit Code",
+                Identifier = "Exit Code",
                 Type = ExitCodeType,
             });
         }
@@ -3697,16 +3700,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CompiledGlobalVariables.Add(variable);
             CleanupItem cleanupItem = new(size, variable.Modifiers.Contains(ModifierKeywords.Temp), variable.Type);
             globalVariablesCleanup.Insert(0, cleanupItem);
-
-            CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
-            {
-                Address = variable.MemoryAddress,
-                BasePointerRelative = false,
-                Kind = StackElementKind.Variable,
-                Size = size,
-                Tag = variable.Identifier.Content,
-                Type = variable.Type,
-            });
         }
 
         AddComment("Allocate global variables {");
@@ -3720,8 +3713,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), Register.StackPointer);
-                AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), GlobalVariablesSize);
+                // AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), Register.StackPointer);
+                // AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), GlobalVariablesSize);
                 AddInstruction(Opcode.Push, Register.StackPointer);
             }
 
@@ -3731,7 +3724,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = AbsGlobalAddressSize,
-                Tag = "Absolute Global Offset",
+                Identifier = "Absolute Global Offset",
                 Type = AbsGlobalAddressType,
             });
         }
@@ -3778,18 +3771,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
         // 4 -> exit code
         if (ScopeSizes.Pop() != 4) { } // throw new InternalException("Bruh");
 
-        foreach (CompiledVariable variable in CompiledGlobalVariables)
-        {
-            CurrentScopeDebug.LastRef.Stack.Add(new StackElementInformation()
-            {
-                Address = GetGlobalVariableAddress(variable).Offset,
-                BasePointerRelative = false,
-                Kind = StackElementKind.Variable,
-                Size = variable.Type.GetSize(this, Diagnostics, variable),
-                Tag = variable.Identifier.Content,
-                Type = variable.Type,
-            });
-        }
+        // foreach (CompiledVariable variable in CompiledGlobalVariables)
+        // {
+        //     int absoluteGlobalAddress = ExitCodeType.GetSize(this) + GlobalVariablesSize;
+        //     CurrentScopeDebug.LastRef.Stack.Add(new StackElementInformation()
+        //     {
+        //         Address = -(absoluteGlobalAddress + variable.MemoryAddress - 1),
+        //         BasePointerRelative = false,
+        //         Kind = StackElementKind.GlobalVariable,
+        //         Size = variable.Type.GetSize(this, Diagnostics, variable),
+        //         Identifier = variable.Identifier.Content,
+        //         Type = variable.Type,
+        //     });
+        // }
 
         while (true)
         {
@@ -3814,11 +3808,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         SetUndefinedFunctionOffsets(UndefinedGeneralFunctionOffsets, true);
         SetUndefinedFunctionOffsets(UndefinedInstructionLabels, true);
 
-        {
-            ScopeInformation scope = CurrentScopeDebug.Pop();
-            scope.Location.Instructions.End = GeneratedCode.Count - 1;
-            DebugInfo?.ScopeInformation.Add(scope);
-        }
+        // {
+        //     ScopeInformation scope = CurrentScopeDebug.Pop();
+        //     scope.Location.Instructions.End = GeneratedCode.Count - 1;
+        //     DebugInfo?.ScopeInformation.Add(scope);
+        // }
 
         Print?.Invoke("Code generated", LogType.Debug);
 

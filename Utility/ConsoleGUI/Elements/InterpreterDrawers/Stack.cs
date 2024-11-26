@@ -241,7 +241,7 @@ public partial class InterpreterElement
                     _ => throw new UnreachableException(),
                 };
                 b.AddText(' ');
-                b.AddText(info.Tag);
+                b.AddText(info.Identifier);
             }
             else if (range.Start == address)
             {
@@ -258,7 +258,7 @@ public partial class InterpreterElement
                     _ => throw new UnreachableException(),
                 };
                 b.AddText(' ');
-                b.AddText(info.Tag);
+                b.AddText(info.Identifier);
 
                 b.ForegroundColor = CharColor.Gray;
                 b.AddText(" {");

@@ -21,6 +21,7 @@ public enum StackElementKind
 {
     Internal,
     Variable,
+    GlobalVariable,
     Parameter,
 }
 
@@ -29,7 +30,7 @@ public struct StackElementInformation
 {
     public StackElementKind Kind;
     public GeneralType Type;
-    public string Tag;
+    public string Identifier;
 
     public int Address;
     public bool BasePointerRelative;
@@ -42,10 +43,7 @@ public struct StackElementInformation
         if (BasePointerRelative) itemStart += basePointer;
         else itemStart += absoluteOffset;
 
-        if (BytecodeProcessor.StackDirection < 0)
-        { itemStart += Size - 1; }
-
-        int itemEnd = itemStart + ((Size - 1) * BytecodeProcessor.StackDirection);
+        int itemEnd = itemStart + Size;
 
         return new Range<int>(itemStart, itemEnd);
     }
@@ -154,11 +152,7 @@ public readonly struct CompiledDebugInformation
             ScopeInformation = ImmutableArray<ScopeInformation>.Empty;
             CodeComments = FrozenDictionary<int, ImmutableArray<string>>.Empty;
             OriginalFiles = FrozenDictionary<Uri, ImmutableArray<Tokenizing.Token>>.Empty;
-            StackOffsets = new StackOffsets()
-            {
-                SavedBasePointer = 0,
-                SavedCodePointer = 0,
-            };
+            StackOffsets = new StackOffsets(0, 0);
             HasValue = false;
         }
         else
@@ -203,6 +197,22 @@ public readonly struct CompiledDebugInformation
             { continue; }
             sourceLocation = _sourceLocation;
             success = true;
+        }
+
+        if (success) return true;
+
+        for (int i = 0; i < sourceCodeLocations.Length; i++)
+        {
+            SourceCodeLocation _sourceLocation = sourceCodeLocations[i];
+            if (_sourceLocation.Instructions.End + 1 == instruction)
+            {
+                sourceLocation = new SourceCodeLocation()
+                {
+                    Instructions = new(instruction),
+                    Location = _sourceLocation.Location.After(),
+                };
+                return true;
+            }
         }
 
         return success;
@@ -290,11 +300,7 @@ public class DebugInformation : IDuplicatable<DebugInformation>
         ScopeInformation = new List<ScopeInformation>();
         CodeComments = new Dictionary<int, List<string>>();
         OriginalFiles = new Dictionary<Uri, ImmutableArray<Tokenizing.Token>>(originalFiles);
-        StackOffsets = new StackOffsets()
-        {
-            SavedBasePointer = 0,
-            SavedCodePointer = 0,
-        };
+        StackOffsets = new StackOffsets(0, 0);
     }
 
     public void OffsetCodeFrom(int from, int offset)

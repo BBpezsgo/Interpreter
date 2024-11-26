@@ -33,4 +33,32 @@ public struct Registers
     [FieldOffset(27)] public byte DL;
 
     [FieldOffset(28)] public Flags Flags;
+
+    public readonly int Get(Register register) => register switch
+    {
+        Register.CodePointer => CodePointer,
+        Register.StackPointer => StackPointer,
+        Register.BasePointer => BasePointer,
+        Register.EAX => EAX,
+        Register.AX => AX,
+        Register.AH => AH,
+        Register.AL => AL,
+        Register.EBX => EBX,
+        Register.BX => BX,
+        Register.BH => BH,
+        Register.BL => BL,
+        Register.ECX => ECX,
+        Register.CX => CX,
+        Register.CH => CH,
+        Register.CL => CL,
+        Register.EDX => EDX,
+        Register.DX => DX,
+        Register.DH => DH,
+        Register.DL => DL,
+        Register.RAX => throw new NotImplementedException(),
+        Register.RBX => throw new NotImplementedException(),
+        Register.RCX => throw new NotImplementedException(),
+        Register.RDX => throw new NotImplementedException(),
+        _ => throw new UnreachableException(),
+    };
 }

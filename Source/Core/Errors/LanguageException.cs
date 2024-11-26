@@ -24,7 +24,7 @@ public class LanguageException : Exception
         return result.ToString();
     }
 
-    public static string Format(string message, Location location)
+    public static string Format(string? message, Location location)
         => LanguageException.Format(message, location.Position, location.File);
 
     public static string Format(string? message, Position position, Uri? file)

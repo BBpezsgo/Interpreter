@@ -18,7 +18,7 @@ export void Print(char message);
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-inline u8 _FindMaxPowOf10(u8 num)
+u8 _FindMaxPowOf10(u8 num)
 {
     u8 result = (u8)1;
     num /= (u8)10;
@@ -33,7 +33,7 @@ inline u8 _FindMaxPowOf10(u8 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-inline i8 _FindMaxPowOf10(i8 num)
+i8 _FindMaxPowOf10(i8 num)
 {
     i8 result = (i8)1;
     num /= (i8)10;
@@ -48,7 +48,7 @@ inline i8 _FindMaxPowOf10(i8 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-inline u16 _FindMaxPowOf10(u16 num)
+u16 _FindMaxPowOf10(u16 num)
 {
     u16 result = (u16)1;
     num /= (u16)10;
@@ -63,7 +63,7 @@ inline u16 _FindMaxPowOf10(u16 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-inline i16 _FindMaxPowOf10(i16 num)
+i16 _FindMaxPowOf10(i16 num)
 {
     i16 result = (i16)1;
     num /= (i16)10;
@@ -78,7 +78,7 @@ inline i16 _FindMaxPowOf10(i16 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-inline u32 _FindMaxPowOf10(u32 num)
+u32 _FindMaxPowOf10(u32 num)
 {
     u32 result = (u32)1;
     num /= (u32)10;
@@ -93,7 +93,7 @@ inline u32 _FindMaxPowOf10(u32 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-inline i32 _FindMaxPowOf10(i32 num)
+i32 _FindMaxPowOf10(i32 num)
 {
     i32 result = (i32)1;
     num /= (i32)10;
@@ -108,7 +108,7 @@ inline i32 _FindMaxPowOf10(i32 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export inline void Print(int message)
+export void Print(int message)
 {
     if (message < 0)
     {
@@ -129,7 +129,7 @@ export inline void Print(int message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export inline void Print(u8 message)
+export void Print(u8 message)
 {
     u8 pow10 = _FindMaxPowOf10(message);
     while (pow10)
@@ -144,7 +144,7 @@ export inline void Print(u8 message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export inline void Print(i8 message)
+export void Print(i8 message)
 {
     if (message < (i8)0)
     {
@@ -165,7 +165,7 @@ export inline void Print(i8 message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export inline void Print(u16 message)
+export void Print(u16 message)
 {
     u16 pow10 = _FindMaxPowOf10(message);
     while (pow10)
@@ -180,7 +180,7 @@ export inline void Print(u16 message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export inline void Print(i16 message)
+export void Print(i16 message)
 {
     if (message < (i16)0)
     {
@@ -201,7 +201,7 @@ export inline void Print(i16 message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export inline void Print(u32 message)
+export void Print(u32 message)
 {
     u32 pow10 = _FindMaxPowOf10(message);
     while (pow10)
@@ -249,7 +249,7 @@ export void Print(f32 message)
     Print((int)message);
 }
 
-export inline void Print(temp string message)
+export void Print(temp string message)
 {
     for (int i = 0; message[i]; i++)
     {

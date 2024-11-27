@@ -3,7 +3,7 @@
  *
  * Source: https://stackoverflow.com/a/67122267
  */
-export inline float Sin(float x)
+export float Sin(float x)
 {
     float value = x;
     float sum = value;
@@ -24,7 +24,7 @@ export inline float Sin(float x)
  * 
  * Source: https://stackoverflow.com/a/67122267
  */
-export inline float Cos(float x)
+export float Cos(float x)
 {
     float value = 1f;
     float sum = value;
@@ -226,7 +226,7 @@ export int Sqrt(int s)
 /**
  * Calculates the base 10 logarithm of `v`
  */
-export inline int Log10(i32 v)
+export int Log10(i32 v)
 {
     if (v >= 1000000000) { return 9; }
     if (v >= 100000000) { return 8; }
@@ -243,7 +243,7 @@ export inline int Log10(i32 v)
 /**
  * Calculates the base 10 logarithm of `v`
  */
-export inline byte Log10(u8 v)
+export byte Log10(u8 v)
 {
     if (v >= 100) { return (u8)2; }
     if (v >= 10) { return (u8)1; }

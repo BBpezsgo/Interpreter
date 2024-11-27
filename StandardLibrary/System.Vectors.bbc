@@ -78,12 +78,12 @@ export inline float Cross(Vector2 a, Vector2 b)
     return a.x * b.y - a.y * b.x;
 }
 
-export float Magnitude(this Vector2 v)
+export inline float Magnitude(this Vector2 v)
 {
     return Sqrt((v.x * v.x) + (v.y * v.y));
 }
 
-export float Magnitude(this Vector2* v)
+export inline float Magnitude(this Vector2* v)
 {
     return Sqrt((v.x * v.x) + (v.y * v.y));
 }

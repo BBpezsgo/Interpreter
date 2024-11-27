@@ -1,0 +1,49 @@
+using System.Memory;
+
+struct B
+{
+    byte _a;
+    string _b;
+}
+
+struct A
+{
+    float _a;
+    B* _b;
+    float _c;
+}
+
+void fc(A a)
+{
+    string la;
+    crash 0;
+}
+
+void fb(A* a)
+{
+    float la = 69f;
+    byte lb = (byte)42;
+    fc(*a);
+}
+
+void fa()
+{
+    A la = new A;
+    A lb = new A;
+    A* lc = new A*;
+    
+    la._b = new B*;
+    lb._b = new B*;
+    lc._b = new B*;
+
+    la._b._b = "asdasdasdasd1";
+    lb._b._b = "asdasdasdasd2";
+    lc._b._b = "asdasdasdasd3";
+
+    fb(lc);
+}
+
+A* _a = 0 as A*;
+A _b = new A;
+
+fa();

@@ -1,0 +1,81 @@
+using System.Memory;
+using System.Console;
+
+template<T>
+struct Stack
+{
+    private T[]* _array;
+    private int _length;
+    private int _capacity;
+
+    void EnsureCapacity(int capacity)
+    {
+        if (!this._array)
+        {
+            this._array = new T[4]*;
+            this._capacity = 4;
+        }
+        if (this._capacity >= capacity) return;
+
+        this._capacity *= 2;
+        T[]* oldArray = this._array;
+        T[]* newArray = new T[this._capacity]*;
+
+        for (int i = 0; i < this._length; i++)
+        {
+            newArray[i] = oldArray[i];
+        }
+
+        delete oldArray;
+        this._array = newArray;
+    }
+
+    void Push(T item)
+    {
+        if (!this._array)
+        {
+            this._array = new T[4]*;
+            this._capacity = 4;
+        }
+        else if (this._capacity <= this._length)
+        {
+            this._capacity *= 2;
+            T[]* oldArray = this._array;
+            this._array = new T[this._capacity]*;
+
+            for (int i = 0; i < this._length; i++)
+            {
+                this._array[i] = oldArray[i];
+            }
+
+            delete oldArray;
+        }
+
+        this._array[this._length] = item;
+        this._length++;
+    }
+
+    T Pop()
+    {
+        if (!this._length) crash 0;
+        this._length--;
+        return this._array[this._length];
+    }
+
+    destructor()
+    {
+        if (this._array) delete this._array;
+    }
+}
+
+temp Stack<byte>* stack = new Stack<byte>*;
+
+stack.Push((byte)3);
+stack.Push((byte)6);
+stack.Push((byte)8);
+stack.Push((byte)9);
+
+PrintLine(stack.Pop());
+PrintLine(stack.Pop());
+PrintLine(stack.Pop());
+PrintLine(stack.Pop());

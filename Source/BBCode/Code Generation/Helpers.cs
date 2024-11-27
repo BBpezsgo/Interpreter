@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 
@@ -118,25 +118,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
         address = default;
 
         GeneralType prevType = FindStatementType(field.PrevStatement);
-        StructType? @struct;
-        Address? baseAddress;
+        Address? baseAddress = null;
 
-        if (prevType.Is(out PointerType? prevPointerType))
+        while (prevType.Is(out PointerType? pointerType))
         {
-            if (!prevPointerType.To.Is(out @struct))
-            {
-                error = new PossibleDiagnostic($"Multiple dereference is not supported at the moment", field.PrevStatement);
-                return false;
-            }
-
-            baseAddress = new AddressRuntimePointer(field.PrevStatement);
+            prevType = pointerType.To;
+            baseAddress =
+                baseAddress is null
+                ? new AddressRuntimePointer(field.PrevStatement)
+                : new AddressPointer(baseAddress);
         }
-        else if (!prevType.Is(out @struct))
+
+        if (!prevType.Is(out StructType? @struct))
         {
             error = new PossibleDiagnostic($"This is not a struct", field.PrevStatement);
             return false;
         }
-        else if (!GetAddress(field.PrevStatement, out baseAddress, out error))
+
+        if (baseAddress is null &&
+            !GetAddress(field.PrevStatement, out baseAddress, out error))
         {
             return false;
         }
@@ -667,10 +667,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             PopTo(reg.Get(PointerBitWidth));
             AddInstruction(Opcode.Compare, reg.Get(PointerBitWidth), 0);
-            AddInstruction(Opcode.JumpIfNotEqual, 0);
         }
 
-        int jumpInstruction = GeneratedCode.Count - 1;
+        int jumpInstruction = GeneratedCode.Count;
+        AddInstruction(Opcode.JumpIfNotEqual, 0);
 
         GenerateCodeForLiteralString("null pointer", location, false);
         using (RegisterUsage.Auto reg = Registers.GetFree())

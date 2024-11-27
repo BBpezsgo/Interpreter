@@ -2535,7 +2535,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             return OnGotStatementType(field, ArrayLengthType);
         }
 
-        if (prevStatementType.Is(out PointerType? pointerType))
+        while (prevStatementType.Is(out PointerType? pointerType))
         { prevStatementType = pointerType.To; }
 
         if (prevStatementType.Is(out StructType? structType))

@@ -55,7 +55,7 @@ public class AddressOffset : Address
     {
         > 0 => $"{Base} + {Offset}",
         < 0 => $"{Base} - {-Offset}",
-        _ => $"{Base}"
+        _ => $"{Base} + 0"
     };
 }
 

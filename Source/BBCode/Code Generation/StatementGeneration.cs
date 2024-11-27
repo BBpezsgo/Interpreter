@@ -2248,11 +2248,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (prevType.Is(out PointerType? pointerType))
+        if (prevType.Is(out PointerType? pointerType2))
         {
-            if (!pointerType.To.Is(out StructType? structPointerType))
+            GenerateCodeForStatement(field.PrevStatement);
+            CheckPointerNull(field.PrevStatement.Location);
+            prevType = pointerType2.To;
+
+            while (prevType.Is(out pointerType2))
             {
-                Diagnostics.Add(Diagnostic.Critical($"Could not get the field offsets of type \"{pointerType}\"", field.PrevStatement));
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    PopTo(reg.Get(PointerBitWidth));
+                    PushFrom(new AddressRegisterPointer(
+                        reg.Get(PointerBitWidth)),
+                        PointerSize
+                    );
+                }
+                CheckPointerNull(field.PrevStatement.Location);
+                prevType = pointerType2.To;
+            }
+
+            if (!prevType.Is(out StructType? structPointerType))
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Could not get the field offsets of type \"{prevType}\"", field.PrevStatement));
                 return;
             }
 
@@ -2266,19 +2284,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             field.Reference = fieldDefinition;
             fieldDefinition.References.AddReference(field);
 
-            GenerateCodeForStatement(field.PrevStatement);
-
-            CheckPointerNull(field.PrevStatement.Location);
-
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                PopTo(reg.Get(pointerType.GetBitWidth(this, Diagnostics, field.PrevStatement)));
+                PopTo(reg.Get(PointerBitWidth));
                 PushFrom(new AddressOffset(
-                    new AddressRegisterPointer(reg.Get(pointerType.GetBitWidth(this, Diagnostics, field.PrevStatement))),
+                    new AddressRegisterPointer(reg.Get(PointerBitWidth)),
                     fieldOffset
                     ), fieldDefinition.Type.GetSize(this, Diagnostics, fieldDefinition));
             }
-
             return;
         }
 

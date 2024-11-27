@@ -161,8 +161,13 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             if (colored) result.ResetStyle();
         }
 
-        void AppendValue(Range<int> range, GeneralType type)
+        void AppendValue(Range<int> range, GeneralType type, int depth)
         {
+            if (depth > 3)
+            {
+                result.Append("..."); return;
+            }
+
             RuntimeInfoProvider runtimeInfoProvider = new()
             {
                 PointerSize = 4,
@@ -216,7 +221,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                     else
                     {
                         Range<int> pointerTo = new(value.To<int>(), value.To<int>() + pointerType.To.GetSize(runtimeInfoProvider));
-                        AppendValue(pointerTo, pointerType.To);
+                        AppendValue(pointerTo, pointerType.To, depth + 1);
                     }
                 }
                 else if (pointerType.To is BuiltinType toBuiltinType &&
@@ -230,7 +235,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                 else
                 {
                     Range<int> pointerTo = new(value.To<int>(), value.To<int>() + pointerType.To.GetSize(runtimeInfoProvider));
-                    AppendValue(pointerTo, pointerType.To);
+                    AppendValue(pointerTo, pointerType.To, depth + 1);
                 }
             }
             else if (type.Is(out StructType? structType))
@@ -250,7 +255,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                         result.Append(field.Identifier.Content);
                         result.Append(": ");
                         Range<int> fieldRange = new(range.Start + offset, range.Start + offset + field.Type.GetSize(runtimeInfoProvider));
-                        AppendValue(fieldRange, field.Type);
+                        AppendValue(fieldRange, field.Type, depth + 1);
                     }
                     if (fields.Length > 0) result.Append(' ');
                 }
@@ -308,7 +313,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                     if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append(" = ");
                     if (colored) result.ResetStyle();
-                    AppendValue(range, item.Type);
+                    AppendValue(range, item.Type, 0);
                     result.Append(';');
                     result.AppendLine();
                 }
@@ -367,7 +372,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                         if (item.Kind != StackElementKind.Parameter) continue;
                         if (item.Identifier != function.Parameters[j].Identifier.Content) continue;
                         result.Append(" = ");
-                        AppendValue(item.GetRange(callTraceItem.BasePointer, context.StackStart), item.Type);
+                        AppendValue(item.GetRange(callTraceItem.BasePointer, context.StackStart), item.Type, 0);
                         f = true;
                         break;
                     }
@@ -425,7 +430,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                         if (!AppendFrame(callStack[i], CallTrace[i]))
                         {
                             result.Append($"<unknown> {CallTrace[i].InstructionPointer}");
-                            if (DebugInformation.TryGetSourceLocation(CallTrace[i].InstructionPointer, out var sourceLocation))
+                            if (DebugInformation.TryGetSourceLocation(CallTrace[i].InstructionPointer, out SourceCodeLocation sourceLocation))
                             {
                                 result.Append(' ');
                                 result.Append(sourceLocation.Location.ToString());

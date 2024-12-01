@@ -1142,7 +1142,7 @@ public class Literal : StatementWithValue
         {
             RuntimeType.U8 => LiteralType.Integer,
             RuntimeType.I8 => LiteralType.Integer,
-            RuntimeType.Char => LiteralType.Char,
+            RuntimeType.U16 => LiteralType.Integer,
             RuntimeType.I16 => LiteralType.Integer,
             RuntimeType.U32 => LiteralType.Integer,
             RuntimeType.I32 => LiteralType.Integer,
@@ -1163,7 +1163,7 @@ public class Literal : StatementWithValue
             LiteralType.Integer => TokenType.LiteralNumber,
             LiteralType.Float => TokenType.LiteralFloat,
             LiteralType.String => TokenType.LiteralString,
-            LiteralType.Char => TokenType.LiteralCharacter,
+            LiteralType.Char => TokenType.LiteralNumber,
             _ => TokenType.Identifier,
         };
         return new Literal(type, value, Token.CreateAnonymous(value, tokenType), file)
@@ -1181,7 +1181,7 @@ public class Literal : StatementWithValue
         {
             RuntimeType.U8 => TokenType.LiteralNumber,
             RuntimeType.I8 => TokenType.LiteralNumber,
-            RuntimeType.Char => TokenType.LiteralCharacter,
+            RuntimeType.U16 => TokenType.LiteralNumber,
             RuntimeType.I16 => TokenType.LiteralNumber,
             RuntimeType.U32 => TokenType.LiteralNumber,
             RuntimeType.I32 => TokenType.LiteralNumber,

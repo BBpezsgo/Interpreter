@@ -3,7 +3,6 @@ using LanguageCore.Runtime;
 
 namespace LanguageCore.Compiler;
 
-[DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
 [StructLayout(LayoutKind.Explicit)]
 public readonly partial struct CompiledValue
 {
@@ -15,6 +14,7 @@ public readonly partial struct CompiledValue
     [FieldOffset(1)] public readonly float F32;
     [FieldOffset(1)] public readonly byte U8;
     [FieldOffset(1)] public readonly sbyte I8;
+    [FieldOffset(1)] public readonly ushort U16;
     [FieldOffset(1)] public readonly char Char;
     [FieldOffset(1)] public readonly short I16;
     [FieldOffset(1)] public readonly uint U32;
@@ -25,7 +25,7 @@ public readonly partial struct CompiledValue
     {
         RuntimeType.U8 => BitWidth._8,
         RuntimeType.I8 => BitWidth._8,
-        RuntimeType.Char => BitWidth._16,
+        RuntimeType.U16 => BitWidth._16,
         RuntimeType.I16 => BitWidth._16,
         RuntimeType.U32 => BitWidth._32,
         RuntimeType.I32 => BitWidth._32,
@@ -44,10 +44,10 @@ public readonly partial struct CompiledValue
     { U8 = value; }
     public CompiledValue(sbyte value) : this(RuntimeType.I8)
     { I8 = value; }
-    public CompiledValue(char value) : this(RuntimeType.Char)
+    public CompiledValue(char value) : this(RuntimeType.U16)
     { Char = value; }
-    public CompiledValue(ushort value) : this(RuntimeType.Char)
-    { Char = (char)value; }
+    public CompiledValue(ushort value) : this(RuntimeType.U16)
+    { U16 = value; }
     public CompiledValue(short value) : this(RuntimeType.I16)
     { I16 = value; }
     public CompiledValue(uint value) : this(RuntimeType.U32)
@@ -70,24 +70,11 @@ public readonly partial struct CompiledValue
 
     #endregion
 
-    public string GetDebuggerDisplay() => Type switch
-    {
-        RuntimeType.Null => "null",
-        RuntimeType.U8 => U8.ToString(CultureInfo.InvariantCulture),
-        RuntimeType.I8 => I8.ToString(CultureInfo.InvariantCulture),
-        RuntimeType.Char => $"'{Char.Escape()}'",
-        RuntimeType.I16 => I16.ToString(CultureInfo.InvariantCulture),
-        RuntimeType.F32 => F32.ToString(CultureInfo.InvariantCulture) + "f",
-        RuntimeType.U32 => U32.ToString(CultureInfo.InvariantCulture),
-        RuntimeType.I32 => I32.ToString(CultureInfo.InvariantCulture),
-        _ => throw new UnreachableException(),
-    };
-
     public override int GetHashCode() => Type switch
     {
         RuntimeType.U8 => HashCode.Combine(Type, U8),
         RuntimeType.I8 => HashCode.Combine(Type, I8),
-        RuntimeType.Char => HashCode.Combine(Type, Char),
+        RuntimeType.U16 => HashCode.Combine(Type, U16),
         RuntimeType.I16 => HashCode.Combine(Type, I16),
         RuntimeType.U32 => HashCode.Combine(Type, U32),
         RuntimeType.I32 => HashCode.Combine(Type, I32),
@@ -102,11 +89,11 @@ public readonly partial struct CompiledValue
             case RuntimeType.U8: return true;
             case RuntimeType.I8: return true;
 
-            case RuntimeType.Char:
+            case RuntimeType.U16:
             {
-                if (value.Char is < (char)byte.MinValue or > (char)byte.MaxValue)
+                if (value.U16 is < (ushort)byte.MinValue or > (ushort)byte.MaxValue)
                 { return false; }
-                value = new CompiledValue((byte)value.Char);
+                value = new CompiledValue((byte)value.U16);
                 return true;
             }
 
@@ -144,39 +131,39 @@ public readonly partial struct CompiledValue
         {
             case RuntimeType.U8:
             {
-                value = new CompiledValue((char)value.U8);
+                value = new CompiledValue((ushort)value.U8);
                 return true;
             }
 
             case RuntimeType.I8:
             {
-                value = new CompiledValue((char)value.U8);
+                value = new CompiledValue((ushort)value.U8);
                 return true;
             }
 
-            case RuntimeType.Char: return true;
+            case RuntimeType.U16: return true;
 
             case RuntimeType.I16:
             {
-                if (value.I16 < (short)char.MinValue)
+                if (value.I16 < (short)ushort.MinValue)
                 { return false; }
-                value = new CompiledValue((char)value.I16);
+                value = new CompiledValue((ushort)value.I16);
                 return true;
             }
 
             case RuntimeType.U32:
             {
-                if (value.U32 is < char.MinValue or > char.MaxValue)
+                if (value.U32 is < ushort.MinValue or > ushort.MaxValue)
                 { return false; }
-                value = new CompiledValue((char)value.U32);
+                value = new CompiledValue((ushort)value.U32);
                 return true;
             }
 
             case RuntimeType.I32:
             {
-                if (value.I32 is < char.MinValue or > char.MaxValue)
+                if (value.I32 is < ushort.MinValue or > ushort.MaxValue)
                 { return false; }
-                value = new CompiledValue((char)value.I32);
+                value = new CompiledValue((ushort)value.I32);
                 return true;
             }
 

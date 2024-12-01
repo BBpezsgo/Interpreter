@@ -155,7 +155,7 @@ public readonly struct InstructionOperand
         {
             default(BitWidth) => (default(int), InstructionOperandType.Immediate32),
             BitWidth._8 => (value.U8.I32(), InstructionOperandType.Immediate8),
-            BitWidth._16 => (value.Char.I32(), InstructionOperandType.Immediate16),
+            BitWidth._16 => (value.U16.I32(), InstructionOperandType.Immediate16),
             BitWidth._32 => (value.U32.I32(), InstructionOperandType.Immediate32),
             _ => throw new UnreachableException(),
         };

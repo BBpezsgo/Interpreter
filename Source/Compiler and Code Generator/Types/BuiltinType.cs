@@ -9,7 +9,7 @@ public class BuiltinType : GeneralType,
 {
     public static readonly BuiltinType U8 = new(BasicType.U8);
     public static readonly BuiltinType I8 = new(BasicType.I8);
-    public static readonly BuiltinType Char = new(BasicType.Char);
+    public static readonly BuiltinType Char = new(BasicType.U16);
     public static readonly BuiltinType I16 = new(BasicType.I16);
     public static readonly BuiltinType U32 = new(BasicType.U32);
     public static readonly BuiltinType I32 = new(BasicType.I32);
@@ -23,7 +23,7 @@ public class BuiltinType : GeneralType,
     {
         BasicType.U8 => RuntimeType.U8,
         BasicType.I8 => RuntimeType.I8,
-        BasicType.Char => RuntimeType.Char,
+        BasicType.U16 => RuntimeType.U16,
         BasicType.I16 => RuntimeType.I16,
         BasicType.U32 => RuntimeType.U32,
         BasicType.I32 => RuntimeType.I32,
@@ -48,7 +48,7 @@ public class BuiltinType : GeneralType,
         {
             RuntimeType.U8 => BasicType.U8,
             RuntimeType.I8 => BasicType.I8,
-            RuntimeType.Char => BasicType.Char,
+            RuntimeType.U16 => BasicType.U16,
             RuntimeType.I16 => BasicType.I16,
             RuntimeType.U32 => BasicType.U32,
             RuntimeType.I32 => BasicType.I32,
@@ -69,7 +69,7 @@ public class BuiltinType : GeneralType,
             case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{this}\""); return false;
             case BasicType.U8: size = 1; return true;
             case BasicType.I8: size = 1; return true;
-            case BasicType.Char: size = 2; return true;
+            case BasicType.U16: size = 2; return true;
             case BasicType.I16: size = 2; return true;
             case BasicType.U32: size = 4; return true;
             case BasicType.I32: size = 4; return true;
@@ -145,7 +145,7 @@ public class BuiltinType : GeneralType,
         BasicType.Any => TypeKeywords.Any,
         BasicType.U8 => TypeKeywords.U8,
         BasicType.I8 => TypeKeywords.I8,
-        BasicType.Char => TypeKeywords.U16,
+        BasicType.U16 => TypeKeywords.U16,
         BasicType.I16 => TypeKeywords.I16,
         BasicType.U32 => TypeKeywords.U32,
         BasicType.I32 => TypeKeywords.I32,

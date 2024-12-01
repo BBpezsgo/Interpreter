@@ -186,7 +186,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             { result.Append(value.To<byte>()); }
             else if (type.SameAs(BasicType.I8))
             { result.Append(value.To<sbyte>()); }
-            else if (type.SameAs(BasicType.Char))
+            else if (type.SameAs(BasicType.U16))
             { result.Append($"'{value.To<char>().Escape()}'"); }
             else if (type.SameAs(BasicType.I16))
             { result.Append(value.To<short>()); }
@@ -198,7 +198,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             {
                 if (pointerType.To is ArrayType toArrayType)
                 {
-                    if (toArrayType.Of.SameAs(BasicType.Char))
+                    if (toArrayType.Of.SameAs(BasicType.U16))
                     {
                         result.Append('"');
                         int i = value.To<int>();

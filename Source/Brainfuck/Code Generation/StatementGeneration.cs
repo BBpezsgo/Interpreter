@@ -192,7 +192,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (type.Is(out ArrayType? arrayType))
             {
-                if (arrayType.Of.SameAs(BasicType.Char) &&
+                if (arrayType.Of.SameAs(BasicType.U16) &&
                     variableDeclaration.InitialValue is Literal literal)
                 {
                     if (literal.Type != LiteralType.String)
@@ -336,7 +336,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
             case BasicType.U8: size = 1; return true;
             case BasicType.I8: size = 1; return true;
-            case BasicType.Char: size = 1; return true;
+            case BasicType.U16: size = 1; return true;
             case BasicType.I16: size = 1; return true;
             case BasicType.U32: size = 1; return true;
             case BasicType.I32: size = 1; return true;
@@ -618,7 +618,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (variable.Type.Is(out ArrayType? arrayType))
             {
-                if (arrayType.Of.SameAs(BasicType.Char))
+                if (arrayType.Of.SameAs(BasicType.U16))
                 {
                     if (value is not Literal literal)
                     { throw new InternalExceptionWithoutContext(); }
@@ -2125,7 +2125,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (expectedType is not null &&
                         expectedType.Is(out PointerType? pointerType) &&
-                        pointerType.To.SameAs(BasicType.Char))
+                        pointerType.To.SameAs(BasicType.U16))
                     {
                         // TODO: not true but false
                         GenerateCodeForLiteralString(statement, true);
@@ -2602,7 +2602,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     if ((leftType.SameAs(BasicType.U8) ||
                         leftType.SameAs(BasicType.I8) ||
-                        leftType.SameAs(BasicType.Char) ||
+                        leftType.SameAs(BasicType.U16) ||
                         leftType.SameAs(BasicType.I16) ||
                         leftType.SameAs(BasicType.U32) ||
                         leftType.SameAs(BasicType.I32)) &&

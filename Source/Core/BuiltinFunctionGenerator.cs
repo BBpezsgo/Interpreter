@@ -443,10 +443,10 @@ public static unsafe class ExternalFunctionGenerator
         { return RuntimeType.I8; }
 
         if (type_ == typeof(char))
-        { return RuntimeType.Char; }
+        { return RuntimeType.U16; }
 
         if (type_ == typeof(ushort))
-        { return RuntimeType.Char; }
+        { return RuntimeType.U16; }
 
         if (type_ == typeof(short))
         { return RuntimeType.I16; }

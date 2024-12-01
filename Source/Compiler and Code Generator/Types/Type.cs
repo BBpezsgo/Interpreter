@@ -9,7 +9,7 @@ public enum BasicType : byte
     Any,
     U8,
     I8,
-    Char,
+    U16,
     I16,
     U32,
     I32,
@@ -43,7 +43,7 @@ public static class TypeExtensions
             case BasicType.I8:
                 numericType = NumericType.SignedInteger;
                 return true;
-            case BasicType.Char:
+            case BasicType.U16:
                 numericType = NumericType.UnsignedInteger;
                 return true;
             case BasicType.I16:

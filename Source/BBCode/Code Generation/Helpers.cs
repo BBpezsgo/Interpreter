@@ -1,4 +1,4 @@
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 
@@ -335,7 +335,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int wordCount = size / 2;
         size %= 2;
         for (int i = 0; i < wordCount; i++)
-        { Push(new CompiledValue((char)0)); }
+        { Push(new CompiledValue((ushort)0)); }
 
         for (int i = 0; i < size; i++)
         { Push(new CompiledValue((byte)0)); }
@@ -672,11 +672,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = GeneratedCode.Count;
         AddInstruction(Opcode.JumpIfNotEqual, 0);
 
-        GenerateCodeForLiteralString("null pointer", location, false);
+        // GenerateCodeForLiteralString("null pointer", location, false);
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            PopTo(reg.Get(PointerBitWidth));
-            AddInstruction(Opcode.Crash, reg.Get(PointerBitWidth));
+            // PopTo(reg.Get(PointerBitWidth));
+            // AddInstruction(Opcode.Crash, reg.Get(PointerBitWidth));
+            AddInstruction(Opcode.Crash, 0);
         }
         GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction;
 

@@ -1537,7 +1537,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                             return;
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.Char))
+                    else if (expectedType.SameAs(BasicType.U16))
                     {
                         if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
                         {
@@ -1634,7 +1634,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                             return;
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.Char))
+                    else if (expectedType.SameAs(BasicType.U16))
                     {
                         OnGotStatementType(literal, BuiltinType.Char);
                         Push(new CompiledValue(literal.Value[0]));
@@ -2726,7 +2726,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         error = null;
         if (type.Is(out ArrayType? arrayType) &&
-            arrayType.Of.SameAs(BasicType.Char) &&
+            arrayType.Of.SameAs(BasicType.U16) &&
             value is LiteralStatement literalStatement &&
             literalStatement.Type == LiteralType.String &&
             arrayType.ComputedLength.HasValue)
@@ -3174,7 +3174,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment("}");
         }
         else if (compiledVariable.Type.Is(out ArrayType? arrayType) &&
-            arrayType.Of.SameAs(BasicType.Char) &&
+            arrayType.Of.SameAs(BasicType.U16) &&
             newVariable.InitialValue is LiteralStatement literalStatement &&
             literalStatement.Type == LiteralType.String &&
             arrayType.ComputedLength.HasValue &&

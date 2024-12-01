@@ -1759,7 +1759,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             literal.Type == LiteralType.String)
         {
             if (destination.Is(out ArrayType? destArrayType) &&
-                destArrayType.Of.SameAs(BasicType.Char))
+                destArrayType.Of.SameAs(BasicType.U16))
             {
                 string literalValue = literal.Value;
                 if (destArrayType.Length is null)
@@ -1785,7 +1785,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
             if (destination.Is(out PointerType? pointerType) &&
                 pointerType.To.Is(out ArrayType? arrayType) &&
-                arrayType.Of.SameAs(BasicType.Char))
+                arrayType.Of.SameAs(BasicType.U16))
             {
                 if (arrayType.Length is not null)
                 {
@@ -1924,7 +1924,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     {
         BasicType.U8 => new CompiledValue(default(byte)),
         BasicType.I8 => new CompiledValue(default(sbyte)),
-        BasicType.Char => new CompiledValue(default(char)),
+        BasicType.U16 => new CompiledValue(default(ushort)),
         BasicType.I16 => new CompiledValue(default(short)),
         BasicType.U32 => new CompiledValue(default(uint)),
         BasicType.I32 => new CompiledValue(default(int)),
@@ -2333,7 +2333,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                             return OnGotStatementType(literal, expectedType);
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.Char))
+                    else if (expectedType.SameAs(BasicType.U16))
                     {
                         if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
                         {
@@ -3636,10 +3636,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                 return true;
             case LiteralType.Char:
                 if (literal.Value.Length != 1)
-                {
-                    value = CompiledValue.Null;
-                    return false;
-                }
+                { throw new InternalExceptionWithoutContext($"Invalid character literal"); }
+
                 value = new CompiledValue(literal.Value[0]);
                 return true;
             case LiteralType.String:
@@ -4517,7 +4515,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
             case BasicType.U8: size = 1; return true;
             case BasicType.I8: size = 1; return true;
-            case BasicType.Char: size = 2; return true;
+            case BasicType.U16: size = 2; return true;
             case BasicType.I16: size = 2; return true;
             case BasicType.U32: size = 4; return true;
             case BasicType.I32: size = 4; return true;

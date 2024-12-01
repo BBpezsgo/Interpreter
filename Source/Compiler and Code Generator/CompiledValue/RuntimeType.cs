@@ -5,7 +5,7 @@ public enum RuntimeType : byte
     Null,
     U8,
     I8,
-    Char,
+    U16,
     I16,
     U32,
     I32,

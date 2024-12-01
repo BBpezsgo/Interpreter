@@ -8,7 +8,7 @@ public partial struct CompiledValue :
         RuntimeType.Null => true,
         RuntimeType.U8 => value.U8 == default,
         RuntimeType.I8 => value.I8 == default,
-        RuntimeType.Char => value.Char == default,
+        RuntimeType.U16 => value.U16 == default,
         RuntimeType.I16 => value.I16 == default,
         RuntimeType.U32 => value.U32 == default,
         RuntimeType.I32 => value.I32 == default,
@@ -21,24 +21,11 @@ public partial struct CompiledValue :
         RuntimeType.Null => "null",
         RuntimeType.U8 => U8.ToString(),
         RuntimeType.I8 => I8.ToString(),
-        RuntimeType.Char => Char.ToString(),
+        RuntimeType.U16 => U16.ToString(),
         RuntimeType.I16 => I16.ToString(),
         RuntimeType.U32 => U32.ToString(),
         RuntimeType.I32 => I32.ToString(),
         RuntimeType.F32 => F32.ToString(),
-        _ => throw new UnreachableException(),
-    };
-
-    public string ToString(IFormatProvider? provider) => Type switch
-    {
-        RuntimeType.Null => "null",
-        RuntimeType.U8 => Convert.ToString(U8, provider),
-        RuntimeType.I8 => Convert.ToString(I8, provider),
-        RuntimeType.Char => Convert.ToString(Char, provider),
-        RuntimeType.I16 => Convert.ToString(I16, provider),
-        RuntimeType.U32 => Convert.ToString(U32, provider),
-        RuntimeType.I32 => Convert.ToString(I32, provider),
-        RuntimeType.F32 => Convert.ToString(F32, provider),
         _ => throw new UnreachableException(),
     };
 
@@ -63,7 +50,7 @@ public partial struct CompiledValue :
             {
                 RuntimeType.U8 => (U8 >= byte.MinValue && U8 <= byte.MaxValue) ? new CompiledValue((byte)I8) : this,
                 RuntimeType.I8 => (I8 >= byte.MinValue && I8 <= byte.MaxValue) ? new CompiledValue((byte)I8) : this,
-                RuntimeType.Char => (Char >= byte.MinValue && Char <= byte.MaxValue) ? new CompiledValue((byte)Char) : this,
+                RuntimeType.U16 => (U16 >= byte.MinValue && U16 <= byte.MaxValue) ? new CompiledValue((byte)U16) : this,
                 RuntimeType.I16 => (I16 >= byte.MinValue && I16 <= byte.MaxValue) ? new CompiledValue((byte)I16) : this,
                 RuntimeType.U32 => (U32 >= byte.MinValue && U32 <= byte.MaxValue) ? new CompiledValue((byte)U32) : this,
                 RuntimeType.I32 => (I32 >= byte.MinValue && I32 <= byte.MaxValue) ? new CompiledValue((byte)I32) : this,
@@ -73,27 +60,27 @@ public partial struct CompiledValue :
             {
                 RuntimeType.U8 => (U8 >= sbyte.MinValue && U8 <= sbyte.MaxValue) ? new CompiledValue((sbyte)I8) : this,
                 RuntimeType.I8 => (I8 >= sbyte.MinValue && I8 <= sbyte.MaxValue) ? new CompiledValue((sbyte)I8) : this,
-                RuntimeType.Char => (Char >= sbyte.MinValue && Char <= sbyte.MaxValue) ? new CompiledValue((sbyte)Char) : this,
+                RuntimeType.U16 => (U16 >= sbyte.MinValue && U16 <= sbyte.MaxValue) ? new CompiledValue((sbyte)U16) : this,
                 RuntimeType.I16 => (I16 >= sbyte.MinValue && I16 <= sbyte.MaxValue) ? new CompiledValue((sbyte)I16) : this,
                 RuntimeType.U32 => (U32 >= sbyte.MinValue && U32 <= sbyte.MaxValue) ? new CompiledValue((sbyte)U32) : this,
                 RuntimeType.I32 => (I32 >= sbyte.MinValue && I32 <= sbyte.MaxValue) ? new CompiledValue((sbyte)I32) : this,
                 _ => this,
             },
-            RuntimeType.Char => Type switch
+            RuntimeType.U16 => Type switch
             {
-                RuntimeType.U8 => (U8 >= char.MinValue && U8 <= char.MaxValue) ? new CompiledValue((char)I8) : this,
-                RuntimeType.I8 => (I8 >= char.MinValue && I8 <= char.MaxValue) ? new CompiledValue((char)I8) : this,
-                RuntimeType.Char => (Char >= char.MinValue && Char <= char.MaxValue) ? new CompiledValue((char)Char) : this,
-                RuntimeType.I16 => (I16 >= char.MinValue && I16 <= char.MaxValue) ? new CompiledValue((char)I16) : this,
-                RuntimeType.U32 => (U32 >= char.MinValue && U32 <= char.MaxValue) ? new CompiledValue((char)U32) : this,
-                RuntimeType.I32 => (I32 >= char.MinValue && I32 <= char.MaxValue) ? new CompiledValue((char)I32) : this,
+                RuntimeType.U8 => (U8 >= ushort.MinValue && U8 <= ushort.MaxValue) ? new CompiledValue((ushort)I8) : this,
+                RuntimeType.I8 => (I8 >= ushort.MinValue && I8 <= ushort.MaxValue) ? new CompiledValue((ushort)I8) : this,
+                RuntimeType.U16 => (U16 >= ushort.MinValue && U16 <= ushort.MaxValue) ? new CompiledValue((ushort)U16) : this,
+                RuntimeType.I16 => (I16 >= ushort.MinValue && I16 <= ushort.MaxValue) ? new CompiledValue((ushort)I16) : this,
+                RuntimeType.U32 => (U32 >= ushort.MinValue && U32 <= ushort.MaxValue) ? new CompiledValue((ushort)U32) : this,
+                RuntimeType.I32 => (I32 >= ushort.MinValue && I32 <= ushort.MaxValue) ? new CompiledValue((ushort)I32) : this,
                 _ => this,
             },
             RuntimeType.I16 => Type switch
             {
                 RuntimeType.U8 => (U8 >= short.MinValue && U8 <= short.MaxValue) ? new CompiledValue((short)I8) : this,
                 RuntimeType.I8 => (I8 >= short.MinValue && I8 <= short.MaxValue) ? new CompiledValue((short)I8) : this,
-                RuntimeType.Char => (Char >= short.MinValue && Char <= short.MaxValue) ? new CompiledValue((short)Char) : this,
+                RuntimeType.U16 => (U16 >= short.MinValue && U16 <= short.MaxValue) ? new CompiledValue((short)U16) : this,
                 RuntimeType.I16 => (I16 >= short.MinValue && I16 <= short.MaxValue) ? new CompiledValue((short)I16) : this,
                 RuntimeType.U32 => (U32 >= short.MinValue && U32 <= short.MaxValue) ? new CompiledValue((short)U32) : this,
                 RuntimeType.I32 => (I32 >= short.MinValue && I32 <= short.MaxValue) ? new CompiledValue((short)I32) : this,
@@ -103,7 +90,7 @@ public partial struct CompiledValue :
             {
                 RuntimeType.U8 => (U8 >= uint.MinValue && U8 <= uint.MaxValue) ? new CompiledValue((uint)I8) : this,
                 RuntimeType.I8 => (I8 >= uint.MinValue && I8 <= uint.MaxValue) ? new CompiledValue((uint)I8) : this,
-                RuntimeType.Char => (Char >= uint.MinValue && Char <= uint.MaxValue) ? new CompiledValue((uint)Char) : this,
+                RuntimeType.U16 => (U16 >= uint.MinValue && U16 <= uint.MaxValue) ? new CompiledValue((uint)U16) : this,
                 RuntimeType.I16 => (I16 >= uint.MinValue && I16 <= uint.MaxValue) ? new CompiledValue((uint)I16) : this,
                 RuntimeType.U32 => (U32 >= uint.MinValue && U32 <= uint.MaxValue) ? new CompiledValue((uint)U32) : this,
                 RuntimeType.I32 => (I32 >= uint.MinValue && I32 <= uint.MaxValue) ? new CompiledValue((uint)I32) : this,
@@ -113,7 +100,7 @@ public partial struct CompiledValue :
             {
                 RuntimeType.U8 => (U8 >= int.MinValue && U8 <= int.MaxValue) ? new CompiledValue((int)I8) : this,
                 RuntimeType.I8 => (I8 >= int.MinValue && I8 <= int.MaxValue) ? new CompiledValue((int)I8) : this,
-                RuntimeType.Char => (Char >= int.MinValue && Char <= int.MaxValue) ? new CompiledValue((int)Char) : this,
+                RuntimeType.U16 => (U16 >= int.MinValue && U16 <= int.MaxValue) ? new CompiledValue((int)U16) : this,
                 RuntimeType.I16 => (I16 >= int.MinValue && I16 <= int.MaxValue) ? new CompiledValue((int)I16) : this,
                 RuntimeType.U32 => (U32 >= int.MinValue && U32 <= int.MaxValue) ? new CompiledValue((int)U32) : this,
                 RuntimeType.I32 => (I32 >= int.MinValue && I32 <= int.MaxValue) ? new CompiledValue((int)I32) : this,
@@ -123,7 +110,7 @@ public partial struct CompiledValue :
             {
                 RuntimeType.U8 => new CompiledValue((float)I8),
                 RuntimeType.I8 => new CompiledValue((float)I8),
-                RuntimeType.Char => new CompiledValue((float)Char),
+                RuntimeType.U16 => new CompiledValue((float)U16),
                 RuntimeType.I16 => new CompiledValue((float)I16),
                 RuntimeType.U32 => new CompiledValue((float)U32),
                 RuntimeType.I32 => new CompiledValue((float)I32),
@@ -149,7 +136,7 @@ public partial struct CompiledValue :
         RuntimeType.Null => false,
         RuntimeType.U8 => v.U8 != default,
         RuntimeType.I8 => v.I8 != default,
-        RuntimeType.Char => v.Char != default,
+        RuntimeType.U16 => v.U16 != default,
         RuntimeType.I16 => v.I16 != default,
         RuntimeType.I32 => v.I32 != default,
         RuntimeType.U32 => v.U32 != default,
@@ -163,7 +150,7 @@ public partial struct CompiledValue :
     {
         RuntimeType.U8 => (byte)v.U8,
         RuntimeType.I8 => (byte)v.I8,
-        RuntimeType.Char => (byte)v.Char,
+        RuntimeType.U16 => (byte)v.U16,
         RuntimeType.I16 => (byte)v.I16,
         RuntimeType.I32 => (byte)v.I32,
         RuntimeType.F32 => (byte)v.F32,
@@ -176,7 +163,7 @@ public partial struct CompiledValue :
     {
         RuntimeType.U8 => (ushort)v.U8,
         RuntimeType.I8 => (ushort)v.U8,
-        RuntimeType.Char => (ushort)v.Char,
+        RuntimeType.U16 => (ushort)v.U16,
         RuntimeType.I16 => (ushort)v.I16,
         RuntimeType.U32 => (ushort)v.U32,
         RuntimeType.I32 => (ushort)v.I32,
@@ -189,7 +176,7 @@ public partial struct CompiledValue :
     {
         RuntimeType.U8 => (int)v.U8,
         RuntimeType.I8 => (int)v.U8,
-        RuntimeType.Char => (int)v.Char,
+        RuntimeType.U16 => (int)v.U16,
         RuntimeType.I16 => (int)v.I16,
         RuntimeType.U32 => (int)v.U32,
         RuntimeType.I32 => (int)v.I32,
@@ -203,7 +190,7 @@ public partial struct CompiledValue :
     {
         RuntimeType.U8 => (float)v.U8,
         RuntimeType.I8 => (float)v.U8,
-        RuntimeType.Char => (float)v.Char,
+        RuntimeType.U16 => (float)v.U16,
         RuntimeType.I16 => (float)v.I16,
         RuntimeType.U32 => (float)v.U32,
         RuntimeType.I32 => (float)v.I32,
@@ -217,7 +204,7 @@ public partial struct CompiledValue :
     {
         RuntimeType.U8 => (char)v.U8,
         RuntimeType.I8 => (char)v.U8,
-        RuntimeType.Char => (char)v.Char,
+        RuntimeType.U16 => (char)v.U16,
         RuntimeType.I16 => (char)v.I16,
         RuntimeType.U32 => (char)v.U32,
         RuntimeType.I32 => (char)v.I32,

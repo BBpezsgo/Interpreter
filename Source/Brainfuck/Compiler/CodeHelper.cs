@@ -77,7 +77,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
         {
             RuntimeType.U8 => v.U8,
             RuntimeType.I8 => v.I8,
-            RuntimeType.Char => CharCode.GetByte(v.Char),
+            RuntimeType.U16 => CharCode.GetByte(v.Char),
             RuntimeType.I16 => v.I16,
             RuntimeType.U32 => (int)v.U32,
             RuntimeType.I32 => v.I32,

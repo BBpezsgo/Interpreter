@@ -44,7 +44,7 @@ public static class TypeKeywords
 
         { TypeKeywords.U8, BasicType.U8 },
         { TypeKeywords.I8, BasicType.I8 },
-        { TypeKeywords.U16, BasicType.Char },
+        { TypeKeywords.U16, BasicType.U16 },
         { TypeKeywords.I16, BasicType.I16 },
         { TypeKeywords.U32, BasicType.U32 },
         { TypeKeywords.I32, BasicType.I32 },
@@ -208,7 +208,7 @@ public static class BuiltinFunctions
                 v => v.SameAs(new PointerType(BuiltinType.Any)),
                 v => v.SameAs(BasicType.U8)
                   || v.SameAs(BasicType.I8)
-                  || v.SameAs(BasicType.Char)
+                  || v.SameAs(BasicType.U16)
                   || v.SameAs(BasicType.I16)
                   || v.SameAs(BasicType.U32)
                   || v.SameAs(BasicType.I32)

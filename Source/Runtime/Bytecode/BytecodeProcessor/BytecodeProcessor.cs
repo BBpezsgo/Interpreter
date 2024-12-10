@@ -131,19 +131,10 @@ public partial class BytecodeProcessor
         }
     }
 
-#if UNITY
-    public RuntimeContext GetContext() => new(
-        Registers,
-        new Unity.Collections.NativeArray<byte>(Memory.ToArray(), Unity.Collections.Allocator.Temp),
-        new Unity.Collections.NativeArray<Instruction>(Code.ToArray(), Unity.Collections.Allocator.Temp),
-        StackStart
-    );
-#else
     public RuntimeContext GetContext() => new(
         Registers,
         ImmutableArray.Create(Memory),
         Code,
         StackStart
     );
-#endif
 }

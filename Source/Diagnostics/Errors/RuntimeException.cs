@@ -393,16 +393,16 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             return true;
         }
 
-        result.AppendLine();
-        result.AppendLine($"Registers:");
-        result.AppendLine($"CP: {context.Registers.CodePointer}");
-        result.AppendLine($"SP: {context.Registers.StackPointer}");
-        result.AppendLine($"BP: {context.Registers.BasePointer}");
-        result.AppendLine($"AX: {context.Registers.AX}");
-        result.AppendLine($"BX: {context.Registers.BX}");
-        result.AppendLine($"CX: {context.Registers.CX}");
-        result.AppendLine($"DX: {context.Registers.DX}");
-        result.AppendLine($"Flags: {context.Registers.Flags}");
+        // result.AppendLine();
+        // result.AppendLine($"Registers:");
+        // result.AppendLine($"CP: {context.Registers.CodePointer}");
+        // result.AppendLine($"SP: {context.Registers.StackPointer}");
+        // result.AppendLine($"BP: {context.Registers.BasePointer}");
+        // result.AppendLine($"AX: {context.Registers.AX}");
+        // result.AppendLine($"BX: {context.Registers.BX}");
+        // result.AppendLine($"CX: {context.Registers.CX}");
+        // result.AppendLine($"DX: {context.Registers.DX}");
+        // result.AppendLine($"Flags: {context.Registers.Flags}");
 
         result.AppendLine();
         result.AppendLine("Call Stack (from last to recent):");

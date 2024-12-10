@@ -59,21 +59,12 @@ public ref partial struct ProcessorState
         Registers.StackPointer = StackStart - StackDirection;
     }
 
-#if UNITY
-    public readonly RuntimeContext GetContext() => new(
-        Registers,
-        new Unity.Collections.NativeArray<byte>(Memory.ToArray(), Unity.Collections.Allocator.Temp),
-        new Unity.Collections.NativeArray<Instruction>(Code.ToArray(), Unity.Collections.Allocator.Temp),
-        StackStart
-    );
-#else
     public readonly RuntimeContext GetContext() => new(
         Registers,
         ImmutableArray.Create(Memory),
         ImmutableArray.Create(Code),
         StackStart
     );
-#endif
 
     void Step() => Registers.CodePointer++;
     void Step(int num) => Registers.CodePointer += num;

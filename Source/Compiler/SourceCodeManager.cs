@@ -1,6 +1,4 @@
-﻿#pragma warning disable IDE0028 // Simplify collection initialization
-
-using System.IO;
+﻿using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using LanguageCore.Parser;
@@ -8,132 +6,50 @@ using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Compiler;
 
-public delegate bool FileParser(
-    Uri file,
-    [NotNullWhen(true)] out string? content);
+#if UNITY
+public delegate UnityEngine.Awaitable<Stream?>? FileParser(Uri file);
+#else
+public delegate Task<Stream?>? FileParser(Uri file);
+#endif
 
 public readonly record struct ParsedFile(
     Uri File,
     UsingDefinition? Using,
     TokenizerResult Tokens,
-    ParserResult AST);
+    ParserResult AST
+);
+
+record PendingFile(
+    Uri Uri,
+    UsingDefinition? Initiator,
+#if UNITY
+    UnityEngine.Awaitable<Stream?> Task
+#else
+    Task<Stream?> Task
+#endif
+);
 
 public class SourceCodeManager
 {
-    readonly HashSet<Uri> AlreadyLoadedCodes;
+    readonly HashSet<Uri> CompiledUris;
     readonly DiagnosticsCollection Diagnostics;
-    readonly PrintCallback? Print;
     readonly IEnumerable<string> PreprocessorVariables;
     readonly FileParser? FileParser;
+    readonly List<PendingFile> PendingFiles;
+    readonly List<ParsedFile> ParsedFiles;
+    readonly TokenizerSettings? TokenizerSettings;
+    readonly string? BasePath;
 
-    public SourceCodeManager(DiagnosticsCollection diagnostics, PrintCallback? printCallback, IEnumerable<string> preprocessorVariables, FileParser? fileParser)
+    public SourceCodeManager(DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, FileParser? fileParser, TokenizerSettings? tokenizerSettings, string? basePath)
     {
-        AlreadyLoadedCodes = new();
+        CompiledUris = new();
         Diagnostics = diagnostics;
-        Print = printCallback;
         PreprocessorVariables = preprocessorVariables;
         FileParser = fileParser;
-    }
-
-    bool FromWeb(
-        Uri file,
-        [NotNullWhen(true)] out Stream? content)
-    {
-        Print?.Invoke($"  Download file \"{file}\" ...", LogType.Debug);
-
-        using HttpClient client = new();
-        using Task<HttpResponseMessage> getTask = client.GetAsync(file, HttpCompletionOption.ResponseHeadersRead);
-        try
-        {
-            getTask.Wait();
-        }
-        catch (AggregateException ex)
-        {
-            foreach (Exception error in ex.InnerExceptions)
-            { Output.LogError(error.Message); }
-
-            content = default;
-            return false;
-        }
-        using HttpResponseMessage res = getTask.Result;
-
-        if (!res.IsSuccessStatusCode)
-        {
-            Output.LogError($"HTTP {res.StatusCode}");
-
-            content = default;
-            return false;
-        }
-
-        content = res.Content.ReadAsStream();
-        return true;
-    }
-
-    bool FromFile(
-        Uri file,
-        [NotNullWhen(true)] out Stream? content)
-    {
-        content = default;
-
-        string path = file.AbsolutePath;
-
-        if (path.StartsWith("/~")) path = path[1..];
-        if (path.StartsWith('~'))
-        { path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "." + path[1..]); }
-
-        if (!File.Exists(path))
-        { return false; }
-
-        Print?.Invoke($"  Load local file \"{path}\" ...", LogType.Debug);
-
-        content = File.OpenRead(path);
-
-        return true;
-    }
-
-    bool FromAnywhere(
-        UsingDefinition? initiator,
-        Uri file,
-        out Stream? content)
-    {
-        if (initiator is not null)
-        {
-            if (file.IsFile)
-            { initiator.CompiledUri = file.AbsolutePath; }
-            else
-            { initiator.CompiledUri = file.ToString(); }
-        }
-
-        content = null;
-
-        if (AlreadyLoadedCodes.Contains(file))
-        { return true; }
-
-        if (FileParser is not null && FileParser.Invoke(file, out string? stringContent))
-        {
-            content = new MemoryStream(Encoding.UTF8.GetBytes(stringContent));
-            AlreadyLoadedCodes.Add(file);
-            return true;
-        }
-
-        if (file.Scheme is "https" or "http")
-        {
-            if (FromWeb(file, out content))
-            {
-                AlreadyLoadedCodes.Add(file);
-                return true;
-            }
-        }
-        else if (file.IsFile)
-        {
-            if (FromFile(file, out content))
-            {
-                AlreadyLoadedCodes.Add(file);
-                return true;
-            }
-        }
-
-        return false;
+        PendingFiles = new();
+        ParsedFiles = new();
+        TokenizerSettings = tokenizerSettings;
+        BasePath = basePath;
     }
 
     static IEnumerable<Uri> GetFileQuery(string @using, Uri? parent, string? basePath)
@@ -174,107 +90,295 @@ public class SourceCodeManager
         }
     }
 
+#if UNITY
+    void ProcessPendingFiles()
+    {
+        for (int i = 0; i < PendingFiles.Count; i++)
+        {
+            UnityEngine.Awaitable<Stream?>.Awaiter awaiter = PendingFiles[i].Task.GetAwaiter();
+            if (!awaiter.IsCompleted) break;
+            PendingFile finishedFile = PendingFiles[i];
+            PendingFiles.RemoveAt(i--);
+
+            Stream? content = awaiter.GetResult();
+
+            if (content is null)
+            {
+                if (finishedFile.Initiator is null)
+                { Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{finishedFile.Uri}\" not found")); }
+                else
+                { Diagnostics.Add(Diagnostic.Critical($"File \"{finishedFile.Uri}\" not found", finishedFile.Initiator)); }
+                break;
+            }
+
+            TokenizerResult tokens = StreamTokenizer.Tokenize(
+                content,
+                Diagnostics,
+                PreprocessorVariables,
+                finishedFile.Uri,
+                TokenizerSettings,
+                null,
+                null);
+
+            ParserResult ast = Parser.Parser.Parse(tokens.Tokens, finishedFile.Uri, Diagnostics);
+
+            if (ast.Usings.Any())
+            { Output.LogDebug("Loading files ..."); }
+
+            ParsedFiles.Add(new ParsedFile(finishedFile.Uri, finishedFile.Initiator, tokens, ast));
+
+            foreach (UsingDefinition @using in ast.Usings)
+            {
+                IEnumerable<Uri> query = GetFileQuery(@using.PathString, finishedFile.Uri, BasePath);
+                if (!FromAnywhere(@using, query, out _))
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"File \"{@using.PathString}\" not found", @using));
+                    continue;
+                }
+            }
+        }
+    }
+#else
+    void ProcessPendingFiles()
+    {
+        for (int i = 0; i < PendingFiles.Count; i++)
+        {
+            if (!PendingFiles[i].Task.IsCompleted) break;
+            PendingFile finishedFile = PendingFiles[i];
+            PendingFiles.RemoveAt(i--);
+
+            if (finishedFile.Task.IsCanceled)
+            {
+                if (finishedFile.Initiator is null)
+                { Diagnostics.Add(DiagnosticWithoutContext.Critical($"Failed to collect the necessary files: operation cancelled")); }
+                else
+                { Diagnostics.Add(Diagnostic.Critical($"Failed to collect the necessary files: operation cancelled", finishedFile.Initiator)); }
+                break;
+            }
+
+            if (finishedFile.Task.IsFaulted)
+            {
+                if (finishedFile.Initiator is null)
+                { Diagnostics.Add(DiagnosticWithoutContext.Critical($"Failed to collect the necessary files: {finishedFile.Task.Exception}")); }
+                else
+                { Diagnostics.Add(Diagnostic.Critical($"Failed to collect the necessary files: {finishedFile.Task.Exception}", finishedFile.Initiator)); }
+                break;
+            }
+
+            Stream? content = finishedFile.Task.Result;
+
+            if (content is null)
+            {
+                if (finishedFile.Initiator is null)
+                { Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{finishedFile.Uri}\" not found")); }
+                else
+                { Diagnostics.Add(Diagnostic.Critical($"File \"{finishedFile.Uri}\" not found", finishedFile.Initiator)); }
+                break;
+            }
+
+            TokenizerResult tokens = StreamTokenizer.Tokenize(
+                content,
+                Diagnostics,
+                PreprocessorVariables,
+                finishedFile.Uri,
+                TokenizerSettings,
+                null,
+                null);
+
+            ParserResult ast = Parser.Parser.Parse(tokens.Tokens, finishedFile.Uri, Diagnostics);
+
+            if (ast.Usings.Any())
+            { Output.LogDebug("Loading files ..."); }
+
+            ParsedFiles.Add(new ParsedFile(finishedFile.Uri, finishedFile.Initiator, tokens, ast));
+
+            foreach (UsingDefinition @using in ast.Usings)
+            {
+                IEnumerable<Uri> query = GetFileQuery(@using.PathString, finishedFile.Uri, BasePath);
+                if (!FromAnywhere(@using, query, out _))
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"File \"{@using.PathString}\" not found", @using));
+                    continue;
+                }
+            }
+        }
+    }
+#endif
+
+    static bool FromWeb(
+        Uri file,
+        [NotNullWhen(true)] out Stream? content)
+    {
+        Output.LogDebug($"  Download file \"{file}\" ...");
+
+        using HttpClient client = new();
+        using Task<HttpResponseMessage> getTask = client.GetAsync(file, HttpCompletionOption.ResponseHeadersRead);
+        try
+        {
+            getTask.Wait();
+        }
+        catch (AggregateException ex)
+        {
+            foreach (Exception error in ex.InnerExceptions)
+            { Output.LogError(error.Message); }
+
+            content = default;
+            return false;
+        }
+        using HttpResponseMessage res = getTask.Result;
+
+        if (!res.IsSuccessStatusCode)
+        {
+            Output.LogError($"HTTP {res.StatusCode}");
+
+            content = default;
+            return false;
+        }
+
+        content = res.Content.ReadAsStream();
+        return true;
+    }
+
+    static bool FromFile(
+        Uri file,
+        [NotNullWhen(true)] out Stream? content)
+    {
+        content = default;
+
+        string path = file.AbsolutePath;
+
+        if (path.StartsWith("/~")) path = path[1..];
+        if (path.StartsWith('~'))
+        { path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "." + path[1..]); }
+
+        if (!File.Exists(path))
+        { return false; }
+
+        Output.LogDebug($"  Load local file \"{path}\" ...");
+
+        content = File.OpenRead(path);
+
+        return true;
+    }
+
     bool FromAnywhere(
         UsingDefinition? initiator,
-        IEnumerable<Uri> query,
-        out Stream? content,
-        [NotNullWhen(true)] out Uri? file)
+        Uri file)
     {
-        foreach (Uri item in query)
+        if (initiator is not null)
         {
-            if (FromAnywhere(initiator, item, out content))
+            if (file.IsFile)
+            { initiator.CompiledUri = file.AbsolutePath; }
+            else
+            { initiator.CompiledUri = file.ToString(); }
+        }
+
+        if (CompiledUris.Contains(file))
+        { return true; }
+
+        if (FileParser is not null)
+        {
+            var task = FileParser.Invoke(file);
+            if (task is not null)
             {
-                file = item;
+                CompiledUris.Add(file);
+                PendingFiles.Add(new PendingFile(file, initiator, task));
                 return true;
             }
         }
 
-        content = null;
-        file = null;
+        if (file.Scheme is "https" or "http")
+        {
+            if (FromWeb(file, out Stream? content))
+            {
+                CompiledUris.Add(file);
+#if UNITY
+                UnityEngine.AwaitableCompletionSource<Stream?> task = new();
+                task.SetResult(content);
+#else
+                Task<Stream?> task = Task.FromResult<Stream?>(content);
+#endif
+                PendingFiles.Add(new PendingFile(file, initiator, task.Awaitable));
+                return true;
+            }
+        }
+        else if (file.IsFile)
+        {
+            if (FromFile(file, out Stream? content))
+            {
+                CompiledUris.Add(file);
+#if UNITY
+                UnityEngine.AwaitableCompletionSource<Stream?> task = new();
+                task.SetResult(content);
+#else
+                Task<Stream?> task = Task.FromResult<Stream?>(content);
+#endif
+                PendingFiles.Add(new PendingFile(file, initiator, task.Awaitable));
+                return true;
+            }
+        }
+
         return false;
     }
 
-    List<ParsedFile> CollectAll(
+    bool FromAnywhere(
         UsingDefinition? initiator,
-        Stream content,
-        Uri file,
-        string? basePath,
-        TokenizerSettings? tokenizerSettings)
+        IEnumerable<Uri> query,
+        [NotNullWhen(true)] out Uri? uri)
     {
-        TokenizerResult tokens = StreamTokenizer.Tokenize(
-            content,
-            Diagnostics,
-            PreprocessorVariables,
-            file,
-            tokenizerSettings,
-            null,
-            null);
-
-        ParserResult ast = Parser.Parser.Parse(tokens.Tokens, file, Diagnostics);
-
-        if (ast.Usings.Any())
-        { Print?.Invoke("Loading files ...", LogType.Debug); }
-
-        List<ParsedFile> collectedASTs = new();
-        collectedASTs.Add(new ParsedFile(file, initiator, tokens, ast));
-
-        foreach (UsingDefinition @using in ast.Usings)
+        foreach (Uri item in query)
         {
-            IEnumerable<Uri> query = GetFileQuery(@using.PathString, file, basePath);
-            if (!FromAnywhere(@using, query, out Stream? subContent, out Uri? subFile) ||
-                subContent is null)
+            if (FromAnywhere(initiator, item))
             {
-                if (subFile is not null && AlreadyLoadedCodes.Contains(subFile)) continue;
-                Diagnostics.Add(Diagnostic.Critical($"File \"{@using.PathString}\" not found", @using));
-                continue;
+                uri = item;
+                return true;
             }
-
-            collectedASTs.AddRange(CollectAll(@using, subContent, subFile, basePath, tokenizerSettings));
         }
 
-        return collectedASTs;
+        uri = null;
+        return false;
     }
 
     ImmutableArray<ParsedFile> Entry(
         Uri? file,
-        string? basePath,
-        TokenizerSettings? tokenizerSettings,
         IEnumerable<string>? additionalImports)
     {
-        List<ParsedFile> collected = new();
-
         if (file is not null)
         {
-            if (!FromAnywhere(null, file, out Stream? content) || content is null)
+            if (!FromAnywhere(null, file))
             {
                 Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{file}\" not found"));
                 return ImmutableArray<ParsedFile>.Empty;
             }
-            collected.AddRange(CollectAll(null, content, file, basePath, tokenizerSettings));
         }
 
         if (additionalImports is not null)
         {
             foreach (string additionalImport in additionalImports)
             {
-                IEnumerable<Uri> query = GetFileQuery(additionalImport, null, basePath);
-                if (!FromAnywhere(null, query, out Stream? subContent, out Uri? subFile) ||
-                    subContent is null)
+                IEnumerable<Uri> query = GetFileQuery(additionalImport, null, BasePath);
+                if (!FromAnywhere(null, query, out _))
                 {
                     Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{additionalImport}\" not found"));
                     continue;
                 }
-
-                collected.AddRange(CollectAll(null, subContent, subFile, basePath, tokenizerSettings));
             }
         }
 
-        return collected.ToImmutableArray();
+        while (PendingFiles.Count > 0)
+        {
+#if UNITY
+#else
+            PendingFiles[0].Task.Wait();
+#endif
+            ProcessPendingFiles();
+        }
+
+        return ParsedFiles.ToImmutableArray();
     }
 
     public static ImmutableArray<ParsedFile> Collect(
         Uri? file,
-        PrintCallback? printCallback,
         string? basePath,
         DiagnosticsCollection diagnostics,
         IEnumerable<string> preprocessorVariables,
@@ -282,7 +386,7 @@ public class SourceCodeManager
         FileParser? fileParser,
         IEnumerable<string>? additionalImports)
     {
-        SourceCodeManager sourceCodeManager = new(diagnostics, printCallback, preprocessorVariables, fileParser);
-        return sourceCodeManager.Entry(file, basePath, tokenizerSettings, additionalImports);
+        SourceCodeManager sourceCodeManager = new(diagnostics, preprocessorVariables, fileParser, tokenizerSettings, basePath);
+        return sourceCodeManager.Entry(file, additionalImports);
     }
 }

@@ -639,7 +639,7 @@ public sealed class Compiler
 
     CompilerResult CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
     {
-        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, PrintCallback, Settings.BasePath, Diagnostics, PreprocessorVariables, TokenizerSettings, fileParser, additionalImports);
+        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, Settings.BasePath, Diagnostics, PreprocessorVariables, TokenizerSettings, fileParser, additionalImports);
 
         foreach (ParsedFile parsedFile in parsedFiles)
         { AddAST(parsedFile, parsedFile.File != file); }
@@ -670,7 +670,6 @@ public sealed class Compiler
     {
         ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(
             null,
-            PrintCallback,
             Settings.BasePath,
             Diagnostics,
             PreprocessorVariables,

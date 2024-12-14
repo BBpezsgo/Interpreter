@@ -295,10 +295,11 @@ public class SourceCodeManager
 #if UNITY
                 UnityEngine.AwaitableCompletionSource<Stream?> task = new();
                 task.SetResult(content);
+                PendingFiles.Add(new PendingFile(file, initiator, task.Awaitable));
 #else
                 Task<Stream?> task = Task.FromResult<Stream?>(content);
+                PendingFiles.Add(new PendingFile(file, initiator, task));
 #endif
-                PendingFiles.Add(new PendingFile(file, initiator, task.Awaitable));
                 return true;
             }
         }
@@ -310,10 +311,11 @@ public class SourceCodeManager
 #if UNITY
                 UnityEngine.AwaitableCompletionSource<Stream?> task = new();
                 task.SetResult(content);
+                PendingFiles.Add(new PendingFile(file, initiator, task.Awaitable));
 #else
                 Task<Stream?> task = Task.FromResult<Stream?>(content);
+                PendingFiles.Add(new PendingFile(file, initiator, task));
 #endif
-                PendingFiles.Add(new PendingFile(file, initiator, task.Awaitable));
                 return true;
             }
         }

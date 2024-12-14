@@ -615,11 +615,26 @@ public partial class CodeGeneratorForMain : CodeGenerator
             StatementWithValue throwValue = keywordCall.Arguments[0];
             GeneralType throwType = FindStatementType(throwValue);
 
-            GenerateCodeForStatement(throwValue);
-            using (RegisterUsage.Auto reg = Registers.GetFree())
+            if (throwValue is LiteralStatement literalThrowValue &&
+                literalThrowValue.Type == LiteralType.String)
             {
-                PopTo(reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
-                AddInstruction(Opcode.Crash, reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
+                for (int i = literalThrowValue.Value.Length - 1; i >= 0; i--)
+                {
+                    Push(new InstructionOperand(
+                        literalThrowValue.Value[i],
+                        InstructionOperandType.Immediate16
+                    ));
+                }
+                AddInstruction(Opcode.Crash, Register.StackPointer);
+            }
+            else
+            {
+                GenerateCodeForStatement(throwValue);
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    PopTo(reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
+                    AddInstruction(Opcode.Crash, reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
+                }
             }
 
             return;

@@ -57,7 +57,7 @@ struct Stack
 
     T Pop()
     {
-        if (!this._length) crash 0;
+        if (!this._length) crash "Stack is empty";
         this._length--;
         return this._array[this._length];
     }

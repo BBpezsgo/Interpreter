@@ -10,7 +10,11 @@ const BlockHeader SizeMask = 0x7fffffff;
 
 alias bool u8;
 
+#if BRAINFUCK
 const int HeapSize = 127;
+#else
+const int HeapSize = 512;
+#endif
 const int HeaderSize = sizeof(BlockHeader);
 
 const bool true = (bool)1;
@@ -82,12 +86,12 @@ bool JoinFreeBlocks()
 [Builtin("alloc")]
 export any* Alloc(int sizeNeed)
 {
-    if (sizeNeed <= 0) { crash 0; }
+    if (sizeNeed <= 0) { crash "Bruh"; }
 
     BlockHeader* headerPointer = 0 as BlockHeader*;
     while (true)
     {
-        if (headerPointer >= HeapSize) { crash 0; }
+        if (headerPointer >= HeapSize) { crash "Out of memory"; }
 
         int blockSize;
         bool blockUsed;

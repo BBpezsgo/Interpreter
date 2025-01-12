@@ -2979,7 +2979,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         StatementWithValue condition = InlineMacro(statement.Condition, parameters);
 
-        if (!InlineMacro(statement.Block, parameters, out Block? block))
+        if (!InlineMacro(statement.Block, parameters, out Statement? block))
         { return false; }
 
         inlined = new WhileLoop(
@@ -3273,7 +3273,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     {
         Block v => FindControlFlowUsage(v.Statements, true),
         KeywordCall v => FindControlFlowUsage(v, inDepth),
-        WhileLoop v => FindControlFlowUsage(v.Block.Statements, true),
+        WhileLoop v => FindControlFlowUsage(v.Block, true),
         ForLoop v => FindControlFlowUsage(v.Block.Statements, true),
         IfContainer v => FindControlFlowUsage(v.Branches, true),
         BaseBranch v => FindControlFlowUsage(v.Block, true),

@@ -1257,8 +1257,8 @@ public sealed class Parser
         if (!ExpectOperator(")", out Token? bracketEnd))
         { throw new SyntaxException($"Expected \")\" after while-loop condition", condition.Position.After(), File); }
 
-        if (!ExpectBlock(out Block? block))
-        { throw new SyntaxException("Expected block", bracketEnd.Position.After(), File); }
+        if (!ExpectStatement(out Statement.Statement? block))
+        { throw new SyntaxException($"Expected a statement after \"{keyword}\" condition", bracketEnd.Position.After(), File); }
 
         whileLoop = new WhileLoop(keyword, condition, block, File);
         return true;

@@ -288,6 +288,17 @@ public abstract class GeneralType :
 
         if (defined.Is(out PointerType? definedPointerType) && passed.Is(out PointerType? passedPointerType))
         {
+            if (definedPointerType.To is ArrayType definedArrayType && passedPointerType.To is ArrayType passedArrayType)
+            {
+                if (definedArrayType.ComputedLength.HasValue)
+                {
+                    if (!passedArrayType.ComputedLength.HasValue) return false;
+                    if (definedArrayType.ComputedLength.Value != passedArrayType.ComputedLength.Value) return false;
+                }
+
+                return TryGetTypeParameters(definedArrayType.Of, passedArrayType.Of, typeParameters);
+            }
+
             return TryGetTypeParameters(definedPointerType.To, passedPointerType.To, typeParameters);
         }
 

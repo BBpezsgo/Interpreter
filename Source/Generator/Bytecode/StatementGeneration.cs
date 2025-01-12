@@ -1870,6 +1870,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(WhileLoop whileLoop)
     {
+        Block block = Block.CreateIfNotBlock(whileLoop.Block);
+
         if (AllowEvaluating &&
             TryCompute(whileLoop.Condition, out CompiledValue condition))
         {
@@ -1878,20 +1880,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"While loop condition evaluated as true", whileLoop.Condition));
                 AddComment("while (1) {");
 
-                OnScopeEnter(whileLoop.Block, false);
+                OnScopeEnter(block, false);
 
                 int beginOffset = GeneratedCode.Count;
 
                 BreakInstructions.Push(new List<int>());
 
-                GenerateCodeForStatement(whileLoop.Block, true);
+                GenerateCodeForStatement(block, true);
 
                 AddComment("Jump Back");
                 AddInstruction(Opcode.Jump, beginOffset - GeneratedCode.Count);
 
                 FinishJumpInstructions(BreakInstructions.Last);
 
-                OnScopeExit(whileLoop.Block.Brackets.End.Position, whileLoop.Block.File);
+                OnScopeExit(whileLoop.Block.Position.After(), whileLoop.Block.File);
 
                 BreakInstructions.Pop();
 
@@ -1907,7 +1909,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("while (...) {");
 
-        OnScopeEnter(whileLoop.Block, false);
+        OnScopeEnter(block, false);
 
         AddComment("Condition");
         int conditionOffset = GeneratedCode.Count;
@@ -1925,7 +1927,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         BreakInstructions.Push(new List<int>());
 
-        GenerateCodeForStatement(whileLoop.Block, true);
+        GenerateCodeForStatement(block, true);
 
         AddComment("Jump Back");
         AddInstruction(Opcode.Jump, conditionOffset - GeneratedCode.Count);
@@ -1934,7 +1936,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GeneratedCode[conditionJumpOffset].Operand1 = GeneratedCode.Count - conditionJumpOffset;
 
-        OnScopeExit(whileLoop.Block.Brackets.End.Position, whileLoop.Block.File);
+        OnScopeExit(whileLoop.Block.Position.After(), whileLoop.Block.File);
 
         AddComment("}");
 

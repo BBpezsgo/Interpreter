@@ -100,7 +100,24 @@ public class SourceCodeManager
             PendingFile finishedFile = PendingFiles[i];
             PendingFiles.RemoveAt(i--);
 
-            Stream? content = awaiter.GetResult();
+            Stream? content;
+
+            try
+            {
+                content = awaiter.GetResult();
+            }
+            catch (FileNotFoundException)
+            {
+                content = null;
+            }
+            catch (Exception ex)
+            {
+                if (finishedFile.Initiator is null)
+                { Diagnostics.Add(DiagnosticWithoutContext.Critical(ex.Message)); }
+                else
+                { Diagnostics.Add(Diagnostic.Critical(ex.Message, finishedFile.Initiator)); }
+                break;
+            }
 
             if (content is null)
             {

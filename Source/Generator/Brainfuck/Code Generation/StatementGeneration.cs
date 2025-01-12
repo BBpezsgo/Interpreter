@@ -1423,7 +1423,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             Code.CommentLine($"Condition result at {conditionAddress}");
 
-            ControlFlowBlock? breakBlock = BeginBreakBlock(new Location(@while.Block.Brackets.Start.Position, @while.Block.File), FindControlFlowUsage(@while.Block.Statements));
+            ControlFlowBlock? breakBlock = BeginBreakBlock(new Location(@while.Block.Position.Before(), @while.Block.File), FindControlFlowUsage(@while.Block));
 
             using (Code.LoopBlock(this, conditionAddress))
             {

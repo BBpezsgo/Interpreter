@@ -467,7 +467,7 @@ public ref partial struct ProcessorState
         }
     }
 
-    void Push(int data, BitWidth size)
+    public void Push(int data, BitWidth size)
     {
         Registers.StackPointer += (int)size * StackDirection;
         SetData(Registers.StackPointer, data, size);
@@ -482,7 +482,7 @@ public ref partial struct ProcessorState
         }
     }
 
-    int Pop(BitWidth size)
+    public int Pop(BitWidth size)
     {
         if (Registers.StackPointer >= Memory.Length ||
             Registers.StackPointer < 0)
@@ -498,7 +498,7 @@ public ref partial struct ProcessorState
         return data;
     }
 
-    void Push(scoped ReadOnlySpan<byte> data)
+    public void Push(scoped ReadOnlySpan<byte> data)
     {
         Registers.StackPointer += data.Length * StackDirection;
         Memory.Set(Registers.StackPointer, data);
@@ -513,7 +513,15 @@ public ref partial struct ProcessorState
         }
     }
 
-    Span<byte> Pop(int size)
+    public unsafe void Push<T>(scoped ReadOnlySpan<T> data) where T : unmanaged
+    {
+        fixed (void* ptr = data)
+        {
+            Push(new ReadOnlySpan<byte>(ptr, data.Length * sizeof(T)));
+        }
+    }
+
+    public Span<byte> Pop(int size)
     {
         if (Registers.StackPointer >= Memory.Length ||
             Registers.StackPointer < Settings.HeapSize)

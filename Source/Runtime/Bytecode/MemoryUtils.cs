@@ -19,6 +19,7 @@ public static unsafe class MemoryUtils
 
     public static void Set<T>(this nint memory, T value) where T : unmanaged => *(T*)memory = value;
     public static void Set<T>(this nint memory, int ptr, T data) where T : unmanaged => *(T*)(memory + ptr) = data;
+    public static void Set(this nint memory, int ptr, ReadOnlySpan<byte> data) => data.CopyTo(memory + ptr);
     public static T Get<T>(this nint memory, int ptr) where T : unmanaged => *(T*)(memory + ptr);
 
     #endregion

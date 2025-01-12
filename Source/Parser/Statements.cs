@@ -1407,7 +1407,7 @@ public class Pointer : StatementWithValue
     }
 }
 
-public class WhileLoop : StatementWithBlock
+public class WhileLoop : StatementWithAnyBlock
 {
     public Token KeywordToken { get; }
     public StatementWithValue Condition { get; }
@@ -1418,7 +1418,7 @@ public class WhileLoop : StatementWithBlock
     public WhileLoop(
         Token keyword,
         StatementWithValue condition,
-        Block block,
+        Statement block,
         Uri file) : base(block, file)
     {
         KeywordToken = keyword;

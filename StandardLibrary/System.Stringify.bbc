@@ -1,0 +1,79 @@
+using System.String;
+using System.Memory;
+using System.Math;
+
+export string ToString(this u8 number)
+{
+	if (number == 0)
+    { return "0"; }
+
+	u8 v = number;
+
+    int numberLength = Log10(v) + 2;
+
+	string result = new char[numberLength]*;
+    result[numberLength - 1] = '\0';
+
+    int i = numberLength - 2;
+	while (v > 0)
+	{
+        u8 rem = v % (u8)10;
+        result[i] = ((char)rem) + '0';
+		v = v / 10;
+        i--;
+	}
+
+	return result;
+}
+
+export string ToString(this i32 number)
+{
+	if (number == 0)
+    { return "0"; }
+    
+	i32 v = number;
+
+	byte isNegative = v < 0;
+	if (isNegative)
+	{ v = 0 - v; }
+    
+    int numberLength = Log10(v) + 2;
+    if (isNegative)
+    { numberLength++; }
+
+	string result = new char[numberLength]*;
+    result[numberLength - 1] = '\0';
+
+    if (isNegative)
+    {
+        result[0] = '-'; 
+    }
+    
+    int i = numberLength - 2;
+	while (v > 0)
+	{
+        i32 rem = v % 10;
+        result[i] = ((char)rem) + '0';
+		v = v / 10;
+        i--;
+	}
+
+	return result;
+}
+
+template<T>
+export string ToString(List<T>* list)
+{
+    string result = "";
+    
+    int length = list.Length();
+    for (int i; i < length; i++)
+    {
+        if (i > 0)
+        { result = (temp result) + ", "; }
+
+        result = (temp result) + (temp list.Raw()[i].ToString());
+    }
+    
+    return "{ " + (temp result) + " }";
+}

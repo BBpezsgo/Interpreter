@@ -1,3 +1,38 @@
+export const f32 NEG_ZERO = 0b_1_00000000_00000000000000000000000 as f32;
+export const f32 POSITIVE_INFINITY = 1f / 0f;
+export const f32 NEGATIVE_INFINITY = -1f / 0f;
+
+export inline byte IsNaN(this f32 v)
+{
+    return (
+        (v as i32) & 0b_0_11111111_00000000000000000000000
+    ) == 0b_0_11111111_00000000000000000000000;
+}
+
+/*
+ * Source: https://en.wikipedia.org/wiki/Lehmer_random_number_generator
+ */
+export int Random(int state)
+{
+	// Precomputed parameters for Schrage's method
+	int M = 0x7fffffff;
+	int A = 48271;
+	int Q = M / A;    // 44488
+	int R = M % A;    //  3399
+
+	int div = state / Q;	// max: M / Q = A = 48,271
+	int rem = state % Q;	// max: Q - 1     = 44,487
+
+	int s = rem * A;	// max: 44,487 * 48,271 = 2,147,431,977 = 0x7fff3629
+	int t = div * R;	// max: 48,271 *  3,399 =   164,073,129
+	int result = s - t;
+
+	if (result < 0)
+    { result += M; };
+    
+	return result;
+}
+
 /*
  * Calculates the sine of `x` using the Taylor series
  *

@@ -8,10 +8,6 @@ export void Clear()
     Print("\e[H");
 }
 
-//
-//  == PRINT ==
-//
-
 [External("stdout")]
 export void Print(char message);
 
@@ -244,9 +240,15 @@ export void Print(f32 message)
     message = (message % 1f) * 10f;
     Print((int)message);
     message = (message % 1f) * 10f;
-    Print((int)message);
-    message = (message % 1f) * 10f;
-    Print((int)message);
+    if (message)
+    {
+        Print((int)message);
+        message = (message % 1f) * 10f;
+        if (message)
+        {
+            Print((int)message);
+        }
+    }
 }
 
 export void Print(temp string message)
@@ -255,13 +257,6 @@ export void Print(temp string message)
     {
         Print(message[i]);
     }
-}
-
-template<T>
-export inline void PrintLine(List<T>* list)
-{
-	Print(list);
-	PrintLine();
 }
 
 template<T>
@@ -294,10 +289,33 @@ export void Print(List<T>* list)
 	Print(" }");
 }
 
+template<T>
+export void Print(T[]* list, int length)
+{
+	if (!list)
+	{
+		Print("{ }");
+		return;
+	}
+	
+	if (!length)
+	{
+		Print("{ }");
+		return;
+	}
+	
+	Print("{ ");
+	
+    for (int i = 0; i < length; i++)
+    {
+        if (i > 0)
+        { Print(", "); }
 
-//
-//  == PRINT LINE ==
-//
+        Print(list[i]);
+    }
+
+	Print(" }");
+}
 
 export inline void PrintLine()
 {
@@ -311,57 +329,19 @@ export inline void PrintLine(temp string message)
     PrintLine();
 }
 
-export inline void PrintLine(char message)
+template<T>
+export inline void PrintLine(T value)
 {
-    Print(message);
+    Print(value);
     PrintLine();
 }
 
-export inline void PrintLine(int message)
+template<T>
+export inline void PrintLine(T[]* array, int length)
 {
-    Print(message);
+    Print(array, length);
     PrintLine();
 }
-
-export inline void PrintLine(f32 message)
-{
-    Print(message);
-    PrintLine();
-}
-
-export inline void PrintLine(u8 message)
-{
-    Print(message);
-    PrintLine();
-}
-
-export inline void PrintLine(i8 message)
-{
-    Print(message);
-    PrintLine();
-}
-
-export inline void PrintLine(u16 message)
-{
-    Print(message);
-    PrintLine();
-}
-
-export inline void PrintLine(i16 message)
-{
-    Print(message);
-    PrintLine();
-}
-
-export inline void PrintLine(u32 message)
-{
-    Print(message);
-    PrintLine();
-}
-
-//
-//  == INPUT ==
-//
 
 [External("stdin")]
 char StdIn();

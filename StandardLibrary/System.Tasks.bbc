@@ -1,10 +1,32 @@
 using System.Lists;
 using System.Memory;
 
+struct PCB
+{
+    i32 _bp;
+    i32 _ip;
+    i32 _sp;
+}
+
 struct Task
 {
+    any* _stack;
+    u8 _yielded;
+    PCB _pcb;
+    PCB _parent;
     void(Task*) _work;
     void(Task*) _callback;
+}
+
+export void SwitchContext(PCB* pcb)
+{
+    EAX = pcb._bp;
+    EBX = pcb._sp;
+    ECX = pcb._ip;
+
+    BP = EAX;
+    SP = EBX;
+    IP = ECX;
 }
 
 temp List<Task> _tasks = new List<Task>(8);
@@ -13,6 +35,7 @@ export void Schedule(void(Task*) task)
 {
     Task _task = new Task;
     _task._work = task;
+    _task._stack = new byte[256]*;
     (&_tasks).Add(_task);
 }
 
@@ -21,6 +44,7 @@ export void Schedule(void(Task*) task, void(Task*) callback)
     Task _task = new Task;
     _task._work = task;
     _task._callback = callback;
+    _task._stack = new byte[256]*;
     (&_tasks).Add(_task);
 }
 
@@ -28,10 +52,33 @@ u8 RunNext()
 {
     int length = (&_tasks).Length();
     if (length == 0) { return (u8)0; }
-    Task task = (&_tasks).Remove(0);
+    Task task = (&_tasks)[0];
 
-    task._work(&task);
+    task._parent._bp = BP;
+    task._parent._sp = SP;
+    task._parent._ip = _yield as i32;
 
+    if (task._yielded)
+    {
+        task._yielded = (u8)0;
+        SwitchContext(&task._pcb);
+    }
+    else
+    {
+        ECX = &task as i32;
+        EDX = task._work as i32;
+        SP = task._stack as i32 + 255;
+        BP = SP;
+        IP = EDX + 1;
+        // ((void(Task*))EDX)(ECX as Task*);
+    }
+
+    _yield:
+
+    if (task._yielded) return (u8)1;
+
+    delete task._stack;
+    (&_tasks).Remove(0);
     if (task._callback) Schedule(task._callback);
     return (u8)1;
 }

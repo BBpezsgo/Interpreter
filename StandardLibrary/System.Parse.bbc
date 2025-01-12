@@ -1,0 +1,45 @@
+using System.String;
+using System.Memory;
+using System.Math;
+
+export int ParseInt(temp string v)
+{
+    if (v.IsNullOrEmpty())
+    { return 0; }
+
+    byte isNegative = (v[0] == '-');
+    int start = 0;
+    int result = 0;
+    
+    if (isNegative)
+    { start = 1; }
+
+    for (int i = start; v[i]; i++)
+    {
+        char digit = v[i];
+        result *= 10;
+        result += (digit - '0');
+    }
+    
+    if (isNegative)
+    { result *= -1; }
+
+    return result;
+}
+
+export byte ParseByte(temp string v)
+{
+    if (v.IsNullOrEmpty())
+    { return (byte)0; }
+
+    byte result = (byte)0;
+    
+    for (int i = 0; v[i]; i++)
+    {
+        char digit = v[i];
+        result *= (byte)10;
+        result += (byte)(digit - '0');
+    }
+    
+    return result;
+}

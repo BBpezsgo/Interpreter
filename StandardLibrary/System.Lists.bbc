@@ -1,6 +1,4 @@
-using System;
 using System.Memory;
-using System.String;
 
 template<T>
 struct List
@@ -15,22 +13,6 @@ struct List
 
     export T[]* Raw() { return this._ptr; }
 
-    export string ToString()
-    {
-        string result = "";
-        
-        int length = this._length;
-        for (int i; i < length; i++)
-        {
-            if (i > 0)
-            { result = (temp result) + ", "; }
-
-            result = (temp result) + (temp this._ptr[i].ToString());
-        }
-        
-        return "{ " + (temp result) + " }";
-    }
-    
     export T indexer_get(int index)
     {
         if (index < 0 || index >= this._length)

@@ -1,0 +1,34 @@
+using System.Math;
+using System.Vectors;
+
+export struct byte2
+{
+    i8 x;
+    i8 y;
+
+    export byte2(i8 x, i8 y)
+    {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+export void ToByte2(float2* a, byte2* b)
+{
+    b.x = (i8)(int)Round(a.x);
+    b.y = (i8)(int)Round(a.y);
+}
+
+export float Distance(byte2 a, byte2 b)
+{
+    int dx = (int)a.x - (int)b.x;
+    int dy = (int)a.y - (int)b.y;
+    return Sqrt((float)((dx * dx) + (dy * dy)));
+}
+
+export float DistanceSqr(byte2 a, byte2 b)
+{
+    int dx = (int)a.x - (int)b.x;
+    int dy = (int)a.y - (int)b.y;
+    return (float)((dx * dx) + (dy * dy));
+}

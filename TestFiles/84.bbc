@@ -2,7 +2,7 @@ using System.Console;
 using System.Vectors;
 using System.Math;
 
-void PrintLine(Vector2 v)
+void PrintLine(float2 v)
 {
     Print('(');
     Print(v.x);
@@ -12,8 +12,8 @@ void PrintLine(Vector2 v)
     PrintLine();
 }
 
-Vector2 v1 = new Vector2(8f, 0f);
-Vector2 v2 = new Vector2(1f, 0f);
+float2 v1 = new float2(8f, 0f);
+float2 v2 = new float2(1f, 0f);
 
 PrintLine(v1);
 PrintLine(v2);

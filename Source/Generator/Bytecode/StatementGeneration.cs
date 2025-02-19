@@ -2307,7 +2307,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 PushFrom(new AddressOffset(
                     new AddressRegisterPointer(reg.Get(PointerBitWidth)),
                     fieldOffset
-                    ), fieldDefinition.Type.GetSize(this, Diagnostics, fieldDefinition));
+                    ), (GeneralType.InsertTypeParameters(fieldDefinition.Type, structPointerType.TypeArguments) ?? fieldDefinition.Type).GetSize(this, Diagnostics, fieldDefinition));
             }
             return;
         }
@@ -2960,7 +2960,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             statementToSet.Reference = fieldDefinition;
             fieldDefinition.References.AddReference(statementToSet);
 
-            if (!CanCastImplicitly(valueType, fieldDefinition.Type, value, out PossibleDiagnostic? castError1))
+            if (!CanCastImplicitly(valueType, GeneralType.InsertTypeParameters(fieldDefinition.Type, structType.TypeArguments) ?? fieldDefinition.Type, value, out PossibleDiagnostic? castError1))
             {
                 Diagnostics.Add(castError1.ToError(value));
             }

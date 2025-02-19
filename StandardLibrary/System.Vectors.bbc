@@ -1,2 +1,4 @@
 using System.float2;
 using System.byte2;
+using System.float3;
+using System.byte3;

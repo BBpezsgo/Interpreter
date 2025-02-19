@@ -1,0 +1,77 @@
+using System.Math;
+using System.Vectors;
+
+export struct float3
+{
+    float x;
+    float y;
+    float z;
+
+    export float3(float x, float y, float z)
+    {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+}
+
+export void ToFloat3(byte3* a, float3* b)
+{
+    int _x = (int)a.x;
+    int _y = (int)a.y;
+    int _z = (int)a.z;
+    if (_x > 127) { _x = -256 + _x; }
+    if (_y > 127) { _y = -256 + _y; }
+    if (_z > 127) { _z = -256 + _z; }
+    b.x = (f32)_x;
+    b.y = (f32)_y;
+    b.z = (f32)_z;
+}
+
+export float Distance(float3 a, float3 b)
+{
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    float dz = a.z - b.z;
+    return Sqrt((dx * dx) + (dy * dy) + (dz * dz));
+}
+
+export float DistanceSqr(float3 a, float3 b)
+{
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    float dz = a.z - b.z;
+    return (dx * dx) + (dy * dy) + (dz * dz);
+}
+
+export float Dot(float3 a, float3 b)
+{
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
+}
+
+export float Magnitude(this float3 v)
+{
+    return Sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
+}
+
+export float Magnitude(this float3* v)
+{
+    return Sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
+}
+
+export float3 Normalised(this float3 v)
+{
+    float d = v.Magnitude();
+    v.x /= d;
+    v.y /= d;
+    v.z /= d;
+    return v;
+}
+
+export void Normalise(float3* v)
+{
+    float d = v.Magnitude();
+    v.x /= d;
+    v.y /= d;
+    v.z /= d;
+}

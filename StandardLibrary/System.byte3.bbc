@@ -37,3 +37,6 @@ export float DistanceSqr(byte3 a, byte3 b)
     int dz = (int)a.z - (int)b.z;
     return (float)((dx * dx) + (dy * dy) + (dz * dz));
 }
+
+export byte3 +(byte3 a, byte3 b) { return new byte3(a.x + b.x, a.y + b.y, a.z + b.z); }
+export byte3 -(byte3 a, byte3 b) { return new byte3(a.x - b.x, a.y - b.y, a.z - b.z); }

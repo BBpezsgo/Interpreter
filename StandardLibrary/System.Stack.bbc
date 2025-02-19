@@ -1,7 +1,7 @@
 using System.Memory;
 
 template<T>
-struct Stack
+export struct Stack
 {
     private T[]* _array;
     private int _length;
@@ -29,7 +29,7 @@ struct Stack
         this._array = newArray;
     }
 
-    void Push(T item)
+    export void Push(T item)
     {
         if (!this._array)
         {
@@ -54,14 +54,14 @@ struct Stack
         this._length++;
     }
 
-    T Pop()
+    export T Pop()
     {
         if (!this._length) crash "Stack is empty";
         this._length--;
         return this._array[this._length];
     }
 
-    destructor()
+    export destructor()
     {
         if (this._array) delete this._array;
     }

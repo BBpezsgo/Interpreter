@@ -1,0 +1,167 @@
+using System.Memory;
+
+int GetHash(int v)
+{
+    return v;
+}
+
+int GetHash(float v)
+{
+    return v as int;
+}
+
+int GetHash(string v)
+{
+    int hash = 181;
+    char c = str[0];
+
+    while (c)
+    {
+        hash = ((hash << 5) + hash) + c;
+        v += sizeof(char);
+        c = str[0];
+    }
+
+    return hash;
+}
+
+u8 Equals(int a, int b)
+{
+    return a == b;
+}
+
+u8 Equals(float a, float b)
+{
+    return a == b;
+}
+
+u8 Equals(string a, string b)
+{
+    if (a == b) return (u8)1;
+    if (a == 0 || b == 0) return (u8)0;
+    int i = 0;
+    while (1)
+    {
+        if (a[i] != b[i]) return (u8)0;
+        if (a[i] == (char)0) break;
+    }
+    return (u8)1;
+}
+
+template<TKey, TValue>
+struct Pair
+{
+    TKey Key;
+    TValue Value;
+
+    Pair<TKey, TValue>*(TKey key, TValue value)
+    {
+        this.Key = key;
+        this.Value = value;
+    }
+}
+
+template<TKey, TValue>
+struct HashMap
+{
+    private int _capacity;
+    private int _length;
+    private Pair<TKey, TValue>*[]* _ptr;
+
+    void EnsureCapacity(int capacity)
+    {
+        if (this._capacity >= capacity) return;
+
+        int newCapacity = this._capacity * 2;
+        if (!newCapacity) newCapacity = 4;
+
+        var old = this._ptr;
+
+        this._ptr = new Pair<TKey, TValue>*[newCapacity]*;
+        this._length = 0;
+        this._capacity = newCapacity;
+
+        if (old)
+        {
+            for (int i = this._capacity - 1; i >= 0; i--)
+            {
+                if (old[i]) this.Add(old[i].Key, old[i].Value);
+            }
+            delete old;
+        }
+    }
+
+    export u8 Get(TKey key, TValue* value)
+    {
+        int hash = GetHash(key);
+        int i = hash % this._capacity;
+        int started = i;
+
+        while (this._ptr[i])
+        {
+            if (Equals(this._ptr[i].Key, key))
+            {
+                *value = this._ptr[i].Value;
+                return (u8)1;
+            }
+
+            i++;
+            if (i >= this._capacity) i = 0;
+            if (started == i) break;
+        }
+
+        return (u8)0;
+    }
+
+    export u8 Add(TKey key, TValue value)
+    {
+        this.EnsureCapacity(this._length + 1);
+
+        int hash = GetHash(key);
+        int i = hash % this._capacity;
+
+        while (this._ptr[i])
+        {
+            i++;
+            if (i >= this._capacity) i = 0;
+        }
+
+        this._ptr[i] = new Pair<TKey, TValue>*(key, value);
+        this._length++;
+    }
+
+    export u8 Remove(TKey key)
+    {
+        int hash = GetHash(key);
+        int i = hash % this._capacity;
+        int started = i;
+
+        while (this._ptr[i])
+        {
+            if (Equals(this._ptr[i].Key, key))
+            {
+                this._ptr[i] = 0;
+                this._length--;
+                return (u8)1;
+            }
+
+            i++;
+            if (i >= this._capacity) i = 0;
+            if (started == i) break;
+        }
+
+        return (u8)0;
+    }
+
+    export destructor()
+    {
+        if (this._ptr)
+        {
+            for (int i = this._capacity - 1; i >= 0; i--)
+            {
+                if (this._ptr[i]) delete this._ptr[i];
+            }
+            delete this._ptr;
+        }
+    }
+}

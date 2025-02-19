@@ -1,0 +1,12 @@
+using System.Memory;
+using System.Console;
+using System.HashMap;
+
+temp HashMap<int, int>* map = new HashMap<int, int>*;
+int v;
+
+map.Add(175, 34);
+
+v = 0;
+PrintLine(map.Get(175, &v));
+PrintLine(v);

@@ -90,5 +90,5 @@ export float2 Rotated(float2 v, f32 angle)
 export float2 +(float2 a, float2 b) { return new float2(a.x + b.x, a.y + b.y); }
 export float2 -(float2 a, float2 b) { return new float2(a.x - b.x, a.y - b.y); }
 
-export float2 *(float2 a, float b) { return new float2(a.x * b, a.y * b); }
+// export float2 *(float2 a, float b) { return new float2(a.x * b, a.y * b); }
 export float2 /(float2 a, float b) { return new float2(a.x / b, a.y / b); }

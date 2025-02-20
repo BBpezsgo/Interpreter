@@ -3284,6 +3284,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         ShortOperatorCall => ControlFlowUsage.None,
         CompoundAssignment => ControlFlowUsage.None,
         BinaryOperatorCall => ControlFlowUsage.None,
+        Identifier => ControlFlowUsage.None,
 
         _ => throw new NotImplementedException(statement.GetType().Name),
     };

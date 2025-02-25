@@ -13,13 +13,13 @@ int GetHash(float v)
 int GetHash(string v)
 {
     int hash = 181;
-    char c = str[0];
+    char c = v[0];
 
     while (c)
     {
         hash = ((hash << 5) + hash) + c;
         v += sizeof(char);
-        c = str[0];
+        c = v[0];
     }
 
     return hash;

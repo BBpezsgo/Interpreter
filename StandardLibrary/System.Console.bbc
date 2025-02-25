@@ -1,6 +1,7 @@
 using System.String;
 using System.Memory;
 using System.Lists;
+using System.Math;
 
 export void Clear()
 {

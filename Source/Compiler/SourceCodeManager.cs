@@ -226,10 +226,10 @@ public class SourceCodeManager
         Uri file,
         [NotNullWhen(true)] out Stream? content)
     {
-        Output.LogDebug($"  Download file \"{file}\" ...");
+        Output.LogInfo($"  Download file \"{file}\" ...");
 
         using HttpClient client = new();
-        using Task<HttpResponseMessage> getTask = client.GetAsync(file, HttpCompletionOption.ResponseHeadersRead);
+        using Task<HttpResponseMessage> getTask = client.GetAsync(file);
         try
         {
             getTask.Wait();
@@ -252,7 +252,9 @@ public class SourceCodeManager
             return false;
         }
 
-        content = res.Content.ReadAsStream();
+        Task<byte[]> _content = res.Content.ReadAsByteArrayAsync();
+        _content.Wait();
+        content = new MemoryStream(_content.Result);
         return true;
     }
 
@@ -295,7 +297,9 @@ public class SourceCodeManager
 
         if (FileParser is not null)
         {
+#pragma warning disable IDE0008 // Use explicit type
             var task = FileParser.Invoke(file);
+#pragma warning restore IDE0008
             if (task is not null)
             {
                 CompiledUris.Add(file);

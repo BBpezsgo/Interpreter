@@ -37,10 +37,9 @@ public class SourceCodeManager
     readonly FileParser? FileParser;
     readonly List<PendingFile> PendingFiles;
     readonly List<ParsedFile> ParsedFiles;
-    readonly TokenizerSettings? TokenizerSettings;
     readonly string? BasePath;
 
-    public SourceCodeManager(DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, FileParser? fileParser, TokenizerSettings? tokenizerSettings, string? basePath)
+    public SourceCodeManager(DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, FileParser? fileParser, string? basePath)
     {
         CompiledUris = new();
         Diagnostics = diagnostics;
@@ -48,7 +47,6 @@ public class SourceCodeManager
         FileParser = fileParser;
         PendingFiles = new();
         ParsedFiles = new();
-        TokenizerSettings = tokenizerSettings;
         BasePath = basePath;
     }
 
@@ -90,12 +88,13 @@ public class SourceCodeManager
         }
     }
 
-#if UNITY
     void ProcessPendingFiles()
     {
         for (int i = 0; i < PendingFiles.Count; i++)
         {
-            UnityEngine.Awaitable<Stream?>.Awaiter awaiter = PendingFiles[i].Task.GetAwaiter();
+#pragma warning disable IDE0008 // Use explicit type
+            var awaiter = PendingFiles[i].Task.GetAwaiter();
+#pragma warning restore IDE0008
             if (!awaiter.IsCompleted) break;
             PendingFile finishedFile = PendingFiles[i];
             PendingFiles.RemoveAt(i--);
@@ -133,7 +132,7 @@ public class SourceCodeManager
                 Diagnostics,
                 PreprocessorVariables,
                 finishedFile.Uri,
-                TokenizerSettings,
+                TokenizerSettings.Default,
                 null,
                 null);
 
@@ -155,72 +154,6 @@ public class SourceCodeManager
             }
         }
     }
-#else
-    void ProcessPendingFiles()
-    {
-        for (int i = 0; i < PendingFiles.Count; i++)
-        {
-            if (!PendingFiles[i].Task.IsCompleted) break;
-            PendingFile finishedFile = PendingFiles[i];
-            PendingFiles.RemoveAt(i--);
-
-            if (finishedFile.Task.IsCanceled)
-            {
-                if (finishedFile.Initiator is null)
-                { Diagnostics.Add(DiagnosticWithoutContext.Critical($"Failed to collect the necessary files: operation cancelled")); }
-                else
-                { Diagnostics.Add(Diagnostic.Critical($"Failed to collect the necessary files: operation cancelled", finishedFile.Initiator)); }
-                break;
-            }
-
-            if (finishedFile.Task.IsFaulted)
-            {
-                if (finishedFile.Initiator is null)
-                { Diagnostics.Add(DiagnosticWithoutContext.Critical($"Failed to collect the necessary files: {finishedFile.Task.Exception}")); }
-                else
-                { Diagnostics.Add(Diagnostic.Critical($"Failed to collect the necessary files: {finishedFile.Task.Exception}", finishedFile.Initiator)); }
-                break;
-            }
-
-            Stream? content = finishedFile.Task.Result;
-
-            if (content is null)
-            {
-                if (finishedFile.Initiator is null)
-                { Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{finishedFile.Uri}\" not found")); }
-                else
-                { Diagnostics.Add(Diagnostic.Critical($"File \"{finishedFile.Uri}\" not found", finishedFile.Initiator)); }
-                break;
-            }
-
-            TokenizerResult tokens = StreamTokenizer.Tokenize(
-                content,
-                Diagnostics,
-                PreprocessorVariables,
-                finishedFile.Uri,
-                TokenizerSettings,
-                null,
-                null);
-
-            ParserResult ast = Parser.Parser.Parse(tokens.Tokens, finishedFile.Uri, Diagnostics);
-
-            if (ast.Usings.Any())
-            { Output.LogDebug("Loading files ..."); }
-
-            ParsedFiles.Add(new ParsedFile(finishedFile.Uri, finishedFile.Initiator, tokens, ast));
-
-            foreach (UsingDefinition @using in ast.Usings)
-            {
-                IEnumerable<Uri> query = GetFileQuery(@using.PathString, finishedFile.Uri, BasePath);
-                if (!FromAnywhere(@using, query, out _))
-                {
-                    Diagnostics.Add(Diagnostic.Critical($"File \"{@using.PathString}\" not found", @using));
-                    continue;
-                }
-            }
-        }
-    }
-#endif
 
     static bool FromWeb(
         Uri file,
@@ -405,11 +338,10 @@ public class SourceCodeManager
         string? basePath,
         DiagnosticsCollection diagnostics,
         IEnumerable<string> preprocessorVariables,
-        TokenizerSettings? tokenizerSettings,
         FileParser? fileParser,
         IEnumerable<string>? additionalImports)
     {
-        SourceCodeManager sourceCodeManager = new(diagnostics, preprocessorVariables, fileParser, tokenizerSettings, basePath);
+        SourceCodeManager sourceCodeManager = new(diagnostics, preprocessorVariables, fileParser, basePath);
         return sourceCodeManager.Entry(file, additionalImports);
     }
 }

@@ -38,9 +38,7 @@ public static class Interactive
                 externalFunctions,
                 new CompilerSettings() { BasePath = "/home/BB/Projects/BBLang/Core/StandardLibrary" },
                 PreprocessorVariables.Interactive,
-                null,
                 diagnostics,
-                null,
                 Utils.AssemblyFile);
 
             generated = CodeGeneratorForMain.Generate(

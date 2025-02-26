@@ -276,22 +276,18 @@ public sealed class Compiler
     readonly Stack<ImmutableArray<Token>> GenericParameters = new();
 
     readonly CompilerSettings Settings;
-    readonly TokenizerSettings? TokenizerSettings;
     readonly ImmutableArray<IExternalFunction> ExternalFunctions;
-    readonly PrintCallback? PrintCallback;
     readonly ImmutableArray<UserDefinedAttribute> UserDefinedAttributes;
 
     readonly DiagnosticsCollection Diagnostics;
     readonly IEnumerable<string> PreprocessorVariables;
 
-    Compiler(IEnumerable<IExternalFunction>? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
+    Compiler(IEnumerable<IExternalFunction>? externalFunctions, CompilerSettings settings, DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
     {
         ExternalFunctions = (externalFunctions ?? Enumerable.Empty<IExternalFunction>()).ToImmutableArray();
         Settings = settings;
-        PrintCallback = printCallback;
         Diagnostics = diagnostics;
         PreprocessorVariables = preprocessorVariables;
-        TokenizerSettings = tokenizerSettings;
         UserDefinedAttributes = (userDefinedAttributes ?? Enumerable.Empty<UserDefinedAttribute>()).ToImmutableArray();
     }
 
@@ -639,7 +635,7 @@ public sealed class Compiler
 
     CompilerResult CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
     {
-        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, Settings.BasePath, Diagnostics, PreprocessorVariables, TokenizerSettings, fileParser, additionalImports);
+        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, Settings.BasePath, Diagnostics, PreprocessorVariables, fileParser, additionalImports);
 
         foreach (ParsedFile parsedFile in parsedFiles)
         { AddAST(parsedFile, parsedFile.File != file); }
@@ -673,7 +669,6 @@ public sealed class Compiler
             Settings.BasePath,
             Diagnostics,
             PreprocessorVariables,
-            TokenizerSettings,
             null,
             new string[] { "Primitives", "System" }
         );
@@ -1032,20 +1027,16 @@ public sealed class Compiler
         IEnumerable<IExternalFunction>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback,
         DiagnosticsCollection diagnostics,
-        TokenizerSettings? tokenizerSettings = null,
         FileParser? fileParser = null,
         IEnumerable<string>? additionalImports = null,
         IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
     {
         Compiler compiler = new(
             externalFunctions,
-            printCallback,
             settings,
             diagnostics,
             preprocessorVariables,
-            tokenizerSettings,
             userDefinedAttributes);
         return compiler.CompileMainFile(file, fileParser, additionalImports);
     }
@@ -1055,19 +1046,15 @@ public sealed class Compiler
         IEnumerable<IExternalFunction>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
-        PrintCallback? printCallback,
         DiagnosticsCollection diagnostics,
-        TokenizerSettings? tokenizerSettings,
         Uri file,
         IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
     {
         Compiler compiler = new(
             externalFunctions,
-            printCallback,
             settings,
             diagnostics,
             preprocessorVariables,
-            tokenizerSettings,
             userDefinedAttributes);
         return compiler.CompileInteractiveInternal(statement, file);
     }

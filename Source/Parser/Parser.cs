@@ -278,7 +278,19 @@ public sealed class Parser
         { CurrentTokenIndex = parseStart; return false; }
 
         if (!ExpectOperator(OverloadableOperators, out Token? possibleName))
-        { CurrentTokenIndex = parseStart; return false; }
+        {
+            if (OverloadableOperators.Contains("*") &&
+                possibleType is TypeInstancePointer _possibleTypePointer)
+            {
+                possibleType = _possibleTypePointer.To;
+                possibleName = _possibleTypePointer.Operator;
+            }
+            else
+            {
+                CurrentTokenIndex = parseStart;
+                return false;
+            }
+        }
 
         if (!ExpectOperator("(", out Token? bracketStart))
         { CurrentTokenIndex = parseStart; return false; }

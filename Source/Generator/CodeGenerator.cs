@@ -1,4 +1,4 @@
-using LanguageCore.Parser;
+﻿using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;

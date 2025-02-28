@@ -1,4 +1,4 @@
-﻿using LanguageCore.Parser;
+using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
@@ -3285,6 +3285,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         CompoundAssignment => ControlFlowUsage.None,
         BinaryOperatorCall => ControlFlowUsage.None,
         Identifier => ControlFlowUsage.None,
+        ConstructorCall => ControlFlowUsage.None,
+        Field => ControlFlowUsage.None,
 
         _ => throw new NotImplementedException(statement.GetType().Name),
     };
@@ -3990,7 +3992,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         };
     }
 
-    protected bool TryEvaluate(CompiledFunction function, ImmutableArray<StatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement[]? runtimeStatements)
+    protected bool TryEvaluate<TFunction>(TFunction function, ImmutableArray<StatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement[]? runtimeStatements)
+        where TFunction : FunctionThingDefinition, ICompiledFunction
     {
         value = default;
         runtimeStatements = default;

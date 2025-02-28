@@ -10,7 +10,8 @@ public class CompiledOperator : FunctionDefinition,
     IInContext<CompiledStruct?>,
     ITemplateable<CompiledOperator>,
     ICompiledFunction,
-    IHaveInstructionOffset
+    IHaveInstructionOffset,
+    IExternalFunctionDefinition
 {
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
 

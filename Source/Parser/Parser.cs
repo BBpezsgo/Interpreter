@@ -326,7 +326,7 @@ public sealed class Parser
             { expectParameter = true; }
         }
 
-        CheckModifiers(modifiers, ProtectionKeywords.Export);
+        CheckModifiers(modifiers, FunctionModifiers.AsSpan());
 
         Block? block = null;
 

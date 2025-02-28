@@ -852,66 +852,66 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("}");
     }
 
-    void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
+    void GenerateCodeForFunctionCall<TFunction>(StatementWithValue caller, ImmutableArray<StatementWithValue> arguments, TFunction callee)
+        where TFunction : FunctionThingDefinition, ICompiledFunction, IExportable, ISimpleReadable, ILocated, IExternalFunctionDefinition, IHaveInstructionOffset
     {
-        compiledFunction.References.Add(new Reference<StatementWithValue?>(functionCall, functionCall.File));
-        OnGotStatementType(functionCall, compiledFunction.Type);
+        OnGotStatementType(caller, callee.Type);
 
-        if (!compiledFunction.CanUse(functionCall.File))
+        if (!callee.CanUse(caller.File))
         {
-            Diagnostics.Add(Diagnostic.Error($"Function \"{compiledFunction.ToReadable()}\" could not be called due to its protection level", functionCall.Identifier));
+            Diagnostics.Add(Diagnostic.Error($"Function \"{callee.ToReadable()}\" could not be called due to its protection level", caller));
             return;
         }
 
-        if (functionCall.MethodArguments.Length != compiledFunction.ParameterCount)
+        if (arguments.Length != callee.Parameters.Count)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{compiledFunction.ToReadable()}\": required {compiledFunction.ParameterCount} passed {functionCall.MethodArguments.Length}", functionCall));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{callee.ToReadable()}\": required {callee.ParameterCount} passed {arguments.Length}", caller));
             return;
         }
 
-        if (compiledFunction.IsExternal)
+        if (callee.IsExternal)
         {
-            if (!ExternalFunctions.TryGet(compiledFunction.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
+            if (!ExternalFunctions.TryGet(callee.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
             {
-                Diagnostics.Add(exception.ToError(functionCall.Identifier));
+                Diagnostics.Add(exception.ToError(caller));
                 AddComment("}");
                 return;
             }
 
-            GenerateCodeForFunctionCall_External(functionCall.MethodArguments, functionCall.SaveValue, compiledFunction, externalFunction);
+            GenerateCodeForFunctionCall_External(arguments, caller.SaveValue, callee, externalFunction);
             return;
         }
 
         if (AllowEvaluating &&
-            TryEvaluate(compiledFunction, functionCall.MethodArguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
+            TryEvaluate(callee, arguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
-            functionCall.PredictedValue = returnValue.Value;
-            if (!functionCall.SaveValue)
+            caller.PredictedValue = returnValue.Value;
+            if (!caller.SaveValue)
             {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"Function call fully trimmed", functionCall));
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Function call fully trimmed", caller));
             }
             else
             {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"Function evaluated with result \"{returnValue.Value}\"", functionCall));
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Function evaluated with result \"{returnValue.Value}\"", caller));
                 Push(returnValue.Value);
             }
             return;
         }
 
         if (AllowFunctionInlining &&
-            compiledFunction.IsInlineable)
+            callee.IsInlineable)
         {
-            if (InlineMacro(compiledFunction, functionCall.MethodArguments, out Statement? inlined))
+            if (InlineMacro(callee, arguments, out Statement? inlined))
             {
                 bool argumentsAreObservable = false;
-                foreach (StatementWithValue argument in functionCall.MethodArguments)
+                foreach (StatementWithValue argument in arguments)
                 {
                     if (IsObservable(argument))
                     {
                         argumentsAreObservable = true;
-                        Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{compiledFunction.ToReadable()}\" because of this argument", argument));
+                        Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because of this argument", argument));
                         break;
                     }
                 }
@@ -919,20 +919,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (!argumentsAreObservable)
                 {
                     ControlFlowUsage controlFlowUsage = inlined is Block _block2 ? FindControlFlowUsage(_block2.Statements) : FindControlFlowUsage(inlined);
-                    if (!compiledFunction.ReturnSomething &&
+                    if (!callee.ReturnSomething &&
                         controlFlowUsage == ControlFlowUsage.None)
                     {
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", functionCall));
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", caller));
                         GenerateCodeForStatement(inlined);
                         return;
                     }
-                    else if (compiledFunction.ReturnSomething &&
+                    else if (callee.ReturnSomething &&
                              controlFlowUsage == ControlFlowUsage.None &&
                              inlined is StatementWithValue statementWithValue)
                     {
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", functionCall));
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", caller));
                         GeneralType type = FindStatementType(statementWithValue);
-                        if (!CanCastImplicitly(type, compiledFunction.Type, statementWithValue, this, out PossibleDiagnostic? castError))
+                        if (!CanCastImplicitly(type, callee.Type, statementWithValue, this, out PossibleDiagnostic? castError))
                         { Diagnostics.Add(castError.ToError(statementWithValue)); }
                         GenerateCodeForStatement(inlined);
                         return;
@@ -945,36 +945,54 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else
             {
-                Diagnostics.Add(Diagnostic.Warning($"Failed to inline \"{compiledFunction.ToReadable()}\"", functionCall));
+                Diagnostics.Add(Diagnostic.Warning($"Failed to inline \"{callee.ToReadable()}\"", caller));
             }
         }
 
-        AddComment($"Call \"{compiledFunction.ToReadable()}\" {{");
+        AddComment($"Call \"{callee.ToReadable()}\" {{");
 
         Stack<ParameterCleanupItem> parameterCleanup;
 
-        if (compiledFunction.ReturnSomething)
+        if (callee.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            StackAlloc(compiledFunction.Type.GetSize(this, Diagnostics, compiledFunction), false);
+            StackAlloc(callee.Type.GetSize(this, Diagnostics, callee), false);
             AddComment($"}}");
         }
 
-        parameterCleanup = GenerateCodeForArguments(functionCall.MethodArguments, compiledFunction);
+        parameterCleanup = GenerateCodeForArguments(arguments, callee);
 
         AddComment(" .:");
 
-        int jumpInstruction = Call(compiledFunction.InstructionOffset, functionCall);
+        int jumpInstruction = Call(callee.InstructionOffset, caller);
 
-        if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, functionCall, compiledFunction)); }
+        if (callee.InstructionOffset == InvalidFunctionAddress)
+        {
+            switch (callee)
+            {
+                case CompiledFunction v:
+                    UndefinedFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
+                    break;
+                case CompiledOperator v:
+                    UndefinedOperatorFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
+                    break;
+                case CompiledConstructor v:
+                    UndefinedConstructorOffsets.Add(new(jumpInstruction, false, caller, v));
+                    break;
+                case CompiledGeneralFunction v:
+                    UndefinedGeneralFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
-        if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
+        if (callee.ReturnSomething && !caller.SaveValue)
         {
             AddComment(" Clear Return Value:");
-            Pop(compiledFunction.Type.GetSize(this, Diagnostics, compiledFunction));
+            Pop(callee.Type.GetSize(this, Diagnostics, callee));
         }
 
         AddComment("}");
@@ -1032,7 +1050,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (anyCall.PrevStatement is IReferenceableTo<CompiledFunction> _ref1)
             { _ref1.Reference = compiledFunction; }
 
-            GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
+            compiledFunction.References.Add(new(anyCall, anyCall.File));
+            GenerateCodeForFunctionCall(functionCall, functionCall.MethodArguments, compiledFunction);
 
             if (functionCall.CompiledType is not null)
             { OnGotStatementType(anyCall, functionCall.CompiledType); }
@@ -1152,6 +1171,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
 
+            GenerateCodeForFunctionCall(@operator, @operator.Arguments, operatorDefinition);
+
+            /*
             if (!operatorDefinition.CanUse(@operator.File))
             {
                 Diagnostics.Add(Diagnostic.Error($"Operator \"{operatorDefinition.ToReadable()}\" cannot be called due to its protection level", @operator.Operator, @operator.File));
@@ -1199,6 +1221,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             AddComment("}");
+            */
         }
         else if (LanguageOperators.BinaryOperators.Contains(@operator.Operator.Content))
         {
@@ -2362,13 +2385,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (GetIndexGetter(prevType, indexType, index.File, out FunctionQueryResult<CompiledFunction>? indexer, out PossibleDiagnostic? notFoundError, AddCompilable))
         {
-            GenerateCodeForFunctionCall_Function(new FunctionCall(
-                    index.PrevStatement,
-                    new(Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerGet), index.File),
-                    ImmutableArray.Create(index.Index),
-                    index.Brackets,
-                    index.File
-                ), indexer.Function);
+            indexer.Function.References.Add(new(index, index.File));
+            GenerateCodeForFunctionCall(index, ImmutableArray.Create(index.PrevStatement, index.Index), indexer.Function);
             return;
         }
 
@@ -3010,13 +3028,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (GetIndexSetter(prevType, valueType, indexType, statementToSet.File, out FunctionQueryResult<CompiledFunction>? indexer, out PossibleDiagnostic? indexerNotFoundError, AddCompilable))
         {
-            GenerateCodeForFunctionCall_Function(new FunctionCall(
-                statementToSet.PrevStatement,
-                new(Token.CreateAnonymous(BuiltinFunctionIdentifiers.IndexerSet), statementToSet.File),
-                ImmutableArray.Create<StatementWithValue>(statementToSet.Index, value),
-                statementToSet.Brackets,
-                statementToSet.File
-            ), indexer.Function);
+            indexer.Function.References.Add(new(statementToSet, statementToSet.File));
+            GenerateCodeForFunctionCall(statementToSet, ImmutableArray.Create<StatementWithValue>(statementToSet.PrevStatement, statementToSet.Index, value), indexer.Function);
             return;
         }
 

@@ -7,11 +7,11 @@ struct List
     private int _length;
     private T[]* _ptr;
 
-    export int Length() { return this._length; }
+    export inline int Length() { return this._length; }
 
-    export void Clear() { this._length = 0; }
+    export inline void Clear() { this._length = 0; }
 
-    export T[]* Raw() { return this._ptr; }
+    export inline T[]* Raw() { return this._ptr; }
 
     export T indexer_get(int index)
     {

@@ -11,7 +11,8 @@ public class CompiledConstructor : ConstructorDefinition,
     ITemplateable<CompiledConstructor>,
     IHaveInstructionOffset,
     ICompiledFunction,
-    IIdentifiable<GeneralType>
+    IIdentifiable<GeneralType>,
+    IExternalFunctionDefinition
 {
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
 
@@ -24,6 +25,9 @@ public class CompiledConstructor : ConstructorDefinition,
     IReadOnlyList<ParameterDefinition> ICompiledFunction.Parameters => Parameters;
     IReadOnlyList<GeneralType> ICompiledFunction.ParameterTypes => ParameterTypes;
     GeneralType IIdentifiable<GeneralType>.Identifier => Type;
+
+    bool IExternalFunctionDefinition.IsExternal => false;
+    string? IExternalFunctionDefinition.ExternalFunctionName => null;
 
     public CompiledConstructor(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
     {

@@ -249,3 +249,10 @@ public interface IHaveAttributes
 {
     public ImmutableArray<AttributeUsage> Attributes { get; }
 }
+
+public interface IExternalFunctionDefinition
+{
+    [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
+    bool IsExternal { get; }
+    string? ExternalFunctionName { get; }
+}

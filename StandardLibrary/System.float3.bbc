@@ -44,17 +44,17 @@ export float DistanceSqr(float3 a, float3 b)
     return (dx * dx) + (dy * dy) + (dz * dz);
 }
 
-export float Dot(float3 a, float3 b)
+export inline float Dot(float3 a, float3 b)
 {
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
 }
 
-export float Magnitude(this float3 v)
+export inline float Magnitude(this float3 v)
 {
     return Sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
 }
 
-export float Magnitude(this float3* v)
+export inline float Magnitude(this float3* v)
 {
     return Sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
 }
@@ -76,8 +76,8 @@ export void Normalise(float3* v)
     v.z /= d;
 }
 
-export float3 +(float3 a, float3 b) { return new float3(a.x + b.x, a.y + b.y, a.z + b.z); }
-export float3 -(float3 a, float3 b) { return new float3(a.x - b.x, a.y - b.y, a.z - b.z); }
+export inline float3 +(float3 a, float3 b) { return new float3(a.x + b.x, a.y + b.y, a.z + b.z); }
+export inline float3 -(float3 a, float3 b) { return new float3(a.x - b.x, a.y - b.y, a.z - b.z); }
 
-export float3 *(float3 a, float b) { return new float3(a.x * b, a.y * b, a.z * b); }
-export float3 /(float3 a, float b) { return new float3(a.x / b, a.y / b, a.z / b); }
+export inline float3 *(float3 a, float b) { return new float3(a.x * b, a.y * b, a.z * b); }
+export inline float3 /(float3 a, float b) { return new float3(a.x / b, a.y / b, a.z / b); }

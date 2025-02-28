@@ -38,5 +38,5 @@ export float DistanceSqr(byte3 a, byte3 b)
     return (float)((dx * dx) + (dy * dy) + (dz * dz));
 }
 
-export byte3 +(byte3 a, byte3 b) { return new byte3(a.x + b.x, a.y + b.y, a.z + b.z); }
-export byte3 -(byte3 a, byte3 b) { return new byte3(a.x - b.x, a.y - b.y, a.z - b.z); }
+export inline byte3 +(byte3 a, byte3 b) { return new byte3(a.x + b.x, a.y + b.y, a.z + b.z); }
+export inline byte3 -(byte3 a, byte3 b) { return new byte3(a.x - b.x, a.y - b.y, a.z - b.z); }

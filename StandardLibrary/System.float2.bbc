@@ -37,22 +37,22 @@ export float DistanceSqr(float2 a, float2 b)
     return (dx * dx) + (dy * dy);
 }
 
-export float Dot(float2 a, float2 b)
+export inline float Dot(float2 a, float2 b)
 {
     return (a.x * b.x) + (a.y * b.y);
 }
 
-export float Cross(float2 a, float2 b)
+export inline float Cross(float2 a, float2 b)
 {
     return a.x * b.y - a.y * b.x;
 }
 
-export float Magnitude(this float2 v)
+export inline float Magnitude(this float2 v)
 {
     return Sqrt((v.x * v.x) + (v.y * v.y));
 }
 
-export float Magnitude(this float2* v)
+export inline float Magnitude(this float2* v)
 {
     return Sqrt((v.x * v.x) + (v.y * v.y));
 }
@@ -87,8 +87,8 @@ export float2 Rotated(float2 v, f32 angle)
     );
 }
 
-export float2 +(float2 a, float2 b) { return new float2(a.x + b.x, a.y + b.y); }
-export float2 -(float2 a, float2 b) { return new float2(a.x - b.x, a.y - b.y); }
+export inline float2 +(float2 a, float2 b) { return new float2(a.x + b.x, a.y + b.y); }
+export inline float2 -(float2 a, float2 b) { return new float2(a.x - b.x, a.y - b.y); }
 
-export float2 *(float2 a, float b) { return new float2(a.x * b, a.y * b); }
-export float2 /(float2 a, float b) { return new float2(a.x / b, a.y / b); }
+export inline float2 *(float2 a, float b) { return new float2(a.x * b, a.y * b); }
+export inline float2 /(float2 a, float b) { return new float2(a.x / b, a.y / b); }

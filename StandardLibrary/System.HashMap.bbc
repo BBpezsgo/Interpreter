@@ -1,11 +1,11 @@
 using System.Memory;
 
-int GetHash(int v)
+inline int GetHash(int v)
 {
     return v;
 }
 
-int GetHash(float v)
+inline int GetHash(float v)
 {
     return v as int;
 }
@@ -25,12 +25,12 @@ int GetHash(string v)
     return hash;
 }
 
-u8 Equals(int a, int b)
+inline u8 Equals(int a, int b)
 {
     return a == b;
 }
 
-u8 Equals(float a, float b)
+inline u8 Equals(float a, float b)
 {
     return a == b;
 }

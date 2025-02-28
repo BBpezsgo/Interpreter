@@ -8,17 +8,12 @@ const BlockHeader StatusFlag = 0x80000000;
 const BlockHeader SizeMask = 0x7fffffff;
 #endif
 
-alias bool u8;
-
 #if BRAINFUCK
 const int HeapSize = 127;
 #else
 const int HeapSize = 512;
 #endif
 const int HeaderSize = sizeof(BlockHeader);
-
-const bool true = (bool)1;
-const bool false = (bool)0;
 
 #if BRAINFUCK
 #else

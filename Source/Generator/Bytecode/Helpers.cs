@@ -318,9 +318,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddInstruction(Opcode.MathSub, Register.StackPointer, size);
             ScopeSizes.LastRef += size;
             if (ScopeSizes.Last >= Settings.StackSize)
-            {
-                throw null!;
-            }
+            { Diagnostics.Add(new DiagnosticWithoutContext(DiagnosticsLevel.Warning, "Stack will overflow")); }
             return;
         }
 
@@ -645,9 +643,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddInstruction(Opcode.Push, value);
         ScopeSizes.LastRef += (int)value.BitWidth;
         if (ScopeSizes.Last >= Settings.StackSize)
-        {
-            throw null!;
-        }
+        { Diagnostics.Add(new DiagnosticWithoutContext(DiagnosticsLevel.Warning, "Stack will overflow")); }
     }
 
     void CheckPointerNull(Location location, bool preservePointer = true)

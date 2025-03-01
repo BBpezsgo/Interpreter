@@ -2766,9 +2766,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             literalStatement.Type == LiteralType.String &&
             arrayType.ComputedLength.HasValue)
         {
-            if (literalStatement.Value.Length != arrayType.ComputedLength.Value)
+            if (literalStatement.Value.Length >= arrayType.ComputedLength.Value)
             {
-                error = new PossibleDiagnostic($"String literal's length ({literalStatement.Value.Length}) aint match with the array's length ({arrayType.ComputedLength})", literalStatement);
+                error = new PossibleDiagnostic($"String literal is longer ({literalStatement.Value.Length}) the array's length ({arrayType.ComputedLength})", literalStatement);
             }
             literal = literalStatement;
             return true;
@@ -2956,67 +2956,74 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
     {
-        GeneralType prevType = FindStatementType(statementToSet.PrevStatement);
         GeneralType type = FindStatementType(statementToSet);
         GeneralType valueType = FindStatementType(value, type);
 
-        if (prevType.Is(out PointerType? pointerType))
-        {
-            if (!pointerType.To.Is(out StructType? structType))
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Failed to get the field offsets of type \"{pointerType.To}\"", statementToSet.PrevStatement));
-                return;
-            }
-
-            if (!structType.GetField(statementToSet.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset, out PossibleDiagnostic? error))
-            {
-                Diagnostics.Add(error.ToError(statementToSet.Identifier, statementToSet.File));
-                return;
-            }
-
-            statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
-            statementToSet.Reference = fieldDefinition;
-            fieldDefinition.References.AddReference(statementToSet);
-
-            if (!CanCastImplicitly(valueType, GeneralType.InsertTypeParameters(fieldDefinition.Type, structType.TypeArguments) ?? fieldDefinition.Type, value, out PossibleDiagnostic? castError1))
-            {
-                Diagnostics.Add(castError1.ToError(value));
-            }
-
-            GenerateCodeForStatement(value, type);
-            PopTo(statementToSet.PrevStatement, fieldOffset, valueType.GetSize(this, Diagnostics, value));
-            return;
-        }
-
-        if (!prevType.Is<StructType>())
-        { throw new NotImplementedException(); }
-
-        if (!CanCastImplicitly(valueType, type, value, out PossibleDiagnostic? castError2))
-        {
-            Diagnostics.Add(castError2.ToError(value));
-        }
-
-        GenerateCodeForStatement(value, type);
-
         StatementWithValue? dereference = NeedDereference(statementToSet);
 
-        if (dereference is null)
+        if (IsStringOnStack(type, value, out LiteralStatement? stackString, out PossibleDiagnostic? stackStringError))
         {
-            if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error2))
+            if (stackStringError != null) Diagnostics.Add(stackStringError.ToError(stackString));
+
+            if (dereference is null)
             {
-                Diagnostics.Add(error2.ToError(statementToSet));
-                return;
+                if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error2))
+                {
+                    Diagnostics.Add(error2.ToError(statementToSet));
+                    return;
+                }
+                for (int i = 0; i < stackString.Value.Length; i++)
+                {
+                    Push(new CompiledValue(stackString.Value[i]));
+                    PopTo(new AddressOffset(address, i * 2), 2);
+                }
+                Push(new CompiledValue('\0'));
+                PopTo(new AddressOffset(address, stackString.Value.Length * 2), 2);
             }
-            PopTo(address, valueType.GetSize(this, Diagnostics, value));
+            else
+            {
+                if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error))
+                {
+                    Diagnostics.Add(error.ToError(statementToSet));
+                    return;
+                }
+                for (int i = 0; i < stackString.Value.Length; i++)
+                {
+                    Push(new CompiledValue(stackString.Value[i]));
+                    PopTo(new AddressOffset(address, i * 2), 2, dereference.Location);
+                }
+                Push(new CompiledValue('\0'));
+                PopTo(new AddressOffset(address, stackString.Value.Length * 2), 2, dereference.Location);
+            }
         }
         else
         {
-            if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error))
+
+            if (!CanCastImplicitly(valueType, type, value, out PossibleDiagnostic? castError2))
             {
-                Diagnostics.Add(error.ToError(statementToSet));
-                return;
+                Diagnostics.Add(castError2.ToError(value));
             }
-            PopTo(address, valueType.GetSize(this, Diagnostics, value), dereference.Location);
+
+            GenerateCodeForStatement(value, type);
+
+            if (dereference is null)
+            {
+                if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error2))
+                {
+                    Diagnostics.Add(error2.ToError(statementToSet));
+                    return;
+                }
+                PopTo(address, valueType.GetSize(this, Diagnostics, value));
+            }
+            else
+            {
+                if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error))
+                {
+                    Diagnostics.Add(error.ToError(statementToSet));
+                    return;
+                }
+                PopTo(address, valueType.GetSize(this, Diagnostics, value), dereference.Location);
+            }
         }
     }
     void GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value)

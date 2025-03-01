@@ -4636,6 +4636,11 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         return false;
     }
+
+    protected bool IsObservable(ConstructorCall basicTypeCast)
+    {
+        return true;
+    }
     protected bool IsObservable(Statement statement) => statement switch
     {
         Block v => IsObservable(v),
@@ -4655,6 +4660,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Pointer v => IsObservable(v),
         AddressGetter v => IsObservable(v),
         BasicTypeCast v => IsObservable(v),
+        ConstructorCall v => IsObservable(v),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 

@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -2757,7 +2757,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    static bool IsStringOnStack(GeneralType type, StatementWithValue? value, [NotNullWhen(true)] out LiteralStatement? literal, out PossibleDiagnostic? error)
+    static bool IsStringOnStack(GeneralType type, StatementWithValue? value, [NotNullWhen(true)] out LiteralStatement? literal, out int avaliableLength, out PossibleDiagnostic? error)
     {
         error = null;
         if (type.Is(out ArrayType? arrayType) &&
@@ -2766,7 +2766,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             literalStatement.Type == LiteralType.String &&
             arrayType.ComputedLength.HasValue)
         {
-            if (literalStatement.Value.Length >= arrayType.ComputedLength.Value)
+            avaliableLength = arrayType.ComputedLength.Value;
+            if (literalStatement.Value.Length > arrayType.ComputedLength.Value)
             {
                 error = new PossibleDiagnostic($"String literal is longer ({literalStatement.Value.Length}) the array's length ({arrayType.ComputedLength})", literalStatement);
             }
@@ -2775,7 +2776,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            literal = null;
+            avaliableLength = default;
+            literal = default;
             return false;
         }
     }
@@ -2892,7 +2894,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GeneralType valueType = FindStatementType(value, variable.Type);
 
             if (variable.InitialValue is not null &&
-                IsStringOnStack(variable.Type, variable.InitialValue, out LiteralStatement? literal, out PossibleDiagnostic? error))
+                IsStringOnStack(variable.Type, variable.InitialValue, out LiteralStatement? literal, out int avaliableLength, out PossibleDiagnostic? error))
             {
                 if (error is not null) Diagnostics.Add(error.ToError(value));
                 variable.IsInitialized = true;
@@ -2924,7 +2926,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GeneralType valueType = FindStatementType(value, globalVariable.Type);
 
             if (globalVariable.InitialValue is not null &&
-                IsStringOnStack(globalVariable.Type, globalVariable.InitialValue, out LiteralStatement? literal, out PossibleDiagnostic? error))
+                IsStringOnStack(globalVariable.Type, globalVariable.InitialValue, out LiteralStatement? literal, out int avaliableLength, out PossibleDiagnostic? error))
             {
                 if (error is not null) Diagnostics.Add(error.ToError(literal));
 
@@ -2961,7 +2963,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         StatementWithValue? dereference = NeedDereference(statementToSet);
 
-        if (IsStringOnStack(type, value, out LiteralStatement? stackString, out PossibleDiagnostic? stackStringError))
+        if (IsStringOnStack(type, value, out LiteralStatement? stackString, out int avaliableLength, out PossibleDiagnostic? stackStringError))
         {
             if (stackStringError != null) Diagnostics.Add(stackStringError.ToError(stackString));
 
@@ -2977,8 +2979,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     Push(new CompiledValue(stackString.Value[i]));
                     PopTo(new AddressOffset(address, i * 2), 2);
                 }
-                Push(new CompiledValue('\0'));
-                PopTo(new AddressOffset(address, stackString.Value.Length * 2), 2);
+                if (avaliableLength > stackString.Value.Length)
+                {
+                    Push(new CompiledValue('\0'));
+                    PopTo(new AddressOffset(address, stackString.Value.Length * 2), 2);
+                }
             }
             else
             {
@@ -2992,8 +2997,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     Push(new CompiledValue(stackString.Value[i]));
                     PopTo(new AddressOffset(address, i * 2), 2, dereference.Location);
                 }
-                Push(new CompiledValue('\0'));
-                PopTo(new AddressOffset(address, stackString.Value.Length * 2), 2, dereference.Location);
+                if (avaliableLength > stackString.Value.Length)
+                {
+                    Push(new CompiledValue('\0'));
+                    PopTo(new AddressOffset(address, stackString.Value.Length * 2), 2, dereference.Location);
+                }
             }
         }
         else

@@ -21,6 +21,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
     bool AllowEvaluating => !Settings.DontOptimize;
     bool AllowOtherOptimizations => !Settings.DontOptimize;
     bool AllowInstructionLevelOptimizations => !Settings.DontOptimize;
+    bool AllowTrimming => !Settings.DontOptimize;
+
+    GeneratorStatistics _statistics;
 
     #region AddInstruction()
 
@@ -37,13 +40,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Opcode.JumpIfLessOrEqual or
                 Opcode.JumpIfNotEqual) &&
                 instruction.Operand1 == 1)
-            { return; }
+            {
+                _statistics.InstructionLevelOptimizations++;
+                return;
+            }
 
             if ((instruction.Opcode is
                 Opcode.MathAdd or
                 Opcode.MathSub) &&
                 instruction.Operand2 == 0)
-            { return; }
+            {
+                _statistics.InstructionLevelOptimizations++;
+                return;
+            }
         }
 
         // if (GeneratedCode.Count > 0)
@@ -128,6 +137,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
+            Diagnostics.Add(Diagnostic.OptimizationNotice("Function evaluated", size));
+            _statistics.FunctionEvaluations++;
             Push(returnValue.Value);
             return;
         }
@@ -196,6 +207,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
+            _statistics.FunctionEvaluations++;
+            Diagnostics.Add(Diagnostic.OptimizationNotice("Function evaluated", value));
             Push(returnValue.Value);
             return;
         }
@@ -618,6 +631,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (throwValue is LiteralStatement literalThrowValue &&
                 literalThrowValue.Type == LiteralType.String)
             {
+                _statistics.Optimizations++;
+                Diagnostics.Add(Diagnostic.OptimizationNotice("String allocated on stack", throwValue));
                 for (int i = literalThrowValue.Value.Length - 1; i >= 0; i--)
                 {
                     Push(new InstructionOperand(
@@ -897,6 +912,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"Function evaluated with result \"{returnValue.Value}\"", caller));
                 Push(returnValue.Value);
             }
+            _statistics.FunctionEvaluations++;
             return;
         }
 
@@ -923,6 +939,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         controlFlowUsage == ControlFlowUsage.None)
                     {
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", caller));
+                        _statistics.InlinedFunctions++;
                         GenerateCodeForStatement(inlined);
                         return;
                     }
@@ -931,6 +948,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                              inlined is StatementWithValue statementWithValue)
                     {
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", caller));
+                        _statistics.InlinedFunctions++;
                         GeneralType type = FindStatementType(statementWithValue);
                         if (!CanCastImplicitly(type, callee.Type, statementWithValue, this, out PossibleDiagnostic? castError))
                         { Diagnostics.Add(castError.ToError(statementWithValue)); }
@@ -1155,6 +1173,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             TryCompute(@operator, out CompiledValue predictedValue))
         {
             Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{predictedValue}\"", @operator));
+            _statistics.FunctionEvaluations++;
             OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
             @operator.PredictedValue = predictedValue;
 
@@ -1432,6 +1451,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             TryCompute(@operator, out CompiledValue predictedValue))
         {
             Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{predictedValue}\"", @operator));
+            _statistics.FunctionEvaluations++;
             OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
             @operator.PredictedValue = predictedValue;
 
@@ -1898,6 +1918,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (AllowEvaluating &&
             TryCompute(whileLoop.Condition, out CompiledValue condition))
         {
+            _statistics.Precomputations++;
             if (condition)
             {
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"While loop condition evaluated as true", whileLoop.Condition));
@@ -1977,6 +1998,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (AllowEvaluating &&
             TryCompute(forLoop.Condition, out CompiledValue condition))
         {
+            _statistics.Precomputations++;
             if (condition)
             {
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop condition evaluated as true", forLoop.Condition));
@@ -2054,6 +2076,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (AllowEvaluating &&
                     TryCompute(partIf.Condition, out CompiledValue condition))
                 {
+                    _statistics.Precomputations++;
                     if (!condition)
                     {
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"If branch fully trimmed", partIf));
@@ -2103,6 +2126,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (AllowEvaluating &&
                     TryCompute(partElseif.Condition, out CompiledValue condition))
                 {
+                    _statistics.Precomputations++;
                     if (!condition)
                     {
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Else-if branch fully trimmed", partElseif));
@@ -2397,6 +2421,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             if (TryCompute(index.Index, out CompiledValue computedIndexData))
             {
+                _statistics.Precomputations++;
                 index.Index.PredictedValue = computedIndexData;
 
                 if (computedIndexData < 0 || (arrayType.ComputedLength.HasValue && computedIndexData >= arrayType.ComputedLength.Value))
@@ -2404,6 +2429,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 if (GetParameter(identifier.Content, out CompiledParameter? param, out _))
                 {
+                    Diagnostics.Add(Diagnostic.OptimizationNotice("Indexing a parameter", index));
+
                     if (!param.Type.SameAs(arrayType))
                     { throw new NotImplementedException(); }
 
@@ -2415,6 +2442,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 if (GetVariable(identifier.Content, out CompiledVariable? val, out _))
                 {
+                    Diagnostics.Add(Diagnostic.OptimizationNotice("Indexing a variable", index));
+
                     if (!val.Type.SameAs(arrayType))
                     { throw new NotImplementedException(); }
 
@@ -2592,6 +2621,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (statementType.Equals(targetType))
         {
             Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Type, typeCast.File));
+            _statistics.Optimizations++;
             GenerateCodeForStatement(typeCast.PrevStatement);
             return;
         }
@@ -2602,7 +2632,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             prevValue.TryCast(targetBuiltinType.RuntimeType, out CompiledValue castedValue))
         {
             Diagnostics.Add(Diagnostic.OptimizationNotice($"Type cast evaluated, converting {prevValue} to {castedValue}", typeCast));
-
+            _statistics.Precomputations++;
             Push(castedValue);
             return;
         }
@@ -2687,10 +2717,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForStatement(Block block, bool ignoreScope = false)
     {
-        if (!Settings.DontOptimize &&
+        if (AllowTrimming &&
             block.Statements.Length == 0)
         {
             Diagnostics.Add(Diagnostic.OptimizationNotice($"Empty block", block));
+            _statistics.Optimizations++;
             AddComment("Statements { }");
             return;
         }
@@ -2754,31 +2785,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Instructions = (startInstruction, GeneratedCode.Count - 1),
                 Location = statement.Location,
             });
-        }
-    }
-
-    static bool IsStringOnStack(GeneralType type, StatementWithValue? value, [NotNullWhen(true)] out LiteralStatement? literal, out int avaliableLength, out PossibleDiagnostic? error)
-    {
-        error = null;
-        if (type.Is(out ArrayType? arrayType) &&
-            arrayType.Of.SameAs(BasicType.U16) &&
-            value is LiteralStatement literalStatement &&
-            literalStatement.Type == LiteralType.String &&
-            arrayType.ComputedLength.HasValue)
-        {
-            avaliableLength = arrayType.ComputedLength.Value;
-            if (literalStatement.Value.Length > arrayType.ComputedLength.Value)
-            {
-                error = new PossibleDiagnostic($"String literal is longer ({literalStatement.Value.Length}) the array's length ({arrayType.ComputedLength})", literalStatement);
-            }
-            literal = literalStatement;
-            return true;
-        }
-        else
-        {
-            avaliableLength = default;
-            literal = default;
-            return false;
         }
     }
 
@@ -3193,6 +3199,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { computedInitialValue = castedInitialValue; }
 
             Diagnostics.Add(Diagnostic.OptimizationNotice($"Variable initial value evaluated as {castedInitialValue}", newVariable.InitialValue));
+            _statistics.Precomputations++;
 
             newVariable.InitialValue.PredictedValue = computedInitialValue;
 

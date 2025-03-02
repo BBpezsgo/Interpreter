@@ -4665,4 +4665,29 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     };
 
     #endregion
+
+    protected static bool IsStringOnStack(GeneralType type, StatementWithValue? value, [NotNullWhen(true)] out LiteralStatement? literal, out int avaliableLength, out PossibleDiagnostic? error)
+    {
+        error = null;
+        if (type.Is(out ArrayType? arrayType) &&
+            arrayType.Of.SameAs(BasicType.U16) &&
+            value is LiteralStatement literalStatement &&
+            literalStatement.Type == LiteralType.String &&
+            arrayType.ComputedLength.HasValue)
+        {
+            avaliableLength = arrayType.ComputedLength.Value;
+            if (literalStatement.Value.Length > arrayType.ComputedLength.Value)
+            {
+                error = new PossibleDiagnostic($"String literal is longer ({literalStatement.Value.Length}) the array's length ({arrayType.ComputedLength})", literalStatement);
+            }
+            literal = literalStatement;
+            return true;
+        }
+        else
+        {
+            avaliableLength = default;
+            literal = default;
+            return false;
+        }
+    }
 }

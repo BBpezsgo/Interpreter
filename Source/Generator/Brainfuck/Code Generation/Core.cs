@@ -5,15 +5,6 @@ using LanguageCore.Runtime;
 
 namespace LanguageCore.Brainfuck.Generator;
 
-public struct BrainfuckGeneratorResult
-{
-    public string Code;
-    public int Optimizations;
-    public int Precomputations;
-    public int FunctionEvaluations;
-    public DebugInformation? DebugInfo;
-}
-
 [Flags]
 public enum BrainfuckCompilerFlags
 {
@@ -140,6 +131,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
                 Function = Function,
                 Instructions = (InstructionStart, Code.Length),
                 IsValid = true,
+                TypeArguments = TypeArguments?.ToImmutableDictionary(),
             });
         }
     }
@@ -151,9 +143,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         public readonly ImmutableArray<ControlFlowBlock> Returns;
         public readonly ImmutableArray<ControlFlowBlock> Breaks;
 
-        public readonly int Optimizations;
-        public readonly int Precomputations;
-        public readonly int FunctionEvaluations;
+        public readonly GeneratorStatistics Statistics;
 
         public readonly ImmutableArray<IDefinition> CurrentMacro;
 
@@ -169,9 +159,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             Returns = v.Returns.ToImmutableArray();
             Breaks = v.Breaks.ToImmutableArray();
 
-            Optimizations = v.Optimizations;
-            Precomputations = v.Precomputations;
-            FunctionEvaluations = v.FunctionEvaluations;
+            Statistics = v._statistics;
 
             CurrentMacro = v.CurrentMacro.ToImmutableArray();
 
@@ -188,9 +176,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             v.Returns.Set(Returns);
             v.Breaks.Set(Breaks);
 
-            v.Optimizations = Optimizations;
-            v.Precomputations = Precomputations;
-            v.FunctionEvaluations = FunctionEvaluations;
+            v._statistics = Statistics;
 
             v.CurrentMacro.Set(CurrentMacro);
 
@@ -747,7 +733,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         return usages;
     }
 
-    void GenerateTopLevelStatements(ImmutableArray<Statement> statements, Uri file, bool isImported)
+    void GenerateTopLevelStatements(ImmutableArray<Statement> statements, Uri file)
     {
         if (statements.Length == 0) return;
 
@@ -809,7 +795,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         for (int i = 0; i < compilerResult.TopLevelStatements.Length; i++)
         {
             (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[i];
-            GenerateTopLevelStatements(statements, file, i < compilerResult.TopLevelStatements.Length - 1);
+            GenerateTopLevelStatements(statements, file);
         }
 
         if (Settings.ClearGlobalVariablesBeforeExit)
@@ -835,9 +821,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         return new BrainfuckGeneratorResult()
         {
             Code = Code.ToString(),
-            Optimizations = Optimizations,
-            Precomputations = Precomputations,
-            FunctionEvaluations = FunctionEvaluations,
+            Statistics = _statistics,
             DebugInfo = DebugInfo,
         };
     }

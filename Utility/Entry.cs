@@ -135,6 +135,12 @@ public static class Entry
                     }
                 }
 
+                Output.LogDebug($"Optimized {generatedCode.Statistics.Optimizations} statements");
+                Output.LogDebug($"Precomputed {generatedCode.Statistics.Precomputations} statements");
+                Output.LogDebug($"Evaluated {generatedCode.Statistics.FunctionEvaluations} functions");
+                Output.LogDebug($"Inlined {generatedCode.Statistics.InlinedFunctions} functions");
+                Output.LogDebug($"Optimized {generatedCode.Statistics.InstructionLevelOptimizations} instructions");
+
                 if (mainGeneratorSettings.PrintInstructions)
                 {
                     for (int i = 0; i < generatedCode.Code.Length; i++)
@@ -346,9 +352,9 @@ public static class Entry
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Throw();
                     diagnostics.Print();
-                    Output.LogDebug($"Optimized {generated.Optimizations} statements");
-                    Output.LogDebug($"Precomputed {generated.Precomputations} statements");
-                    Output.LogDebug($"Evaluated {generated.FunctionEvaluations} functions");
+                    Output.LogDebug($"Optimized {generated.Statistics.Optimizations} statements");
+                    Output.LogDebug($"Precomputed {generated.Statistics.Precomputations} statements");
+                    Output.LogDebug($"Evaluated {generated.Statistics.FunctionEvaluations} functions");
                 }
                 else
                 {
@@ -359,9 +365,9 @@ public static class Entry
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                         diagnostics.Throw();
                         diagnostics.Print();
-                        Output.LogDebug($"Optimized {generated.Optimizations} statements");
-                        Output.LogDebug($"Precomputed {generated.Precomputations} statements");
-                        Output.LogDebug($"Evaluated {generated.FunctionEvaluations} functions");
+                        Output.LogDebug($"Optimized {generated.Statistics.Optimizations} statements");
+                        Output.LogDebug($"Precomputed {generated.Statistics.Precomputations} statements");
+                        Output.LogDebug($"Evaluated {generated.Statistics.FunctionEvaluations} functions");
                     }
                     catch (LanguageException exception)
                     {

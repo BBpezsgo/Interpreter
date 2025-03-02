@@ -13,9 +13,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     bool AllowEvaluating => !Settings.DontOptimize;
     bool AllowOtherOptimizations => !Settings.DontOptimize;
 
-    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int Optimizations { get; set; }
-    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int Precomputations { get; set; }
-    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int FunctionEvaluations { get; set; }
+    GeneratorStatistics _statistics;
 
     void GenerateAllocator(int size, IPositioned position, Uri file)
     {
@@ -543,7 +541,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (variable.Address == valueVariable.Address)
             {
-                Optimizations++;
+                _statistics.Optimizations++;
                 return;
             }
 
@@ -575,7 +573,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 Code.CopyValue(offsettedSource, offsettedTarget, tempAddress);
             }
 
-            Optimizations++;
+            _statistics.Optimizations++;
 
             variable.IsInitialized = valueVariable.IsInitialized;
 
@@ -606,7 +604,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 Code.SetValue(variable.Address, constantValue);
 
-                Precomputations++;
+                _statistics.Precomputations++;
 
                 VariableCanBeDiscarded = null;
                 variable.IsInitialized = true;
@@ -787,7 +785,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 Code.SetValue(address.Value, constantValue.U8);
 
-                Precomputations++;
+                _statistics.Precomputations++;
 
                 return;
             }
@@ -1813,7 +1811,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     Code.AddValue(variable.Address, constantValue);
 
-                    Precomputations++;
+                    _statistics.Precomputations++;
                     return;
                 }
 
@@ -1874,7 +1872,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     Code.AddValue(variable.Address, -constantValue);
 
-                    Precomputations++;
+                    _statistics.Precomputations++;
                     return;
                 }
 
@@ -1946,7 +1944,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     Code.AddValue(variable.Address, 1);
                 }
 
-                Optimizations++;
+                _statistics.Optimizations++;
                 return;
             }
             case "--":
@@ -1977,7 +1975,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     Code.AddValue(variable.Address, -1);
                 }
 
-                Optimizations++;
+                _statistics.Optimizations++;
                 return;
             }
             default:
@@ -2211,7 +2209,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     Code.MoveValue(offsettedSource, offsettedTarget);
                     DiscardVariable(CompiledVariables, variable.Name);
-                    Optimizations++;
+                    _statistics.Optimizations++;
                 }
                 else
                 {
@@ -2246,7 +2244,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (AllowPrecomputing && TryCompute(statement, out CompiledValue computed))
         {
             Stack.Push(computed);
-            Precomputations++;
+            _statistics.Precomputations++;
             return;
         }
 
@@ -2306,7 +2304,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                             Code.AddValue(resultAddress, -right.U8);
 
-                            Optimizations++;
+                            _statistics.Optimizations++;
 
                             return;
                         }
@@ -2342,7 +2340,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             using (Code.Block(this, $"Snippet MATH_MUL_SELF({leftAddress_})"))
                             {
                                 Code.MATH_MUL_SELF(leftAddress_, v => Stack.GetTemporaryAddress(v, statement));
-                                Optimizations++;
+                                _statistics.Optimizations++;
                                 break;
                             }
                         }
@@ -2682,7 +2680,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (AllowPrecomputing && TryCompute(statement, out CompiledValue computed))
         {
             Stack.Push(computed);
-            Precomputations++;
+            _statistics.Precomputations++;
             return;
         }
 
@@ -3352,7 +3350,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 callerWithValue.SaveValue)
             { Stack.Push(returnValue.Value); }
 
-            FunctionEvaluations++;
+            _statistics.FunctionEvaluations++;
             return;
         }
 

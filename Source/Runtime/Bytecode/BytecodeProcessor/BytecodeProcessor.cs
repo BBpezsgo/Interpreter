@@ -42,14 +42,30 @@ public partial class BytecodeProcessor
             default
         );
 
-        try
+        state.Tick();
+
+        switch (state.Signal)
         {
-            state.Tick();
-        }
-        catch (RuntimeException error)
-        {
-            error.Context = GetContext();
-            throw;
+            case Signal.PointerOutOfRange:
+                throw new RuntimeException($"Pointer out of range ({state.Crash})")
+                {
+                    Context = state.GetContext()
+                };
+            case Signal.StackOverflow:
+                throw new RuntimeException($"Stack overflow")
+                {
+                    Context = state.GetContext()
+                };
+            case Signal.UndefinedExternalFunction:
+                throw new RuntimeException($"Undefined external function {state.Crash}")
+                {
+                    Context = state.GetContext()
+                };
+            case Signal.UserCrash:
+                throw new UserException(HeapUtils.GetString(Memory, state.Crash) ?? string.Empty)
+                {
+                    Context = state.GetContext()
+                };
         }
 
         Registers = state.Registers;

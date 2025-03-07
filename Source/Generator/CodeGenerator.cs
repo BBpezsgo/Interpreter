@@ -1,4 +1,4 @@
-﻿using LanguageCore.Parser;
+using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
@@ -2102,21 +2102,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         return OnGotStatementType(anyCall, functionType.ReturnType);
     }
-    protected BuiltinType FindStatementType(KeywordCall keywordCall)
-    {
-        switch (keywordCall.Identifier.Content)
-        {
-            case StatementKeywords.Return: return OnGotStatementType(keywordCall, BuiltinType.Void);
-            case StatementKeywords.Crash: return OnGotStatementType(keywordCall, BuiltinType.Void);
-            case StatementKeywords.Break: return OnGotStatementType(keywordCall, BuiltinType.Void);
-            case StatementKeywords.Delete: return OnGotStatementType(keywordCall, BuiltinType.Void);
-            default:
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Unknown keyword-function \"{keywordCall.Identifier}\"", keywordCall.Identifier));
-                return OnGotStatementType(keywordCall, BuiltinType.Void);
-            }
-        }
-    }
     protected GeneralType FindStatementType(IndexCall index)
     {
         GeneralType prevType = FindStatementType(index.PrevStatement);
@@ -2607,7 +2592,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             case Field v: return FindStatementType(v);
             case BasicTypeCast v: return FindStatementType(v);
             case ManagedTypeCast v: return FindStatementType(v);
-            case KeywordCall v: return FindStatementType(v);
             case IndexCall v: return FindStatementType(v);
             case ModifiedStatement v: return FindStatementType(v, expectedType);
             case AnyCall v: return FindStatementType(v);
@@ -2736,7 +2720,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             arguments: InlineMacro(keywordCall.Arguments, parameters),
             file: keywordCall.File)
         {
-            SaveValue = keywordCall.SaveValue,
             Semicolon = keywordCall.Semicolon,
         };
 
@@ -2828,6 +2811,12 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
                     inlined = inlined_;
                     return true;
                 }
+                break;
+            }
+
+            case KeywordCall v:
+            {
+                inlined = InlineMacro(v, parameters);
                 break;
             }
 
@@ -3229,7 +3218,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Identifier v => InlineMacro(v, parameters),
         BinaryOperatorCall v => InlineMacro(v, parameters),
         UnaryOperatorCall v => InlineMacro(v, parameters),
-        KeywordCall v => InlineMacro(v, parameters),
         FunctionCall v => InlineMacro(v, parameters),
         AnyCall v => InlineMacro(v, parameters),
         Pointer v => InlineMacro(v, parameters),
@@ -3241,7 +3229,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         ManagedTypeCast v => InlineMacro(v, parameters),
         ModifiedStatement v => InlineMacro(v, parameters),
         TypeStatement v => v,
-        InstructionLabel v => v,
         ConstructorCall v => InlineMacro(v, parameters),
         NewInstance v => InlineMacro(v, parameters),
         LiteralList v => InlineMacro(v, parameters),
@@ -3879,7 +3866,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             BinaryOperatorCall v => TryCompute(v, context, out value),
             UnaryOperatorCall v => TryCompute(v, context, out value),
             Pointer v => TryCompute(v, context, out value),
-            KeywordCall v => TryCompute(v, out value),
             FunctionCall v => TryCompute(v, context, out value),
             AnyCall v => TryCompute(v, context, out value),
             Identifier v => TryCompute(v, context, out value),

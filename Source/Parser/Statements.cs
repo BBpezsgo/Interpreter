@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser.Statement;
@@ -627,7 +627,7 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
     }
 }
 
-public class KeywordCall : StatementWithValue, IReadable
+public class KeywordCall : Statement, IReadable
 {
     public Token IdentifierToken { get; }
     public ImmutableArray<StatementWithValue> Arguments { get; }
@@ -650,7 +650,6 @@ public class KeywordCall : StatementWithValue, IReadable
     public override string ToString()
     {
         StringBuilder result = new();
-        result.Append(SurroundingBracelet?.Start);
 
         result.Append(IdentifierToken);
 
@@ -668,7 +667,6 @@ public class KeywordCall : StatementWithValue, IReadable
             }
         }
 
-        result.Append(SurroundingBracelet?.End);
         result.Append(Semicolon);
         return result.ToString();
     }
@@ -1318,7 +1316,7 @@ public class Identifier : StatementWithValue, IReferenceableTo
     }
 }
 
-public class InstructionLabel : StatementWithValue
+public class InstructionLabel : Statement
 {
     public Identifier Identifier { get; }
     public Token Colon { get; }

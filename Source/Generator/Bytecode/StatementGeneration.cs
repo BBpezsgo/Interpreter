@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -1244,6 +1244,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else if (LanguageOperators.BinaryOperators.Contains(@operator.Operator.Content))
         {
+            if (@operator.Operator.Content is
+                "==" or "!=" or "<" or ">" or "<=" or ">=")
+            {
+                expectedType = null;
+            }
+
             FindStatementType(@operator);
 
             StatementWithValue left = @operator.Left;
@@ -1277,6 +1283,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     (InstructionOperand)StackTop,
                     (InstructionOperand)StackTop);
                 leftType = BuiltinType.F32;
+                leftNType = NumericType.Float;
             }
 
             if (@operator.Operator.Content == BinaryOperatorCall.LogicalAND)
@@ -1313,9 +1320,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddInstruction(Opcode.FTo,
                     (InstructionOperand)StackTop,
                     (InstructionOperand)StackTop);
+                rightType = BuiltinType.F32;
+                rightNType = NumericType.Float;
             }
 
-            if ((leftNType == NumericType.Float) != (rightNType == NumericType.Float))
+            if ((leftNType is NumericType.Float) != (rightNType is NumericType.Float))
             {
                 Diagnostics.Add(notFoundError.ToError(@operator));
                 return;

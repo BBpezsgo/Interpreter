@@ -1,0 +1,28 @@
+template<T>
+export inline int BinarySearch(T[]* values, T element, int length)
+{
+    return BinarySearch(values, element, 0, length - 1);
+}
+
+template<T>
+export int BinarySearch(T[]* values, T element, int left, int right)
+{
+    while (left < right)
+    {
+        int middle = left + ((right - left) / 2);
+        T value = values[middle];
+        if (value == element)
+        {
+            return middle;
+        }
+        else if (value < element)
+        {
+            left = middle;
+        }
+        else
+        {
+            right = middle;
+        }
+    }
+    return -1;
+}

@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Tokenizing;
@@ -175,6 +175,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         else
         {
             type = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
+
+            if (type is ArrayType arrayType &&
+                variableDeclaration.InitialValue is LiteralList literalList &&
+                arrayType.Length is null)
+            {
+                arrayType = new ArrayType(arrayType.Of, null, literalList.Values.Length);
+            }
+
             variableDeclaration.Type.SetAnalyzedType(type);
         }
 
@@ -616,49 +624,63 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (variable.Type.Is(out ArrayType? arrayType))
             {
-                if (arrayType.Of.SameAs(BasicType.U16))
+                if (value is Literal literal &&
+                    literal.Type == LiteralType.String &&
+                    arrayType.ComputedLength.HasValue &&
+                    literal.Value.Length == arrayType.ComputedLength.Value)
                 {
-                    if (value is not Literal literal)
-                    { throw new InternalExceptionWithoutContext(); }
-                    if (literal.Type != LiteralType.String)
-                    { throw new InternalExceptionWithoutContext(); }
-                    if (!arrayType.ComputedLength.HasValue)
-                    { throw new InternalExceptionWithoutContext(); }
-                    if (literal.Value.Length != arrayType.ComputedLength.Value)
-                    { throw new InternalExceptionWithoutContext(); }
-
-                    int arraySize = arrayType.ComputedLength.Value;
-
-                    int size = Snippets.ARRAY_SIZE(arraySize);
-
-                    using StackAddress indexAddress = Stack.GetTemporaryAddress(1, value);
-                    using StackAddress valueAddress = Stack.GetTemporaryAddress(1, value);
+                    if (arrayType.Of.SameAs(BasicType.U16))
                     {
-                        for (int i = 0; i < literal.Value.Length; i++)
+                        int arraySize = arrayType.ComputedLength.Value;
+
+                        int size = Snippets.ARRAY_SIZE(arraySize);
+
+                        using StackAddress indexAddress = Stack.GetTemporaryAddress(1, value);
+                        using StackAddress valueAddress = Stack.GetTemporaryAddress(1, value);
                         {
-                            Code.SetValue(indexAddress, i);
-                            Code.SetValue(valueAddress, literal.Value[i]);
-                            Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, value));
+                            for (int i = 0; i < literal.Value.Length; i++)
+                            {
+                                Code.SetValue(indexAddress, i);
+                                Code.SetValue(valueAddress, literal.Value[i]);
+                                Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, value));
+                            }
                         }
+
+                        UndiscardVariable(CompiledVariables, variable.Name);
+
+                        VariableCanBeDiscarded = null;
+
+                        return;
                     }
+                    else if (arrayType.Of.SameAs(BasicType.U8))
+                    {
+                        int arraySize = arrayType.ComputedLength.Value;
 
-                    UndiscardVariable(CompiledVariables, variable.Name);
+                        int size = Snippets.ARRAY_SIZE(arraySize);
 
-                    VariableCanBeDiscarded = null;
+                        using StackAddress indexAddress = Stack.GetTemporaryAddress(1, value);
+                        using StackAddress valueAddress = Stack.GetTemporaryAddress(1, value);
+                        {
+                            for (int i = 0; i < literal.Value.Length; i++)
+                            {
+                                Code.SetValue(indexAddress, i);
+                                Code.SetValue(valueAddress, (byte)literal.Value[i]);
+                                Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, value));
+                            }
+                        }
 
-                    return;
+                        UndiscardVariable(CompiledVariables, variable.Name);
+
+                        VariableCanBeDiscarded = null;
+
+                        return;
+                    }
                 }
-                else if (arrayType.Of.SameAs(BasicType.U8))
+                else if (value is LiteralList literalList &&
+                         arrayType.ComputedLength.HasValue &&
+                         arrayType.ComputedLength.Value == literalList.Values.Length &&
+                         arrayType.Of.GetSize(this, Diagnostics, variable) == 1)
                 {
-                    if (value is not Literal literal)
-                    { throw new InternalExceptionWithoutContext(); }
-                    if (literal.Type != LiteralType.String)
-                    { throw new InternalExceptionWithoutContext(); }
-                    if (!arrayType.ComputedLength.HasValue)
-                    { throw new InternalExceptionWithoutContext(); }
-                    if (literal.Value.Length != arrayType.ComputedLength.Value)
-                    { throw new InternalExceptionWithoutContext(); }
-
                     int arraySize = arrayType.ComputedLength.Value;
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
@@ -666,11 +688,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     using StackAddress indexAddress = Stack.GetTemporaryAddress(1, value);
                     using StackAddress valueAddress = Stack.GetTemporaryAddress(1, value);
                     {
-                        for (int i = 0; i < literal.Value.Length; i++)
+                        for (int i = 0; i < literalList.Values.Length; i++)
                         {
-                            Code.SetValue(indexAddress, i);
-                            Code.SetValue(valueAddress, (byte)literal.Value[i]);
-                            Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, value));
+                            if (TryCompute(literalList.Values[i], out CompiledValue elementValue))
+                            {
+                                Code.ARRAY_SET_CONST(variable.Address, i, elementValue);
+                                // Code.SetValue(indexAddress, i);
+                                // Code.SetValue(valueAddress, elementValue);
+                                // Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, value));
+                            }
+                            else
+                            {
+                                throw new NotImplementedException();
+                            }
                         }
                     }
 
@@ -3488,7 +3518,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         }
 
                         VariableDeclaration variableDeclaration = defined.ToVariable(passed);
-                        compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, false, v.Type, v.Size, variableDeclaration));
+                        compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, false, v.Type, v.Size, variableDeclaration)
+                        {
+                            IsInitialized = true,
+                        });
                         continue;
                     }
                     case ModifierKeywords.Const:
@@ -3556,7 +3589,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 VariableDeclaration variableDeclaration = defined.ToVariable(passed);
                 PointerType parameterType = new(v.Type);
-                compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, false, parameterType, parameterType.GetSize(this, Diagnostics, modifiedVariable), variableDeclaration));
+                compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, false, parameterType, parameterType.GetSize(this, Diagnostics, modifiedVariable), variableDeclaration)
+                {
+                    IsInitialized = v.IsInitialized,
+                });
                 continue;
             }
 
@@ -3573,7 +3609,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
 
                 VariableDeclaration variableDeclaration = defined.ToVariable(passed);
-                compiledParameters.Push(new BrainfuckVariable(variable.Address, true, false, false, variable.Type, variable.Type.GetSize(this, Diagnostics, identifier), variableDeclaration));
+                compiledParameters.Push(new BrainfuckVariable(variable.Address, true, false, false, variable.Type, variable.Type.GetSize(this, Diagnostics, identifier), variableDeclaration)
+                {
+                    IsInitialized = variable.IsInitialized,
+                });
                 continue;
             }
 
@@ -4295,17 +4334,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (MaxRecursiveDepth > 0)
             {
-                if (MaxRecursiveDepth >= depth)
-                {
-                    return true;
-                }
-                else
-                {
-                    GenerateCodeForPrinter(Ansi.Style(Ansi.BrightForegroundRed), callerPosition);
-                    GenerateCodeForPrinter($"Max recursivity depth ({MaxRecursiveDepth}) exceeded (\"{function.ToReadable()}\")", callerPosition);
-                    GenerateCodeForPrinter(Ansi.Reset, callerPosition);
-                    return false;
-                }
+                if (MaxRecursiveDepth >= depth) continue;
+
+                GenerateCodeForPrinter(Ansi.Style(Ansi.BrightForegroundRed), callerPosition);
+                GenerateCodeForPrinter($"Max recursivity depth ({MaxRecursiveDepth}) exceeded (\"{function.ToReadable()}\")", callerPosition);
+                GenerateCodeForPrinter(Ansi.Reset, callerPosition);
+                return false;
             }
 
             throw new NotSupportedException($"Recursive functions are not supported (The function \"{function.ToReadable()}\" used recursively)", callerPosition.Location);

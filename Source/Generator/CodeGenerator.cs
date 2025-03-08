@@ -1906,6 +1906,13 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         {
             type = GeneralType.From(newVariable.Type, FindType, TryCompute);
 
+            if (type is ArrayType arrayType &&
+                newVariable.InitialValue is LiteralList literalList &&
+                arrayType.Length is null)
+            {
+                type = new ArrayType(arrayType.Of, null, literalList.Values.Length);
+            }
+
             newVariable.Type.SetAnalyzedType(type);
             newVariable.CompiledType = type;
         }
@@ -2101,6 +2108,32 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         }
 
         return OnGotStatementType(anyCall, functionType.ReturnType);
+    }
+    protected ArrayType FindStatementType(LiteralList list)
+    {
+        GeneralType? itemType = null;
+
+        for (int i = 0; i < list.Values.Length; i++)
+        {
+            StatementWithValue item = list.Values[i];
+            GeneralType currentItemType = FindStatementType(item, itemType);
+            if (itemType is null)
+            {
+                itemType = currentItemType;
+            }
+            else if (!currentItemType.SameAs(itemType))
+            {
+                Diagnostics.Add(Diagnostic.Critical($"List element at index {i} should be a {itemType} and not {currentItemType}", item));
+            }
+        }
+
+        if (itemType is null)
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Could not infer the list element type", list));
+            itemType = BuiltinType.Any;
+        }
+
+        return new ArrayType(itemType, null, list.Values.Length);
     }
     protected GeneralType FindStatementType(IndexCall index)
     {
@@ -2595,6 +2628,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             case IndexCall v: return FindStatementType(v);
             case ModifiedStatement v: return FindStatementType(v, expectedType);
             case AnyCall v: return FindStatementType(v);
+            case LiteralList v: return FindStatementType(v);
             default:
             {
                 Diagnostics.Add(Diagnostic.Critical($"Statement \"{statement.GetType().Name}\" does not have a type", statement));

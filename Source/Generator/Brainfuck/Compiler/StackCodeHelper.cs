@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 
 namespace LanguageCore.Brainfuck;
 
@@ -174,7 +174,7 @@ public class StackCodeHelper
             _code.CRASH(address, "Stack overflow");
             if (location is not null)
             {
-                _diagnostics?.Add(Diagnostic.Warning("The stack will overflow here", location));
+                _diagnostics?.Add(Diagnostic.Warning($"The stack will overflow here (size {Size} exceeded {MaxSize})", location));
             }
             // Debugger.Break();
         }

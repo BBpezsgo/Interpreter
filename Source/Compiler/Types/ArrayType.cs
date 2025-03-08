@@ -1,4 +1,4 @@
-﻿using LanguageCore.Runtime;
+using LanguageCore.Runtime;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 
@@ -85,5 +85,5 @@ public class ArrayType : GeneralType,
         return true;
     }
     public override int GetHashCode() => HashCode.Combine(Of, Length);
-    public override string ToString() => $"{Of}[{Length}]";
+    public override string ToString() => $"{Of}[{(ComputedLength.HasValue ? ComputedLength.Value.ToString() : Length?.ToString())}]";
 }

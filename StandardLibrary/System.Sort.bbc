@@ -2,6 +2,15 @@
  * Source: https://en.wikipedia.org/wiki/Quicksort
  */
 template<T>
+export inline void QuickSort(T[]* array, int length)
+{
+    QuickSort(array, 0, length - 1);
+}
+
+/*
+ * Source: https://en.wikipedia.org/wiki/Quicksort
+ */
+template<T>
 export void QuickSort(T[]* array, int left, int right)
 {
     if (left >= 0 && right >= 0 && left < right)
@@ -35,5 +44,26 @@ int Partition(T[]* array, int left, int right)
         T _temp1 = array[i];
         array[i] = array[j];
         array[j] = _temp1;
+    }
+}
+
+/*
+ * Source: https://en.wikipedia.org/wiki/Insertion_sort
+ */
+template<T>
+export void InsertSort(T[]* values, int length)
+{
+    int i = 1;
+    while (i < length)
+    {
+        T x = values[i];
+        int j = i;
+        while (j > 0 && values[j - 1] > x)
+        {
+            values[j] = values[j - 1];
+            j = j - 1;
+        }
+        values[j] = x;
+        i = i + 1;
     }
 }

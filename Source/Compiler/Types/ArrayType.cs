@@ -56,6 +56,9 @@ public class ArrayType : GeneralType,
     {
         if (other is null) return false;
         if (!Of.Equals(other.Of)) return false;
+
+        if (ComputedLength.HasValue && other.ComputedLength.HasValue && ComputedLength.Value == other.ComputedLength.Value) return true;
+
         if (Length is not null)
         {
             if (other.Length is null) return false;

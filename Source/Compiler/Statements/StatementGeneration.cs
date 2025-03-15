@@ -1951,12 +1951,6 @@ public partial class StatementCompiler
 
         if (prev.Type.Is(out ArrayType? arrayType) && field.Identifier.Content == "Length")
         {
-            if (arrayType.Length is null)
-            {
-                Diagnostics.Add(Diagnostic.Critical("Array type's length isn't defined", field));
-                return false;
-            }
-
             if (!arrayType.ComputedLength.HasValue)
             {
                 Diagnostics.Add(Diagnostic.Critical("I will eventually implement this", field));

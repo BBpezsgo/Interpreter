@@ -85,11 +85,11 @@ public class AddressRegisterPointer : Address
     public override string ToString() => $"{Register}";
 }
 
-public class AddressRuntimePointer : Address
+public class AddressRuntimePointer2 : Address
 {
-    public StatementWithValue PointerValue { get; }
+    public CompiledStatementWithValue PointerValue { get; }
 
-    public AddressRuntimePointer(StatementWithValue pointerValue)
+    public AddressRuntimePointer2(CompiledStatementWithValue pointerValue)
     {
         PointerValue = pointerValue;
     }
@@ -98,13 +98,13 @@ public class AddressRuntimePointer : Address
     public override string ToString() => $"*[{PointerValue}]";
 }
 
-public class AddressRuntimeIndex : Address
+public class AddressRuntimeIndex2 : Address
 {
     public Address Base { get; }
-    public StatementWithValue IndexValue { get; }
+    public CompiledStatementWithValue IndexValue { get; }
     public int ElementSize { get; }
 
-    public AddressRuntimeIndex(Address @base, StatementWithValue indexValue, int elementSize)
+    public AddressRuntimeIndex2(Address @base, CompiledStatementWithValue indexValue, int elementSize)
     {
         Base = @base;
         IndexValue = indexValue;
@@ -192,7 +192,9 @@ public interface IHaveInstructionOffset
 
 public interface ICompiledFunction :
     IHaveCompiledType,
-    IInFile
+    IInFile,
+    IHaveInstructionOffset
+    // IInContext<CompiledStruct>
 {
     public bool ReturnSomething { get; }
     public Block? Block { get; }

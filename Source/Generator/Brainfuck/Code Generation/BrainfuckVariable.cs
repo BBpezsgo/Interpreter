@@ -5,40 +5,45 @@ namespace LanguageCore.Brainfuck.Generator;
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class BrainfuckVariable :
-    CompiledVariable,
     IIdentifiable<string>,
     IHaveCompiledType,
     IInFile
 {
-    public string Name => Identifier.Content;
+    public readonly CompiledVariableDeclaration Declaration;
     public readonly int Address;
     public readonly bool IsReference;
-
     public readonly bool HaveToClean;
-    public readonly bool DeallocateOnClean;
-
+    public readonly CompiledCleanup? Cleanup;
     public readonly int Size;
-
     public bool IsDiscarded;
+    public bool IsInitialized;
 
-    string IIdentifiable<string>.Identifier => Name;
-    GeneralType IHaveCompiledType.Type => Type;
-    Uri IInFile.File => File;
+    public string Identifier => Declaration.Identifier;
+    public GeneralType Type => Declaration.Type;
+    public Uri File => Declaration.Location.File;
 
-    public BrainfuckVariable(int address, bool isReference, bool haveToClean, bool deallocateOnClean, GeneralType type, int size, Parser.Statement.VariableDeclaration declaration)
-        : base(address, type, declaration)
+    public BrainfuckVariable(int address, bool isReference, bool haveToClean, CompiledCleanup? cleanup, int size, CompiledVariableDeclaration declaration)
+    {
+        Declaration = declaration;
+        Address = address;
+        IsReference = isReference;
+        HaveToClean = haveToClean;
+        Cleanup = cleanup;
+        IsDiscarded = false;
+        Size = size;
+    }
+
+    public BrainfuckVariable(int address, bool isReference, bool haveToClean, CompiledCleanup? cleanup, int size, BrainfuckVariable declaration)
     {
         Address = address;
         IsReference = isReference;
-
         HaveToClean = haveToClean;
-        DeallocateOnClean = deallocateOnClean;
-
+        Cleanup = cleanup;
         IsDiscarded = false;
         Size = size;
-        IsInitialized = false;
+        Declaration = declaration.Declaration;
     }
 
     [ExcludeFromCodeCoverage]
-    string GetDebuggerDisplay() => $"{Type} {Name} ({Size} bytes at {Address})";
+    string GetDebuggerDisplay() => $"{Type} {Identifier} ({Size} bytes at {Address})";
 }

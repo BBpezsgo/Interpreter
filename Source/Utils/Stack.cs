@@ -37,7 +37,11 @@ public static class StackUtils
         { list.RemoveAt(list.Count - 1); }
     }
 
-    public static void Push<T>(this List<T> list, T item) => list.Add(item);
+    public static T Push<T>(this List<T> list, T item)
+    {
+        list.Add(item);
+        return item;
+    }
 
     public static void PushIf<T>(this List<T> list, T? item) where T : struct
     {

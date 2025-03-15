@@ -107,7 +107,7 @@ public static class Nasm
 
         // -gcv8 -f win32
 
-        using Process? process = Process.Start(new ProcessStartInfo("nasm", $"-f elf64 -g -F dwarf {inputFile} -o {outputFile}")
+        using Process? process = Process.Start(new ProcessStartInfo("nasm", $"-f elf32 -g -F dwarf {inputFile} -o {outputFile}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,

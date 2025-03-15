@@ -23,6 +23,7 @@ public class TextSectionBuilder : SectionBuilder
         Runtime.Opcode.Pop8 => "pop",
         Runtime.Opcode.Pop16 => "pop",
         Runtime.Opcode.Pop32 => "pop",
+        Runtime.Opcode.Pop64 => "pop",
         Runtime.Opcode.PopTo8 => "pop",
         Runtime.Opcode.PopTo16 => "pop",
         Runtime.Opcode.PopTo32 => "pop",
@@ -39,10 +40,22 @@ public class TextSectionBuilder : SectionBuilder
         Runtime.Opcode.BitsOR => "or",
         Runtime.Opcode.BitsShiftRight => "shr",
         Runtime.Opcode.BitsShiftLeft => "shl",
+        Runtime.Opcode.LogicOR => "or",
+        Runtime.Opcode.LogicAND => "and",
+        Runtime.Opcode.BitsNOT => "not",
+
+        Runtime.Opcode.MathMod => throw new NotImplementedException(),
+        Runtime.Opcode.FMathAdd => throw new NotImplementedException(),
+        Runtime.Opcode.FMathSub => throw new NotImplementedException(),
+        Runtime.Opcode.FMathMult => throw new NotImplementedException(),
+        Runtime.Opcode.FMathDiv => throw new NotImplementedException(),
+        Runtime.Opcode.FMathMod => throw new NotImplementedException(),
 
         Runtime.Opcode.Call => "call",
         Runtime.Opcode.Return => "ret",
         Runtime.Opcode.Exit => "hlt",
+        Runtime.Opcode.CallExternal => throw new NotImplementedException(),
+        Runtime.Opcode.Crash => throw new NotImplementedException(),
 
         Runtime.Opcode.Jump => "jmp",
         Runtime.Opcode.JumpIfEqual => "je",
@@ -51,6 +64,11 @@ public class TextSectionBuilder : SectionBuilder
         Runtime.Opcode.JumpIfGreater => "jg",
         Runtime.Opcode.JumpIfLessOrEqual => "jle",
         Runtime.Opcode.JumpIfLess => "jl",
+
+        Runtime.Opcode.NOP => "nop",
+
+        Runtime.Opcode.FTo => throw new NotImplementedException(),
+        Runtime.Opcode.FFrom => throw new NotImplementedException(),
 
         _ => throw new UnreachableException(),
     }).ToUpperInvariant();

@@ -755,7 +755,7 @@ public sealed class Parser
             }
 
             endlessSafe++;
-            if (endlessSafe >= 50) { throw new EndlessLoopException(); }
+            if (endlessSafe >= 69420) { throw new EndlessLoopException(); }
         }
 
         listValue = new LiteralList(values, new TokenPair(bracketStart, bracketEnd), File);

@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using CommandLine;
@@ -490,7 +490,7 @@ public static class Entry
                                 if (i > 0)
                                 { Console.WriteLine(); }
                                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                                Console.Write($"{i}: ");
+                                Console.Write($"{i,3}: ");
                                 Console.ResetColor();
                             }
 

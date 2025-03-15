@@ -1,8 +1,7 @@
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
-using LanguageCore.Tokenizing;
 using LiteralStatement = LanguageCore.Parser.Statement.Literal;
 
 #if NET_STANDARD
@@ -10,8 +9,6 @@ using LiteralStatement = LanguageCore.Parser.Statement.Literal;
 #endif
 
 namespace LanguageCore.BBLang.Generator;
-
-public record struct ParameterCleanupItem(int Size, bool CanDeallocate, GeneralType Type, Location Location) { }
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
@@ -107,174 +104,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    void GenerateAllocator(StatementWithValue size)
+    void GenerateDeallocator(CompiledCleanup cleanup)
     {
-        ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(size);
-
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, parameters, size.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? error, AddCompilable))
+        if (cleanup.Deallocator is null)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found: {error}", size));
             return;
         }
-
-        CompiledFunction? allocator = result.Function;
-
-        if (!allocator.ReturnSomething)
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size));
-            return;
-        }
-
-        allocator.References.AddReference(size, size.File);
-
-        if (!allocator.CanUse(size.File))
-        {
-            Diagnostics.Add(Diagnostic.Error($"Function \"{allocator.ToReadable()}\" cannot be called due to its protection level", size));
-            return;
-        }
-
-        if (TryEvaluate(allocator, parameters, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
-            returnValue.HasValue &&
-            runtimeStatements.Length == 0)
-        {
-            Diagnostics.Add(Diagnostic.OptimizationNotice("Function evaluated", size));
-            _statistics.FunctionEvaluations++;
-            Push(returnValue.Value);
-            return;
-        }
-
-        if (allocator.IsExternal)
-        {
-            if (!ExternalFunctions.TryGet(allocator.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
-            {
-                Diagnostics.Add(exception.ToError(allocator));
-                AddComment("}");
-                return;
-            }
-
-            GenerateCodeForFunctionCall_External(parameters, true, allocator, externalFunction);
-            return;
-        }
-
-        AddComment($"Call \"{allocator.ToReadable()}\" {{");
-
-        Stack<ParameterCleanupItem> parameterCleanup;
-
-        if (allocator.ReturnSomething)
-        {
-            AddComment($"Initial return value {{");
-            StackAlloc(allocator.Type.GetSize(this, Diagnostics, size), false);
-            AddComment($"}}");
-        }
-
-        parameterCleanup = GenerateCodeForArguments(parameters, allocator);
-
-        AddComment(" .:");
-
-        int jumpInstruction = Call(allocator.InstructionOffset, size);
-
-        if (allocator.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, size, allocator)); }
-
-        GenerateCodeForParameterCleanup(parameterCleanup);
-
-        AddComment("}");
-    }
-
-    void GenerateDeallocator(StatementWithValue value)
-    {
-        ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(value);
-
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameters, value.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFoundError, AddCompilable))
-        {
-            Diagnostics.Add(Diagnostic.Critical(
-                $"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found",
-                value,
-                notFoundError.ToError(value)));
-            return;
-        }
-        CompiledFunction? deallocator = result.Function;
-
-        deallocator.References.Add(new Reference<StatementWithValue?>(value, value.File));
-
-        if (!deallocator.CanUse(value.File))
-        {
-            Diagnostics.Add(Diagnostic.Error($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", value));
-            return;
-        }
-
-        if (TryEvaluate(deallocator, parameters, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
-            returnValue.HasValue &&
-            runtimeStatements.Length == 0)
-        {
-            _statistics.FunctionEvaluations++;
-            Diagnostics.Add(Diagnostic.OptimizationNotice("Function evaluated", value));
-            Push(returnValue.Value);
-            return;
-        }
-
-        if (deallocator.IsExternal)
-        {
-            if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
-            {
-                Diagnostics.Add(exception.ToError(deallocator));
-                AddComment("}");
-                return;
-            }
-
-            GenerateCodeForFunctionCall_External(parameters, true, deallocator, externalFunction);
-            return;
-        }
-
-        AddComment($"Call \"{deallocator.ToReadable()}\" {{");
-
-        Stack<ParameterCleanupItem> parameterCleanup;
-
-        if (deallocator.ReturnSomething)
-        {
-            AddComment($"Initial return value {{");
-            StackAlloc(deallocator.Type.GetSize(this, Diagnostics, value), false);
-            AddComment($"}}");
-        }
-
-        parameterCleanup = GenerateCodeForArguments(parameters, deallocator);
-
-        AddComment(" .:");
-
-        int jumpInstruction = Call(deallocator.InstructionOffset, value);
-
-        if (deallocator.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, value, deallocator)); }
-
-        if (deallocator.ReturnSomething)
-        {
-            AddComment($" Clear return value:");
-            Pop(deallocator.Type.GetSize(this, Diagnostics, value));
-        }
-
-        GenerateCodeForParameterCleanup(parameterCleanup);
-
-        AddComment("}");
-    }
-
-    void GenerateDeallocator(GeneralType deallocateableType, Location location)
-    {
-        ImmutableArray<GeneralType> parameterTypes = ImmutableArray.Create(deallocateableType);
-
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, location.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFoundError, AddCompilable))
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found ({notFoundError.Message})", location));
-            return;
-        }
-        CompiledFunction? deallocator = result.Function;
-
-        deallocator.References.Add(new Reference<StatementWithValue?>(null, location.File));
-
-        if (!deallocator.CanUse(location.File))
-        {
-            Diagnostics.Add(Diagnostic.Error($"Function \"{deallocator.ToReadable()}\" cannot be called due to its protection level", location));
-            return;
-        }
+        CompiledFunction? deallocator = cleanup.Deallocator;
 
         if (deallocator.IsExternal)
         {
@@ -293,14 +129,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (deallocator.ReturnSomething)
         { throw new NotImplementedException(); }
 
-        Stack<ParameterCleanupItem> parameterCleanup = new() { new(deallocateableType.GetSize(this, Diagnostics, location), false, deallocateableType, location) };
-
         AddComment(" .:");
 
-        int jumpInstruction = Call(deallocator.InstructionOffset, location);
+        int jumpInstruction = Call(deallocator.InstructionOffset, cleanup.Location);
 
         if (deallocator.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, location, deallocator)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, cleanup.Location, deallocator)); }
 
         if (deallocator.ReturnSomething)
         {
@@ -311,76 +145,43 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Pop(returnValueSize);
         }
 
-        GenerateCodeForParameterCleanup(parameterCleanup);
-
         AddComment("}");
     }
 
-    void GenerateDestructor(GeneralType deallocateableType, Location location)
+    void GenerateDestructor(CompiledCleanup cleanup)
     {
-        ImmutableArray<GeneralType> argumentTypes = ImmutableArray.Create<GeneralType>(deallocateableType);
-        FunctionQueryResult<CompiledGeneralFunction>? result;
+        GeneralType deallocateableType = cleanup.TrashType;
 
-        if (deallocateableType.Is(out PointerType? deallocateablePointerType))
+        if (cleanup.TrashType.Is<PointerType>())
         {
-            if (!GetGeneralFunction(deallocateablePointerType.To, argumentTypes, BuiltinFunctionIdentifiers.Destructor, location.File, out result, out PossibleDiagnostic? error, AddCompilable))
+            if (cleanup.Destructor is null)
             {
                 AddComment($"Pointer value should be already there");
-                GenerateDeallocator(deallocateableType, location);
-                AddComment("}");
-
-                if (deallocateablePointerType.To.Is<StructType>())
-                {
-                    Diagnostics.Add(Diagnostic.Warning(
-                        $"Destructor for type \"{deallocateableType}\" not found",
-                        location,
-                        error.ToWarning(location)));
-                }
+                GenerateDeallocator(cleanup);
 
                 return;
             }
         }
         else
         {
-            if (!GetGeneralFunction(deallocateableType, argumentTypes, BuiltinFunctionIdentifiers.Destructor, location.File, out result, out PossibleDiagnostic? error, AddCompilable))
+            if (cleanup.Destructor is null)
             {
-                Diagnostics.Add(Diagnostic.Warning(
-                    $"Destructor for type \"{deallocateableType}\" not found",
-                    location,
-                    error.ToWarning(location)));
                 return;
             }
-        }
-
-        CompiledGeneralFunction? destructor = result.Function;
-
-        destructor.References.Add(new Reference<Statement?>(null, location.File));
-
-        if (!destructor.CanUse(location.File))
-        {
-            Diagnostics.Add(Diagnostic.Error($"Destructor for type \"{deallocateableType}\" function cannot be called due to its protection level", location));
-            AddComment("}");
-            return;
         }
 
         AddComment(" Param0 should be already there");
 
         AddComment(" .:");
 
-        int jumpInstruction = Call(destructor.InstructionOffset, location);
+        int jumpInstruction = Call(cleanup.Destructor.InstructionOffset, cleanup.Location);
 
-        if (destructor.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, location, destructor)); }
-
-        AddComment(" Clear Param0:");
+        if (cleanup.Destructor.InstructionOffset == InvalidFunctionAddress)
+        { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, cleanup.Location, cleanup.Destructor)); }
 
         if (deallocateableType.Is<PointerType>())
         {
-            GenerateDeallocator(deallocateableType, location);
-        }
-        else
-        {
-            Pop(deallocateableType.GetSize(this, Diagnostics, location));
+            GenerateDeallocator(cleanup);
         }
 
         AddComment("}");
@@ -440,7 +241,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return false;
         }
 
-        GeneralType lengthType = FindStatementType(type.Length);
+        GeneralType lengthType = type.Length.Type;
         if (!lengthType.Is<BuiltinType>())
         {
             error = new PossibleDiagnostic($"Array length must be a builtin type and not \"{lengthType}\"", type.Length);
@@ -494,246 +295,199 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region GenerateCodeForStatement
 
-    void GenerateCodeForStatement(VariableDeclaration newVariable)
+    void GenerateCodeForStatement(CompiledVariableDeclaration newVariable)
     {
-        if (newVariable.Modifiers.Contains(ModifierKeywords.Const)) return;
-
-        newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
-
-        if (GetConstant(newVariable.Identifier.Content, newVariable.File, out _, out _))
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Symbol name \"{newVariable.Identifier}\" conflicts with an another symbol name", newVariable.Identifier));
-            return;
-        }
-
-        if (!GetVariable(newVariable.Identifier.Content, out CompiledVariable? compiledVariable, out _) &&
-            !GetGlobalVariable(newVariable.Identifier.Content, newVariable.File, out compiledVariable, out _))
-        {
-            Diagnostics.Add(Diagnostic.Internal($"Variable \"{newVariable.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.Identifier));
-            return;
-        }
-
-        if (compiledVariable.IsInitialized) return;
-
-        newVariable.Type.SetAnalyzedType(compiledVariable.Type);
+        bool isGlobal = newVariable.IsGlobal;
 
         if (newVariable.InitialValue == null) return;
 
-        AddComment($"New Variable \"{newVariable.Identifier.Content}\" {{");
+        AddComment($"New Variable \"{newVariable.Identifier}\" {{");
 
-        if (newVariable.InitialValue is LiteralList literalList)
+        if (newVariable.InitialValue is CompiledLiteralList literalList)
         {
             for (int i = 0; i < literalList.Values.Length; i++)
             {
-                StatementWithValue value = literalList.Values[i];
-                GenerateCodeForValueSetter(new IndexCall(newVariable.Identifier, LiteralStatement.CreateAnonymous(i, newVariable.Identifier.Position.After(), newVariable.Identifier.File), TokenPair.CreateAnonymous(newVariable.Identifier.Position.After(), "[", "]"), newVariable.Identifier.File), value);
+                CompiledStatementWithValue value = literalList.Values[i];
+                GenerateCodeForValueSetter(new CompiledIndexSetter()
+                {
+                    Base = isGlobal ? new CompiledGlobalVariableGetter()
+                    {
+                        Variable = newVariable,
+                        Location = newVariable.Location,
+                        SaveValue = true,
+                        Type = newVariable.Type,
+                    } : new CompiledLocalVariableGetter()
+                    {
+                        Variable = newVariable,
+                        Location = newVariable.Location,
+                        SaveValue = true,
+                        Type = newVariable.Type,
+                    },
+                    Index = new CompiledEvaluatedValue()
+                    {
+                        Value = i,
+                        Location = value.Location,
+                        SaveValue = true,
+                        Type = BuiltinType.I32,
+                    },
+                    IsCompoundAssignment = false,
+                    Location = value.Location,
+                    Value = value,
+                });
             }
             AddComment("}");
             return;
         }
 
-        GenerateCodeForValueSetter(newVariable.Identifier, newVariable.InitialValue);
+        if (isGlobal)
+        {
+            GenerateCodeForValueSetter(new CompiledGlobalVariableSetter()
+            {
+                Variable = newVariable,
+                Value = newVariable.InitialValue,
+                Location = newVariable.Location,
+                IsCompoundAssignment = false,
+            });
+        }
+        else
+        {
+            GenerateCodeForValueSetter(new CompiledLocalVariableSetter()
+            {
+                Variable = newVariable,
+                Value = newVariable.InitialValue,
+                Location = newVariable.Location,
+                IsCompoundAssignment = false,
+            });
+        }
         AddComment("}");
     }
-
-    void GenerateCodeForStatement(InstructionLabel instructionLabel)
+    void GenerateCodeForStatement(CompiledInstructionLabelDeclaration instructionLabel)
     {
-        if (!GetInstructionLabel(instructionLabel.Identifier.Content, out CompiledInstructionLabel? compiledInstructionLabel, out _))
+        GeneratedInstructionLabels[instructionLabel] = new()
         {
-            Diagnostics.Add(Diagnostic.Internal($"Instruction label \"{instructionLabel.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", instructionLabel.Identifier));
-            return;
-        }
-
-        compiledInstructionLabel.InstructionOffset = GeneratedCode.Count;
+            InstructionOffset = GeneratedCode.Count,
+        };
     }
-
-    void GenerateCodeForStatement(KeywordCall keywordCall)
+    void GenerateCodeForStatement(CompiledReturn keywordCall)
     {
-        AddComment($"Call Keyword \"{keywordCall.Identifier}\" {{");
+        AddComment($"Return {{");
 
-        if (keywordCall.Identifier.Content == StatementKeywords.Return)
+        if (!CanReturn)
         {
-            if (keywordCall.Arguments.Length > 1)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {keywordCall.Arguments.Length}", keywordCall));
-                return;
-            }
-
-            if (!CanReturn)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Can't return for some reason", keywordCall.Identifier));
-                return;
-            }
-
-            if (keywordCall.Arguments.Length == 1)
-            {
-                AddComment(" Param 0:");
-
-                StatementWithValue returnValue = keywordCall.Arguments[0];
-                GeneralType returnValueType = FindStatementType(returnValue);
-
-                GenerateCodeForStatement(returnValue);
-
-                if (!CanCastImplicitly(returnValueType, CurrentReturnType, returnValue, out PossibleDiagnostic? castError))
-                {
-                    Diagnostics.Add(castError.ToError(returnValue));
-                }
-
-                if (InFunction)
-                {
-                    AddComment(" Set return value:");
-                    PopTo(GetReturnValueAddress(returnValueType), returnValueType.GetSize(this, Diagnostics, keywordCall));
-                }
-                else
-                {
-                    AddComment(" Set exit code:");
-                    PopTo(ExitCodeAddress, ExitCodeType.GetSize(this));
-                }
-            }
-
-            AddComment(" .:");
-
-            if (CanReturn)
-            {
-                AddComment("Cleanup function scopes {");
-                for (int i = CleanupStack.Count - 1; i >= 0; i--)
-                {
-                    Scope item = CleanupStack[i];
-
-                    CleanupVariables(item.Variables, keywordCall.Location, true);
-
-                    if (item.IsFunction) break;
-                }
-                AddComment("}");
-            }
-
-            ReturnInstructions.Last.Add(GeneratedCode.Count);
-            AddInstruction(Opcode.Jump, 0);
-
-            AddComment("}");
-
+            Diagnostics.Add(Diagnostic.Critical($"Can't return for some reason", keywordCall.Location));
             return;
         }
 
-        if (keywordCall.Identifier.Content == StatementKeywords.Crash)
+        if (keywordCall.Value is not null)
         {
-            if (keywordCall.Arguments.Length != 1)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{StatementKeywords.Crash}\": required {1} passed {keywordCall.Arguments}", keywordCall));
-                return;
-            }
-
             AddComment(" Param 0:");
 
-            StatementWithValue throwValue = keywordCall.Arguments[0];
-            GeneralType throwType = FindStatementType(throwValue);
+            CompiledStatementWithValue returnValue = keywordCall.Value;
+            GeneralType returnValueType = returnValue.Type;
 
-            if (throwValue is LiteralStatement literalThrowValue &&
-                literalThrowValue.Type == LiteralType.String)
+            GenerateCodeForStatement(returnValue);
+
+            if (InFunction)
             {
-                _statistics.Optimizations++;
-                Diagnostics.Add(Diagnostic.OptimizationNotice("String allocated on stack", throwValue));
-                for (int i = literalThrowValue.Value.Length - 1; i >= 0; i--)
-                {
-                    Push(new InstructionOperand(
-                        literalThrowValue.Value[i],
-                        InstructionOperandType.Immediate16
-                    ));
-                }
-                AddInstruction(Opcode.Crash, Register.StackPointer);
+                AddComment(" Set return value:");
+                PopTo(GetReturnValueAddress(returnValueType), returnValueType.GetSize(this, Diagnostics, keywordCall));
             }
             else
             {
-                GenerateCodeForStatement(throwValue);
-                using (RegisterUsage.Auto reg = Registers.GetFree())
-                {
-                    PopTo(reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
-                    AddInstruction(Opcode.Crash, reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
-                }
+                AddComment(" Set exit code:");
+                PopTo(ExitCodeAddress, ExitCodeType.GetSize(this));
             }
-
-            return;
         }
 
-        if (keywordCall.Identifier.Content == StatementKeywords.Break)
+        AddComment(" .:");
+
+        if (CanReturn)
         {
-            if (BreakInstructions.Count == 0)
+            AddComment("Cleanup function scopes {");
+            for (int i = CleanupStack2.Count - 1; i >= 0; i--)
             {
-                Diagnostics.Add(Diagnostic.Critical($"The keyword \"{StatementKeywords.Break}\" does not available in the current context", keywordCall.Identifier));
-                return;
+                CleanupVariables(CleanupStack2[i].Variables, keywordCall.Location, true);
+                if (CleanupStack2[i].IsFunction) break;
             }
-
-            BreakInstructions.Last.Add(GeneratedCode.Count);
-            AddInstruction(Opcode.Jump, 0);
-
             AddComment("}");
-
-            return;
         }
 
-        if (keywordCall.Identifier.Content == StatementKeywords.Delete)
+        ReturnInstructions.Last.Add(GeneratedCode.Count);
+        AddInstruction(Opcode.Jump, 0);
+
+        AddComment("}");
+    }
+    void GenerateCodeForStatement(CompiledCrash keywordCall)
+    {
+        CompiledStatementWithValue throwValue = keywordCall.Value;
+        GeneralType throwType = throwValue.Type;
+
+        if (throwValue is CompiledStringInstance literalThrowValue)
         {
-            if (keywordCall.Arguments.Length != 1)
+            _statistics.Optimizations++;
+            Diagnostics.Add(Diagnostic.OptimizationNotice("String allocated on stack", throwValue));
+            for (int i = literalThrowValue.Value.Length - 1; i >= 0; i--)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{StatementKeywords.Delete}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall));
-                return;
+                Push(new InstructionOperand(
+                    literalThrowValue.Value[i],
+                    InstructionOperandType.Immediate16
+                ));
             }
-
-            GenerateCodeForStatement(keywordCall.Arguments[0]);
-
-            GeneralType deletableType = FindStatementType(keywordCall.Arguments[0]);
-            GenerateDestructor(deletableType, keywordCall.Arguments[0].Location);
-
-            return;
+            AddInstruction(Opcode.Crash, Register.StackPointer);
         }
-
-        if (keywordCall.Identifier.Content == "goto")
+        else
         {
-            if (keywordCall.Arguments.Length != 1)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{"goto"}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall));
-                return;
-            }
-
-            GeneralType argumentType = FindStatementType(keywordCall.Arguments[0]);
-
-            if (!CanCastImplicitly(argumentType, CompiledInstructionLabel.Type, null, out PossibleDiagnostic? castError))
-            {
-                Diagnostics.Add(castError.ToError(keywordCall.Arguments[0]));
-                return;
-            }
-
-            GenerateCodeForStatement(keywordCall.Arguments[0]);
-
+            GenerateCodeForStatement(throwValue);
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                PopTo(reg.Get(PointerBitWidth));
-                AddInstruction(Opcode.MathSub, reg.Get(PointerBitWidth), GeneratedCode.Count + 1);
-
-                int jumpInstruction = GeneratedCode.Count;
-                AddInstruction(Opcode.Jump, reg.Get(PointerBitWidth));
+                PopTo(reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
+                AddInstruction(Opcode.Crash, reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
             }
-
+        }
+    }
+    void GenerateCodeForStatement(CompiledBreak keywordCall)
+    {
+        if (BreakInstructions.Count == 0)
+        {
+            Diagnostics.Add(Diagnostic.Critical($"The keyword \"{StatementKeywords.Break}\" does not available in the current context", keywordCall));
             return;
         }
 
-        Diagnostics.Add(Diagnostic.Critical($"Unknown keyword \"{keywordCall.Identifier}\"", keywordCall.Identifier));
-        return;
+        BreakInstructions.Last.Add(GeneratedCode.Count);
+        AddInstruction(Opcode.Jump, 0);
     }
-
-    Stack<ParameterCleanupItem> GenerateCodeForArguments(IReadOnlyList<StatementWithValue> arguments, ICompiledFunction compiledFunction, int alreadyPassed = 0)
+    void GenerateCodeForStatement(CompiledDelete compiledDelete)
     {
-        Stack<ParameterCleanupItem> argumentCleanup = new();
+        GenerateCodeForStatement(compiledDelete.Value);
+        GenerateDestructor(compiledDelete.Cleanup);
+        Pop(compiledDelete.Value.Type.GetSize(this, Diagnostics, compiledDelete));
+    }
+    void GenerateCodeForStatement(CompiledGoto keywordCall)
+    {
+        GenerateCodeForStatement(keywordCall.Value);
+
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            PopTo(reg.Get(PointerBitWidth));
+            AddInstruction(Opcode.MathSub, reg.Get(PointerBitWidth), GeneratedCode.Count + 1);
+
+            int jumpInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.Jump, reg.Get(PointerBitWidth));
+        }
+    }
+    Stack<CompiledCleanup> GenerateCodeForArguments(IReadOnlyList<CompiledPassedArgument> arguments, ICompiledFunction compiledFunction, int alreadyPassed = 0)
+    {
+        Stack<CompiledCleanup> argumentCleanup = new();
 
         for (int i = 0; i < arguments.Count; i++)
         {
-            StatementWithValue argument = arguments[i];
-            GeneralType argumentType = FindStatementType(argument);
+            CompiledPassedArgument argument = arguments[i];
+            GeneralType argumentType = argument.Value.Type;
             ParameterDefinition parameter = compiledFunction.Parameters[i + alreadyPassed];
             GeneralType parameterType = compiledFunction.ParameterTypes[i + alreadyPassed];
 
-            if (argumentType.GetSize(this, Diagnostics, argument) != parameterType.GetSize(this, Diagnostics, parameter))
-            { Diagnostics.Add(Diagnostic.Internal($"Bad argument type passed: expected \"{parameterType}\" passed \"{argumentType}\"", argument)); }
+            if (argumentType.GetSize(this, Diagnostics, argument.Value) != parameterType.GetSize(this, Diagnostics, parameter))
+            { Diagnostics.Add(Diagnostic.Internal($"Bad argument type passed: expected \"{parameterType}\" passed \"{argumentType}\"", argument.Value)); }
 
             AddComment($" Pass {parameter}:");
 
@@ -741,124 +495,88 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             bool calleeAllowsTemp = parameter.Modifiers.Contains(ModifierKeywords.Temp);
 
-            bool callerAllowsTemp = StatementCanBeDeallocated(argument, out bool explicitDeallocate);
+            bool callerAllowsTemp = StatementCanBeDeallocated(argument.Value, out bool explicitDeallocate);
 
             if (callerAllowsTemp)
             {
                 if (explicitDeallocate && !calleeAllowsTemp)
-                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", argument)); }
+                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", argument.Value)); }
                 if (explicitDeallocate && !typeAllowsTemp)
-                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this type", argument)); }
+                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this type", argument.Value)); }
             }
             else
             {
                 if (explicitDeallocate)
-                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value", argument)); }
+                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value", argument.Value)); }
             }
 
-            if (argument is AddressGetter addressGetter &&
-                addressGetter.PrevStatement is Identifier identifier &&
-                GetVariable(identifier.Content, out CompiledVariable? variable,
-                out _))
+            if (argument.Value is CompiledAddressGetter addressGetter &&
+                addressGetter.Of is CompiledLocalVariableGetter identifier)
             {
-                variable.IsInitialized = true;
+                // identifier.Variable.IsInitialized = true;
             }
 
-            GenerateCodeForStatement(argument, parameterType);
+            GenerateCodeForStatement(argument.Value, parameterType);
 
-            argumentCleanup.Push(new ParameterCleanupItem(argumentType.GetSize(this, Diagnostics, argument), calleeAllowsTemp && callerAllowsTemp && typeAllowsTemp, argumentType, argument.Location));
+            argumentCleanup.Push(argument.Cleanup);
         }
 
         return argumentCleanup;
     }
-
-    Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(IReadOnlyList<StatementWithValue> parameters, FunctionType function)
+    Stack<CompiledCleanup> GenerateCodeForParameterPassing(IReadOnlyList<CompiledPassedArgument> parameters, FunctionType function)
     {
-        Stack<ParameterCleanupItem> parameterCleanup = new();
+        Stack<CompiledCleanup> parameterCleanup = new();
 
         for (int i = 0; i < parameters.Count; i++)
         {
-            StatementWithValue argument = parameters[i];
-            GeneralType argumentType = FindStatementType(argument);
-            GeneralType definedParameterType = function.Parameters[i];
-
             AddComment($" Param {i}:");
-
-            bool canDeallocate = true; // temp type maybe?
-
-            canDeallocate = canDeallocate && argumentType.Is<PointerType>();
-
-            if (StatementCanBeDeallocated(argument, out bool explicitDeallocate))
-            {
-                if (explicitDeallocate && !canDeallocate)
-                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", argument)); }
-            }
-            else
-            {
-                if (explicitDeallocate)
-                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value", argument)); }
-                canDeallocate = false;
-            }
-
-            GenerateCodeForStatement(argument, definedParameterType);
-
-            parameterCleanup.Push(new ParameterCleanupItem(argumentType.GetSize(this, Diagnostics, argument), canDeallocate, argumentType, argument.Location));
+            GenerateCodeForStatement(parameters[i].Value, function.Parameters[i]);
+            parameterCleanup.Push(parameters[i].Cleanup);
         }
 
         return parameterCleanup;
     }
-
-    void GenerateCodeForParameterCleanup(Stack<ParameterCleanupItem> parameterCleanup)
+    void GenerateCodeForParameterCleanup(Stack<CompiledCleanup> parameterCleanup)
     {
         AddComment(" Clear Params:");
         while (parameterCleanup.Count > 0)
         {
-            ParameterCleanupItem passedParameter = parameterCleanup.Pop();
-
-            if (passedParameter.CanDeallocate)
-            {
-                GenerateDestructor(passedParameter.Type, passedParameter.Location);
-                continue;
-            }
-
-            Pop(passedParameter.Size);
+            CompiledCleanup passedParameter = parameterCleanup.Pop();
+            GenerateDestructor(passedParameter);
+            Pop(passedParameter.TrashType.GetSize(this, Diagnostics, passedParameter));
         }
     }
-
-    void GenerateCodeForFunctionCall_External<TFunction>(IReadOnlyList<StatementWithValue> parameters, bool saveValue, TFunction compiledFunction, IExternalFunction externalFunction)
-        where TFunction : FunctionThingDefinition, ICompiledFunction, ISimpleReadable
+    void GenerateCodeForFunctionCall_External(CompiledExternalFunctionCall caller)
     {
-        Compiler.Compiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction, Diagnostics);
+        AddComment($"Call \"{((ISimpleReadable)caller.Declaration).ToReadable()}\" {{");
 
-        AddComment($"Call \"{compiledFunction.ToReadable()}\" {{");
-
-        if (compiledFunction.ReturnSomething)
+        if (caller.Function.ReturnValueSize > 0)
         {
             AddComment($"Initial return value {{");
-            StackAlloc(compiledFunction.Type.GetSize(this, Diagnostics, compiledFunction), false);
+            StackAlloc(caller.Function.ReturnValueSize, false);
             AddComment($"}}");
         }
 
-        int returnValueOffset = -externalFunction.ReturnValueSize;
+        int returnValueOffset = -caller.Function.ReturnValueSize;
 
-        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(parameters, compiledFunction);
+        Stack<CompiledCleanup> parameterCleanup = GenerateCodeForArguments(caller.Arguments, caller.Declaration);
         for (int i = 0; i < parameterCleanup.Count; i++)
-        { returnValueOffset -= parameterCleanup[i].Size; }
+        { returnValueOffset -= parameterCleanup[i].TrashType.GetSize(this, Diagnostics, parameterCleanup[i]); }
 
         AddComment(" .:");
-        AddInstruction(Opcode.CallExternal, externalFunction.Id);
+        AddInstruction(Opcode.CallExternal, caller.Function.Id);
 
-        if (compiledFunction.ReturnSomething)
+        if (caller.Function.ReturnValueSize > 0)
         {
-            if (saveValue)
+            if (caller.SaveValue)
             {
                 AddComment($" Store return value:");
-                PopTo(new AddressOffset(Register.StackPointer, -returnValueOffset), compiledFunction.Type.GetSize(this, Diagnostics, compiledFunction));
+                PopTo(new AddressOffset(Register.StackPointer, -returnValueOffset), caller.Function.ReturnValueSize);
             }
             else
             {
                 AddComment($" Clear return value:");
-                Pop(compiledFunction.Type.GetSize(this, Diagnostics, compiledFunction));
+                Pop(caller.Function.ReturnValueSize);
             }
         }
 
@@ -866,127 +584,26 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
-
-    void GenerateCodeForFunctionCall<TFunction>(StatementWithValue caller, ImmutableArray<StatementWithValue> arguments, TFunction callee)
-        where TFunction : FunctionThingDefinition, ICompiledFunction, IExportable, ISimpleReadable, ILocated, IExternalFunctionDefinition, IHaveInstructionOffset
+    void GenerateCodeForFunctionCall(CompiledFunctionCall caller)
     {
-        OnGotStatementType(caller, callee.Type);
+        AddComment($"Call \"{((ISimpleReadable)caller.Function).ToReadable()}\" {{");
 
-        if (!callee.CanUse(caller.File))
-        {
-            Diagnostics.Add(Diagnostic.Error($"Function \"{callee.ToReadable()}\" could not be called due to its protection level", caller));
-            return;
-        }
-
-        if (arguments.Length != callee.Parameters.Count)
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{callee.ToReadable()}\": required {callee.ParameterCount} passed {arguments.Length}", caller));
-            return;
-        }
-
-        if (callee.IsExternal)
-        {
-            if (!ExternalFunctions.TryGet(callee.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
-            {
-                Diagnostics.Add(exception.ToError(caller));
-                AddComment("}");
-                return;
-            }
-
-            GenerateCodeForFunctionCall_External(arguments, caller.SaveValue, callee, externalFunction);
-            return;
-        }
-
-        if (AllowEvaluating &&
-            TryEvaluate(callee, arguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
-            returnValue.HasValue &&
-            runtimeStatements.Length == 0)
-        {
-            caller.PredictedValue = returnValue.Value;
-            if (!caller.SaveValue)
-            {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"Function call fully trimmed", caller));
-            }
-            else
-            {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"Function evaluated with result \"{returnValue.Value}\"", caller));
-                Push(returnValue.Value);
-            }
-            _statistics.FunctionEvaluations++;
-            return;
-        }
-
-        if (AllowFunctionInlining &&
-            callee.IsInlineable)
-        {
-            if (InlineMacro(callee, arguments, out Statement? inlined))
-            {
-                bool argumentsAreObservable = false;
-                foreach (StatementWithValue argument in arguments)
-                {
-                    if (IsObservable(argument))
-                    {
-                        argumentsAreObservable = true;
-                        Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because of this argument", argument));
-                        break;
-                    }
-                }
-
-                if (!argumentsAreObservable)
-                {
-                    ControlFlowUsage controlFlowUsage = inlined is Block _block2 ? FindControlFlowUsage(_block2.Statements) : FindControlFlowUsage(inlined);
-                    if (!callee.ReturnSomething &&
-                        controlFlowUsage == ControlFlowUsage.None)
-                    {
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", caller));
-                        _statistics.InlinedFunctions++;
-                        GenerateCodeForStatement(inlined);
-                        return;
-                    }
-                    else if (callee.ReturnSomething &&
-                             controlFlowUsage == ControlFlowUsage.None &&
-                             inlined is StatementWithValue statementWithValue)
-                    {
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", caller));
-                        _statistics.InlinedFunctions++;
-                        GeneralType type = FindStatementType(statementWithValue);
-                        if (!CanCastImplicitly(type, callee.Type, statementWithValue, this, out PossibleDiagnostic? castError))
-                        { Diagnostics.Add(castError.ToError(statementWithValue)); }
-                        GenerateCodeForStatement(inlined);
-                        return;
-                    }
-                    else
-                    {
-                        Debugger.Break();
-                    }
-                }
-            }
-            else
-            {
-                Diagnostics.Add(Diagnostic.Warning($"Failed to inline \"{callee.ToReadable()}\"", caller));
-            }
-        }
-
-        AddComment($"Call \"{callee.ToReadable()}\" {{");
-
-        Stack<ParameterCleanupItem> parameterCleanup;
-
-        if (callee.ReturnSomething)
+        if (caller.Function.ReturnSomething)
         {
             AddComment($"Initial return value {{");
-            StackAlloc(callee.Type.GetSize(this, Diagnostics, callee), false);
+            StackAlloc(caller.Function.Type.GetSize(this, Diagnostics, caller), false);
             AddComment($"}}");
         }
 
-        parameterCleanup = GenerateCodeForArguments(arguments, callee);
+        Stack<CompiledCleanup> parameterCleanup = GenerateCodeForArguments(caller.Arguments, caller.Function);
 
         AddComment(" .:");
 
-        int jumpInstruction = Call(callee.InstructionOffset, caller);
+        int jumpInstruction = Call(caller.Function.InstructionOffset, caller);
 
-        if (callee.InstructionOffset == InvalidFunctionAddress)
+        if (caller.Function.InstructionOffset == InvalidFunctionAddress)
         {
-            switch (callee)
+            switch (caller.Function)
             {
                 case CompiledFunction v:
                     UndefinedFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
@@ -1007,126 +624,55 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
-        if (callee.ReturnSomething && !caller.SaveValue)
+        if (caller.Function.ReturnSomething && !caller.SaveValue)
         {
             AddComment(" Clear Return Value:");
-            Pop(callee.Type.GetSize(this, Diagnostics, callee));
+            Pop(caller.Function.Type.GetSize(this, Diagnostics, caller));
         }
 
         AddComment("}");
     }
-
-    void GenerateCodeForStatement(AnyCall anyCall)
+    void GenerateCodeForStatement(CompiledSizeof anyCall)
     {
-        if (anyCall.PrevStatement is Identifier _identifier &&
-            _identifier.Content == "sizeof")
+        GeneralType paramType = anyCall.Of;
+
+        if (FindSize(paramType, out int size, out _))
         {
-            _identifier.AnalyzedType = TokenAnalyzedType.Keyword;
-
-            if (anyCall.Arguments.Length != 1)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"sizeof\": required {1} passed {anyCall.Arguments.Length}", anyCall));
-                return;
-            }
-
-            StatementWithValue param = anyCall.Arguments[0];
-            GeneralType paramType;
-            if (param is TypeStatement typeStatement)
-            { paramType = GeneralType.From(typeStatement.Type, FindType, TryCompute); }
-            else if (param is CompiledTypeStatement compiledTypeStatement)
-            { paramType = compiledTypeStatement.Type; }
-            else
-            { paramType = FindStatementType(param); }
-
-            OnGotStatementType(anyCall, BuiltinType.I32);
-
-            if (FindSize(paramType, out int size, out PossibleDiagnostic? findSizeError))
-            {
-                Push(size);
-                anyCall.PredictedValue = size;
-            }
-            else
-            {
-                using RegisterUsage.Auto reg = Registers.GetFree();
-                AddInstruction(Opcode.Move, reg.Get(BuiltinType.I32.GetBitWidth(this)), 0);
-                if (!GenerateSize(paramType, reg.Get(BuiltinType.I32.GetBitWidth(this)), out PossibleDiagnostic? generateSizeError))
-                { Diagnostics.Add(generateSizeError.ToError(param)); }
-                Push(reg.Get(BuiltinType.I32.GetBitWidth(this)));
-            }
-
-            return;
+            Push(size);
         }
-
-        if (GetFunction(anyCall, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? notFound, AddCompilable) &&
-            anyCall.ToFunctionCall(out FunctionCall? functionCall))
+        else
         {
-            CompiledFunction compiledFunction = result.Function;
-
-            if (anyCall.PrevStatement is Identifier _identifier2)
-            { _identifier2.AnalyzedType = TokenAnalyzedType.FunctionName; }
-            anyCall.Reference = compiledFunction;
-            if (anyCall.PrevStatement is IReferenceableTo<CompiledFunction> _ref1)
-            { _ref1.Reference = compiledFunction; }
-
-            compiledFunction.References.Add(new(anyCall, anyCall.File));
-            GenerateCodeForFunctionCall(functionCall, functionCall.MethodArguments, compiledFunction);
-
-            if (functionCall.CompiledType is not null)
-            { OnGotStatementType(anyCall, functionCall.CompiledType); }
-
-            return;
+            using RegisterUsage.Auto reg = Registers.GetFree();
+            AddInstruction(Opcode.Move, reg.Get(BuiltinType.I32.GetBitWidth(this)), 0);
+            if (!GenerateSize(paramType, reg.Get(BuiltinType.I32.GetBitWidth(this)), out PossibleDiagnostic? generateSizeError))
+            { Diagnostics.Add(generateSizeError.ToError(anyCall)); }
+            Push(reg.Get(BuiltinType.I32.GetBitWidth(this)));
         }
-
-        GeneralType prevType = FindStatementType(anyCall.PrevStatement);
+    }
+    void GenerateCodeForStatement(CompiledRuntimeCall anyCall)
+    {
+        GeneralType prevType = anyCall.Function.Type;
         if (!prevType.Is(out FunctionType? functionType))
         {
-            if (notFound is not null)
-            {
-                Diagnostics.Add(notFound.ToError(anyCall.PrevStatement));
-            }
-            else
-            {
-                Diagnostics.Add(Diagnostic.Critical($"This isn't a function", anyCall.PrevStatement));
-            }
-
+            Diagnostics.Add(Diagnostic.Critical($"This isn't a function", anyCall.Function));
             return;
         }
-
-        /*
-        if (TryInlineMacro(anyCall.PrevStatement, out Statement? inlined))
-        {
-            if (inlined is Identifier identifier)
-            {
-                functionCall = new FunctionCall(null, identifier.Token, anyCall.Parameters, anyCall.Brackets)
-                {
-                    SaveValue = anyCall.SaveValue,
-                    Semicolon = anyCall.Semicolon,
-                    SurroundingBracelet = anyCall.SurroundingBracelet,
-                };
-                GenerateCodeForStatement(functionCall);
-                return;
-            }
-        }
-        */
-
-        OnGotStatementType(anyCall, functionType.ReturnType);
 
         if (anyCall.Arguments.Length != functionType.Parameters.Length)
         {
-            if (notFound is not null) Diagnostics.Add(notFound.ToError(anyCall.PrevStatement));
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{functionType}\": required {functionType.Parameters.Length} passed {anyCall.Arguments.Length}", new Position(anyCall.Arguments.As<IPositioned>().Or(anyCall.Brackets)), anyCall.File));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{functionType}\": required {functionType.Parameters.Length} passed {anyCall.Arguments.Length}", anyCall));
             return;
         }
 
         PossibleDiagnostic? argumentError = null;
         if (!Utils.SequenceEquals(anyCall.Arguments, functionType.Parameters, (argument, parameter) =>
         {
-            GeneralType argumentType = FindStatementType(argument, parameter);
+            GeneralType argumentType = argument.Type;
 
             if (argument.Equals(parameter))
             { return true; }
 
-            if (CodeGenerator.CanCastImplicitly(argumentType, parameter, null, this, out argumentError))
+            if (StatementCompiler.CanCastImplicitly(argumentType, parameter, null, this, out argumentError))
             { return true; }
 
             argumentError = argumentError.TrySetLocation(argument);
@@ -1134,9 +680,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return false;
         }))
         {
-            if (notFound is not null) Diagnostics.Add(notFound.ToError(anyCall.PrevStatement));
             Diagnostics.Add(Diagnostic.Critical(
-                $"Argument types of caller \"{anyCall.ToReadable(FindStatementType)}\" doesn't match with callee \"{functionType}\"",
+                $"Argument types of caller \"{anyCall}\" doesn't match with callee \"{functionType}\"",
                 anyCall,
                 argumentError?.ToError(anyCall)));
             return;
@@ -1151,11 +696,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForParameterPassing(anyCall.Arguments, functionType);
+        Stack<CompiledCleanup> parameterCleanup = GenerateCodeForParameterPassing(anyCall.Arguments, functionType);
 
         AddComment(" .:");
 
-        CallRuntime(anyCall.PrevStatement);
+        CallRuntime(anyCall.Function);
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -1167,598 +712,255 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
-    void GenerateCodeForStatement(BinaryOperatorCall @operator, GeneralType? expectedType = null)
+    void GenerateCodeForStatement(CompiledBinaryOperatorCall @operator)
     {
-        if (AllowEvaluating &&
-            TryCompute(@operator, out CompiledValue predictedValue))
-        {
-            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{predictedValue}\"", @operator));
-            _statistics.FunctionEvaluations++;
-            OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
-            @operator.PredictedValue = predictedValue;
+        CompiledStatementWithValue left = @operator.Left;
+        CompiledStatementWithValue right = @operator.Right;
 
-            Push(predictedValue);
-            return;
+        GeneralType leftType = left.Type;
+        GeneralType rightType = right.Type;
+
+        if (!leftType.TryGetNumericType(out NumericType leftNType) ||
+            !rightType.TryGetNumericType(out NumericType rightNType))
+        {
+            throw new NotImplementedException();
         }
 
-        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out PossibleDiagnostic? notFoundError))
+        BitWidth leftBitWidth = leftType.GetBitWidth(this, Diagnostics, left);
+        BitWidth rightBitWidth = rightType.GetBitWidth(this, Diagnostics, right);
+        BitWidth bitWidth = StatementCompiler.MaxBitWidth(leftBitWidth, rightBitWidth);
+
+        leftType = BuiltinType.CreateNumeric(leftNType, leftBitWidth);
+        rightType = BuiltinType.CreateNumeric(rightNType, rightBitWidth);
+
+        int jumpInstruction = InvalidFunctionAddress;
+
+        GenerateCodeForStatement(left, leftType);
+
+        if (leftNType != NumericType.Float &&
+            rightNType == NumericType.Float)
         {
-            CompiledOperator? operatorDefinition = result.Function;
-
-            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File));
-            @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-            @operator.Reference = operatorDefinition;
-            OnGotStatementType(@operator, operatorDefinition.Type);
-
-            GenerateCodeForFunctionCall(@operator, @operator.Arguments, operatorDefinition);
-
-            /*
-            if (!operatorDefinition.CanUse(@operator.File))
-            {
-                Diagnostics.Add(Diagnostic.Error($"Operator \"{operatorDefinition.ToReadable()}\" cannot be called due to its protection level", @operator.Operator, @operator.File));
-                return;
-            }
-
-            if (BinaryOperatorCall.ParameterCount != operatorDefinition.ParameterCount)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to operator \"{operatorDefinition.ToReadable()}\": required {operatorDefinition.ParameterCount} passed {BinaryOperatorCall.ParameterCount}", @operator));
-                return;
-            }
-
-            if (operatorDefinition.IsExternal)
-            {
-                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
-                {
-                    Diagnostics.Add(exception.ToError(@operator.Operator, @operator.File));
-                    AddComment("}");
-                    return;
-                }
-
-                GenerateCodeForFunctionCall_External(@operator.Arguments, @operator.SaveValue, operatorDefinition, externalFunction);
-                return;
-            }
-
-            AddComment($"Call \"{operatorDefinition.Identifier}\" {{");
-
-            StackAlloc(operatorDefinition.Type.GetSize(this, Diagnostics, operatorDefinition), false);
-
-            Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(@operator.Arguments, operatorDefinition);
-
-            AddComment(" .:");
-
-            int jumpInstruction = Call(operatorDefinition.InstructionOffset, @operator);
-
-            if (operatorDefinition.InstructionOffset == InvalidFunctionAddress)
-            { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition)); }
-
-            GenerateCodeForParameterCleanup(parameterCleanup);
-
-            if (!@operator.SaveValue)
-            {
-                AddComment(" Clear Return Value:");
-                Pop(operatorDefinition.Type.GetSize(this, Diagnostics, operatorDefinition));
-            }
-
-            AddComment("}");
-            */
+            AddInstruction(Opcode.FTo,
+                (InstructionOperand)StackTop,
+                (InstructionOperand)StackTop);
+            leftType = BuiltinType.F32;
+            leftNType = NumericType.Float;
         }
-        else if (LanguageOperators.BinaryOperators.Contains(@operator.Operator.Content))
+
+        if (@operator.Operator == CompiledBinaryOperatorCall.LogicalAND)
         {
-            if (@operator.Operator.Content is
-                "==" or "!=" or "<" or ">" or "<=" or ">=")
-            {
-                expectedType = null;
-            }
-
-            FindStatementType(@operator);
-
-            StatementWithValue left = @operator.Left;
-            StatementWithValue right = @operator.Right;
-
-            GeneralType leftType = FindStatementType(left, expectedType);
-            GeneralType rightType = FindStatementType(right, expectedType);
-
-            if (!leftType.TryGetNumericType(out NumericType leftNType) ||
-                !rightType.TryGetNumericType(out NumericType rightNType))
-            {
-                Diagnostics.Add(notFoundError.ToError(@operator));
-                return;
-            }
-
-            BitWidth leftBitWidth = leftType.GetBitWidth(this, Diagnostics, left);
-            BitWidth rightBitWidth = rightType.GetBitWidth(this, Diagnostics, right);
-            BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
-
-            leftType = BuiltinType.CreateNumeric(leftNType, leftBitWidth);
-            rightType = BuiltinType.CreateNumeric(rightNType, rightBitWidth);
-
-            int jumpInstruction = InvalidFunctionAddress;
-
-            GenerateCodeForStatement(left, leftType);
-
-            if (leftNType != NumericType.Float &&
-                rightNType == NumericType.Float)
-            {
-                AddInstruction(Opcode.FTo,
-                    (InstructionOperand)StackTop,
-                    (InstructionOperand)StackTop);
-                leftType = BuiltinType.F32;
-                leftNType = NumericType.Float;
-            }
-
-            if (@operator.Operator.Content == BinaryOperatorCall.LogicalAND)
-            {
-                PushFrom(StackTop, leftType.GetSize(this, Diagnostics, left));
-
-                using (RegisterUsage.Auto regLeft = Registers.GetFree())
-                {
-                    PopTo(regLeft.Get(leftBitWidth));
-                    AddInstruction(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
-                    jumpInstruction = GeneratedCode.Count;
-                    AddInstruction(Opcode.JumpIfEqual, 0);
-                }
-            }
-            else if (@operator.Operator.Content == BinaryOperatorCall.LogicalOR)
-            {
-                PushFrom(StackTop, leftType.GetSize(this, Diagnostics, left));
-
-                using (RegisterUsage.Auto regLeft = Registers.GetFree())
-                {
-                    PopTo(regLeft.Get(leftBitWidth));
-                    AddInstruction(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
-
-                    jumpInstruction = GeneratedCode.Count;
-                    AddInstruction(Opcode.JumpIfNotEqual, 0);
-                }
-            }
-
-            GenerateCodeForStatement(right, rightType);
-
-            if (leftType.SameAs(BasicType.F32) &&
-                !rightType.SameAs(BasicType.F32))
-            {
-                AddInstruction(Opcode.FTo,
-                    (InstructionOperand)StackTop,
-                    (InstructionOperand)StackTop);
-                rightType = BuiltinType.F32;
-                rightNType = NumericType.Float;
-            }
-
-            if ((leftNType is NumericType.Float) != (rightNType is NumericType.Float))
-            {
-                Diagnostics.Add(notFoundError.ToError(@operator));
-                return;
-            }
-
-            bool isFloat = leftType.SameAs(BasicType.F32) || rightType.SameAs(BasicType.F32);
+            PushFrom(StackTop, leftType.GetSize(this, Diagnostics, left));
 
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
-            using (RegisterUsage.Auto regRight = Registers.GetFree())
             {
-                PopTo(regRight.Get(bitWidth), rightBitWidth);
-                PopTo(regLeft.Get(bitWidth), leftBitWidth);
-
-                switch (@operator.Operator.Content)
-                {
-                    case BinaryOperatorCall.Addition:
-                        AddInstruction(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.Subtraction:
-                        AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.Multiplication:
-                        AddInstruction(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.Division:
-                        AddInstruction(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.Modulo:
-                        AddInstruction(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.LogicalAND:
-                        AddInstruction(Opcode.LogicAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.LogicalOR:
-                        AddInstruction(Opcode.LogicOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.BitwiseAND:
-                        AddInstruction(Opcode.BitsAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.BitwiseOR:
-                        AddInstruction(Opcode.BitsOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.BitwiseXOR:
-                        AddInstruction(Opcode.BitsXOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.BitshiftLeft:
-                        AddInstruction(Opcode.BitsShiftLeft, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-                    case BinaryOperatorCall.BitshiftRight:
-                        AddInstruction(Opcode.BitsShiftRight, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        Push(regLeft.Get(bitWidth));
-                        break;
-
-                    case BinaryOperatorCall.CompEQ:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.JumpIfEqual, 3);
-                        Push(false);
-                        AddInstruction(Opcode.Jump, 2);
-                        Push(true);
-                        break;
-
-                    case BinaryOperatorCall.CompNEQ:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.JumpIfNotEqual, 3);
-                        Push(false);
-                        AddInstruction(Opcode.Jump, 2);
-                        Push(true);
-                        break;
-
-                    case BinaryOperatorCall.CompGT:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.JumpIfLessOrEqual, 3);
-                        Push(true);
-                        AddInstruction(Opcode.Jump, 2);
-                        Push(false);
-                        break;
-
-                    case BinaryOperatorCall.CompGEQ:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.JumpIfLess, 3);
-                        Push(true);
-                        AddInstruction(Opcode.Jump, 2);
-                        Push(false);
-                        break;
-
-                    case BinaryOperatorCall.CompLT:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.JumpIfLess, 3);
-                        Push(false);
-                        AddInstruction(Opcode.Jump, 2);
-                        Push(true);
-                        break;
-
-                    case BinaryOperatorCall.CompLEQ:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        AddInstruction(Opcode.JumpIfLessOrEqual, 3);
-                        Push(false);
-                        AddInstruction(Opcode.Jump, 2);
-                        Push(true);
-                        break;
-
-                    default:
-                        throw new NotImplementedException();
-                }
+                PopTo(regLeft.Get(leftBitWidth));
+                AddInstruction(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
+                jumpInstruction = GeneratedCode.Count;
+                AddInstruction(Opcode.JumpIfEqual, 0);
             }
+        }
+        else if (@operator.Operator == CompiledBinaryOperatorCall.LogicalOR)
+        {
+            PushFrom(StackTop, leftType.GetSize(this, Diagnostics, left));
 
-            if (jumpInstruction != InvalidFunctionAddress)
-            { GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction; }
-        }
-        else if (@operator.Operator.Content == "=")
-        {
-            GenerateCodeForValueSetter(@operator.Left, @operator.Right);
-        }
-        else
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
-        }
-    }
-    void GenerateCodeForStatement(UnaryOperatorCall @operator)
-    {
-        if (AllowEvaluating &&
-            TryCompute(@operator, out CompiledValue predictedValue))
-        {
-            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{predictedValue}\"", @operator));
-            _statistics.FunctionEvaluations++;
-            OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
-            @operator.PredictedValue = predictedValue;
+            using (RegisterUsage.Auto regLeft = Registers.GetFree())
+            {
+                PopTo(regLeft.Get(leftBitWidth));
+                AddInstruction(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
 
-            Push(predictedValue);
-            return;
+                jumpInstruction = GeneratedCode.Count;
+                AddInstruction(Opcode.JumpIfNotEqual, 0);
+            }
         }
 
-        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out PossibleDiagnostic? operatorNotFoundError))
+        GenerateCodeForStatement(right, rightType);
+
+        if (leftType.SameAs(BasicType.F32) &&
+            !rightType.SameAs(BasicType.F32))
         {
-            CompiledOperator? operatorDefinition = result.Function;
-
-            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File));
-            @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-            @operator.Reference = operatorDefinition;
-            OnGotStatementType(@operator, operatorDefinition.Type);
-
-            if (!operatorDefinition.CanUse(@operator.File))
-            {
-                Diagnostics.Add(Diagnostic.Error($"Operator \"{operatorDefinition.ToReadable()}\" cannot be called due to its protection level", @operator.Operator, @operator.File));
-                return;
-            }
-
-            if (UnaryOperatorCall.ParameterCount != operatorDefinition.ParameterCount)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to operator \"{operatorDefinition.ToReadable()}\": required {operatorDefinition.ParameterCount} passed {UnaryOperatorCall.ParameterCount}", @operator));
-                return;
-            }
-
-            if (operatorDefinition.IsExternal)
-            {
-                if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
-                {
-                    Diagnostics.Add(exception.ToError(@operator.Operator, @operator.File));
-                    AddComment("}");
-                    return;
-                }
-
-                GenerateCodeForFunctionCall_External(@operator.Arguments, @operator.SaveValue, operatorDefinition, externalFunction);
-                return;
-            }
-
-            AddComment($"Call \"{operatorDefinition.Identifier}\" {{");
-
-            StackAlloc(operatorDefinition.Type.GetSize(this, Diagnostics, operatorDefinition), false);
-
-            Stack<ParameterCleanupItem> parameterCleanup = GenerateCodeForArguments(@operator.Arguments, operatorDefinition);
-
-            AddComment(" .:");
-
-            int jumpInstruction = Call(operatorDefinition.InstructionOffset, @operator);
-
-            if (operatorDefinition.InstructionOffset == InvalidFunctionAddress)
-            { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition)); }
-
-            GenerateCodeForParameterCleanup(parameterCleanup);
-
-            if (!@operator.SaveValue)
-            {
-                AddComment(" Clear Return Value:");
-                Pop(operatorDefinition.Type.GetSize(this, Diagnostics, operatorDefinition));
-            }
-
-            AddComment("}");
+            AddInstruction(Opcode.FTo,
+                (InstructionOperand)StackTop,
+                (InstructionOperand)StackTop);
+            rightType = BuiltinType.F32;
+            rightNType = NumericType.Float;
         }
-        else if (LanguageOperators.UnaryOperators.Contains(@operator.Operator.Content))
+
+        if ((leftNType is NumericType.Float) != (rightNType is NumericType.Float))
         {
-            GeneralType leftType = FindStatementType(@operator.Left);
-            BitWidth bitWidth = leftType.GetBitWidth(this, Diagnostics, @operator.Left);
+            throw new NotImplementedException();
+        }
 
-            switch (@operator.Operator.Content)
+        bool isFloat = leftType.SameAs(BasicType.F32) || rightType.SameAs(BasicType.F32);
+
+        using (RegisterUsage.Auto regLeft = Registers.GetFree())
+        using (RegisterUsage.Auto regRight = Registers.GetFree())
+        {
+            PopTo(regRight.Get(bitWidth), rightBitWidth);
+            PopTo(regLeft.Get(bitWidth), leftBitWidth);
+
+            switch (@operator.Operator)
             {
-                case UnaryOperatorCall.LogicalNOT:
-                {
-                    GenerateCodeForStatement(@operator.Left);
+                case CompiledBinaryOperatorCall.Addition:
+                    AddInstruction(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.Subtraction:
+                    AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.Multiplication:
+                    AddInstruction(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.Division:
+                    AddInstruction(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.Modulo:
+                    AddInstruction(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.LogicalAND:
+                    AddInstruction(Opcode.LogicAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.LogicalOR:
+                    AddInstruction(Opcode.LogicOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.BitwiseAND:
+                    AddInstruction(Opcode.BitsAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.BitwiseOR:
+                    AddInstruction(Opcode.BitsOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.BitwiseXOR:
+                    AddInstruction(Opcode.BitsXOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.BitshiftLeft:
+                    AddInstruction(Opcode.BitsShiftLeft, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
+                case CompiledBinaryOperatorCall.BitshiftRight:
+                    AddInstruction(Opcode.BitsShiftRight, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Push(regLeft.Get(bitWidth));
+                    break;
 
-                    using (RegisterUsage.Auto reg = Registers.GetFree())
-                    {
-                        PopTo(reg.Get(bitWidth));
-                        AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
-                        AddInstruction(Opcode.JumpIfEqual, 3);
-                        Push(false);
-                        AddInstruction(Opcode.Jump, 2);
-                        Push(true);
-                    }
+                case CompiledBinaryOperatorCall.CompEQ:
+                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    AddInstruction(Opcode.JumpIfEqual, 3);
+                    Push(false);
+                    AddInstruction(Opcode.Jump, 2);
+                    Push(true);
+                    break;
 
-                    return;
-                }
-                case UnaryOperatorCall.BinaryNOT:
-                {
-                    GenerateCodeForStatement(@operator.Left);
+                case CompiledBinaryOperatorCall.CompNEQ:
+                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    AddInstruction(Opcode.JumpIfNotEqual, 3);
+                    Push(false);
+                    AddInstruction(Opcode.Jump, 2);
+                    Push(true);
+                    break;
 
-                    using (RegisterUsage.Auto reg = Registers.GetFree())
-                    {
-                        PopTo(reg.Get(bitWidth));
-                        AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
-                        Push(reg.Get(bitWidth));
-                    }
+                case CompiledBinaryOperatorCall.CompGT:
+                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    AddInstruction(Opcode.JumpIfLessOrEqual, 3);
+                    Push(true);
+                    AddInstruction(Opcode.Jump, 2);
+                    Push(false);
+                    break;
 
-                    return;
-                }
+                case CompiledBinaryOperatorCall.CompGEQ:
+                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    AddInstruction(Opcode.JumpIfLess, 3);
+                    Push(true);
+                    AddInstruction(Opcode.Jump, 2);
+                    Push(false);
+                    break;
+
+                case CompiledBinaryOperatorCall.CompLT:
+                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    AddInstruction(Opcode.JumpIfLess, 3);
+                    Push(false);
+                    AddInstruction(Opcode.Jump, 2);
+                    Push(true);
+                    break;
+
+                case CompiledBinaryOperatorCall.CompLEQ:
+                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    AddInstruction(Opcode.JumpIfLessOrEqual, 3);
+                    Push(false);
+                    AddInstruction(Opcode.Jump, 2);
+                    Push(true);
+                    break;
+
                 default:
-                {
-                    Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
-                    return;
-                }
+                    throw new NotImplementedException();
             }
         }
-        else
+
+        if (jumpInstruction != InvalidFunctionAddress)
+        { GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction; }
+    }
+    void GenerateCodeForStatement(CompiledUnaryOperatorCall @operator)
+    {
+        GeneralType leftType = @operator.Left.Type;
+        BitWidth bitWidth = leftType.GetBitWidth(this, Diagnostics, @operator.Left);
+
+        switch (@operator.Operator)
         {
-            Diagnostics.Add(Diagnostic.Critical(
-                $"Unknown operator \"{@operator.Operator.Content}\"",
-                @operator.Operator,
-                @operator.File,
-                operatorNotFoundError.ToError(@operator)));
+            case CompiledUnaryOperatorCall.LogicalNOT:
+            {
+                GenerateCodeForStatement(@operator.Left);
+
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    PopTo(reg.Get(bitWidth));
+                    AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
+                    AddInstruction(Opcode.JumpIfEqual, 3);
+                    Push(false);
+                    AddInstruction(Opcode.Jump, 2);
+                    Push(true);
+                }
+
+                return;
+            }
+            case CompiledUnaryOperatorCall.BinaryNOT:
+            {
+                GenerateCodeForStatement(@operator.Left);
+
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    PopTo(reg.Get(bitWidth));
+                    AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
+                    Push(reg.Get(bitWidth));
+                }
+
+                return;
+            }
+            default:
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator}\"", @operator));
+                return;
+            }
         }
     }
-    void GenerateCodeForStatement(Assignment setter) => GenerateCodeForValueSetter(setter.Left, setter.Right);
-    void GenerateCodeForStatement(LiteralStatement literal, GeneralType? expectedType = null)
+    void GenerateCodeForStatement(CompiledEvaluatedValue literal, GeneralType? expectedType = null)
     {
-        switch (literal.Type)
-        {
-            case LiteralType.Integer:
-            {
-                if (expectedType is not null)
-                {
-                    if (expectedType.SameAs(BasicType.U8))
-                    {
-                        if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.U8);
-                            Push(new CompiledValue((byte)literal.GetInt()));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.I8))
-                    {
-                        if (literal.GetInt() is >= sbyte.MinValue and <= sbyte.MaxValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.I8);
-                            Push(new CompiledValue((sbyte)literal.GetInt()));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.U16))
-                    {
-                        if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.Char);
-                            Push(new CompiledValue((ushort)literal.GetInt()));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.I16))
-                    {
-                        if (literal.GetInt() is >= short.MinValue and <= short.MaxValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.I16);
-                            Push(new CompiledValue((short)literal.GetInt()));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.U32))
-                    {
-                        if (literal.GetInt() >= (int)uint.MinValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.U32);
-                            Push(new CompiledValue((uint)literal.GetInt()));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.I32))
-                    {
-                        OnGotStatementType(literal, BuiltinType.I32);
-                        Push(new CompiledValue(literal.GetInt()));
-                        return;
-                    }
-                    else if (expectedType.SameAs(BasicType.F32))
-                    {
-                        OnGotStatementType(literal, BuiltinType.F32);
-                        Push(new CompiledValue((float)literal.GetInt()));
-                        return;
-                    }
-                }
-
-                OnGotStatementType(literal, BuiltinType.I32);
-                Push(new CompiledValue(literal.GetInt()));
-                break;
-            }
-            case LiteralType.Float:
-            {
-                OnGotStatementType(literal, BuiltinType.F32);
-
-                Push(new CompiledValue(literal.GetFloat()));
-                break;
-            }
-            case LiteralType.String:
-            {
-                if (expectedType is not null &&
-                    expectedType.Is(out PointerType? pointerType) &&
-                    pointerType.To.Is(out ArrayType? arrayType) &&
-                    arrayType.Of.SameAs(BasicType.U8))
-                {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.U8, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal, literal.File), literal.Value.Length + 1)));
-                    GenerateCodeForLiteralString(literal.Value, literal.Location, true);
-                }
-                else
-                {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, LiteralStatement.CreateAnonymous(literal.Value.Length + 1, literal, literal.File), literal.Value.Length + 1)));
-                    GenerateCodeForLiteralString(literal.Value, literal.Location, false);
-                }
-                break;
-            }
-            case LiteralType.Char:
-            {
-                if (literal.Value.Length != 1)
-                {
-                    Diagnostics.Add(Diagnostic.Internal($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, literal.File));
-                    if (literal.Value.Length == 0) break;
-                }
-
-                if (expectedType is not null)
-                {
-                    if (expectedType.SameAs(BasicType.U8))
-                    {
-                        if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.U8);
-                            Push(new CompiledValue((byte)literal.Value[0]));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.I8))
-                    {
-                        if ((int)literal.Value[0] is >= sbyte.MinValue and <= sbyte.MaxValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.I8);
-                            Push(new CompiledValue((sbyte)literal.Value[0]));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.U16))
-                    {
-                        OnGotStatementType(literal, BuiltinType.Char);
-                        Push(new CompiledValue(literal.Value[0]));
-                        return;
-                    }
-                    else if (expectedType.SameAs(BasicType.I16))
-                    {
-                        if ((int)literal.Value[0] is >= short.MinValue and <= short.MaxValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.I16);
-                            Push(new CompiledValue((short)literal.Value[0]));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.U32))
-                    {
-                        if (literal.Value[0] >= uint.MinValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.U32);
-                            Push(new CompiledValue((short)literal.Value[0]));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.I32))
-                    {
-                        if (literal.Value[0] >= int.MinValue)
-                        {
-                            OnGotStatementType(literal, BuiltinType.I32);
-                            Push(new CompiledValue((short)literal.Value[0]));
-                            return;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.F32))
-                    {
-                        OnGotStatementType(literal, BuiltinType.F32);
-                        Push(new CompiledValue((float)literal.Value[0]));
-                        return;
-                    }
-                }
-
-                OnGotStatementType(literal, BuiltinType.Char);
-                Push(new CompiledValue(literal.Value[0]));
-                break;
-            }
-            default: throw new UnreachableException();
-        }
+        Push(literal.Value);
     }
-
-    void GenerateCodeForLiteralString(string literal, Location location, bool withBytes)
+    void GenerateCodeForStatement(CompiledStringInstance stringInstance)
     {
-        BuiltinType type = withBytes ? BuiltinType.U8 : BuiltinType.Char;
+        BuiltinType type = stringInstance.IsASCII ? BuiltinType.U8 : BuiltinType.Char;
 
-        AddComment($"Create String \"{literal}\" {{");
+        AddComment($"Create String \"{stringInstance.Value}\" {{");
 
         AddComment("Allocate String object {");
 
-        GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Length) * type.GetSize(this), location.Position, location.File));
+        GenerateCodeForStatement(stringInstance.Allocator);
 
         AddComment("}");
 
@@ -1769,23 +971,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
             // Save pointer
             AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), (InstructionOperand)StackTop);
 
-            if (withBytes)
+            if (stringInstance.IsASCII)
             {
-                for (int i = 0; i < literal.Length; i++)
+                for (int i = 0; i < stringInstance.Value.Length; i++)
                 {
-                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), (byte)literal[i]);
+                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), (byte)stringInstance.Value[i]);
                 }
 
-                AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(literal.Length * type.GetSize(this), type.GetBitWidth(this)), (byte)'\0');
+                AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), (byte)'\0');
             }
             else
             {
-                for (int i = 0; i < literal.Length; i++)
+                for (int i = 0; i < stringInstance.Value.Length; i++)
                 {
-                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), literal[i]);
+                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), stringInstance.Value[i]);
                 }
 
-                AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(literal.Length * type.GetSize(this), type.GetBitWidth(this)), '\0');
+                AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), '\0');
             }
         }
 
@@ -1793,182 +995,88 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
-
-    void GenerateCodeForStatement(Identifier variable, GeneralType? expectedType = null, bool resolveReference = true)
+    void GenerateCodeForStatement(RegisterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        if (RegisterKeywords.TryGetValue(variable.Content, out (Register Register, BuiltinType Type) registerKeyword))
-        {
-            AddInstruction(Opcode.Push, registerKeyword.Register);
-            return;
-        }
-
-        if (GetConstant(variable.Content, variable.File, out IConstant? constant, out PossibleDiagnostic? constantNotFoundError))
-        {
-            OnGotStatementType(variable, constant.Type);
-            variable.PredictedValue = constant.Value;
-            variable.Reference = constant;
-            variable.AnalyzedType = TokenAnalyzedType.ConstantName;
-
-            Push(constant.Value);
-            return;
-        }
-
-        if (GetParameter(variable.Content, out CompiledParameter? param, out PossibleDiagnostic? parameterNotFoundError))
-        {
-            if (variable.Content != StatementKeywords.This)
-            { variable.AnalyzedType = TokenAnalyzedType.ParameterName; }
-            variable.Reference = param;
-            OnGotStatementType(variable, param.Type);
-
-            Address address = GetParameterAddress(param);
-
-            if (param.IsRef && resolveReference)
-            { address = new AddressPointer(address); }
-
-            PushFrom(address, param.Type.GetSize(this, Diagnostics, param));
-
-            return;
-        }
-
-        if (GetVariable(variable.Content, out CompiledVariable? val, out PossibleDiagnostic? variableNotFoundError))
-        {
-            variable.AnalyzedType = TokenAnalyzedType.VariableName;
-            variable.Reference = val;
-            OnGotStatementType(variable, val.Type);
-
-            if (!val.IsInitialized)
-            { Diagnostics.Add(Diagnostic.Warning($"U are using the variable \"{val.Identifier}\" but its aint initialized.", variable)); }
-
-            PushFrom(GetLocalVariableAddress(val), val.Type.GetSize(this, Diagnostics, val));
-
-            return;
-        }
-
-        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
-        {
-            variable.AnalyzedType = TokenAnalyzedType.VariableName;
-            variable.Reference = globalVariable;
-            OnGotStatementType(variable, globalVariable.Type);
-
-            PushFrom(GetGlobalVariableAddress(globalVariable), globalVariable.Type.GetSize(this, Diagnostics, globalVariable));
-
-            return;
-        }
-
-        if (GetFunction(variable.Content, expectedType, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? functionNotFoundError))
-        {
-            CompiledFunction? compiledFunction = result.Function;
-
-            compiledFunction.References.AddReference(variable, variable.File);
-            variable.AnalyzedType = TokenAnalyzedType.FunctionName;
-            variable.Reference = compiledFunction;
-            OnGotStatementType(variable, new FunctionType(compiledFunction));
-
-            if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-            { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction)); }
-
-            Push(compiledFunction.InstructionOffset);
-
-            return;
-        }
-
-        if (GetInstructionLabel(variable.Content, out CompiledInstructionLabel? instructionLabel, out _))
-        {
-            variable.Reference = instructionLabel;
-            OnGotStatementType(variable, CompiledInstructionLabel.Type);
-
-            if (instructionLabel.InstructionOffset == InvalidFunctionAddress)
-            { UndefinedInstructionLabels.Add(new UndefinedOffset<CompiledInstructionLabel>(GeneratedCode.Count, true, variable, instructionLabel)); }
-
-            Push(instructionLabel.InstructionOffset);
-
-            return;
-        }
-
-        Diagnostics.Add(Diagnostic.Critical(
-            $"Symbol \"{variable.Content}\" not found",
-            variable,
-            constantNotFoundError.ToError(variable),
-            parameterNotFoundError.ToError(variable),
-            variableNotFoundError.ToError(variable),
-            globalVariableNotFoundError.ToError(variable),
-            functionNotFoundError.ToError(variable)));
+        AddInstruction(Opcode.Push, variable.Register);
     }
-    void GenerateCodeForStatement(AddressGetter addressGetter)
+    void GenerateCodeForStatement(CompiledParameterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        if (!GetAddress(addressGetter.PrevStatement, out Address? address, out PossibleDiagnostic? error))
+        Address address = GetParameterAddress(variable.Variable);
+
+        if (variable.Variable.IsRef && resolveReference)
+        { address = new AddressPointer(address); }
+
+        PushFrom(address, variable.Variable.Type.GetSize(this, Diagnostics, variable.Variable));
+    }
+    void GenerateCodeForStatement(CompiledLocalVariableGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    {
+        PushFrom(GetLocalVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
+    }
+    void GenerateCodeForStatement(CompiledGlobalVariableGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    {
+        PushFrom(GetGlobalVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
+    }
+    void GenerateCodeForStatement(FunctionAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    {
+        CompiledFunction? compiledFunction = variable.Function;
+
+        if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction)); }
+
+        Push(compiledFunction.InstructionOffset);
+    }
+    void GenerateCodeForStatement(InstructionLabelAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    {
+        if (!GeneratedInstructionLabels.TryGetValue(variable.InstructionLabel, out GeneratedInstructionLabel? instructionLabel))
         {
-            Diagnostics.Add(error.ToError(addressGetter.PrevStatement));
+            instructionLabel = GeneratedInstructionLabels[variable.InstructionLabel] = new()
+            {
+                InstructionOffset = InvalidFunctionAddress,
+            };
+            UndefinedInstructionLabels.Add(new UndefinedOffset<GeneratedInstructionLabel>(GeneratedCode.Count, true, variable, instructionLabel));
+        }
+
+        Push(instructionLabel.InstructionOffset);
+    }
+    void GenerateCodeForStatement(CompiledAddressGetter addressGetter)
+    {
+        if (!GetAddress(addressGetter.Of, out Address? address, out PossibleDiagnostic? error))
+        {
+            Diagnostics.Add(error.ToError(addressGetter.Of));
             return;
         }
         GenerateAddressResolver(address);
     }
-    void GenerateCodeForStatement(Pointer pointer)
+    void GenerateCodeForStatement(CompiledPointer pointer)
     {
-        GenerateCodeForStatement(pointer.PrevStatement);
+        GenerateCodeForStatement(pointer.To);
 
-        GeneralType addressType = FindStatementType(pointer.PrevStatement);
+        GeneralType addressType = pointer.To.Type;
         if (!addressType.Is(out PointerType? pointerType))
         {
-            Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", pointer.PrevStatement));
+            Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", pointer.To));
             return;
         }
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(pointerType.GetBitWidth(this, Diagnostics, pointer)));
-            PushFrom(new AddressRegisterPointer(reg.Get(pointerType.GetBitWidth(this, Diagnostics, pointer))), pointerType.To.GetSize(this, Diagnostics, pointer.PrevStatement));
+            PushFrom(new AddressRegisterPointer(reg.Get(pointerType.GetBitWidth(this, Diagnostics, pointer))), pointerType.To.GetSize(this, Diagnostics, pointer.To));
         }
     }
-    void GenerateCodeForStatement(WhileLoop whileLoop)
+    void GenerateCodeForStatement(CompiledWhileLoop whileLoop)
     {
-        Block block = Block.CreateIfNotBlock(whileLoop.Block);
-
-        if (AllowEvaluating &&
-            TryCompute(whileLoop.Condition, out CompiledValue condition))
-        {
-            _statistics.Precomputations++;
-            if (condition)
-            {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"While loop condition evaluated as true", whileLoop.Condition));
-                AddComment("while (1) {");
-
-                OnScopeEnter(block, false);
-
-                int beginOffset = GeneratedCode.Count;
-
-                BreakInstructions.Push(new List<int>());
-
-                GenerateCodeForStatement(block, true);
-
-                AddComment("Jump Back");
-                AddInstruction(Opcode.Jump, beginOffset - GeneratedCode.Count);
-
-                FinishJumpInstructions(BreakInstructions.Last);
-
-                OnScopeExit(whileLoop.Block.Position.After(), whileLoop.Block.File);
-
-                BreakInstructions.Pop();
-
-                AddComment("}");
-            }
-            else
-            {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"While loop fully trimmed", whileLoop));
-                AddComment("while (0) { }");
-            }
-            return;
-        }
+        CompiledBlock block = CompiledBlock.CreateIfNot(whileLoop.Body);
 
         AddComment("while (...) {");
 
-        OnScopeEnter(block, false);
+        CompiledScope scope = OnScopeEnter(block, false);
 
         AddComment("Condition");
         int conditionOffset = GeneratedCode.Count;
         GenerateCodeForStatement(whileLoop.Condition);
 
-        GeneralType conditionType = FindStatementType(whileLoop.Condition);
+        GeneralType conditionType = whileLoop.Condition.Type;
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
@@ -1989,64 +1097,26 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GeneratedCode[conditionJumpOffset].Operand1 = GeneratedCode.Count - conditionJumpOffset;
 
-        OnScopeExit(whileLoop.Block.Position.After(), whileLoop.Block.File);
+        OnScopeExit(block.Location.Position.After(), block.Location.File, scope);
 
         AddComment("}");
 
         BreakInstructions.Pop();
     }
-    void GenerateCodeForStatement(ForLoop forLoop)
+    void GenerateCodeForStatement(CompiledForLoop forLoop)
     {
         AddComment("for (...) {");
 
-        OnScopeEnter(forLoop.Position, forLoop.File, Enumerable.Repeat(forLoop.VariableDeclaration, 1), false);
+        CompiledScope scope = OnScopeEnter(forLoop.Location.Position, forLoop.Location.File, Enumerable.Repeat(forLoop.VariableDeclaration, 1), false);
 
         AddComment("For-loop variable");
         GenerateCodeForStatement(forLoop.VariableDeclaration);
-
-        if (AllowEvaluating &&
-            TryCompute(forLoop.Condition, out CompiledValue condition))
-        {
-            _statistics.Precomputations++;
-            if (condition)
-            {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop condition evaluated as true", forLoop.Condition));
-
-                AddComment("For-loop condition");
-                int beginOffset = GeneratedCode.Count;
-
-                BreakInstructions.Push(new List<int>());
-
-                GenerateCodeForStatement(forLoop.Block);
-
-                AddComment("For-loop expression");
-                GenerateCodeForStatement(forLoop.Expression);
-
-                AddComment("Jump back");
-                AddInstruction(Opcode.Jump, beginOffset - GeneratedCode.Count);
-
-                FinishJumpInstructions(BreakInstructions.Pop());
-
-                OnScopeExit(forLoop.Position.After(), forLoop.File);
-
-                AddComment("}");
-            }
-            else
-            {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop fully trimmed", forLoop));
-
-                OnScopeExit(forLoop.Position.After(), forLoop.File);
-
-                AddComment("}");
-            }
-            return;
-        }
 
         AddComment("For-loop condition");
         int conditionOffsetFor = GeneratedCode.Count;
         GenerateCodeForStatement(forLoop.Condition);
 
-        GeneralType conditionType = FindStatementType(forLoop.Condition);
+        GeneralType conditionType = forLoop.Condition.Type;
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
@@ -2059,7 +1129,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         BreakInstructions.Push(new List<int>());
 
-        GenerateCodeForStatement(forLoop.Block);
+        GenerateCodeForStatement(forLoop.Body);
 
         AddComment("For-loop expression");
         GenerateCodeForStatement(forLoop.Expression);
@@ -2070,46 +1140,26 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         FinishJumpInstructions(BreakInstructions.Pop());
 
-        OnScopeExit(forLoop.Position.After(), forLoop.File);
+        OnScopeExit(forLoop.Location.Position.After(), forLoop.Location.File, scope);
 
         AddComment("}");
     }
-    void GenerateCodeForStatement(IfContainer @if)
+    void GenerateCodeForStatement(CompiledIf @if)
     {
         List<int> jumpOutInstructions = new();
 
-        foreach (BaseBranch ifSegment in @if.Branches)
+        CompiledBranch? ifSegment = @if;
+
+        while (true)
         {
-            if (ifSegment is IfBranch partIf)
+            if (ifSegment is CompiledIf partIf)
             {
-                if (AllowEvaluating &&
-                    TryCompute(partIf.Condition, out CompiledValue condition))
-                {
-                    _statistics.Precomputations++;
-                    if (!condition)
-                    {
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"If branch fully trimmed", partIf));
-
-                        AddComment("if (0) { }");
-                        continue;
-                    }
-                    else
-                    {
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"If condition evaluated as true", partIf.Condition));
-
-                        AddComment("if (1) {");
-                        GenerateCodeForStatement(partIf.Block);
-                        AddComment("}");
-                        break;
-                    }
-                }
-
                 AddComment("if (...) {");
 
                 AddComment("If condition");
                 GenerateCodeForStatement(partIf.Condition);
 
-                GeneralType conditionType = FindStatementType(partIf.Condition);
+                GeneralType conditionType = partIf.Condition.Type;
 
                 AddComment("If jump-to-next");
                 using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -2120,7 +1170,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
                 int jumpNextInstruction = GeneratedCode.Count - 1;
 
-                GenerateCodeForStatement(partIf.Block);
+                GenerateCodeForStatement(partIf.Body);
 
                 AddComment("If jump-to-end");
                 jumpOutInstructions.Add(GeneratedCode.Count);
@@ -2129,64 +1179,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddComment("}");
 
                 GeneratedCode[jumpNextInstruction].Operand1 = GeneratedCode.Count - jumpNextInstruction;
+
+                ifSegment = partIf.Next;
             }
-            else if (ifSegment is ElseIfBranch partElseif)
-            {
-                if (AllowEvaluating &&
-                    TryCompute(partElseif.Condition, out CompiledValue condition))
-                {
-                    _statistics.Precomputations++;
-                    if (!condition)
-                    {
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Else-if branch fully trimmed", partElseif));
-
-                        AddComment("elseif (0) { }");
-                        continue;
-                    }
-                    else
-                    {
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Else-if condition evaluated as ture", partElseif.Condition));
-
-                        AddComment("elseif (1) {");
-                        GenerateCodeForStatement(partElseif.Block);
-                        AddComment("}");
-                        break;
-                    }
-                }
-
-                AddComment("elseif (...) {");
-
-                AddComment("Elseif condition");
-                GenerateCodeForStatement(partElseif.Condition);
-
-                GeneralType conditionType = FindStatementType(partElseif.Condition);
-
-                AddComment("Elseif jump-to-next");
-                using (RegisterUsage.Auto reg = Registers.GetFree())
-                {
-                    PopTo(reg.Get(conditionType.GetBitWidth(this, Diagnostics, partElseif.Condition)));
-                    AddInstruction(Opcode.Compare, reg.Get(conditionType.GetBitWidth(this, Diagnostics, partElseif.Condition)), 0);
-                    AddInstruction(Opcode.JumpIfEqual, 0);
-                }
-                int jumpNextInstruction = GeneratedCode.Count - 1;
-
-                GenerateCodeForStatement(partElseif.Block);
-
-                AddComment("Elseif jump-to-end");
-                jumpOutInstructions.Add(GeneratedCode.Count);
-                AddInstruction(Opcode.Jump, 0);
-
-                AddComment("}");
-
-                GeneratedCode[jumpNextInstruction].Operand1 = GeneratedCode.Count - jumpNextInstruction;
-            }
-            else if (ifSegment is ElseBranch partElse)
+            else if (ifSegment is CompiledElse partElse)
             {
                 AddComment("else {");
 
-                GenerateCodeForStatement(partElse.Block);
+                GenerateCodeForStatement(partElse.Body);
 
                 AddComment("}");
+
+                break;
+            }
+            else
+            {
+                break;
             }
         }
 
@@ -2195,93 +1203,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GeneratedCode[item].Operand1 = GeneratedCode.Count - item;
         }
     }
-    void GenerateCodeForStatement(NewInstance newInstance)
+    void GenerateCodeForStatement(CompiledStackAllocation newInstance)
     {
         AddComment($"new \"{newInstance.Type}\" {{");
 
-        GeneralType instanceType = GeneralType.From(newInstance.Type, FindType, TryCompute);
+        GeneralType instanceType = newInstance.Type;
 
-        newInstance.Type.SetAnalyzedType(instanceType);
-        OnGotStatementType(newInstance, instanceType);
-
-        switch (instanceType)
-        {
-            case PointerType pointerType:
-            {
-                GenerateAllocator(new AnyCall(
-                    new Identifier(Token.CreateAnonymous("sizeof"), newInstance.File),
-                    new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To, newInstance.File) },
-                    Array.Empty<Token>(),
-                    TokenPair.CreateAnonymous(newInstance.Position, "(", ")"),
-                    newInstance.File
-                ));
-
-                // using (RegisterUsage.Auto reg = Registers.GetFree())
-                // {
-                //     AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth), (InstructionOperand)StackTop);
-                // 
-                //      for (int offset = 0; offset < pointerType.To.SizeBytes; offset++)
-                //   { AddInstruction(Opcode.Move, reg.Get(BytecodeProcessor.PointerBitWidth).ToPtr(offset, BitWidth._8), new InstructionOperand((byte)0)); }
-                // }
-
-                break;
-            }
-
-            case StructType structType:
-            {
-                structType.Struct.References.AddReference(newInstance.Type, newInstance.File);
-
-                StackAlloc(structType.GetSize(this, Diagnostics, newInstance), true);
-                break;
-            }
-
-            case ArrayType arrayType:
-            {
-                StackAlloc(arrayType.GetSize(this, Diagnostics, newInstance), true);
-                break;
-            }
-
-            default:
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Unknown type \"{instanceType}\"", newInstance.Type, newInstance.File));
-                break;
-            }
-        }
+        StackAlloc(instanceType.GetSize(this, Diagnostics, newInstance), true);
 
         AddComment("}");
     }
-    void GenerateCodeForStatement(ConstructorCall constructorCall)
+    void GenerateCodeForStatement(CompiledConstructorCall constructorCall)
     {
-        GeneralType instanceType = GeneralType.From(constructorCall.Type, FindType, TryCompute);
-        ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
+        GeneralType instanceType = constructorCall.Type;
+        ImmutableArray<GeneralType> parameters = constructorCall.Arguments.Select(v => v.Type).ToImmutableArray();
 
-        if (!GetConstructor(instanceType, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructor>? result, out PossibleDiagnostic? notFound, AddCompilable))
-        {
-            Diagnostics.Add(notFound.ToError(constructorCall.Type, constructorCall.File));
-            return;
-        }
-
-        CompiledConstructor? compiledFunction = result.Function;
-
-        compiledFunction.References.AddReference(constructorCall);
-        OnGotStatementType(constructorCall, compiledFunction.Type);
-
-        if (!compiledFunction.CanUse(constructorCall.File))
-        {
-            Diagnostics.Add(Diagnostic.Error($"Constructor \"{compiledFunction.ToReadable()}\" could not be called due to its protection level", constructorCall.Type, constructorCall.File));
-            return;
-        }
+        CompiledConstructor? compiledFunction = constructorCall.Function;
 
         AddComment($"Call \"{compiledFunction.ToReadable()}\" {{");
 
-        Stack<ParameterCleanupItem> parameterCleanup;
-
-        NewInstance newInstance = constructorCall.ToInstantiation();
-        GenerateCodeForStatement(newInstance);
+        GenerateCodeForStatement(constructorCall.Object);
 
         AddComment(" Pass arguments (\"this\" is already passed):");
 
-        parameterCleanup = GenerateCodeForArguments(constructorCall.Arguments, compiledFunction, 1);
+        Stack<CompiledCleanup> parameterCleanup = GenerateCodeForArguments(constructorCall.Arguments, compiledFunction, 1);
 
         AddComment(" .:");
 
@@ -2294,37 +1239,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
-    void GenerateCodeForStatement(Field field)
+    void GenerateCodeForStatement(CompiledFieldGetter field)
     {
-        field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
-
-        GeneralType prevType = FindStatementType(field.PrevStatement);
-
-        if (prevType.Is(out ArrayType? arrayType) && field.Identifier.Content == "Length")
-        {
-            if (arrayType.Length is null)
-            {
-                Diagnostics.Add(Diagnostic.Critical("Array type's length isn't defined", field));
-                return;
-            }
-
-            if (!arrayType.ComputedLength.HasValue)
-            {
-                Diagnostics.Add(Diagnostic.Critical("I will eventually implement this", field));
-                return;
-            }
-
-            OnGotStatementType(field, ArrayLengthType);
-            field.PredictedValue = arrayType.ComputedLength.Value;
-
-            Push(arrayType.ComputedLength.Value);
-            return;
-        }
+        GeneralType prevType = field.Object.Type;
 
         if (prevType.Is(out PointerType? pointerType2))
         {
-            GenerateCodeForStatement(field.PrevStatement);
-            CheckPointerNull(field.PrevStatement.Location);
+            GenerateCodeForStatement(field.Object);
+            CheckPointerNull(field.Object.Location);
             prevType = pointerType2.To;
 
             while (prevType.Is(out pointerType2))
@@ -2337,25 +1259,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         PointerSize
                     );
                 }
-                CheckPointerNull(field.PrevStatement.Location);
+                CheckPointerNull(field.Object.Location);
                 prevType = pointerType2.To;
             }
 
             if (!prevType.Is(out StructType? structPointerType))
             {
-                Diagnostics.Add(Diagnostic.Critical($"Could not get the field offsets of type \"{prevType}\"", field.PrevStatement));
+                Diagnostics.Add(Diagnostic.Critical($"Could not get the field offsets of type \"{prevType}\"", field.Object));
                 return;
             }
 
-            if (!structPointerType.GetField(field.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset, out PossibleDiagnostic? error1))
+            if (!structPointerType.GetField(field.Field.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset, out PossibleDiagnostic? error1))
             {
-                Diagnostics.Add(error1.ToError(field.Identifier, field.File));
+                Diagnostics.Add(error1.ToError(field));
                 return;
             }
-
-            field.CompiledType = fieldDefinition.Type;
-            field.Reference = fieldDefinition;
-            fieldDefinition.References.AddReference(field);
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
@@ -2370,35 +1288,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (!prevType.Is(out StructType? structType)) throw new NotImplementedException();
 
-        GeneralType type = FindStatementType(field);
+        GeneralType type = field.Type;
 
-        if (!structType.GetField(field.Identifier.Content, this, out CompiledField? compiledField, out _, out PossibleDiagnostic? error2))
+        if (!structType.GetField(field.Field.Identifier.Content, this, out _, out _, out PossibleDiagnostic? error2))
         {
-            Diagnostics.Add(error2.ToError(field.Identifier, field.File));
+            Diagnostics.Add(error2.ToError(field));
             return;
         }
 
-        field.CompiledType = compiledField.Type;
-        field.Reference = compiledField;
-        compiledField.References.AddReference(field);
-
-        // if (CurrentContext?.Context != null)
-        // {
-        //     switch (compiledField.Protection)
-        //     {
-        //         case Protection.Private:
-        //             if (CurrentContext.Context.Identifier.Content != compiledField.Class.Identifier.Content)
-        //             { Diagnostics.Add(Diagnostic.Critical($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Identifier}\" due to it's protection level", field.Identifier, field.File); }
-        //             break;
-        //         case Protection.Public:
-        //             break;
-        //         default: throw new UnreachableException();
-        //     }
-        // }
-
         // TODO: what the hell is that
 
-        StatementWithValue? dereference = NeedDereference(field);
+        CompiledStatementWithValue? dereference = NeedDerefernce(field);
 
         if (!GetAddress(field, out Address? address, out PossibleDiagnostic? error))
         {
@@ -2411,101 +1311,46 @@ public partial class CodeGeneratorForMain : CodeGenerator
         else
         { PushFrom(address, type.GetSize(this, Diagnostics, field), dereference.Location); }
     }
-    void GenerateCodeForStatement(IndexCall index)
+    void GenerateCodeForStatement(CompiledIndexGetter index)
     {
-        GeneralType prevType = FindStatementType(index.PrevStatement);
-        GeneralType indexType = FindStatementType(index.Index);
-
-        if (GetIndexGetter(prevType, indexType, index.File, out FunctionQueryResult<CompiledFunction>? indexer, out PossibleDiagnostic? notFoundError, AddCompilable))
-        {
-            indexer.Function.References.Add(new(index, index.File));
-            GenerateCodeForFunctionCall(index, ImmutableArray.Create(index.PrevStatement, index.Index), indexer.Function);
-            return;
-        }
+        GeneralType prevType = index.Base.Type;
+        GeneralType indexType = index.Index.Type;
 
         if (prevType.Is(out ArrayType? arrayType))
         {
-            if (index.PrevStatement is not Identifier identifier)
-            { throw new NotSupportedException($"Only variables/parameters supported by now", index.PrevStatement); }
-
-            if (TryCompute(index.Index, out CompiledValue computedIndexData))
+            using (RegisterUsage.Auto regPtr = Registers.GetFree())
             {
-                _statistics.Precomputations++;
-                index.Index.PredictedValue = computedIndexData;
-
-                if (computedIndexData < 0 || (arrayType.ComputedLength.HasValue && computedIndexData >= arrayType.ComputedLength.Value))
-                { Diagnostics.Add(Diagnostic.Warning($"Index out of range", index.Index)); }
-
-                if (GetParameter(identifier.Content, out CompiledParameter? param, out _))
+                if (!GetAddress(index.Base, out Address? address, out PossibleDiagnostic? error))
                 {
-                    Diagnostics.Add(Diagnostic.OptimizationNotice("Indexing a parameter", index));
-
-                    if (!param.Type.SameAs(arrayType))
-                    { throw new NotImplementedException(); }
-
-                    Address offset = GetParameterAddress(param, (int)computedIndexData * arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement));
-                    PushFrom(offset, arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement));
-
-                    throw new NotImplementedException();
-                }
-
-                if (GetVariable(identifier.Content, out CompiledVariable? val, out _))
-                {
-                    Diagnostics.Add(Diagnostic.OptimizationNotice("Indexing a variable", index));
-
-                    if (!val.Type.SameAs(arrayType))
-                    { throw new NotImplementedException(); }
-
-                    // TODO: this
-                    // if (!val.IsInitialized)
-                    // { AnalysisCollection?.Warnings.Add(Diagnostic.Warning($"U are using the variable \"{val.Identifier}\" but its aint initialized.", identifier, identifier.File)); }
-
-                    int offset = (int)computedIndexData * arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement);
-                    Address address = GetLocalVariableAddress(val);
-
-                    PushFrom(new AddressOffset(address, offset), arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement));
-
+                    Diagnostics.Add(error.ToError(index.Base));
                     return;
                 }
-            }
+                GenerateAddressResolver(address);
+                PopTo(regPtr.Get(PointerBitWidth));
 
-            {
-                using (RegisterUsage.Auto regPtr = Registers.GetFree())
+                GenerateCodeForStatement(index.Index);
+
+                if (!indexType.Is<BuiltinType>())
                 {
-                    if (!GetAddress(identifier, out Address? address, out PossibleDiagnostic? error))
-                    {
-                        Diagnostics.Add(error.ToError(identifier));
-                        return;
-                    }
-                    GenerateAddressResolver(address);
-                    PopTo(regPtr.Get(PointerBitWidth));
-
-                    GenerateCodeForStatement(index.Index);
-
-                    if (!indexType.Is<BuiltinType>())
-                    {
-                        Diagnostics.Add(Diagnostic.Critical($"Index must be a builtin type (i.e. int) and not \"{indexType}\"", index.Index));
-                        return;
-                    }
-
-                    using (RegisterUsage.Auto regIndex = Registers.GetFree())
-                    {
-                        PopTo(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
-                        AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)), arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement));
-                        AddInstruction(Opcode.MathAdd, regPtr.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
-                    }
-
-                    PushFrom(new AddressRegisterPointer(regPtr.Get(PointerBitWidth)), arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement));
+                    Diagnostics.Add(Diagnostic.Critical($"Index must be a builtin type (i.e. int) and not \"{indexType}\"", index.Index));
+                    return;
                 }
-                return;
-            }
 
-            throw new NotImplementedException();
+                using (RegisterUsage.Auto regIndex = Registers.GetFree())
+                {
+                    PopTo(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
+                    AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)), arrayType.Of.GetSize(this, Diagnostics, index.Base));
+                    AddInstruction(Opcode.MathAdd, regPtr.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
+                }
+
+                PushFrom(new AddressRegisterPointer(regPtr.Get(PointerBitWidth)), arrayType.Of.GetSize(this, Diagnostics, index.Base));
+            }
+            return;
         }
 
         if (prevType.Is(out PointerType? pointerType) && pointerType.To.Is(out arrayType))
         {
-            int elementSize = arrayType.Of.GetSize(this, Diagnostics, index.PrevStatement);
+            int elementSize = arrayType.Of.GetSize(this, Diagnostics, index.Base);
             if (!GetAddress(index, out Address? _address, out PossibleDiagnostic? _error))
             {
                 Diagnostics.Add(_error.ToError(index));
@@ -2517,7 +1362,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         Diagnostics.Add(Diagnostic.Critical($"Index getter for type \"{prevType}\" not found", index));
     }
-
     void GenerateAddressResolver(Address address)
     {
         switch (address)
@@ -2543,17 +1387,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
                 break;
             }
-            case AddressRuntimePointer runtimePointer:
+            case AddressRuntimePointer2 runtimePointer:
             {
                 GenerateCodeForStatement(runtimePointer.PointerValue);
                 CheckPointerNull(runtimePointer.PointerValue.Location);
                 break;
             }
-            case AddressRuntimeIndex runtimeIndex:
+            case AddressRuntimeIndex2 runtimeIndex:
             {
                 GenerateAddressResolver(runtimeIndex.Base);
 
-                GeneralType indexType = FindStatementType(runtimeIndex.IndexValue);
+                GeneralType indexType = runtimeIndex.IndexValue.Type;
 
                 if (!indexType.Is<BuiltinType>())
                 {
@@ -2580,77 +1424,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
             default: throw new NotImplementedException();
         }
     }
-
-    void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
+    void GenerateCodeForStatement(CompiledFakeTypeCast typeCast)
     {
-        StatementWithValue statement = modifiedStatement.Statement;
-        Token modifier = modifiedStatement.Modifier;
-
-        if (modifier.Content == ModifierKeywords.Ref)
-        {
-            throw new NotImplementedException();
-        }
-
-        if (modifier.Content == ModifierKeywords.Temp)
-        {
-            GenerateCodeForStatement(statement);
-            return;
-        }
-
-        throw new NotImplementedException();
+        GenerateCodeForStatement(typeCast.Value);
     }
-    [DoesNotReturn]
-    void GenerateCodeForStatement(LiteralList listValue) => throw new NotImplementedException();
-    void GenerateCodeForStatement(BasicTypeCast typeCast)
+    void GenerateCodeForStatement(CompiledTypeCast typeCast)
     {
-        GeneralType statementType = FindStatementType(typeCast.PrevStatement);
-        GeneralType targetType = GeneralType.From(typeCast.Type, FindType, TryCompute);
-
-        if (statementType.Equals(targetType))
-        { Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Keyword, typeCast.File)); }
-
-        if (statementType.GetSize(this, Diagnostics, typeCast.PrevStatement) != targetType.GetSize(this, Diagnostics, typeCast))
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Can't convert \"{statementType}\" ({statementType.GetSize(this, Diagnostics, typeCast.PrevStatement)} bytes) to \"{targetType}\" ({targetType.GetSize(this, Diagnostics, typeCast)} bytes)", typeCast.Keyword, typeCast.File));
-            return;
-        }
-
-        typeCast.Type.SetAnalyzedType(targetType);
-        OnGotStatementType(typeCast, targetType);
-
-        GenerateCodeForStatement(typeCast.PrevStatement);
-    }
-    void GenerateCodeForStatement(ManagedTypeCast typeCast)
-    {
-        GeneralType statementType = FindStatementType(typeCast.PrevStatement);
-        GeneralType targetType = GeneralType.From(typeCast.Type, FindType, TryCompute);
-        typeCast.Type.SetAnalyzedType(targetType);
-        OnGotStatementType(typeCast, targetType);
-
-        if (statementType.Equals(targetType))
-        {
-            Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Type, typeCast.File));
-            _statistics.Optimizations++;
-            GenerateCodeForStatement(typeCast.PrevStatement);
-            return;
-        }
-
-        if (AllowEvaluating &&
-            targetType.Is(out BuiltinType? targetBuiltinType) &&
-            TryComputeSimple(typeCast.PrevStatement, out CompiledValue prevValue) &&
-            prevValue.TryCast(targetBuiltinType.RuntimeType, out CompiledValue castedValue))
-        {
-            Diagnostics.Add(Diagnostic.OptimizationNotice($"Type cast evaluated, converting {prevValue} to {castedValue}", typeCast));
-            _statistics.Precomputations++;
-            Push(castedValue);
-            return;
-        }
+        GeneralType statementType = typeCast.Value.Type;
+        GeneralType targetType = typeCast.Type;
 
         // f32 -> i32
         if (statementType.SameAs(BuiltinType.F32) &&
             targetType.SameAs(BuiltinType.I32))
         {
-            GenerateCodeForStatement(typeCast.PrevStatement);
+            GenerateCodeForStatement(typeCast.Value);
             AddInstruction(Opcode.FFrom, (InstructionOperand)StackTop, (InstructionOperand)StackTop);
             return;
         }
@@ -2659,13 +1446,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (statementType.SameAs(BuiltinType.I32) &&
             targetType.SameAs(BuiltinType.F32))
         {
-            GenerateCodeForStatement(typeCast.PrevStatement);
+            GenerateCodeForStatement(typeCast.Value);
             AddInstruction(Opcode.FTo, (InstructionOperand)StackTop, (InstructionOperand)StackTop);
             return;
         }
 
-        int statementSize = statementType.GetSize(this, Diagnostics, typeCast.PrevStatement);
-        int targetSize = targetType.GetSize(this, Diagnostics, new Location(typeCast.Type.Position, typeCast.File));
+        int statementSize = statementType.GetSize(this, Diagnostics, typeCast.Value);
+        int targetSize = targetType.GetSize(this, Diagnostics, typeCast);
 
         if (statementSize != targetSize)
         {
@@ -2679,7 +1466,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment("Value");
 
-                GenerateCodeForStatement(typeCast.PrevStatement);
+                GenerateCodeForStatement(typeCast.Value);
 
                 AddComment("Save");
 
@@ -2700,7 +1487,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment("Value");
 
-                GenerateCodeForStatement(typeCast.PrevStatement);
+                GenerateCodeForStatement(typeCast.Value);
 
                 AddComment("Save");
 
@@ -2721,20 +1508,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        GenerateCodeForStatement(typeCast.PrevStatement, targetType);
+        GenerateCodeForStatement(typeCast.Value, targetType);
     }
-
-    void GenerateCodeForStatement(Block block, bool ignoreScope = false)
+    void GenerateCodeForStatement(CompiledBlock block, bool ignoreScope = false)
     {
-        if (AllowTrimming &&
-            block.Statements.Length == 0)
-        {
-            Diagnostics.Add(Diagnostic.OptimizationNotice($"Empty block", block));
-            _statistics.Optimizations++;
-            AddComment("Statements { }");
-            return;
-        }
-
         if (ignoreScope)
         {
             AddComment("Statements {");
@@ -2745,45 +1522,63 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        OnScopeEnter(block, false);
+        CompiledScope scope = OnScopeEnter(block, false);
 
         AddComment("Statements {");
         for (int i = 0; i < block.Statements.Length; i++)
         { GenerateCodeForStatement(block.Statements[i]); }
         AddComment("}");
 
-        OnScopeExit(block.Brackets.End.Position, block.File);
+        OnScopeExit(block.Location.Position.After(), block.Location.File, scope);
     }
-
-    void GenerateCodeForStatement(Statement statement, GeneralType? expectedType = null, bool resolveReference = true)
+    void GenerateCodeForStatement(CompiledStatement statement, GeneralType? expectedType = null, bool resolveReference = true)
     {
         int startInstruction = GeneratedCode.Count;
 
         switch (statement)
         {
-            case LiteralList v: GenerateCodeForStatement(v); break;
-            case VariableDeclaration v: GenerateCodeForStatement(v); break;
-            case KeywordCall v: GenerateCodeForStatement(v); break;
-            case BinaryOperatorCall v: GenerateCodeForStatement(v, expectedType); break;
-            case UnaryOperatorCall v: GenerateCodeForStatement(v); break;
-            case AnyAssignment v: GenerateCodeForStatement(v.ToAssignment()); break;
-            case LiteralStatement v: GenerateCodeForStatement(v, expectedType); break;
-            case Identifier v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
-            case AddressGetter v: GenerateCodeForStatement(v); break;
-            case Pointer v: GenerateCodeForStatement(v); break;
-            case WhileLoop v: GenerateCodeForStatement(v); break;
-            case ForLoop v: GenerateCodeForStatement(v); break;
-            case IfContainer v: GenerateCodeForStatement(v); break;
-            case NewInstance v: GenerateCodeForStatement(v); break;
-            case ConstructorCall v: GenerateCodeForStatement(v); break;
-            case IndexCall v: GenerateCodeForStatement(v); break;
-            case Field v: GenerateCodeForStatement(v); break;
-            case BasicTypeCast v: GenerateCodeForStatement(v); break;
-            case ManagedTypeCast v: GenerateCodeForStatement(v); break;
-            case ModifiedStatement v: GenerateCodeForStatement(v); break;
-            case AnyCall v: GenerateCodeForStatement(v); break;
-            case Block v: GenerateCodeForStatement(v); break;
-            case InstructionLabel v: GenerateCodeForStatement(v); break;
+            case CompiledVariableDeclaration v: GenerateCodeForStatement(v); break;
+            case CompiledSizeof v: GenerateCodeForStatement(v); break;
+            case CompiledReturn v: GenerateCodeForStatement(v); break;
+            case CompiledCrash v: GenerateCodeForStatement(v); break;
+            case CompiledBreak v: GenerateCodeForStatement(v); break;
+            case CompiledDelete v: GenerateCodeForStatement(v); break;
+            case CompiledGoto v: GenerateCodeForStatement(v); break;
+            case CompiledBinaryOperatorCall v: GenerateCodeForStatement(v); break;
+            case CompiledUnaryOperatorCall v: GenerateCodeForStatement(v); break;
+            case CompiledEvaluatedValue v: GenerateCodeForStatement(v, expectedType); break;
+            case RegisterGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledLocalVariableGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledGlobalVariableGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledParameterGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case FunctionAddressGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case InstructionLabelAddressGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledFieldGetter v: GenerateCodeForStatement(v); break;
+            case CompiledIndexGetter v: GenerateCodeForStatement(v); break;
+            case CompiledAddressGetter v: GenerateCodeForStatement(v); break;
+            case RegisterSetter v: GenerateCodeForValueSetter(v); break;
+            case CompiledLocalVariableSetter v: GenerateCodeForValueSetter(v); break;
+            case CompiledGlobalVariableSetter v: GenerateCodeForValueSetter(v); break;
+            case CompiledParameterSetter v: GenerateCodeForValueSetter(v); break;
+            case CompiledIndirectSetter v: GenerateCodeForValueSetter(v); break;
+            case CompiledFieldSetter v: GenerateCodeForValueSetter(v); break;
+            case CompiledIndexSetter v: GenerateCodeForValueSetter(v); break;
+            case CompiledPointer v: GenerateCodeForStatement(v); break;
+            case CompiledWhileLoop v: GenerateCodeForStatement(v); break;
+            case CompiledForLoop v: GenerateCodeForStatement(v); break;
+            case CompiledIf v: GenerateCodeForStatement(v); break;
+            case CompiledStackAllocation v: GenerateCodeForStatement(v); break;
+            case CompiledConstructorCall v: GenerateCodeForStatement(v); break;
+            case CompiledTypeCast v: GenerateCodeForStatement(v); break;
+            case CompiledFakeTypeCast v: GenerateCodeForStatement(v); break;
+            case CompiledRuntimeCall v: GenerateCodeForStatement(v); break;
+            case CompiledFunctionCall v: GenerateCodeForFunctionCall(v); break;
+            case CompiledExternalFunctionCall v: GenerateCodeForFunctionCall_External(v); break;
+            case CompiledBlock v: GenerateCodeForStatement(v); break;
+            case CompiledInstructionLabelDeclaration v: GenerateCodeForStatement(v); break;
+            case CompiledStatementWithValueThatActuallyDoesntHaveValue v: GenerateCodeForStatement(v.Statement); break;
+            case CompiledStringInstance v: GenerateCodeForStatement(v); break;
+            case EmptyStatement: break;
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
 
@@ -2797,16 +1592,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    ImmutableArray<CleanupItem> CompileVariables(IEnumerable<VariableDeclaration> statements, bool addComments = true)
+    ImmutableArray<CompiledCleanup> CompileVariables(IEnumerable<CompiledVariableDeclaration> statements, bool addComments = true)
     {
         if (addComments) AddComment("Variables {");
 
-        ImmutableArray<CleanupItem>.Builder result = ImmutableArray.CreateBuilder<CleanupItem>();
+        ImmutableArray<CompiledCleanup>.Builder result = ImmutableArray.CreateBuilder<CompiledCleanup>();
 
-        foreach (VariableDeclaration statement in statements)
+        foreach (CompiledVariableDeclaration statement in statements)
         {
-            CleanupItem item = GenerateCodeForLocalVariable(statement);
-            if (item.SizeOnStack == 0) continue;
+            CompiledCleanup? item = GenerateCodeForLocalVariable(statement);
+            if (item is null) continue;
 
             result.Add(item);
         }
@@ -2816,7 +1611,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return result.ToImmutable();
     }
 
-    void CleanupVariables(ImmutableArray<CleanupItem> cleanupItems, Location location, bool justGenerateCode)
+    void CleanupVariables(ImmutableArray<CompiledCleanup> cleanupItems, Location location, bool justGenerateCode)
     {
         if (cleanupItems.Length == 0) return;
         AddComment("Clear Variables");
@@ -2825,168 +1620,87 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CleanupVariables(cleanupItems[i], location, justGenerateCode);
         }
     }
-
-    void CleanupVariables(CleanupItem cleanupItem, Location location, bool justGenerateCode)
+    void CleanupVariables(CompiledCleanup cleanupItem, Location location, bool justGenerateCode)
     {
-        if (cleanupItem.ShouldDeallocate)
-        {
-            if (cleanupItem.Type is null) throw new InternalExceptionWithoutContext();
-            GenerateDestructor(cleanupItem.Type, location);
-        }
-        else
-        {
-            Pop(cleanupItem.SizeOnStack);
-        }
+        GenerateDestructor(cleanupItem);
+        Pop(cleanupItem.TrashType.GetSize(this, Diagnostics, cleanupItem));
 
         if (!justGenerateCode) CompiledLocalVariables.Pop();
     }
 
-    void GenerateCodeForValueSetter(Statement statementToSet, StatementWithValue value)
+    void GenerateCodeForValueSetter(RegisterSetter registerSetter)
     {
-        switch (statementToSet)
-        {
-            case Identifier v: GenerateCodeForValueSetter(v, value); break;
-            case Field v: GenerateCodeForValueSetter(v, value); break;
-            case IndexCall v: GenerateCodeForValueSetter(v, value); break;
-            case Pointer v: GenerateCodeForValueSetter(v, value); break;
-            default:
-                Diagnostics.Add(Diagnostic.Critical($"The left side of the assignment operator should be a variable, field or memory address. Passed \"{statementToSet.GetType().Name}\"", statementToSet));
-                return;
-        }
+        GenerateCodeForStatement(registerSetter.Value);
+        PopTo(registerSetter.Register);
     }
-    void GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value)
+    void GenerateCodeForValueSetter(CompiledLocalVariableSetter localVariableSetter)
     {
-        if (RegisterKeywords.TryGetValue(statementToSet.Content, out (Register Register, BuiltinType Type) registerKeyword))
+        if (localVariableSetter.Variable.InitialValue is not null &&
+                StatementCompiler.IsStringOnStack(localVariableSetter.Variable.Type, localVariableSetter.Variable.InitialValue, out CompiledStringInstance? literal, out _, out PossibleDiagnostic? error))
         {
-            GeneralType valueType = FindStatementType(value, registerKeyword.Type);
+            if (error is not null) Diagnostics.Add(error.ToError(localVariableSetter.Value));
+            // localVariableSetter.Variable.IsInitialized = true;
 
-            if (!CanCastImplicitly(valueType, registerKeyword.Type, value, out PossibleDiagnostic? castError))
-            { Diagnostics.Add(castError.ToError(value)); }
-
-            GenerateCodeForStatement(value, registerKeyword.Type);
-            PopTo(registerKeyword.Register);
-            return;
+            for (int i = 0; i < literal.Value.Length; i++)
+            { Push(new CompiledValue(literal.Value[i])); }
+        }
+        else
+        {
+            GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
         }
 
-        if (GetConstant(statementToSet.Content, statementToSet.File, out _, out _))
-        {
-            statementToSet.AnalyzedType = TokenAnalyzedType.ConstantName;
-            Diagnostics.Add(Diagnostic.Critical($"Can not set constant value: it is readonly", statementToSet));
-            return;
-        }
-
-        if (GetParameter(statementToSet.Content, out CompiledParameter? parameter, out PossibleDiagnostic? parameterNotFoundError))
-        {
-            if (statementToSet.Content != StatementKeywords.This)
-            { statementToSet.AnalyzedType = TokenAnalyzedType.ParameterName; }
-            statementToSet.CompiledType = parameter.Type;
-            statementToSet.Reference = parameter;
-
-            GeneralType valueType = FindStatementType(value, parameter.Type);
-
-            if (!CanCastImplicitly(valueType, parameter.Type, value, out PossibleDiagnostic? castError))
-            {
-                Diagnostics.Add(castError.ToError(value));
-            }
-
-            GenerateCodeForStatement(value, parameter.Type);
-
-            Address address = GetParameterAddress(parameter);
-
-            if (parameter.IsRef)
-            { address = new AddressPointer(address); }
-
-            PopTo(address, parameter.Type.GetSize(this, Diagnostics, statementToSet));
-            return;
-        }
-
-        if (GetVariable(statementToSet.Content, out CompiledVariable? variable, out PossibleDiagnostic? variableNotFoundError))
-        {
-            statementToSet.AnalyzedType = TokenAnalyzedType.VariableName;
-            statementToSet.CompiledType = variable.Type;
-            statementToSet.Reference = variable;
-
-            GeneralType valueType = FindStatementType(value, variable.Type);
-
-            if (variable.InitialValue is not null &&
-                IsStringOnStack(variable.Type, variable.InitialValue, out LiteralStatement? literal, out int avaliableLength, out PossibleDiagnostic? error))
-            {
-                if (error is not null) Diagnostics.Add(error.ToError(value));
-                variable.IsInitialized = true;
-
-                for (int i = 0; i < literal.Value.Length; i++)
-                { Push(new CompiledValue(literal.Value[i])); }
-            }
-            else
-            {
-                if (!CanCastImplicitly(valueType, variable.Type, value, out PossibleDiagnostic? castError))
-                {
-                    Diagnostics.Add(castError.ToError(value));
-                }
-
-                GenerateCodeForStatement(value, variable.Type);
-            }
-
-            PopTo(GetLocalVariableAddress(variable), variable.Type.GetSize(this, Diagnostics, statementToSet));
-            variable.IsInitialized = true;
-            return;
-        }
-
-        if (GetGlobalVariable(statementToSet.Content, statementToSet.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
-        {
-            statementToSet.AnalyzedType = TokenAnalyzedType.VariableName;
-            statementToSet.CompiledType = globalVariable.Type;
-            statementToSet.Reference = globalVariable;
-
-            GeneralType valueType = FindStatementType(value, globalVariable.Type);
-
-            if (globalVariable.InitialValue is not null &&
-                IsStringOnStack(globalVariable.Type, globalVariable.InitialValue, out LiteralStatement? literal, out int avaliableLength, out PossibleDiagnostic? error))
-            {
-                if (error is not null) Diagnostics.Add(error.ToError(literal));
-
-                globalVariable.IsInitialized = true;
-
-                for (int i = 0; i < literal.Value.Length; i++)
-                { Push(new CompiledValue(literal.Value[i])); }
-            }
-            else
-            {
-                if (!CanCastImplicitly(valueType, globalVariable.Type, value, out PossibleDiagnostic? castError))
-                {
-                    Diagnostics.Add(castError.ToError(value));
-                }
-
-                GenerateCodeForStatement(value, globalVariable.Type);
-            }
-
-            PopTo(GetGlobalVariableAddress(globalVariable), globalVariable.Type.GetSize(this, Diagnostics, globalVariable));
-            return;
-        }
-
-        Diagnostics.Add(Diagnostic.Critical(
-            $"Symbol \"{statementToSet.Content}\" not found",
-            statementToSet,
-            parameterNotFoundError.ToError(statementToSet),
-            variableNotFoundError.ToError(statementToSet),
-            globalVariableNotFoundError.ToError(statementToSet)));
+        PopTo(GetLocalVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter));
+        // localVariableSetter.Variable.Variable.IsInitialized = true;
+        return;
     }
-    void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
+    void GenerateCodeForValueSetter(CompiledGlobalVariableSetter globalVariableSetter)
     {
-        GeneralType type = FindStatementType(statementToSet);
-        GeneralType valueType = FindStatementType(value, type);
+        if (globalVariableSetter.Variable.InitialValue is not null &&
+            StatementCompiler.IsStringOnStack(globalVariableSetter.Variable.Type, globalVariableSetter.Variable.InitialValue, out CompiledStringInstance? literal, out _, out PossibleDiagnostic? error))
+        {
+            if (error is not null) Diagnostics.Add(error.ToError(literal));
 
-        StatementWithValue? dereference = NeedDereference(statementToSet);
+            // globalVariableSetter.Variable.Variable.IsInitialized = true;
 
-        if (IsStringOnStack(type, value, out LiteralStatement? stackString, out int avaliableLength, out PossibleDiagnostic? stackStringError))
+            for (int i = 0; i < literal.Value.Length; i++)
+            { Push(new CompiledValue(literal.Value[i])); }
+        }
+        else
+        {
+            GenerateCodeForStatement(globalVariableSetter.Value, globalVariableSetter.Variable.Type);
+        }
+
+        PopTo(GetGlobalVariableAddress(globalVariableSetter.Variable), globalVariableSetter.Variable.Type.GetSize(this, Diagnostics, globalVariableSetter.Variable));
+        return;
+    }
+    void GenerateCodeForValueSetter(CompiledParameterSetter parameterSetter)
+    {
+        GenerateCodeForStatement(parameterSetter.Value, parameterSetter.Variable.Type);
+
+        Address address = GetParameterAddress(parameterSetter.Variable);
+
+        if (parameterSetter.Variable.IsRef)
+        { address = new AddressPointer(address); }
+
+        PopTo(address, parameterSetter.Variable.Type.GetSize(this, Diagnostics, parameterSetter));
+        return;
+    }
+    void GenerateCodeForValueSetter(CompiledFieldSetter fieldSetter)
+    {
+        GeneralType type = fieldSetter.Type;
+        GeneralType valueType = fieldSetter.Value.Type;
+
+        CompiledStatementWithValue? dereference = NeedDerefernce(fieldSetter.ToGetter());
+
+        if (StatementCompiler.IsStringOnStack(type, fieldSetter.Value, out CompiledStringInstance? stackString, out int avaliableLength, out PossibleDiagnostic? stackStringError))
         {
             if (stackStringError != null) Diagnostics.Add(stackStringError.ToError(stackString));
 
             if (dereference is null)
             {
-                if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error2))
+                if (!GetAddress(fieldSetter.ToGetter(), out Address? address, out PossibleDiagnostic? error2))
                 {
-                    Diagnostics.Add(error2.ToError(statementToSet));
+                    Diagnostics.Add(error2.ToError(fieldSetter));
                     return;
                 }
                 for (int i = 0; i < stackString.Value.Length; i++)
@@ -3002,9 +1716,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else
             {
-                if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error))
+                if (!GetAddress(fieldSetter.ToGetter(), out Address? address, out PossibleDiagnostic? error))
                 {
-                    Diagnostics.Add(error.ToError(statementToSet));
+                    Diagnostics.Add(error.ToError(fieldSetter));
                     return;
                 }
                 for (int i = 0; i < stackString.Value.Length; i++)
@@ -3021,96 +1735,61 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-
-            if (!CanCastImplicitly(valueType, type, value, out PossibleDiagnostic? castError2))
-            {
-                Diagnostics.Add(castError2.ToError(value));
-            }
-
-            GenerateCodeForStatement(value, type);
+            GenerateCodeForStatement(fieldSetter.Value, type);
 
             if (dereference is null)
             {
-                if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error2))
+                if (!GetAddress(fieldSetter.ToGetter(), out Address? address, out PossibleDiagnostic? error2))
                 {
-                    Diagnostics.Add(error2.ToError(statementToSet));
+                    Diagnostics.Add(error2.ToError(fieldSetter));
                     return;
                 }
-                PopTo(address, valueType.GetSize(this, Diagnostics, value));
+                PopTo(address, valueType.GetSize(this, Diagnostics, fieldSetter.Value));
             }
             else
             {
-                if (!GetAddress(statementToSet, out Address? address, out PossibleDiagnostic? error))
+                if (!GetAddress(fieldSetter.ToGetter(), out Address? address, out PossibleDiagnostic? error))
                 {
-                    Diagnostics.Add(error.ToError(statementToSet));
+                    Diagnostics.Add(error.ToError(fieldSetter));
                     return;
                 }
-                PopTo(address, valueType.GetSize(this, Diagnostics, value), dereference.Location);
+                PopTo(address, valueType.GetSize(this, Diagnostics, fieldSetter.Value), dereference.Location);
             }
         }
     }
-    void GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value)
+    void GenerateCodeForValueSetter(CompiledIndexSetter indexSetter)
     {
-        GeneralType itemType = FindStatementType(statementToSet);
-        GeneralType prevType = FindStatementType(statementToSet.PrevStatement);
-        GeneralType indexType = FindStatementType(statementToSet.Index);
-        GeneralType valueType = FindStatementType(value);
-
-        if (GetIndexSetter(prevType, valueType, indexType, statementToSet.File, out FunctionQueryResult<CompiledFunction>? indexer, out PossibleDiagnostic? indexerNotFoundError, AddCompilable))
+        if (!GetAddress(indexSetter.ToGetter(), out Address? _address, out PossibleDiagnostic? _error))
         {
-            indexer.Function.References.Add(new(statementToSet, statementToSet.File));
-            GenerateCodeForFunctionCall(statementToSet, ImmutableArray.Create<StatementWithValue>(statementToSet.PrevStatement, statementToSet.Index, value), indexer.Function);
+            Diagnostics.Add(_error.ToError(indexSetter));
             return;
         }
-
-        if (!CanCastImplicitly(valueType, itemType, value, out PossibleDiagnostic? castError))
-        {
-            Diagnostics.Add(castError.ToError(value));
-        }
-
-        if (!GetAddress(statementToSet, out Address? _address, out PossibleDiagnostic? _error))
-        {
-            Diagnostics.Add(_error.ToError(statementToSet));
-            Diagnostics.Add(indexerNotFoundError.ToError(statementToSet));
-            return;
-        }
-        GenerateCodeForStatement(value);
-        PopTo(_address, valueType.GetSize(this, Diagnostics, value));
-        return;
+        GenerateCodeForStatement(indexSetter.Value);
+        PopTo(_address, indexSetter.Value.Type.GetSize(this, Diagnostics, indexSetter.Value));
     }
-    void GenerateCodeForValueSetter(Pointer statementToSet, StatementWithValue value)
+    void GenerateCodeForValueSetter(CompiledIndirectSetter statementToSet)
     {
-        GeneralType targetType = FindStatementType(statementToSet);
-        GeneralType valueType = FindStatementType(value, targetType);
-        GeneralType pointerValueType = FindStatementType(statementToSet.PrevStatement);
-
-        if (!CanCastImplicitly(valueType, targetType, value, out PossibleDiagnostic? castError))
+        if (statementToSet.AddressValue.Type.GetBitWidth(this, Diagnostics, statementToSet.AddressValue) != PointerBitWidth)
         {
-            Diagnostics.Add(castError.ToError(value));
-        }
-
-        if (pointerValueType.GetBitWidth(this, Diagnostics, statementToSet.PrevStatement) != PointerBitWidth)
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Type \"{pointerValueType}\" cant be a pointer", statementToSet.PrevStatement));
+            Diagnostics.Add(Diagnostic.Critical($"Type \"{statementToSet.AddressValue.Type}\" cant be a pointer", statementToSet.AddressValue));
             return;
         }
 
-        GenerateCodeForStatement(value, targetType);
+        GenerateCodeForStatement(statementToSet.Value);
 
-        GenerateCodeForStatement(statementToSet.PrevStatement);
+        GenerateCodeForStatement(statementToSet.AddressValue);
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(PointerBitWidth));
-            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), valueType.GetSize(this, Diagnostics, value));
+            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), statementToSet.Value.Type.GetSize(this, Diagnostics, statementToSet.Value));
         }
     }
 
     #endregion
 
-    void OnScopeEnter(Block block, bool isFunction) => OnScopeEnter(block.Position, block.File, block.Statements.OfType<VariableDeclaration>(), isFunction);
-
-    void OnScopeEnter(Position position, Uri file, IEnumerable<VariableDeclaration> variables, bool isFunction)
+    CompiledScope OnScopeEnter(CompiledBlock block, bool isFunction) => OnScopeEnter(block.Location.Position, block.Location.File, block.Statements.OfType<CompiledVariableDeclaration>(), isFunction);
+    CompiledScope OnScopeEnter(Position position, Uri file, IEnumerable<CompiledVariableDeclaration> variables, bool isFunction)
     {
         CurrentScopeDebug.Push(new ScopeInformation()
         {
@@ -3124,125 +1803,73 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Scope enter");
 
-        CompileLocalConstants(variables);
-
-        CleanupStack.Push(new Scope(
+        CompiledScope scope = new(
             CompileVariables(variables, CurrentContext is null),
             isFunction
-        ));
+        );
+        CleanupStack2.Push(scope);
+        return scope;
     }
 
-    void OnScopeExit(Position position, Uri file)
+    void OnScopeExit(Position position, Uri file, CompiledScope scope)
     {
         AddComment("Scope exit");
+        Debug.Assert(scope.Equals(CleanupStack2.Pop()));
 
-        CleanupVariables(CleanupStack.Pop().Variables, new Location(position, file), false);
+        CleanupVariables(scope.Variables, new Location(position, file), false);
 
-        CleanupLocalConstants();
-
-        ScopeInformation scope = CurrentScopeDebug.Pop();
-        scope.Location.Instructions.End = GeneratedCode.Count - 1;
-        DebugInfo?.ScopeInformation.Add(scope);
+        ScopeInformation scopeDebug = CurrentScopeDebug.Pop();
+        scopeDebug.Location.Instructions.End = GeneratedCode.Count - 1;
+        DebugInfo?.ScopeInformation.Add(scopeDebug);
     }
 
     #region GenerateCodeForLocalVariable
 
-    CleanupItem GenerateCodeForLocalVariable(VariableDeclaration newVariable)
+    CompiledCleanup? GenerateCodeForLocalVariable(CompiledVariableDeclaration newVariable)
     {
-        if (newVariable.Modifiers.Contains(ModifierKeywords.Const)) return CleanupItem.Null;
-
-        newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
-
-        foreach (CompiledVariable other in CompiledLocalVariables)
-        {
-            if (other.Identifier.Content != newVariable.Identifier.Content) continue;
-            Diagnostics.Add(Diagnostic.Warning($"Variable \"{other.Identifier}\" already defined", newVariable.Identifier));
-        }
-
-        GeneralType type;
-        if (newVariable.Type == StatementKeywords.Var)
-        {
-            if (newVariable.InitialValue == null)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Initial value for variable declaration with implicit type is required", newVariable));
-                return default;
-            }
-
-            type = FindStatementType(newVariable.InitialValue);
-        }
-        else
-        {
-            type = GeneralType.From(newVariable.Type, FindType, TryCompute);
-
-            newVariable.Type.SetAnalyzedType(type);
-            newVariable.CompiledType = type;
-        }
+        GeneralType type = newVariable.Type;
 
         int offset = (VariablesSize + type.GetSize(this, Diagnostics, newVariable)) * BytecodeProcessor.StackDirection;
-
-        CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
+        GeneratedVariable generatedVariable = GeneratedVariables[newVariable] = new GeneratedVariable()
+        {
+            MemoryAddress = offset,
+        };
 
         StackElementInformation debugInfo = new()
         {
             Kind = StackElementKind.Variable,
-            Identifier = compiledVariable.Identifier.Content,
+            Identifier = newVariable.Identifier,
             Address = offset,
             BasePointerRelative = true,
-            Size = compiledVariable.Type.GetSize(this, Diagnostics, compiledVariable),
-            Type = compiledVariable.Type
+            Size = type.GetSize(this, Diagnostics, newVariable),
+            Type = type
         };
-        newVariable.CompiledType = compiledVariable.Type;
 
         if (CurrentScopeDebug.Count > 0) CurrentScopeDebug.Last.Stack.Add(debugInfo);
 
-        CompiledLocalVariables.Add(compiledVariable);
-
-        newVariable.Type.SetAnalyzedType(compiledVariable.Type);
+        CompiledLocalVariables.Add(newVariable);
 
         int size;
 
-        if (AllowEvaluating &&
-            TryCompute(newVariable.InitialValue, out CompiledValue computedInitialValue))
+        if (newVariable.InitialValue is CompiledEvaluatedValue evaluatedInitialValue)
         {
-            if (computedInitialValue.TryCast(compiledVariable.Type, out CompiledValue castedInitialValue))
-            { computedInitialValue = castedInitialValue; }
-
-            Diagnostics.Add(Diagnostic.OptimizationNotice($"Variable initial value evaluated as {castedInitialValue}", newVariable.InitialValue));
-            _statistics.Precomputations++;
-
-            newVariable.InitialValue.PredictedValue = computedInitialValue;
-
             AddComment($"Initial value {{");
 
-            size = new BuiltinType(computedInitialValue.Type).GetSize(this, Diagnostics, newVariable.InitialValue);
+            size = evaluatedInitialValue.Type.GetSize(this, Diagnostics, newVariable.InitialValue);
 
-            Push(computedInitialValue);
-            compiledVariable.IsInitialized = true;
-
-            if (size <= 0)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Variable has a size of {size}", newVariable));
-                return default;
-            }
-
-            if (newVariable.InitialValue is not null)
-            {
-                GeneralType initialValueType = FindStatementType(newVariable.InitialValue);
-                if (!CanCastImplicitly(initialValueType, type, newVariable.InitialValue, out PossibleDiagnostic? castError))
-                { Diagnostics.Add(castError.ToError(newVariable.InitialValue)); }
-            }
+            Push(evaluatedInitialValue.Value);
+            generatedVariable.IsInitialized = true;
 
             AddComment("}");
         }
-        else if (compiledVariable.Type.Is(out ArrayType? arrayType) &&
+        else if (newVariable.Type.Is(out ArrayType? arrayType) &&
             arrayType.Of.SameAs(BasicType.U16) &&
-            newVariable.InitialValue is LiteralStatement literalStatement &&
-            literalStatement.Type == LiteralType.String &&
+            newVariable.InitialValue is CompiledStringInstance literalStatement &&
             arrayType.ComputedLength.HasValue &&
             literalStatement.Value.Length == arrayType.ComputedLength.Value)
         {
-            size = arrayType.GetSize(this, Diagnostics, compiledVariable);
-            compiledVariable.IsInitialized = true;
+            size = arrayType.GetSize(this, Diagnostics, newVariable);
+            generatedVariable.IsInitialized = true;
 
             for (int i = 0; i < literalStatement.Value.Length; i++)
             {
@@ -3253,7 +1880,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             AddComment($"Initial value {{");
 
-            size = compiledVariable.Type.GetSize(this, Diagnostics, compiledVariable);
+            size = newVariable.Type.GetSize(this, Diagnostics, newVariable);
             StackAlloc(size, false);
 
             if (size <= 0)
@@ -3262,70 +1889,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return default;
             }
 
-            if (newVariable.InitialValue is not null)
-            {
-                GeneralType initialValueType = FindStatementType(newVariable.InitialValue);
-                if (!CanCastImplicitly(initialValueType, type, newVariable.InitialValue, out PossibleDiagnostic? castError))
-                { Diagnostics.Add(castError.ToError(newVariable.InitialValue)); }
-            }
-
             AddComment("}");
         }
 
-        if (size != compiledVariable.Type.GetSize(this, Diagnostics, compiledVariable))
-        { Diagnostics.Add(Diagnostic.Internal($"Variable size ({compiledVariable.Type.GetSize(this, Diagnostics, compiledVariable)}) and initial value size ({size}) mismatch", newVariable.InitialValue!)); }
+        if (size != newVariable.Type.GetSize(this, Diagnostics, newVariable))
+        { Diagnostics.Add(Diagnostic.Internal($"Variable size ({newVariable.Type.GetSize(this, Diagnostics, newVariable)}) and initial value size ({size}) mismatch", newVariable.InitialValue!)); }
 
-        return new CleanupItem(size, newVariable.Modifiers.Contains(ModifierKeywords.Temp), compiledVariable.Type);
-    }
-    CleanupItem GenerateCodeForLocalVariable(Statement st)
-    {
-        if (st is VariableDeclaration newVariable)
-        { return GenerateCodeForLocalVariable(newVariable); }
-        return CleanupItem.Null;
-    }
-    ImmutableArray<CleanupItem> GenerateCodeForLocalVariable(IEnumerable<Statement> statements)
-    {
-        ImmutableArray<CleanupItem>.Builder result = ImmutableArray.CreateBuilder<CleanupItem>();
-
-        foreach (Statement statement in statements)
-        {
-            CleanupItem item = GenerateCodeForLocalVariable(statement);
-            if (item.SizeOnStack == 0) continue;
-
-            result.Add(item);
-        }
-
-        return result.ToImmutable();
-    }
-
-    #endregion
-
-    #region GenerateCodeForInstructionLabel
-
-    void GenerateCodeForInstructionLabel(InstructionLabel instructionLabel)
-    {
-        foreach (CompiledInstructionLabel other in CompiledInstructionLabels)
-        {
-            if (other.Identifier.Content != instructionLabel.Identifier.Content) continue;
-            Diagnostics.Add(Diagnostic.Warning($"Instruction label \"{other.Identifier}\" already defined", instructionLabel.Identifier));
-        }
-
-        CompiledInstructionLabels.Add(new CompiledInstructionLabel(
-            InvalidFunctionAddress,
-            instructionLabel
-        ));
-    }
-    void GenerateCodeForInstructionLabel(Statement statement)
-    {
-        if (statement is InstructionLabel instructionLabel)
-        { GenerateCodeForInstructionLabel(instructionLabel); }
-    }
-    void GenerateCodeForInstructionLabel(IEnumerable<Statement> statements)
-    {
-        foreach (Statement statement in statements)
-        {
-            GenerateCodeForInstructionLabel(statement);
-        }
+        return newVariable.Cleanup;
     }
 
     #endregion
@@ -3337,7 +1907,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         get
         {
             int sum = 0;
-            foreach (CompiledVariable variable in CompiledLocalVariables)
+            foreach (var variable in CompiledLocalVariables)
             { sum += variable.Type.GetSize(this, Diagnostics, variable); }
             return sum;
         }
@@ -3348,7 +1918,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         get
         {
             int sum = 0;
-            foreach (CompiledVariable variable in CompiledGlobalVariables)
+            foreach (var variable in CompiledGlobalVariables)
             { sum += variable.Type.GetSize(this, Diagnostics, variable); }
             return sum;
         }
@@ -3364,33 +1934,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    bool GenerateCodeForFunction(FunctionThingDefinition function)
+    bool GenerateCodeForFunction(ICompiledFunction function, CompiledBlock body)
     {
-        if (function.Identifier is not null &&
-            LanguageConstants.KeywordList.Contains(function.Identifier.ToString()))
-        {
-            Diagnostics.Add(Diagnostic.Critical($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.File));
-            return default;
-        }
-
-        if (function.Identifier is not null)
-        { function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName; }
-
-        if (function is FunctionDefinition functionDefinition)
-        {
-            for (int i = 0; i < functionDefinition.Attributes.Length; i++)
-            {
-                if (functionDefinition.Attributes[i].Identifier.Content == AttributeConstants.ExternalIdentifier)
-                { return false; }
-            }
-        }
-
-        Print?.Invoke($"Generate \"{function.ToReadable()}\" ...", LogType.Debug);
-
-        if (function.Identifier is not null)
-        { AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }")); }
-        else
-        { AddComment("null" + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }")); }
+        function.InstructionOffset = GeneratedCode.Count;
+        Print?.Invoke($"Generate \"{((FunctionThingDefinition)function).ToReadable()}\" ...", LogType.Debug);
 
         CurrentContext = function as IDefinition;
         InFunction = true;
@@ -3401,7 +1948,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ScopeSizes.Push(0);
         int savedInstructionLabelCount = CompiledInstructionLabels.Count;
 
-        CompileParameters(function.Parameters);
+        CompiledParameters.AddRange(function.Parameters.Select((v, i) => new CompiledParameter(i, function.ParameterTypes[i], v)));
 
         int instructionStart = GeneratedCode.Count;
 
@@ -3410,15 +1957,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         else
         { CurrentReturnType = BuiltinType.Void; }
 
-        if (function.Block is null)
+        if (body is null)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have a body", function));
+            Diagnostics.Add(Diagnostic.Critical($"Function \"{((FunctionThingDefinition)function).ToReadable()}\" does not have a body", (FunctionThingDefinition)function));
             return default;
         }
 
-        GenerateCodeForInstructionLabel(function.Block.GetStatementsRecursively(false));
-
-        OnScopeEnter(function.Block, true);
+        CompiledScope scope = OnScopeEnter(body, true);
 
         if (function is IHaveCompiledType returnType && !returnType.Type.SameAs(BasicType.Void))
         {
@@ -3427,7 +1972,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Address = GetReturnValueAddress(returnType.Type).Offset,
                 BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
-                Size = returnType.Type.GetSize(this, Diagnostics, function),
+                Size = returnType.Type.GetSize(this, Diagnostics, (FunctionThingDefinition)function),
                 Identifier = "Return Value",
                 Type = returnType.Type,
             });
@@ -3482,32 +2027,28 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions.Push(new List<int>());
 
         AddComment("Statements {");
-        for (int i = 0; i < function.Block.Statements.Length; i++)
-        { GenerateCodeForStatement(function.Block.Statements[i]); }
+        GenerateCodeForStatement(body, true);
         AddComment("}");
 
         CurrentReturnType = null;
 
-        OnScopeExit(function.Block.Brackets.End.Position, function.Block.File);
+        OnScopeExit(body.Location.Position.After(), body.Location.File, scope);
 
         FinishJumpInstructions(ReturnInstructions.Last);
         ReturnInstructions.Pop();
 
         AddComment("Return");
-        Return(function.Block.Location.After());
+        Return(body.Location.After());
 
-        if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
+        if (body != null) AddComment("}");
 
-        if (function.Identifier is not null)
+        DebugInfo?.FunctionInformation.Add(new FunctionInformation()
         {
-            DebugInfo?.FunctionInformation.Add(new FunctionInformation()
-            {
-                IsValid = true,
-                Function = function,
-                TypeArguments = TypeArguments.ToImmutableDictionary(),
-                Instructions = (instructionStart, GeneratedCode.Count),
-            });
-        }
+            IsValid = true,
+            Function = (FunctionThingDefinition)function,
+            TypeArguments = TypeArguments.ToImmutableDictionary(),
+            Instructions = (instructionStart, GeneratedCode.Count),
+        });
 
         SetUndefinedFunctionOffsets(UndefinedInstructionLabels, false);
 
@@ -3526,72 +2067,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return true;
     }
 
-    bool GenerateCodeForFunctions<TFunction>(IEnumerable<TFunction> functions)
-        where TFunction : FunctionThingDefinition, IHaveInstructionOffset, IReferenceable
-    {
-        bool generatedAnything = false;
-        foreach (TFunction function in functions)
-        {
-            if (function.IsTemplate) continue;
-            if (function.InstructionOffset >= 0) continue;
-            if (!function.References.Any())
-            {
-                switch (CompileLevel)
-                {
-                    case CompileLevel.Minimal: continue;
-                    case CompileLevel.Exported:
-                        if (!function.IsExported) continue;
-                        break;
-                }
-            }
-
-            function.InstructionOffset = GeneratedCode.Count;
-            if (GenerateCodeForFunction(function))
-            { generatedAnything = true; }
-        }
-        return generatedAnything;
-    }
-
-    bool GenerateCodeForCompilableFunction<T>(CompliableTemplate<T> function)
-        where T : FunctionThingDefinition, ITemplateable<T>
-    {
-        SetTypeArguments(function.TypeArguments);
-        bool generatedAnything = GenerateCodeForFunction(function.Function);
-        TypeArguments.Clear();
-        return generatedAnything;
-    }
-
-    bool GenerateCodeForCompilableFunctions<T>(IReadOnlyList<CompliableTemplate<T>> functions)
-        where T : FunctionThingDefinition, ITemplateable<T>, IHaveInstructionOffset
-    {
-        bool generatedAnything = false;
-        int i = 0;
-        while (i < functions.Count)
-        {
-            CompliableTemplate<T> function = functions[i];
-            i++;
-
-            if (function.Function.InstructionOffset >= 0) continue;
-
-            function.Function.InstructionOffset = GeneratedCode.Count;
-            if (GenerateCodeForCompilableFunction(function))
-            { generatedAnything = true; }
-        }
-        return generatedAnything;
-    }
-
-    void CompileParameters(ImmutableArray<ParameterDefinition> parameters)
-    {
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            GeneralType parameterType = GeneralType.From(parameters[i].Type, FindType);
-            parameters[i].Type.SetAnalyzedType(parameterType);
-
-            CompiledParameters.Add(new CompiledParameter(i, parameterType, parameters[i]));
-        }
-    }
-
-    void GenerateCodeForTopLevelStatements(ImmutableArray<Statement> statements, Uri file)
+    void GenerateCodeForTopLevelStatements(ImmutableArray<CompiledStatement> statements)
     {
         if (statements.IsDefaultOrEmpty) return;
 
@@ -3600,7 +2076,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Location = new SourceCodeLocation()
             {
                 Instructions = (GeneratedCode.Count, GeneratedCode.Count),
-                Location = new Location(new Position(statements), file),
+                Location = statements.Select(v => v.Location).Aggregate((a, b) => a.Union(b)),
             },
             Stack = new List<StackElementInformation>(),
         });
@@ -3628,35 +2104,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentReturnType = ExitCodeType;
 
-        /*
-        AddComment("Variables");
-        CleanupStack.Push(new Scope(
-            GenerateCodeForLocalVariable(statements),
-            true
-        ));
-        */
-
         AddComment("Statements {");
-        foreach (Statement statement in statements)
+        foreach (CompiledStatement statement in statements)
         { GenerateCodeForStatement(statement); }
         AddComment("}");
-
-        /*
-        AddComment("Save global variables {");
-        foreach (CompiledVariable variable in CompiledVariables)
-        {
-            if (!GetGlobalVariable(variable.Identifier.Content, variable.File, out CompiledVariable? globalVariable, out _))
-            { continue; }
-            if (!variable.Type.Equals(globalVariable.Type))
-            { continue; }
-            PushFrom(GetLocalVariableAddress(variable), variable.Type.GetSize(this, Diagnostics, variable));
-            PopTo(GetGlobalVariableAddress(globalVariable), globalVariable.Type.GetSize(this, Diagnostics, globalVariable));
-        }
-        AddComment("}");
-        */
-
-        // CompiledGlobalVariables.AddRange(CompiledVariables);
-        // CleanupVariables(CleanupStack.Pop().Variables, new Location(statements[^1].Position.NextLine(), statements[^1].File), false);
 
         FinishJumpInstructions(ReturnInstructions.Last);
         ReturnInstructions.Pop();
@@ -3665,7 +2116,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Pop stack frame");
         PopTo(Register.BasePointer);
-        if (ScopeSizes.Pop() != 0) { } // throw new InternalException("Bruh");
+        if (ScopeSizes.Pop() != 0) { }
 
         AddComment("}");
 
@@ -3678,6 +2129,52 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     BBLangGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
     {
+        StringBuilder builder = new();
+        DiagnosticsCollection d = new();
+        CompilerResult2 res = StatementCompiler.Compile(compilerResult, new()
+        {
+            DontOptimize = settings.DontOptimize,
+            PointerSize = PointerSize,
+            ArrayLengthType = ArrayLengthType,
+            BooleanType = BooleanType,
+            ExitCodeType = ExitCodeType,
+            SizeofStatementType = SizeofStatementType,
+        }, Print, d);
+        d.Throw();
+
+        {
+            ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
+            ImmutableArray<CompiledOperator>.Builder compiledOperators = ImmutableArray.CreateBuilder<CompiledOperator>();
+            ImmutableArray<CompiledGeneralFunction>.Builder compiledGeneralFunctions = ImmutableArray.CreateBuilder<CompiledGeneralFunction>();
+            ImmutableArray<CompiledConstructor>.Builder compiledConstructors = ImmutableArray.CreateBuilder<CompiledConstructor>();
+
+            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions)
+            {
+                switch (function)
+                {
+                    case CompiledFunction compiledFunction:
+                        compiledFunctions.Add(compiledFunction);
+                        break;
+                    case CompiledOperator compiledOperator:
+                        compiledOperators.Add(compiledOperator);
+                        break;
+                    case CompiledGeneralFunction compiledGeneralFunction:
+                        compiledGeneralFunctions.Add(compiledGeneralFunction);
+                        break;
+                    case CompiledConstructor compiledConstructor:
+                        compiledConstructors.Add(compiledConstructor);
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+
+            CompiledFunctions = compiledFunctions.ToImmutable();
+            CompiledOperators = compiledOperators.ToImmutable();
+            CompiledGeneralFunctions = compiledGeneralFunctions.ToImmutable();
+            CompiledConstructors = compiledConstructors.ToImmutable();
+        }
+
         if (settings.ExternalFunctionsCache)
         { throw new NotImplementedException(); }
 
@@ -3696,11 +2193,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (@operator.IsExternal)
             { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
-        }
-
-        foreach ((ImmutableArray<Statement> statements, _) in compilerResult.TopLevelStatements)
-        {
-            CompileGlobalConstants(statements);
         }
 
         CurrentScopeDebug.Push(new ScopeInformation()
@@ -3730,50 +2222,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        IEnumerable<InstructionLabel> globalInstructionLabels = compilerResult.TopLevelStatements
-            .Select(v => v.Statements)
-            .Aggregate(Enumerable.Empty<Statement>(), (a, b) => a.Concat(b))
-            .Select(v => v as InstructionLabel)
-            .Where(v => v is not null)!;
+        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = res.Statements
+            .OfType<CompiledVariableDeclaration>();
 
-        GenerateCodeForInstructionLabel(globalInstructionLabels);
-
-        IEnumerable<VariableDeclaration> globalVariableDeclarations = compilerResult.TopLevelStatements
-            .Select(v => v.Statements)
-            .Aggregate(Enumerable.Empty<Statement>(), (a, b) => a.Concat(b))
-            .Select(v => v as VariableDeclaration)
-            .Where(v => v is not null)
-            .Where(v => !v!.Modifiers.Contains(ModifierKeywords.Const))!;
-
-        Stack<CleanupItem> globalVariablesCleanup = new();
-        foreach (VariableDeclaration variableDeclaration in globalVariableDeclarations)
+        Stack<CompiledCleanup> globalVariablesCleanup = new();
+        foreach (CompiledVariableDeclaration variableDeclaration in globalVariableDeclarations)
         {
-            GeneralType type;
-            if (variableDeclaration.Type == StatementKeywords.Var)
-            {
-                if (variableDeclaration.InitialValue == null)
-                {
-                    Diagnostics.Add(Diagnostic.Critical($"Initial value for variable declaration with implicit type is required", variableDeclaration));
-                    return default;
-                }
-
-                type = FindStatementType(variableDeclaration.InitialValue);
-            }
-            else
-            {
-                type = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
-
-                variableDeclaration.Type.SetAnalyzedType(type);
-                variableDeclaration.CompiledType = type;
-            }
+            GeneralType type = variableDeclaration.Type;
 
             int size = type.GetSize(this, Diagnostics, variableDeclaration);
             int currentOffset = GlobalVariablesSize;
 
-            CompiledVariable variable = CompileVariable(variableDeclaration, currentOffset);
-            CompiledGlobalVariables.Add(variable);
-            CleanupItem cleanupItem = new(size, variable.Modifiers.Contains(ModifierKeywords.Temp), variable.Type);
-            globalVariablesCleanup.Insert(0, cleanupItem);
+            GeneratedVariables[variableDeclaration] = new GeneratedVariable()
+            {
+                MemoryAddress = currentOffset,
+                IsInitialized = false,
+            };
+
+            CompiledGlobalVariables.Add(variableDeclaration);
+            globalVariablesCleanup.Insert(0, variableDeclaration.Cleanup);
         }
 
         AddComment("Allocate global variables {");
@@ -3789,7 +2256,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 // AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), Register.StackPointer);
                 // AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), GlobalVariablesSize);
-                AddInstruction(Opcode.Push, Register.StackPointer);
+                Push(Register.StackPointer);
             }
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
@@ -3803,35 +2270,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        for (int i = 0; i < compilerResult.TopLevelStatements.Length - 1; i++)
-        {
-            (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[i];
-            Print?.Invoke($"Generating top level statements for file \"{file}\" ...", LogType.Debug);
-            GenerateCodeForTopLevelStatements(statements, file);
-        }
-
-        if (compilerResult.TopLevelStatements.Length > 0)
-        {
-            (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[^1];
-            Print?.Invoke($"Generating top level statements for file \"{file}\" ...", LogType.Debug);
-            if (compilerResult.IsInteractive &&
-                statements.Length == 1 &&
-                statements[0] is StatementWithValue statementWithValue)
-            {
-                GeneralType type = FindStatementType(statementWithValue);
-                if (type.SameAs(BasicType.I32))
-                {
-                    statements = ImmutableArray.Create<Statement>(
-                        new KeywordCall(
-                            (Token)StatementKeywords.Return,
-                            Enumerable.Repeat(statementWithValue, 1),
-                            statementWithValue.File
-                        )
-                    );
-                }
-            }
-            GenerateCodeForTopLevelStatements(statements, file);
-        }
+        GenerateCodeForTopLevelStatements(res.Statements);
 
         AddComment("Pop abs global address");
         Pop(AbsGlobalAddressType.GetSize(this)); // Pop abs global offset
@@ -3859,21 +2298,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     });
         // }
 
-        while (true)
+        foreach ((ICompiledFunction function, CompiledBlock body) in res.Functions)
         {
-            bool generatedAnything = false;
-
-            generatedAnything = GenerateCodeForFunctions(CompiledFunctions) || generatedAnything;
-            generatedAnything = GenerateCodeForFunctions(CompiledOperators) || generatedAnything;
-            generatedAnything = GenerateCodeForFunctions(CompiledGeneralFunctions) || generatedAnything;
-            generatedAnything = GenerateCodeForFunctions(CompiledConstructors) || generatedAnything;
-
-            generatedAnything = GenerateCodeForCompilableFunctions(CompilableFunctions) || generatedAnything;
-            generatedAnything = GenerateCodeForCompilableFunctions(CompilableConstructors) || generatedAnything;
-            generatedAnything = GenerateCodeForCompilableFunctions(CompilableOperators) || generatedAnything;
-            generatedAnything = GenerateCodeForCompilableFunctions(CompilableGeneralFunctions) || generatedAnything;
-
-            if (!generatedAnything) break;
+            GenerateCodeForFunction(function, body);
         }
 
         SetUndefinedFunctionOffsets(UndefinedFunctionOffsets, true);

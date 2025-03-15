@@ -1,6 +1,5 @@
-using LanguageCore.Runtime;
+﻿using LanguageCore.Runtime;
 using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
 
 namespace LanguageCore.Compiler;
 
@@ -9,7 +8,7 @@ public class ArrayType : GeneralType,
     IEquatable<ArrayType>
 {
     public GeneralType Of { get; }
-    public StatementWithValue? Length { get; }
+    public CompiledStatementWithValue? Length { get; }
     public int? ComputedLength { get; }
 
     public ArrayType(ArrayType other)
@@ -18,7 +17,7 @@ public class ArrayType : GeneralType,
         Length = other.Length;
     }
 
-    public ArrayType(GeneralType of, StatementWithValue? length, int? computedLength)
+    public ArrayType(GeneralType of, CompiledStatementWithValue? length, int? computedLength)
     {
         Of = of;
         Length = length;

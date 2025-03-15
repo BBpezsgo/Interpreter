@@ -117,15 +117,28 @@ class RegisterUsage
     }
 }
 
-record struct Scope(ImmutableArray<CleanupItem> Variables, bool IsFunction);
+record struct CompiledScope(ImmutableArray<CompiledCleanup> Variables, bool IsFunction);
+
+class GeneratedInstructionLabel : IHaveInstructionOffset
+{
+    public int InstructionOffset { get; set; }
+}
+
+class GeneratedVariable
+{
+    public int MemoryAddress { get; set; }
+    public bool IsInitialized { get; set; }
+}
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
     #region Fields
 
     readonly ImmutableArray<IExternalFunction> ExternalFunctions;
+    readonly Dictionary<CompiledInstructionLabelDeclaration, GeneratedInstructionLabel> GeneratedInstructionLabels = new();
+    readonly Dictionary<CompiledVariableDeclaration, GeneratedVariable> GeneratedVariables = new();
 
-    readonly Stack<Scope> CleanupStack;
+    readonly Stack<CompiledScope> CleanupStack2;
     IDefinition? CurrentContext;
 
     readonly Stack<List<int>> ReturnInstructions;
@@ -137,7 +150,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly List<UndefinedOffset<CompiledOperator>> UndefinedOperatorFunctionOffsets;
     readonly List<UndefinedOffset<CompiledGeneralFunction>> UndefinedGeneralFunctionOffsets;
     readonly List<UndefinedOffset<CompiledConstructor>> UndefinedConstructorOffsets;
-    readonly List<UndefinedOffset<CompiledInstructionLabel>> UndefinedInstructionLabels;
+    readonly List<UndefinedOffset<GeneratedInstructionLabel>> UndefinedInstructionLabels;
 
     readonly RegisterUsage Registers;
 
@@ -146,7 +159,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     bool CanReturn => CurrentReturnType is not null;
 
     readonly Stack<ScopeInformation> CurrentScopeDebug = new();
-    CompileLevel CompileLevel => Settings.CompileLevel;
     readonly MainGeneratorSettings Settings;
 
     public override int PointerSize { get; }
@@ -188,7 +200,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         ExternalFunctions = compilerResult.ExternalFunctions;
         GeneratedCode = new();
-        CleanupStack = new();
+        CleanupStack2 = new();
         ReturnInstructions = new();
         BreakInstructions = new();
         UndefinedFunctionOffsets = new();

@@ -1,3 +1,4 @@
+using LanguageCore.Compiler;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Tokenizing;
 
@@ -92,12 +93,18 @@ public static class StatementConverters
         Semicolon = constructorCall.Semicolon,
     };
 
-    public static VariableDeclaration ToVariable(this ParameterDefinition parameterDefinition, StatementWithValue? initialValue = null)
-        => new(
-            Enumerable.Empty<Token>(),
-            parameterDefinition.Type,
-            new Identifier(parameterDefinition.Identifier, parameterDefinition.File),
-            initialValue,
-            parameterDefinition.File
-        );
+    public static CompiledVariableDeclaration ToVariable2(this ParameterDefinition parameterDefinition, CompiledPassedArgument? initialValue = null)
+        => new()
+        {
+            Identifier = parameterDefinition.Identifier.Content,
+            Type = initialValue?.Type ?? GeneralType.From(parameterDefinition.Type, null, null, parameterDefinition.File),
+            Cleanup = new CompiledCleanup()
+            {
+                Location = parameterDefinition.Location,
+                TrashType = initialValue?.Type ?? GeneralType.From(parameterDefinition.Type, null, null, parameterDefinition.File),
+            },
+            InitialValue = initialValue,
+            Location = parameterDefinition.Location,
+            IsGlobal = false,
+        };
 }

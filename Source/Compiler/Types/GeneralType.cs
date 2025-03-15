@@ -85,14 +85,16 @@ public abstract class GeneralType :
             }
             else
             {
-                if (CodeGenerator.TryComputeSimple(type.StackArraySize, out CompiledValue _stackArraySize))
+                if (StatementCompiler.TryComputeSimple(type.StackArraySize, out CompiledValue _stackArraySize))
                 { stackArraySize = _stackArraySize; }
             }
         }
 
         GeneralType? of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer, file);
 
-        ArrayType result = new(of, type.StackArraySize, (int?)stackArraySize);
+        if (type.StackArraySize is not null) throw new NotImplementedException();
+
+        ArrayType result = new(of, null, (int?)stackArraySize);
         type.SetAnalyzedType(result);
 
         return result;

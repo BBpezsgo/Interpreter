@@ -22,6 +22,12 @@ public readonly struct Location : IEquatable<Location>, ILocated
     internal Location Before() => new(Position.Before(), File);
     internal Location NextLine() => new(Position.NextLine(), File);
 
+    public Location Union(Location other)
+    {
+        if (File != other.File) return this;
+        return new Location(Position.Union(Position, other.Position), File);
+    }
+
     public static bool operator ==(Location left, Location right) => left.Equals(right);
     public static bool operator !=(Location left, Location right) => !left.Equals(right);
 }

@@ -1,5 +1,4 @@
 ﻿using LanguageCore.Compiler;
-using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.BBLang.Generator;
@@ -8,9 +7,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 {
     #region Helper Functions
 
-    void CallRuntime(StatementWithValue address)
+    void CallRuntime(CompiledStatementWithValue address)
     {
-        GeneralType addressType = FindStatementType(address);
+        GeneralType addressType = address.Type;
 
         if (!addressType.Is<FunctionType>())
         {
@@ -70,206 +69,60 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Memory Helpers
 
-    bool GetAddress(StatementWithValue value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error) => value switch
+    AddressOffset GetGlobalVariableAddress(CompiledVariableDeclaration variable)
     {
-        IndexCall v => GetAddress(v, out address, out error),
-        Identifier v => GetAddress(v, out address, out error),
-        Field v => GetAddress(v, out address, out error),
-        _ => throw new NotImplementedException()
-    };
-    bool GetAddress(Identifier variable, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        address = null;
-        error = null;
+        if (!GeneratedVariables.TryGetValue(variable, out var generatedVariable))
+        { throw new NotImplementedException(); }
 
-        if (GetConstant(variable.Content, variable.File, out _, out _))
-        {
-            error = new PossibleDiagnostic($"Constant does not have a memory address");
-            return false;
-        }
-
-        if (GetParameter(variable.Content, out CompiledParameter? parameter, out PossibleDiagnostic? parameterNotFoundError))
-        {
-            address = GetParameterAddress(parameter);
-            return true;
-        }
-
-        if (GetVariable(variable.Content, out CompiledVariable? localVariable, out PossibleDiagnostic? variableNotFoundError))
-        {
-            address = GetLocalVariableAddress(localVariable);
-            return true;
-        }
-
-        if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariable? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
-        {
-            address = GetGlobalVariableAddress(globalVariable);
-            return true;
-        }
-
-        error = new PossibleDiagnostic(
-            $"Local symbol \"{variable.Content}\" not found",
-            parameterNotFoundError,
-            variableNotFoundError,
-            globalVariableNotFoundError);
-        return false;
-    }
-    bool GetAddress(Field field, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        address = default;
-
-        GeneralType prevType = FindStatementType(field.PrevStatement);
-        Address? baseAddress = null;
-
-        while (prevType.Is(out PointerType? pointerType))
-        {
-            prevType = pointerType.To;
-            baseAddress =
-                baseAddress is null
-                ? new AddressRuntimePointer(field.PrevStatement)
-                : new AddressPointer(baseAddress);
-        }
-
-        if (!prevType.Is(out StructType? @struct))
-        {
-            error = new PossibleDiagnostic($"This is not a struct", field.PrevStatement);
-            return false;
-        }
-
-        if (baseAddress is null &&
-            !GetAddress(field.PrevStatement, out baseAddress, out error))
-        {
-            return false;
-        }
-
-        if (!@struct.GetField(field.Identifier.Content, this, out _, out int fieldOffset, out error))
-        {
-            return false;
-        }
-
-        address = new AddressOffset(baseAddress, fieldOffset);
-        return true;
-    }
-    bool GetAddress(IndexCall indexCall, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        error = default;
-        address = default;
-
-        GeneralType prevType = FindStatementType(indexCall.PrevStatement);
-        ArrayType? array;
-        Address? baseAddress;
-
-        if (prevType.Is(out PointerType? prevPointerType))
-        {
-            if (!prevPointerType.To.Is(out array))
-            {
-                error = new PossibleDiagnostic($"Multiple dereference is not supported at the moment", indexCall.PrevStatement);
-                return false;
-            }
-
-            baseAddress = new AddressRuntimePointer(indexCall.PrevStatement);
-        }
-        else if (!prevType.Is(out array))
-        {
-            error = new PossibleDiagnostic($"Can't index a non-array type", indexCall.PrevStatement);
-            return false;
-        }
-        else if (!GetAddress(indexCall.PrevStatement, out baseAddress, out error))
-        {
-            return false;
-        }
-
-        int elementSize = array.Of.GetSize(this, Diagnostics, indexCall);
-
-        if (TryCompute(indexCall.Index, out CompiledValue index))
-        {
-            int offset = (int)index * array.Of.GetSize(this, Diagnostics, indexCall);
-            address = new AddressOffset(baseAddress, offset);
-            return true;
-        }
-        else
-        {
-            address = new AddressRuntimeIndex(baseAddress, indexCall.Index, elementSize);
-            return true;
-        }
+        return new(
+                new AddressPointer(AbsoluteGlobalAddress),
+                0
+                + generatedVariable.MemoryAddress
+            //  + ((
+            //      AbsGlobalAddressSize
+            //      + BasePointerSize
+            //  ) * BytecodeProcessor.StackDirection)
+            );
     }
 
-    AddressOffset GetGlobalVariableAddress(CompiledVariable variable)
-        => new(
-            new AddressPointer(AbsoluteGlobalAddress),
-            0
-            + variable.MemoryAddress
-            // + ((
-            //     AbsGlobalAddressSize
-            //     + BasePointerSize
-            // ) * BytecodeProcessor.StackDirection)
-        );
+    AddressOffset GetLocalVariableAddress(CompiledVariableDeclaration variable)
+    {
+        if (!GeneratedVariables.TryGetValue(variable, out var generatedVariable))
+        { throw new NotImplementedException(); }
 
-    static AddressOffset GetLocalVariableAddress(CompiledVariable variable)
-        => new(
-            Register.BasePointer,
-            variable.MemoryAddress
-        );
+        return new(
+                Register.BasePointer,
+                generatedVariable.MemoryAddress
+            );
+    }
 
     [SuppressMessage("Style", "IDE0060:Remove unused parameter")]
     public AddressOffset GetReturnValueAddress(GeneralType returnType)
-        => new(
-            Register.BasePointer,
-            0 // We start at the saved base pointer
-            - ((
-                ParametersSize // Offset by the parameters
-                + StackFrameTags // Offset by the stack frame stuff
-            ) * BytecodeProcessor.StackDirection)
-            // - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
-            // + 1 // Stack pointer offset (???)
-            );
+    {
+        return new(
+                Register.BasePointer,
+                0 // We start at the saved base pointer
+                - ((
+                    ParametersSize // Offset by the parameters
+                    + StackFrameTags // Offset by the stack frame stuff
+                ) * BytecodeProcessor.StackDirection)
+                // - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
+                // + 1 // Stack pointer offset (???)
+                );
+    }
 
     public AddressOffset GetParameterAddress(CompiledParameter parameter, int offset = 0)
-        => new(
-            Register.BasePointer,
-            0 // We start at the saved base pointer
-            - ((
-                ParametersSizeBefore(parameter.Index) // ???
-                + StackFrameTags // Offset by the stack frame stuff
-            ) * BytecodeProcessor.StackDirection)
-            + offset
-            // + 1 // Stack pointer offset (???)
-            );
-
-    StatementWithValue? NeedDerefernce(StatementWithValue value) => value switch
     {
-        Identifier => null,
-        Field v => NeedDereference(v),
-        IndexCall v => NeedDerefernce(v),
-        _ => throw new NotImplementedException()
-    };
-    StatementWithValue? NeedDerefernce(IndexCall indexCall)
-    {
-        if (FindStatementType(indexCall.PrevStatement).Is<PointerType>())
-        { return indexCall.PrevStatement; }
-
-        return NeedDerefernce(indexCall.PrevStatement);
-    }
-    StatementWithValue? NeedDereference(Field field)
-    {
-        if (FindStatementType(field.PrevStatement).Is<PointerType>())
-        { return field.PrevStatement; }
-
-        if (field.PrevStatement is Identifier identifier)
-        {
-            if (GetParameter(identifier.Content, out CompiledParameter? prevParameter, out _))
-            {
-                if (prevParameter.IsRef)
-                {
-                    return field.PrevStatement;
-                }
-            }
-            else if (GetVariable(identifier.Content, out _, out _))
-            { }
-            else if (GetGlobalVariable(identifier.Content, identifier.File, out _, out _))
-            { }
-        }
-
-        return NeedDerefernce(field.PrevStatement);
+        return new(
+                Register.BasePointer,
+                0 // We start at the saved base pointer
+                - ((
+                    ParametersSizeBefore(parameter.Index) // ???
+                    + StackFrameTags // Offset by the stack frame stuff
+                ) * BytecodeProcessor.StackDirection)
+                + offset
+                // + 1 // Stack pointer offset (???)
+                );
     }
 
     void Pop(int size)
@@ -346,8 +199,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AddressOffset v: PopTo(v, size); break;
             case AddressPointer v: PopTo(v, size); break;
             case AddressRegisterPointer v: PopTo(v, size); break;
-            case AddressRuntimePointer v: PopTo(v, size); break;
-            case AddressRuntimeIndex v: PopTo(v, size); break;
+            case AddressRuntimePointer2 v: PopTo(v, size); break;
+            case AddressRuntimeIndex2 v: PopTo(v, size); break;
             default: throw new NotImplementedException();
         }
     }
@@ -464,7 +317,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PopTo(AddressRuntimePointer address, int size)
+    void PopTo(AddressRuntimePointer2 address, int size)
     {
         GenerateAddressResolver(address);
         using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -474,7 +327,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PopTo(AddressRuntimeIndex address, int size)
+    void PopTo(AddressRuntimeIndex2 address, int size)
     {
         AddComment($"Resolver address {{");
         GenerateAddressResolver(address);
@@ -495,8 +348,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AddressOffset v: PushFrom(v, size); break;
             case AddressPointer v: PushFrom(v, size); break;
             case AddressRegisterPointer v: PushFrom(v, size); break;
-            case AddressRuntimePointer v: PushFrom(v, size); break;
-            case AddressRuntimeIndex v: PushFrom(v, size); break;
+            case AddressRuntimePointer2 v: PushFrom(v, size); break;
+            case AddressRuntimeIndex2 v: PushFrom(v, size); break;
             default: throw new NotImplementedException();
         }
     }
@@ -615,7 +468,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PushFrom(AddressRuntimePointer address, int size)
+    void PushFrom(AddressRuntimePointer2 address, int size)
     {
         GenerateAddressResolver(address);
         using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -625,7 +478,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PushFrom(AddressRuntimeIndex address, int size)
+    void PushFrom(AddressRuntimeIndex2 address, int size)
     {
         GenerateAddressResolver(address);
         using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -694,25 +547,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PopTo(StatementWithValue pointer, int offset, int size)
-    {
-        if (!FindStatementType(pointer).Is<PointerType>())
-        {
-            Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", pointer));
-            return;
-        }
-
-        GenerateCodeForStatement(pointer, resolveReference: false);
-
-        CheckPointerNull(pointer.Location);
-
-        using (RegisterUsage.Auto reg = Registers.GetFree())
-        {
-            PopTo(reg.Get(PointerBitWidth));
-            PopTo(new AddressOffset(new AddressRegisterPointer(reg.Get(PointerBitWidth)), offset), size);
-        }
-    }
-
     void PopTo(Address address, int size, Location location)
     {
         GenerateAddressResolver(address);
@@ -723,6 +557,146 @@ public partial class CodeGeneratorForMain : CodeGenerator
             PopTo(reg.Get(PointerBitWidth));
             PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
         }
+    }
+
+    #endregion
+
+    #region Memory Helpers
+
+    bool GetAddress(CompiledStatementWithValue value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error) => value switch
+    {
+        CompiledGlobalVariableGetter v => GetAddress(v, out address, out error),
+        CompiledLocalVariableGetter v => GetAddress(v, out address, out error),
+        CompiledParameterGetter v => GetAddress(v, out address, out error),
+        CompiledIndexGetter v => GetAddress(v, out address, out error),
+        CompiledFieldGetter v => GetAddress(v, out address, out error),
+        _ => throw new NotImplementedException()
+    };
+
+    bool GetAddress(CompiledGlobalVariableGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        address = GetGlobalVariableAddress(value.Variable);
+        error = null;
+        return true;
+    }
+
+    bool GetAddress(CompiledLocalVariableGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        address = GetLocalVariableAddress(value.Variable);
+        error = null;
+        return true;
+    }
+
+    bool GetAddress(CompiledParameterGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        address = GetParameterAddress(value.Variable);
+        error = null;
+        return true;
+    }
+
+    bool GetAddress(CompiledIndexGetter indexCall, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        error = default;
+        address = default;
+
+        GeneralType prevType = indexCall.Base.Type;
+        ArrayType? array;
+        Address? baseAddress;
+
+        if (prevType.Is(out PointerType? prevPointerType))
+        {
+            if (!prevPointerType.To.Is(out array))
+            {
+                error = new PossibleDiagnostic($"Multiple dereference is not supported at the moment", indexCall.Base);
+                return false;
+            }
+
+            baseAddress = new AddressRuntimePointer2(indexCall.Base);
+        }
+        else if (!prevType.Is(out array))
+        {
+            error = new PossibleDiagnostic($"Can't index a non-array type", indexCall.Base);
+            return false;
+        }
+        else if (!GetAddress(indexCall.Base, out baseAddress, out error))
+        {
+            return false;
+        }
+
+        int elementSize = array.Of.GetSize(this, Diagnostics, indexCall);
+
+        if (indexCall.Index is CompiledEvaluatedValue evaluatedStatement)
+        {
+            int offset = (int)evaluatedStatement.Value * array.Of.GetSize(this, Diagnostics, indexCall);
+            address = new AddressOffset(baseAddress, offset);
+            return true;
+        }
+        else
+        {
+            address = new AddressRuntimeIndex2(baseAddress, indexCall.Index, elementSize);
+            return true;
+        }
+    }
+
+    bool GetAddress(CompiledFieldGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        address = default;
+
+        GeneralType prevType = value.Object.Type;
+        Address? baseAddress = null;
+
+        while (prevType.Is(out PointerType? pointerType))
+        {
+            prevType = pointerType.To;
+            baseAddress =
+                baseAddress is null
+                ? new AddressRuntimePointer2(value.Object)
+                : new AddressPointer(baseAddress);
+        }
+
+        if (!prevType.Is(out StructType? @struct))
+        {
+            error = new PossibleDiagnostic($"This is not a struct", value.Object);
+            return false;
+        }
+
+        if (baseAddress is null &&
+            !GetAddress(value.Object, out baseAddress, out error))
+        {
+            return false;
+        }
+
+        if (!@struct.GetField(value.Field.Identifier.Content, this, out _, out int fieldOffset, out error))
+        {
+            return false;
+        }
+
+        address = new AddressOffset(baseAddress, fieldOffset);
+        return true;
+    }
+
+    CompiledStatementWithValue? NeedDerefernce(CompiledStatementWithValue value) => value switch
+    {
+        CompiledLocalVariableGetter => null,
+        CompiledGlobalVariableGetter => null,
+        CompiledParameterGetter => null,
+        CompiledIndexGetter v => NeedDerefernce(v),
+        CompiledFieldGetter v => NeedDerefernce(v),
+        _ => throw new NotImplementedException()
+    };
+    CompiledStatementWithValue? NeedDerefernce(CompiledIndexGetter indexCall)
+    {
+        if (indexCall.Base.Type.Is<PointerType>())
+        { return indexCall.Base; }
+
+        return NeedDerefernce(indexCall.Base);
+    }
+    CompiledStatementWithValue? NeedDerefernce(CompiledFieldGetter field)
+    {
+        if (field.Object.Type.Is<PointerType>())
+        { return field.Object; }
+
+        return NeedDerefernce(field.Object);
     }
 
     #endregion

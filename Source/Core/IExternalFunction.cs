@@ -2,8 +2,8 @@ namespace LanguageCore.Runtime;
 
 public interface IExternalFunction
 {
-    public string? Name { get; }
-    public int Id { get; }
-    public int ParametersSize { get; }
-    public int ReturnValueSize { get; }
+    string? Name { get; }
+    int Id { get; }
+    int ParametersSize { get; }
+    int ReturnValueSize { get; }
 }

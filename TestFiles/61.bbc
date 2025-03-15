@@ -8,7 +8,7 @@ struct A
 
 A a;
 a._a = 33;
-a._b = 66666666;
+a._b = 60;
 
 temp A* b = new A*;
 *b = a;

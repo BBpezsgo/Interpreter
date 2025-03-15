@@ -1,4 +1,5 @@
 ﻿using LanguageCore.Parser.Statement;
+using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Compiler;
@@ -67,5 +68,38 @@ public static class TypeExtensions
     {
         numericType = NumericType.SignedInteger;
         return true;
+    }
+
+    public static bool TryGetBitWidth(this GeneralType type, out BitWidth bitWidth)
+    {
+        bitWidth = default;
+        return type.FinalValue switch
+        {
+            BuiltinType v => v.TryGetBitWidth(out bitWidth),
+            _ => false,
+        };
+    }
+
+    public static bool TryGetBitWidth(this BuiltinType type, out BitWidth bitWidth)
+    {
+        bitWidth = default;
+        switch (type.Type)
+        {
+            case BasicType.U8:
+            case BasicType.I8:
+                bitWidth = BitWidth._8;
+                return true;
+            case BasicType.U16:
+            case BasicType.I16:
+                bitWidth = BitWidth._16;
+                return true;
+            case BasicType.U32:
+            case BasicType.I32:
+            case BasicType.F32:
+                bitWidth = BitWidth._32;
+                return true;
+            default:
+                return false;
+        }
     }
 }

@@ -22,7 +22,7 @@ public static class GnuLinker
 
         // -m i386pe 
         // -L \"C:\\Windows\\System32\" -l \"kernel32\"
-        using Process? process = Process.Start(new ProcessStartInfo("ld", $"{inputFile} -o {outputFile}")
+        using Process? process = Process.Start(new ProcessStartInfo("ld", $"-m elf_i386 {inputFile} -o {outputFile}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,

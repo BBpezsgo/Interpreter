@@ -293,14 +293,14 @@ public sealed class Compiler
 
     bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
     {
-        if (CodeGenerator.GetAlias(CompiledAliases, name.Content, relevantFile, out CompiledAlias? alias, out _))
+        if (StatementCompiler.GetAlias(CompiledAliases, name.Content, relevantFile, out CompiledAlias? alias, out _))
         {
             // HERE
             result = new AliasType(alias.Value, alias);
             return true;
         }
 
-        if (CodeGenerator.GetStruct(CompiledStructs, name.Content, relevantFile, out CompiledStruct? @struct, out _))
+        if (StatementCompiler.GetStruct(CompiledStructs, name.Content, relevantFile, out CompiledStruct? @struct, out _))
         {
             result = new StructType(@struct, relevantFile);
             return true;
@@ -319,17 +319,17 @@ public sealed class Compiler
             }
         }
 
-        if (CodeGenerator.GetFunction<CompiledFunction, Token, string, GeneralType>(
-            new CodeGenerator.Functions<CompiledFunction>()
+        if (StatementCompiler.GetFunction<CompiledFunction, Token, string, GeneralType>(
+            new StatementCompiler.Functions<CompiledFunction>()
             {
                 Compiled = CompiledFunctions,
-                Compilable = Enumerable.Empty<CodeGenerator.CompliableTemplate<CompiledFunction>>(),
+                Compilable = Enumerable.Empty<StatementCompiler.CompliableTemplate<CompiledFunction>>(),
             },
             "function",
             null,
 
-            CodeGenerator.FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, (v, _) => v, relevantFile),
-            out CodeGenerator.FunctionQueryResult<CompiledFunction>? result_,
+            StatementCompiler.FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, (v, _) => v, relevantFile),
+            out StatementCompiler.FunctionQueryResult<CompiledFunction>? result_,
             out _
         ))
         {

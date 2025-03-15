@@ -72,7 +72,6 @@ public partial class StatementCompiler
         compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
         compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
 
-        InFunction = false;
         TypeArguments = new Dictionary<string, GeneralType>();
 
         CompiledStructs = compilerResult.Structs;
@@ -99,20 +98,6 @@ public partial class StatementCompiler
         DiagnosticsCollection diagnostics)
     {
         return new StatementCompiler(compilerResult, settings, diagnostics, printCallback).GenerateCode(compilerResult);
-    }
-
-    protected bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = default;
-        error = default;
-        return false;
-    }
-
-    protected bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = default;
-        error = default;
-        return false;
     }
 }
 

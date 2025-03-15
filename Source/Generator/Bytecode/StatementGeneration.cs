@@ -1,8 +1,6 @@
 ﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
-using LiteralStatement = LanguageCore.Parser.Statement.Literal;
 
 #if NET_STANDARD
 #pragma warning disable CS8604 // Possible null reference argument.
@@ -490,31 +488,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { Diagnostics.Add(Diagnostic.Internal($"Bad argument type passed: expected \"{parameterType}\" passed \"{argumentType}\"", argument.Value)); }
 
             AddComment($" Pass {parameter}:");
-
-            bool typeAllowsTemp = argumentType.Is<PointerType>();
-
-            bool calleeAllowsTemp = parameter.Modifiers.Contains(ModifierKeywords.Temp);
-
-            bool callerAllowsTemp = StatementCanBeDeallocated(argument.Value, out bool explicitDeallocate);
-
-            if (callerAllowsTemp)
-            {
-                if (explicitDeallocate && !calleeAllowsTemp)
-                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", argument.Value)); }
-                if (explicitDeallocate && !typeAllowsTemp)
-                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this type", argument.Value)); }
-            }
-            else
-            {
-                if (explicitDeallocate)
-                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value", argument.Value)); }
-            }
-
-            if (argument.Value is CompiledAddressGetter addressGetter &&
-                addressGetter.Of is CompiledLocalVariableGetter identifier)
-            {
-                // identifier.Variable.IsInitialized = true;
-            }
 
             GenerateCodeForStatement(argument.Value, parameterType);
 
@@ -1907,7 +1880,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         get
         {
             int sum = 0;
-            foreach (var variable in CompiledLocalVariables)
+            foreach (CompiledVariableDeclaration variable in CompiledLocalVariables)
             { sum += variable.Type.GetSize(this, Diagnostics, variable); }
             return sum;
         }
@@ -1918,7 +1891,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         get
         {
             int sum = 0;
-            foreach (var variable in CompiledGlobalVariables)
+            foreach (CompiledVariableDeclaration variable in CompiledGlobalVariables)
             { sum += variable.Type.GetSize(this, Diagnostics, variable); }
             return sum;
         }

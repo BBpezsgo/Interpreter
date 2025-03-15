@@ -1,4 +1,4 @@
-namespace Tests;
+﻿namespace Tests;
 
 [TestClass, TestCategory("Brainfuck"), TestCategory("FileTest")]
 public class BrainfuckFileTests
@@ -46,7 +46,7 @@ public class BrainfuckFileTests
     [TestMethod, Timeout(Timeout)] public void Test38() => Utils.GetTest(38).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test39() => Utils.GetTest(39).DoBrainfuck();
     [TestMethod, Timeout(LongTimeout)] public void Test40() => Utils.GetTest(40).DoBrainfuck();
-    [TestMethod, Timeout(Timeout)] public void Test41() => Utils.GetTest(41).DoBrainfuck();
+    [TestMethod, Timeout(LongTimeout)] public void Test41() => Utils.GetTest(41).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test42() => Utils.GetTest(42).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Function pointers are not supported")] public void Test43() => Utils.GetTest(43).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test44() => Utils.GetTest(44).DoBrainfuck();

@@ -1,6 +1,5 @@
 using LanguageCore.Compiler;
 using LanguageCore.Parser.Statement;
-using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser;
 
@@ -93,7 +92,7 @@ public static class StatementConverters
         Semicolon = constructorCall.Semicolon,
     };
 
-    public static CompiledVariableDeclaration ToVariable2(this ParameterDefinition parameterDefinition, CompiledPassedArgument? initialValue = null)
+    public static CompiledVariableDeclaration ToVariable(this ParameterDefinition parameterDefinition, CompiledPassedArgument? initialValue = null)
         => new()
         {
             Identifier = parameterDefinition.Identifier.Content,

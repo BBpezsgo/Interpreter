@@ -97,30 +97,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         Print = print;
     }
 
-    protected bool StatementCanBeDeallocated(CompiledStatement statement, out bool explicitly)
-    {
-        if (statement is CompiledStringInstance)
-        {
-            explicitly = false;
-            return true;
-        }
-
-        if (statement is CompiledBinaryOperatorCall)
-        {
-            explicitly = false;
-            return true;
-        }
-
-        if (statement is CompiledUnaryOperatorCall)
-        {
-            explicitly = false;
-            return true;
-        }
-
-        explicitly = default;
-        return false;
-    }
-
     #region SetTypeArguments()
 
     protected void SetTypeArguments(ImmutableDictionary<string, GeneralType>? arguments)

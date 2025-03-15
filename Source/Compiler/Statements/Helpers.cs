@@ -52,12 +52,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region Protected Fields
 
-    ImmutableArray<CompiledStruct> CompiledStructs;
-    ImmutableArray<CompiledFunction> CompiledFunctions;
-    ImmutableArray<CompiledOperator> CompiledOperators;
-    ImmutableArray<CompiledConstructor> CompiledConstructors;
-    ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
-    ImmutableArray<CompiledAlias> CompiledAliases;
+    readonly ImmutableArray<CompiledStruct> CompiledStructs;
+    readonly ImmutableArray<CompiledFunction> CompiledFunctions;
+    readonly ImmutableArray<CompiledOperator> CompiledOperators;
+    readonly ImmutableArray<CompiledConstructor> CompiledConstructors;
+    readonly ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
+    readonly ImmutableArray<CompiledAlias> CompiledAliases;
 
     readonly Stack<Scope> Scopes = new();
 
@@ -71,7 +71,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     IReadOnlyList<CompliableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions => compilableGeneralFunctions;
     IReadOnlyList<CompliableTemplate<CompiledConstructor>> CompilableConstructors => compilableConstructors;
 
-    bool InFunction;
     readonly Dictionary<string, GeneralType> TypeArguments;
 
     readonly PrintCallback? Print;
@@ -103,7 +102,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         notFoundError = null;
         ConstantPerfectus perfectus = ConstantPerfectus.None;
 
-        foreach (var item in Scopes)
+        foreach (Scope item in Scopes)
         {
             foreach (CompiledVariableConstant _constant in item.Constants)
             {
@@ -207,30 +206,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
 
         if (statement is UnaryOperatorCall)
-        {
-            explicitly = false;
-            return true;
-        }
-
-        explicitly = default;
-        return false;
-    }
-
-    bool StatementCanBeDeallocated(CompiledStatement statement, out bool explicitly)
-    {
-        if (statement is CompiledStringInstance)
-        {
-            explicitly = false;
-            return true;
-        }
-
-        if (statement is CompiledBinaryOperatorCall)
-        {
-            explicitly = false;
-            return true;
-        }
-
-        if (statement is CompiledUnaryOperatorCall)
         {
             explicitly = false;
             return true;
@@ -351,14 +326,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     public static class FunctionQuery
     {
-        public static FunctionQuery<TFunction, string, GeneralType> Create<TFunction>(
-            string? identifier)
-            where TFunction : ITemplateable<TFunction>
-            => new()
-            {
-                Identifier = identifier,
-            };
-
         public static FunctionQuery<TFunction, TIdentifier, TArgument> Create<TFunction, TIdentifier, TArgument>(
             TIdentifier? identifier,
             ImmutableArray<TArgument>? arguments = null,
@@ -392,22 +359,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 Arguments = arguments,
                 ArgumentCount = arguments.Length,
                 Converter = converter,
-                RelevantFile = relevantFile,
-                ReturnType = returnType,
-                AddCompilable = addCompilable,
-            };
-
-        public static FunctionQuery<TFunction, TIdentifier, TArgument> Create<TFunction, TIdentifier, TArgument>(
-            TIdentifier? identifier,
-            int argumentCount,
-            Uri? relevantFile = null,
-            GeneralType? returnType = null,
-            Action<CompliableTemplate<TFunction>>? addCompilable = null)
-            where TFunction : ITemplateable<TFunction>
-            => new()
-            {
-                Identifier = identifier,
-                ArgumentCount = argumentCount,
                 RelevantFile = relevantFile,
                 ReturnType = returnType,
                 AddCompilable = addCompilable,
@@ -1553,7 +1504,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariableDeclaration? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (var scope in Scopes)
+        foreach (Scope scope in Scopes)
         {
             foreach (CompiledVariableDeclaration compiledVariable_ in scope.Variables)
             {
@@ -1783,95 +1734,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     bool CanCastImplicitly(GeneralType source, GeneralType destination, StatementWithValue? value, [NotNullWhen(false)] out PossibleDiagnostic? error)
         => StatementCompiler.CanCastImplicitly(source, destination, value, this, out error);
 
-    bool CanCastImplicitly(CompiledValue source, GeneralType destination, StatementWithValue? value, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        error = null;
-
-        if (destination.TryGetNumericType(out NumericType numericType))
-        {
-            if (numericType == NumericType.Float) return true;
-            (CompiledValue min, CompiledValue max) = destination.GetBitWidth(this) switch
-            {
-                BitWidth._8 => numericType switch
-                {
-                    NumericType.UnsignedInteger => ((CompiledValue)byte.MinValue, (CompiledValue)byte.MaxValue),
-                    NumericType.SignedInteger => ((CompiledValue)sbyte.MinValue, (CompiledValue)sbyte.MaxValue),
-                    NumericType.Float => default,
-                    _ => default,
-                },
-                BitWidth._16 => numericType switch
-                {
-                    NumericType.UnsignedInteger => ((CompiledValue)ushort.MinValue, (CompiledValue)ushort.MaxValue),
-                    NumericType.SignedInteger => ((CompiledValue)short.MinValue, (CompiledValue)short.MaxValue),
-                    NumericType.Float => default,
-                    _ => default,
-                },
-                BitWidth._32 => numericType switch
-                {
-                    NumericType.UnsignedInteger => ((CompiledValue)uint.MinValue, (CompiledValue)uint.MaxValue),
-                    NumericType.SignedInteger => ((CompiledValue)int.MinValue, (CompiledValue)int.MaxValue),
-                    NumericType.Float => default,
-                    _ => default,
-                },
-                BitWidth._64 => numericType switch
-                {
-                    NumericType.UnsignedInteger => ((CompiledValue)ulong.MinValue, (CompiledValue)ulong.MaxValue),
-                    NumericType.SignedInteger => ((CompiledValue)long.MinValue, (CompiledValue)long.MaxValue),
-                    NumericType.Float => default,
-                    _ => default,
-                },
-                _ => default,
-            };
-            if (source >= min && source <= max) return true;
-        }
-
-        return CanCastImplicitly(new BuiltinType(source.Type), destination, value, out error);
-    }
-
     public static BitWidth MaxBitWidth(BitWidth a, BitWidth b) => a > b ? a : b;
-
-    /*
-    public CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset)
-    {
-        if (LanguageConstants.KeywordList.Contains(newVariable.Identifier.Content))
-        { Diagnostics.Add(Diagnostic.Critical($"Illegal variable name \"{newVariable.Identifier.Content}\"", newVariable.Identifier, newVariable.File)); }
-
-        GeneralType type;
-        if (newVariable.Type == StatementKeywords.Var)
-        {
-            if (newVariable.InitialValue == null)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Initial value for variable declaration with implicit type is required", newVariable));
-                type = BuiltinType.Void;
-            }
-            else
-            {
-                type = FindStatementType(newVariable.InitialValue);
-            }
-        }
-        else
-        {
-            type = GeneralType.From(newVariable.Type, FindType, TryCompute);
-
-            if (type is ArrayType arrayType &&
-                newVariable.InitialValue is LiteralList literalList &&
-                arrayType.Length is null)
-            {
-                type = new ArrayType(arrayType.Of, null, literalList.Values.Length);
-            }
-
-            newVariable.Type.SetAnalyzedType(type);
-            newVariable.CompiledType = type;
-        }
-
-        if (!type.AllGenericsDefined())
-        {
-            Diagnostics.Add(Diagnostic.Internal($"Failed to qualify all generics in variable \"{newVariable.Identifier}\" type \"{type}\" (what edge case is this???)", newVariable.Type, newVariable.File));
-        }
-
-        return new CompiledVariable(memoryOffset, type, newVariable);
-    }
-    */
 
     #region Initial Value
 
@@ -2033,7 +1896,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return type is not null;
     }
 
-    TType OnGotStatementType<TType>(StatementWithValue statement, TType type)
+    static TType OnGotStatementType<TType>(StatementWithValue statement, TType type)
         where TType : GeneralType
     {
         statement.CompiledType = type;
@@ -2190,6 +2053,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                         result = BuiltinType.Void;
                         break;
                 }
+                if (expectedType is not null &&
+                    CanCastImplicitly(result, expectedType, null, this, out _))
+                { result = expectedType; }
                 return OnGotStatementType(@operator, result);
             }
         }
@@ -2556,11 +2422,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         Diagnostics.Add(Diagnostic.Critical($"Unimplemented modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, modifiedStatement.File));
         return OnGotStatementType(modifiedStatement, FindStatementType(modifiedStatement.Statement, expectedType));
     }
-
     [return: NotNullIfNotNull(nameof(statement))]
     GeneralType? FindStatementType(StatementWithValue? statement)
         => FindStatementType(statement, null);
-
     [return: NotNullIfNotNull(nameof(statement))]
     GeneralType? FindStatementType(StatementWithValue? statement, GeneralType? expectedType)
     {
@@ -2590,24 +2454,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             }
         }
     }
-
     ImmutableArray<GeneralType> FindStatementTypes(ImmutableArray<StatementWithValue> statements)
     {
         ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(statements.Length);
         for (int i = 0; i < statements.Length; i++)
         { result.Add(FindStatementType(statements[i])); }
-        return result.ToImmutable();
-    }
-
-    ImmutableArray<GeneralType> FindStatementTypes(ImmutableArray<StatementWithValue> statements, ImmutableArray<GeneralType> expectedTypes)
-    {
-        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(statements.Length);
-        for (int i = 0; i < statements.Length; i++)
-        {
-            GeneralType? expectedType = null;
-            if (i < expectedTypes.Length) expectedType = expectedTypes[i];
-            result.Add(FindStatementType(statements[i], expectedType));
-        }
         return result.ToImmutable();
     }
 
@@ -2617,7 +2468,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
         => statements.Select(statement => InlineMacro(statement, parameters));
-
     static bool InlineMacro(FunctionThingDefinition function, ImmutableArray<StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
         Dictionary<string, StatementWithValue> _parameters =
@@ -2627,7 +2477,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return InlineMacro(function, _parameters, out inlined);
     }
-
     static bool InlineMacro(FunctionThingDefinition function, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
         inlined = default;
@@ -2654,7 +2503,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-
     static bool InlineMacro(Block block, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Block? inlined)
     {
         inlined = null;
@@ -2678,7 +2526,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static BinaryOperatorCall InlineMacro(BinaryOperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             op: operatorCall.Operator,
@@ -2690,7 +2537,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             SaveValue = operatorCall.SaveValue,
             Semicolon = operatorCall.Semicolon,
         };
-
     static UnaryOperatorCall InlineMacro(UnaryOperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             op: operatorCall.Operator,
@@ -2701,7 +2547,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             SaveValue = operatorCall.SaveValue,
             Semicolon = operatorCall.Semicolon,
         };
-
     static KeywordCall InlineMacro(KeywordCall keywordCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             identifier: keywordCall.IdentifierToken,
@@ -2710,7 +2555,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         {
             Semicolon = keywordCall.Semicolon,
         };
-
     static FunctionCall InlineMacro(FunctionCall functionCall, Dictionary<string, StatementWithValue> parameters)
     {
         IEnumerable<StatementWithValue> _parameters = InlineMacro(functionCall.Arguments, parameters);
@@ -2719,7 +2563,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         { prevStatement = InlineMacro(prevStatement, parameters); }
         return new FunctionCall(prevStatement, functionCall.Identifier, _parameters, functionCall.Brackets, functionCall.File);
     }
-
     static AnyCall InlineMacro(AnyCall anyCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(anyCall.PrevStatement, parameters),
@@ -2731,7 +2574,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             SaveValue = anyCall.SaveValue,
             Semicolon = anyCall.Semicolon,
         };
-
     static ConstructorCall InlineMacro(ConstructorCall constructorCall, Dictionary<string, StatementWithValue> parameters)
         => new(
             keyword: constructorCall.Keyword,
@@ -2743,17 +2585,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             SaveValue = constructorCall.SaveValue,
             Semicolon = constructorCall.Semicolon,
         };
-
-    static NewInstance InlineMacro(NewInstance newInstance, Dictionary<string, StatementWithValue> parameters)
-        => new(
-            keyword: newInstance.KeywordToken,
-            typeName: newInstance.Type,
-            file: newInstance.File)
-        {
-            SaveValue = newInstance.SaveValue,
-            Semicolon = newInstance.Semicolon,
-        };
-
+    static NewInstance InlineMacro(NewInstance newInstance, Dictionary<string, StatementWithValue> _)
+        => newInstance;
     static LiteralList InlineMacro(LiteralList literalList, Dictionary<string, StatementWithValue> parameters)
         => new(
             values: literalList.Values.Select(v => InlineMacro(v, parameters)),
@@ -2764,7 +2597,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             Semicolon = literalList.Semicolon,
             SurroundingBracelet = literalList.SurroundingBracelet,
         };
-
     static TypeInstance InlineMacro(TypeInstance type, Dictionary<string, StatementWithValue> parameters) => type switch
     {
         TypeInstanceFunction v => new TypeInstanceFunction(
@@ -2785,7 +2617,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         ),
         _ => throw new NotImplementedException(),
     };
-
     static bool InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
         inlined = null;
@@ -2869,7 +2700,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-
     static bool InlineMacro(IfContainer statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out IfContainer? inlined)
     {
         inlined = null;
@@ -2884,7 +2714,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         { Semicolon = statement.Semicolon, };
         return true;
     }
-
     static bool InlineMacro(BaseBranch statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out BaseBranch? inlined) => statement switch
     {
         IfBranch v => InlineMacro(v, parameters, out inlined),
@@ -2892,7 +2721,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         ElseBranch v => InlineMacro(v, parameters, out inlined),
         _ => throw new UnreachableException()
     };
-
     static bool InlineMacro(IfBranch statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out BaseBranch? inlined)
     {
         inlined = null;
@@ -2912,7 +2740,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static bool InlineMacro(ElseIfBranch statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out BaseBranch? inlined)
     {
         inlined = null;
@@ -2932,7 +2759,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static bool InlineMacro(ElseBranch statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out BaseBranch? inlined)
     {
         inlined = null;
@@ -2949,7 +2775,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static bool InlineMacro(WhileLoop statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out WhileLoop? inlined)
     {
         inlined = null;
@@ -2969,7 +2794,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static bool InlineMacro(ForLoop statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out ForLoop? inlined)
     {
         inlined = null;
@@ -2997,7 +2821,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static bool InlineMacro(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out AnyAssignment? inlined)
     {
         inlined = null;
@@ -3036,7 +2859,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-
     static bool InlineMacro(Assignment statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out Assignment? inlined)
     {
         inlined = null;
@@ -3054,7 +2876,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static bool InlineMacro(ShortOperatorCall statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out ShortOperatorCall? inlined)
     {
         inlined = null;
@@ -3071,7 +2892,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static bool InlineMacro(CompoundAssignment statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out CompoundAssignment? inlined)
     {
         inlined = null;
@@ -3089,7 +2909,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static bool InlineMacro(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out VariableDeclaration? inlined)
     {
         inlined = null;
@@ -3108,7 +2927,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-
     static Pointer InlineMacro(Pointer statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             operatorToken: statement.Operator,
@@ -3118,7 +2936,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
         };
-
     static AddressGetter InlineMacro(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             operatorToken: statement.Operator,
@@ -3128,17 +2945,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
         };
-
     static StatementWithValue InlineMacro(Identifier statement, Dictionary<string, StatementWithValue> parameters)
     {
         if (parameters.TryGetValue(statement.Content, out StatementWithValue? inlinedStatement))
         { return inlinedStatement; }
         return statement;
     }
-
     static LiteralStatement InlineMacro(LiteralStatement statement, Dictionary<string, StatementWithValue> _)
         => statement;
-
     static Field InlineMacro(Field statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
@@ -3148,7 +2962,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
         };
-
     static IndexCall InlineMacro(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
@@ -3159,7 +2972,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             SaveValue = statement.SaveValue,
             Semicolon = statement.Semicolon,
         };
-
     static BasicTypeCast InlineMacro(BasicTypeCast statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
@@ -3172,7 +2984,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
             CompiledType = statement.CompiledType,
         };
-
     static ManagedTypeCast InlineMacro(ManagedTypeCast statement, Dictionary<string, StatementWithValue> parameters)
         => new(
             prevStatement: InlineMacro(statement.PrevStatement, parameters),
@@ -3186,7 +2997,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledType = statement.CompiledType,
             SurroundingBracelet = statement.SurroundingBracelet,
         };
-
     static ModifiedStatement InlineMacro(ModifiedStatement modifiedStatement, Dictionary<string, StatementWithValue> parameters)
         => new(
             modifier: modifiedStatement.Modifier,
@@ -3198,7 +3008,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
             CompiledType = modifiedStatement.CompiledType,
         };
-
     [return: NotNullIfNotNull(nameof(statement))]
     static StatementWithValue? InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
     {
@@ -3236,22 +3045,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         Break = 0x4,
     }
 
-    public static ControlFlowUsage FindControlFlowUsage(IEnumerable<Statement> statements, bool inDepth = false)
+    static ControlFlowUsage FindControlFlowUsage(IEnumerable<Statement> statements, bool inDepth = false)
     {
         ControlFlowUsage result = ControlFlowUsage.None;
         foreach (Statement statement in statements)
         { result |= FindControlFlowUsage(statement, inDepth); }
         return result;
     }
-
-    public static ControlFlowUsage FindControlFlowUsage(IEnumerable<CompiledStatement> statements, bool inDepth = false)
-    {
-        ControlFlowUsage result = ControlFlowUsage.None;
-        foreach (CompiledStatement statement in statements)
-        { result |= FindControlFlowUsage(statement, inDepth); }
-        return result;
-    }
-    public static ControlFlowUsage FindControlFlowUsage(Statement statement, bool inDepth = false) => statement switch
+    static ControlFlowUsage FindControlFlowUsage(Statement statement, bool inDepth = false) => statement switch
     {
         Block v => FindControlFlowUsage(v.Statements, true),
         KeywordCall v => FindControlFlowUsage(v, inDepth),
@@ -3272,7 +3073,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         _ => throw new NotImplementedException(statement.GetType().Name),
     };
-
     static ControlFlowUsage FindControlFlowUsage(KeywordCall statement, bool inDepth = false)
     {
         switch (statement.Identifier.Content)
@@ -3296,11 +3096,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
+    public static ControlFlowUsage FindControlFlowUsage(IEnumerable<CompiledStatement> statements, bool inDepth = false)
+    {
+        ControlFlowUsage result = ControlFlowUsage.None;
+        foreach (CompiledStatement statement in statements)
+        { result |= FindControlFlowUsage(statement, inDepth); }
+        return result;
+    }
     public static ControlFlowUsage FindControlFlowUsage(CompiledStatement statement, bool inDepth = false) => statement switch
     {
         CompiledBlock v => FindControlFlowUsage(v.Statements, true),
-        CompiledReturn v => inDepth ? ControlFlowUsage.ConditionalReturn : ControlFlowUsage.Return,
-        CompiledBreak v => ControlFlowUsage.Break,
+        CompiledReturn => inDepth ? ControlFlowUsage.ConditionalReturn : ControlFlowUsage.Return,
+        CompiledBreak => ControlFlowUsage.Break,
         CompiledWhileLoop v => FindControlFlowUsage(v.Body, true),
         CompiledForLoop v => FindControlFlowUsage(v.Body, true),
         CompiledIf v => FindControlFlowUsage(v.Body, true) | (v.Next is null ? ControlFlowUsage.None : FindControlFlowUsage(v.Next, true)),
@@ -3363,6 +3170,20 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         public static EvaluationContext Empty => new(null, null);
 
         public static EvaluationContext EmptyWithVariables => new(null, new Dictionary<string, CompiledValue>());
+
+        public Dictionary<string, StatementWithValue> Variables
+        {
+            get
+            {
+                if (_frames is null || _frames.Count == 0) return new Dictionary<string, StatementWithValue>();
+                Dictionary<string, StatementWithValue> result = new();
+                foreach (Dictionary<string, CompiledValue> scope in _frames.Last)
+                {
+                    result.AddRange(scope.Select(v => new KeyValuePair<string, StatementWithValue>(v.Key, Literal.CreateAnonymous(v.Value, Position.UnknownPosition, null))));
+                }
+                return result;
+            }
+        }
 
         public EvaluationContext(IDictionary<StatementWithValue, CompiledValue>? values, IDictionary<string, CompiledValue>? variables)
         {
@@ -3455,7 +3276,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
-    public static bool TryCompute(string @operator, CompiledValue left, CompiledValue right, [NotNullWhen(true)] out CompiledValue result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool TryCompute(string @operator, CompiledValue left, CompiledValue right, [NotNullWhen(true)] out CompiledValue result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         // TODO: wtf
         try
@@ -3644,26 +3465,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
         }
     }
-    bool TryCompute(KeywordCall keywordCall, out CompiledValue value)
-    {
-        if (keywordCall.Identifier.Content == "sizeof")
-        {
-            if (keywordCall.Arguments.Length != 1)
-            {
-                value = CompiledValue.Null;
-                return false;
-            }
-
-            StatementWithValue param0 = keywordCall.Arguments[0];
-            GeneralType param0Type = FindStatementType(param0);
-
-            value = new CompiledValue(param0Type.GetSize(this, Diagnostics, param0));
-            return true;
-        }
-
-        value = CompiledValue.Null;
-        return false;
-    }
     bool TryCompute(AnyCall anyCall, EvaluationContext context, out CompiledValue value)
     {
         if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
@@ -3704,7 +3505,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        if (GetFunction(functionCall, out FunctionQueryResult<CompiledFunction>? result, out _))
+        if (GetFunction(InlineMacro(functionCall, context.Variables), out FunctionQueryResult<CompiledFunction>? result, out _))
         {
             CompiledFunction? function = result.Function;
 
@@ -3890,7 +3691,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
     }
 
-    public static bool TryComputeSimple(BinaryOperatorCall @operator, out CompiledValue value)
+    static bool TryComputeSimple(BinaryOperatorCall @operator, out CompiledValue value)
     {
         if (!TryComputeSimple(@operator.Left, out CompiledValue leftValue))
         {
@@ -3932,7 +3733,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = leftValue;
         return true;
     }
-    public static bool TryComputeSimple(UnaryOperatorCall @operator, out CompiledValue value)
+    static bool TryComputeSimple(UnaryOperatorCall @operator, out CompiledValue value)
     {
         if (!TryComputeSimple(@operator.Left, out CompiledValue leftValue))
         {
@@ -3957,7 +3758,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = leftValue;
         return true;
     }
-    public static bool TryComputeSimple(IndexCall indexCall, out CompiledValue value)
+    static bool TryComputeSimple(IndexCall indexCall, out CompiledValue value)
     {
         if (indexCall.PrevStatement is LiteralStatement literal &&
             literal.Type == LiteralType.String &&
@@ -4077,7 +3878,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-
     bool TryEvaluate(WhileLoop whileLoop, EvaluationContext context)
     {
         int iterations = 64;
@@ -4446,7 +4246,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region Find Size
 
-    bool FindSize(GeneralType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => type switch
+    static bool FindSize(GeneralType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => type switch
     {
         PointerType v => FindSize(v, out size, out error),
         ArrayType v => FindSize(v, out size, out error),
@@ -4457,8 +4257,19 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         AliasType v => FindSize(v, out size, out error),
         _ => throw new NotImplementedException(),
     };
-
-    bool FindSize(ArrayType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        size = default;
+        error = new PossibleDiagnostic($"Pointer size is runtime dependent");
+        return false;
+    }
+    static bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        size = default;
+        error = new PossibleDiagnostic($"Pointer size is runtime dependent");
+        return false;
+    }
+    static bool FindSize(ArrayType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = default;
 
@@ -4480,8 +4291,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         error = null;
         return true;
     }
-
-    bool FindSize(StructType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(StructType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = 0;
 
@@ -4496,10 +4306,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         error = null;
         return true;
     }
-
-    bool FindSize(GenericType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => throw new InvalidOperationException($"Generic type doesn't have a size");
-
-    bool FindSize(BuiltinType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(GenericType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        throw new InvalidOperationException($"Generic type doesn't have a size");
+    }
+    static bool FindSize(BuiltinType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = default;
         error = default;
@@ -4517,21 +4328,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             default: throw new UnreachableException();
         }
     }
-
-    bool FindSize(AliasType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => FindSize(type.Value, out size, out error);
+    static bool FindSize(AliasType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        return FindSize(type.Value, out size, out error);
+    }
 
     #endregion
 
     #region IsObservable
 
-    bool IsObservable(CompiledFunction function)
-    {
-        return true;
-    }
-    bool IsObservable(ICompiledFunction function)
-    {
-        return true;
-    }
     bool IsObservable(WhileLoop whileLoop)
     {
         return true;
@@ -4626,7 +4431,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-
     bool IsObservable(ConstructorCall basicTypeCast)
     {
         return true;
@@ -4660,31 +4464,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     };
 
     #endregion
-
-    public static bool IsStringOnStack(GeneralType type, StatementWithValue? value, [NotNullWhen(true)] out LiteralStatement? literal, out int avaliableLength, out PossibleDiagnostic? error)
-    {
-        error = null;
-        if (type.Is(out ArrayType? arrayType) &&
-            arrayType.Of.SameAs(BasicType.U16) &&
-            value is LiteralStatement literalStatement &&
-            literalStatement.Type == LiteralType.String &&
-            arrayType.ComputedLength.HasValue)
-        {
-            avaliableLength = arrayType.ComputedLength.Value;
-            if (literalStatement.Value.Length > arrayType.ComputedLength.Value)
-            {
-                error = new PossibleDiagnostic($"String literal is longer ({literalStatement.Value.Length}) the array's length ({arrayType.ComputedLength})", literalStatement);
-            }
-            literal = literalStatement;
-            return true;
-        }
-        else
-        {
-            avaliableLength = default;
-            literal = default;
-            return false;
-        }
-    }
 
     public static bool IsStringOnStack(GeneralType type, CompiledStatementWithValue? value, [NotNullWhen(true)] out CompiledStringInstance? literal, out int avaliableLength, out PossibleDiagnostic? error)
     {

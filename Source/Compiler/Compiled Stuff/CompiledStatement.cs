@@ -100,7 +100,6 @@ public class CompiledBlock : CompiledStatement
 
 public abstract class CompiledBranch : CompiledStatement
 {
-
 }
 
 public class CompiledIf : CompiledBranch
@@ -231,6 +230,8 @@ public class CompiledVariableDeclaration : CompiledStatement
     public required CompiledStatementWithValue? InitialValue { get; init; }
     public required CompiledCleanup Cleanup { get; init; }
     public required bool IsGlobal { get; init; }
+    public HashSet<CompiledVariableSetter> Setters { get; } = new();
+    public HashSet<CompiledVariableGetter> Getters { get; } = new();
 
     public override string Stringify(int depth = 0)
         =>
@@ -327,7 +328,6 @@ public class CompiledDelete : CompiledStatement
 
     public override string Stringify(int depth = 0) => $"delete {Value.Stringify(depth + 1)}";
     public override string ToString() => $"delete {Value}";
-
 }
 
 public class CompiledReturn : CompiledStatement
@@ -343,7 +343,6 @@ public class CompiledReturn : CompiledStatement
         => Value is null
         ? $"return"
         : $"return {Value}";
-
 }
 
 public class CompiledBreak : CompiledStatement
@@ -360,7 +359,6 @@ public class CompiledCleanup : CompiledStatement
 
     public override string Stringify(int depth = 0) => "";
     public override string ToString() => "::cleanup::";
-
 }
 
 public class CompiledPassedArgument : CompiledStatementWithValue
@@ -391,7 +389,6 @@ public class CompiledGoto : CompiledStatement
 
     public override string Stringify(int depth = 0) => $"goto {Value.Stringify(depth + 1)}";
     public override string ToString() => $"goto {Value}";
-
 }
 
 public class CompiledBinaryOperatorCall : CompiledStatementWithValue
@@ -462,7 +459,6 @@ public class CompiledUnaryOperatorCall : CompiledStatementWithValue
     public override string Stringify(int depth = 0) => $"({Operator}{Left.Stringify(depth + 1)})";
 
     public override string ToString() => $"{Operator}{Left}";
-
 }
 
 public class CompiledEvaluatedValue : CompiledStatementWithValue
@@ -507,12 +503,11 @@ public class CompiledEvaluatedValue : CompiledStatementWithValue
 public class CompiledInstructionLabelDeclaration : CompiledStatement
 {
     public static readonly FunctionType Type = new(BuiltinType.Void, Enumerable.Empty<GeneralType>());
-
     public required string Identifier { get; init; }
+    public HashSet<InstructionLabelAddressGetter> Getters { get; } = new();
 
     public override string Stringify(int depth = 0) => $"{Identifier}:";
     public override string ToString() => $"{Identifier}:";
-
 }
 
 public class CompiledAddressGetter : CompiledStatementWithValue
@@ -521,7 +516,6 @@ public class CompiledAddressGetter : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"&{Of.Stringify(depth + 1)}";
     public override string ToString() => $"&{Of}";
-
 }
 
 public class CompiledPointer : CompiledStatementWithValue
@@ -530,7 +524,6 @@ public class CompiledPointer : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"*{To.Stringify(depth + 1)}";
     public override string ToString() => $"*{To}";
-
 }
 
 public class CompiledWhileLoop : CompiledStatement
@@ -587,7 +580,6 @@ public class CompiledConstructorCall : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"new {Function.Type}({string.Join(", ", Arguments.Select(v => v.Stringify(depth + 1)))})";
     public override string ToString() => $"new {Function.Type}({string.Join(", ", Arguments.Select(v => v.ToString()))})";
-
 }
 
 public class CompiledDesctructorCall : CompiledStatementWithValue
@@ -597,7 +589,6 @@ public class CompiledDesctructorCall : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"{Function.Identifier}({Value.Stringify(depth + 1)})";
     public override string ToString() => $"{Function.Identifier}({Value})";
-
 }
 
 public class CompiledTypeCast : CompiledStatementWithValue
@@ -623,7 +614,6 @@ public class CompiledFakeTypeCast : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"{Value.Stringify(depth)}";
     public override string ToString() => $"{Value} as {Type}";
-
 }
 
 public class CompiledIndexGetter : CompiledStatementWithValue
@@ -633,10 +623,9 @@ public class CompiledIndexGetter : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"{Base.Stringify(depth + 1)}[{Index.Stringify(depth + 1)}]";
     public override string ToString() => $"{Base}[{Index}]";
-
 }
 
-public class CompiledLocalVariableSetter : CompiledStatement
+public class CompiledVariableSetter : CompiledStatement
 {
     public required CompiledVariableDeclaration Variable { get; init; }
     public required CompiledStatementWithValue Value { get; init; }
@@ -644,18 +633,6 @@ public class CompiledLocalVariableSetter : CompiledStatement
 
     public override string Stringify(int depth = 0) => $"{Variable.Identifier} = {Value.Stringify(depth + 1)}";
     public override string ToString() => $"{Variable.Identifier} = {Value}";
-
-}
-
-public class CompiledGlobalVariableSetter : CompiledStatement
-{
-    public required CompiledVariableDeclaration Variable { get; init; }
-    public required CompiledStatementWithValue Value { get; init; }
-    public required bool IsCompoundAssignment { get; init; }
-
-    public override string Stringify(int depth = 0) => $"{Variable.Identifier} = {Value.Stringify(depth + 1)}";
-    public override string ToString() => $"{Variable.Identifier} = {Value}";
-
 }
 
 public class CompiledParameterSetter : CompiledStatement
@@ -666,7 +643,6 @@ public class CompiledParameterSetter : CompiledStatement
 
     public override string Stringify(int depth = 0) => $"{Variable.Identifier} = {Value.Stringify(depth + 1)}";
     public override string ToString() => $"{Variable.Identifier} = {Value}";
-
 }
 
 public class CompiledFieldSetter : CompiledStatement
@@ -698,7 +674,6 @@ public class CompiledIndirectSetter : CompiledStatement
 
     public override string Stringify(int depth = 0) => $"*{AddressValue.Stringify(depth + 1)} = {Value.Stringify(depth + 1)}";
     public override string ToString() => $"*{AddressValue} = {Value}";
-
 }
 
 public class CompiledIndexSetter : CompiledStatement
@@ -731,22 +706,12 @@ public class RegisterSetter : CompiledStatement
     public override string ToString() => $"{Register} = {Value}";
 }
 
-public class CompiledLocalVariableGetter : CompiledStatementWithValue
+public class CompiledVariableGetter : CompiledStatementWithValue
 {
     public required CompiledVariableDeclaration Variable { get; init; }
 
     public override string Stringify(int depth = 0) => $"{Variable.Identifier}";
     public override string ToString() => $"{Variable.Identifier}";
-
-}
-
-public class CompiledGlobalVariableGetter : CompiledStatementWithValue
-{
-    public required CompiledVariableDeclaration Variable { get; init; }
-
-    public override string Stringify(int depth = 0) => $"{Variable.Identifier}";
-    public override string ToString() => $"{Variable.Identifier}";
-
 }
 
 public class CompiledParameterGetter : CompiledStatementWithValue
@@ -755,7 +720,6 @@ public class CompiledParameterGetter : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"{Variable.Identifier}";
     public override string ToString() => $"{Variable.Identifier}";
-
 }
 
 public class CompiledFieldGetter : CompiledStatementWithValue
@@ -765,7 +729,6 @@ public class CompiledFieldGetter : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"{Object.Stringify(depth + 1)}.{Field.Identifier}";
     public override string ToString() => $"{Object}.{Field.Identifier}";
-
 }
 
 public class RegisterGetter : CompiledStatementWithValue
@@ -774,7 +737,6 @@ public class RegisterGetter : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"{Register}";
     public override string ToString() => $"{Register}";
-
 }
 
 public class CompiledStringInstance : CompiledStatementWithValue
@@ -785,7 +747,6 @@ public class CompiledStringInstance : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"\"{Value}\"";
     public override string ToString() => $"\"{Value}\"";
-
 }
 
 public class FunctionAddressGetter : CompiledStatementWithValue
@@ -794,7 +755,6 @@ public class FunctionAddressGetter : CompiledStatementWithValue
 
     public override string Stringify(int depth = 0) => $"&{Function.Identifier}";
     public override string ToString() => $"&{Function.Identifier}";
-
 }
 
 public class InstructionLabelAddressGetter : CompiledStatementWithValue

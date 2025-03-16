@@ -319,12 +319,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void EmitStatement(CompiledGlobalVariableGetter statement, ILGenerator il)
-    {
-        il.Emit(OpCodes.Ldloc, Locals[statement.Variable].LocalIndex);
-    }
-
-    void EmitStatement(CompiledLocalVariableGetter statement, ILGenerator il)
+    void EmitStatement(CompiledVariableGetter statement, ILGenerator il)
     {
         il.Emit(OpCodes.Ldloc, Locals[statement.Variable].LocalIndex);
     }
@@ -412,13 +407,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         throw new NotImplementedException();
     }
 
-    void EmitStatement(CompiledLocalVariableSetter statement, ILGenerator il)
-    {
-        EmitStatement(statement.Value, il);
-        il.Emit(OpCodes.Stloc, Locals[statement.Variable].LocalIndex);
-    }
-
-    void EmitStatement(CompiledGlobalVariableSetter statement, ILGenerator il)
+    void EmitStatement(CompiledVariableSetter statement, ILGenerator il)
     {
         EmitStatement(statement.Value, il);
         il.Emit(OpCodes.Stloc, Locals[statement.Variable].LocalIndex);
@@ -613,10 +602,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         switch (statement.Of)
         {
-            case CompiledLocalVariableGetter v:
-                il.Emit(OpCodes.Ldloca, Locals[v.Variable]);
-                break;
-            case CompiledGlobalVariableGetter v:
+            case CompiledVariableGetter v:
                 il.Emit(OpCodes.Ldloca, Locals[v.Variable]);
                 break;
             case CompiledParameterGetter v:
@@ -688,15 +674,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case CompiledBinaryOperatorCall v: EmitStatement(v, il); break;
             case CompiledUnaryOperatorCall v: EmitStatement(v, il); break;
             case CompiledVariableDeclaration v: EmitStatement(v, il); break;
-            case CompiledGlobalVariableGetter v: EmitStatement(v, il); break;
-            case CompiledLocalVariableGetter v: EmitStatement(v, il); break;
+            case CompiledVariableGetter v: EmitStatement(v, il); break;
             case CompiledParameterGetter v: EmitStatement(v, il); break;
             case CompiledFieldGetter v: EmitStatement(v, il); break;
             case CompiledPointer v: EmitStatement(v, il); break;
             case CompiledFunctionCall v: EmitStatement(v, il); break;
             case CompiledExternalFunctionCall v: EmitStatement(v, il); break;
-            case CompiledGlobalVariableSetter v: EmitStatement(v, il); break;
-            case CompiledLocalVariableSetter v: EmitStatement(v, il); break;
+            case CompiledVariableSetter v: EmitStatement(v, il); break;
             case CompiledParameterSetter v: EmitStatement(v, il); break;
             case CompiledFieldSetter v: EmitStatement(v, il); break;
             case CompiledIndirectSetter v: EmitStatement(v, il); break;

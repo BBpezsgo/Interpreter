@@ -378,8 +378,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         {
             case CompiledIndexGetter index: return TryGetAddress(index, out address, out size);
             case CompiledPointer pointer: return TryGetAddress(pointer, out address, out size);
-            case CompiledLocalVariableGetter identifier: return TryGetAddress(identifier, out address, out size);
-            case CompiledGlobalVariableGetter identifier: return TryGetAddress(identifier, out address, out size);
+            case CompiledVariableGetter identifier: return TryGetAddress(identifier, out address, out size);
             case CompiledParameterGetter identifier: return TryGetAddress(identifier, out address, out size);
             case CompiledFieldGetter field: return TryGetAddress(field, out address, out size);
             default:
@@ -517,21 +516,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         size = 1;
         return true;
     }
-    bool TryGetAddress(CompiledLocalVariableGetter identifier, [NotNullWhen(true)] out Address? address, out int size)
-    {
-        if (!GetVariable(identifier, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
-        {
-            Diagnostics.Add(notFoundError.ToError(identifier));
-            address = default;
-            size = default;
-            return false;
-        }
-
-        address = new AddressAbsolute(variable.Address);
-        size = variable.Size;
-        return true;
-    }
-    bool TryGetAddress(CompiledGlobalVariableGetter identifier, [NotNullWhen(true)] out Address? address, out int size)
+    bool TryGetAddress(CompiledVariableGetter identifier, [NotNullWhen(true)] out Address? address, out int size)
     {
         if (!GetVariable(identifier, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
@@ -570,7 +555,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         BrainfuckVariable? result_ = default;
         PossibleDiagnostic? error_ = null;
 
-       StatementCompiler.GlobalVariablePerfectus perfectus = StatementCompiler.GlobalVariablePerfectus.None;
+        StatementCompiler.GlobalVariablePerfectus perfectus = StatementCompiler.GlobalVariablePerfectus.None;
 
         static StatementCompiler.GlobalVariablePerfectus Max(StatementCompiler.GlobalVariablePerfectus a, StatementCompiler.GlobalVariablePerfectus b) => a > b ? a : b;
 
@@ -639,22 +624,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         notFoundError = null;
         return name switch
         {
-            CompiledLocalVariableGetter identifier => GetVariable(variables, identifier, out variable, out notFoundError),
-            CompiledGlobalVariableGetter identifier => GetVariable(variables, identifier, out variable, out notFoundError),
+            CompiledVariableGetter identifier => GetVariable(variables, identifier, out variable, out notFoundError),
             CompiledParameterGetter identifier => GetVariable(variables, identifier, out variable, out notFoundError),
             CompiledPointer pointer => GetVariable(variables, pointer, out variable, out notFoundError),
             _ => false
         };
     }
-    static bool GetVariable(Stack<BrainfuckVariable> variables, CompiledLocalVariableGetter name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(variables, name.Variable.Identifier, name.Variable.Location.File, out variable, out notFoundError);
-    static bool GetVariable(Stack<BrainfuckVariable> variables, CompiledGlobalVariableGetter name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(variables, name.Variable.Identifier, name.Variable.Location.File, out variable, out notFoundError);
+    static bool GetVariable(Stack<BrainfuckVariable> variables, CompiledVariableGetter name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(variables, name.Variable.Identifier, name.Variable.Location.File, out variable, out notFoundError);
     static bool GetVariable(Stack<BrainfuckVariable> variables, CompiledParameterGetter name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(variables, name.Variable.Identifier.Content, name.Variable.File, out variable, out notFoundError);
     static bool GetVariable(Stack<BrainfuckVariable> variables, CompiledPointer name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError)
     {
         string _identifier;
 
-        if (name.To is CompiledLocalVariableGetter localVariableGetter) _identifier = localVariableGetter.Variable.Identifier;
-        else if (name.To is CompiledGlobalVariableGetter globalVariableGetter) _identifier = globalVariableGetter.Variable.Identifier;
+        if (name.To is CompiledVariableGetter variableGetter) _identifier = variableGetter.Variable.Identifier;
         else if (name.To is CompiledParameterGetter parameterGetter) _identifier = parameterGetter.Variable.Identifier.Content;
         else
         {

@@ -71,6 +71,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     AddressOffset GetGlobalVariableAddress(CompiledVariableDeclaration variable)
     {
+        if (!variable.IsGlobal) throw null;
+
         if (!GeneratedVariables.TryGetValue(variable, out GeneratedVariable? generatedVariable))
         { throw new NotImplementedException(); }
 
@@ -87,6 +89,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     AddressOffset GetLocalVariableAddress(CompiledVariableDeclaration variable)
     {
+        if (variable.IsGlobal) throw null;
+
         if (!GeneratedVariables.TryGetValue(variable, out GeneratedVariable? generatedVariable))
         { throw new NotImplementedException(); }
 
@@ -561,24 +565,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     bool GetAddress(CompiledStatementWithValue value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error) => value switch
     {
-        CompiledGlobalVariableGetter v => GetAddress(v, out address, out error),
-        CompiledLocalVariableGetter v => GetAddress(v, out address, out error),
+        CompiledVariableGetter v => GetAddress(v, out address, out error),
         CompiledParameterGetter v => GetAddress(v, out address, out error),
         CompiledIndexGetter v => GetAddress(v, out address, out error),
         CompiledFieldGetter v => GetAddress(v, out address, out error),
         _ => throw new NotImplementedException()
     };
 
-    bool GetAddress(CompiledGlobalVariableGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetAddress(CompiledVariableGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        address = GetGlobalVariableAddress(value.Variable);
-        error = null;
-        return true;
-    }
-
-    bool GetAddress(CompiledLocalVariableGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        address = GetLocalVariableAddress(value.Variable);
+        if (value.Variable.IsGlobal)
+        {
+            address = GetGlobalVariableAddress(value.Variable);
+        }
+        else
+        {
+            address = GetLocalVariableAddress(value.Variable);
+        }
         error = null;
         return true;
     }
@@ -673,8 +676,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     CompiledStatementWithValue? NeedDerefernce(CompiledStatementWithValue value) => value switch
     {
-        CompiledLocalVariableGetter => null,
-        CompiledGlobalVariableGetter => null,
+        CompiledVariableGetter => null,
         CompiledParameterGetter => null,
         CompiledIndexGetter v => NeedDerefernce(v),
         CompiledFieldGetter v => NeedDerefernce(v),

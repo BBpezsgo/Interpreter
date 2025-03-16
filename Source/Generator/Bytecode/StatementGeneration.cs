@@ -295,6 +295,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateCodeForStatement(CompiledVariableDeclaration newVariable)
     {
+        // if (newVariable.Getters.Count == 0 &&
+        //     newVariable.Setters.Count == 0)
+        // {
+        //     if (newVariable.InitialValue is not null)
+        //     {
+        //         GenerateCodeForStatement(newVariable.InitialValue);
+        //         Pop(newVariable.InitialValue.Type.GetSize(this, Diagnostics, newVariable.InitialValue));
+        //     }
+        //     return;
+        // }
+
         bool isGlobal = newVariable.IsGlobal;
 
         if (newVariable.InitialValue == null) return;
@@ -308,13 +319,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 CompiledStatementWithValue value = literalList.Values[i];
                 GenerateCodeForValueSetter(new CompiledIndexSetter()
                 {
-                    Base = isGlobal ? new CompiledGlobalVariableGetter()
-                    {
-                        Variable = newVariable,
-                        Location = newVariable.Location,
-                        SaveValue = true,
-                        Type = newVariable.Type,
-                    } : new CompiledLocalVariableGetter()
+                    Base = new CompiledVariableGetter()
                     {
                         Variable = newVariable,
                         Location = newVariable.Location,
@@ -337,26 +342,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        if (isGlobal)
+        if (isGlobal != newVariable.IsGlobal) throw null;
+
+        GenerateCodeForValueSetter(new CompiledVariableSetter()
         {
-            GenerateCodeForValueSetter(new CompiledGlobalVariableSetter()
-            {
-                Variable = newVariable,
-                Value = newVariable.InitialValue,
-                Location = newVariable.Location,
-                IsCompoundAssignment = false,
-            });
-        }
-        else
-        {
-            GenerateCodeForValueSetter(new CompiledLocalVariableSetter()
-            {
-                Variable = newVariable,
-                Value = newVariable.InitialValue,
-                Location = newVariable.Location,
-                IsCompoundAssignment = false,
-            });
-        }
+            Variable = newVariable,
+            Value = newVariable.InitialValue,
+            Location = newVariable.Location,
+            IsCompoundAssignment = false,
+        });
         AddComment("}");
     }
     void GenerateCodeForStatement(CompiledInstructionLabelDeclaration instructionLabel)
@@ -941,13 +935,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         PushFrom(address, variable.Variable.Type.GetSize(this, Diagnostics, variable.Variable));
     }
-    void GenerateCodeForStatement(CompiledLocalVariableGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    void GenerateCodeForStatement(CompiledVariableGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        PushFrom(GetLocalVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
-    }
-    void GenerateCodeForStatement(CompiledGlobalVariableGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
-    {
-        PushFrom(GetGlobalVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
+        if (variable.Variable.IsGlobal)
+        {
+            PushFrom(GetGlobalVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
+        }
+        else
+        {
+            PushFrom(GetLocalVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
+        }
     }
     void GenerateCodeForStatement(FunctionAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
@@ -1459,8 +1456,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case CompiledUnaryOperatorCall v: GenerateCodeForStatement(v); break;
             case CompiledEvaluatedValue v: GenerateCodeForStatement(v, expectedType); break;
             case RegisterGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
-            case CompiledLocalVariableGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
-            case CompiledGlobalVariableGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledVariableGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
             case CompiledParameterGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
             case FunctionAddressGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
             case InstructionLabelAddressGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
@@ -1468,8 +1464,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case CompiledIndexGetter v: GenerateCodeForStatement(v); break;
             case CompiledAddressGetter v: GenerateCodeForStatement(v); break;
             case RegisterSetter v: GenerateCodeForValueSetter(v); break;
-            case CompiledLocalVariableSetter v: GenerateCodeForValueSetter(v); break;
-            case CompiledGlobalVariableSetter v: GenerateCodeForValueSetter(v); break;
+            case CompiledVariableSetter v: GenerateCodeForValueSetter(v); break;
             case CompiledParameterSetter v: GenerateCodeForValueSetter(v); break;
             case CompiledIndirectSetter v: GenerateCodeForValueSetter(v); break;
             case CompiledFieldSetter v: GenerateCodeForValueSetter(v); break;
@@ -1742,45 +1737,48 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(registerSetter.Value);
         PopTo(registerSetter.Register);
     }
-    void GenerateCodeForValueSetter(CompiledLocalVariableSetter localVariableSetter)
+    void GenerateCodeForValueSetter(CompiledVariableSetter localVariableSetter)
     {
-        if (localVariableSetter.Variable.InitialValue is not null &&
+        if (localVariableSetter.Variable.IsGlobal)
+        {
+            if (localVariableSetter.Variable.InitialValue is not null &&
                 StatementCompiler.IsStringOnStack(localVariableSetter.Variable.Type, localVariableSetter.Variable.InitialValue, out CompiledStringInstance? literal, out _, out PossibleDiagnostic? error))
-        {
-            if (error is not null) Diagnostics.Add(error.ToError(localVariableSetter.Value));
-            // localVariableSetter.Variable.IsInitialized = true;
+            {
+                if (error is not null) Diagnostics.Add(error.ToError(literal));
 
-            for (int i = 0; i < literal.Value.Length; i++)
-            { Push(new CompiledValue(literal.Value[i])); }
+                // globalVariableSetter.Variable.Variable.IsInitialized = true;
+
+                for (int i = 0; i < literal.Value.Length; i++)
+                { Push(new CompiledValue(literal.Value[i])); }
+            }
+            else
+            {
+                GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
+            }
+
+            PopTo(GetGlobalVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter.Variable));
+            return;
         }
         else
         {
-            GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
+            if (localVariableSetter.Variable.InitialValue is not null &&
+                    StatementCompiler.IsStringOnStack(localVariableSetter.Variable.Type, localVariableSetter.Variable.InitialValue, out CompiledStringInstance? literal, out _, out PossibleDiagnostic? error))
+            {
+                if (error is not null) Diagnostics.Add(error.ToError(localVariableSetter.Value));
+                // localVariableSetter.Variable.IsInitialized = true;
+
+                for (int i = 0; i < literal.Value.Length; i++)
+                { Push(new CompiledValue(literal.Value[i])); }
+            }
+            else
+            {
+                GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
+            }
+
+            PopTo(GetLocalVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter));
+            // localVariableSetter.Variable.Variable.IsInitialized = true;
+            return;
         }
-
-        PopTo(GetLocalVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter));
-        // localVariableSetter.Variable.Variable.IsInitialized = true;
-        return;
-    }
-    void GenerateCodeForValueSetter(CompiledGlobalVariableSetter globalVariableSetter)
-    {
-        if (globalVariableSetter.Variable.InitialValue is not null &&
-            StatementCompiler.IsStringOnStack(globalVariableSetter.Variable.Type, globalVariableSetter.Variable.InitialValue, out CompiledStringInstance? literal, out _, out PossibleDiagnostic? error))
-        {
-            if (error is not null) Diagnostics.Add(error.ToError(literal));
-
-            // globalVariableSetter.Variable.Variable.IsInitialized = true;
-
-            for (int i = 0; i < literal.Value.Length; i++)
-            { Push(new CompiledValue(literal.Value[i])); }
-        }
-        else
-        {
-            GenerateCodeForStatement(globalVariableSetter.Value, globalVariableSetter.Variable.Type);
-        }
-
-        PopTo(GetGlobalVariableAddress(globalVariableSetter.Variable), globalVariableSetter.Variable.Type.GetSize(this, Diagnostics, globalVariableSetter.Variable));
-        return;
     }
     void GenerateCodeForValueSetter(CompiledParameterSetter parameterSetter)
     {
@@ -1936,6 +1934,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     CompiledCleanup? GenerateCodeForLocalVariable(CompiledVariableDeclaration newVariable)
     {
+        // if (newVariable.Getters.Count == 0 &&
+        //     newVariable.Setters.Count == 0)
+        // { return null; }
+
         GeneralType type = newVariable.Type;
 
         int offset = (VariablesSize + type.GetSize(this, Diagnostics, newVariable)) * BytecodeProcessor.StackDirection;
@@ -2337,6 +2339,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Stack<CompiledCleanup> globalVariablesCleanup = new();
         foreach (CompiledVariableDeclaration variableDeclaration in globalVariableDeclarations)
         {
+            // if (variableDeclaration.Getters.Count == 0 &&
+            //     variableDeclaration.Setters.Count == 0)
+            // { continue; }
+
             GeneralType type = variableDeclaration.Type;
 
             int size = type.GetSize(this, Diagnostics, variableDeclaration);

@@ -53,7 +53,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         if (variable.Cleanup is null) return;
         GenerateDestructor(
-            new CompiledLocalVariableGetter()
+            new CompiledVariableGetter()
             {
                 Variable = variable.Declaration,
                 Location = variable.Declaration.Location,
@@ -366,17 +366,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     #region GenerateCodeForSetter()
 
-    void GenerateCodeForSetter(CompiledLocalVariableSetter _statement)
-    {
-        if (!GetVariable(_statement.Variable.Identifier, _statement.Variable.Location.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
-        {
-            Diagnostics.Add(notFoundError.ToError(_statement.Variable));
-            return;
-        }
-
-        GenerateCodeForSetter(variable, _statement.Value);
-    }
-    void GenerateCodeForSetter(CompiledGlobalVariableSetter _statement)
+    void GenerateCodeForSetter(CompiledVariableSetter _statement)
     {
         if (!GetVariable(_statement.Variable.Identifier, _statement.Variable.Location.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
@@ -716,58 +706,28 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForSetter(CompiledIndirectSetter indirectSetter)
     {
-        if (indirectSetter.AddressValue is CompiledLocalVariableGetter localVariableGetter)
+        if (indirectSetter.AddressValue is CompiledVariableGetter variableGetter)
         {
-            if (!GetVariable(localVariableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
+            if (!GetVariable(variableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
-                Diagnostics.Add(notFoundError.ToError(localVariableGetter));
+                Diagnostics.Add(notFoundError.ToError(variableGetter));
                 return;
             }
 
             if (variable.IsDiscarded)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Identifier}\" is discarded", localVariableGetter));
+                Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Identifier}\" is discarded", variableGetter));
                 return;
             }
 
             if (variable.Size != 1)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Bruh", localVariableGetter));
+                Diagnostics.Add(Diagnostic.Critical($"Bruh", variableGetter));
                 return;
             }
 
             if (!variable.IsInitialized)
-            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Identifier}\" is not initialized", localVariableGetter)); }
-
-            if (variable.IsReference)
-            {
-                GenerateCodeForSetter(variable, indirectSetter.Value);
-                return;
-            }
-        }
-
-        if (indirectSetter.AddressValue is CompiledGlobalVariableGetter globalVariableGetter)
-        {
-            if (!GetVariable(globalVariableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
-            {
-                Diagnostics.Add(notFoundError.ToError(globalVariableGetter));
-                return;
-            }
-
-            if (variable.IsDiscarded)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Identifier}\" is discarded", globalVariableGetter));
-                return;
-            }
-
-            if (variable.Size != 1)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Bruh", globalVariableGetter));
-                return;
-            }
-
-            if (!variable.IsInitialized)
-            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Identifier}\" is not initialized", globalVariableGetter)); }
+            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Identifier}\" is not initialized", variableGetter)); }
 
             if (variable.IsReference)
             {
@@ -1087,8 +1047,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case CompiledWhileLoop v: GenerateCodeForStatement(v); break;
             case CompiledForLoop v: GenerateCodeForStatement(v); break;
             case CompiledEvaluatedValue v: GenerateCodeForStatement(v); break;
-            case CompiledLocalVariableGetter v: GenerateCodeForStatement(v); break;
-            case CompiledGlobalVariableGetter v: GenerateCodeForStatement(v); break;
+            case CompiledVariableGetter v: GenerateCodeForStatement(v); break;
             case CompiledParameterGetter v: GenerateCodeForStatement(v); break;
             case CompiledBinaryOperatorCall v: GenerateCodeForStatement(v); break;
             case CompiledUnaryOperatorCall v: GenerateCodeForStatement(v); break;
@@ -1103,8 +1062,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case CompiledIndexGetter v: GenerateCodeForStatement(v); break;
             case CompiledRuntimeCall v: GenerateCodeForStatement(v); break;
             case CompiledBlock v: GenerateCodeForStatement(v); break;
-            case CompiledLocalVariableSetter v: GenerateCodeForSetter(v); break;
-            case CompiledGlobalVariableSetter v: GenerateCodeForSetter(v); break;
+            case CompiledVariableSetter v: GenerateCodeForSetter(v); break;
             case CompiledParameterSetter v: GenerateCodeForSetter(v); break;
             case CompiledFieldSetter v: GenerateCodeForSetter(v); break;
             case CompiledIndexSetter v: GenerateCodeForSetter(v); break;
@@ -1650,16 +1608,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             Stack.Push(evaluatedValue.Value);
         }
     }
-    void GenerateCodeForStatement(CompiledLocalVariableGetter statement)
-    {
-        using DebugInfoBlock debugBlock = DebugBlock(statement);
-
-        if (!GetVariable(statement, out BrainfuckVariable? variable, out PossibleDiagnostic? variableNotFoundError))
-        { throw new NotImplementedException(); }
-
-        GenerateCodeForStatement(variable, statement);
-    }
-    void GenerateCodeForStatement(CompiledGlobalVariableGetter statement)
+    void GenerateCodeForStatement(CompiledVariableGetter statement)
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
@@ -2169,38 +2118,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugInfoBlock debugBlock = DebugBlock(pointer);
 
-        if (pointer.To is CompiledLocalVariableGetter localVariableGetter)
+        if (pointer.To is CompiledVariableGetter variableGetter)
         {
-            if (!GetVariable(localVariableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
+            if (!GetVariable(variableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
-                Diagnostics.Add(notFoundError.ToError(localVariableGetter));
+                Diagnostics.Add(notFoundError.ToError(variableGetter));
                 return;
             }
 
             if (variable.Size != 1)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Bruh", localVariableGetter));
-                return;
-            }
-
-            if (variable.IsReference)
-            {
-                GenerateCodeForStatement(variable, pointer.To);
-                return;
-            }
-        }
-
-        if (pointer.To is CompiledGlobalVariableGetter globalVariableGetter)
-        {
-            if (!GetVariable(globalVariableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
-            {
-                Diagnostics.Add(notFoundError.ToError(globalVariableGetter));
-                return;
-            }
-
-            if (variable.Size != 1)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Bruh", globalVariableGetter));
+                Diagnostics.Add(Diagnostic.Critical($"Bruh", variableGetter));
                 return;
             }
 

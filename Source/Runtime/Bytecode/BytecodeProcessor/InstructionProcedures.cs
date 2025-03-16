@@ -577,12 +577,12 @@ public ref partial struct ProcessorState
                 if (function.ReturnValueSize > 0)
                 {
                     Span<byte> returnValue = stackalloc byte[function.ReturnValueSize];
-                    simpleFunction.Callback(parameters, returnValue);
+                    simpleFunction.MarshaledCallback(parameters, returnValue);
                     Push(returnValue);
                 }
                 else
                 {
-                    simpleFunction.Callback(parameters, default);
+                    simpleFunction.MarshaledCallback(parameters, default);
                 }
             }
 

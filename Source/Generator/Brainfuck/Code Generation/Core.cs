@@ -783,7 +783,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             BooleanType = BooleanType,
             ExitCodeType = ExitCodeType,
             SizeofStatementType = SizeofStatementType,
-            ExternalFunctions = [
+            ExternalFunctions = ImmutableArray.Create<IExternalFunction>(
                 new ExternalFunctionStub("stdin")
                 {
                     ReturnValueSize = 1,
@@ -791,8 +791,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
                 new ExternalFunctionStub("stdout")
                 {
                     ParametersSize = 1,
-                },
-            ],
+                }
+            ),
         }, Print, d);
         d.Throw();
 

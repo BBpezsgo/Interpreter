@@ -687,42 +687,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledBinaryOperatorCall @operator)
     {
-        CompiledStatementWithValue left = @operator.Left;
-        CompiledStatementWithValue right = @operator.Right;
-
-        GeneralType leftType = left.Type;
-        GeneralType rightType = right.Type;
-
-        if (!leftType.TryGetNumericType(out NumericType leftNType) ||
-            !rightType.TryGetNumericType(out NumericType rightNType))
-        {
-            throw new NotImplementedException();
-        }
-
-        BitWidth leftBitWidth = leftType.GetBitWidth(this, Diagnostics, left);
-        BitWidth rightBitWidth = rightType.GetBitWidth(this, Diagnostics, right);
+        BitWidth leftBitWidth = @operator.Left.Type.GetBitWidth(this, Diagnostics, @operator.Left);
+        BitWidth rightBitWidth = @operator.Right.Type.GetBitWidth(this, Diagnostics, @operator.Right);
         BitWidth bitWidth = StatementCompiler.MaxBitWidth(leftBitWidth, rightBitWidth);
-
-        leftType = BuiltinType.CreateNumeric(leftNType, leftBitWidth);
-        rightType = BuiltinType.CreateNumeric(rightNType, rightBitWidth);
 
         int jumpInstruction = InvalidFunctionAddress;
 
-        GenerateCodeForStatement(left, leftType);
-
-        if (leftNType != NumericType.Float &&
-            rightNType == NumericType.Float)
-        {
-            AddInstruction(Opcode.FTo,
-                (InstructionOperand)StackTop,
-                (InstructionOperand)StackTop);
-            leftType = BuiltinType.F32;
-            leftNType = NumericType.Float;
-        }
+        GenerateCodeForStatement(@operator.Left);
 
         if (@operator.Operator == CompiledBinaryOperatorCall.LogicalAND)
         {
-            PushFrom(StackTop, leftType.GetSize(this, Diagnostics, left));
+            PushFrom(StackTop, @operator.Left.Type.GetSize(this, Diagnostics, @operator.Left));
 
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
             {
@@ -734,7 +709,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else if (@operator.Operator == CompiledBinaryOperatorCall.LogicalOR)
         {
-            PushFrom(StackTop, leftType.GetSize(this, Diagnostics, left));
+            PushFrom(StackTop, @operator.Left.Type.GetSize(this, Diagnostics, @operator.Left));
 
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
             {
@@ -746,24 +721,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        GenerateCodeForStatement(right, rightType);
+        GenerateCodeForStatement(@operator.Right);
 
-        if (leftType.SameAs(BasicType.F32) &&
-            !rightType.SameAs(BasicType.F32))
-        {
-            AddInstruction(Opcode.FTo,
-                (InstructionOperand)StackTop,
-                (InstructionOperand)StackTop);
-            rightType = BuiltinType.F32;
-            rightNType = NumericType.Float;
-        }
-
-        if ((leftNType is NumericType.Float) != (rightNType is NumericType.Float))
-        {
-            throw new NotImplementedException();
-        }
-
-        bool isFloat = leftType.SameAs(BasicType.F32) || rightType.SameAs(BasicType.F32);
+        bool isFloat = @operator.Left.Type.SameAs(BasicType.F32) || @operator.Right.Type.SameAs(BasicType.F32);
 
         using (RegisterUsage.Auto regLeft = Registers.GetFree())
         using (RegisterUsage.Auto regRight = Registers.GetFree())
@@ -1047,17 +1007,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Condition");
         int conditionOffset = GeneratedCode.Count;
-        GenerateCodeForStatement(whileLoop.Condition);
 
-        GeneralType conditionType = whileLoop.Condition.Type;
-
-        using (RegisterUsage.Auto reg = Registers.GetFree())
-        {
-            PopTo(reg.Get(conditionType.GetBitWidth(this, Diagnostics, whileLoop.Condition)));
-            AddInstruction(Opcode.Compare, reg.Get(conditionType.GetBitWidth(this, Diagnostics, whileLoop.Condition)), 0);
-            AddInstruction(Opcode.JumpIfEqual, 0);
-        }
-        int conditionJumpOffset = GeneratedCode.Count - 1;
+        List<int> conditionFalseAddresses = new();
+        GenerateCodeForCondition(whileLoop.Condition, conditionFalseAddresses);
 
         BreakInstructions.Push(new List<int>());
 
@@ -1068,7 +1020,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         FinishJumpInstructions(BreakInstructions.Last);
 
-        GeneratedCode[conditionJumpOffset].Operand1 = GeneratedCode.Count - conditionJumpOffset;
+        foreach (int v in conditionFalseAddresses)
+        { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
 
         OnScopeExit(block.Location.Position.After(), block.Location.File, scope);
 
@@ -1087,18 +1040,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("For-loop condition");
         int conditionOffsetFor = GeneratedCode.Count;
-        GenerateCodeForStatement(forLoop.Condition);
 
-        GeneralType conditionType = forLoop.Condition.Type;
-
-        using (RegisterUsage.Auto reg = Registers.GetFree())
-        {
-            PopTo(reg.Get(conditionType.GetBitWidth(this, Diagnostics, forLoop.Condition)));
-            AddInstruction(Opcode.Compare, reg.Get(conditionType.GetBitWidth(this, Diagnostics, forLoop.Condition)), 0);
-            AddInstruction(Opcode.JumpIfEqual, 0);
-        }
-
-        int conditionJumpOffsetFor = GeneratedCode.Count - 1;
+        List<int> conditionFalseAddresses = new();
+        GenerateCodeForCondition(forLoop.Condition, conditionFalseAddresses);
 
         BreakInstructions.Push(new List<int>());
 
@@ -1109,7 +1053,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Jump back");
         AddInstruction(Opcode.Jump, conditionOffsetFor - GeneratedCode.Count);
-        GeneratedCode[conditionJumpOffsetFor].Operand1 = GeneratedCode.Count - conditionJumpOffsetFor;
+
+        foreach (int v in conditionFalseAddresses)
+        { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
 
         FinishJumpInstructions(BreakInstructions.Pop());
 
@@ -1130,18 +1076,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddComment("if (...) {");
 
                 AddComment("If condition");
-                GenerateCodeForStatement(partIf.Condition);
 
-                GeneralType conditionType = partIf.Condition.Type;
-
-                AddComment("If jump-to-next");
-                using (RegisterUsage.Auto reg = Registers.GetFree())
-                {
-                    PopTo(reg.Get(conditionType.GetBitWidth(this, Diagnostics, partIf.Condition)));
-                    AddInstruction(Opcode.Compare, reg.Get(conditionType.GetBitWidth(this, Diagnostics, partIf.Condition)), 0);
-                    AddInstruction(Opcode.JumpIfEqual, 0);
-                }
-                int jumpNextInstruction = GeneratedCode.Count - 1;
+                List<int> falseJumpAddresses = new();
+                GenerateCodeForCondition(partIf.Condition, falseJumpAddresses);
 
                 GenerateCodeForStatement(partIf.Body);
 
@@ -1151,7 +1088,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment("}");
 
-                GeneratedCode[jumpNextInstruction].Operand1 = GeneratedCode.Count - jumpNextInstruction;
+                foreach (int falseJumpAddress in falseJumpAddresses)
+                { GeneratedCode[falseJumpAddress].Operand1 = GeneratedCode.Count - falseJumpAddress; }
 
                 ifSegment = partIf.Next;
             }
@@ -1219,7 +1157,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (prevType.Is(out PointerType? pointerType2))
         {
             GenerateCodeForStatement(field.Object);
-            CheckPointerNull(field.Object.Location);
+            CheckPointerNull();
             prevType = pointerType2.To;
 
             while (prevType.Is(out pointerType2))
@@ -1232,7 +1170,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         PointerSize
                     );
                 }
-                CheckPointerNull(field.Object.Location);
+                CheckPointerNull();
                 prevType = pointerType2.To;
             }
 
@@ -1282,7 +1220,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (dereference is null)
         { PushFrom(address, type.GetSize(this, Diagnostics, field)); }
         else
-        { PushFrom(address, type.GetSize(this, Diagnostics, field), dereference.Location); }
+        { PushFromChecked(address, type.GetSize(this, Diagnostics, field)); }
     }
     void GenerateCodeForStatement(CompiledIndexGetter index)
     {
@@ -1363,7 +1301,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AddressRuntimePointer2 runtimePointer:
             {
                 GenerateCodeForStatement(runtimePointer.PointerValue);
-                CheckPointerNull(runtimePointer.PointerValue.Location);
+                CheckPointerNull();
                 break;
             }
             case AddressRuntimeIndex2 runtimeIndex:
@@ -1565,6 +1503,204 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
+    void GenerateCodeForCondition(CompiledStatementWithValue statement, List<int> falseJumpAddresses)
+    {
+        switch (statement)
+        {
+            case CompiledBinaryOperatorCall v:
+                GenerateCodeForCondition(v, falseJumpAddresses);
+                break;
+            case CompiledUnaryOperatorCall v:
+                GenerateCodeForCondition(v, falseJumpAddresses);
+                break;
+            default:
+                GenerateCodeForStatement(statement);
+                break;
+        }
+
+        if (falseJumpAddresses.Count == 0)
+        {
+            using (RegisterUsage.Auto reg = Registers.GetFree())
+            {
+                PopTo(reg.Get(statement.Type.GetBitWidth(this, Diagnostics, statement)));
+                AddInstruction(Opcode.Compare, reg.Get(statement.Type.GetBitWidth(this, Diagnostics, statement)), 0);
+                falseJumpAddresses.Add(GeneratedCode.Count);
+                AddInstruction(Opcode.JumpIfEqual, 0);
+            }
+        }
+    }
+    void GenerateCodeForCondition(CompiledUnaryOperatorCall @operator, List<int> falseJumpAddresses)
+    {
+        switch (@operator.Operator)
+        {
+            case CompiledUnaryOperatorCall.LogicalNOT:
+            {
+                List<int> subFalseJumpAddresses = new();
+                GenerateCodeForCondition(@operator.Left, subFalseJumpAddresses);
+
+                falseJumpAddresses.Add(GeneratedCode.Count);
+                AddInstruction(Opcode.Jump, 0);
+
+                foreach (int v in subFalseJumpAddresses)
+                { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
+
+                return;
+            }
+            case CompiledUnaryOperatorCall.BinaryNOT:
+            {
+                BitWidth bitWidth = @operator.Left.Type.GetBitWidth(this, Diagnostics, @operator.Left);
+
+                GenerateCodeForStatement(@operator.Left);
+
+                using (RegisterUsage.Auto reg = Registers.GetFree())
+                {
+                    PopTo(reg.Get(bitWidth));
+                    AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
+                    Push(reg.Get(bitWidth));
+                }
+
+                return;
+            }
+            default:
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator}\"", @operator));
+                return;
+            }
+        }
+    }
+    void GenerateCodeForCondition(CompiledBinaryOperatorCall @operator, List<int> falseJumpAddresses)
+    {
+        BitWidth leftBitWidth = @operator.Left.Type.GetBitWidth(this, Diagnostics, @operator.Left);
+        BitWidth rightBitWidth = @operator.Right.Type.GetBitWidth(this, Diagnostics, @operator.Right);
+        BitWidth bitWidth = StatementCompiler.MaxBitWidth(leftBitWidth, rightBitWidth);
+
+        if (@operator.Operator == CompiledBinaryOperatorCall.LogicalAND)
+        {
+            GenerateCodeForCondition(@operator.Left, falseJumpAddresses);
+            GenerateCodeForCondition(@operator.Right, falseJumpAddresses);
+        }
+        else if (@operator.Operator == CompiledBinaryOperatorCall.LogicalOR)
+        {
+            List<int> subFalseJumpAddresses = new();
+            GenerateCodeForCondition(@operator.Left, subFalseJumpAddresses);
+
+            int trueAddress = GeneratedCode.Count;
+            AddInstruction(Opcode.Jump, 0);
+
+            foreach (int v in subFalseJumpAddresses)
+            { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
+
+            GenerateCodeForCondition(@operator.Right, falseJumpAddresses);
+
+            GeneratedCode[trueAddress].Operand1 = GeneratedCode.Count - trueAddress;
+        }
+        else
+        {
+            GenerateCodeForStatement(@operator.Left);
+            GenerateCodeForStatement(@operator.Right);
+
+            bool isFloat = @operator.Left.Type.SameAs(BasicType.F32) || @operator.Right.Type.SameAs(BasicType.F32);
+
+            using (RegisterUsage.Auto regLeft = Registers.GetFree())
+            using (RegisterUsage.Auto regRight = Registers.GetFree())
+            {
+                PopTo(regRight.Get(bitWidth), rightBitWidth);
+                PopTo(regLeft.Get(bitWidth), leftBitWidth);
+
+                switch (@operator.Operator)
+                {
+                    case CompiledBinaryOperatorCall.Addition:
+                        AddInstruction(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.Subtraction:
+                        AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.Multiplication:
+                        AddInstruction(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.Division:
+                        AddInstruction(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.Modulo:
+                        AddInstruction(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.LogicalAND:
+                        AddInstruction(Opcode.LogicAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.LogicalOR:
+                        AddInstruction(Opcode.LogicOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.BitwiseAND:
+                        AddInstruction(Opcode.BitsAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.BitwiseOR:
+                        AddInstruction(Opcode.BitsOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.BitwiseXOR:
+                        AddInstruction(Opcode.BitsXOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.BitshiftLeft:
+                        AddInstruction(Opcode.BitsShiftLeft, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+                    case CompiledBinaryOperatorCall.BitshiftRight:
+                        AddInstruction(Opcode.BitsShiftRight, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Push(regLeft.Get(bitWidth));
+                        break;
+
+                    case CompiledBinaryOperatorCall.CompEQ:
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        AddInstruction(Opcode.JumpIfNotEqual, 0);
+                        break;
+
+                    case CompiledBinaryOperatorCall.CompNEQ:
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        AddInstruction(Opcode.JumpIfEqual, 0);
+                        break;
+
+                    case CompiledBinaryOperatorCall.CompGT:
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        AddInstruction(Opcode.JumpIfLessOrEqual, 0);
+                        break;
+
+                    case CompiledBinaryOperatorCall.CompGEQ:
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        AddInstruction(Opcode.JumpIfLess, 0);
+                        break;
+
+                    case CompiledBinaryOperatorCall.CompLT:
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        AddInstruction(Opcode.JumpIfGreaterOrEqual, 0);
+                        break;
+
+                    case CompiledBinaryOperatorCall.CompLEQ:
+                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        AddInstruction(Opcode.JumpIfGreater, 0);
+                        break;
+
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+        }
+    }
+
     ImmutableArray<CompiledCleanup> CompileVariables(IEnumerable<CompiledVariableDeclaration> statements, bool addComments = true)
     {
         if (addComments) AddComment("Variables {");
@@ -1697,12 +1833,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 for (int i = 0; i < stackString.Value.Length; i++)
                 {
                     Push(new CompiledValue(stackString.Value[i]));
-                    PopTo(new AddressOffset(address, i * 2), 2, dereference.Location);
+                    PopToChecked(new AddressOffset(address, i * 2), 2);
                 }
                 if (avaliableLength > stackString.Value.Length)
                 {
                     Push(new CompiledValue('\0'));
-                    PopTo(new AddressOffset(address, stackString.Value.Length * 2), 2, dereference.Location);
+                    PopToChecked(new AddressOffset(address, stackString.Value.Length * 2), 2);
                 }
             }
         }
@@ -1726,7 +1862,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     Diagnostics.Add(error.ToError(fieldSetter));
                     return;
                 }
-                PopTo(address, valueType.GetSize(this, Diagnostics, fieldSetter.Value), dereference.Location);
+                PopToChecked(address, valueType.GetSize(this, Diagnostics, fieldSetter.Value));
             }
         }
     }

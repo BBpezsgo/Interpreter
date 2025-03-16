@@ -1,3 +1,6 @@
+using System.Reflection.Emit;
+using System.Runtime.InteropServices;
+
 namespace LanguageCore.Runtime;
 
 public delegate void ExternalFunctionSyncCallback(ReadOnlySpan<byte> arguments, Span<byte> returnValue);
@@ -10,11 +13,14 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     public int Id { get; }
     public int ParametersSize { get; }
     public int ReturnValueSize { get; }
-    public ExternalFunctionSyncCallback Callback { get; }
+    public ExternalFunctionSyncCallback MarshaledCallback { get; }
+    public nint UnmanagedCallback { get; }
 
-    public ExternalFunctionSync(ExternalFunctionSyncCallback callback, int id, string? name, int parametersSize, int returnValueSize)
+    public ExternalFunctionSync(ExternalFunctionSyncCallback callback, Delegate unmanagedCallback, int id, string? name, int parametersSize, int returnValueSize)
     {
-        Callback = callback;
+        MarshaledCallback = callback;
+        if (callback is not null && callback.Target is not null && callback.Method.IsStatic && callback.Method is not DynamicMethod)
+        { UnmanagedCallback = Marshal.GetFunctionPointerForDelegate(unmanagedCallback); }
         Id = id;
         Name = name;
         ParametersSize = parametersSize;
@@ -28,7 +34,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         return new ExternalFunctionSync((ReadOnlySpan<byte> args, Span<byte> returnValue) =>
         {
             callback.Invoke();
-        }, id, name, 0, 0);
+        }, callback, id, name, 0, 0);
     }
 
     public static ExternalFunctionSync Create<T0>(int id, string? name, Action<T0> callback)
@@ -39,7 +45,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
             var _args = ExternalFunctionGenerator.TakeParameters<T0>(args);
             callback.Invoke(
                 _args);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0>(), 0);
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0>(), 0);
     }
 
     public static ExternalFunctionSync Create<T0, T1>(int id, string? name, Action<T0, T1> callback)
@@ -52,7 +58,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
             callback.Invoke(
                 _args.P0,
                 _args.P1);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), 0);
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), 0);
     }
 
     public static ExternalFunctionSync Create<T0, T1, T2>(int id, string? name, Action<T0, T1, T2> callback)
@@ -67,7 +73,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P0,
                 _args.P1,
                 _args.P2);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), 0);
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), 0);
     }
 
     public static ExternalFunctionSync Create<T0, T1, T2, T3>(int id, string? name, Action<T0, T1, T2, T3> callback)
@@ -84,7 +90,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P1,
                 _args.P2,
                 _args.P3);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), 0);
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), 0);
     }
 
     public static ExternalFunctionSync Create<T0, T1, T2, T3, T4>(int id, string? name, Action<T0, T1, T2, T3, T4> callback)
@@ -103,7 +109,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P2,
                 _args.P3,
                 _args.P4);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), 0);
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), 0);
     }
 
     public static ExternalFunctionSync Create<T0, T1, T2, T3, T4, T5>(int id, string? name, Action<T0, T1, T2, T3, T4, T5> callback)
@@ -124,7 +130,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P3,
                 _args.P4,
                 _args.P5);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4, T5>(), 0);
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4, T5>(), 0);
     }
 
     public static ExternalFunctionSync Create<TResult>(int id, string? name, Func<TResult> callback)
@@ -134,7 +140,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         {
             TResult result = callback.Invoke();
             result.AsBytes().CopyTo(returnValue);
-        }, id, name, 0, ExternalFunctionGenerator.SizeOf<TResult>());
+        }, callback, id, name, 0, ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
     public static ExternalFunctionSync Create<T0, TResult>(int id, string? name, Func<T0, TResult> callback)
@@ -148,7 +154,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args);
 
             result.AsBytes().CopyTo(returnValue);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0>(), ExternalFunctionGenerator.SizeOf<TResult>());
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
     public static ExternalFunctionSync Create<T0, T1, TResult>(int id, string? name, Func<T0, T1, TResult> callback)
@@ -164,7 +170,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P1);
 
             result.AsBytes().CopyTo(returnValue);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), ExternalFunctionGenerator.SizeOf<TResult>());
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
     public static ExternalFunctionSync Create<T0, T1, T2, TResult>(int id, string? name, Func<T0, T1, T2, TResult> callback)
@@ -182,7 +188,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P2);
 
             result.AsBytes().CopyTo(returnValue);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), ExternalFunctionGenerator.SizeOf<TResult>());
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
     public static ExternalFunctionSync Create<T0, T1, T2, T3, TResult>(int id, string? name, Func<T0, T1, T2, T3, TResult> callback)
@@ -202,7 +208,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P3);
 
             result.AsBytes().CopyTo(returnValue);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), ExternalFunctionGenerator.SizeOf<TResult>());
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
     public static ExternalFunctionSync Create<T0, T1, T2, T3, T4, TResult>(int id, string? name, Func<T0, T1, T2, T3, T4, TResult> callback)
@@ -224,7 +230,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P4);
 
             result.AsBytes().CopyTo(returnValue);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), ExternalFunctionGenerator.SizeOf<TResult>());
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
     public static ExternalFunctionSync Create<T0, T1, T2, T3, T4, T5, TResult>(int id, string? name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
@@ -248,7 +254,7 @@ public readonly struct ExternalFunctionSync : IExternalFunction
                 _args.P5);
 
             result.AsBytes().CopyTo(returnValue);
-        }, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4, T5>(), ExternalFunctionGenerator.SizeOf<TResult>());
+        }, callback, id, name, ExternalFunctionGenerator.SizeOf<T0, T1, T2, T3, T4, T5>(), ExternalFunctionGenerator.SizeOf<TResult>());
     }
 
     #endregion

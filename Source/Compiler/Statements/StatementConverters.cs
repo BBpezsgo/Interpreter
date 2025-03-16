@@ -92,15 +92,15 @@ public static class StatementConverters
         Semicolon = constructorCall.Semicolon,
     };
 
-    public static CompiledVariableDeclaration ToVariable(this ParameterDefinition parameterDefinition, CompiledPassedArgument? initialValue = null)
+    public static CompiledVariableDeclaration ToVariable(this ParameterDefinition parameterDefinition, GeneralType type, CompiledPassedArgument? initialValue = null)
         => new()
         {
             Identifier = parameterDefinition.Identifier.Content,
-            Type = initialValue?.Type ?? GeneralType.From(parameterDefinition.Type, null, null, parameterDefinition.File),
+            Type = type,
             Cleanup = new CompiledCleanup()
             {
                 Location = parameterDefinition.Location,
-                TrashType = initialValue?.Type ?? GeneralType.From(parameterDefinition.Type, null, null, parameterDefinition.File),
+                TrashType = type,
             },
             InitialValue = initialValue,
             Location = parameterDefinition.Location,

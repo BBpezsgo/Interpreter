@@ -17,7 +17,7 @@ const int HeaderSize = sizeof(BlockHeader);
 
 #if BRAINFUCK
 #else
-*0 = (BlockHeader)HeapSize;
+*(0 as BlockHeader*) = (BlockHeader)HeapSize;
 #endif
 
 export void GetHeader(BlockHeader* headerPtr, int* size, bool* allocated)

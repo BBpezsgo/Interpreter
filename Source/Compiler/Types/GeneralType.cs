@@ -92,7 +92,7 @@ public abstract class GeneralType :
 
         GeneralType? of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer, file);
 
-        if (type.StackArraySize is not null) throw new NotImplementedException();
+        // if (type.StackArraySize is not null) throw new NotImplementedException();
 
         ArrayType result = new(of, null, (int?)stackArraySize);
         type.SetAnalyzedType(result);

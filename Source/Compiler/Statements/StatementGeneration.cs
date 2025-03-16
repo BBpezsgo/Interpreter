@@ -17,7 +17,7 @@ public partial class StatementCompiler
 
         if (!GenerateCodeForStatement(size, out CompiledStatementWithValue? compiledSize)) return false;
 
-        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, [compiledSize.Type], size.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? error, AddCompilable))
+        if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, ImmutableArray.Create(compiledSize.Type), size.File, out FunctionQueryResult<CompiledFunction>? result, out PossibleDiagnostic? error, AddCompilable))
         {
             Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] not found: {error}", size));
             return false;
@@ -1543,10 +1543,20 @@ public partial class StatementCompiler
             variable.Reference = constant;
             variable.AnalyzedType = TokenAnalyzedType.ConstantName;
 
+            CompiledValue value = constant.Value;
+            GeneralType type = constant.Type;
+
+            if (expectedType is not null &&
+                constant.Value.TryCast(expectedType, out CompiledValue castedValue))
+            {
+                value = castedValue;
+                type = expectedType;
+            }
+
             compiledStatement = new CompiledEvaluatedValue()
             {
-                Value = constant.Value,
-                Type = constant.Type,
+                Value = value,
+                Type = type,
                 Location = variable.Location,
                 SaveValue = variable.SaveValue,
             };
@@ -2212,9 +2222,9 @@ public partial class StatementCompiler
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
 
-        if (!GenerateCodeForStatement(typeCast.PrevStatement, out CompiledStatementWithValue? prev)) return false;
+        if (!GenerateCodeForStatement(typeCast.PrevStatement, out CompiledStatementWithValue? prev, targetType)) return false;
 
-        if (prev.Type.Equals(targetType))
+        if (prev.Type.SameAs(targetType))
         {
             Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Type, typeCast.File));
             compiledStatement = prev;
@@ -2643,10 +2653,10 @@ public partial class StatementCompiler
         if (!GenerateCodeForStatement(statementToSet.PrevStatement, out CompiledStatementWithValue? prev)) return false;
 
         GeneralType targetType;
-        if (!prev.Type.Is(out PointerType? pointerType))
-        { targetType = OnGotStatementType(statementToSet, BuiltinType.Any); }
-        else
+        if (prev.Type.Is(out PointerType? pointerType))
         { targetType = OnGotStatementType(statementToSet, pointerType.To); }
+        else
+        { targetType = OnGotStatementType(statementToSet, BuiltinType.Any); }
 
         if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, targetType)) return false;
 

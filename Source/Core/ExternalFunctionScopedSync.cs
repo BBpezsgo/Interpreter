@@ -38,4 +38,9 @@ public unsafe struct ExternalFunctionScopedSync
         ReturnValueSize = returnValueSize;
         Scope = scope;
     }
+
+    public readonly IExternalFunction ToManaged(string name)
+    {
+        return new ExternalFunctionSync(null, null, Id, name, ParametersSize, ReturnValueSize);
+    }
 }

@@ -194,7 +194,6 @@ public interface ICompiledFunction :
     IHaveCompiledType,
     IInFile,
     IHaveInstructionOffset
-    // IInContext<CompiledStruct>
 {
     public bool ReturnSomething { get; }
     public Block? Block { get; }

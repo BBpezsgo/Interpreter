@@ -29,7 +29,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (cleanup.Destructor is null)
         {
-            if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, [CompiledPassedArgument.Wrap(value)], null, value);
+            if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, ImmutableArray.Create(CompiledPassedArgument.Wrap(value)), null, value);
 
             if (!deallocateablePointerType.To.Is<BuiltinType>())
             {
@@ -46,7 +46,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (cleanup.Destructor.ReturnSomething)
         { Stack.Pop(); }
 
-        if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, [CompiledPassedArgument.Wrap(value)], null, value);
+        if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, ImmutableArray.Create(CompiledPassedArgument.Wrap(value)), null, value);
     }
 
     void GenerateDestructor(BrainfuckVariable variable)
@@ -2630,7 +2630,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     }
                 }
 
-                CompiledVariableDeclaration variableDeclaration = defined.ToVariable(passed);
+                CompiledVariableDeclaration variableDeclaration = defined.ToVariable(definedType, passed);
                 PointerType parameterType = new(v.Type);
                 compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
                 {
@@ -2671,7 +2671,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
 
             {
-                CompiledVariableDeclaration variableDeclaration = defined.ToVariable(passed);
+                CompiledVariableDeclaration variableDeclaration = defined.ToVariable(definedType, passed);
                 using (TypeArgumentsScope g = SetTypeArgumentsScope(typeArguments))
                 { PrecompileVariable(compiledParameters, variableDeclaration, false, definedType); }
 
@@ -3192,7 +3192,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            CompiledVariableDeclaration variableDeclaration2 = defined.ToVariable(passed);
+            CompiledVariableDeclaration variableDeclaration2 = defined.ToVariable(definedType, passed);
             PrecompileVariable(compiledParameters, variableDeclaration2, false);
 
             BrainfuckVariable? compiledParameter = null;

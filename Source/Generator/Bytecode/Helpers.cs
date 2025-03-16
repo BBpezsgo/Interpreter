@@ -71,7 +71,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     AddressOffset GetGlobalVariableAddress(CompiledVariableDeclaration variable)
     {
-        if (!GeneratedVariables.TryGetValue(variable, out var generatedVariable))
+        if (!GeneratedVariables.TryGetValue(variable, out GeneratedVariable? generatedVariable))
         { throw new NotImplementedException(); }
 
         return new(
@@ -87,7 +87,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     AddressOffset GetLocalVariableAddress(CompiledVariableDeclaration variable)
     {
-        if (!GeneratedVariables.TryGetValue(variable, out var generatedVariable))
+        if (!GeneratedVariables.TryGetValue(variable, out GeneratedVariable? generatedVariable))
         { throw new NotImplementedException(); }
 
         return new(
@@ -499,7 +499,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { Diagnostics.Add(new DiagnosticWithoutContext(DiagnosticsLevel.Warning, "Stack will overflow")); }
     }
 
-    void CheckPointerNull(Location location, bool preservePointer = true)
+    void CheckPointerNull(bool preservePointer = true)
     {
         if (!Settings.CheckNullPointers)
         {
@@ -521,11 +521,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = GeneratedCode.Count;
         AddInstruction(Opcode.JumpIfNotEqual, 0);
 
-        // GenerateCodeForLiteralString("null pointer", location, false);
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            // PopTo(reg.Get(PointerBitWidth));
-            // AddInstruction(Opcode.Crash, reg.Get(PointerBitWidth));
             AddInstruction(Opcode.Crash, 0);
         }
         GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction;
@@ -533,11 +530,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment($"}}");
     }
 
-    void PushFrom(Address address, int size, Location location)
+    void PushFromChecked(Address address, int size)
     {
         GenerateAddressResolver(address);
-
-        CheckPointerNull(location);
+        CheckPointerNull();
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
@@ -547,10 +543,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PopTo(Address address, int size, Location location)
+    void PopToChecked(Address address, int size)
     {
         GenerateAddressResolver(address);
-        CheckPointerNull(location);
+        CheckPointerNull();
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {

@@ -3521,7 +3521,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
             }
 
-            if (function.IsExternal &&
+            if (function.ExternalFunctionName is not null &&
                 !functionCall.SaveValue)
             {
                 context.RuntimeStatements.Add(new RuntimeFunctionCall(function, parameters, functionCall));

@@ -56,7 +56,7 @@ public partial class StatementCompiler
             return true;
         }
 
-        if (allocator.IsExternal)
+        if (allocator.ExternalFunctionName is not null)
         {
             if (!ExternalFunctions.TryGet(allocator.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
             {
@@ -101,7 +101,7 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (deallocator.IsExternal)
+        if (deallocator.ExternalFunctionName is not null)
         {
             if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out _, out PossibleDiagnostic? exception))
             {
@@ -574,7 +574,7 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (callee.IsExternal)
+        if (callee.ExternalFunctionName is not null)
         {
             if (!ExternalFunctions.TryGet(callee.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
             {
@@ -1090,7 +1090,7 @@ public partial class StatementCompiler
                 return false;
             }
 
-            if (operatorDefinition.IsExternal)
+            if (operatorDefinition.ExternalFunctionName is not null)
             {
                 if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
                 {
@@ -2999,13 +2999,13 @@ public partial class StatementCompiler
 
         foreach (CompiledFunction function in CompiledFunctions)
         {
-            if (function.IsExternal)
+            if (function.ExternalFunctionName is not null)
             { usedExternalFunctions.Add(function.ExternalFunctionName); }
         }
 
         foreach (CompiledOperator @operator in CompiledOperators)
         {
-            if (@operator.IsExternal)
+            if (@operator.ExternalFunctionName is not null)
             { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
         }
 

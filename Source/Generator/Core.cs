@@ -253,7 +253,5 @@ public interface IHaveAttributes
 
 public interface IExternalFunctionDefinition
 {
-    [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
-    bool IsExternal { get; }
     string? ExternalFunctionName { get; }
 }

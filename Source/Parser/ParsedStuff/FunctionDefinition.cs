@@ -18,8 +18,6 @@ public class FunctionDefinition : FunctionThingDefinition,
 
     public override Position Position => base.Position.Union(Type);
 
-    [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
-    public bool IsExternal => Attributes.TryGetAttribute(AttributeConstants.ExternalIdentifier, out _);
     public string? ExternalFunctionName => Attributes.TryGetAttribute(AttributeConstants.ExternalIdentifier, out AttributeUsage? attribute) && attribute.TryGetValue(out string? name) ? name : null;
 
     [MemberNotNullWhen(true, nameof(BuiltinFunctionName))]

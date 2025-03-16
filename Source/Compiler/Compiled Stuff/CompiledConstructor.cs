@@ -26,7 +26,6 @@ public class CompiledConstructor : ConstructorDefinition,
     IReadOnlyList<GeneralType> ICompiledFunction.ParameterTypes => ParameterTypes;
     GeneralType IIdentifiable<GeneralType>.Identifier => Type;
 
-    bool IExternalFunctionDefinition.IsExternal => false;
     string? IExternalFunctionDefinition.ExternalFunctionName => null;
 
     public CompiledConstructor(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)

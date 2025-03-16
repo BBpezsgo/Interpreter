@@ -110,7 +110,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         CompiledFunction? deallocator = cleanup.Deallocator;
 
-        if (deallocator.IsExternal)
+        if (deallocator.ExternalFunctionName is not null)
         {
             if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out _, out PossibleDiagnostic? exception))
             {
@@ -2294,13 +2294,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         foreach (CompiledFunction function in CompiledFunctions)
         {
-            if (function.IsExternal)
+            if (function.ExternalFunctionName is not null)
             { usedExternalFunctions.Add(function.ExternalFunctionName); }
         }
 
         foreach (CompiledOperator @operator in CompiledOperators)
         {
-            if (@operator.IsExternal)
+            if (@operator.ExternalFunctionName is not null)
             { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
         }
 

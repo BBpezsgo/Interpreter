@@ -556,9 +556,11 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateCodeForFunctionCall<TFunction>(StatementWithValue caller, ImmutableArray<StatementWithValue> arguments, TFunction callee, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool GenerateCodeForFunctionCall<TFunction>(StatementWithValue caller, ImmutableArray<StatementWithValue> arguments, FunctionQueryResult<TFunction> _callee, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
         where TFunction : FunctionThingDefinition, ICompiledFunction, IExportable, ISimpleReadable, ILocated, IExternalFunctionDefinition, IHaveInstructionOffset
     {
+        (TFunction callee, Dictionary<string, GeneralType>? typeArguments) = _callee;
+
         compiledStatement = null;
         OnGotStatementType(caller, callee.Type);
 
@@ -602,77 +604,119 @@ public partial class StatementCompiler
             return true;
         }
 
+        if (!GenerateCodeForArguments(arguments, callee, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
+
         if (AllowFunctionInlining &&
             callee.IsInlineable)
         {
-            if (InlineMacro(callee, arguments, out Statement? inlined))
-            {
-                bool argumentsAreObservable = false;
-                foreach (StatementWithValue argument in arguments)
-                {
-                    if (IsObservable(argument))
-                    {
-                        argumentsAreObservable = true;
-                        Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because of this argument", argument));
-                        break;
-                    }
-                }
+            GenerateCodeForFunction(callee, typeArguments);
 
-                if (!argumentsAreObservable)
+            CompiledFunction2? f = GeneratedFunctions.FirstOrDefault(v => v.Function == callee);
+            if (f?.Body is not null)
+            {
+                InlineContext inlineContext = new()
                 {
-                    ControlFlowUsage controlFlowUsage = inlined is Block _block2 ? FindControlFlowUsage(_block2.Statements) : FindControlFlowUsage(inlined);
+                    Arguments = f.Function.Parameters
+                        .Select((value, index) => (value.Identifier.Content, compiledArguments[index]))
+                        .ToImmutableDictionary(v => v.Content, v => v.Item2),
+                };
+
+                if (f.Body is not null && InlineFunction(f.Body, inlineContext, out CompiledStatement? inlined1))
+                {
+                    {
+                        var volatileArguments =
+                            compiledArguments
+                            .Where(v => GetStatementComplexity(v.Value).HasFlag(StatementComplexity.Volatile))
+                            .ToImmutableArray();
+                        int i = 0;
+                        foreach (var item in volatileArguments)
+                        {
+                            for (int j = i; j < inlineContext.InlinedArguments.Count; j++)
+                            {
+                                if (inlineContext.InlinedArguments[j] == item)
+                                {
+                                    i = j;
+                                    goto ok;
+                                }
+                            }
+                            Debugger.Break();
+                            Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because the behavior might change", item));
+                            goto bad;
+                        ok:;
+                        }
+                    }
+
+                    foreach (CompiledPassedArgument argument in compiledArguments)
+                    {
+                        StatementComplexity complexity = StatementComplexity.None;
+                        complexity |= GetStatementComplexity(argument.Value);
+
+                        if (complexity.HasFlag(StatementComplexity.Bruh))
+                        {
+                            Debugger.Break();
+                            Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because of this argument", argument));
+                            goto bad;
+                        }
+
+                        if (complexity.HasFlag(StatementComplexity.Complex))
+                        {
+                            if (inlineContext.InlinedArguments.Count(v => v == argument) > 1)
+                            {
+                                Debugger.Break();
+                                Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because this expression might be complex", argument));
+                                goto bad;
+                            }
+                        }
+                    }
+
+                    ControlFlowUsage controlFlowUsage = inlined1 is CompiledBlock _block2 ? FindControlFlowUsage(_block2.Statements) : FindControlFlowUsage(inlined1);
                     if (!callee.ReturnSomething &&
                         controlFlowUsage == ControlFlowUsage.None)
                     {
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", caller));
-                        if (GenerateCodeForStatement(inlined, out CompiledStatement? compiledStatement2))
+                        CompiledStatement? compiledStatement2 = inlined1;
+                        compiledStatement = new CompiledStatementWithValueThatActuallyDoesntHaveValue()
                         {
-                            compiledStatement = new CompiledStatementWithValueThatActuallyDoesntHaveValue()
-                            {
-                                Statement = compiledStatement2,
-                                Location = compiledStatement2.Location,
-                                SaveValue = false,
-                                Type = BuiltinType.Void,
-                            };
-                            return true;
-                        }
-                        else
-                        {
-                            return false;
-                        }
+                            Statement = compiledStatement2,
+                            Location = compiledStatement2.Location,
+                            SaveValue = false,
+                            Type = BuiltinType.Void,
+                        };
+                        return true;
                     }
                     else if (callee.ReturnSomething &&
                              controlFlowUsage == ControlFlowUsage.None &&
-                             inlined is StatementWithValue statementWithValue)
+                             inlined1 is CompiledStatementWithValue statementWithValue)
                     {
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", caller));
 
-                        if (GenerateCodeForStatement(statementWithValue, out CompiledStatementWithValue? compiledStatement2, callee.Type))
-                        {
-                            if (!CanCastImplicitly(compiledStatement2.Type, callee.Type, statementWithValue, this, out PossibleDiagnostic? castError))
-                            { Diagnostics.Add(castError.ToError(statementWithValue)); }
+                        if (!CanCastImplicitly(statementWithValue.Type, callee.Type, null, this, out PossibleDiagnostic? castError))
+                        { Diagnostics.Add(castError.ToError(statementWithValue)); }
 
-                            compiledStatement = compiledStatement2;
-                            return true;
-                        }
-                        else
-                        {
-                            return false;
-                        }
+                        compiledStatement = statementWithValue;
+                        return true;
                     }
                     else
                     {
                         Debugger.Break();
                     }
+
+                bad:
+                    Debugger.Break();
+                }
+                else
+                {
+                    Debugger.Break();
+                    InlineFunction(f.Body, new InlineContext()
+                    {
+                        Arguments = f.Function.Parameters
+                            .Select((value, index) => (value.Identifier.Content, compiledArguments[index]))
+                            .ToImmutableDictionary(v => v.Content, v => v.Item2),
+                    }, out inlined1);
+                    Diagnostics.Add(Diagnostic.Warning($"Failed to inline \"{callee.ToReadable()}\"", caller));
                 }
             }
-            else
-            {
-                Diagnostics.Add(Diagnostic.Warning($"Failed to inline \"{callee.ToReadable()}\"", caller));
-            }
         }
-
-        if (!GenerateCodeForArguments(arguments, callee, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
         compiledStatement = new CompiledFunctionCall()
         {
@@ -756,7 +800,7 @@ public partial class StatementCompiler
             if (functionCall.CompiledType is not null)
             { OnGotStatementType(anyCall, functionCall.CompiledType); }
 
-            return GenerateCodeForFunctionCall(functionCall, functionCall.MethodArguments, compiledFunction, out compiledStatement);
+            return GenerateCodeForFunctionCall(functionCall, functionCall.MethodArguments, result, out compiledStatement);
         }
 
         if (!GenerateCodeForStatement(anyCall.PrevStatement, out CompiledStatementWithValue? functionValue)) return false;
@@ -856,7 +900,7 @@ public partial class StatementCompiler
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
 
-            return GenerateCodeForFunctionCall(@operator, @operator.Arguments, operatorDefinition, out compiledStatement);
+            return GenerateCodeForFunctionCall(@operator, @operator.Arguments, result, out compiledStatement);
         }
         else if (LanguageOperators.BinaryOperators.Contains(@operator.Operator.Content))
         {
@@ -1586,7 +1630,9 @@ public partial class StatementCompiler
             variable.Reference = val;
             OnGotStatementType(variable, val.Type);
 
-            compiledStatement = new CompiledLocalVariableGetter()
+            if (val.IsGlobal) throw null;
+
+            compiledStatement = new CompiledVariableGetter()
             {
                 Variable = val,
                 Type = val.Type,
@@ -1602,7 +1648,9 @@ public partial class StatementCompiler
             variable.Reference = globalVariable;
             OnGotStatementType(variable, globalVariable.Type);
 
-            compiledStatement = new CompiledGlobalVariableGetter()
+            if (!globalVariable.IsGlobal) throw null;
+
+            compiledStatement = new CompiledVariableGetter()
             {
                 Variable = globalVariable,
                 Type = globalVariable.Type,
@@ -2050,7 +2098,7 @@ public partial class StatementCompiler
         if (GetIndexGetter(baseStatement.Type, indexStatement.Type, index.File, out FunctionQueryResult<CompiledFunction>? indexer, out PossibleDiagnostic? notFoundError, AddCompilable))
         {
             indexer.Function.References.Add(new(index, index.File));
-            return GenerateCodeForFunctionCall(index, ImmutableArray.Create(index.PrevStatement, index.Index), indexer.Function, out compiledStatement);
+            return GenerateCodeForFunctionCall(index, ImmutableArray.Create(index.PrevStatement, index.Index), indexer, out compiledStatement);
         }
 
         if (baseStatement.Type.Is(out ArrayType? arrayType))
@@ -2455,14 +2503,17 @@ public partial class StatementCompiler
             statementToSet.Reference = variable;
 
             if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, variable.Type)) return false;
-            compiledStatement = new CompiledLocalVariableSetter()
+
+            if (variable.IsGlobal) throw null;
+
+            compiledStatement = new CompiledVariableSetter()
             {
                 Variable = variable,
                 Value = _value,
                 Location = statementToSet.Location.Union(value.Location),
                 IsCompoundAssignment =
                     _value is CompiledBinaryOperatorCall _v1 &&
-                    _v1.Left is CompiledLocalVariableGetter _v2 &&
+                    _v1.Left is CompiledVariableGetter _v2 &&
                     _v2.Variable == variable,
             };
             return true;
@@ -2475,14 +2526,17 @@ public partial class StatementCompiler
             statementToSet.Reference = globalVariable;
 
             if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, globalVariable.Type)) return false;
-            compiledStatement = new CompiledGlobalVariableSetter()
+
+            if (!globalVariable.IsGlobal) throw null;
+
+            compiledStatement = new CompiledVariableSetter()
             {
                 Variable = globalVariable,
                 Value = _value,
                 Location = statementToSet.Location.Union(value.Location),
                 IsCompoundAssignment =
                     _value is CompiledBinaryOperatorCall _v1 &&
-                    _v1.Left is CompiledGlobalVariableGetter _v2 &&
+                    _v1.Left is CompiledVariableGetter _v2 &&
                     _v2.Variable == globalVariable,
             };
             return true;
@@ -2620,7 +2674,7 @@ public partial class StatementCompiler
         if (GetIndexSetter(_base.Type, _value.Type, _index.Type, statementToSet.File, out FunctionQueryResult<CompiledFunction>? indexer, out PossibleDiagnostic? indexerNotFoundError, AddCompilable))
         {
             indexer.Function.References.Add(new(statementToSet, statementToSet.File));
-            if (GenerateCodeForFunctionCall(statementToSet, ImmutableArray.Create<StatementWithValue>(statementToSet.PrevStatement, statementToSet.Index, value), indexer.Function, out CompiledStatementWithValue? compiledStatement2))
+            if (GenerateCodeForFunctionCall(statementToSet, ImmutableArray.Create<StatementWithValue>(statementToSet.PrevStatement, statementToSet.Index, value), indexer, out CompiledStatementWithValue? compiledStatement2))
             {
                 compiledStatement = compiledStatement2;
                 return true;
@@ -2829,44 +2883,47 @@ public partial class StatementCompiler
 
     #region GenerateCodeForInstructionLabel
 
-    void GenerateCodeForInstructionLabel(InstructionLabel instructionLabel)
+    ImmutableArray<CompiledInstructionLabelDeclaration> PrecompileInstructionLabels(IEnumerable<Statement> statements)
     {
-        foreach (CompiledInstructionLabelDeclaration other in CompiledInstructionLabels)
-        {
-            if (other.Identifier != instructionLabel.Identifier.Content) continue;
-            Diagnostics.Add(Diagnostic.Warning($"Instruction label \"{other.Identifier}\" already defined", instructionLabel.Identifier));
-        }
-
-        CompiledInstructionLabels.Push(new CompiledInstructionLabelDeclaration()
-        {
-            Identifier = instructionLabel.Identifier.Content,
-            Location = instructionLabel.Location,
-        });
-    }
-    void GenerateCodeForInstructionLabel(Statement statement)
-    {
-        if (statement is InstructionLabel instructionLabel)
-        { GenerateCodeForInstructionLabel(instructionLabel); }
-    }
-    void GenerateCodeForInstructionLabel(IEnumerable<Statement> statements)
-    {
+        ImmutableArray<CompiledInstructionLabelDeclaration>.Builder res = ImmutableArray.CreateBuilder<CompiledInstructionLabelDeclaration>();
         foreach (Statement statement in statements)
         {
-            GenerateCodeForInstructionLabel(statement);
+            if (statement is InstructionLabel instructionLabel)
+            {
+                if (GetInstructionLabel(instructionLabel.Identifier.Content, out _, out _) ||
+                    res.Any(v => v.Identifier == instructionLabel.Identifier.Content))
+                { Diagnostics.Add(Diagnostic.Warning($"Instruction label \"{instructionLabel.Identifier.Content}\" already defined", instructionLabel.Identifier)); }
+
+                res.Add(new CompiledInstructionLabelDeclaration()
+                {
+                    Identifier = instructionLabel.Identifier.Content,
+                    Location = instructionLabel.Location,
+                });
+            }
         }
+        return res.ToImmutable();
     }
 
     #endregion
 
     #region GenerateCodeFor...
 
-    bool GenerateCodeForFunction(FunctionThingDefinition function)
+    HashSet<FunctionThingDefinition> _generatedFunctions = new();
+
+    bool GenerateCodeForFunction(FunctionThingDefinition function, Dictionary<string, GeneralType>? typeArguments)
     {
+        if (!_generatedFunctions.Add(function)) return false;
+
+        Dictionary<string, GeneralType>? savedTypeArguments = new(TypeArguments);
+
+        TypeArguments.Clear();
+        if (typeArguments is not null) TypeArguments.AddRange(typeArguments);
+
         if (function.Identifier is not null &&
             LanguageConstants.KeywordList.Contains(function.Identifier.ToString()))
         {
-            Diagnostics.Add(Diagnostic.Critical($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.File));
-            return default;
+            Diagnostics.Add(Diagnostic.Error($"The identifier \"{function.Identifier}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.File));
+            goto end;
         }
 
         if (function.Identifier is not null)
@@ -2877,14 +2934,22 @@ public partial class StatementCompiler
             for (int i = 0; i < functionDefinition.Attributes.Length; i++)
             {
                 if (functionDefinition.Attributes[i].Identifier.Content == AttributeConstants.ExternalIdentifier)
-                { return false; }
+                { goto end; }
             }
+        }
+
+        if (function.Block is null)
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have a body", function));
+            goto end;
         }
 
         Print?.Invoke($"Generate \"{function.ToReadable()}\" ...", LogType.Debug);
 
-        CompiledParameters.Clear();
+        ImmutableArray<CompiledParameter> originalParameters = CompiledParameters.ToImmutableArray();
+        GeneralType? originalReturnType = CurrentReturnType;
 
+        CompiledParameters.Clear();
         CompileParameters(function.Parameters);
 
         if (function is IHaveCompiledType functionWithType)
@@ -2892,26 +2957,23 @@ public partial class StatementCompiler
         else
         { CurrentReturnType = BuiltinType.Void; }
 
-        if (function.Block is null)
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have a body", function));
-            return default;
-        }
-
-        GenerateCodeForInstructionLabel(function.Block.GetStatementsRecursively(false));
-
         if (!GenerateCodeForStatement(function.Block, out CompiledStatement? body)) return false;
 
-        CurrentReturnType = null;
+        CurrentReturnType = originalReturnType;
 
         CompiledParameters.Clear();
+        CompiledParameters.AddRange(originalParameters);
 
         GeneratedFunctions.Add(new((ICompiledFunction)function, (CompiledBlock)body));
+
+        TypeArguments.Clear();
+        if (savedTypeArguments is not null) TypeArguments.AddRange(savedTypeArguments);
+
         return true;
+
+    end:
+        return false;
     }
-
-    HashSet<FunctionThingDefinition> _generatedFunctions = new();
-
     bool GenerateCodeForFunctions<TFunction>(IEnumerable<TFunction> functions)
         where TFunction : FunctionThingDefinition, IHaveInstructionOffset, IReferenceable
     {
@@ -2922,24 +2984,11 @@ public partial class StatementCompiler
             if (function.InstructionOffset >= 0) continue;
             if (!function.References.Any()) continue;
 
-            if (!_generatedFunctions.Add(function)) continue;
-
-            if (GenerateCodeForFunction(function))
+            if (GenerateCodeForFunction(function, null))
             { generatedAnything = true; }
         }
         return generatedAnything;
     }
-
-    bool GenerateCodeForCompilableFunction<T>(CompliableTemplate<T> function)
-        where T : FunctionThingDefinition, ITemplateable<T>
-    {
-        if (!_generatedFunctions.Add(function.Function)) return false;
-        SetTypeArguments(function.TypeArguments);
-        bool generatedAnything = GenerateCodeForFunction(function.Function);
-        TypeArguments.Clear();
-        return generatedAnything;
-    }
-
     bool GenerateCodeForCompilableFunctions<T>(IReadOnlyList<CompliableTemplate<T>> functions)
         where T : FunctionThingDefinition, ITemplateable<T>, IHaveInstructionOffset
     {
@@ -2952,7 +3001,7 @@ public partial class StatementCompiler
 
             if (function.Function.InstructionOffset >= 0) continue;
 
-            if (GenerateCodeForCompilableFunction(function))
+            if (GenerateCodeForFunction(function.Function, function.TypeArguments))
             { generatedAnything = true; }
         }
         return generatedAnything;
@@ -3015,13 +3064,12 @@ public partial class StatementCompiler
             {
                 if (variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
                 {
-                    CompiledVariableConstant variable = CompileConstant(variableDeclaration);
-                    CompiledGlobalConstants.Add(variable);
+                    CompiledGlobalConstants.Add(CompileConstant(variableDeclaration));
                 }
             }
             else if (item is InstructionLabel instructionLabel)
             {
-                CompiledInstructionLabels.Add(new CompiledInstructionLabelDeclaration()
+                CompiledGlobalInstructionLabels.Add(new CompiledInstructionLabelDeclaration()
                 {
                     Identifier = instructionLabel.Identifier.Content,
                     Location = instructionLabel.Location,
@@ -3052,6 +3100,37 @@ public partial class StatementCompiler
 
             if (!generatedAnything) break;
         }
+
+        /*
+        var allStatements =
+            Visit(compiledTopLevelStatements)
+            .Concat(GeneratedFunctions.SelectMany(v => Visit(v.Body)));
+
+        foreach (var item in allStatements.OfType<CompiledVariableDeclaration>())
+        {
+            item.Getters.Clear();
+            item.Setters.Clear();
+        }
+        foreach (var item in allStatements.OfType<CompiledInstructionLabelDeclaration>())
+        {
+            item.Getters.Clear();
+        }
+
+        foreach (var item in allStatements.OfType<CompiledVariableGetter>())
+        {
+            item.Variable.Getters.Add(item);
+        }
+
+        foreach (var item in allStatements.OfType<CompiledVariableSetter>())
+        {
+            item.Variable.Setters.Add(item);
+        }
+
+        foreach (var item in allStatements.OfType<InstructionLabelAddressGetter>())
+        {
+            item.InstructionLabel.Getters.Add(item);
+        }
+        */
 
         return new CompilerResult2()
         {

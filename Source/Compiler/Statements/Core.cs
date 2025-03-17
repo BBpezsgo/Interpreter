@@ -66,11 +66,11 @@ public partial class StatementCompiler
 
     public StatementCompiler(CompilerResult compilerResult, StatementCompilerSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print)
     {
-        CompiledParameters = new Stack<CompiledParameter>();
+        CompiledParameters = new();
 
-        compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
-        compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
-        compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
+        CompilableFunctions = new();
+        CompilableOperators = new();
+        CompilableGeneralFunctions = new();
 
         TypeArguments = new Dictionary<string, GeneralType>();
 

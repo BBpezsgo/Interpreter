@@ -50,7 +50,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
-    #region Protected Fields
+    #region Fields
 
     readonly ImmutableArray<CompiledStruct> CompiledStructs;
     readonly ImmutableArray<CompiledFunction> CompiledFunctions;
@@ -60,16 +60,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     readonly ImmutableArray<CompiledAlias> CompiledAliases;
 
     readonly Stack<Scope> Scopes = new();
-
-    readonly Stack<CompiledVariableConstant> CompiledGlobalConstants = new();
-    readonly Stack<CompiledInstructionLabelDeclaration> CompiledInstructionLabels = new();
-    readonly Stack<CompiledVariableDeclaration> CompiledGlobalVariables = new();
     readonly Stack<CompiledParameter> CompiledParameters;
 
-    IReadOnlyList<CompliableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
-    IReadOnlyList<CompliableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;
-    IReadOnlyList<CompliableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions => compilableGeneralFunctions;
-    IReadOnlyList<CompliableTemplate<CompiledConstructor>> CompilableConstructors => compilableConstructors;
+    readonly Stack<CompiledVariableConstant> CompiledGlobalConstants = new();
+    readonly Stack<CompiledInstructionLabelDeclaration> CompiledGlobalInstructionLabels = new();
+    readonly Stack<CompiledVariableDeclaration> CompiledGlobalVariables = new();
 
     readonly Dictionary<string, GeneralType> TypeArguments;
 
@@ -78,14 +73,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     public BitWidth PointerBitWidth => (BitWidth)PointerSize;
 
-    #endregion
-
-    #region Private Fields
-
-    readonly List<CompliableTemplate<CompiledFunction>> compilableFunctions = new();
-    readonly List<CompliableTemplate<CompiledOperator>> compilableOperators = new();
-    readonly List<CompliableTemplate<CompiledGeneralFunction>> compilableGeneralFunctions = new();
-    readonly List<CompliableTemplate<CompiledConstructor>> compilableConstructors = new();
+    readonly List<CompliableTemplate<CompiledFunction>> CompilableFunctions = new();
+    readonly List<CompliableTemplate<CompiledOperator>> CompilableOperators = new();
+    readonly List<CompliableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions = new();
+    readonly List<CompliableTemplate<CompiledConstructor>> CompilableConstructors = new();
 
     #endregion
 
@@ -219,87 +210,42 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     void AddCompilable(CompliableTemplate<CompiledFunction> compilable)
     {
-        for (int i = 0; i < compilableFunctions.Count; i++)
+        for (int i = 0; i < CompilableFunctions.Count; i++)
         {
-            if (compilableFunctions[i].Function.IsSame(compilable.Function))
+            if (CompilableFunctions[i].Function.IsSame(compilable.Function))
             { return; }
         }
-        compilableFunctions.Add(compilable);
+        CompilableFunctions.Add(compilable);
     }
 
     void AddCompilable(CompliableTemplate<CompiledOperator> compilable)
     {
-        for (int i = 0; i < compilableOperators.Count; i++)
+        for (int i = 0; i < CompilableOperators.Count; i++)
         {
-            if (compilableOperators[i].Function.IsSame(compilable.Function))
+            if (CompilableOperators[i].Function.IsSame(compilable.Function))
             { return; }
         }
-        compilableOperators.Add(compilable);
+        CompilableOperators.Add(compilable);
     }
 
     void AddCompilable(CompliableTemplate<CompiledGeneralFunction> compilable)
     {
-        for (int i = 0; i < compilableGeneralFunctions.Count; i++)
+        for (int i = 0; i < CompilableGeneralFunctions.Count; i++)
         {
-            if (compilableGeneralFunctions[i].Function.IsSame(compilable.Function))
+            if (CompilableGeneralFunctions[i].Function.IsSame(compilable.Function))
             { return; }
         }
-        compilableGeneralFunctions.Add(compilable);
+        CompilableGeneralFunctions.Add(compilable);
     }
 
     void AddCompilable(CompliableTemplate<CompiledConstructor> compilable)
     {
-        for (int i = 0; i < compilableConstructors.Count; i++)
+        for (int i = 0; i < CompilableConstructors.Count; i++)
         {
-            if (compilableConstructors[i].Function.IsSame(compilable.Function))
+            if (CompilableConstructors[i].Function.IsSame(compilable.Function))
             { return; }
         }
-        compilableConstructors.Add(compilable);
-    }
-
-    #endregion
-
-    #region SetTypeArguments()
-
-    void SetTypeArguments(Dictionary<string, GeneralType>? arguments)
-    {
-        TypeArguments.Clear();
-        if (arguments is not null) TypeArguments.AddRange(arguments);
-    }
-
-    void SetTypeArguments(ImmutableDictionary<string, GeneralType>? arguments)
-    {
-        TypeArguments.Clear();
-        if (arguments is not null) TypeArguments.AddRange(arguments);
-    }
-
-    void SetTypeArguments(Dictionary<string, GeneralType>? arguments, out Dictionary<string, GeneralType> old)
-    {
-        old = new Dictionary<string, GeneralType>(TypeArguments);
-        TypeArguments.Clear();
-        if (arguments is not null) TypeArguments.AddRange(arguments);
-    }
-
-    TypeArgumentsScope SetTypeArgumentsScope(Dictionary<string, GeneralType>? arguments)
-    {
-        TypeArgumentsScope scope = new(this, TypeArguments);
-        TypeArguments.Clear();
-        if (arguments is not null) TypeArguments.AddRange(arguments);
-        return scope;
-    }
-
-    readonly struct TypeArgumentsScope : IDisposable
-    {
-        readonly StatementCompiler _codeGenerator;
-        readonly ImmutableDictionary<string, GeneralType> _prev;
-
-        public TypeArgumentsScope(StatementCompiler codeGenerator, IDictionary<string, GeneralType>? prev)
-        {
-            _codeGenerator = codeGenerator;
-            _prev = prev?.ToImmutableDictionary() ?? ImmutableDictionary<string, GeneralType>.Empty;
-        }
-
-        public void Dispose() => _codeGenerator.SetTypeArguments(_prev);
+        CompilableConstructors.Add(compilable);
     }
 
     #endregion
@@ -485,25 +431,25 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     Functions<CompiledFunction> GetFunctions() => new()
     {
         Compiled = CompiledFunctions,
-        Compilable = compilableFunctions,
+        Compilable = CompilableFunctions,
     };
 
     Functions<CompiledOperator> GetOperators() => new()
     {
         Compiled = CompiledOperators,
-        Compilable = compilableOperators,
+        Compilable = CompilableOperators,
     };
 
     Functions<CompiledGeneralFunction> GetGeneralFunctions() => new()
     {
         Compiled = CompiledGeneralFunctions,
-        Compilable = compilableGeneralFunctions,
+        Compilable = CompilableGeneralFunctions,
     };
 
     Functions<CompiledConstructor> GetConstructors() => new()
     {
         Compiled = CompiledConstructors,
-        Compilable = compilableConstructors,
+        Compilable = CompilableConstructors,
     };
 
     bool GetConstructor(
@@ -595,7 +541,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             .Where(v => v.BuiltinFunctionName == builtinName);
 
         IEnumerable<CompliableTemplate<CompiledFunction>> builtinCompilableFunctions =
-            compilableFunctions
+            CompilableFunctions
             .Where(v => v.Function.BuiltinFunctionName == builtinName);
 
         string readable = $"[Builtin(\"{builtinName}\")] ?({string.Join(", ", arguments)})";
@@ -631,7 +577,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             .Where(v => v.BuiltinFunctionName == builtinName);
 
         IEnumerable<CompliableTemplate<CompiledFunction>> builtinCompilableFunctions =
-            compilableFunctions
+            CompilableFunctions
             .Where(v => v.Function.BuiltinFunctionName == builtinName);
 
         string readable = $"[Builtin(\"{builtinName}\")] ?({string.Join(", ", arguments)})";
@@ -710,7 +656,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             .Where(v => ContextIs(v, context));
 
         IEnumerable<CompliableTemplate<CompiledGeneralFunction>> compilableGeneralFunctionsInContext =
-            compilableGeneralFunctions
+            CompilableGeneralFunctions
             .Where(v => ContextIs(v.Function, context));
 
         return GetFunction<CompiledGeneralFunction, Token, string, GeneralType>(
@@ -1614,7 +1560,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     bool GetInstructionLabel(string identifier, [NotNullWhen(true)] out CompiledInstructionLabelDeclaration? instructionLabel, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in CompiledInstructionLabels)
+        foreach (Scope scope in Scopes)
+        {
+            foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in scope.InstructionLabels)
+            {
+                if (compiledInstructionLabel.Identifier != identifier) continue;
+                instructionLabel = compiledInstructionLabel;
+                error = null;
+                return true;
+            }
+        }
+
+        foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in CompiledGlobalInstructionLabels)
         {
             if (compiledInstructionLabel.Identifier != identifier) continue;
             instructionLabel = compiledInstructionLabel;
@@ -3034,6 +2991,695 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #endregion
 
+    #region Inlining
+
+    class InlineContext
+    {
+        public required ImmutableDictionary<string, CompiledPassedArgument> Arguments { get; init; }
+        public List<CompiledPassedArgument> InlinedArguments { get; } = new();
+        public Dictionary<CompiledVariableDeclaration, CompiledVariableDeclaration> VariableReplacements { get; } = new();
+    }
+
+    static bool Inline(IEnumerable<CompiledPassedArgument> statements, InlineContext context, [NotNullWhen(true)] out ImmutableArray<CompiledPassedArgument> inlined)
+    {
+        inlined = ImmutableArray<CompiledPassedArgument>.Empty;
+        ImmutableArray<CompiledPassedArgument>.Builder res = ImmutableArray.CreateBuilder<CompiledPassedArgument>();
+
+        foreach (CompiledPassedArgument statement in statements)
+        {
+            if (!Inline(statement.Value, context, out CompiledStatementWithValue? v)) return false;
+            res.Add(new CompiledPassedArgument()
+            {
+                Value = v,
+                Cleanup = new CompiledCleanup()
+                {
+                    Location = statement.Cleanup.Location,
+                    TrashType = statement.Cleanup.TrashType,
+                },
+                Location = statement.Location,
+                SaveValue = statement.SaveValue,
+                Type = statement.Type,
+            });
+        }
+
+        inlined = res.ToImmutable();
+        return true;
+    }
+
+    static bool InlineFunction(CompiledBlock _block, InlineContext context, [NotNullWhen(true)] out CompiledStatement? inlined)
+    {
+        if (_block.Statements.Length == 1)
+        {
+            if (!Inline(_block.Statements[0], context, out inlined))
+            { return false; }
+        }
+        else
+        {
+            if (!Inline(_block, context, out inlined))
+            { return false; }
+        }
+
+        if (inlined is CompiledReturn compiledReturn &&
+            compiledReturn.Value is not null)
+        { inlined = compiledReturn.Value; }
+
+        return true;
+    }
+
+    static bool Inline(CompiledSizeof statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(CompiledBinaryOperatorCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.Left, context, out CompiledStatementWithValue? inlinedLeft)) return false;
+        if (!Inline(statement.Right, context, out CompiledStatementWithValue? inlinedRight)) return false;
+
+        inlined = new CompiledBinaryOperatorCall()
+        {
+            Left = inlinedLeft,
+            Right = inlinedRight,
+            Operator = statement.Operator,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
+        return true;
+    }
+    static bool Inline(CompiledUnaryOperatorCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.Left, context, out CompiledStatementWithValue? inlinedLeft)) return false;
+
+        inlined = new CompiledUnaryOperatorCall()
+        {
+            Left = inlinedLeft,
+            Operator = statement.Operator,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
+        return true;
+    }
+    static bool Inline(CompiledEvaluatedValue statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(RegisterGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(CompiledVariableGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        if (!context.VariableReplacements.TryGetValue(statement.Variable, out var replacedVariable))
+        {
+            if (statement.Variable.IsGlobal)
+            {
+                replacedVariable = statement.Variable;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        inlined = new CompiledVariableGetter()
+        {
+            Variable = replacedVariable,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
+        return true;
+    }
+    static bool Inline(CompiledParameterGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+
+        if (context.Arguments.TryGetValue(statement.Variable.Identifier.Content, out CompiledPassedArgument? inlinedArgument))
+        {
+            if (inlinedArgument.Cleanup.Deallocator is not null ||
+                inlinedArgument.Cleanup.Destructor is not null)
+            { return false; }
+
+            context.InlinedArguments.Add(inlinedArgument);
+            inlined = inlinedArgument.Value;
+            return true;
+        }
+
+        return false;
+    }
+    static bool Inline(FunctionAddressGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(InstructionLabelAddressGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(CompiledFieldGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.Object, context, out CompiledStatementWithValue? inlinedObject)) return false;
+
+        while (inlinedObject is CompiledAddressGetter addressGetter)
+        { inlinedObject = addressGetter.Of; }
+
+        inlined = new CompiledFieldGetter()
+        {
+            Object = inlinedObject,
+            Field = statement.Field,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
+        return true;
+    }
+    static bool Inline(CompiledIndexGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.Base, context, out CompiledStatementWithValue? inlinedBase)) return false;
+        if (!Inline(statement.Index, context, out CompiledStatementWithValue? inlinedIndex)) return false;
+
+        inlined = new CompiledIndexGetter()
+        {
+            Base = inlinedBase,
+            Index = inlinedIndex,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
+        return true;
+    }
+    static bool Inline(CompiledAddressGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.Of, context, out CompiledStatementWithValue? inlinedOf)) return false;
+
+        inlined = new CompiledAddressGetter()
+        {
+            Of = inlinedOf,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
+        return true;
+    }
+    static bool Inline(CompiledPointer statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.To, context, out CompiledStatementWithValue? inlinedTo)) return false;
+
+        inlined = new CompiledPointer()
+        {
+            To = inlinedTo,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
+        return true;
+    }
+    static bool Inline(CompiledStackAllocation statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(CompiledConstructorCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.Object, context, out CompiledStatement? inlinedObject)) return false;
+        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledPassedArgument> inlinedArguments)) return false;
+
+        inlined = new CompiledConstructorCall()
+        {
+            Object = (CompiledStatementWithValue)inlinedObject,
+            Arguments = inlinedArguments,
+            Function = statement.Function,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
+        return true;
+    }
+    static bool Inline(CompiledTypeCast statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledFakeTypeCast()
+        {
+            Value = inlinedValue,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+            Type = statement.Type,
+        };
+        return true;
+    }
+    static bool Inline(CompiledFakeTypeCast statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledFakeTypeCast()
+        {
+            Value = inlinedValue,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+            Type = statement.Type,
+        };
+        return true;
+    }
+    static bool Inline(CompiledRuntimeCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledPassedArgument> inlinedArguments)) return false;
+        if (!Inline(statement.Function, context, out CompiledStatementWithValue? inlinedFunction)) return false;
+
+        inlined = new CompiledRuntimeCall()
+        {
+            Function = inlinedFunction,
+            Arguments = inlinedArguments,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+            Type = statement.Type,
+        };
+        return true;
+    }
+    static bool Inline(CompiledFunctionCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledPassedArgument> inlinedArguments)) return false;
+
+        inlined = new CompiledFunctionCall()
+        {
+            Function = statement.Function,
+            Arguments = inlinedArguments,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+            Type = statement.Type,
+        };
+        return true;
+    }
+    static bool Inline(CompiledExternalFunctionCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledPassedArgument> inlinedArguments)) return false;
+
+        inlined = new CompiledExternalFunctionCall()
+        {
+            Declaration = statement.Declaration,
+            Function = statement.Function,
+            Arguments = inlinedArguments,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+            Type = statement.Type,
+        };
+        return true;
+    }
+    static bool Inline(CompiledStatementWithValueThatActuallyDoesntHaveValue statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.Statement, context, out CompiledStatement? inlinedStatement)) return false;
+
+        inlined = new CompiledStatementWithValueThatActuallyDoesntHaveValue()
+        {
+            Statement = inlinedStatement,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
+        return true;
+    }
+    static bool Inline(CompiledStringInstance statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(CompiledVariableDeclaration statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.InitialValue, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        CompiledVariableDeclaration _inlined = new()
+        {
+            InitialValue = inlinedValue,
+            Cleanup = statement.Cleanup,
+            Identifier = statement.Identifier,
+            IsGlobal = statement.IsGlobal,
+            Type = statement.Type,
+            Location = statement.Location,
+        };
+        context.VariableReplacements[statement] = _inlined;
+        inlined = _inlined;
+        return true;
+    }
+    static bool Inline(CompiledReturn statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledReturn()
+        {
+            Value = inlinedValue,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledCrash statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledCrash()
+        {
+            Value = inlinedValue,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledBreak statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(CompiledDelete statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledDelete()
+        {
+            Value = inlinedValue,
+            Cleanup = statement.Cleanup,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledGoto statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledGoto()
+        {
+            Value = inlinedValue,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(RegisterSetter statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new RegisterSetter()
+        {
+            Value = inlinedValue,
+            Register = statement.Register,
+            IsCompoundAssignment = statement.IsCompoundAssignment,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledVariableSetter statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!context.VariableReplacements.TryGetValue(statement.Variable, out var replacedVariable))
+        {
+            if (statement.Variable.IsGlobal)
+            {
+                replacedVariable = statement.Variable;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledVariableSetter()
+        {
+            Value = inlinedValue,
+            Variable = replacedVariable,
+            IsCompoundAssignment = statement.IsCompoundAssignment,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledParameterSetter statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+        return false;
+    }
+    static bool Inline(CompiledIndirectSetter statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.AddressValue, context, out CompiledStatementWithValue? inlinedAddressValue)) return false;
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledIndirectSetter()
+        {
+            AddressValue = inlinedAddressValue,
+            Value = inlinedValue,
+            IsCompoundAssignment = statement.IsCompoundAssignment,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledFieldSetter statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Object, context, out CompiledStatementWithValue? inlinedObject)) return false;
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledFieldSetter()
+        {
+            Object = inlinedObject,
+            Value = inlinedValue,
+            Field = statement.Field,
+            Type = statement.Type,
+            IsCompoundAssignment = statement.IsCompoundAssignment,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledIndexSetter statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Base, context, out CompiledStatementWithValue? inlinedBase)) return false;
+        if (!Inline(statement.Index, context, out CompiledStatementWithValue? inlinedIndex)) return false;
+        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+
+        inlined = new CompiledIndexSetter()
+        {
+            Base = inlinedBase,
+            Index = inlinedIndex,
+            Value = inlinedValue,
+            IsCompoundAssignment = statement.IsCompoundAssignment,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledWhileLoop statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Condition, context, out CompiledStatementWithValue? inlinedCondition)) return false;
+        if (!Inline(statement.Body, context, out CompiledStatement? inlinedBody)) return false;
+
+        inlined = new CompiledWhileLoop()
+        {
+            Condition = inlinedCondition,
+            Body = inlinedBody,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledForLoop statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.VariableDeclaration, context, out CompiledStatement? inlinedVariableDeclaration)) return false;
+        if (!Inline(statement.Condition, context, out CompiledStatementWithValue? inlinedCondition)) return false;
+        if (!Inline(statement.Expression, context, out CompiledStatement? inlinedExpression)) return false;
+        if (!Inline(statement.Body, context, out CompiledStatement? inlinedBody)) return false;
+
+        inlined = new CompiledForLoop()
+        {
+            VariableDeclaration = (CompiledVariableDeclaration)inlinedVariableDeclaration,
+            Condition = inlinedCondition,
+            Expression = inlinedExpression,
+            Body = inlinedBody,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledIf statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Condition, context, out CompiledStatementWithValue? inlinedCondition)) return false;
+        if (!Inline(statement.Body, context, out CompiledStatement? inlinedBody)) return false;
+        if (!Inline(statement.Next, context, out CompiledStatement? inlinedNext)) return false;
+
+        inlined = new CompiledIf()
+        {
+            Condition = inlinedCondition,
+            Body = inlinedBody,
+            Next = (CompiledBranch?)inlinedNext,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledElse statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        if (!Inline(statement.Body, context, out CompiledStatement? inlinedBody)) return false;
+
+        inlined = new CompiledElse()
+        {
+            Body = inlinedBody,
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledBlock statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+
+        List<CompiledStatement> statements = new(statement.Statements.Length);
+        foreach (CompiledStatement v in statement.Statements)
+        {
+            if (!Inline(v, context, out CompiledStatement? inlinedStatement))
+            { return false; }
+
+            statements.Add(inlinedStatement);
+
+            if (v is CompiledReturn)
+            { break; }
+        }
+
+        inlined = new CompiledBlock()
+        {
+            Statements = statements.ToImmutableArray(),
+            Location = statement.Location,
+        };
+        return true;
+    }
+    static bool Inline(CompiledInstructionLabelDeclaration statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(EmptyStatement statement, InlineContext context, out CompiledStatement inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+
+    static bool Inline(CompiledStatement? statement, InlineContext context, [NotNullIfNotNull(nameof(statement))] out CompiledStatement? inlined)
+    {
+        if (statement is null)
+        {
+            inlined = null;
+            return true;
+        }
+
+        switch (statement)
+        {
+            case CompiledVariableDeclaration v: return Inline(v, context, out inlined);
+            case CompiledReturn v: return Inline(v, context, out inlined);
+            case CompiledCrash v: return Inline(v, context, out inlined);
+            case CompiledBreak v: return Inline(v, context, out inlined);
+            case CompiledDelete v: return Inline(v, context, out inlined);
+            case CompiledGoto v: return Inline(v, context, out inlined);
+            case RegisterSetter v: return Inline(v, context, out inlined);
+            case CompiledVariableSetter v: return Inline(v, context, out inlined);
+            case CompiledParameterSetter v: return Inline(v, context, out inlined);
+            case CompiledIndirectSetter v: return Inline(v, context, out inlined);
+            case CompiledFieldSetter v: return Inline(v, context, out inlined);
+            case CompiledIndexSetter v: return Inline(v, context, out inlined);
+            case CompiledWhileLoop v: return Inline(v, context, out inlined);
+            case CompiledForLoop v: return Inline(v, context, out inlined);
+            case CompiledIf v: return Inline(v, context, out inlined);
+            case CompiledElse v: return Inline(v, context, out inlined);
+            case CompiledBlock v: return Inline(v, context, out inlined);
+            case CompiledInstructionLabelDeclaration v: return Inline(v, context, out inlined);
+            case EmptyStatement v: return Inline(v, context, out inlined);
+            case CompiledStatementWithValue v:
+                if (Inline(v, context, out CompiledStatementWithValue inlinedWithValue))
+                {
+                    inlined = inlinedWithValue;
+                    return true;
+                }
+                else
+                {
+                    inlined = inlinedWithValue;
+                    return false;
+                }
+            default: throw new NotImplementedException(statement.GetType().Name);
+        }
+    }
+    static bool Inline(CompiledStatementWithValue? statement, InlineContext context, [NotNullIfNotNull(nameof(statement))] out CompiledStatementWithValue? inlined)
+    {
+        if (statement is null)
+        {
+            inlined = null!;
+            return true;
+        }
+
+        return statement switch
+        {
+            CompiledSizeof v => Inline(v, context, out inlined),
+            CompiledBinaryOperatorCall v => Inline(v, context, out inlined),
+            CompiledUnaryOperatorCall v => Inline(v, context, out inlined),
+            CompiledEvaluatedValue v => Inline(v, context, out inlined),
+            RegisterGetter v => Inline(v, context, out inlined),
+            CompiledVariableGetter v => Inline(v, context, out inlined),
+            CompiledParameterGetter v => Inline(v, context, out inlined),
+            FunctionAddressGetter v => Inline(v, context, out inlined),
+            InstructionLabelAddressGetter v => Inline(v, context, out inlined),
+            CompiledFieldGetter v => Inline(v, context, out inlined),
+            CompiledIndexGetter v => Inline(v, context, out inlined),
+            CompiledAddressGetter v => Inline(v, context, out inlined),
+            CompiledPointer v => Inline(v, context, out inlined),
+            CompiledStackAllocation v => Inline(v, context, out inlined),
+            CompiledConstructorCall v => Inline(v, context, out inlined),
+            CompiledTypeCast v => Inline(v, context, out inlined),
+            CompiledFakeTypeCast v => Inline(v, context, out inlined),
+            CompiledRuntimeCall v => Inline(v, context, out inlined),
+            CompiledFunctionCall v => Inline(v, context, out inlined),
+            CompiledExternalFunctionCall v => Inline(v, context, out inlined),
+            CompiledStatementWithValueThatActuallyDoesntHaveValue v => Inline(v, context, out inlined),
+            CompiledStringInstance v => Inline(v, context, out inlined),
+
+            _ => throw new NotImplementedException(statement.GetType().ToString()),
+        };
+    }
+
+    #endregion
+
     #region Control Flow Usage
 
     [Flags]
@@ -4337,129 +4983,47 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region IsObservable
 
-    bool IsObservable(WhileLoop whileLoop)
+    [Flags]
+    enum StatementComplexity
     {
-        return true;
+        None = 0,
+        Volatile = 1,
+        Complex = 2,
+        Bruh = 4,
     }
-    bool IsObservable(ForLoop forLoop)
-    {
-        return true;
-    }
-    bool IsObservable(IfContainer ifContainer)
-    {
-        return true;
-    }
-    bool IsObservable(Block block)
-    {
-        foreach (Statement item in block.Statements)
-        {
-            if (IsObservable(item))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-    bool IsObservable(VariableDeclaration variableDeclaration)
-    {
-        return true;
-    }
-    bool IsObservable(AnyAssignment anyAssignment)
-    {
-        return true;
-    }
-    bool IsObservable(KeywordCall keywordCall)
-    {
-        return true;
-    }
-    bool IsObservable(Identifier identifier)
-    {
-        return false;
-    }
-    bool IsObservable(BinaryOperatorCall binaryOperatorCall)
-    {
-        if (GetOperator(binaryOperatorCall, binaryOperatorCall.File, out _, out _))
-        { return true; }
 
-        if (TryCompute(binaryOperatorCall, out _))
-        { return false; }
+    StatementComplexity GetStatementComplexity(IEnumerable<CompiledStatementWithValue> statements)
+    {
+        StatementComplexity res = StatementComplexity.None;
+        foreach (CompiledStatementWithValue statement in statements) res |= GetStatementComplexity(statement);
+        return res;
+    }
 
-        return false;
-    }
-    bool IsObservable(LiteralStatement literal)
+    StatementComplexity GetStatementComplexity(CompiledStatementWithValue statement) => statement switch
     {
-        if (literal.Type == LiteralType.String) return true;
-        return false;
-    }
-    bool IsObservable(ModifiedStatement modifiedStatement)
-    {
-        return true;
-    }
-    bool IsObservable(Field field)
-    {
-        if (IsObservable(field.PrevStatement))
-        { return true; }
-
-        return false;
-    }
-    bool IsObservable(IndexCall indexCall)
-    {
-        return true;
-    }
-    bool IsObservable(AnyCall anyCall)
-    {
-        return true;
-    }
-    bool IsObservable(Pointer pointer)
-    {
-        if (IsObservable(pointer.PrevStatement))
-        { return true; }
-
-        return false;
-    }
-    bool IsObservable(AddressGetter addressGetter)
-    {
-        if (IsObservable(addressGetter.PrevStatement))
-        { return true; }
-
-        return false;
-    }
-    bool IsObservable(BasicTypeCast basicTypeCast)
-    {
-        if (IsObservable(basicTypeCast.PrevStatement))
-        { return true; }
-
-        return false;
-    }
-    bool IsObservable(ConstructorCall basicTypeCast)
-    {
-        return true;
-    }
-    bool IsObservable(ManagedTypeCast managedTypeCast)
-    {
-        return true;
-    }
-    bool IsObservable(Statement statement) => statement switch
-    {
-        Block v => IsObservable(v),
-        VariableDeclaration v => IsObservable(v),
-        WhileLoop v => IsObservable(v),
-        ForLoop v => IsObservable(v),
-        AnyAssignment v => IsObservable(v),
-        KeywordCall v => IsObservable(v),
-        IfContainer v => IsObservable(v),
-        Identifier v => IsObservable(v),
-        BinaryOperatorCall v => IsObservable(v),
-        LiteralStatement v => IsObservable(v),
-        ModifiedStatement v => IsObservable(v),
-        Field v => IsObservable(v),
-        IndexCall v => IsObservable(v),
-        AnyCall v => IsObservable(v),
-        Pointer v => IsObservable(v),
-        AddressGetter v => IsObservable(v),
-        BasicTypeCast v => IsObservable(v),
-        ConstructorCall v => IsObservable(v),
-        ManagedTypeCast v => IsObservable(v),
+        CompiledSizeof v => StatementComplexity.Bruh,
+        CompiledPassedArgument v => GetStatementComplexity(v.Value) | ((v.Cleanup.Destructor is not null || v.Cleanup.Deallocator is not null) ? StatementComplexity.Complex | StatementComplexity.Volatile : StatementComplexity.None),
+        CompiledBinaryOperatorCall v => GetStatementComplexity(v.Left) | GetStatementComplexity(v.Right) | StatementComplexity.Complex,
+        CompiledUnaryOperatorCall v => GetStatementComplexity(v.Left) | StatementComplexity.Complex,
+        CompiledEvaluatedValue v => StatementComplexity.None,
+        RegisterGetter v => StatementComplexity.None,
+        CompiledVariableGetter v => StatementComplexity.None,
+        CompiledParameterGetter v => StatementComplexity.None,
+        FunctionAddressGetter v => StatementComplexity.None,
+        InstructionLabelAddressGetter v => StatementComplexity.None,
+        CompiledFieldGetter v => GetStatementComplexity(v.Object),
+        CompiledIndexGetter v => GetStatementComplexity(v.Base) | GetStatementComplexity(v.Index),
+        CompiledAddressGetter v => GetStatementComplexity(v.Of),
+        CompiledPointer v => GetStatementComplexity(v.To),
+        CompiledStackAllocation v => StatementComplexity.Bruh,
+        CompiledConstructorCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Complex | StatementComplexity.Volatile,
+        CompiledTypeCast v => GetStatementComplexity(v.Value) | StatementComplexity.Complex,
+        CompiledFakeTypeCast v => GetStatementComplexity(v.Value),
+        CompiledRuntimeCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Complex | StatementComplexity.Volatile,
+        CompiledFunctionCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Complex | StatementComplexity.Volatile,
+        CompiledExternalFunctionCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Volatile,
+        CompiledStatementWithValueThatActuallyDoesntHaveValue v => StatementComplexity.Bruh,
+        CompiledStringInstance v => StatementComplexity.Complex | StatementComplexity.Volatile,
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 
@@ -4488,4 +5052,248 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
     }
+
+    #region Visit
+
+    IEnumerable<CompiledStatement> Visit(IEnumerable<GeneralType> type)
+    {
+        foreach (GeneralType v in type)
+        {
+            foreach (CompiledStatement v2 in Visit(v)) yield return v2;
+        }
+    }
+
+    IEnumerable<CompiledStatement> Visit(GeneralType? type)
+    {
+        switch (type)
+        {
+            case BuiltinType:
+                break;
+            case AliasType v:
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case PointerType v:
+                foreach (CompiledStatement v2 in Visit(v.To)) yield return v2;
+                break;
+            case FunctionType v:
+                foreach (CompiledStatement v2 in Visit(v.ReturnType)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Parameters)) yield return v2;
+                break;
+            case GenericType v:
+                break;
+            case StructType v:
+                foreach (CompiledStatement v2 in Visit(v.TypeArguments.Values)) yield return v2;
+                break;
+            case ArrayType v:
+                foreach (CompiledStatement v2 in Visit(v.Of)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Length)) yield return v2;
+                break;
+        }
+    }
+
+    IEnumerable<CompiledStatement> Visit(IEnumerable<CompiledStatement> type)
+    {
+        foreach (CompiledStatement v in type)
+        {
+            foreach (CompiledStatement v2 in Visit(v)) yield return v2;
+        }
+    }
+
+    IEnumerable<CompiledStatement> Visit(CompiledStatement? statement)
+    {
+        switch (statement)
+        {
+            case CompiledVariableDeclaration v:
+                yield return v;
+                if (v.InitialValue is not null)
+                {
+                    foreach (CompiledStatement v2 in Visit(v.InitialValue)) yield return v2;
+                }
+                foreach (CompiledStatement v2 in Visit(v.Type)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Cleanup)) yield return v2;
+                break;
+            case CompiledSizeof v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Of)) yield return v2;
+                break;
+            case CompiledReturn v:
+                yield return v;
+                if (v.Value is not null)
+                {
+                    foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                }
+                break;
+            case CompiledCrash v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledBreak v:
+                yield return v;
+                break;
+            case CompiledDelete v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Cleanup)) yield return v2;
+                break;
+            case CompiledGoto v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledBinaryOperatorCall v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Left)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Right)) yield return v2;
+                break;
+            case CompiledUnaryOperatorCall v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Left)) yield return v2;
+                break;
+            case CompiledEvaluatedValue v:
+                yield return v;
+                break;
+            case RegisterGetter v:
+                yield return v;
+                break;
+            case CompiledVariableGetter v:
+                yield return v;
+                break;
+            case CompiledParameterGetter v:
+                yield return v;
+                break;
+            case FunctionAddressGetter v:
+                yield return v;
+                break;
+            case InstructionLabelAddressGetter v:
+                yield return v;
+                break;
+            case CompiledFieldGetter v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Object)) yield return v2;
+                break;
+            case CompiledIndexGetter v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Base)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Index)) yield return v2;
+                break;
+            case CompiledAddressGetter v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Of)) yield return v2;
+                break;
+            case RegisterSetter v:
+                yield return v;
+                break;
+            case CompiledVariableSetter v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledParameterSetter v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledIndirectSetter v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.AddressValue)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledFieldSetter v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Object)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledIndexSetter v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Base)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Index)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledPointer v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.To)) yield return v2;
+                break;
+            case CompiledWhileLoop v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Condition)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Body)) yield return v2;
+                break;
+            case CompiledForLoop v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.VariableDeclaration)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Condition)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Expression)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Body)) yield return v2;
+                break;
+            case CompiledIf v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Condition)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Body)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Next)) yield return v2;
+                break;
+            case CompiledElse v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Body)) yield return v2;
+                break;
+            case CompiledStackAllocation v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Type)) yield return v2;
+                break;
+            case CompiledConstructorCall v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Type)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Arguments)) yield return v2;
+                break;
+            case CompiledTypeCast v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Type)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledFakeTypeCast v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledRuntimeCall v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Function)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Arguments)) yield return v2;
+                break;
+            case CompiledFunctionCall v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Arguments)) yield return v2;
+                break;
+            case CompiledExternalFunctionCall v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Arguments)) yield return v2;
+                break;
+            case CompiledBlock v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Statements)) yield return v2;
+                break;
+            case CompiledInstructionLabelDeclaration v:
+                yield return v;
+                break;
+            case CompiledStatementWithValueThatActuallyDoesntHaveValue v:
+                yield return v;
+                break;
+            case CompiledStringInstance v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Allocator)) yield return v2;
+                break;
+            case EmptyStatement v:
+                yield return v;
+                break;
+            case CompiledPassedArgument v:
+                yield return v;
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Cleanup)) yield return v2;
+                break;
+            case CompiledCleanup v:
+                yield return v;
+                break;
+            case null:
+                break;
+            default:
+                throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
+        }
+    }
+
+    #endregion
 }

@@ -662,12 +662,13 @@ public sealed class Compiler
                 }
 
                 List<ParameterDefinition> parameters = method.Parameters.ToList();
-                parameters.Insert(0, new ParameterDefinition(
-                    ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.Ref), Token.CreateAnonymous(ModifierKeywords.This)),
-                    TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters),
-                    Token.CreateAnonymous(StatementKeywords.This),
-                    method)
-                );
+                parameters.Insert(0,
+                    new ParameterDefinition(
+                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
+                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
+                        Token.CreateAnonymous(StatementKeywords.This),
+                        method)
+                    );
 
                 FunctionDefinition copy = new(
                     method.Attributes,
@@ -682,37 +683,7 @@ public sealed class Compiler
                     Block = method.Block,
                 };
 
-                CompiledFunction methodWithRef = CompileFunction(copy, compiledStruct);
-
-                parameters = method.Parameters.ToList();
-                parameters.Insert(0,
-                    new ParameterDefinition(
-                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
-                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
-                        Token.CreateAnonymous(StatementKeywords.This),
-                        method)
-                    );
-
-                copy = new FunctionDefinition(
-                    method.Attributes,
-                    method.Modifiers,
-                    method.Type,
-                    method.Identifier,
-                    new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
-                    method.Template,
-                    method.File)
-                {
-                    Context = method.Context,
-                    Block = method.Block,
-                };
-
                 CompiledFunction methodWithPointer = CompileFunction(copy, compiledStruct);
-
-                if (CompiledFunctions.Any(methodWithRef.IsSame))
-                {
-                    Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
-                    return;
-                }
 
                 if (CompiledFunctions.Any(methodWithPointer.IsSame))
                 {
@@ -720,7 +691,6 @@ public sealed class Compiler
                     return;
                 }
 
-                CompiledFunctions.Add(methodWithRef);
                 CompiledFunctions.Add(methodWithPointer);
             }
 

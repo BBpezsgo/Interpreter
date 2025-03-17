@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=311&f=1&s=243)](#)
-[![](https://img.shields.io/badge/Passing-311-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-1-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-243-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=312&f=0&s=243)](#)
+[![](https://img.shields.io/badge/Passing-312-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-0-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-243-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -86,7 +86,7 @@
 | [88](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/88.bbc) | ✅ | ✅ |
 | [89](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/89.bbc) | ✅ | ✅ |
 | [90](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/90.bbc) | ✅ | ✅ |
-| [91](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/91.bbc) | ✅ | ❌ Test method Tests.BrainfuckFileTests.Test91 threw exception:  LanguageCore.InternalExceptionWithoutContext:  |
+| [91](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/91.bbc) | ✅ | ✅ |
 | [92](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/92.bbc) | ✅ | ✅ |
 | [93](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/93.bbc) | ✅ | ✅ |
 | [96](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/96.bbc) | ✅ | ✅ |

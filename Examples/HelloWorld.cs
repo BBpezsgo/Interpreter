@@ -21,7 +21,9 @@ public static class HelloWorld
 
     public static void Run()
     {
+        // This will get the example script's path. With the `CallerFilePath` attribute it should be correct on other systems too.
         string scriptPath = GetScriptPath();
+        // This is the same but with the standard library.
         string standardLibraryPath = GetStandardLibraryPath();
 
         // This will generate some stub function informations, so it will not produce warnings.

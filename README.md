@@ -101,5 +101,6 @@ ln -s ../Source Runtime
 - If you are using the Burst compiler, add `UNITY_BURST` too.
 - If you are not using the Burst compiler, remove the `Unity.Burst` reference from `/Unity/BBLang.asmdef`.
 - If you want some profiler analytics, add `UNITY_PROFILER` too.
+- You can install the necessary NuGet packages with this tool: [NuGetForUnity](https://github.com/GlitchEnzo/NuGetForUnity).
 
 ## [Tests](https://github.com/BBpezsgo/Interpreter/blob/master/Tests.md)

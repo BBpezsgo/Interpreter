@@ -16,3 +16,4 @@ obj
 /Source/ASM/i8086/Builds/run.bat
 /Tests/TestResults
 /get-dump.sh
+/Unity/Runtime

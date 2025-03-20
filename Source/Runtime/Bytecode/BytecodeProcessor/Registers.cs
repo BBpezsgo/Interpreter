@@ -3,7 +3,7 @@
 namespace LanguageCore.Runtime;
 
 [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
-#if UNITY
+#if UNITY_BURST
 [Unity.Burst.BurstCompile]
 #endif
 public struct Registers

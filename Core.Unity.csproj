@@ -54,8 +54,4 @@
     <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\Math\MathUnity.csproj" />
-  </ItemGroup>
-
 </Project>

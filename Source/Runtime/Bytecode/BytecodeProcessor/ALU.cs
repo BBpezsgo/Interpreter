@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.Runtime;
 
-#if UNITY
+#if UNITY_BURST
 [Unity.Burst.BurstCompile]
 #endif
 public static class ALU
@@ -15,7 +15,7 @@ public static class ALU
     public const int AllBit32 = unchecked((int)0xFFFFFFFF);
     public const int AllBit64 = unchecked((int)0xFFFFFFFFFFFFFFFF);
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static int AddI(int a, int b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
@@ -27,7 +27,7 @@ public static class ALU
         _ => throw new UnreachableException(),
     };
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static byte AddI8(sbyte a, sbyte b, ref Flags flags)
@@ -42,7 +42,7 @@ public static class ALU
         return unchecked((byte)result);
     }
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static short AddI16(short a, short b, ref Flags flags)
@@ -57,7 +57,7 @@ public static class ALU
         return unchecked((short)result);
     }
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static int AddI32(int a, int b, ref Flags flags)
@@ -72,7 +72,7 @@ public static class ALU
         return unchecked((int)result);
     }
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static int SubtractI(int a, int b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
@@ -84,7 +84,7 @@ public static class ALU
         _ => throw new UnreachableException(),
     };
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static sbyte SubtractI8(sbyte a, sbyte b, ref Flags flags)
@@ -99,7 +99,7 @@ public static class ALU
         return unchecked((sbyte)result);
     }
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static short SubtractI16(short a, short b, ref Flags flags)
@@ -114,7 +114,7 @@ public static class ALU
         return unchecked((short)result);
     }
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static int SubtractI32(int a, int b, ref Flags flags)

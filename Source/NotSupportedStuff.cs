@@ -3,6 +3,14 @@ global using MemberNotNullWhenAttribute = System.Runtime.CompilerServices.Member
 [assembly: SuppressMessage("Design", "CS8604")]
 [assembly: SuppressMessage("Design", "CS8632")]
 
+namespace System.Runtime.InteropServices
+{
+    public static class CollectionsMarshal
+    {
+        public static Span<T> AsSpan<T>(List<T> values) => values.ToArray();
+    }
+}
+
 namespace System.Runtime.CompilerServices
 {
     public class IsExternalInit : Attribute
@@ -75,37 +83,35 @@ namespace System.Numerics
 
     }
 
-    /*
-        public interface IAdditionOperators<TSelf, TOher, TResult>
-        {
-            public static TResult operator +(TSelf a, TOher b);
-        }
+    public interface IAdditionOperators<TSelf, TOher, TResult>
+    {
+        
+    }
 
-        public interface ISubtractionOperators<TSelf, TOher, TResult>
-        {
-            public static TResult operator -(TSelf a, TOher b);
-        }
+    public interface ISubtractionOperators<TSelf, TOher, TResult>
+    {
+        
+    }
 
-        public interface IMultiplyOperators<TSelf, TOher, TResult>
-        {
-            public static TResult operator *(TSelf a, TOher b);
-        }
+    public interface IEqualityOperators<TSelf, TOher, TResult>
+    {
+        
+    }
 
-        public interface IDivisionOperators<TSelf, TOher, TResult>
-        {
-            public static TResult operator /(TSelf a, TOher b);
-        }
+    public interface IMultiplyOperators<TSelf, TOher, TResult>
+    {
+        
+    }
 
-        public interface IComparisonOperators<TSelf, TOher, TResult>
-        {
-            public static TResult operator ==(TSelf a, TOher b);
-            public static TResult operator !=(TSelf a, TOher b);
-            public static TResult operator <(TSelf a, TOher b);
-            public static TResult operator >(TSelf a, TOher b);
-            public static TResult operator <=(TSelf a, TOher b);
-            public static TResult operator >=(TSelf a, TOher b);
-        }
-    */
+    public interface IDivisionOperators<TSelf, TOher, TResult>
+    {
+        
+    }
+
+    public interface IComparisonOperators<TSelf, TOher, TResult>
+    {
+        
+    }
 }
 
 namespace System
@@ -119,5 +125,14 @@ namespace System
         protected UnreachableException(
             Runtime.Serialization.SerializationInfo info,
             Runtime.Serialization.StreamingContext context) : base(info, context) { }
+    }
+}
+
+namespace System.Diagnostics.CodeAnalysis
+{
+    [AttributeUsage(AttributeTargets.Constructor, AllowMultiple = false, Inherited = false)]
+    public sealed class SetsRequiredMembersAttribute : Attribute
+    {
+        public SetsRequiredMembersAttribute() { }
     }
 }

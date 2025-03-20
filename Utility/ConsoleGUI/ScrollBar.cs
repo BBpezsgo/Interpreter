@@ -5,7 +5,7 @@ namespace ConsoleGUI;
 [ExcludeFromCodeCoverage]
 public class ScrollBar
 {
-    public readonly Func<Element, Range<int>> GetRange;
+    public readonly Func<Element, LanguageCore.Range<int>> GetRange;
     readonly Element Parent;
 
     public int Offset { get; set; }
@@ -14,14 +14,14 @@ public class ScrollBar
     {
         get
         {
-            Range<int> range = GetRange.Invoke(Parent);
+            LanguageCore.Range<int> range = GetRange.Invoke(Parent);
             Offset -= range.Start;
             int max = range.End - range.Start;
             return (float)Offset / (float)max;
         }
     }
 
-    public ScrollBar(Func<Element, Range<int>> getRange, Element parent)
+    public ScrollBar(Func<Element, LanguageCore.Range<int>> getRange, Element parent)
     {
         GetRange = getRange;
         Parent = parent;
@@ -50,7 +50,7 @@ public class ScrollBar
 
     public void FeedEvent(Element sender, MouseEvent e)
     {
-        Range<int> range = GetRange.Invoke(sender);
+        LanguageCore.Range<int> range = GetRange.Invoke(sender);
         if (e.EventFlags.HasFlag(MouseEventFlags.MouseWheeled))
         {
             Offset = Math.Clamp(Offset - Math.Sign(e.Scroll), range.Start, range.End);
@@ -89,7 +89,7 @@ public class ScrollBar
     {
         if (!sender.IsFocused) return;
 
-        Range<int> range = GetRange.Invoke(sender);
+        LanguageCore.Range<int> range = GetRange.Invoke(sender);
 
         if (e.IsDown == 1 && e.VirtualKeyCode == Win32.VirtualKeyCode.Up)
         {

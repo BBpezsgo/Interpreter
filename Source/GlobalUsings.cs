@@ -9,4 +9,3 @@ global using System.Globalization;
 global using System.Linq;
 global using System.Numerics;
 global using System.Text;
-global using Maths;

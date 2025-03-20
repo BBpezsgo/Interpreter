@@ -1,11 +1,11 @@
 ﻿namespace LanguageCore.Runtime;
 
-#if UNITY
+#if UNITY_BURST
 [Unity.Burst.BurstCompile]
 #endif
 public static class FlagExtensions
 {
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static void Set(ref this Flags flags, Flags flag, bool value)
@@ -14,12 +14,12 @@ public static class FlagExtensions
         else flags &= ~flag;
     }
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static bool Get(this Flags flags, Flags flag) => (flags & flag) != 0;
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static void SetSign(ref this Flags flags, int v, BitWidth bitWidth)
@@ -38,7 +38,7 @@ public static class FlagExtensions
         }
     }
 
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static void SetZero(ref this Flags flags, int v, BitWidth bitWidth)
@@ -60,7 +60,7 @@ public static class FlagExtensions
     /// <summary>
     /// https://github.com/amensch/e8086/blob/master/e8086/i8086/ConditionalRegister.cs
     /// </summary>
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static void SetCarry(ref this Flags flags, long result, BitWidth bitWidth)
@@ -82,7 +82,7 @@ public static class FlagExtensions
     /// <summary>
     /// https://github.com/amensch/e8086/blob/master/e8086/i8086/ConditionalRegister.cs
     /// </summary>
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static void SetOverflowAfterAdd(ref this Flags flags, int source, int destination, BitWidth bitWidth)
@@ -106,7 +106,7 @@ public static class FlagExtensions
     /// <summary>
     /// https://github.com/amensch/e8086/blob/master/e8086/i8086/ConditionalRegister.cs
     /// </summary>
-#if UNITY
+#if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
     public static void SetOverflowAfterSub(ref this Flags flags, int source, int destination, BitWidth bitWidth)

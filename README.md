@@ -65,36 +65,38 @@ PrintLine("hello, world");
 ## api-ms-win-crt-string-l1-1-0.dll Missing Error
 This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
 
-## Build From Source
+## Project structure
 
-1. Download this repository
-2. Download the [Win32-Stuff](https://github.com/BBpezsgo/Win32-Stuff) repository
-3. Download the [Maths](https://github.com/BBpezsgo/Math) repository
-4. Extract the .zip files
-5. Remove all `-main` suffixes
+- `/Examples` Some basic examples for using the project. I only tested the `ExposedFunctions.cs`, `ExternalFunctions.cs` and `HelloWorld.cs` 😅.
+- `/StandardLibrary` Contains some preimplemented functions and structures and some "external function" declarations.
+- `/TestFiles` Contains all the test files I use for testing the project.
+- `/Source` All the source code for the core functionality can be found here.
+- `/Utility` This contains the command line utility and the debugger.
 
-Now the folder structure should look like this:
+## Project dependencies
+
+### Core library
+
+- [System.Collections.Immutable](https://www.nuget.org/packages/System.Collections.Immutable)
+> [!NOTE]
+> With .NET 9 this is already installed.
+
+### Utility
+
+- The core library
+- [Win32-Stuff](https://github.com/BBpezsgo/Win32-Stuff)
+- [Maths](https://github.com/BBpezsgo/Math)
+
+## Unity compatibility
+
+Import the `/Unity/package.json` to the Unity project.
+Make sure to make a symlink to the Sources directory. Run this inside the `/Unity` directory:
+```sh
+ln -s ../Source Runtime
 ```
-./Interpreter/Core.csproj
-./Win32-Stuff/Win32.csproj
-./Math/Math.csproj
-```
-
-6. Open `./Interpreter/Core.csproj` in a **text editor**
-7. In the `ProjectReference` tags, replace all `..\..` with `..` (so it will point to the existing projects you downloaded)
-
-### Method 1: Building with Visual Studio:
-
-8. Open `./Interpreter/Core.csproj` in Visual Studio
-9. Add the `./Win32-Stuff/Win32.csproj` project to the solution
-10. Add the `./Math/Math.csproj` project to the solution
-
-Now you can build it with the "Build" button
-
-### Method 2: Building with .NET CLI:
-
-8. Open the `./Interpreter` folder
-
-11. Now you can use the .NET CLI to build (`dotnet build`) or run (`dotnet run`) the project
+Inside Unity, naviage to `Edit > Project Settings... > Player > Other Settings > Scripting Define Symbols` and add the `UNITY` variable.
+If you are using the Burst compiler, add `UNITY_BURST` too.
+If you are not using the Burst compiler, remove the `Unity.Burst` reference from `/Unity/BBLang.asmdef`.
+If you want some profiler analytics, add `UNITY_PROFILER` too.
 
 ## [Tests](https://github.com/BBpezsgo/Interpreter/blob/master/Tests.md)

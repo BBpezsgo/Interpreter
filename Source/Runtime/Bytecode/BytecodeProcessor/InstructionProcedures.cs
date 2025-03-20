@@ -4,7 +4,7 @@ namespace LanguageCore.Runtime;
 
 public ref partial struct ProcessorState
 {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
     static readonly Unity.Profiling.ProfilerMarker _ProcessMarkerDataMove = new("Processor.Instructions.DataMove");
     static readonly Unity.Profiling.ProfilerMarker _ProcessMarkerPush = new("Processor.Instructions.Push");
     static readonly Unity.Profiling.ProfilerMarker _ProcessMarkerPop = new("Processor.Instructions.Pop");
@@ -19,7 +19,7 @@ public ref partial struct ProcessorState
 
     void Move()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerDataMove.Auto();
 #endif
 
@@ -35,7 +35,7 @@ public ref partial struct ProcessorState
 
     void CRASH()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -50,7 +50,7 @@ public ref partial struct ProcessorState
 
     void CALL()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -63,7 +63,7 @@ public ref partial struct ProcessorState
 
     void RETURN()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -74,7 +74,7 @@ public ref partial struct ProcessorState
 
     void JUMP_BY()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -85,7 +85,7 @@ public ref partial struct ProcessorState
 
     void EXIT()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -95,7 +95,7 @@ public ref partial struct ProcessorState
 
     void JumpIfEqual()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -107,7 +107,7 @@ public ref partial struct ProcessorState
 
     void JumpIfNotEqual()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -119,7 +119,7 @@ public ref partial struct ProcessorState
 
     void JumpIfGreater()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -131,7 +131,7 @@ public ref partial struct ProcessorState
 
     void JumpIfGreaterOrEqual()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -143,7 +143,7 @@ public ref partial struct ProcessorState
 
     void JumpIfLess()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -155,7 +155,7 @@ public ref partial struct ProcessorState
 
     void JumpIfLessOrEqual()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerControlFlow.Auto();
 #endif
 
@@ -171,7 +171,7 @@ public ref partial struct ProcessorState
 
     void Compare()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMath.Auto();
 #endif
 
@@ -185,7 +185,7 @@ public ref partial struct ProcessorState
 
     void CompareF()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMathF.Auto();
 #endif
 
@@ -208,7 +208,7 @@ public ref partial struct ProcessorState
 
     void LogicAND()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
@@ -225,7 +225,7 @@ public ref partial struct ProcessorState
 
     void LogicOR()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
@@ -242,7 +242,7 @@ public ref partial struct ProcessorState
 
     void BitsShiftLeft()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
@@ -255,7 +255,7 @@ public ref partial struct ProcessorState
 
     void BitsShiftRight()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
@@ -268,7 +268,7 @@ public ref partial struct ProcessorState
 
     void BitsOR()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
@@ -282,7 +282,7 @@ public ref partial struct ProcessorState
 
     void BitsXOR()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
@@ -296,7 +296,7 @@ public ref partial struct ProcessorState
 
     void BitsNOT()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
@@ -309,7 +309,7 @@ public ref partial struct ProcessorState
 
     void BitsAND()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerLogic.Auto();
 #endif
 
@@ -327,7 +327,7 @@ public ref partial struct ProcessorState
 
     void MathAdd()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMath.Auto();
 #endif
 
@@ -343,7 +343,7 @@ public ref partial struct ProcessorState
 
     void MathDiv()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMath.Auto();
 #endif
 
@@ -358,7 +358,7 @@ public ref partial struct ProcessorState
 
     void MathSub()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMath.Auto();
 #endif
 
@@ -374,7 +374,7 @@ public ref partial struct ProcessorState
 
     void MathMult()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMath.Auto();
 #endif
 
@@ -391,7 +391,7 @@ public ref partial struct ProcessorState
 
     void MathMod()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMath.Auto();
 #endif
 
@@ -410,7 +410,7 @@ public ref partial struct ProcessorState
 
     void FMathAdd()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMathF.Auto();
 #endif
 
@@ -423,7 +423,7 @@ public ref partial struct ProcessorState
 
     void FMathDiv()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMathF.Auto();
 #endif
 
@@ -436,7 +436,7 @@ public ref partial struct ProcessorState
 
     void FMathSub()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMathF.Auto();
 #endif
 
@@ -449,7 +449,7 @@ public ref partial struct ProcessorState
 
     void FMathMult()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMathF.Auto();
 #endif
 
@@ -462,7 +462,7 @@ public ref partial struct ProcessorState
 
     void FMathMod()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMathF.Auto();
 #endif
 
@@ -479,7 +479,7 @@ public ref partial struct ProcessorState
 
     void PUSH_VALUE()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerPush.Auto();
 #endif
 
@@ -491,7 +491,7 @@ public ref partial struct ProcessorState
 
     void POP_VALUE(BitWidth size)
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerPop.Auto();
 #endif
 
@@ -502,7 +502,7 @@ public ref partial struct ProcessorState
 
     void POP_TO_VALUE(BitWidth size)
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerPop.Auto();
 #endif
 
@@ -518,7 +518,7 @@ public ref partial struct ProcessorState
 
     void FTo()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMathF.Auto();
 #endif
 
@@ -530,7 +530,7 @@ public ref partial struct ProcessorState
 
     void FFrom()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerMathF.Auto();
 #endif
 
@@ -546,7 +546,7 @@ public ref partial struct ProcessorState
 
     unsafe void CALL_EXTERNAL()
     {
-#if UNITY && UNITY_PROFILER
+#if UNITY_PROFILER
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerExternal.Auto();
 #endif
 
@@ -601,7 +601,7 @@ public ref partial struct ProcessorState
             if (scopedExternalFunction.ReturnValueSize > 0)
             {
                 Span<byte> returnValue = stackalloc byte[scopedExternalFunction.ReturnValueSize];
-#if UNITY
+#if UNITY_BURST
                 fixed (byte* _parametersPtr = _parameters)
                 fixed (byte* returnValuePtr = returnValue)
                 {
@@ -614,7 +614,7 @@ public ref partial struct ProcessorState
             }
             else
             {
-#if UNITY
+#if UNITY_BURST
                 fixed (byte* _parametersPtr = _parameters)
                 {
                     scopedExternalFunction.Callback(scopedExternalFunction.Scope, (nint)_parametersPtr, default);

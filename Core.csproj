@@ -12,6 +12,7 @@
     <PackageId>BBLang</PackageId>
     <Authors>BB</Authors>
     <AnalysisLevel>preview-all</AnalysisLevel>
+    <DefineConstants>LANG_10;LANG_11;LANG_12;LANG_13</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -28,16 +29,19 @@
     <Compile Remove="Tests\**" />
     <Compile Remove="Utility\**" />
     <Compile Remove="Source\NotSupportedStuff.cs" />
+    <Compile Remove="Unity\**" />
     <EmbeddedResource Remove="out\**" />
     <EmbeddedResource Remove="Scripts\BuildJob\**" />
     <EmbeddedResource Remove="Tests\**" />
     <EmbeddedResource Remove="Utility\**" />
     <EmbeddedResource Remove="Source\NotSupportedStuff.cs" />
+    <EmbeddedResource Remove="Unity\**" />
     <None Remove="out\**" />
     <None Remove="Scripts\BuildJob\**" />
     <None Remove="Tests\**" />
     <None Remove="Utility\**" />
     <None Remove="Source\NotSupportedStuff.cs" />
+    <None Remove="Unity\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -48,14 +52,6 @@
 
   <ItemGroup>
     <Content Include="icon.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\Math\Math.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include=".github\workflows\dotnet-desktop.yml" />
   </ItemGroup>
 
 </Project>

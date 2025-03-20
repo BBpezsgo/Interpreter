@@ -2238,20 +2238,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    BBLangGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
+    BBLangGeneratorResult GenerateCode(CompilerResult2 compilerResult, MainGeneratorSettings settings)
     {
-        StringBuilder builder = new();
-        DiagnosticsCollection d = new();
-        CompilerResult2 res = StatementCompiler.Compile(compilerResult, new()
-        {
-            DontOptimize = settings.DontOptimize,
-            PointerSize = PointerSize,
-            ArrayLengthType = ArrayLengthType,
-            BooleanType = BooleanType,
-            ExitCodeType = ExitCodeType,
-            SizeofStatementType = SizeofStatementType,
-        }, Print, d);
-        d.Throw();
+        CompilerResult2 res = compilerResult;
 
         {
             ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
@@ -2259,7 +2248,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             ImmutableArray<CompiledGeneralFunction>.Builder compiledGeneralFunctions = ImmutableArray.CreateBuilder<CompiledGeneralFunction>();
             ImmutableArray<CompiledConstructor>.Builder compiledConstructors = ImmutableArray.CreateBuilder<CompiledConstructor>();
 
-            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions)
+            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions2)
             {
                 switch (function)
                 {
@@ -2333,7 +2322,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = res.Statements
+        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = res.Statements2
             .OfType<CompiledVariableDeclaration>();
 
         Stack<CompiledCleanup> globalVariablesCleanup = new();
@@ -2385,7 +2374,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        GenerateCodeForTopLevelStatements(res.Statements);
+        GenerateCodeForTopLevelStatements(res.Statements2);
 
         AddComment("Pop abs global address");
         Pop(AbsGlobalAddressType.GetSize(this)); // Pop abs global offset
@@ -2413,7 +2402,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     });
         // }
 
-        foreach ((ICompiledFunction function, CompiledBlock body) in res.Functions)
+        foreach ((ICompiledFunction function, CompiledBlock body) in res.Functions2)
         {
             GenerateCodeForFunction(function, body);
         }
@@ -2436,6 +2425,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Code = GeneratedCode.Select(v => new Instruction(v)).ToImmutableArray(),
             DebugInfo = DebugInfo,
+            CompiledFunctions = CompiledFunctions,
+            CompiledOperators = CompiledOperators,
+            CompiledGeneralFunctions = CompiledGeneralFunctions,
+            CompiledConstructors = CompiledConstructors,
         };
     }
 }

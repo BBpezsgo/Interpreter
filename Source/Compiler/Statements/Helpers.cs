@@ -563,42 +563,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         );
     }
 
-    bool TryGetBuiltinFunction(
-        string builtinName,
-        ImmutableArray<StatementWithValue> arguments,
-        Uri relevantFile,
-
-        [NotNullWhen(true)] out FunctionQueryResult<CompiledFunction>? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error,
-        Action<CompliableTemplate<CompiledFunction>>? addCompilable = null)
-    {
-        IEnumerable<CompiledFunction> builtinCompiledFunctions =
-            CompiledFunctions
-            .Where(v => v.BuiltinFunctionName == builtinName);
-
-        IEnumerable<CompliableTemplate<CompiledFunction>> builtinCompilableFunctions =
-            CompilableFunctions
-            .Where(v => v.Function.BuiltinFunctionName == builtinName);
-
-        string readable = $"[Builtin(\"{builtinName}\")] ?({string.Join(", ", arguments)})";
-        FunctionQuery<CompiledFunction, string, StatementWithValue> query = FunctionQuery.Create(null as string, arguments, FindStatementType, relevantFile, null, addCompilable);
-
-        return GetFunction<CompiledFunction, Token, string, StatementWithValue>(
-            new Functions<CompiledFunction>()
-            {
-                Compiled = builtinCompiledFunctions,
-                Compilable = builtinCompilableFunctions,
-            },
-            "builtin function",
-            readable,
-
-            query,
-
-            out result,
-            out error
-        );
-    }
-
     bool GetOperator(
         BinaryOperatorCall @operator,
         Uri relevantFile,

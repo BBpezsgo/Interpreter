@@ -33,6 +33,8 @@ public class ExternalFunctionStub : IExternalFunction
     {
         Name = name;
     }
+
+    public override string ToString() => $"<{ReturnValueSize}b> {Name ?? Id.ToString()}(<{ParametersSize}b>)";
 }
 
 public struct BrainfuckGeneratorSettings
@@ -78,6 +80,27 @@ public struct BrainfuckGeneratorSettings
 
 public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenerator
 {
+    public static readonly CompilerSettings DefaultCompilerSettings = new()
+    {
+        PointerSize = 1,
+        ArrayLengthType = BuiltinType.U8,
+        BooleanType = BuiltinType.U8,
+        ExitCodeType = BuiltinType.U8,
+        SizeofStatementType = BuiltinType.U8,
+        ExternalFunctions = ImmutableArray.Create<IExternalFunction>(
+            new ExternalFunctionStub("stdin")
+            {
+                ReturnValueSize = 1,
+            },
+            new ExternalFunctionStub("stdout")
+            {
+                ParametersSize = 1,
+            }
+        ),
+        DontOptimize = false,
+        BasePath = null,
+    };
+
     const string ReturnVariableName = "@return";
 
     readonly struct DebugInfoBlock : IDisposable
@@ -272,7 +295,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     #endregion
 
     public CodeGeneratorForBrainfuck(
-        CompilerResult compilerResult,
+        CompilerResult2 compilerResult,
         BrainfuckGeneratorSettings brainfuckSettings,
         DiagnosticsCollection diagnostics,
         PrintCallback? print) : base(compilerResult, diagnostics, print)
@@ -750,42 +773,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     ImmutableDictionary<ICompiledFunction, CompiledStatement> FunctionBodies = ImmutableDictionary<ICompiledFunction, CompiledStatement>.Empty;
 
-    BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
+    BrainfuckGeneratorResult GenerateCode(CompilerResult2 compilerResult)
     {
         Print?.Invoke("Generating code ...", LogType.Debug);
         Print?.Invoke("  Precompiling ...", LogType.Debug);
 
-        StringBuilder builder = new();
-        DiagnosticsCollection d = new();
-        CompilerResult2 res = StatementCompiler.Compile(compilerResult, new()
-        {
-            DontOptimize = Settings.DontOptimize,
-            PointerSize = PointerSize,
-            ArrayLengthType = ArrayLengthType,
-            BooleanType = BooleanType,
-            ExitCodeType = ExitCodeType,
-            SizeofStatementType = SizeofStatementType,
-            ExternalFunctions = ImmutableArray.Create<IExternalFunction>(
-                new ExternalFunctionStub("stdin")
-                {
-                    ReturnValueSize = 1,
-                },
-                new ExternalFunctionStub("stdout")
-                {
-                    ParametersSize = 1,
-                }
-            ),
-        }, Print, d);
-        d.Throw();
+        CompilerResult2 res = compilerResult;
 
         {
-            FunctionBodies = res.Functions.Select(v => new KeyValuePair<ICompiledFunction, CompiledStatement>(v.Function, v.Body)).ToImmutableDictionary();
+            FunctionBodies = res.Functions2.Select(v => new KeyValuePair<ICompiledFunction, CompiledStatement>(v.Function, v.Body)).ToImmutableDictionary();
             ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
             ImmutableArray<CompiledOperator>.Builder compiledOperators = ImmutableArray.CreateBuilder<CompiledOperator>();
             ImmutableArray<CompiledGeneralFunction>.Builder compiledGeneralFunctions = ImmutableArray.CreateBuilder<CompiledGeneralFunction>();
             ImmutableArray<CompiledConstructor>.Builder compiledConstructors = ImmutableArray.CreateBuilder<CompiledConstructor>();
 
-            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions)
+            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions2)
             {
                 switch (function)
                 {
@@ -841,7 +843,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         //     .Where(v => v is not null)
         //     .Where(v => !v!.Modifiers.Contains(ModifierKeywords.Const))!;
 
-        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = res.Statements.OfType<CompiledVariableDeclaration>();
+        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = res.Statements2.OfType<CompiledVariableDeclaration>();
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(globalVariableDeclarations, false)); }
@@ -854,7 +856,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         //     GenerateTopLevelStatements(statements, file);
         // }
 
-        GenerateTopLevelStatements(res.Statements);
+        GenerateTopLevelStatements(res.Statements2);
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { CleanupVariables(VariableCleanupStack.Pop()); }
@@ -885,7 +887,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     }
 
     public static BrainfuckGeneratorResult Generate(
-        CompilerResult compilerResult,
+        CompilerResult2 compilerResult,
         BrainfuckGeneratorSettings brainfuckSettings,
         PrintCallback? printCallback,
         DiagnosticsCollection diagnostics)

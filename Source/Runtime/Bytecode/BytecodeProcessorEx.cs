@@ -8,6 +8,9 @@ public class BytecodeProcessorEx
     public readonly IOHandler IO;
     double CurrentSleepFinishAt;
 
+    readonly Queue<UserCall> UserCalls = new();
+    UserCall? CurrentUserCall = null;
+
     public BytecodeProcessorEx(
         BytecodeInterpreterSettings settings,
         ImmutableArray<Instruction> program,
@@ -65,24 +68,97 @@ public class BytecodeProcessorEx
         externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<float, float, float>(externalFunctions.GenerateId("atan2"), "atan2", MathF.Atan2));
     }
 
-    public void Tick()
+    public unsafe bool Tick()
     {
         if (CurrentSleepFinishAt != 0d)
         {
-            if (CurrentSleepFinishAt < DateTime.UtcNow.TimeOfDay.TotalSeconds) return;
+            if (CurrentSleepFinishAt < DateTime.UtcNow.TimeOfDay.TotalSeconds) return true;
             CurrentSleepFinishAt = 0d;
         }
 
-        if (IO.IsAwaitingInput) return;
+        if (IO.IsAwaitingInput) return true;
 
         try
         {
-            Processor.Tick();
+            ProcessorState state = new(
+                Processor.Settings,
+                Processor.Registers,
+                Processor.Memory,
+                Processor.Code.AsSpan(),
+                Processor.ExternalFunctions.Values.AsSpan(),
+                default,
+                default
+            );
+
+            state.Tick();
+
+            if (state.IsDone && CurrentUserCall is not null)
+            {
+                state.Pop(CurrentUserCall.Arguments.Length);
+                CurrentUserCall = null;
+            }
+
+            if (state.IsDone && UserCalls.TryDequeue(out UserCall? userCall))
+            {
+                CurrentUserCall = userCall;
+
+                state.Push(userCall.Arguments.AsSpan());
+
+                // Push the return instruction address
+                state.Push(state.Registers.CodePointer, Register.CodePointer.BitWidth());
+                // Push the absolute global address
+                state.Push(
+                    state.Registers.StackPointer + // This points to the abs global address value
+                    (int)Register.CodePointer.BitWidth() + // Offset it by the pushed return instruction address
+                    (int)Register.StackPointer.BitWidth(), // Offset it by the abs global itself
+                //  The final value is pointing to the first global variable's address
+                    Register.StackPointer.BitWidth());
+                // Push the previous base pointer
+                state.Push(state.Registers.BasePointer, Register.BasePointer.BitWidth());
+
+                state.Registers.BasePointer = state.Registers.StackPointer;
+                state.Registers.CodePointer = userCall.InstructionOffset;
+            }
+
+            switch (state.Signal)
+            {
+                case Signal.PointerOutOfRange:
+                    throw new RuntimeException($"Pointer out of range ({state.Crash})")
+                    {
+                        Context = state.GetContext()
+                    };
+                case Signal.StackOverflow:
+                    throw new RuntimeException($"Stack overflow")
+                    {
+                        Context = state.GetContext()
+                    };
+                case Signal.UndefinedExternalFunction:
+                    throw new RuntimeException($"Undefined external function {state.Crash}")
+                    {
+                        Context = state.GetContext()
+                    };
+                case Signal.UserCrash:
+                    throw new UserException(HeapUtils.GetString(Processor.Memory, state.Crash) ?? string.Empty)
+                    {
+                        Context = state.GetContext()
+                    };
+            }
+
+            Processor.Registers = state.Registers;
+
+            return !state.IsDone;
         }
         catch (RuntimeException runtimeException)
         {
             runtimeException.DebugInformation = DebugInformation;
             throw;
         }
+    }
+
+    public UserCall Call(int instructionOffset, ImmutableArray<byte> arguments)
+    {
+        UserCall userCall = new(instructionOffset, arguments);
+        UserCalls.Enqueue(userCall);
+        return userCall;
     }
 }

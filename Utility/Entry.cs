@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using CommandLine;
@@ -56,33 +56,6 @@ public static class Entry
         Output.LogWarnings = true;
         ConsoleProgress.IsEnabled = arguments.Verbose;
 
-        CompilerSettings compilerSettings = new(CompilerSettings.Default)
-        {
-            BasePath = arguments.BasePath,
-        };
-        MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
-        {
-            CheckNullPointers = !arguments.NoNullcheck,
-            DontOptimize = arguments.DontOptimize,
-            PrintInstructions = arguments.PrintInstructions,
-            GenerateDebugInstructions = !arguments.NoDebugInfo,
-            StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
-        };
-        BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)
-        {
-            DontOptimize = arguments.DontOptimize,
-            GenerateDebugInformation = !arguments.NoDebugInfo,
-            GenerateComments = !arguments.NoDebugInfo,
-            GenerateSmallComments = !arguments.NoDebugInfo,
-            StackSize = arguments.StackSize ?? BrainfuckGeneratorSettings.Default.StackSize,
-            HeapSize = arguments.HeapSize ?? BrainfuckGeneratorSettings.Default.HeapSize,
-        };
-        BytecodeInterpreterSettings bytecodeInterpreterSettings = new(BytecodeInterpreterSettings.Default)
-        {
-            StackSize = arguments.StackSize ?? BytecodeInterpreterSettings.Default.StackSize,
-            HeapSize = arguments.HeapSize ?? BytecodeInterpreterSettings.Default.HeapSize,
-        };
-
         if (arguments.Source is null)
         {
             Interactive.Run();
@@ -105,9 +78,39 @@ public static class Entry
                 BBLangGeneratorResult generatedCode;
                 DiagnosticsCollection diagnostics = new();
 
+                // {
+                //     CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
+                //     Func<int> res = IL.Generator.CodeGeneratorForMain.Generate(compiled, Output.Log, diagnostics);
+                //     Console.WriteLine(res.Invoke());
+                //     diagnostics.Print();
+                //     diagnostics.Throw();
+                //     diagnostics.Clear();
+                //     return 0;
+                // }
+
+                CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
+                {
+                    BasePath = arguments.BasePath,
+                    DontOptimize = arguments.DontOptimize,
+                    ExternalFunctions = externalFunctions.ToImmutableArray(),
+                };
+                MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
+                {
+                    CheckNullPointers = !arguments.NoNullcheck,
+                    DontOptimize = arguments.DontOptimize,
+                    PrintInstructions = arguments.PrintInstructions,
+                    GenerateDebugInstructions = !arguments.NoDebugInfo,
+                    StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
+                };
+                BytecodeInterpreterSettings bytecodeInterpreterSettings = new(BytecodeInterpreterSettings.Default)
+                {
+                    StackSize = arguments.StackSize ?? BytecodeInterpreterSettings.Default.StackSize,
+                    HeapSize = arguments.HeapSize ?? BytecodeInterpreterSettings.Default.HeapSize,
+                };
+
                 if (arguments.ThrowErrors)
                 {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
+                    CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Print();
                     diagnostics.Throw();
@@ -116,7 +119,7 @@ public static class Entry
                 {
                     try
                     {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
+                        CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
                         generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                         diagnostics.Print();
                         if (diagnostics.HasErrors) return 1;
@@ -141,7 +144,7 @@ public static class Entry
                 Output.LogDebug($"Inlined {generatedCode.Statistics.InlinedFunctions} functions");
                 Output.LogDebug($"Optimized {generatedCode.Statistics.InstructionLevelOptimizations} instructions");
 
-                if (mainGeneratorSettings.PrintInstructions)
+                if (arguments.PrintInstructions)
                 {
                     for (int i = 0; i < generatedCode.Code.Length; i++)
                     {
@@ -344,11 +347,26 @@ public static class Entry
                 BrainfuckGeneratorResult generated;
                 ImmutableArray<Token> tokens;
 
+                CompilerSettings compilerSettings = new(CodeGeneratorForBrainfuck.DefaultCompilerSettings)
+                {
+                    BasePath = arguments.BasePath,
+                    DontOptimize = arguments.DontOptimize,
+                };
+                BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)
+                {
+                    DontOptimize = arguments.DontOptimize,
+                    GenerateDebugInformation = !arguments.NoDebugInfo,
+                    GenerateComments = !arguments.NoDebugInfo,
+                    GenerateSmallComments = !arguments.NoDebugInfo,
+                    StackSize = arguments.StackSize ?? BrainfuckGeneratorSettings.Default.StackSize,
+                    HeapSize = arguments.HeapSize ?? BrainfuckGeneratorSettings.Default.HeapSize,
+                };
+
                 DiagnosticsCollection diagnostics = new();
                 if (arguments.ThrowErrors)
                 {
                     tokens = AnyTokenizer.Tokenize(arguments.Source, diagnostics, PreprocessorVariables.Brainfuck).Tokens;
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, diagnostics, null, additionalImports);
+                    CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Brainfuck, diagnostics, null, additionalImports);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Throw();
                     diagnostics.Print();
@@ -361,7 +379,7 @@ public static class Entry
                     try
                     {
                         tokens = AnyTokenizer.Tokenize(arguments.Source, diagnostics, PreprocessorVariables.Brainfuck).Tokens;
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, null, compilerSettings, PreprocessorVariables.Brainfuck, diagnostics, null, additionalImports);
+                        CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Brainfuck, diagnostics, null, additionalImports);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                         diagnostics.Throw();
                         diagnostics.Print();
@@ -402,7 +420,7 @@ public static class Entry
                 generated.Code = Minifier.Minify(generated.Code, generated.DebugInfo);
                 Output.LogDebug($"Minification: {prevCodeLength} -> {generated.Code.Length} ({((float)generated.Code.Length - prevCodeLength) / (float)generated.Code.Length * 100f:#}%)");
 
-                if (mainGeneratorSettings.PrintInstructions)
+                if (arguments.PrintInstructions)
                 {
                     Console.WriteLine();
                     Console.WriteLine($" === FINAL ===");
@@ -448,7 +466,7 @@ public static class Entry
                 {
                     Console.WriteLine();
                     Console.Write("Press any key to start executing");
-                    Console.ReadKey();
+                    Console.Read();
                 }
 
                 if (arguments.Debug)
@@ -578,6 +596,35 @@ public static class Entry
 
                 List<IExternalFunction> externalFunctions = Runtime.BytecodeProcessorEx.GetExternalFunctions();
 
+                CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
+                {
+                    BasePath = arguments.BasePath,
+                    DontOptimize = arguments.DontOptimize,
+                    ExternalFunctions = externalFunctions.ToImmutableArray(),
+                };
+                MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
+                {
+                    CheckNullPointers = !arguments.NoNullcheck,
+                    DontOptimize = arguments.DontOptimize,
+                    PrintInstructions = arguments.PrintInstructions,
+                    GenerateDebugInstructions = !arguments.NoDebugInfo,
+                    StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
+                };
+                BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)
+                {
+                    DontOptimize = arguments.DontOptimize,
+                    GenerateDebugInformation = !arguments.NoDebugInfo,
+                    GenerateComments = !arguments.NoDebugInfo,
+                    GenerateSmallComments = !arguments.NoDebugInfo,
+                    StackSize = arguments.StackSize ?? BrainfuckGeneratorSettings.Default.StackSize,
+                    HeapSize = arguments.HeapSize ?? BrainfuckGeneratorSettings.Default.HeapSize,
+                };
+                BytecodeInterpreterSettings bytecodeInterpreterSettings = new(BytecodeInterpreterSettings.Default)
+                {
+                    StackSize = arguments.StackSize ?? BytecodeInterpreterSettings.Default.StackSize,
+                    HeapSize = arguments.HeapSize ?? BytecodeInterpreterSettings.Default.HeapSize,
+                };
+
                 BBLangGeneratorResult generatedCode;
                 DiagnosticsCollection diagnostics = new();
 
@@ -587,7 +634,7 @@ public static class Entry
 
                 if (arguments.ThrowErrors)
                 {
-                    CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
+                    CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Throw();
                     diagnostics.Print();
@@ -596,7 +643,7 @@ public static class Entry
                 {
                     try
                     {
-                        CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
+                        CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
                         generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                         diagnostics.Throw();
                         diagnostics.Print();
@@ -624,16 +671,16 @@ public static class Entry
 
                 Output.LogInfo($"Output: \"{outputFile}\"");
 
-                // if (File.Exists(outputFile))
-                // {
-                //     Process? process = Process.Start(new ProcessStartInfo(outputFile)) ?? throw new InternalException($"Failed to start process \"{outputFile}\"");
-                //     process.WaitForExit();
-                //     Console.WriteLine();
-                //     Console.WriteLine($"Exit code: {process.ExitCode}");
-                // 
-                //     if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out ProcessRuntimeException? runtimeException))
-                //     { throw runtimeException; }
-                // }
+                if (File.Exists(outputFile))
+                {
+                    Process process = Process.Start(new ProcessStartInfo(outputFile)) ?? throw new Exception($"Failed to start process \"{outputFile}\"");
+                    process.WaitForExit();
+                    Console.WriteLine();
+                    Console.WriteLine($"Exit code: {process.ExitCode}");
+
+                    if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out ProcessRuntimeException? runtimeException))
+                    { throw runtimeException; }
+                }
 
                 break;
             }

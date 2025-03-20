@@ -32,7 +32,7 @@ public partial class StatementCompiler
 
     GeneralType? CurrentReturnType;
 
-    readonly StatementCompilerSettings Settings;
+    readonly CompilerSettings Settings;
     readonly List<CompiledFunction2> GeneratedFunctions = new();
 
     #endregion
@@ -64,7 +64,7 @@ public partial class StatementCompiler
         { "DL", (Register.DL, BuiltinType.I8) },
     }.ToImmutableDictionary();
 
-    public StatementCompiler(CompilerResult compilerResult, StatementCompilerSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print)
+    public StatementCompiler(CompilerResult compilerResult, CompilerSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print)
     {
         CompiledParameters = new();
 
@@ -83,68 +83,17 @@ public partial class StatementCompiler
 
         Diagnostics = diagnostics;
         Print = print;
-
-        ImmutableArray<IExternalFunction>.Builder externalFunctions = ImmutableArray.CreateBuilder<IExternalFunction>();
-        externalFunctions.AddRange(compilerResult.ExternalFunctions);
-        if (!settings.ExternalFunctions.IsDefaultOrEmpty) externalFunctions.AddRange(settings.ExternalFunctions);
-        ExternalFunctions = externalFunctions.ToImmutable();
+        ExternalFunctions = compilerResult.ExternalFunctions;
         Settings = settings;
     }
 
     public static CompilerResult2 Compile(
         CompilerResult compilerResult,
-        StatementCompilerSettings settings,
+        CompilerSettings settings,
         PrintCallback? printCallback,
         DiagnosticsCollection diagnostics)
     {
         return new StatementCompiler(compilerResult, settings, diagnostics, printCallback).GenerateCode(compilerResult);
-    }
-}
-
-public struct CompilerResult2
-{
-    public ImmutableArray<CompiledStatement> Statements;
-    public ImmutableArray<CompiledFunction2> Functions;
-
-    public readonly string Stringify()
-    {
-        StringBuilder res = new();
-
-        foreach ((ICompiledFunction function, CompiledBlock body) in Functions)
-        {
-            res.Append(function.Type.ToString());
-            res.Append(' ');
-            res.Append(function switch
-            {
-                CompiledFunction v => v.Identifier.Content,
-                CompiledOperator v => v.Identifier.Content,
-                CompiledGeneralFunction v => v.Identifier.Content,
-                CompiledConstructor v => v.Type.ToString(),
-                _ => "???",
-            });
-            res.Append('(');
-            for (int i = 0; i < function.Parameters.Count; i++)
-            {
-                if (i > 0) res.Append(", ");
-                res.Append(function.ParameterTypes[i].ToString());
-                res.Append(' ');
-                res.Append(function.Parameters[i].Identifier.Content);
-            }
-            res.Append(')');
-            res.Append(body.Stringify(0));
-            res.AppendLine();
-        }
-
-        res.AppendLine("// Top level statements");
-        foreach (CompiledStatement statement in Statements)
-        {
-            if (statement is EmptyStatement) continue;
-            res.Append(statement.Stringify(0));
-            res.Append(';');
-            res.AppendLine();
-        }
-
-        return res.ToString();
     }
 }
 
@@ -164,4 +113,6 @@ public class CompiledFunction2
         function = Function;
         body = Body;
     }
+
+    public override string? ToString() => Function.ToString() ?? base.ToString();
 }

@@ -20,4 +20,6 @@ public readonly struct ExternalFunctionAsync : IExternalFunction
         ParametersSize = parametersSize;
         ReturnValueSize = returnValueSize;
     }
+
+    public override string ToString() => $"<{ReturnValueSize}b> {Name ?? Id.ToString()}(<{ParametersSize}b>)";
 }

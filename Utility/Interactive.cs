@@ -33,10 +33,13 @@ public static class Interactive
 
             List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
-            CompilerResult compiled = Compiler.Compiler.CompileInteractive(
+            CompilerResult2 compiled = Compiler.Compiler.CompileInteractive(
                 statement,
-                externalFunctions,
-                new CompilerSettings() { BasePath = "/home/BB/Projects/BBLang/Core/StandardLibrary" },
+                new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
+                {
+                    BasePath = "/home/BB/Projects/BBLang/Core/StandardLibrary",
+                    ExternalFunctions = externalFunctions.ToImmutableArray(),
+                },
                 PreprocessorVariables.Interactive,
                 diagnostics,
                 Utils.AssemblyFile);

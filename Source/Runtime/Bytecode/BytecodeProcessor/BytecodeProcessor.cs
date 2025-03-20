@@ -15,11 +15,11 @@ public partial class BytecodeProcessor
     public bool IsDone => Registers.CodePointer == Code.Length;
     public int StackStart => StackDirection > 0 ? Settings.HeapSize : Settings.HeapSize + Settings.StackSize - 1;
 
-    readonly BytecodeInterpreterSettings Settings;
+    public readonly BytecodeInterpreterSettings Settings;
     public Registers Registers;
     public readonly byte[] Memory;
     public ImmutableArray<Instruction> Code;
-    readonly FrozenDictionary<int, IExternalFunction> ExternalFunctions;
+    public readonly FrozenDictionary<int, IExternalFunction> ExternalFunctions;
 
     public BytecodeProcessor(ImmutableArray<Instruction> code, byte[]? memory, FrozenDictionary<int, IExternalFunction> externalFunctions, BytecodeInterpreterSettings settings)
     {

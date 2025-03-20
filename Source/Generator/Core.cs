@@ -255,3 +255,8 @@ public interface IExternalFunctionDefinition
 {
     string? ExternalFunctionName { get; }
 }
+
+public interface IExposeable
+{
+    string? ExposedFunctionName { get; }
+}

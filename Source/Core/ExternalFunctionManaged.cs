@@ -19,6 +19,8 @@ public readonly struct ExternalFunctionManaged : IExternalFunction
         ReturnValueSize = returnValueSize;
     }
 
+    public override string ToString() => $"<{ReturnValueSize}b> {Name ?? Id.ToString()}(<{ParametersSize}b>)";
+
     #region Generators
 
     public static ExternalFunctionManaged Create(int id, string? name, Action callback) => new(callback, id, name, 0, 0);

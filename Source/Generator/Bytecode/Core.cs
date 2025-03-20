@@ -132,6 +132,18 @@ class GeneratedVariable
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
+    public static readonly CompilerSettings DefaultCompilerSettings = new()
+    {
+        PointerSize = 4,
+        ArrayLengthType = BuiltinType.I32,
+        BooleanType = BuiltinType.U8,
+        ExitCodeType = BuiltinType.I32,
+        SizeofStatementType = BuiltinType.I32,
+        BasePath = null,
+        DontOptimize = false,
+        ExternalFunctions = ImmutableArray<IExternalFunction>.Empty,
+    };
+
     #region Fields
 
     readonly ImmutableArray<IExternalFunction> ExternalFunctions;
@@ -196,7 +208,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { "DL", (Register.DL, BuiltinType.I8) },
     }.ToImmutableDictionary();
 
-    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
+    public CodeGeneratorForMain(CompilerResult2 compilerResult, MainGeneratorSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
     {
         ExternalFunctions = compilerResult.ExternalFunctions;
         GeneratedCode = new();
@@ -256,7 +268,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
 
     public static BBLangGeneratorResult Generate(
-        CompilerResult compilerResult,
+        CompilerResult2 compilerResult,
         MainGeneratorSettings settings,
         PrintCallback? printCallback,
         DiagnosticsCollection diagnostics)

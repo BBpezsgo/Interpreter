@@ -196,6 +196,7 @@ public static class LanguageOperators
 public static class AttributeConstants
 {
     public const string ExternalIdentifier = "External";
+    public const string ExposeIdentifier = "Expose";
     public const string BuiltinIdentifier = "Builtin";
 }
 

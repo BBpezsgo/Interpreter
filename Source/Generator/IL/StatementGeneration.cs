@@ -841,19 +841,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Locals.Clear();
     }
 
-    Func<int> GenerateCode(CompilerResult compilerResult)
+    Func<int> GenerateCode(CompilerResult2 compilerResult)
     {
-        DiagnosticsCollection d = new();
-        CompilerResult2 res = StatementCompiler.Compile(compilerResult, new()
-        {
-            DontOptimize = true,
-            PointerSize = 8,
-            ArrayLengthType = ArrayLengthType,
-            BooleanType = BooleanType,
-            ExitCodeType = BuiltinType.I32,
-            SizeofStatementType = SizeofStatementType,
-        }, Print, d);
-        d.Throw();
+        CompilerResult2 res = compilerResult;
 
         {
             ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
@@ -861,7 +851,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             ImmutableArray<CompiledGeneralFunction>.Builder compiledGeneralFunctions = ImmutableArray.CreateBuilder<CompiledGeneralFunction>();
             ImmutableArray<CompiledConstructor>.Builder compiledConstructors = ImmutableArray.CreateBuilder<CompiledConstructor>();
 
-            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions)
+            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions2)
             {
                 switch (function)
                 {
@@ -894,7 +884,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }, AssemblyBuilderAccess.RunAndCollect);
         Module = assemBuilder.DefineDynamicModule("DynamicModule");
 
-        foreach ((ICompiledFunction function, _) in res.Functions)
+        foreach ((ICompiledFunction function, _) in res.Functions2)
         {
             switch (function)
             {
@@ -911,9 +901,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        Func<int> result = GenerateCodeForTopLevelStatements(res.Statements);
+        Func<int> result = GenerateCodeForTopLevelStatements(res.Statements2);
 
-        foreach ((ICompiledFunction function, CompiledBlock body) in res.Functions)
+        foreach ((ICompiledFunction function, CompiledBlock body) in res.Functions2)
         {
             ILGenerator il = Functions[function].GetILGenerator();
             EmitMethod(body.Statements, function.Type, il);

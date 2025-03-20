@@ -43,4 +43,7 @@ public unsafe struct ExternalFunctionScopedSync
     {
         return new ExternalFunctionSync(null, null, Id, name, ParametersSize, ReturnValueSize);
     }
+
+    public override string ToString() => $"<{ReturnValueSize}b> {Id.ToString()}(<{ParametersSize}b>)";
+
 }

@@ -11,7 +11,8 @@ public class CompiledFunction : FunctionDefinition,
     ITemplateable<CompiledFunction>,
     ICompiledFunction,
     IHaveInstructionOffset,
-    IExternalFunctionDefinition
+    IExternalFunctionDefinition,
+    IExposeable
 {
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
 

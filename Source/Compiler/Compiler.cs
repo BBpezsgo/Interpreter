@@ -30,9 +30,9 @@ public sealed class Compiler
     readonly DiagnosticsCollection Diagnostics;
     readonly IEnumerable<string> PreprocessorVariables;
 
-    Compiler(IEnumerable<IExternalFunction>? externalFunctions, CompilerSettings settings, DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
+    Compiler(CompilerSettings settings, DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
     {
-        ExternalFunctions = (externalFunctions ?? Enumerable.Empty<IExternalFunction>()).ToImmutableArray();
+        ExternalFunctions = settings.ExternalFunctions;
         Settings = settings;
         Diagnostics = diagnostics;
         PreprocessorVariables = preprocessorVariables;
@@ -201,6 +201,22 @@ public sealed class Compiler
 
                         Diagnostics.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: \"{definedParameterType}\" Passed: \"{passedParameterType}\"", function.Parameters[i].Type, function.Parameters[i].File));
                     }
+                    break;
+                }
+                case AttributeConstants.ExposeIdentifier:
+                {
+                    if (attribute.Parameters.Length != 1)
+                    {
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                        break;
+                    }
+
+                    if (attribute.Parameters[0].Type != LiteralType.String)
+                    {
+                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
+                        break;
+                    }
+
                     break;
                 }
                 default:
@@ -381,7 +397,7 @@ public sealed class Compiler
         AliasDefinitions.AddRange(collectedAST.AST.AliasDefinitions);
     }
 
-    CompilerResult CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
+    CompilerResult2 CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
     {
         ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, Settings.BasePath, Diagnostics, PreprocessorVariables, fileParser, additionalImports);
 
@@ -394,23 +410,10 @@ public sealed class Compiler
             TopLevelStatements.Add((parsedFile.AST.TopLevelStatements, parsedFile.File));
         }
 
-        CompileInternal();
-
-        return new CompilerResult(
-            parsedFiles,
-            CompiledFunctions,
-            CompiledGeneralFunctions,
-            CompiledOperators,
-            CompiledConstructors,
-            CompiledAliases,
-            ExternalFunctions,
-            CompiledStructs,
-            TopLevelStatements,
-            file,
-            false);
+        return CompileInternal(file, parsedFiles);
     }
 
-    CompilerResult CompileInteractiveInternal(Statement statement, Uri file)
+    CompilerResult2 CompileInteractiveInternal(Statement statement, Uri file)
     {
         ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(
             null,
@@ -426,23 +429,10 @@ public sealed class Compiler
 
         TopLevelStatements.Add((ImmutableArray.Create(statement), file));
 
-        CompileInternal();
-
-        return new CompilerResult(
-            parsedFiles,
-            CompiledFunctions,
-            CompiledGeneralFunctions,
-            CompiledOperators,
-            CompiledConstructors,
-            CompiledAliases,
-            ExternalFunctions,
-            CompiledStructs,
-            TopLevelStatements,
-            file,
-            true);
+        return CompileInternal(file, parsedFiles);
     }
 
-    void CompileInternal()
+    CompilerResult2 CompileInternal(Uri file, ImmutableArray<ParsedFile> parsedFiles)
     {
         static bool ThingEquality<TThing1, TThing2>(TThing1 a, TThing2 b)
             where TThing1 : IIdentifiable<Token>, IInFile
@@ -482,7 +472,7 @@ public sealed class Compiler
             if (IsThingExists(@aliasDefinition))
             {
                 Diagnostics.Add(Diagnostic.Critical("Symbol already exists", @aliasDefinition.Identifier, @aliasDefinition.File));
-                return;
+                continue;
             }
 
             CompiledAlias alias = new(
@@ -501,7 +491,7 @@ public sealed class Compiler
             if (IsThingExists(@struct))
             {
                 Diagnostics.Add(Diagnostic.Critical("Symbol already exists", @struct.Identifier, @struct.File));
-                return;
+                continue;
             }
 
             CompiledStructs.Add(CompileStructNoFields(@struct));
@@ -537,7 +527,7 @@ public sealed class Compiler
             if (CompiledOperators.Any(other => FunctionEquality(compiled, other)))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Operator \"{compiled.ToReadable()}\" already defined", @operator.Identifier, @operator.File));
-                return;
+                continue;
             }
 
             CompiledOperators.Add(compiled);
@@ -550,7 +540,7 @@ public sealed class Compiler
             if (CompiledFunctions.Any(other => FunctionEquality(compiled, other)))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Function \"{compiled.ToReadable()}\" already defined", function.Identifier, function.File));
-                return;
+                continue;
             }
 
             CompiledFunctions.Add(compiled);
@@ -572,7 +562,7 @@ public sealed class Compiler
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
                     {
                         Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File));
-                        return;
+                        continue;
                     }
                 }
 
@@ -625,13 +615,13 @@ public sealed class Compiler
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
                     {
                         Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
-                        return;
+                        continue;
                     }
 
                     if (CompiledGeneralFunctions.Any(methodWithPointer.IsSame))
                     {
                         Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
-                        return;
+                        continue;
                     }
 
                     CompiledGeneralFunctions.Add(methodWithRef);
@@ -646,7 +636,7 @@ public sealed class Compiler
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
                     {
                         Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithRef.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
-                        return;
+                        continue;
                     }
 
                     CompiledGeneralFunctions.Add(methodWithRef);
@@ -688,7 +678,7 @@ public sealed class Compiler
                 if (CompiledFunctions.Any(methodWithPointer.IsSame))
                 {
                     Diagnostics.Add(Diagnostic.Critical($"Function with name \"{methodWithPointer.ToReadable()}\" already defined", method.Identifier, compiledStruct.File));
-                    return;
+                    continue;
                 }
 
                 CompiledFunctions.Add(methodWithPointer);
@@ -701,7 +691,7 @@ public sealed class Compiler
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
                     {
                         Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File));
-                        return;
+                        continue;
                     }
                 }
 
@@ -729,7 +719,7 @@ public sealed class Compiler
                 if (CompiledConstructors.Any(compiledConstructor.IsSame))
                 {
                     Diagnostics.Add(Diagnostic.Critical($"Constructor \"{compiledConstructor.ToReadable()}\" already defined", constructor.Type, compiledStruct.File));
-                    return;
+                    continue;
                 }
 
                 CompiledConstructors.Add(compiledConstructor);
@@ -738,11 +728,23 @@ public sealed class Compiler
             if (compiledStruct.Template is not null)
             { GenericParameters.Pop(); }
         }
+
+        return StatementCompiler.Compile(new CompilerResult(
+            parsedFiles,
+            CompiledFunctions,
+            CompiledGeneralFunctions,
+            CompiledOperators,
+            CompiledConstructors,
+            CompiledAliases,
+            ExternalFunctions,
+            CompiledStructs,
+            TopLevelStatements,
+            file,
+            false), Settings, null, Diagnostics);
     }
 
-    public static CompilerResult CompileFile(
+    public static CompilerResult2 CompileFile(
         Uri file,
-        IEnumerable<IExternalFunction>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         DiagnosticsCollection diagnostics,
@@ -751,7 +753,6 @@ public sealed class Compiler
         IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
     {
         Compiler compiler = new(
-            externalFunctions,
             settings,
             diagnostics,
             preprocessorVariables,
@@ -759,9 +760,8 @@ public sealed class Compiler
         return compiler.CompileMainFile(file, fileParser, additionalImports);
     }
 
-    public static CompilerResult CompileInteractive(
+    public static CompilerResult2 CompileInteractive(
         Statement statement,
-        IEnumerable<IExternalFunction>? externalFunctions,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
         DiagnosticsCollection diagnostics,
@@ -769,7 +769,6 @@ public sealed class Compiler
         IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
     {
         Compiler compiler = new(
-            externalFunctions,
             settings,
             diagnostics,
             preprocessorVariables,

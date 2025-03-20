@@ -2982,7 +2982,16 @@ public partial class StatementCompiler
         {
             if (function.IsTemplate) continue;
             if (function.InstructionOffset >= 0) continue;
-            if (!function.References.Any()) continue;
+            if (!function.References.Any())
+            {
+                if (function is IExposeable exposeable &&
+                    exposeable.ExposedFunctionName is not null)
+                { }
+                else
+                {
+                    continue;
+                }
+            }
 
             if (GenerateCodeForFunction(function, null))
             { generatedAnything = true; }
@@ -3132,10 +3141,20 @@ public partial class StatementCompiler
         }
         */
 
-        return new CompilerResult2()
-        {
-            Functions = GeneratedFunctions.ToImmutableArray(),
-            Statements = compiledTopLevelStatements.ToImmutable(),
-        };
+        return new CompilerResult2(
+            compilerResult.Raw,
+            compilerResult.Functions,
+            compilerResult.GeneralFunctions,
+            compilerResult.Operators,
+            compilerResult.Constructors,
+            compilerResult.Aliases,
+            compilerResult.ExternalFunctions,
+            compilerResult.Structs,
+            compilerResult.TopLevelStatements,
+            compilerResult.File,
+            compilerResult.IsInteractive,
+            compiledTopLevelStatements.ToImmutable(),
+            GeneratedFunctions.ToImmutableArray()
+        );
     }
 }

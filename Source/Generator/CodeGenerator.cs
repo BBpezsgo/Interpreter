@@ -76,7 +76,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     #endregion
 
-    protected CodeGenerator(CompilerResult compilerResult, DiagnosticsCollection diagnostics, PrintCallback? print)
+    protected CodeGenerator(CompilerResult2 compilerResult, DiagnosticsCollection diagnostics, PrintCallback? print)
     {
         CompiledParameters = new Stack<CompiledParameter>();
         CompiledLocalVariables = new Stack<CompiledVariableDeclaration>();

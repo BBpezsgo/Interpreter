@@ -27,6 +27,8 @@ public readonly struct ExternalFunctionSync : IExternalFunction
         ReturnValueSize = returnValueSize;
     }
 
+    public override string ToString() => $"<{ReturnValueSize}b> {Name ?? Id.ToString()}(<{ParametersSize}b>)";
+
     #region Generators
 
     public static ExternalFunctionSync Create(int id, string? name, Action callback)

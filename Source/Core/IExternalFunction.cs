@@ -6,4 +6,6 @@ public interface IExternalFunction
     int Id { get; }
     int ParametersSize { get; }
     int ReturnValueSize { get; }
+
+    string ToString();
 }

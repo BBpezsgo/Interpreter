@@ -87,19 +87,19 @@ This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/window
 - [Win32-Stuff](https://github.com/BBpezsgo/Win32-Stuff)
 - [Maths](https://github.com/BBpezsgo/Math)
 
-## Unity compatibility
+## Unity
 
-Import the `/Unity/package.json` to the Unity project.
-Make sure to make a symlink to the Sources directory. Run this inside the `/Unity` directory:
+- Import the `/Unity/package.json` to the Unity project.
+- Make sure to make a symlink to the Sources directory. Run this inside the `/Unity` directory:
 ```sh
 ln -s ../Source Runtime
 ```
 > [!NOTE]
 > If you are on Windows, move and rename the `/Source` directory to `/Unity/Runtime`.
 
-Inside Unity, naviage to `Edit > Project Settings... > Player > Other Settings > Scripting Define Symbols` and add the `UNITY` variable.
-If you are using the Burst compiler, add `UNITY_BURST` too.
-If you are not using the Burst compiler, remove the `Unity.Burst` reference from `/Unity/BBLang.asmdef`.
-If you want some profiler analytics, add `UNITY_PROFILER` too.
+- Inside Unity, naviage to `Edit > Project Settings... > Player > Other Settings > Scripting Define Symbols` and add the `UNITY` variable.
+- If you are using the Burst compiler, add `UNITY_BURST` too.
+- If you are not using the Burst compiler, remove the `Unity.Burst` reference from `/Unity/BBLang.asmdef`.
+- If you want some profiler analytics, add `UNITY_PROFILER` too.
 
 ## [Tests](https://github.com/BBpezsgo/Interpreter/blob/master/Tests.md)

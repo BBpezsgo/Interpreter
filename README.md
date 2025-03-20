@@ -1,4 +1,4 @@
-# My programming language
+# My Programming Language
 
 [![.Net 9.0](https://img.shields.io/badge/.NET-9.0-5C2D91)](#)
 [![C# preview](https://img.shields.io/badge/C%23-preview-239120.svg)](#)
@@ -12,7 +12,7 @@ It's my own programming language that can generate bytecodes (executed by a cust
 
 I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tutorial series](https://www.youtube.com/watch?v=2DTNDrdqGlo&list=PLZjGMBjt_VVAMW53XnMtNfAQowZwMviBF) showing how to make a parser and a compiler. I basically copied the code with minimal changes. When the series ended, I was left on my own, so I improved the code myself.
 
-## Command line arguments
+## Command Line Arguments
 
 `BBLang [options...] source`
 
@@ -65,7 +65,7 @@ PrintLine("hello, world");
 ## api-ms-win-crt-string-l1-1-0.dll Missing Error
 This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
 
-## Project structure
+## Project Structure
 
 - `/Examples` Some basic examples for using the project. I only tested the `ExposedFunctions.cs`, `ExternalFunctions.cs` and `HelloWorld.cs` 😅.
 - `/StandardLibrary` Contains some preimplemented functions and structures and some "external function" declarations.
@@ -73,15 +73,15 @@ This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/window
 - `/Source` All the source code for the core functionality can be found here.
 - `/Utility` This contains the command line utility and the debugger.
 
-## Project dependencies
+## Project Dependencies
 
-### Core library
+### Core Library
 
 - [System.Collections.Immutable](https://www.nuget.org/packages/System.Collections.Immutable)
 > [!NOTE]
 > With .NET 9 this is already installed.
 
-### Utility
+### Command Line Utility
 
 - The core library
 - [Win32-Stuff](https://github.com/BBpezsgo/Win32-Stuff)

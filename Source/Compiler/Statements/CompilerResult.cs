@@ -25,6 +25,50 @@ public readonly struct CompilerResult
 
     public readonly bool IsInteractive;
 
+    public readonly ImmutableArray<CompiledStatement> CompiledStatements;
+    public readonly ImmutableArray<CompiledFunction2> Functions2;
+
+    public readonly string Stringify()
+    {
+        StringBuilder res = new();
+
+        foreach ((ICompiledFunction function, CompiledBlock body) in Functions2)
+        {
+            res.Append(function.Type.ToString());
+            res.Append(' ');
+            res.Append(function switch
+            {
+                CompiledFunction v => v.Identifier.Content,
+                CompiledOperator v => v.Identifier.Content,
+                CompiledGeneralFunction v => v.Identifier.Content,
+                CompiledConstructor v => v.Type.ToString(),
+                _ => "???",
+            });
+            res.Append('(');
+            for (int i = 0; i < function.Parameters.Count; i++)
+            {
+                if (i > 0) res.Append(", ");
+                res.Append(function.ParameterTypes[i].ToString());
+                res.Append(' ');
+                res.Append(function.Parameters[i].Identifier.Content);
+            }
+            res.Append(')');
+            res.Append(body.Stringify(0));
+            res.AppendLine();
+        }
+
+        res.AppendLine("// Top level statements");
+        foreach (CompiledStatement statement in CompiledStatements)
+        {
+            if (statement is EmptyStatement) continue;
+            res.Append(statement.Stringify(0));
+            res.Append(';');
+            res.AppendLine();
+        }
+
+        return res.ToString();
+    }
+
     public readonly IEnumerable<Uri> Files
     {
         get
@@ -127,7 +171,9 @@ public readonly struct CompilerResult
         Enumerable.Empty<CompiledStruct>(),
         Enumerable.Empty<(ImmutableArray<Statement>, Uri)>(),
         file,
-        false);
+        false,
+        ImmutableArray<CompiledStatement>.Empty,
+        ImmutableArray<CompiledFunction2>.Empty);
 
     public CompilerResult(
         IEnumerable<ParsedFile> tokens,
@@ -140,7 +186,9 @@ public readonly struct CompilerResult
         IEnumerable<CompiledStruct> structs,
         IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
         Uri file,
-        bool isInteractive)
+        bool isInteractive,
+        ImmutableArray<CompiledStatement> compiledStatements,
+        ImmutableArray<CompiledFunction2> functions2)
     {
         Raw = tokens.ToImmutableArray();
         Functions = functions.ToImmutableArray();
@@ -153,6 +201,8 @@ public readonly struct CompilerResult
         TopLevelStatements = topLevelStatements.ToImmutableArray();
         File = file;
         IsInteractive = isInteractive;
+        CompiledStatements = compiledStatements;
+        Functions2 = functions2;
     }
 
     public static bool GetThingAt<TThing, TIdentifier>(IEnumerable<TThing> things, Uri file, SinglePosition position, [NotNullWhen(true)] out TThing? result)

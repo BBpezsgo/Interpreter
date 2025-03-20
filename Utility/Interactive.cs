@@ -33,7 +33,7 @@ public static class Interactive
 
             List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
-            CompilerResult2 compiled = Compiler.Compiler.CompileInteractive(
+            CompilerResult compiled = Compiler.StatementCompiler.CompileInteractive(
                 statement,
                 new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
                 {

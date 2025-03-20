@@ -2,41 +2,8 @@
 
 namespace LanguageCore.Compiler;
 
-class Scope
-{
-    public readonly Stack<CompiledVariableDeclaration> Variables;
-    public readonly ImmutableArray<CompiledVariableConstant> Constants;
-    public readonly ImmutableArray<CompiledInstructionLabelDeclaration> InstructionLabels;
-
-    public Scope(ImmutableArray<CompiledVariableConstant> constants, ImmutableArray<CompiledInstructionLabelDeclaration> instructionLabels)
-    {
-        Variables = new();
-        Constants = constants;
-        InstructionLabels = instructionLabels;
-    }
-}
-
 public partial class StatementCompiler
 {
-    #region Fields
-
-    public const int InvalidFunctionAddress = int.MinValue;
-
-    readonly ImmutableArray<IExternalFunction> ExternalFunctions;
-
-    public BuiltinType ArrayLengthType => Settings.ArrayLengthType;
-    public BuiltinType BooleanType => Settings.BooleanType;
-    public int PointerSize => Settings.PointerSize;
-    public BuiltinType SizeofStatementType => Settings.SizeofStatementType;
-    public BuiltinType ExitCodeType => Settings.ExitCodeType;
-
-    GeneralType? CurrentReturnType;
-
-    readonly CompilerSettings Settings;
-    readonly List<CompiledFunction2> GeneratedFunctions = new();
-
-    #endregion
-
     public static readonly ImmutableDictionary<string, (Register Register, BuiltinType Type)> RegisterKeywords = new Dictionary<string, (Register Register, BuiltinType Type)>()
     {
         { "IP", (Register.CodePointer, BuiltinType.I32) },
@@ -64,7 +31,7 @@ public partial class StatementCompiler
         { "DL", (Register.DL, BuiltinType.I8) },
     }.ToImmutableDictionary();
 
-    public StatementCompiler(CompilerResult compilerResult, CompilerSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print)
+    public StatementCompiler(CompilerSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print, IEnumerable<string> preprocessorVariables, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
     {
         CompiledParameters = new();
 
@@ -74,26 +41,13 @@ public partial class StatementCompiler
 
         TypeArguments = new Dictionary<string, GeneralType>();
 
-        CompiledStructs = compilerResult.Structs;
-        CompiledFunctions = compilerResult.Functions;
-        CompiledOperators = compilerResult.Operators;
-        CompiledConstructors = compilerResult.Constructors;
-        CompiledGeneralFunctions = compilerResult.GeneralFunctions;
-        CompiledAliases = compilerResult.Aliases;
-
         Diagnostics = diagnostics;
         Print = print;
-        ExternalFunctions = compilerResult.ExternalFunctions;
         Settings = settings;
-    }
 
-    public static CompilerResult2 Compile(
-        CompilerResult compilerResult,
-        CompilerSettings settings,
-        PrintCallback? printCallback,
-        DiagnosticsCollection diagnostics)
-    {
-        return new StatementCompiler(compilerResult, settings, diagnostics, printCallback).GenerateCode(compilerResult);
+        ExternalFunctions = settings.ExternalFunctions;
+        PreprocessorVariables = preprocessorVariables;
+        UserDefinedAttributes = (userDefinedAttributes ?? Enumerable.Empty<UserDefinedAttribute>()).ToImmutableArray();
     }
 }
 

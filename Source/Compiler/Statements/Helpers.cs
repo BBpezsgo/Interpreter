@@ -8,56 +8,14 @@ namespace LanguageCore.Compiler;
 
 public partial class StatementCompiler : IRuntimeInfoProvider
 {
-    public readonly struct CompliableTemplate<T> where T : ITemplateable<T>
-    {
-        public readonly T OriginalFunction;
-        public readonly T Function;
-        public readonly Dictionary<string, GeneralType> TypeArguments;
-
-        public CompliableTemplate(T function, Dictionary<string, GeneralType> typeArguments)
-        {
-            OriginalFunction = function;
-            TypeArguments = typeArguments;
-
-            foreach (GeneralType argument in TypeArguments.Values)
-            {
-                if (argument.Is<GenericType>())
-                { throw new InternalExceptionWithoutContext($"{argument} is generic"); }
-            }
-
-            Function = OriginalFunction.InstantiateTemplate(typeArguments);
-        }
-
-        public override string ToString() => Function?.ToString() ?? "null";
-    }
-
-    public readonly struct ControlFlowBlock
-    {
-        public int? FlagAddress { get; }
-        public Stack<int> PendingJumps { get; }
-        public Stack<bool> Doings { get; }
-        public ILocated Location { get; }
-
-        public ControlFlowBlock(int? flagAddress, ILocated location)
-        {
-            FlagAddress = flagAddress;
-            PendingJumps = new Stack<int>();
-            Doings = new Stack<bool>();
-
-            PendingJumps.Push(0);
-            Doings.Push(false);
-            Location = location;
-        }
-    }
-
     #region Fields
 
-    readonly ImmutableArray<CompiledStruct> CompiledStructs;
-    readonly ImmutableArray<CompiledFunction> CompiledFunctions;
-    readonly ImmutableArray<CompiledOperator> CompiledOperators;
-    readonly ImmutableArray<CompiledConstructor> CompiledConstructors;
-    readonly ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
-    readonly ImmutableArray<CompiledAlias> CompiledAliases;
+    readonly List<CompiledStruct> CompiledStructs = new();
+    readonly List<CompiledOperator> CompiledOperators = new();
+    readonly List<CompiledConstructor> CompiledConstructors = new();
+    readonly List<CompiledFunction> CompiledFunctions = new();
+    readonly List<CompiledGeneralFunction> CompiledGeneralFunctions = new();
+    readonly List<CompiledAlias> CompiledAliases = new();
 
     readonly Stack<Scope> Scopes = new();
     readonly Stack<CompiledParameter> CompiledParameters;
@@ -71,12 +29,39 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     readonly PrintCallback? Print;
     readonly DiagnosticsCollection Diagnostics;
 
+    public const int InvalidFunctionAddress = int.MinValue;
+
+    readonly ImmutableArray<IExternalFunction> ExternalFunctions;
+
+    public BuiltinType ArrayLengthType => Settings.ArrayLengthType;
+    public BuiltinType BooleanType => Settings.BooleanType;
+    public int PointerSize => Settings.PointerSize;
+    public BuiltinType SizeofStatementType => Settings.SizeofStatementType;
+    public BuiltinType ExitCodeType => Settings.ExitCodeType;
+
+    GeneralType? CurrentReturnType;
+
+    readonly CompilerSettings Settings;
+    readonly List<CompiledFunction2> GeneratedFunctions = new();
+
     public BitWidth PointerBitWidth => (BitWidth)PointerSize;
 
     readonly List<CompliableTemplate<CompiledFunction>> CompilableFunctions = new();
     readonly List<CompliableTemplate<CompiledOperator>> CompilableOperators = new();
     readonly List<CompliableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions = new();
     readonly List<CompliableTemplate<CompiledConstructor>> CompilableConstructors = new();
+
+    readonly List<FunctionDefinition> OperatorDefinitions = new();
+    readonly List<FunctionDefinition> FunctionDefinitions = new();
+    readonly List<StructDefinition> StructDefinitions = new();
+    readonly List<AliasDefinition> AliasDefinitions = new();
+
+    readonly List<(ImmutableArray<Statement> Statements, Uri File)> TopLevelStatements = new();
+
+    readonly Stack<ImmutableArray<Token>> GenericParameters = new();
+    readonly ImmutableArray<UserDefinedAttribute> UserDefinedAttributes;
+    readonly IEnumerable<string> PreprocessorVariables;
+    readonly ImmutableArray<CompiledStatement>.Builder CompiledTopLevelStatements = ImmutableArray.CreateBuilder<CompiledStatement>();
 
     #endregion
 
@@ -1709,16 +1694,38 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
     {
-        if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out _))
-        {
-            // HERE
-            result = new AliasType(alias.Value, alias);
-            return true;
-        }
-
         if (TypeKeywords.BasicTypes.TryGetValue(name.Content, out BasicType builtinType))
         {
             result = new BuiltinType(builtinType);
+            return true;
+        }
+
+        if (TypeArguments.TryGetValue(name.Content, out GeneralType? typeArgument))
+        {
+            result = typeArgument;
+            return true;
+        }
+
+        for (int i = 0; i < GenericParameters.Count; i++)
+        {
+            for (int j = 0; j < GenericParameters[i].Length; j++)
+            {
+                if (GenericParameters[i][j].Content == name.Content)
+                {
+                    GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
+                    result = new GenericType(GenericParameters[i][j], relevantFile);
+                    return true;
+                }
+            }
+        }
+
+        if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out _))
+        {
+            name.AnalyzedType = TokenAnalyzedType.Type;
+            alias.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), relevantFile));
+
+            // HERE
+            result = new AliasType(alias.Value, alias);
             return true;
         }
 
@@ -1731,22 +1738,19 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        if (TypeArguments.TryGetValue(name.Content, out GeneralType? typeArgument))
-        {
-            result = typeArgument;
-            return true;
-        }
-
         if (GetFunction(FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, null, relevantFile), out FunctionQueryResult<CompiledFunction>? function, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.FunctionName;
             function.Function.References.Add(new Reference<StatementWithValue?>(new Identifier(name, relevantFile), relevantFile));
+
             result = new FunctionType(function.Function);
             return true;
         }
 
         if (GetGlobalVariable(name.Content, relevantFile, out CompiledVariableDeclaration? globalVariable, out _))
         {
+            name.AnalyzedType = TokenAnalyzedType.VariableName;
+
             result = globalVariable.Type;
             return true;
         }
@@ -1771,10 +1775,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 case "float": return LiteralType.Float;
                 case "string": return LiteralType.String;
                 default:
-                {
-                    Diagnostics.Add(Diagnostic.Critical($"Invalid literal type \"{literalTypeName}\"", attribute.Parameters[0]));
-                    return default;
-                }
+                    {
+                        Diagnostics.Add(Diagnostic.Critical($"Invalid literal type \"{literalTypeName}\"", attribute.Parameters[0]));
+                        return default;
+                    }
             }
         }
 
@@ -2043,21 +2047,21 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         switch (@operator.Operator.Content)
         {
             case UnaryOperatorCall.LogicalNOT:
-            {
-                result = BooleanType;
-                break;
-            }
+                {
+                    result = BooleanType;
+                    break;
+                }
             case UnaryOperatorCall.BinaryNOT:
-            {
-                result = leftType;
-                break;
-            }
+                {
+                    result = leftType;
+                    break;
+                }
             default:
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
-                result = BuiltinType.Void;
-                break;
-            }
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
+                    result = BuiltinType.Void;
+                    break;
+                }
         }
 
         if (expectedType is not null && expectedType.Is<PointerType>() && result.SameAs(BasicType.I32))
@@ -2369,10 +2373,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             case AnyCall v: return FindStatementType(v);
             case LiteralList v: return FindStatementType(v);
             default:
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Statement \"{statement.GetType().Name}\" does not have a type", statement));
-                return BuiltinType.Void;
-            }
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Statement \"{statement.GetType().Name}\" does not have a type", statement));
+                    return BuiltinType.Void;
+                }
         }
     }
     ImmutableArray<GeneralType> FindStatementTypes(ImmutableArray<StatementWithValue> statements)
@@ -2545,76 +2549,76 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         switch (statement)
         {
             case Block v:
-            {
-                if (InlineMacro(v, parameters, out Block? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out Block? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case KeywordCall v:
-            {
-                inlined = InlineMacro(v, parameters);
-                break;
-            }
+                {
+                    inlined = InlineMacro(v, parameters);
+                    break;
+                }
 
             case StatementWithValue v:
-            {
-                inlined = InlineMacro(v, parameters);
-                return true;
-            }
+                {
+                    inlined = InlineMacro(v, parameters);
+                    return true;
+                }
 
             case ForLoop v:
-            {
-                if (InlineMacro(v, parameters, out ForLoop? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out ForLoop? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case IfContainer v:
-            {
-                if (InlineMacro(v, parameters, out IfContainer? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out IfContainer? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case AnyAssignment v:
-            {
-                if (InlineMacro(v, parameters, out AnyAssignment? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out AnyAssignment? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case VariableDeclaration v:
-            {
-                if (InlineMacro(v, parameters, out VariableDeclaration? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out VariableDeclaration? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             case WhileLoop v:
-            {
-                if (InlineMacro(v, parameters, out WhileLoop? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out WhileLoop? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
 
             default: throw new NotImplementedException(statement.GetType().ToString());
         }
@@ -2749,32 +2753,32 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         switch (statement)
         {
             case Assignment v:
-            {
-                if (InlineMacro(v, parameters, out Assignment? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out Assignment? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             case ShortOperatorCall v:
-            {
-                if (InlineMacro(v, parameters, out ShortOperatorCall? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out ShortOperatorCall? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             case CompoundAssignment v:
-            {
-                if (InlineMacro(v, parameters, out CompoundAssignment? inlined_))
                 {
-                    inlined = inlined_;
-                    return true;
+                    if (InlineMacro(v, parameters, out CompoundAssignment? inlined_))
+                    {
+                        inlined = inlined_;
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             default: throw new UnreachableException();
         }
 
@@ -3688,15 +3692,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         switch (statement.Identifier.Content)
         {
             case StatementKeywords.Return:
-            {
-                if (inDepth) return ControlFlowUsage.ConditionalReturn;
-                else return ControlFlowUsage.Return;
-            }
+                {
+                    if (inDepth) return ControlFlowUsage.ConditionalReturn;
+                    else return ControlFlowUsage.Return;
+                }
 
             case StatementKeywords.Break:
-            {
-                return ControlFlowUsage.Break;
-            }
+                {
+                    return ControlFlowUsage.Break;
+                }
 
             case StatementKeywords.Delete:
             case StatementKeywords.Crash:
@@ -3981,23 +3985,23 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         switch (op)
         {
             case "&&":
-            {
-                if (!(bool)leftValue)
                 {
-                    value = new CompiledValue(false);
-                    return true;
+                    if (!(bool)leftValue)
+                    {
+                        value = new CompiledValue(false);
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             case "||":
-            {
-                if ((bool)leftValue)
                 {
-                    value = new CompiledValue(true);
-                    return true;
+                    if ((bool)leftValue)
+                    {
+                        value = new CompiledValue(true);
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             default:
                 if (context is not null &&
                     context.TryGetValue(@operator, out value))
@@ -4318,23 +4322,23 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         switch (op)
         {
             case "&&":
-            {
-                if (!leftValue)
                 {
-                    value = new CompiledValue(false);
-                    return true;
+                    if (!leftValue)
+                    {
+                        value = new CompiledValue(false);
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             case "||":
-            {
-                if (leftValue)
                 {
-                    value = new CompiledValue(true);
-                    return true;
+                    if (leftValue)
+                    {
+                        value = new CompiledValue(true);
+                        return true;
+                    }
+                    break;
                 }
-                break;
-            }
             default:
                 value = CompiledValue.Null;
                 return false;
@@ -4564,40 +4568,40 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             switch (_branch)
             {
                 case IfBranch branch:
-                {
-                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
-                    { return false; }
+                    {
+                        if (!TryCompute(branch.Condition, context, out CompiledValue condition))
+                        { return false; }
 
-                    if (!condition)
-                    { continue; }
+                        if (!condition)
+                        { continue; }
 
-                    if (!TryEvaluate(branch.Block, context))
-                    { return false; }
+                        if (!TryEvaluate(branch.Block, context))
+                        { return false; }
 
-                    return true;
-                }
+                        return true;
+                    }
 
                 case ElseIfBranch branch:
-                {
-                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
-                    { return false; }
+                    {
+                        if (!TryCompute(branch.Condition, context, out CompiledValue condition))
+                        { return false; }
 
-                    if (!condition)
-                    { continue; }
+                        if (!condition)
+                        { continue; }
 
-                    if (!TryEvaluate(branch.Block, context))
-                    { return false; }
+                        if (!TryEvaluate(branch.Block, context))
+                        { return false; }
 
-                    return true;
-                }
+                        return true;
+                    }
 
                 case ElseBranch branch:
-                {
-                    if (!TryEvaluate(branch.Block, context))
-                    { return false; }
+                    {
+                        if (!TryEvaluate(branch.Block, context))
+                        { return false; }
 
-                    return true;
-                }
+                        return true;
+                    }
 
                 default: throw new UnreachableException();
             }

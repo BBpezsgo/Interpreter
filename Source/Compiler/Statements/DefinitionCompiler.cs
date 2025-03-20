@@ -1,94 +1,13 @@
-﻿using LanguageCore.Parser;
+
+using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Compiler;
 
-public sealed class Compiler
+public partial class StatementCompiler
 {
-    readonly List<CompiledStruct> CompiledStructs = new();
-    readonly List<CompiledOperator> CompiledOperators = new();
-    readonly List<CompiledConstructor> CompiledConstructors = new();
-    readonly List<CompiledFunction> CompiledFunctions = new();
-    readonly List<CompiledGeneralFunction> CompiledGeneralFunctions = new();
-    readonly List<CompiledAlias> CompiledAliases = new();
-
-    readonly List<FunctionDefinition> Operators = new();
-    readonly List<FunctionDefinition> Functions = new();
-    readonly List<StructDefinition> Structs = new();
-    readonly List<AliasDefinition> AliasDefinitions = new();
-
-    readonly List<(ImmutableArray<Statement> Statements, Uri File)> TopLevelStatements = new();
-
-    readonly Stack<ImmutableArray<Token>> GenericParameters = new();
-
-    readonly CompilerSettings Settings;
-    readonly ImmutableArray<IExternalFunction> ExternalFunctions;
-    readonly ImmutableArray<UserDefinedAttribute> UserDefinedAttributes;
-
-    readonly DiagnosticsCollection Diagnostics;
-    readonly IEnumerable<string> PreprocessorVariables;
-
-    Compiler(CompilerSettings settings, DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
-    {
-        ExternalFunctions = settings.ExternalFunctions;
-        Settings = settings;
-        Diagnostics = diagnostics;
-        PreprocessorVariables = preprocessorVariables;
-        UserDefinedAttributes = (userDefinedAttributes ?? Enumerable.Empty<UserDefinedAttribute>()).ToImmutableArray();
-    }
-
-    bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
-    {
-        if (StatementCompiler.GetAlias(CompiledAliases, name.Content, relevantFile, out CompiledAlias? alias, out _))
-        {
-            // HERE
-            result = new AliasType(alias.Value, alias);
-            return true;
-        }
-
-        if (StatementCompiler.GetStruct(CompiledStructs, name.Content, relevantFile, out CompiledStruct? @struct, out _))
-        {
-            result = new StructType(@struct, relevantFile);
-            return true;
-        }
-
-        for (int i = 0; i < GenericParameters.Count; i++)
-        {
-            for (int j = 0; j < GenericParameters[i].Length; j++)
-            {
-                if (GenericParameters[i][j].Content == name.Content)
-                {
-                    GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
-                    result = new GenericType(GenericParameters[i][j], relevantFile);
-                    return true;
-                }
-            }
-        }
-
-        if (StatementCompiler.GetFunction<CompiledFunction, Token, string, GeneralType>(
-            new StatementCompiler.Functions<CompiledFunction>()
-            {
-                Compiled = CompiledFunctions,
-                Compilable = Enumerable.Empty<StatementCompiler.CompliableTemplate<CompiledFunction>>(),
-            },
-            "function",
-            null,
-
-            StatementCompiler.FunctionQuery.Create<CompiledFunction, string, GeneralType>(name.Content, null, (v, _) => v, relevantFile),
-            out StatementCompiler.FunctionQueryResult<CompiledFunction>? result_,
-            out _
-        ))
-        {
-            result = new FunctionType(result_.Function);
-            return true;
-        }
-
-        result = null;
-        return false;
-    }
-
     CompiledStruct CompileStructNoFields(StructDefinition @struct)
     {
         if (LanguageConstants.KeywordList.Contains(@struct.Identifier.Content))
@@ -110,6 +29,30 @@ public sealed class Compiler
         return new CompiledStruct(@struct.Fields.Select(v => new CompiledField(BuiltinType.Any, null!, v)), @struct);
     }
 
+    void CompileStructFields(CompiledStruct @struct)
+    {
+        if (@struct.Template is not null)
+        {
+            GenericParameters.Push(@struct.Template.Parameters);
+            foreach (Token typeParameter in @struct.Template.Parameters)
+            { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
+        }
+
+        CompiledField[] compiledFields = new CompiledField[@struct.Fields.Length];
+
+        for (int i = 0; i < @struct.Fields.Length; i++)
+        {
+            FieldDefinition field = @struct.Fields[i];
+
+            compiledFields[i] = new CompiledField(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field);
+        }
+
+        if (@struct.Template is not null)
+        { GenericParameters.Pop(); }
+
+        @struct.SetFields(compiledFields);
+    }
+
     void CompileFunctionAttributes(FunctionThingDefinition function)
     {
         GeneralType? type = null;
@@ -125,105 +68,105 @@ public sealed class Compiler
             switch (attribute.Identifier.Content)
             {
                 case AttributeConstants.ExternalIdentifier:
-                {
-                    if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                        if (attribute.Parameters.Length != 1)
+                        {
+                            Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                            break;
+                        }
+
+                        if (attribute.Parameters[0].Type != LiteralType.String)
+                        {
+                            Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
+                            break;
+                        }
+
+                        string externalName = attribute.Parameters[0].Value;
+
+                        if (!ExternalFunctions.TryGet(externalName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
+                        {
+                            Diagnostics.Add(exception.ToWarning(attribute, function.File));
+                            break;
+                        }
+
+                        // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
+
                         break;
                     }
-
-                    if (attribute.Parameters[0].Type != LiteralType.String)
-                    {
-                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
-                        break;
-                    }
-
-                    string externalName = attribute.Parameters[0].Value;
-
-                    if (!ExternalFunctions.TryGet(externalName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
-                    {
-                        Diagnostics.Add(exception.ToWarning(attribute, function.File));
-                        break;
-                    }
-
-                    // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
-
-                    break;
-                }
                 case AttributeConstants.BuiltinIdentifier:
-                {
-                    if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                        if (attribute.Parameters.Length != 1)
+                        {
+                            Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                            break;
+                        }
+
+                        if (attribute.Parameters[0].Type != LiteralType.String)
+                        {
+                            Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
+                            break;
+                        }
+
+                        string builtinName = attribute.Parameters[0].Value;
+
+                        if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out BuiltinFunction? builtinFunction))
+                        {
+                            Diagnostics.Add(Diagnostic.Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
+                            break;
+                        }
+
+                        if (builtinFunction.Parameters.Length != function.Parameters.Count)
+                        {
+                            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File));
+                        }
+
+                        if (type is null)
+                        {
+                            Diagnostics.Add(Diagnostic.Critical($"Can't use attribute \"{attribute.Identifier}\" on this function because its aint have a return type", typeInstance, function.File));
+                            continue;
+                        }
+
+                        if (!builtinFunction.Type.Invoke(type))
+                        {
+                            Diagnostics.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", typeInstance, function.File));
+                        }
+
+                        for (int i = 0; i < builtinFunction.Parameters.Length; i++)
+                        {
+                            if (i >= function.Parameters.Count) break;
+
+                            Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
+                            GeneralType passedParameterType = parameterTypes[i];
+                            function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
+
+                            if (definedParameterType.Invoke(passedParameterType))
+                            { continue; }
+
+                            Diagnostics.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: \"{definedParameterType}\" Passed: \"{passedParameterType}\"", function.Parameters[i].Type, function.Parameters[i].File));
+                        }
                         break;
                     }
-
-                    if (attribute.Parameters[0].Type != LiteralType.String)
-                    {
-                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
-                        break;
-                    }
-
-                    string builtinName = attribute.Parameters[0].Value;
-
-                    if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out BuiltinFunction? builtinFunction))
-                    {
-                        Diagnostics.Add(Diagnostic.Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
-                        break;
-                    }
-
-                    if (builtinFunction.Parameters.Length != function.Parameters.Count)
-                    {
-                        Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File));
-                    }
-
-                    if (type is null)
-                    {
-                        Diagnostics.Add(Diagnostic.Critical($"Can't use attribute \"{attribute.Identifier}\" on this function because its aint have a return type", typeInstance, function.File));
-                        continue;
-                    }
-
-                    if (!builtinFunction.Type.Invoke(type))
-                    {
-                        Diagnostics.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", typeInstance, function.File));
-                    }
-
-                    for (int i = 0; i < builtinFunction.Parameters.Length; i++)
-                    {
-                        if (i >= function.Parameters.Count) break;
-
-                        Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
-                        GeneralType passedParameterType = parameterTypes[i];
-                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
-
-                        if (definedParameterType.Invoke(passedParameterType))
-                        { continue; }
-
-                        Diagnostics.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: \"{definedParameterType}\" Passed: \"{passedParameterType}\"", function.Parameters[i].Type, function.Parameters[i].File));
-                    }
-                    break;
-                }
                 case AttributeConstants.ExposeIdentifier:
-                {
-                    if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                        if (attribute.Parameters.Length != 1)
+                        {
+                            Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                            break;
+                        }
+
+                        if (attribute.Parameters[0].Type != LiteralType.String)
+                        {
+                            Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
+                            break;
+                        }
+
                         break;
                     }
-
-                    if (attribute.Parameters[0].Type != LiteralType.String)
-                    {
-                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
-                        break;
-                    }
-
-                    break;
-                }
                 default:
-                {
-                    CompileUserAttribute(function, attribute);
-                    break;
-                }
+                    {
+                        CompileUserAttribute(function, attribute);
+                        break;
+                    }
             }
         }
     }
@@ -261,30 +204,6 @@ public sealed class Compiler
         }
     }
 
-    void CompileStructFields(CompiledStruct @struct)
-    {
-        if (@struct.Template is not null)
-        {
-            GenericParameters.Push(@struct.Template.Parameters);
-            foreach (Token typeParameter in @struct.Template.Parameters)
-            { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
-        }
-
-        CompiledField[] compiledFields = new CompiledField[@struct.Fields.Length];
-
-        for (int i = 0; i < @struct.Fields.Length; i++)
-        {
-            FieldDefinition field = @struct.Fields[i];
-
-            compiledFields[i] = new CompiledField(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field);
-        }
-
-        if (@struct.Template is not null)
-        { GenericParameters.Pop(); }
-
-        @struct.SetFields(compiledFields);
-    }
-
     public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, IExternalFunction externalFunction, DiagnosticsCollection diagnostics)
         where TFunction : FunctionThingDefinition, ICompiledFunction
         => CheckExternalFunctionDeclaration(runtime, definition, externalFunction, definition.Type, definition.ParameterTypes, diagnostics);
@@ -304,7 +223,7 @@ public sealed class Compiler
         }
     }
 
-    CompiledFunction CompileFunction(FunctionDefinition function, CompiledStruct? context)
+    CompiledFunction CompileFunctionDefinition(FunctionDefinition function, CompiledStruct? context)
     {
         if (function.Template is not null)
         {
@@ -324,7 +243,8 @@ public sealed class Compiler
             type,
             parameterTypes,
             context,
-            function);
+            function
+        );
 
         if (function.Template is not null)
         { GenericParameters.Pop(); }
@@ -332,7 +252,7 @@ public sealed class Compiler
         return result;
     }
 
-    CompiledOperator CompileOperator(FunctionDefinition function, CompiledStruct? context)
+    CompiledOperator CompileOperatorDefinition(FunctionDefinition function, CompiledStruct? context)
     {
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
@@ -345,10 +265,11 @@ public sealed class Compiler
             type,
             parameterTypes,
             context,
-            function);
+            function
+        );
     }
 
-    CompiledGeneralFunction CompileGeneralFunction(GeneralFunctionDefinition function, GeneralType returnType, CompiledStruct context)
+    CompiledGeneralFunction CompileGeneralFunctionDefinition(GeneralFunctionDefinition function, GeneralType returnType, CompiledStruct context)
     {
         CompileFunctionAttributes(function);
 
@@ -357,10 +278,10 @@ public sealed class Compiler
             GeneralType.FromArray(function.Parameters, FindType),
             context,
             function
-            );
+        );
     }
 
-    CompiledConstructor CompileConstructor(ConstructorDefinition function, CompiledStruct context)
+    CompiledConstructor CompileConstructorDefinition(ConstructorDefinition function, CompiledStruct context)
     {
         if (function.Template is not null)
         {
@@ -391,48 +312,13 @@ public sealed class Compiler
         if (addTopLevelStatements)
         { TopLevelStatements.Add((collectedAST.AST.TopLevelStatements, collectedAST.File)); }
 
-        Functions.AddRange(collectedAST.AST.Functions);
-        Operators.AddRange(collectedAST.AST.Operators);
-        Structs.AddRange(collectedAST.AST.Structs);
+        FunctionDefinitions.AddRange(collectedAST.AST.Functions);
+        OperatorDefinitions.AddRange(collectedAST.AST.Operators);
+        StructDefinitions.AddRange(collectedAST.AST.Structs);
         AliasDefinitions.AddRange(collectedAST.AST.AliasDefinitions);
     }
 
-    CompilerResult2 CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
-    {
-        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, Settings.BasePath, Diagnostics, PreprocessorVariables, fileParser, additionalImports);
-
-        foreach (ParsedFile parsedFile in parsedFiles)
-        { AddAST(parsedFile, parsedFile.File != file); }
-
-        foreach (ParsedFile parsedFile in parsedFiles)
-        {
-            if (parsedFile.File != file) continue;
-            TopLevelStatements.Add((parsedFile.AST.TopLevelStatements, parsedFile.File));
-        }
-
-        return CompileInternal(file, parsedFiles);
-    }
-
-    CompilerResult2 CompileInteractiveInternal(Statement statement, Uri file)
-    {
-        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(
-            null,
-            Settings.BasePath,
-            Diagnostics,
-            PreprocessorVariables,
-            null,
-            new string[] { "Primitives", "System" }
-        );
-
-        foreach (ParsedFile parsedFile in parsedFiles)
-        { AddAST(parsedFile); }
-
-        TopLevelStatements.Add((ImmutableArray.Create(statement), file));
-
-        return CompileInternal(file, parsedFiles);
-    }
-
-    CompilerResult2 CompileInternal(Uri file, ImmutableArray<ParsedFile> parsedFiles)
+    void CompileDefinitions(Uri file, ImmutableArray<ParsedFile> parsedFiles)
     {
         static bool ThingEquality<TThing1, TThing2>(TThing1 a, TThing2 b)
             where TThing1 : IIdentifiable<Token>, IInFile
@@ -486,7 +372,7 @@ public sealed class Compiler
         // First compile the structs without fields
         // so it can reference other structs that are
         // not compiled but will be.
-        foreach (StructDefinition @struct in Structs)
+        foreach (StructDefinition @struct in StructDefinitions)
         {
             if (IsThingExists(@struct))
             {
@@ -520,9 +406,9 @@ public sealed class Compiler
             }
         }
 
-        foreach (FunctionDefinition @operator in Operators)
+        foreach (FunctionDefinition @operator in OperatorDefinitions)
         {
-            CompiledOperator compiled = CompileOperator(@operator, null);
+            CompiledOperator compiled = CompileOperatorDefinition(@operator, null);
 
             if (CompiledOperators.Any(other => FunctionEquality(compiled, other)))
             {
@@ -533,9 +419,9 @@ public sealed class Compiler
             CompiledOperators.Add(compiled);
         }
 
-        foreach (FunctionDefinition function in Functions)
+        foreach (FunctionDefinition function in FunctionDefinitions)
         {
-            CompiledFunction compiled = CompileFunction(function, null);
+            CompiledFunction compiled = CompileFunctionDefinition(function, null);
 
             if (CompiledFunctions.Any(other => FunctionEquality(compiled, other)))
             {
@@ -590,7 +476,7 @@ public sealed class Compiler
 
                     returnType = BuiltinType.Void;
 
-                    CompiledGeneralFunction methodWithRef = CompileGeneralFunction(copy, returnType, compiledStruct);
+                    CompiledGeneralFunction methodWithRef = CompileGeneralFunctionDefinition(copy, returnType, compiledStruct);
 
                     parameters = method.Parameters.ToList();
                     parameters.Insert(0, new ParameterDefinition(
@@ -610,7 +496,7 @@ public sealed class Compiler
                         Block = method.Block,
                     };
 
-                    CompiledGeneralFunction methodWithPointer = CompileGeneralFunction(copy, returnType, compiledStruct);
+                    CompiledGeneralFunction methodWithPointer = CompileGeneralFunctionDefinition(copy, returnType, compiledStruct);
 
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
                     {
@@ -631,7 +517,7 @@ public sealed class Compiler
                 {
                     List<ParameterDefinition> parameters = method.Parameters.ToList();
 
-                    CompiledGeneralFunction methodWithRef = CompileGeneralFunction(method, returnType, compiledStruct);
+                    CompiledGeneralFunction methodWithRef = CompileGeneralFunctionDefinition(method, returnType, compiledStruct);
 
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
                     {
@@ -673,7 +559,7 @@ public sealed class Compiler
                     Block = method.Block,
                 };
 
-                CompiledFunction methodWithPointer = CompileFunction(copy, compiledStruct);
+                CompiledFunction methodWithPointer = CompileFunctionDefinition(copy, compiledStruct);
 
                 if (CompiledFunctions.Any(methodWithPointer.IsSame))
                 {
@@ -714,7 +600,7 @@ public sealed class Compiler
                     Context = constructor.Context,
                 };
 
-                CompiledConstructor compiledConstructor = CompileConstructor(constructorWithThisParameter, compiledStruct);
+                CompiledConstructor compiledConstructor = CompileConstructorDefinition(constructorWithThisParameter, compiledStruct);
 
                 if (CompiledConstructors.Any(compiledConstructor.IsSame))
                 {
@@ -728,22 +614,70 @@ public sealed class Compiler
             if (compiledStruct.Template is not null)
             { GenericParameters.Pop(); }
         }
-
-        return StatementCompiler.Compile(new CompilerResult(
-            parsedFiles,
-            CompiledFunctions,
-            CompiledGeneralFunctions,
-            CompiledOperators,
-            CompiledConstructors,
-            CompiledAliases,
-            ExternalFunctions,
-            CompiledStructs,
-            TopLevelStatements,
-            file,
-            false), Settings, null, Diagnostics);
     }
 
-    public static CompilerResult2 CompileFile(
+    CompilerResult CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
+    {
+        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, Settings.BasePath, Diagnostics, PreprocessorVariables, fileParser, additionalImports);
+
+        foreach (ParsedFile parsedFile in parsedFiles)
+        { AddAST(parsedFile, parsedFile.File != file); }
+
+        foreach (ParsedFile parsedFile in parsedFiles)
+        {
+            if (parsedFile.File != file) continue;
+            TopLevelStatements.Add((parsedFile.AST.TopLevelStatements, parsedFile.File));
+        }
+
+        return CompileInternal(file, parsedFiles);
+    }
+
+    CompilerResult CompileInteractiveInternal(Statement statement, Uri file)
+    {
+        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(
+            null,
+            Settings.BasePath,
+            Diagnostics,
+            PreprocessorVariables,
+            null,
+            new string[] { "Primitives", "System" }
+        );
+
+        foreach (ParsedFile parsedFile in parsedFiles)
+        { AddAST(parsedFile); }
+
+        TopLevelStatements.Add((ImmutableArray.Create(statement), file));
+
+        return CompileInternal(file, parsedFiles);
+    }
+
+    CompilerResult CompileInternal(Uri file, ImmutableArray<ParsedFile> parsedFiles)
+    {
+        CompileDefinitions(file, parsedFiles);
+
+        GenerateCode(
+            parsedFiles,
+            file
+        );
+
+        return new CompilerResult(
+            parsedFiles,
+            CompiledFunctions.ToImmutableArray(),
+            CompiledGeneralFunctions.ToImmutableArray(),
+            CompiledOperators.ToImmutableArray(),
+            CompiledConstructors.ToImmutableArray(),
+            CompiledAliases.ToImmutableArray(),
+            ExternalFunctions,
+            CompiledStructs.ToImmutableArray(),
+            TopLevelStatements,
+            file,
+            false,
+            CompiledTopLevelStatements.ToImmutable(),
+            GeneratedFunctions.ToImmutableArray()
+        );
+    }
+
+    public static CompilerResult CompileFile(
         Uri file,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
@@ -752,15 +686,11 @@ public sealed class Compiler
         IEnumerable<string>? additionalImports = null,
         IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
     {
-        Compiler compiler = new(
-            settings,
-            diagnostics,
-            preprocessorVariables,
-            userDefinedAttributes);
+        StatementCompiler compiler = new(settings, diagnostics, null, preprocessorVariables, userDefinedAttributes);
         return compiler.CompileMainFile(file, fileParser, additionalImports);
     }
 
-    public static CompilerResult2 CompileInteractive(
+    public static CompilerResult CompileInteractive(
         Statement statement,
         CompilerSettings settings,
         IEnumerable<string> preprocessorVariables,
@@ -768,11 +698,7 @@ public sealed class Compiler
         Uri file,
         IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
     {
-        Compiler compiler = new(
-            settings,
-            diagnostics,
-            preprocessorVariables,
-            userDefinedAttributes);
+        StatementCompiler compiler = new(settings, diagnostics, null, preprocessorVariables, userDefinedAttributes);
         return compiler.CompileInteractiveInternal(statement, file);
     }
 }

@@ -292,10 +292,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     static readonly BuiltinType ExitCodeType = BuiltinType.U8;
 
+    ImmutableDictionary<ICompiledFunction, CompiledStatement> FunctionBodies;
+
     #endregion
 
     public CodeGeneratorForBrainfuck(
-        CompilerResult2 compilerResult,
+        CompilerResult compilerResult,
         BrainfuckGeneratorSettings brainfuckSettings,
         DiagnosticsCollection diagnostics,
         PrintCallback? print) : base(compilerResult, diagnostics, print)
@@ -318,6 +320,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         DebugInfo = brainfuckSettings.GenerateDebugInformation ? new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.File, v.Tokens.Tokens))) : null;
         MaxRecursiveDepth = 4;
         Settings = brainfuckSettings;
+
+        FunctionBodies = compilerResult.Functions2.Select(v => new KeyValuePair<ICompiledFunction, CompiledStatement>(v.Function, v.Body)).ToImmutableDictionary();
     }
 
     GeneratorSnapshot Snapshot() => new(this);
@@ -405,12 +409,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             case CompiledParameterGetter identifier: return TryGetAddress(identifier, out address, out size);
             case CompiledFieldGetter field: return TryGetAddress(field, out address, out size);
             default:
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Unknown statement \"{statement.GetType().Name}\"", statement));
-                address = default;
-                size = default;
-                return false;
-            }
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Unknown statement \"{statement.GetType().Name}\"", statement));
+                    address = default;
+                    size = default;
+                    return false;
+                }
         }
     }
     bool TryGetAddress(CompiledIndexGetter index, [NotNullWhen(true)] out Address? address, out int size)
@@ -771,48 +775,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         Code.SetPointer(0);
     }
 
-    ImmutableDictionary<ICompiledFunction, CompiledStatement> FunctionBodies = ImmutableDictionary<ICompiledFunction, CompiledStatement>.Empty;
-
-    BrainfuckGeneratorResult GenerateCode(CompilerResult2 compilerResult)
+    BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
     {
         Print?.Invoke("Generating code ...", LogType.Debug);
         Print?.Invoke("  Precompiling ...", LogType.Debug);
-
-        CompilerResult2 res = compilerResult;
-
-        {
-            FunctionBodies = res.Functions2.Select(v => new KeyValuePair<ICompiledFunction, CompiledStatement>(v.Function, v.Body)).ToImmutableDictionary();
-            ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
-            ImmutableArray<CompiledOperator>.Builder compiledOperators = ImmutableArray.CreateBuilder<CompiledOperator>();
-            ImmutableArray<CompiledGeneralFunction>.Builder compiledGeneralFunctions = ImmutableArray.CreateBuilder<CompiledGeneralFunction>();
-            ImmutableArray<CompiledConstructor>.Builder compiledConstructors = ImmutableArray.CreateBuilder<CompiledConstructor>();
-
-            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions2)
-            {
-                switch (function)
-                {
-                    case CompiledFunction compiledFunction:
-                        compiledFunctions.Add(compiledFunction);
-                        break;
-                    case CompiledOperator compiledOperator:
-                        compiledOperators.Add(compiledOperator);
-                        break;
-                    case CompiledGeneralFunction compiledGeneralFunction:
-                        compiledGeneralFunctions.Add(compiledGeneralFunction);
-                        break;
-                    case CompiledConstructor compiledConstructor:
-                        compiledConstructors.Add(compiledConstructor);
-                        break;
-                    default:
-                        throw new NotImplementedException();
-                }
-            }
-
-            CompiledFunctions = compiledFunctions.ToImmutable();
-            CompiledOperators = compiledOperators.ToImmutable();
-            CompiledGeneralFunctions = compiledGeneralFunctions.ToImmutable();
-            CompiledConstructors = compiledConstructors.ToImmutable();
-        }
 
         VariableDeclaration implicitReturnValueVariable = new(
             Enumerable.Empty<Tokenizing.Token>(),
@@ -843,7 +809,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         //     .Where(v => v is not null)
         //     .Where(v => !v!.Modifiers.Contains(ModifierKeywords.Const))!;
 
-        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = res.Statements2.OfType<CompiledVariableDeclaration>();
+        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = compilerResult.CompiledStatements.OfType<CompiledVariableDeclaration>();
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(globalVariableDeclarations, false)); }
@@ -856,7 +822,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         //     GenerateTopLevelStatements(statements, file);
         // }
 
-        GenerateTopLevelStatements(res.Statements2);
+        GenerateTopLevelStatements(compilerResult.CompiledStatements);
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { CleanupVariables(VariableCleanupStack.Pop()); }
@@ -887,7 +853,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     }
 
     public static BrainfuckGeneratorResult Generate(
-        CompilerResult2 compilerResult,
+        CompilerResult compilerResult,
         BrainfuckGeneratorSettings brainfuckSettings,
         PrintCallback? printCallback,
         DiagnosticsCollection diagnostics)

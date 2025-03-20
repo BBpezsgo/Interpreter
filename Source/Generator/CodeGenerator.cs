@@ -76,7 +76,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     #endregion
 
-    protected CodeGenerator(CompilerResult2 compilerResult, DiagnosticsCollection diagnostics, PrintCallback? print)
+    protected CodeGenerator(CompilerResult compilerResult, DiagnosticsCollection diagnostics, PrintCallback? print)
     {
         CompiledParameters = new Stack<CompiledParameter>();
         CompiledLocalVariables = new Stack<CompiledVariableDeclaration>();
@@ -87,14 +87,41 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         TypeArguments = new Dictionary<string, GeneralType>();
 
         CompiledStructs = compilerResult.Structs;
-        CompiledFunctions = compilerResult.Functions;
-        CompiledOperators = compilerResult.Operators;
-        CompiledConstructors = compilerResult.Constructors;
-        CompiledGeneralFunctions = compilerResult.GeneralFunctions;
         CompiledAliases = compilerResult.Aliases;
 
         Diagnostics = diagnostics;
         Print = print;
+
+        ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
+        ImmutableArray<CompiledOperator>.Builder compiledOperators = ImmutableArray.CreateBuilder<CompiledOperator>();
+        ImmutableArray<CompiledGeneralFunction>.Builder compiledGeneralFunctions = ImmutableArray.CreateBuilder<CompiledGeneralFunction>();
+        ImmutableArray<CompiledConstructor>.Builder compiledConstructors = ImmutableArray.CreateBuilder<CompiledConstructor>();
+
+        foreach ((ICompiledFunction function, CompiledStatement _) in compilerResult.Functions2)
+        {
+            switch (function)
+            {
+                case CompiledFunction compiledFunction:
+                    compiledFunctions.Add(compiledFunction);
+                    break;
+                case CompiledOperator compiledOperator:
+                    compiledOperators.Add(compiledOperator);
+                    break;
+                case CompiledGeneralFunction compiledGeneralFunction:
+                    compiledGeneralFunctions.Add(compiledGeneralFunction);
+                    break;
+                case CompiledConstructor compiledConstructor:
+                    compiledConstructors.Add(compiledConstructor);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        CompiledFunctions = compiledFunctions.ToImmutable();
+        CompiledOperators = compiledOperators.ToImmutable();
+        CompiledGeneralFunctions = compiledGeneralFunctions.ToImmutable();
+        CompiledConstructors = compiledConstructors.ToImmutable();
     }
 
     #region SetTypeArguments()

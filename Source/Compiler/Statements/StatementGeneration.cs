@@ -540,7 +540,7 @@ public partial class StatementCompiler
         where TFunction : FunctionThingDefinition, ICompiledFunction, ISimpleReadable
     {
         compiledStatement = null;
-        Compiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction, Diagnostics);
+        StatementCompiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction, Diagnostics);
 
         if (!GenerateCodeForArguments(parameters, compiledFunction, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
@@ -3051,7 +3051,7 @@ public partial class StatementCompiler
 
     #endregion
 
-    CompilerResult2 GenerateCode(CompilerResult compilerResult)
+    void GenerateCode(ImmutableArray<ParsedFile> parsedFiles, Uri file)
     {
         List<string> usedExternalFunctions = new();
 
@@ -3067,7 +3067,7 @@ public partial class StatementCompiler
             { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
         }
 
-        foreach (Statement? item in compilerResult.TopLevelStatements.SelectMany(v => v.Statements))
+        foreach (Statement? item in TopLevelStatements.SelectMany(v => v.Statements))
         {
             if (item is VariableDeclaration variableDeclaration)
             {
@@ -3086,11 +3086,10 @@ public partial class StatementCompiler
             }
         }
 
-        ImmutableArray<CompiledStatement>.Builder compiledTopLevelStatements = ImmutableArray.CreateBuilder<CompiledStatement>();
-        foreach ((ImmutableArray<Statement> Statements, Uri File) item in compilerResult.TopLevelStatements)
+        foreach ((ImmutableArray<Statement> Statements, Uri File) item in TopLevelStatements)
         {
             if (!GenerateCodeForTopLevelStatements(item.Statements, out ImmutableArray<CompiledStatement> v)) continue;
-            compiledTopLevelStatements.AddRange(v);
+            CompiledTopLevelStatements.AddRange(v);
         }
 
         while (true)
@@ -3140,21 +3139,5 @@ public partial class StatementCompiler
             item.InstructionLabel.Getters.Add(item);
         }
         */
-
-        return new CompilerResult2(
-            compilerResult.Raw,
-            compilerResult.Functions,
-            compilerResult.GeneralFunctions,
-            compilerResult.Operators,
-            compilerResult.Constructors,
-            compilerResult.Aliases,
-            compilerResult.ExternalFunctions,
-            compilerResult.Structs,
-            compilerResult.TopLevelStatements,
-            compilerResult.File,
-            compilerResult.IsInteractive,
-            compiledTopLevelStatements.ToImmutable(),
-            GeneratedFunctions.ToImmutableArray()
-        );
     }
 }

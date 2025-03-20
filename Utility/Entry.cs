@@ -110,7 +110,7 @@ public static class Entry
 
                 if (arguments.ThrowErrors)
                 {
-                    CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
+                    CompilerResult compiled = Compiler.StatementCompiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Print();
                     diagnostics.Throw();
@@ -119,7 +119,7 @@ public static class Entry
                 {
                     try
                     {
-                        CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
+                        CompilerResult compiled = Compiler.StatementCompiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
                         generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                         diagnostics.Print();
                         if (diagnostics.HasErrors) return 1;
@@ -366,7 +366,7 @@ public static class Entry
                 if (arguments.ThrowErrors)
                 {
                     tokens = AnyTokenizer.Tokenize(arguments.Source, diagnostics, PreprocessorVariables.Brainfuck).Tokens;
-                    CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Brainfuck, diagnostics, null, additionalImports);
+                    CompilerResult compiled = Compiler.StatementCompiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Brainfuck, diagnostics, null, additionalImports);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Throw();
                     diagnostics.Print();
@@ -379,7 +379,7 @@ public static class Entry
                     try
                     {
                         tokens = AnyTokenizer.Tokenize(arguments.Source, diagnostics, PreprocessorVariables.Brainfuck).Tokens;
-                        CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Brainfuck, diagnostics, null, additionalImports);
+                        CompilerResult compiled = Compiler.StatementCompiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Brainfuck, diagnostics, null, additionalImports);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                         diagnostics.Throw();
                         diagnostics.Print();
@@ -634,7 +634,7 @@ public static class Entry
 
                 if (arguments.ThrowErrors)
                 {
-                    CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
+                    CompilerResult compiled = Compiler.StatementCompiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Throw();
                     diagnostics.Print();
@@ -643,7 +643,7 @@ public static class Entry
                 {
                     try
                     {
-                        CompilerResult2 compiled = Compiler.Compiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
+                        CompilerResult compiled = Compiler.StatementCompiler.CompileFile(arguments.Source, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
                         generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                         diagnostics.Throw();
                         diagnostics.Print();

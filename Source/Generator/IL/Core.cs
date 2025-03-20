@@ -21,11 +21,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public override BuiltinType SizeofStatementType => BuiltinType.I32;
     public override BuiltinType ArrayLengthType => BuiltinType.I32;
 
-    public CodeGeneratorForMain(CompilerResult2 compilerResult, DiagnosticsCollection diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
+    public CodeGeneratorForMain(CompilerResult compilerResult, DiagnosticsCollection diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
     { }
 
     public static Func<int> Generate(
-        CompilerResult2 compilerResult,
+        CompilerResult compilerResult,
         PrintCallback? printCallback,
         DiagnosticsCollection diagnostics)
     {

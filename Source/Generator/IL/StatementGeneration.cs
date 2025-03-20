@@ -841,9 +841,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Locals.Clear();
     }
 
-    Func<int> GenerateCode(CompilerResult2 compilerResult)
+    Func<int> GenerateCode(CompilerResult compilerResult)
     {
-        CompilerResult2 res = compilerResult;
+        CompilerResult res = compilerResult;
 
         {
             ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
@@ -901,7 +901,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        Func<int> result = GenerateCodeForTopLevelStatements(res.Statements2);
+        Func<int> result = GenerateCodeForTopLevelStatements(res.CompiledStatements);
 
         foreach ((ICompiledFunction function, CompiledBlock body) in res.Functions2)
         {

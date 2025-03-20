@@ -2238,43 +2238,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #endregion
 
-    BBLangGeneratorResult GenerateCode(CompilerResult2 compilerResult, MainGeneratorSettings settings)
+    BBLangGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
     {
-        CompilerResult2 res = compilerResult;
-
-        {
-            ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
-            ImmutableArray<CompiledOperator>.Builder compiledOperators = ImmutableArray.CreateBuilder<CompiledOperator>();
-            ImmutableArray<CompiledGeneralFunction>.Builder compiledGeneralFunctions = ImmutableArray.CreateBuilder<CompiledGeneralFunction>();
-            ImmutableArray<CompiledConstructor>.Builder compiledConstructors = ImmutableArray.CreateBuilder<CompiledConstructor>();
-
-            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions2)
-            {
-                switch (function)
-                {
-                    case CompiledFunction compiledFunction:
-                        compiledFunctions.Add(compiledFunction);
-                        break;
-                    case CompiledOperator compiledOperator:
-                        compiledOperators.Add(compiledOperator);
-                        break;
-                    case CompiledGeneralFunction compiledGeneralFunction:
-                        compiledGeneralFunctions.Add(compiledGeneralFunction);
-                        break;
-                    case CompiledConstructor compiledConstructor:
-                        compiledConstructors.Add(compiledConstructor);
-                        break;
-                    default:
-                        throw new NotImplementedException();
-                }
-            }
-
-            CompiledFunctions = compiledFunctions.ToImmutable();
-            CompiledOperators = compiledOperators.ToImmutable();
-            CompiledGeneralFunctions = compiledGeneralFunctions.ToImmutable();
-            CompiledConstructors = compiledConstructors.ToImmutable();
-        }
-
         if (settings.ExternalFunctionsCache)
         { throw new NotImplementedException(); }
 
@@ -2322,7 +2287,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = res.Statements2
+        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = compilerResult.CompiledStatements
             .OfType<CompiledVariableDeclaration>();
 
         Stack<CompiledCleanup> globalVariablesCleanup = new();
@@ -2374,7 +2339,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        GenerateCodeForTopLevelStatements(res.Statements2);
+        GenerateCodeForTopLevelStatements(compilerResult.CompiledStatements);
 
         AddComment("Pop abs global address");
         Pop(AbsGlobalAddressType.GetSize(this)); // Pop abs global offset
@@ -2402,7 +2367,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     });
         // }
 
-        foreach ((ICompiledFunction function, CompiledBlock body) in res.Functions2)
+        foreach ((ICompiledFunction function, CompiledBlock body) in compilerResult.Functions2)
         {
             GenerateCodeForFunction(function, body);
         }

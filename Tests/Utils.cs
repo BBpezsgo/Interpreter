@@ -247,7 +247,12 @@ public static class Utils
         StackSize = MainGeneratorSettings.Default.StackSize,
     };
 
-    public static CompilerSettings CompilerSettings => new(CompilerSettings.Default)
+    public static CompilerSettings BytecodeCompilerSettings => new(CodeGeneratorForMain.DefaultCompilerSettings)
+    {
+
+    };
+
+    public static CompilerSettings BrainfuckCompilerSettings => new(LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.DefaultCompilerSettings)
     {
 
     };
@@ -309,10 +314,23 @@ public static class Utils
 
         DiagnosticsCollection diagnostics = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, diagnostics, null, AdditionalImports);
+        CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
+        {
+            BasePath = BasePath,
+            ExternalFunctions = externalFunctions.ToImmutableArray(),
+            DontOptimize = false,
+        }, PreprocessorVariables.Normal, diagnostics, null, AdditionalImports);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
-        compiled = Compiler.CompileFile(file, externalFunctions, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Normal, diagnostics, null, AdditionalImports);
-        BBLangGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings) { DontOptimize = true }, null, diagnostics);
+        compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
+        {
+            BasePath = BasePath,
+            ExternalFunctions = externalFunctions.ToImmutableArray(),
+            DontOptimize = true,
+        }, PreprocessorVariables.Normal, diagnostics, null, AdditionalImports);
+        BBLangGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings)
+        {
+            DontOptimize = true
+        }, null, diagnostics);
 
         diagnostics.Throw();
 
@@ -373,12 +391,20 @@ public static class Utils
         byte InputCallback() => LanguageCore.Brainfuck.CharCode.GetByte(inputBuffer.Read());
 
         DiagnosticsCollection diagnostics = new();
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, diagnostics, null, AdditionalImports);
+        CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BrainfuckCompilerSettings)
+        {
+            BasePath = BasePath,
+            DontOptimize = false,
+        }, PreprocessorVariables.Brainfuck, diagnostics, null, AdditionalImports);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, diagnostics);
         diagnostics.Throw();
 
         diagnostics = new DiagnosticsCollection();
-        CompilerResult compiledUnoptimized = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath }, PreprocessorVariables.Brainfuck, diagnostics, null, AdditionalImports);
+        CompilerResult compiledUnoptimized = StatementCompiler.CompileFile(file, new CompilerSettings(BrainfuckCompilerSettings)
+        {
+            BasePath = BasePath,
+            DontOptimize = true,
+        }, PreprocessorVariables.Brainfuck, diagnostics, null, AdditionalImports);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generatedUnoptimized = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiledUnoptimized, new LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings(BrainfuckGeneratorSettings)
         { DontOptimize = true }, null, diagnostics);
         diagnostics.Throw();
@@ -426,7 +452,10 @@ public static class Utils
     {
         DiagnosticsCollection diagnostics = new();
 
-        CompilerResult compiled = Compiler.CompileFile(file, null, new CompilerSettings(CompilerSettings) { BasePath = BasePath, }, Enumerable.Empty<string>(), diagnostics, null, AdditionalImports);
+        CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
+        {
+            BasePath = BasePath,
+        }, Enumerable.Empty<string>(), diagnostics, null, AdditionalImports);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
         diagnostics.Throw();
 

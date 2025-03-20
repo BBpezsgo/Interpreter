@@ -102,6 +102,8 @@ public class BytecodeProcessorEx
             {
                 CurrentUserCall = userCall;
 
+                state.Registers.StackPointer -= userCall.ReturnValueSize;
+
                 state.Push(userCall.Arguments.AsSpan());
 
                 // Push the return instruction address
@@ -155,9 +157,23 @@ public class BytecodeProcessorEx
         }
     }
 
-    public UserCall Call(int instructionOffset, ImmutableArray<byte> arguments)
+    public UserCall Call<T0>(in ExposedFunction function, T0 arg0)
+        where T0 : unmanaged
     {
-        UserCall userCall = new(instructionOffset, arguments);
+        
+    }
+
+    public UserCall Call(in ExposedFunction function, ImmutableArray<byte> arguments)
+    {
+        if (function.ArgumentsSize != arguments.Length) throw new ArgumentException($"Invalid number of bytes passed to exposed function \"{function.Identifier}\": expected {function.ArgumentsSize} passed {arguments.Length}");
+        UserCall userCall = new(function.InstructionOffset, arguments, function.ReturnValueSize);
+        UserCalls.Enqueue(userCall);
+        return userCall;
+    }
+
+    public UserCall Call(int instructionOffset, ImmutableArray<byte> arguments, int returnValueSize)
+    {
+        UserCall userCall = new(instructionOffset, arguments, returnValueSize);
         UserCalls.Enqueue(userCall);
         return userCall;
     }

@@ -2386,6 +2386,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         Print?.Invoke("Code generated", LogType.Debug);
 
+        Dictionary<string, ExposedFunction> exposedFunctions = new();
+        foreach (var f in CompiledFunctions)
+        {
+            if (f.ExposedFunctionName is null) continue;
+            if (f.InstructionOffset == InvalidFunctionAddress) throw null; // aaaahhhh
+            int returnValueSize = f.ReturnSomething ? f.Type.GetSize(this, Diagnostics, f.TypeToken) : 0;
+            int argumentsSize = 0;
+            foreach (var p in f.ParameterTypes)
+            {
+                argumentsSize += p.GetSize(this, Diagnostics, null); // ahh
+            }
+            exposedFunctions[f.ExposedFunctionName] = new(f.ExposedFunctionName, returnValueSize, f.InstructionOffset, argumentsSize);
+        }
+
         return new BBLangGeneratorResult()
         {
             Code = GeneratedCode.Select(v => new Instruction(v)).ToImmutableArray(),
@@ -2394,6 +2408,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CompiledOperators = CompiledOperators,
             CompiledGeneralFunctions = CompiledGeneralFunctions,
             CompiledConstructors = CompiledConstructors,
+            ExposedFunctions = exposedFunctions.ToFrozenDictionary(),
         };
     }
 }

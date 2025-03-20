@@ -706,7 +706,7 @@ public partial class StatementCompiler
                 }
                 else
                 {
-                    Debugger.Break();
+                    // Debugger.Break();
                     InlineFunction(f.Body, new InlineContext()
                     {
                         Arguments = f.Function.Parameters

@@ -21,4 +21,5 @@ public struct BBLangGeneratorResult
     public ImmutableArray<CompiledOperator> CompiledOperators;
     public ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
     public ImmutableArray<CompiledConstructor> CompiledConstructors;
+    public FrozenDictionary<string, ExposedFunction> ExposedFunctions;
 }

@@ -22,7 +22,11 @@ public class BytecodeProcessorEx
 
         List<IExternalFunction> _externalFunctions = GenerateExternalFunctions();
         IO = IOHandler.Create(_externalFunctions);
-        if (externalFunctions is not null) _externalFunctions.AddRange(externalFunctions);
+        foreach (IExternalFunction item in externalFunctions ?? Enumerable.Empty<IExternalFunction>())
+        {
+            if (_externalFunctions.Any(v => v.Id == item.Id)) continue;
+            _externalFunctions.Add(item);
+        }
         Processor = new BytecodeProcessor(program, memory, _externalFunctions.Select(v => new KeyValuePair<int, IExternalFunction>(v.Id, v)).ToFrozenDictionary(), settings);
     }
 
@@ -95,12 +99,19 @@ public class BytecodeProcessorEx
             if (state.IsDone && CurrentUserCall is not null)
             {
                 state.Pop(CurrentUserCall.Arguments.Length);
+                Span<byte> returnValue = state.Pop(CurrentUserCall.ReturnValueSize);
+                CurrentUserCall.Result = returnValue.ToArray();
                 CurrentUserCall = null;
             }
 
             if (state.IsDone && UserCalls.TryDequeue(out UserCall? userCall))
             {
+                // Global variables are on top of the stack right now
+
                 CurrentUserCall = userCall;
+
+                // this is pointing to the last global variable's address
+                int globalVariablesAddress = state.Registers.StackPointer;
 
                 state.Registers.StackPointer -= userCall.ReturnValueSize;
 
@@ -108,13 +119,9 @@ public class BytecodeProcessorEx
 
                 // Push the return instruction address
                 state.Push(state.Registers.CodePointer, Register.CodePointer.BitWidth());
+
                 // Push the absolute global address
-                state.Push(
-                    state.Registers.StackPointer + // This points to the abs global address value
-                    (int)Register.CodePointer.BitWidth() + // Offset it by the pushed return instruction address
-                    (int)Register.StackPointer.BitWidth(), // Offset it by the abs global itself
-                //  The final value is pointing to the first global variable's address
-                    Register.StackPointer.BitWidth());
+                state.Push(globalVariablesAddress, Register.StackPointer.BitWidth());
                 // Push the previous base pointer
                 state.Push(state.Registers.BasePointer, Register.BasePointer.BitWidth());
 
@@ -157,13 +164,28 @@ public class BytecodeProcessorEx
         }
     }
 
-    public UserCall Call<T0>(in ExposedFunction function, T0 arg0)
+    #region Call
+
+    public unsafe UserCall Call<T0>(in ExposedFunction function, T0 arg0)
         where T0 : unmanaged
+        => CallUnsafe(function, Utils.ToBytes(PackedValues.Create(arg0)));
+
+    public unsafe UserCall Call<T0, T1>(in ExposedFunction function, T0 arg0, T1 arg1)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        => CallUnsafe(function, Utils.ToBytes(PackedValues.Create(arg1, arg0)));
+
+    #endregion
+
+    public UserCall Call(in ExposedFunction function)
     {
-        
+        if (function.ArgumentsSize != 0) throw new ArgumentException($"Invalid number of bytes passed to exposed function \"{function.Identifier}\": expected {function.ArgumentsSize} passed {0}");
+        UserCall userCall = new(function.InstructionOffset, Array.Empty<byte>(), function.ReturnValueSize);
+        UserCalls.Enqueue(userCall);
+        return userCall;
     }
 
-    public UserCall Call(in ExposedFunction function, ImmutableArray<byte> arguments)
+    public UserCall CallUnsafe(in ExposedFunction function, byte[] arguments)
     {
         if (function.ArgumentsSize != arguments.Length) throw new ArgumentException($"Invalid number of bytes passed to exposed function \"{function.Identifier}\": expected {function.ArgumentsSize} passed {arguments.Length}");
         UserCall userCall = new(function.InstructionOffset, arguments, function.ReturnValueSize);
@@ -171,7 +193,7 @@ public class BytecodeProcessorEx
         return userCall;
     }
 
-    public UserCall Call(int instructionOffset, ImmutableArray<byte> arguments, int returnValueSize)
+    public UserCall CallUnsafe(int instructionOffset, byte[] arguments, int returnValueSize)
     {
         UserCall userCall = new(instructionOffset, arguments, returnValueSize);
         UserCalls.Enqueue(userCall);

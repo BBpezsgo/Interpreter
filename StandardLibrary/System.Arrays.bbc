@@ -1,3 +1,5 @@
+using Primitives;
+
 template<T>
 export inline int BinarySearch(T[]* values, T element, int length)
 {

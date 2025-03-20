@@ -31,7 +31,7 @@ public partial class StatementCompiler
         { "DL", (Register.DL, BuiltinType.I8) },
     }.ToImmutableDictionary();
 
-    public StatementCompiler(CompilerSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print, IEnumerable<string> preprocessorVariables, IEnumerable<UserDefinedAttribute>? userDefinedAttributes)
+    public StatementCompiler(CompilerSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print)
     {
         CompiledParameters = new();
 
@@ -46,8 +46,8 @@ public partial class StatementCompiler
         Settings = settings;
 
         ExternalFunctions = settings.ExternalFunctions;
-        PreprocessorVariables = preprocessorVariables;
-        UserDefinedAttributes = (userDefinedAttributes ?? Enumerable.Empty<UserDefinedAttribute>()).ToImmutableArray();
+        PreprocessorVariables = settings.PreprocessorVariables ?? Enumerable.Empty<string>();
+        UserDefinedAttributes = (settings.UserDefinedAttributes ?? Enumerable.Empty<UserDefinedAttribute>()).ToImmutableArray();
     }
 }
 

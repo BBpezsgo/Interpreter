@@ -39,8 +39,8 @@ public static class Interactive
                 {
                     BasePath = "/home/BB/Projects/BBLang/Core/StandardLibrary",
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
+                    PreprocessorVariables = PreprocessorVariables.Interactive,
                 },
-                PreprocessorVariables.Interactive,
                 diagnostics,
                 Utils.AssemblyFile);
 

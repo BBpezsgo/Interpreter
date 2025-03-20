@@ -2240,9 +2240,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     BBLangGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
     {
-        if (settings.ExternalFunctionsCache)
-        { throw new NotImplementedException(); }
-
         Print?.Invoke("Generating code ...", LogType.Debug);
         ScopeSizes.Push(0);
 
@@ -2344,11 +2341,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("Pop abs global address");
         Pop(AbsGlobalAddressType.GetSize(this)); // Pop abs global offset
 
-        AddComment("Cleanup global variables {");
-        CleanupVariables(globalVariablesCleanup.ToImmutableArray(), default, true);
-        AddComment("}");
+        if (Settings.CleanupGlobalVaraibles)
+        {
+            AddComment("Cleanup global variables {");
+            CleanupVariables(globalVariablesCleanup.ToImmutableArray(), default, true);
+            AddComment("}");
+        }
 
-        AddInstruction(Opcode.Exit); // Exit code already there
+        AddInstruction(Opcode.Exit);
 
         // 4 -> exit code
         if (ScopeSizes.Pop() != 4) { } // throw new InternalException("Bruh");
@@ -2387,13 +2387,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Print?.Invoke("Code generated", LogType.Debug);
 
         Dictionary<string, ExposedFunction> exposedFunctions = new();
-        foreach (var f in CompiledFunctions)
+        foreach (CompiledFunction f in CompiledFunctions)
         {
             if (f.ExposedFunctionName is null) continue;
             if (f.InstructionOffset == InvalidFunctionAddress) throw null; // aaaahhhh
             int returnValueSize = f.ReturnSomething ? f.Type.GetSize(this, Diagnostics, f.TypeToken) : 0;
             int argumentsSize = 0;
-            foreach (var p in f.ParameterTypes)
+            foreach (GeneralType p in f.ParameterTypes)
             {
                 argumentsSize += p.GetSize(this, Diagnostics, null); // ahh
             }

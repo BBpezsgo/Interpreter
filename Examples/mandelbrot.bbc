@@ -1,0 +1,67 @@
+using System;
+
+const u8 Width = 50;
+const u8 Height = 20;
+
+const float MinX = -2.00;
+const float MaxX =  0.47;
+const float MinY = -1.12;
+const float MaxY =  1.12;
+
+for (u8 py = (u8)0; py < Height; py++)
+{
+    for (u8 px = (u8)0; px < Width; px++)
+    {
+        u8 x0 = (px * (u8)3) / Width - (u8)2;
+        u8 y0 = (py * (u8)2) / Height - (u8)1;
+
+        u8 x = (u8)0;
+        u8 y = (u8)0;
+        int iteration = 0;
+
+        while (x * x + y * y <= (u8)64 && iteration < 40) {
+            u8 x_new = (x * x - y * y) / (u8)16 + x0;
+            y = (2 * x * y) / (u8)16 + y0;
+            x = x_new;
+            iteration++;
+        }
+
+        // float x0 = (float)(px * (MaxX - MinX) / Width + MinX);
+        // float y0 = (float)(py * (MaxY - MinY) / Height + MinY);
+
+        // float x = 0.0;
+        // float y = 0.0;
+        // int iteration = 0;
+        // const int max_iteration = 40;
+
+        // while (x * x + y * y <= 2.0 * 2.0 && iteration < max_iteration)
+        // {
+        //     float xtemp = x * x - y * y + x0;
+        //     y = 2.0 * x * y + y0;
+        //     x = xtemp;
+        //     iteration++;
+        // }
+
+        if (iteration < 10)
+        {
+            Print(' ');
+        }
+        else if (iteration < 10)
+        {
+            Print('.');
+        }
+        else if (iteration < 20)
+        {
+            Print('-');
+        }
+        else if (iteration < 40)
+        {
+            Print('x');
+        }
+        else
+        {
+            Print('#');
+        }
+    }
+    PrintLine();
+}

@@ -142,6 +142,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BasePath = null,
         DontOptimize = false,
         ExternalFunctions = ImmutableArray<IExternalFunction>.Empty,
+        PreprocessorVariables = PreprocessorVariables.Normal,
     };
 
     #region Fields

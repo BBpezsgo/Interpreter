@@ -35,6 +35,15 @@ public readonly struct TestFile
         expected.Assert(result, heapShouldBeEmpty);
     }
 
+    public void DoIL()
+    {
+        int result = Utils.RunIL(LanguageCore.Utils.ToFileUri(SourceFile), GetInput());
+        Console.Write($"ExitCode: {result}");
+        ExpectedResult expected = GetExpectedResult();
+        if (expected.ExitCode != result)
+        { throw new AssertFailedException($"Exit code isn't what is expected:{Environment.NewLine}Expected: {expected.ExitCode}{Environment.NewLine}Actual:   {result}"); }
+    }
+
     public void DoBrainfuck(bool memoryShouldBeEmpty = true, int? expectedMemoryPointer = 0)
     {
         (BrainfuckResult result, BrainfuckResult resultCompact, BrainfuckResult resultUnoptimized) = Utils.RunBrainfuck(LanguageCore.Utils.ToFileUri(SourceFile), GetInput());
@@ -243,7 +252,6 @@ public static class Utils
 
     public static MainGeneratorSettings MainGeneratorSettings => new(MainGeneratorSettings.Default)
     {
-        GenerateDebugInstructions = false,
         StackSize = MainGeneratorSettings.Default.StackSize,
     };
 
@@ -319,14 +327,18 @@ public static class Utils
             BasePath = BasePath,
             ExternalFunctions = externalFunctions.ToImmutableArray(),
             DontOptimize = false,
-        }, PreprocessorVariables.Normal, diagnostics, null, AdditionalImports);
+            PreprocessorVariables = PreprocessorVariables.Normal,
+            AdditionalImports = AdditionalImports,
+        }, diagnostics);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
         compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
         {
             BasePath = BasePath,
             ExternalFunctions = externalFunctions.ToImmutableArray(),
             DontOptimize = true,
-        }, PreprocessorVariables.Normal, diagnostics, null, AdditionalImports);
+            PreprocessorVariables = PreprocessorVariables.Normal,
+            AdditionalImports = AdditionalImports,
+        }, diagnostics);
         BBLangGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings)
         {
             DontOptimize = true
@@ -378,6 +390,26 @@ public static class Utils
         return result;
     }
 
+    public static int RunIL(Uri file, string input)
+    {
+        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+
+        DiagnosticsCollection diagnostics = new();
+
+        CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(LanguageCore.IL.Generator.CodeGeneratorForMain.DefaultCompilerSettings)
+        {
+            BasePath = BasePath,
+            ExternalFunctions = externalFunctions.ToImmutableArray(),
+            PreprocessorVariables = PreprocessorVariables.Normal,
+            AdditionalImports = AdditionalImports,
+        }, diagnostics);
+        Func<int> generatedCode = LanguageCore.IL.Generator.CodeGeneratorForMain.Generate(compiled, null, diagnostics);
+
+        diagnostics.Throw();
+
+        return generatedCode.Invoke();
+    }
+
     public static (BrainfuckResult Normal, BrainfuckResult Compact, BrainfuckResult Unoptimized) RunBrainfuck(Uri file, string input)
     {
         BrainfuckResult resultNormal;
@@ -395,7 +427,9 @@ public static class Utils
         {
             BasePath = BasePath,
             DontOptimize = false,
-        }, PreprocessorVariables.Brainfuck, diagnostics, null, AdditionalImports);
+            PreprocessorVariables = PreprocessorVariables.Brainfuck,
+            AdditionalImports = AdditionalImports,
+        }, diagnostics);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, diagnostics);
         diagnostics.Throw();
 
@@ -404,7 +438,9 @@ public static class Utils
         {
             BasePath = BasePath,
             DontOptimize = true,
-        }, PreprocessorVariables.Brainfuck, diagnostics, null, AdditionalImports);
+            PreprocessorVariables = PreprocessorVariables.Brainfuck,
+            AdditionalImports = AdditionalImports,
+        }, diagnostics);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generatedUnoptimized = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiledUnoptimized, new LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings(BrainfuckGeneratorSettings)
         { DontOptimize = true }, null, diagnostics);
         diagnostics.Throw();
@@ -455,7 +491,8 @@ public static class Utils
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
         {
             BasePath = BasePath,
-        }, Enumerable.Empty<string>(), diagnostics, null, AdditionalImports);
+            AdditionalImports = AdditionalImports,
+        }, diagnostics);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
         diagnostics.Throw();
 
@@ -700,8 +737,8 @@ public static class Utils
 
 public interface IResult
 {
-    public string StdOutput { get; }
-    public int ExitCode { get; }
+    string StdOutput { get; }
+    int ExitCode { get; }
 }
 
 public readonly struct MainResult : IResult

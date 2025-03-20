@@ -1,3 +1,4 @@
+using Primitives;
 using System.Memory;
 
 inline int GetHash(int v)

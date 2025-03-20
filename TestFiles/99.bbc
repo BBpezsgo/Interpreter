@@ -1,0 +1,28 @@
+using System;
+
+int A()
+{
+    Print('A');
+    return 5;
+}
+
+int B()
+{
+    Print('B');
+    return 4;
+}
+
+int C()
+{
+    Print('C');
+    return 3;
+}
+
+if (A() || A() < B())
+{
+    return 1;
+}
+else
+{
+    return 2;
+}

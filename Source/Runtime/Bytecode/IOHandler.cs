@@ -33,6 +33,12 @@ public class IOHandler
         _keyConsumer = null;
     }
 
+    public void RegisterStandardIO()
+    {
+        OnStdOut += (data) => Console.Out.Write(char.ToString(data));
+        OnNeedInput += () => SendKey(Console.ReadKey(true).KeyChar);
+    }
+
     public static IOHandler Create(List<IExternalFunction> externalFunctions)
     {
         IOHandler ioHandler = new();
@@ -56,7 +62,10 @@ public class IOHandler
             };
         }, externalFunctions.GenerateId(ExternalFunctionNames.StdIn), ExternalFunctionNames.StdIn, 0, sizeof(char)));
 
-        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdOut), ExternalFunctionNames.StdOut, (char @char) => ioHandler.OnStdOut?.Invoke(@char)));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdOut), ExternalFunctionNames.StdOut, (char @char) =>
+        {
+            ioHandler.OnStdOut?.Invoke(@char);
+        }));
 
         return ioHandler;
     }

@@ -39,11 +39,5 @@ public unsafe struct ExternalFunctionScopedSync
         Scope = scope;
     }
 
-    public readonly IExternalFunction ToManaged(string name)
-    {
-        return new ExternalFunctionSync(null, null, Id, name, ParametersSize, ReturnValueSize);
-    }
-
-    public override string ToString() => $"<{ReturnValueSize}b> {Id.ToString()}(<{ParametersSize}b>)";
-
+    public override readonly string ToString() => $"<{ReturnValueSize}b> {Id}(<{ParametersSize}b>)";
 }

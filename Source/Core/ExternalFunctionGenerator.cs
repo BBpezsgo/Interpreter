@@ -48,8 +48,6 @@ public static unsafe class ExternalFunctionGenerator
         return result;
     }
 
-    #region AddExternalFunction()
-
     public static void AddExternalFunction(this List<IExternalFunction> functions, IExternalFunction function)
     {
         int i = functions.FindIndex(v => v.Id == function.Id);
@@ -58,8 +56,6 @@ public static unsafe class ExternalFunctionGenerator
         else
         { functions.Add(function); }
     }
-
-    #endregion
 
     #region GetTypes<>()
 

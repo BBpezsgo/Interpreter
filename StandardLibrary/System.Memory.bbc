@@ -1,3 +1,5 @@
+using Primitives;
+
 #if BRAINFUCK
 alias BlockHeader u8;
 const BlockHeader StatusFlag = 0x80;

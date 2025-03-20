@@ -68,105 +68,105 @@ public partial class StatementCompiler
             switch (attribute.Identifier.Content)
             {
                 case AttributeConstants.ExternalIdentifier:
+                {
+                    if (attribute.Parameters.Length != 1)
                     {
-                        if (attribute.Parameters.Length != 1)
-                        {
-                            Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
-                            break;
-                        }
-
-                        if (attribute.Parameters[0].Type != LiteralType.String)
-                        {
-                            Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
-                            break;
-                        }
-
-                        string externalName = attribute.Parameters[0].Value;
-
-                        if (!ExternalFunctions.TryGet(externalName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
-                        {
-                            Diagnostics.Add(exception.ToWarning(attribute, function.File));
-                            break;
-                        }
-
-                        // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
-
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
+
+                    if (attribute.Parameters[0].Type != LiteralType.String)
+                    {
+                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
+                        break;
+                    }
+
+                    string externalName = attribute.Parameters[0].Value;
+
+                    if (!ExternalFunctions.TryGet(externalName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
+                    {
+                        Diagnostics.Add(exception.ToWarning(attribute, function.File));
+                        break;
+                    }
+
+                    // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
+
+                    break;
+                }
                 case AttributeConstants.BuiltinIdentifier:
+                {
+                    if (attribute.Parameters.Length != 1)
                     {
-                        if (attribute.Parameters.Length != 1)
-                        {
-                            Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
-                            break;
-                        }
-
-                        if (attribute.Parameters[0].Type != LiteralType.String)
-                        {
-                            Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
-                            break;
-                        }
-
-                        string builtinName = attribute.Parameters[0].Value;
-
-                        if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out BuiltinFunction? builtinFunction))
-                        {
-                            Diagnostics.Add(Diagnostic.Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
-                            break;
-                        }
-
-                        if (builtinFunction.Parameters.Length != function.Parameters.Count)
-                        {
-                            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File));
-                        }
-
-                        if (type is null)
-                        {
-                            Diagnostics.Add(Diagnostic.Critical($"Can't use attribute \"{attribute.Identifier}\" on this function because its aint have a return type", typeInstance, function.File));
-                            continue;
-                        }
-
-                        if (!builtinFunction.Type.Invoke(type))
-                        {
-                            Diagnostics.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", typeInstance, function.File));
-                        }
-
-                        for (int i = 0; i < builtinFunction.Parameters.Length; i++)
-                        {
-                            if (i >= function.Parameters.Count) break;
-
-                            Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
-                            GeneralType passedParameterType = parameterTypes[i];
-                            function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
-
-                            if (definedParameterType.Invoke(passedParameterType))
-                            { continue; }
-
-                            Diagnostics.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: \"{definedParameterType}\" Passed: \"{passedParameterType}\"", function.Parameters[i].Type, function.Parameters[i].File));
-                        }
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
+
+                    if (attribute.Parameters[0].Type != LiteralType.String)
+                    {
+                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
+                        break;
+                    }
+
+                    string builtinName = attribute.Parameters[0].Value;
+
+                    if (!BuiltinFunctions.Prototypes.TryGetValue(builtinName, out BuiltinFunction? builtinFunction))
+                    {
+                        Diagnostics.Add(Diagnostic.Warning($"Builtin function \"{builtinName}\" not found", attribute, function.File));
+                        break;
+                    }
+
+                    if (builtinFunction.Parameters.Length != function.Parameters.Count)
+                    {
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File));
+                    }
+
+                    if (type is null)
+                    {
+                        Diagnostics.Add(Diagnostic.Critical($"Can't use attribute \"{attribute.Identifier}\" on this function because its aint have a return type", typeInstance, function.File));
+                        continue;
+                    }
+
+                    if (!builtinFunction.Type.Invoke(type))
+                    {
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", typeInstance, function.File));
+                    }
+
+                    for (int i = 0; i < builtinFunction.Parameters.Length; i++)
+                    {
+                        if (i >= function.Parameters.Count) break;
+
+                        Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
+                        GeneralType passedParameterType = parameterTypes[i];
+                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
+
+                        if (definedParameterType.Invoke(passedParameterType))
+                        { continue; }
+
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: \"{definedParameterType}\" Passed: \"{passedParameterType}\"", function.Parameters[i].Type, function.Parameters[i].File));
+                    }
+                    break;
+                }
                 case AttributeConstants.ExposeIdentifier:
+                {
+                    if (attribute.Parameters.Length != 1)
                     {
-                        if (attribute.Parameters.Length != 1)
-                        {
-                            Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
-                            break;
-                        }
-
-                        if (attribute.Parameters[0].Type != LiteralType.String)
-                        {
-                            Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
-                            break;
-                        }
-
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
+
+                    if (attribute.Parameters[0].Type != LiteralType.String)
+                    {
+                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
+                        break;
+                    }
+
+                    break;
+                }
                 default:
-                    {
-                        CompileUserAttribute(function, attribute);
-                        break;
-                    }
+                {
+                    CompileUserAttribute(function, attribute);
+                    break;
+                }
             }
         }
     }
@@ -616,9 +616,9 @@ public partial class StatementCompiler
         }
     }
 
-    CompilerResult CompileMainFile(Uri file, FileParser? fileParser, IEnumerable<string>? additionalImports)
+    CompilerResult CompileMainFile(Uri file)
     {
-        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, Settings.BasePath, Diagnostics, PreprocessorVariables, fileParser, additionalImports);
+        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, Settings.BasePath, Diagnostics, PreprocessorVariables, Settings.FileParser, Settings.AdditionalImports);
 
         foreach (ParsedFile parsedFile in parsedFiles)
         { AddAST(parsedFile, parsedFile.File != file); }
@@ -680,25 +680,19 @@ public partial class StatementCompiler
     public static CompilerResult CompileFile(
         Uri file,
         CompilerSettings settings,
-        IEnumerable<string> preprocessorVariables,
-        DiagnosticsCollection diagnostics,
-        FileParser? fileParser = null,
-        IEnumerable<string>? additionalImports = null,
-        IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
+        DiagnosticsCollection diagnostics)
     {
-        StatementCompiler compiler = new(settings, diagnostics, null, preprocessorVariables, userDefinedAttributes);
-        return compiler.CompileMainFile(file, fileParser, additionalImports);
+        StatementCompiler compiler = new(settings, diagnostics, null);
+        return compiler.CompileMainFile(file);
     }
 
     public static CompilerResult CompileInteractive(
         Statement statement,
         CompilerSettings settings,
-        IEnumerable<string> preprocessorVariables,
         DiagnosticsCollection diagnostics,
-        Uri file,
-        IEnumerable<UserDefinedAttribute>? userDefinedAttributes = null)
+        Uri file)
     {
-        StatementCompiler compiler = new(settings, diagnostics, null, preprocessorVariables, userDefinedAttributes);
+        StatementCompiler compiler = new(settings, diagnostics, null);
         return compiler.CompileInteractiveInternal(statement, file);
     }
 }

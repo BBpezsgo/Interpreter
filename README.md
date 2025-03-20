@@ -94,6 +94,9 @@ Make sure to make a symlink to the Sources directory. Run this inside the `/Unit
 ```sh
 ln -s ../Source Runtime
 ```
+> [!NOTE]
+> If you are on Windows, move and rename the `/Source` directory to `/Unity/Runtime`.
+
 Inside Unity, naviage to `Edit > Project Settings... > Player > Other Settings > Scripting Define Symbols` and add the `UNITY` variable.
 If you are using the Burst compiler, add `UNITY_BURST` too.
 If you are not using the Burst compiler, remove the `Unity.Burst` reference from `/Unity/BBLang.asmdef`.

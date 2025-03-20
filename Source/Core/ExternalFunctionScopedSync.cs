@@ -39,5 +39,11 @@ public unsafe struct ExternalFunctionScopedSync
         Scope = scope;
     }
 
+    // This required by my Unity-DOTS project!!!!
+    public readonly IExternalFunction ToManaged(string name)
+    {
+        return new ExternalFunctionSync(null, null, Id, name, ParametersSize, ReturnValueSize);
+    }
+
     public override readonly string ToString() => $"<{ReturnValueSize}b> {Id}(<{ParametersSize}b>)";
 }

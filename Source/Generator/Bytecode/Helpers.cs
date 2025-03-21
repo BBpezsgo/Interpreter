@@ -71,7 +71,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     AddressOffset GetGlobalVariableAddress(CompiledVariableDeclaration variable)
     {
-        if (!variable.IsGlobal) throw null;
+        if (!variable.IsGlobal)
+        { Diagnostics.Add(Diagnostic.Internal($"Trying to get the address of global variable \"{variable.Identifier}\" but it was compiled as a local variable.", variable)); }
 
         if (!GeneratedVariables.TryGetValue(variable, out GeneratedVariable? generatedVariable))
         { throw new NotImplementedException(); }
@@ -89,7 +90,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     AddressOffset GetLocalVariableAddress(CompiledVariableDeclaration variable)
     {
-        if (variable.IsGlobal) throw null;
+        if (variable.IsGlobal)
+        { Diagnostics.Add(Diagnostic.Internal($"Trying to get the address of local variable \"{variable.Identifier}\" but it was compiled as a global variable.", variable)); }
 
         if (!GeneratedVariables.TryGetValue(variable, out GeneratedVariable? generatedVariable))
         { throw new NotImplementedException(); }

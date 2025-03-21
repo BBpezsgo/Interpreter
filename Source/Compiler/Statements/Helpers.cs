@@ -1120,8 +1120,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
         else
         {
-            GenerateCodeForStatement(variableDeclaration.InitialValue, out var compiledInitialValue);
-            if (!TryCompute(variableDeclaration.InitialValue, out constantValue))
+            GenerateCodeForStatement(variableDeclaration.InitialValue, out CompiledStatementWithValue? compiledInitialValue);
+            if (!TryCompute(compiledInitialValue, out constantValue))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue));
                 constantValue = default;
@@ -1131,7 +1131,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         GeneralType constantType;
         if (variableDeclaration.Type != StatementKeywords.Var)
         {
-            constantType = GeneralType.From(variableDeclaration.Type, FindType, TryCompute);
+            constantType = CompileType(variableDeclaration.Type, variableDeclaration.File);
             variableDeclaration.Type.SetAnalyzedType(constantType);
 
             if (constantType.Is(out BuiltinType? builtinType))
@@ -2020,7 +2020,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         CompiledValue leftValue = GetInitialValue(leftNType, leftBitwidth);
         CompiledValue rightValue = GetInitialValue(rightNType, rightBitwidth);
 
-        if (!TryCompute(@operator.Operator.Content, leftValue, rightValue, out CompiledValue predictedValue, out PossibleDiagnostic? evaluateError))
+        if (!TryComputeSimple(@operator.Operator.Content, leftValue, rightValue, out CompiledValue predictedValue, out PossibleDiagnostic? evaluateError))
         {
             Diagnostics.Add(evaluateError.ToError(@operator));
             return BuiltinType.Void;
@@ -2238,12 +2238,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (GetInstructionLabel(identifier.Content, out _, out PossibleDiagnostic? instructionLabelNotFound))
         {
             return OnGotStatementType(identifier, new FunctionType(BuiltinType.Void, Enumerable.Empty<GeneralType>()));
-        }
-
-        for (int i = CurrentEvaluationContext.Count - 1; i >= 0; i--)
-        {
-            if (CurrentEvaluationContext[i].TryGetType(identifier, out GeneralType? _type))
-            { return _type; }
         }
 
         if (FindType(identifier.Token, identifier.File, out GeneralType? result))
@@ -3738,166 +3732,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region Compile Time Evaluation
 
-    abstract class RuntimeStatement :
-        IPositioned,
-        IInFile,
-        ILocated
-    {
-        public abstract Position Position { get; }
-        public abstract Uri File { get; }
-
-        public Location Location => new(Position, File);
-    }
-
-    abstract class RuntimeStatement<TOriginal> : RuntimeStatement
-        where TOriginal : Statement
-    {
-        public TOriginal Original { get; }
-
-        public override Position Position => Original.Position;
-
-        protected RuntimeStatement(TOriginal original)
-        {
-            Original = original;
-        }
-    }
-
-    class RuntimeFunctionCall : RuntimeStatement<FunctionCall>
-    {
-        public CompiledFunction Function { get; }
-        public ImmutableArray<CompiledValue> Parameters { get; }
-        public override Uri File => Original.File;
-
-        public RuntimeFunctionCall(CompiledFunction function, ImmutableArray<CompiledValue> parameters, FunctionCall original) : base(original)
-        {
-            Function = function;
-            Parameters = parameters;
-        }
-    }
-
-    class EvaluationContext
-    {
-        readonly Dictionary<StatementWithValue, CompiledValue> _values;
-        readonly Stack<Stack<Dictionary<string, CompiledValue>>>? _frames;
-
-        public readonly Stack<ICompiledFunction> Calls;
-        public readonly List<RuntimeStatement> RuntimeStatements;
-        public Dictionary<string, CompiledValue>? LastScope => _frames?.Last.Last;
-        public bool IsReturning;
-        public bool IsBreaking;
-
-        public static EvaluationContext Empty => new(null, null);
-
-        public static EvaluationContext EmptyWithVariables => new(null, new Dictionary<string, CompiledValue>());
-
-        public Dictionary<string, StatementWithValue> Variables
-        {
-            get
-            {
-                if (_frames is null || _frames.Count == 0) return new Dictionary<string, StatementWithValue>();
-                Dictionary<string, StatementWithValue> result = new();
-                foreach (Dictionary<string, CompiledValue> scope in _frames.Last)
-                {
-                    result.AddRange(scope.Select(v => new KeyValuePair<string, StatementWithValue>(v.Key, Literal.CreateAnonymous(v.Value, Position.UnknownPosition, null))));
-                }
-                return result;
-            }
-        }
-
-        public EvaluationContext(IDictionary<StatementWithValue, CompiledValue>? values, IDictionary<string, CompiledValue>? variables)
-        {
-            Calls = new();
-
-            if (values != null)
-            { _values = new Dictionary<StatementWithValue, CompiledValue>(values); }
-            else
-            { _values = new Dictionary<StatementWithValue, CompiledValue>(); }
-
-            if (variables != null)
-            { _frames = new Stack<Stack<Dictionary<string, CompiledValue>>>() { new() { new Dictionary<string, CompiledValue>(variables) } }; }
-            else
-            { _frames = null; }
-
-            RuntimeStatements = new List<RuntimeStatement>();
-        }
-
-        public bool TryGetValue(StatementWithValue statement, out CompiledValue value)
-        {
-            if (_values.TryGetValue(statement, out value))
-            { return true; }
-
-            if (statement is Identifier identifier &&
-                TryGetVariable(identifier.Content, out value))
-            { return true; }
-
-            value = default;
-            return false;
-        }
-
-        public bool TryGetVariable(string name, out CompiledValue value)
-        {
-            value = default;
-
-            if (_frames == null)
-            { return false; }
-
-            Stack<Dictionary<string, CompiledValue>> frame = _frames.Last;
-            foreach (Dictionary<string, CompiledValue> scope in frame)
-            {
-                if (scope.TryGetValue(name, out value))
-                { return true; }
-            }
-
-            return false;
-        }
-
-        public bool TrySetVariable(string name, CompiledValue value)
-        {
-            if (_frames == null)
-            { return false; }
-
-            Stack<Dictionary<string, CompiledValue>> frame = _frames.Last;
-            foreach (Dictionary<string, CompiledValue> scope in frame)
-            {
-                if (scope.ContainsKey(name))
-                {
-                    scope[name] = value;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public bool TryGetType(StatementWithValue statement, [NotNullWhen(true)] out GeneralType? type)
-        {
-            if (!TryGetValue(statement, out CompiledValue value))
-            {
-                type = null;
-                return false;
-            }
-
-            type = new BuiltinType(value.Type);
-            return true;
-        }
-
-        public void PushScope(IDictionary<string, CompiledValue>? variables = null)
-        {
-            if (_frames is null) return;
-            if (variables is null)
-            { _frames?.Last.Push(new Dictionary<string, CompiledValue>()); }
-            else
-            { _frames?.Last.Push(new Dictionary<string, CompiledValue>(variables)); }
-        }
-
-        public void PopScope()
-        {
-            if (_frames is null) return;
-            _frames.Last.Pop();
-        }
-    }
-
-    static bool TryCompute(string @operator, CompiledValue left, CompiledValue right, [NotNullWhen(true)] out CompiledValue result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool TryComputeSimple(string @operator, CompiledValue left, CompiledValue right, [NotNullWhen(true)] out CompiledValue result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         // TODO: wtf
         try
@@ -3947,142 +3782,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
-    bool TryCompute(Pointer pointer, EvaluationContext context, out CompiledValue value)
-    {
-        if (pointer.PrevStatement is AddressGetter addressGetter)
-        { return TryCompute(addressGetter.PrevStatement, context, out value); }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(BinaryOperatorCall @operator, EvaluationContext context, out CompiledValue value)
-    {
-        if (context.TryGetValue(@operator, out value))
-        { return true; }
-
-        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out _))
-        {
-            if (context.Calls.Count(v => v == result.Function) > 4)
-            {
-                value = CompiledValue.Null;
-                return false;
-            }
-
-            using (StackAuto<ICompiledFunction> _ = context.Calls.PushAuto(result.Function))
-            {
-                if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&
-                    TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
-                    returnValue.HasValue &&
-                    runtimeStatements.Length == 0)
-                {
-                    value = returnValue.Value;
-                    return true;
-                }
-            }
-
-            value = CompiledValue.Null;
-            return false;
-        }
-
-        if (!TryCompute(@operator.Left, context, out CompiledValue leftValue))
-        {
-            value = CompiledValue.Null;
-            return false;
-        }
-
-        string op = @operator.Operator.Content;
-
-        if (TryCompute(@operator.Right, context, out CompiledValue rightValue) &&
-            TryCompute(op, leftValue, rightValue, out value, out _))
-        {
-            return true;
-        }
-
-        switch (op)
-        {
-            case "&&":
-            {
-                if (!(bool)leftValue)
-                {
-                    value = new CompiledValue(false);
-                    return true;
-                }
-                break;
-            }
-            case "||":
-            {
-                if ((bool)leftValue)
-                {
-                    value = new CompiledValue(true);
-                    return true;
-                }
-                break;
-            }
-            default:
-                if (context is not null &&
-                    context.TryGetValue(@operator, out value))
-                { return true; }
-
-                value = CompiledValue.Null;
-                return false;
-        }
-
-        value = leftValue;
-        return true;
-    }
-    bool TryCompute(UnaryOperatorCall @operator, EvaluationContext context, out CompiledValue value)
-    {
-        if (context.TryGetValue(@operator, out value))
-        { return true; }
-
-        if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out _))
-        {
-            if (context.Calls.Count(v => v == result.Function) > 4)
-            {
-                value = CompiledValue.Null;
-                return false;
-            }
-
-            using (StackAuto<ICompiledFunction> _ = context.Calls.PushAuto(result.Function))
-            {
-                if (TryCompute(@operator.Arguments, context, out ImmutableArray<CompiledValue> parameterValues) &&
-                    TryEvaluate(result.Function, parameterValues, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
-                    returnValue.HasValue &&
-                    runtimeStatements.Length == 0)
-                {
-                    value = returnValue.Value;
-                    return true;
-                }
-            }
-
-            value = CompiledValue.Null;
-            return false;
-        }
-
-        if (!TryCompute(@operator.Left, context, out CompiledValue leftValue))
-        {
-            value = CompiledValue.Null;
-            return false;
-        }
-
-        string op = @operator.Operator.Content;
-
-        if (op == UnaryOperatorCall.LogicalNOT)
-        {
-            value = !leftValue;
-            return true;
-        }
-
-        if (op == UnaryOperatorCall.BinaryNOT)
-        {
-            value = ~leftValue;
-            return true;
-        }
-
-        value = leftValue;
-        return true;
-    }
-    static bool TryCompute(LiteralStatement literal, out CompiledValue value)
+    static bool TryComputeSimple(LiteralStatement literal, out CompiledValue value)
     {
         switch (literal.Type)
         {
@@ -4104,241 +3804,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
         }
     }
-    bool TryCompute(AnyCall anyCall, EvaluationContext context, out CompiledValue value)
-    {
-        if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
-        { return TryCompute(functionCall, context, out value); }
-
-        if (context.TryGetValue(anyCall, out value))
-        { return true; }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(FunctionCall functionCall, EvaluationContext context, out CompiledValue value)
-    {
-        if (functionCall.Identifier.Content == "sizeof")
-        {
-            if (functionCall.Arguments.Length != 1)
-            {
-                value = CompiledValue.Null;
-                return false;
-            }
-
-            StatementWithValue param = functionCall.Arguments[0];
-            GeneralType paramType;
-            if (param is TypeStatement typeStatement)
-            { paramType = GeneralType.From(typeStatement.Type, FindType, TryCompute); }
-            else if (param is CompiledTypeStatement compiledTypeStatement)
-            { paramType = compiledTypeStatement.Type; }
-            else
-            { paramType = FindStatementType(param); }
-
-            if (!FindSize(paramType, out int size, out PossibleDiagnostic? findSizeError))
-            {
-                value = CompiledValue.Null;
-                return false;
-            }
-
-            value = new CompiledValue(size);
-            return true;
-        }
-
-        if (GetFunction(InlineMacro(functionCall, context.Variables), out FunctionQueryResult<CompiledFunction>? result, out _))
-        {
-            CompiledFunction? function = result.Function;
-
-            if (!function.CanUse(functionCall.File))
-            {
-                value = default;
-                return false;
-            }
-
-            if (!TryCompute(functionCall.MethodArguments, context, out ImmutableArray<CompiledValue> parameters))
-            {
-                value = default;
-                return false;
-            }
-
-            if (function.ExternalFunctionName is not null &&
-                !functionCall.SaveValue)
-            {
-                context.RuntimeStatements.Add(new RuntimeFunctionCall(function, parameters, functionCall));
-                value = CompiledValue.Null;
-                return true;
-            }
-
-            if (context.Calls.Count(v => v == function) > 4)
-            {
-                value = CompiledValue.Null;
-                return false;
-            }
-
-            using (StackAuto<ICompiledFunction> _ = context.Calls.PushAuto(function))
-            {
-                if (TryEvaluate(function, parameters, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
-                    returnValue.HasValue &&
-                    runtimeStatements.Length == 0)
-                {
-                    value = returnValue.Value;
-                    return true;
-                }
-            }
-        }
-
-        if (context.TryGetValue(functionCall, out value))
-        { return true; }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(Identifier identifier, EvaluationContext context, out CompiledValue value)
-    {
-        if (GetConstant(identifier.Content, identifier.File, out CompiledVariableConstant? constantValue, out _))
-        {
-            identifier.Reference = constantValue;
-            identifier.AnalyzedType = TokenAnalyzedType.ConstantName;
-            value = constantValue.Value;
-            return true;
-        }
-
-        if (context.TryGetValue(identifier, out value))
-        { return true; }
-
-        if (TryGetVariableValue(identifier, out value))
-        { return true; }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryGetVariableValue(Identifier identifier, out CompiledValue value)
-    {
-        value = default;
-        return false;
-    }
-    bool TryCompute(Field field, EvaluationContext context, out CompiledValue value)
-    {
-        GeneralType prevType = FindStatementType(field.PrevStatement);
-
-        if (prevType.Is(out ArrayType? arrayType) &&
-            field.Identifier.Content == "Length")
-        {
-            if (!arrayType.ComputedLength.HasValue)
-            {
-                value = CompiledValue.Null;
-                return false;
-            }
-
-            value = new CompiledValue(arrayType.ComputedLength.Value);
-            return true;
-        }
-
-        if (context.TryGetValue(field, out value))
-        { return true; }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(BasicTypeCast typeCast, EvaluationContext context, out CompiledValue value)
-    {
-        if (TryCompute(typeCast.PrevStatement, context, out value))
-        {
-            GeneralType type = GeneralType.From(typeCast.Type, FindType, TryCompute);
-            if (!type.Is(out BuiltinType? builtinType)) return false;
-            value = CompiledValue.CreateUnsafe(value.I32, builtinType.RuntimeType);
-            return true;
-        }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(ManagedTypeCast typeCast, EvaluationContext context, out CompiledValue value)
-    {
-        if (TryCompute(typeCast.PrevStatement, context, out value))
-        {
-            GeneralType type = GeneralType.From(typeCast.Type, FindType, TryCompute);
-            if (!type.Is(out BuiltinType? builtinType)) return false;
-            if (!value.TryCast(builtinType.RuntimeType, out value))
-            { return false; }
-            return true;
-        }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(IndexCall indexCall, EvaluationContext context, out CompiledValue value)
-    {
-        if (indexCall.PrevStatement is LiteralStatement literal &&
-            literal.Type == LiteralType.String &&
-            TryCompute(indexCall.Index, context, out CompiledValue index))
-        {
-            if (index == literal.Value.Length)
-            { value = new CompiledValue('\0'); }
-            else
-            { value = new CompiledValue(literal.Value[(int)index]); }
-            return true;
-        }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, out CompiledValue value)
-        => TryCompute(statement, EvaluationContext.Empty, out value);
-    bool TryCompute(IEnumerable<StatementWithValue>? statements, EvaluationContext context, [NotNullWhen(true)] out ImmutableArray<CompiledValue> values)
-    {
-        if (statements is null)
-        {
-            values = ImmutableArray<CompiledValue>.Empty;
-            return false;
-        }
-
-        ImmutableArray<CompiledValue>.Builder result = ImmutableArray.CreateBuilder<CompiledValue>();
-        foreach (StatementWithValue statement in statements)
-        {
-            if (!TryCompute(statement, context, out CompiledValue value))
-            {
-                values = ImmutableArray<CompiledValue>.Empty;
-                return false;
-            }
-
-            result.Add(value);
-        }
-
-        values = result.ToImmutable();
-        return true;
-    }
-    bool TryCompute([NotNullWhen(true)] StatementWithValue? statement, EvaluationContext context, out CompiledValue value)
-    {
-        value = CompiledValue.Null;
-
-        if (statement is null)
-        { return false; }
-
-        if (context.TryGetValue(statement, out value))
-        { return true; }
-
-        return statement switch
-        {
-            LiteralStatement v => TryCompute(v, out value),
-            BinaryOperatorCall v => TryCompute(v, context, out value),
-            UnaryOperatorCall v => TryCompute(v, context, out value),
-            Pointer v => TryCompute(v, context, out value),
-            FunctionCall v => TryCompute(v, context, out value),
-            AnyCall v => TryCompute(v, context, out value),
-            Identifier v => TryCompute(v, context, out value),
-            BasicTypeCast v => TryCompute(v, context, out value),
-            ManagedTypeCast v => TryCompute(v, context, out value),
-            Field v => TryCompute(v, context, out value),
-            IndexCall v => TryCompute(v, context, out value),
-            ModifiedStatement => false,
-            NewInstance => false,
-            ConstructorCall => false,
-            AddressGetter => false,
-            LiteralList => false,
-            _ => throw new NotImplementedException(statement.GetType().ToString()),
-        };
-    }
-
     static bool TryComputeSimple(BinaryOperatorCall @operator, out CompiledValue value)
     {
         if (!TryComputeSimple(@operator.Left, out CompiledValue leftValue))
@@ -4350,7 +3815,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         string op = @operator.Operator.Content;
 
         if (TryComputeSimple(@operator.Right, out CompiledValue rightValue) &&
-            TryCompute(op, leftValue, rightValue, out value, out _))
+            TryComputeSimple(op, leftValue, rightValue, out value, out _))
         { return true; }
 
         switch (op)
@@ -4427,308 +3892,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return statement switch
         {
-            LiteralStatement v => TryCompute(v, out value),
+            LiteralStatement v => TryComputeSimple(v, out value),
             BinaryOperatorCall v => TryComputeSimple(v, out value),
             UnaryOperatorCall v => TryComputeSimple(v, out value),
             IndexCall v => TryComputeSimple(v, out value),
             _ => false,
         };
     }
-
-    bool TryEvaluate(ICompiledFunction function, ImmutableArray<CompiledValue> parameterValues, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement[]? runtimeStatements)
-    {
-        value = null;
-        runtimeStatements = null;
-
-        if (function.Block is null)
-        { return false; }
-
-        {
-            CompiledValue[] castedParameterValues = new CompiledValue[parameterValues.Length];
-            for (int i = 0; i < parameterValues.Length; i++)
-            {
-                if (!parameterValues[i].TryCast(function.ParameterTypes[i], out CompiledValue castedValue))
-                {
-                    // Debugger.Break();
-                    return false;
-                }
-
-                if (!function.ParameterTypes[i].SameAs(castedValue.Type))
-                {
-                    // Debugger.Break();
-                    return false;
-                }
-
-                castedParameterValues[i] = castedValue;
-            }
-            parameterValues = castedParameterValues.ToImmutableArray();
-        }
-
-        Dictionary<string, CompiledValue> variables = new();
-
-        if (function.ReturnSomething)
-        {
-            if (!function.Type.Is(out BuiltinType? returnType))
-            { return false; }
-
-            if (function.ReturnSomething)
-            { variables.Add("@return", GetInitialValue(returnType.Type)); }
-        }
-
-        for (int i = 0; i < parameterValues.Length; i++)
-        { variables.Add(function.Parameters[i].Identifier.Content, parameterValues[i]); }
-
-        EvaluationContext context = new(null, variables);
-
-        CurrentEvaluationContext.Push(context);
-
-        bool success = TryEvaluate(function.Block, context);
-
-        CurrentEvaluationContext.Pop();
-
-        if (!success)
-        { return false; }
-
-        if (function.ReturnSomething)
-        {
-            if (context.LastScope is null)
-            { throw new InternalExceptionWithoutContext(); }
-            value = context.LastScope["@return"];
-        }
-
-        runtimeStatements = context.RuntimeStatements.ToArray();
-
-        return true;
-    }
-    bool TryEvaluate(WhileLoop whileLoop, EvaluationContext context)
-    {
-        int iterations = 64;
-
-        while (true)
-        {
-            if (!TryCompute(whileLoop.Condition, context, out CompiledValue condition))
-            { return false; }
-
-            if (!condition)
-            { break; }
-
-            if (iterations-- < 0)
-            { return false; }
-
-            if (!TryEvaluate(whileLoop.Block, context))
-            {
-                context.IsBreaking = false;
-                return false;
-            }
-
-            if (context.IsBreaking)
-            { break; }
-
-            context.IsBreaking = false;
-        }
-
-        context.IsBreaking = false;
-        return true;
-    }
-    bool TryEvaluate(ForLoop forLoop, EvaluationContext context)
-    {
-        int iterations = 5048;
-
-        context.PushScope();
-
-        if (!TryEvaluate(forLoop.VariableDeclaration, context))
-        { return false; }
-
-        while (true)
-        {
-            if (!TryCompute(forLoop.Condition, context, out CompiledValue condition))
-            { return false; }
-
-            if (!condition)
-            { break; }
-
-            if (iterations-- < 0)
-            { return false; }
-
-            if (!TryEvaluate(forLoop.Block, context))
-            {
-                context.IsBreaking = false;
-                return false;
-            }
-
-            if (context.IsBreaking)
-            { break; }
-
-            if (!TryEvaluate(forLoop.Expression, context))
-            { return false; }
-
-            context.IsBreaking = false;
-        }
-
-        context.IsBreaking = false;
-        context.PopScope();
-        return true;
-    }
-    bool TryEvaluate(IfContainer ifContainer, EvaluationContext context)
-    {
-        foreach (BaseBranch _branch in ifContainer.Branches)
-        {
-            switch (_branch)
-            {
-                case IfBranch branch:
-                {
-                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
-                    { return false; }
-
-                    if (!condition)
-                    { continue; }
-
-                    if (!TryEvaluate(branch.Block, context))
-                    { return false; }
-
-                    return true;
-                }
-
-                case ElseIfBranch branch:
-                {
-                    if (!TryCompute(branch.Condition, context, out CompiledValue condition))
-                    { return false; }
-
-                    if (!condition)
-                    { continue; }
-
-                    if (!TryEvaluate(branch.Block, context))
-                    { return false; }
-
-                    return true;
-                }
-
-                case ElseBranch branch:
-                {
-                    if (!TryEvaluate(branch.Block, context))
-                    { return false; }
-
-                    return true;
-                }
-
-                default: throw new UnreachableException();
-            }
-        }
-
-        return true;
-    }
-    bool TryEvaluate(Block block, EvaluationContext context)
-    {
-        context.PushScope();
-        bool result = TryEvaluate(block.Statements, context);
-        context.PopScope();
-        return result;
-    }
-    bool TryEvaluate(VariableDeclaration variableDeclaration, EvaluationContext context)
-    {
-        CompiledValue value;
-
-        if (context.LastScope is null)
-        { return false; }
-
-        if (variableDeclaration.InitialValue is null &&
-            variableDeclaration.Type.ToString() != StatementKeywords.Var)
-        {
-            GeneralType variableType = GeneralType.From(variableDeclaration.Type, FindType, TryCompute, variableDeclaration.File);
-            if (!GetInitialValue(variableType, out value))
-            { return false; }
-        }
-        else
-        {
-            if (!TryCompute(variableDeclaration.InitialValue, context, out value))
-            { return false; }
-        }
-
-        if (!context.LastScope.TryAdd(variableDeclaration.Identifier.Content, value))
-        { return false; }
-
-        return true;
-    }
-    bool TryEvaluate(AnyAssignment anyAssignment, EvaluationContext context)
-    {
-        Assignment assignment = anyAssignment.ToAssignment();
-
-        if (assignment.Left is not Identifier identifier)
-        { return false; }
-
-        if (!TryCompute(assignment.Right, context, out CompiledValue value))
-        { return false; }
-
-        if (!context.TrySetVariable(identifier.Content, value))
-        { return false; }
-
-        return true;
-    }
-    bool TryEvaluate(KeywordCall keywordCall, EvaluationContext context)
-    {
-        if (keywordCall.Identifier.Content == StatementKeywords.Return)
-        {
-            context.IsReturning = true;
-
-            if (keywordCall.Arguments.Length == 0)
-            { return true; }
-
-            if (keywordCall.Arguments.Length == 1)
-            {
-                if (!TryCompute(keywordCall.Arguments[0], context, out CompiledValue returnValue))
-                { return false; }
-
-                if (!context.TrySetVariable("@return", returnValue))
-                { return false; }
-
-                return true;
-            }
-
-            return false;
-        }
-
-        if (keywordCall.Identifier.Content == StatementKeywords.Break)
-        {
-            context.IsBreaking = true;
-
-            if (keywordCall.Arguments.Length != 0)
-            { return false; }
-
-            return true;
-        }
-
-        return false;
-    }
-    bool TryEvaluate(Statement statement, EvaluationContext context) => statement switch
-    {
-        Block v => TryEvaluate(v, context),
-        VariableDeclaration v => TryEvaluate(v, context),
-        WhileLoop v => TryEvaluate(v, context),
-        ForLoop v => TryEvaluate(v, context),
-        AnyAssignment v => TryEvaluate(v, context),
-        KeywordCall v => TryEvaluate(v, context),
-        IfContainer v => TryEvaluate(v, context),
-        StatementWithValue v => TryCompute(v, context, out _),
-        _ => throw new NotImplementedException(statement.GetType().ToString()),
-    };
-    bool TryEvaluate(ImmutableArray<Statement> statements, EvaluationContext context)
-    {
-        foreach (Statement statement in statements)
-        {
-            if (!TryEvaluate(statement, context))
-            { return false; }
-
-            if (context.IsReturning || context.IsBreaking)
-            { break; }
-        }
-        return true;
-    }
-
-    readonly Stack<EvaluationContext> CurrentEvaluationContext = new();
-
-    #endregion
-
-    #region Compile Time Evaluation
 
     abstract class RuntimeStatement2 :
         IPositioned,
@@ -4780,21 +3950,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         public static EvaluationContext2 EmptyWithVariables => new(null, new Dictionary<string, CompiledValue>());
 
-        public Dictionary<string, CompiledStatementWithValue> Variables
+        public Dictionary<string, CompiledValue> Variables
         {
             get
             {
-                if (_frames is null || _frames.Count == 0) return new Dictionary<string, CompiledStatementWithValue>();
-                Dictionary<string, CompiledStatementWithValue> result = new();
+                if (_frames is null || _frames.Count == 0) return new Dictionary<string, CompiledValue>();
+                Dictionary<string, CompiledValue> result = new();
                 foreach (Dictionary<string, CompiledValue> scope in _frames.Last)
                 {
-                    result.AddRange(scope.Select(v => new KeyValuePair<string, CompiledStatementWithValue>(v.Key, new CompiledEvaluatedValue()
-                    {
-                        Value = v.Value,
-                        Location = new Location(Position.UnknownPosition, null),
-                        SaveValue = true,
-                        Type = new BuiltinType(v.Value.Type),
-                    })));
+                    result.AddRange(scope);
                 }
                 return result;
             }
@@ -4897,20 +4061,20 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
-    bool TryCompute2(CompiledPointer pointer, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledPointer pointer, EvaluationContext2 context, out CompiledValue value)
     {
         if (pointer.To is CompiledAddressGetter addressGetter)
-        { return TryCompute2(addressGetter.Of, context, out value); }
+        { return TryCompute(addressGetter.Of, context, out value); }
 
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute2(CompiledBinaryOperatorCall @operator, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledBinaryOperatorCall @operator, EvaluationContext2 context, out CompiledValue value)
     {
         if (context.TryGetValue(@operator, out value))
         { return true; }
 
-        if (!TryCompute2(@operator.Left, context, out CompiledValue leftValue))
+        if (!TryCompute(@operator.Left, context, out CompiledValue leftValue))
         {
             value = CompiledValue.Null;
             return false;
@@ -4918,8 +4082,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         string op = @operator.Operator;
 
-        if (TryCompute2(@operator.Right, context, out CompiledValue rightValue) &&
-            TryCompute(op, leftValue, rightValue, out value, out _))
+        if (TryCompute(@operator.Right, context, out CompiledValue rightValue) &&
+            TryComputeSimple(op, leftValue, rightValue, out value, out _))
         {
             return true;
         }
@@ -4956,12 +4120,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = leftValue;
         return true;
     }
-    bool TryCompute2(CompiledUnaryOperatorCall @operator, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledUnaryOperatorCall @operator, EvaluationContext2 context, out CompiledValue value)
     {
         if (context.TryGetValue(@operator, out value))
         { return true; }
 
-        if (!TryCompute2(@operator.Left, context, out CompiledValue leftValue))
+        if (!TryCompute(@operator.Left, context, out CompiledValue leftValue))
         {
             value = CompiledValue.Null;
             return false;
@@ -4984,26 +4148,26 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = leftValue;
         return true;
     }
-    static bool TryCompute2(CompiledEvaluatedValue literal, out CompiledValue value)
+    static bool TryCompute(CompiledEvaluatedValue literal, out CompiledValue value)
     {
         value = literal.Value;
         return true;
     }
-    static bool TryCompute2(CompiledStringInstance literal, out CompiledValue value)
+    static bool TryCompute(CompiledStringInstance literal, out CompiledValue value)
     {
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute2(CompiledRuntimeCall anyCall, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledRuntimeCall anyCall, EvaluationContext2 context, out CompiledValue value)
     {
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute2(CompiledExternalFunctionCall functionCall, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledExternalFunctionCall functionCall, EvaluationContext2 context, out CompiledValue value)
     {
         value = CompiledValue.Null;
 
-        if (!TryCompute2(functionCall.Arguments, context, out ImmutableArray<CompiledValue> parameters))
+        if (!TryCompute(functionCall.Arguments, context, out ImmutableArray<CompiledValue> parameters))
         {
             return false;
         }
@@ -5011,13 +4175,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         context.RuntimeStatements.Add(new RuntimeFunctionCall2(parameters, functionCall));
         return true;
     }
-    bool TryCompute2(CompiledFunctionCall functionCall, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledFunctionCall functionCall, EvaluationContext2 context, out CompiledValue value)
     {
         value = CompiledValue.Null;
 
         ICompiledFunction? function = functionCall.Function;
 
-        if (!TryCompute2(functionCall.Arguments, context, out ImmutableArray<CompiledValue> parameters))
+        if (!TryCompute(functionCall.Arguments, context, out ImmutableArray<CompiledValue> parameters))
         {
             return false;
         }
@@ -5043,7 +4207,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         using (StackAuto<ICompiledFunction> _ = context.Calls.PushAuto(function))
         {
-            if (TryEvaluate2(found, parameters, out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
+            if (TryEvaluate(found, parameters, out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
                 returnValue.HasValue &&
                 runtimeStatements.Length == 0)
             {
@@ -5054,7 +4218,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-    bool TryCompute2(CompiledSizeof functionCall, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledSizeof functionCall, EvaluationContext2 context, out CompiledValue value)
     {
         if (!FindSize(functionCall.Of, out int size, out PossibleDiagnostic? findSizeError))
         {
@@ -5065,7 +4229,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = new CompiledValue(size);
         return true;
     }
-    bool TryCompute2(CompiledVariableGetter identifier, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledVariableGetter identifier, EvaluationContext2 context, out CompiledValue value)
     {
         if (context.TryGetValue(identifier, out value))
         { return true; }
@@ -5076,7 +4240,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute2(CompiledParameterGetter identifier, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledParameterGetter identifier, EvaluationContext2 context, out CompiledValue value)
     {
         if (context.TryGetValue(identifier, out value))
         { return true; }
@@ -5097,7 +4261,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = default;
         return false;
     }
-    bool TryCompute2(CompiledFieldGetter field, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledFieldGetter field, EvaluationContext2 context, out CompiledValue value)
     {
         if (context.TryGetValue(field, out value))
         { return true; }
@@ -5105,9 +4269,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute2(CompiledFakeTypeCast typeCast, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledFakeTypeCast typeCast, EvaluationContext2 context, out CompiledValue value)
     {
-        if (TryCompute2(typeCast.Value, context, out value))
+        if (TryCompute(typeCast.Value, context, out value))
         {
             if (!typeCast.Type.Is(out BuiltinType? builtinType)) return false;
             value = CompiledValue.CreateUnsafe(value.I32, builtinType.RuntimeType);
@@ -5117,9 +4281,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute2(CompiledTypeCast typeCast, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledTypeCast typeCast, EvaluationContext2 context, out CompiledValue value)
     {
-        if (TryCompute2(typeCast.Value, context, out value))
+        if (TryCompute(typeCast.Value, context, out value))
         {
             if (!typeCast.Type.Is(out BuiltinType? builtinType)) return false;
             if (!value.TryCast(builtinType.RuntimeType, out value))
@@ -5130,10 +4294,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute2(CompiledIndexGetter indexCall, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledIndexGetter indexCall, EvaluationContext2 context, out CompiledValue value)
     {
         if (indexCall.Base is CompiledStringInstance literal &&
-            TryCompute2(indexCall.Index, context, out CompiledValue index))
+            TryCompute(indexCall.Index, context, out CompiledValue index))
         {
             if (index == literal.Value.Length)
             { value = new CompiledValue('\0'); }
@@ -5145,9 +4309,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute2([NotNullWhen(true)] CompiledStatementWithValue? statement, out CompiledValue value)
-        => TryCompute2(statement, EvaluationContext2.Empty, out value);
-    bool TryCompute2(IEnumerable<CompiledStatementWithValue>? statements, EvaluationContext2 context, [NotNullWhen(true)] out ImmutableArray<CompiledValue> values)
+    bool TryCompute([NotNullWhen(true)] CompiledStatementWithValue? statement, out CompiledValue value)
+        => TryCompute(statement, EvaluationContext2.Empty, out value);
+    bool TryCompute(IEnumerable<CompiledStatementWithValue>? statements, EvaluationContext2 context, [NotNullWhen(true)] out ImmutableArray<CompiledValue> values)
     {
         if (statements is null)
         {
@@ -5158,7 +4322,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         ImmutableArray<CompiledValue>.Builder result = ImmutableArray.CreateBuilder<CompiledValue>();
         foreach (CompiledStatementWithValue statement in statements)
         {
-            if (!TryCompute2(statement, context, out CompiledValue value))
+            if (!TryCompute(statement, context, out CompiledValue value))
             {
                 values = ImmutableArray<CompiledValue>.Empty;
                 return false;
@@ -5170,7 +4334,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         values = result.ToImmutable();
         return true;
     }
-    bool TryCompute2([NotNullWhen(true)] CompiledStatementWithValue? statement, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute([NotNullWhen(true)] CompiledStatementWithValue? statement, EvaluationContext2 context, out CompiledValue value)
     {
         value = CompiledValue.Null;
 
@@ -5182,22 +4346,22 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return statement switch
         {
-            CompiledStringInstance v => TryCompute2(v, out value),
-            CompiledEvaluatedValue v => TryCompute2(v, out value),
-            CompiledBinaryOperatorCall v => TryCompute2(v, context, out value),
-            CompiledUnaryOperatorCall v => TryCompute2(v, context, out value),
-            CompiledPointer v => TryCompute2(v, context, out value),
-            CompiledExternalFunctionCall v => TryCompute2(v, context, out value),
-            CompiledFunctionCall v => TryCompute2(v, context, out value),
-            CompiledSizeof v => TryCompute2(v, context, out value),
-            CompiledRuntimeCall v => TryCompute2(v, context, out value),
-            CompiledVariableGetter v => TryCompute2(v, context, out value),
-            CompiledParameterGetter v => TryCompute2(v, context, out value),
-            CompiledFakeTypeCast v => TryCompute2(v, context, out value),
-            CompiledTypeCast v => TryCompute2(v, context, out value),
-            CompiledFieldGetter v => TryCompute2(v, context, out value),
-            CompiledIndexGetter v => TryCompute2(v, context, out value),
-            CompiledPassedArgument v => TryCompute2(v.Value, context, out value),
+            CompiledStringInstance v => TryCompute(v, out value),
+            CompiledEvaluatedValue v => TryCompute(v, out value),
+            CompiledBinaryOperatorCall v => TryCompute(v, context, out value),
+            CompiledUnaryOperatorCall v => TryCompute(v, context, out value),
+            CompiledPointer v => TryCompute(v, context, out value),
+            CompiledExternalFunctionCall v => TryCompute(v, context, out value),
+            CompiledFunctionCall v => TryCompute(v, context, out value),
+            CompiledSizeof v => TryCompute(v, context, out value),
+            CompiledRuntimeCall v => TryCompute(v, context, out value),
+            CompiledVariableGetter v => TryCompute(v, context, out value),
+            CompiledParameterGetter v => TryCompute(v, context, out value),
+            CompiledFakeTypeCast v => TryCompute(v, context, out value),
+            CompiledTypeCast v => TryCompute(v, context, out value),
+            CompiledFieldGetter v => TryCompute(v, context, out value),
+            CompiledIndexGetter v => TryCompute(v, context, out value),
+            CompiledPassedArgument v => TryCompute(v.Value, context, out value),
             CompiledStackAllocation => false,
             CompiledConstructorCall => false,
             CompiledAddressGetter => false,
@@ -5205,9 +4369,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
     }
-    CompiledStatementWithValue TryCompute2(CompiledStatementWithValue v)
+    CompiledStatementWithValue TryCompute(CompiledStatementWithValue v)
     {
-        if (!TryCompute2(v, out var evaluated)) return v;
+        if (!TryCompute(v, out var evaluated)) return v;
         if (!evaluated.TryCast(v.Type, out var casted)) return v;
 
         return new CompiledEvaluatedValue()
@@ -5219,7 +4383,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
     }
 
-    bool TryEvaluate2(ICompiledFunction function, ImmutableArray<CompiledPassedArgument> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunction function, ImmutableArray<CompiledPassedArgument> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
@@ -5231,13 +4395,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        if (TryCompute2(parameters, EvaluationContext2.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
-            TryEvaluate2(found, parameterValues, out value, out runtimeStatements))
+        if (TryCompute(parameters, EvaluationContext2.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
+            TryEvaluate(found, parameterValues, out value, out runtimeStatements))
         { return true; }
 
         return false;
     }
-    bool TryEvaluate2(ICompiledFunction function, ImmutableArray<CompiledStatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunction function, ImmutableArray<CompiledStatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
@@ -5249,24 +4413,24 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        if (TryCompute2(parameters, EvaluationContext2.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
-            TryEvaluate2(found, parameterValues, out value, out runtimeStatements))
+        if (TryCompute(parameters, EvaluationContext2.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
+            TryEvaluate(found, parameterValues, out value, out runtimeStatements))
         { return true; }
 
         return false;
     }
-    bool TryEvaluate2(CompiledFunction2 function, ImmutableArray<CompiledStatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(CompiledFunction2 function, ImmutableArray<CompiledStatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
 
-        if (TryCompute2(parameters, EvaluationContext2.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
-            TryEvaluate2(function, parameterValues, out value, out runtimeStatements))
+        if (TryCompute(parameters, EvaluationContext2.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
+            TryEvaluate(function, parameterValues, out value, out runtimeStatements))
         { return true; }
 
         return false;
     }
-    bool TryEvaluate2(CompiledFunction2 function, ImmutableArray<CompiledValue> parameterValues, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(CompiledFunction2 function, ImmutableArray<CompiledValue> parameterValues, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
     {
         value = null;
         runtimeStatements = null;
@@ -5310,7 +4474,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         CurrentEvaluationContext2.Push(context);
 
-        bool success = TryEvaluate2(function.Body, context);
+        bool success = TryEvaluate(function.Body, context);
 
         CurrentEvaluationContext2.Pop();
 
@@ -5328,13 +4492,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-    bool TryEvaluate2(CompiledWhileLoop whileLoop, EvaluationContext2 context)
+    bool TryEvaluate(CompiledWhileLoop whileLoop, EvaluationContext2 context)
     {
         int iterations = 64;
 
         while (true)
         {
-            if (!TryCompute2(whileLoop.Condition, context, out CompiledValue condition))
+            if (!TryCompute(whileLoop.Condition, context, out CompiledValue condition))
             { return false; }
 
             if (!condition)
@@ -5343,7 +4507,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (iterations-- < 0)
             { return false; }
 
-            if (!TryEvaluate2(whileLoop.Body, context))
+            if (!TryEvaluate(whileLoop.Body, context))
             {
                 context.IsBreaking = false;
                 return false;
@@ -5358,18 +4522,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         context.IsBreaking = false;
         return true;
     }
-    bool TryEvaluate2(CompiledForLoop forLoop, EvaluationContext2 context)
+    bool TryEvaluate(CompiledForLoop forLoop, EvaluationContext2 context)
     {
         int iterations = 5048;
 
         context.PushScope();
 
-        if (!TryEvaluate2(forLoop.VariableDeclaration, context))
+        if (!TryEvaluate(forLoop.VariableDeclaration, context))
         { return false; }
 
         while (true)
         {
-            if (!TryCompute2(forLoop.Condition, context, out CompiledValue condition))
+            if (!TryCompute(forLoop.Condition, context, out CompiledValue condition))
             { return false; }
 
             if (!condition)
@@ -5378,7 +4542,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (iterations-- < 0)
             { return false; }
 
-            if (!TryEvaluate2(forLoop.Body, context))
+            if (!TryEvaluate(forLoop.Body, context))
             {
                 context.IsBreaking = false;
                 return false;
@@ -5387,7 +4551,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (context.IsBreaking)
             { break; }
 
-            if (!TryEvaluate2(forLoop.Expression, context))
+            if (!TryEvaluate(forLoop.Expression, context))
             { return false; }
 
             context.IsBreaking = false;
@@ -5397,7 +4561,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         context.PopScope();
         return true;
     }
-    bool TryEvaluate2(CompiledIf ifContainer, EvaluationContext2 context)
+    bool TryEvaluate(CompiledIf ifContainer, EvaluationContext2 context)
     {
         CompiledBranch? current = ifContainer;
         while (true)
@@ -5406,18 +4570,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             {
                 case CompiledIf _if:
                 {
-                    if (!TryCompute2(_if.Condition, context, out CompiledValue condition))
+                    if (!TryCompute(_if.Condition, context, out CompiledValue condition))
                     { return false; }
 
                     if (condition)
-                    { return TryEvaluate2(_if.Body, context); }
+                    { return TryEvaluate(_if.Body, context); }
 
                     current = _if.Next;
                     break;
                 }
                 case CompiledElse _else:
                 {
-                    return TryEvaluate2(_else.Body, context);
+                    return TryEvaluate(_else.Body, context);
                 }
                 default:
                     throw new NotImplementedException();
@@ -5427,14 +4591,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-    bool TryEvaluate2(CompiledBlock block, EvaluationContext2 context)
+    bool TryEvaluate(CompiledBlock block, EvaluationContext2 context)
     {
         context.PushScope();
-        bool result = TryEvaluate2(block.Statements, context);
+        bool result = TryEvaluate(block.Statements, context);
         context.PopScope();
         return result;
     }
-    bool TryEvaluate2(CompiledVariableDeclaration variableDeclaration, EvaluationContext2 context)
+    bool TryEvaluate(CompiledVariableDeclaration variableDeclaration, EvaluationContext2 context)
     {
         CompiledValue value;
 
@@ -5449,7 +4613,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
         else
         {
-            if (!TryCompute2(variableDeclaration.InitialValue, context, out value))
+            if (!TryCompute(variableDeclaration.InitialValue, context, out value))
             { return false; }
         }
 
@@ -5458,9 +4622,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-    bool TryEvaluate2(CompiledVariableSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledVariableSetter anyAssignment, EvaluationContext2 context)
     {
-        if (!TryCompute2(anyAssignment.Value, context, out CompiledValue value))
+        if (!TryCompute(anyAssignment.Value, context, out CompiledValue value))
         { return false; }
 
         if (!context.TrySetVariable(anyAssignment.Variable.Identifier, value))
@@ -5468,9 +4632,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-    bool TryEvaluate2(CompiledParameterSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledParameterSetter anyAssignment, EvaluationContext2 context)
     {
-        if (!TryCompute2(anyAssignment.Value, context, out CompiledValue value))
+        if (!TryCompute(anyAssignment.Value, context, out CompiledValue value))
         { return false; }
 
         if (!context.TrySetVariable(anyAssignment.Variable.Identifier.Content, value))
@@ -5478,25 +4642,25 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-    bool TryEvaluate2(CompiledFieldSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledFieldSetter anyAssignment, EvaluationContext2 context)
     {
         return false;
     }
-    bool TryEvaluate2(CompiledIndexSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledIndexSetter anyAssignment, EvaluationContext2 context)
     {
         return false;
     }
-    bool TryEvaluate2(CompiledIndirectSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledIndirectSetter anyAssignment, EvaluationContext2 context)
     {
         return false;
     }
-    bool TryEvaluate2(CompiledReturn keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledReturn keywordCall, EvaluationContext2 context)
     {
         context.IsReturning = true;
 
         if (keywordCall.Value is not null)
         {
-            if (!TryCompute2(keywordCall.Value, context, out CompiledValue returnValue))
+            if (!TryCompute(keywordCall.Value, context, out CompiledValue returnValue))
             { return false; }
 
             if (!context.TrySetVariable("@return", returnValue))
@@ -5505,48 +4669,48 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-    bool TryEvaluate2(CompiledBreak keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledBreak keywordCall, EvaluationContext2 context)
     {
         context.IsBreaking = true;
         return true;
     }
-    bool TryEvaluate2(CompiledCrash keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledCrash keywordCall, EvaluationContext2 context)
     {
         return false;
     }
-    bool TryEvaluate2(CompiledGoto keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledGoto keywordCall, EvaluationContext2 context)
     {
         return false;
     }
-    bool TryEvaluate2(CompiledDelete keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledDelete keywordCall, EvaluationContext2 context)
     {
         return false;
     }
-    bool TryEvaluate2(CompiledStatement statement, EvaluationContext2 context) => statement switch
+    bool TryEvaluate(CompiledStatement statement, EvaluationContext2 context) => statement switch
     {
-        CompiledStatementWithValue v => TryCompute2(v, context, out _),
-        CompiledBlock v => TryEvaluate2(v, context),
-        CompiledVariableDeclaration v => TryEvaluate2(v, context),
-        CompiledWhileLoop v => TryEvaluate2(v, context),
-        CompiledForLoop v => TryEvaluate2(v, context),
-        CompiledVariableSetter v => TryEvaluate2(v, context),
-        CompiledParameterSetter v => TryEvaluate2(v, context),
-        CompiledFieldSetter v => TryEvaluate2(v, context),
-        CompiledIndexSetter v => TryEvaluate2(v, context),
-        CompiledIndirectSetter v => TryEvaluate2(v, context),
-        CompiledReturn v => TryEvaluate2(v, context),
-        CompiledCrash v => TryEvaluate2(v, context),
-        CompiledBreak v => TryEvaluate2(v, context),
-        CompiledGoto v => TryEvaluate2(v, context),
-        CompiledDelete v => TryEvaluate2(v, context),
-        CompiledIf v => TryEvaluate2(v, context),
+        CompiledStatementWithValue v => TryCompute(v, context, out _),
+        CompiledBlock v => TryEvaluate(v, context),
+        CompiledVariableDeclaration v => TryEvaluate(v, context),
+        CompiledWhileLoop v => TryEvaluate(v, context),
+        CompiledForLoop v => TryEvaluate(v, context),
+        CompiledVariableSetter v => TryEvaluate(v, context),
+        CompiledParameterSetter v => TryEvaluate(v, context),
+        CompiledFieldSetter v => TryEvaluate(v, context),
+        CompiledIndexSetter v => TryEvaluate(v, context),
+        CompiledIndirectSetter v => TryEvaluate(v, context),
+        CompiledReturn v => TryEvaluate(v, context),
+        CompiledCrash v => TryEvaluate(v, context),
+        CompiledBreak v => TryEvaluate(v, context),
+        CompiledGoto v => TryEvaluate(v, context),
+        CompiledDelete v => TryEvaluate(v, context),
+        CompiledIf v => TryEvaluate(v, context),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
-    bool TryEvaluate2(ImmutableArray<CompiledStatement> statements, EvaluationContext2 context)
+    bool TryEvaluate(ImmutableArray<CompiledStatement> statements, EvaluationContext2 context)
     {
         foreach (CompiledStatement statement in statements)
         {
-            if (!TryEvaluate2(statement, context))
+            if (!TryEvaluate(statement, context))
             { return false; }
 
             if (context.IsReturning || context.IsBreaking)
@@ -5556,144 +4720,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
 
     readonly Stack<EvaluationContext2> CurrentEvaluationContext2 = new();
-
-    #endregion
-
-    #region Loop Unrolling
-
-    bool IsUnrollable(ForLoop loop)
-    {
-        string iteratorVariable = loop.VariableDeclaration.Identifier.Content;
-        Dictionary<string, StatementWithValue> _params = new()
-        {
-            { iteratorVariable, Literal.CreateAnonymous(new CompiledValue(0), loop.VariableDeclaration, loop.VariableDeclaration.File) }
-        };
-
-        StatementWithValue condition = loop.Condition;
-        Assignment iteratorExpression = loop.Expression.ToAssignment();
-
-        if (iteratorExpression.Left is not Identifier iteratorExpressionLeft ||
-            iteratorExpressionLeft.Content != iteratorVariable)
-        { return false; }
-
-        condition = InlineMacro(condition, _params);
-        StatementWithValue iteratorExpressionRight = InlineMacro(iteratorExpression.Right, _params);
-
-        if (!TryCompute(condition, EvaluationContext.Empty, out _) ||
-            !TryCompute(iteratorExpressionRight, EvaluationContext.Empty, out _))
-        { return false; }
-
-        // TODO: return and break in unrolled loop
-        if (loop.Block.GetStatement<KeywordCall>(out _, (statement) => statement.Identifier.Content is StatementKeywords.Break or StatementKeywords.Return))
-        { return false; }
-
-        return true;
-    }
-
-    ImmutableArray<Block> Unroll(ForLoop loop, Dictionary<StatementWithValue, CompiledValue> values)
-    {
-        VariableDeclaration iteratorVariable = loop.VariableDeclaration;
-        StatementWithValue condition = loop.Condition;
-        AnyAssignment iteratorExpression = loop.Expression;
-
-        CompiledValue iterator;
-        if (iteratorVariable.InitialValue is null)
-        {
-            // FIXME: unitialized variable is undefined behavior
-            GeneralType iteratorType = GeneralType.From(iteratorVariable.Type, FindType, TryCompute);
-            iteratorVariable.Type.SetAnalyzedType(iteratorType);
-            iterator = default;
-
-            if (!iteratorType.GetBitWidth(this, out BitWidth bitWidth, out PossibleDiagnostic? getBitwidthError))
-            {
-                Diagnostics.Add(getBitwidthError.ToError(iteratorVariable));
-            }
-            else if (!iteratorType.TryGetNumericType(out NumericType numericType))
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Type \"{iteratorType}\" aint a numeric type", iteratorVariable));
-            }
-            else
-            {
-                iterator = GetInitialValue(numericType, bitWidth);
-            }
-        }
-        else
-        {
-            if (!TryCompute(iteratorVariable.InitialValue, EvaluationContext.Empty, out iterator))
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Failed to compute the iterator initial value (\"{iteratorVariable.InitialValue}\") for loop unrolling", iteratorVariable.InitialValue));
-                return default;
-            }
-        }
-
-        KeyValuePair<string, StatementWithValue> GetIteratorStatement()
-            => new(iteratorVariable.Identifier.Content, Literal.CreateAnonymous(iterator, iteratorVariable.InitialValue?.Position ?? iteratorVariable.Position, iteratorVariable.InitialValue?.File ?? iteratorVariable.File));
-
-        CompiledValue ComputeIterator()
-        {
-            KeyValuePair<string, StatementWithValue> _yeah = GetIteratorStatement();
-            StatementWithValue _condition = InlineMacro(condition, new Dictionary<string, StatementWithValue>()
-            {
-                {_yeah.Key, _yeah.Value }
-            });
-
-            if (!TryCompute(_condition, new EvaluationContext(values, null), out CompiledValue result))
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Failed to compute the condition value (\"{_condition}\") for loop unrolling", condition));
-                return default;
-            }
-
-            return result;
-        }
-
-        CompiledValue ComputeExpression()
-        {
-            KeyValuePair<string, StatementWithValue> _yeah = GetIteratorStatement();
-            Assignment assignment = iteratorExpression.ToAssignment();
-
-            if (assignment.Left is not Identifier leftIdentifier)
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Failed to unroll for loop", assignment.Left));
-                return default;
-            }
-
-            StatementWithValue _value = InlineMacro(assignment.Right, new Dictionary<string, StatementWithValue>()
-            {
-                { _yeah.Key, _yeah.Value }
-            });
-
-            if (!TryCompute(_value, new EvaluationContext(values, null), out CompiledValue result))
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Failed to compute the condition value (\"{_value}\") for loop unrolling", condition));
-                return default;
-            }
-
-            return result;
-        }
-
-        ImmutableArray<Block>.Builder statements = ImmutableArray.CreateBuilder<Block>();
-
-        while (ComputeIterator())
-        {
-            KeyValuePair<string, StatementWithValue> iteratorStatement = GetIteratorStatement();
-            Dictionary<string, StatementWithValue> parameters = new()
-            {
-                { iteratorStatement.Key, iteratorStatement.Value }
-            };
-
-            if (!InlineMacro(loop.Block, parameters, out Block? subBlock))
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Failed to inline", loop.Block));
-                return default;
-            }
-
-            statements.Add(subBlock);
-
-            iterator = ComputeExpression();
-        }
-
-        return statements.ToImmutable();
-    }
 
     #endregion
 

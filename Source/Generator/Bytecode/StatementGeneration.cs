@@ -306,8 +306,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     return;
         // }
 
-        bool isGlobal = newVariable.IsGlobal;
-
         if (newVariable.InitialValue == null) return;
 
         AddComment($"New Variable \"{newVariable.Identifier}\" {{");
@@ -341,8 +339,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment("}");
             return;
         }
-
-        if (isGlobal != newVariable.IsGlobal) throw null;
 
         GenerateCodeForValueSetter(new CompiledVariableSetter()
         {
@@ -2390,13 +2386,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
         foreach (CompiledFunction f in CompiledFunctions)
         {
             if (f.ExposedFunctionName is null) continue;
-            if (f.InstructionOffset == InvalidFunctionAddress) throw null; // aaaahhhh
+            if (f.InstructionOffset == InvalidFunctionAddress)
+            {
+                Diagnostics.Add(Diagnostic.Internal($"Exposed function \"{f.ToReadable()}\" was not compiled", f.Identifier, f.File));
+                continue;
+            }
+
             int returnValueSize = f.ReturnSomething ? f.Type.GetSize(this, Diagnostics, f.TypeToken) : 0;
             int argumentsSize = 0;
             foreach (GeneralType p in f.ParameterTypes)
-            {
-                argumentsSize += p.GetSize(this, Diagnostics, null); // ahh
-            }
+            { argumentsSize += p.GetSize(this, Diagnostics, ((FunctionDefinition)f).Type); }
+
             exposedFunctions[f.ExposedFunctionName] = new(f.ExposedFunctionName, returnValueSize, f.InstructionOffset, argumentsSize);
         }
 

@@ -41,7 +41,7 @@ public partial class StatementCompiler
 
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(size);
 
-        if (TryEvaluate2(allocator, ImmutableArray.Create(compiledSize), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
+        if (TryEvaluate(allocator, ImmutableArray.Create(compiledSize), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -589,8 +589,10 @@ public partial class StatementCompiler
 
         if (!GenerateCodeForArguments(arguments, callee, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
+        GenerateCodeForFunction(callee, typeArguments);
+
         if (AllowEvaluating &&
-            TryEvaluate2(callee, compiledArguments, out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
+            TryEvaluate(callee, compiledArguments, out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -609,8 +611,6 @@ public partial class StatementCompiler
         if (AllowFunctionInlining &&
             callee.IsInlineable)
         {
-            GenerateCodeForFunction(callee, typeArguments);
-
             CompiledFunction2? f = GeneratedFunctions.FirstOrDefault(v => v.Function == callee);
             if (f?.Body is not null)
             {
@@ -621,7 +621,7 @@ public partial class StatementCompiler
                         .ToImmutableDictionary(v => v.Content, v => v.Item2),
                 };
 
-                if (f.Body is not null && InlineFunction(f.Body, inlineContext, out CompiledStatement? inlined1))
+                if (InlineFunction(f.Body, inlineContext, out CompiledStatement? inlined1))
                 {
                     {
                         var volatileArguments =
@@ -880,7 +880,7 @@ public partial class StatementCompiler
             if (!GenerateCodeForFunctionCall(@operator, @operator.Arguments, result, out compiledStatement)) return false;
 
             if (AllowEvaluating &&
-                TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                TryCompute(compiledStatement, out CompiledValue evaluated) &&
                 evaluated.TryCast(compiledStatement.Type, out evaluated))
             {
                 compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
@@ -1039,7 +1039,7 @@ public partial class StatementCompiler
                     CompiledValue leftValue = GetInitialValue(leftNType, leftBitwidth);
                     CompiledValue rightValue = GetInitialValue(rightNType, rightBitwidth);
 
-                    if (!TryCompute(@operator.Operator.Content, leftValue, rightValue, out var predictedValue, out PossibleDiagnostic? evaluateError))
+                    if (!TryComputeSimple(@operator.Operator.Content, leftValue, rightValue, out var predictedValue, out PossibleDiagnostic? evaluateError))
                     {
                         Diagnostics.Add(evaluateError.ToError(@operator));
                         return false;
@@ -1070,7 +1070,7 @@ public partial class StatementCompiler
             };
 
             if (AllowEvaluating &&
-                TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                TryCompute(compiledStatement, out CompiledValue evaluated) &&
                 evaluated.TryCast(compiledStatement.Type, out evaluated))
             {
                 compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
@@ -1138,7 +1138,7 @@ public partial class StatementCompiler
             };
 
             if (AllowEvaluating &&
-                TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                TryCompute(compiledStatement, out CompiledValue evaluated) &&
                 evaluated.TryCast(compiledStatement.Type, out evaluated))
             {
                 compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
@@ -1166,7 +1166,7 @@ public partial class StatementCompiler
                     };
 
                     if (AllowEvaluating &&
-                        TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                        TryCompute(compiledStatement, out CompiledValue evaluated) &&
                         evaluated.TryCast(compiledStatement.Type, out evaluated))
                     {
                         compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
@@ -1190,7 +1190,7 @@ public partial class StatementCompiler
                     };
 
                     if (AllowEvaluating &&
-                        TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                        TryCompute(compiledStatement, out CompiledValue evaluated) &&
                         evaluated.TryCast(compiledStatement.Type, out evaluated))
                     {
                         compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
@@ -1641,7 +1641,8 @@ public partial class StatementCompiler
             variable.Reference = val;
             OnGotStatementType(variable, val.Type);
 
-            if (val.IsGlobal) throw null;
+            if (val.IsGlobal)
+            { Diagnostics.Add(Diagnostic.Internal($"Trying to get local variable \"{val.Identifier}\" but it was compiled as a global variable.", variable)); }
 
             compiledStatement = new CompiledVariableGetter()
             {
@@ -1659,7 +1660,8 @@ public partial class StatementCompiler
             variable.Reference = globalVariable;
             OnGotStatementType(variable, globalVariable.Type);
 
-            if (!globalVariable.IsGlobal) throw null;
+            if (!globalVariable.IsGlobal)
+            { Diagnostics.Add(Diagnostic.Internal($"Trying to get global variable \"{globalVariable.Identifier}\" but it was compiled as a local variable.", variable)); }
 
             compiledStatement = new CompiledVariableGetter()
             {
@@ -2114,7 +2116,7 @@ public partial class StatementCompiler
 
         if (baseStatement.Type.Is(out ArrayType? arrayType))
         {
-            if (TryCompute2(indexStatement, out CompiledValue computedIndexData))
+            if (TryCompute(indexStatement, out CompiledValue computedIndexData))
             {
                 index.Index.PredictedValue = computedIndexData;
 
@@ -2515,7 +2517,8 @@ public partial class StatementCompiler
 
             if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, variable.Type)) return false;
 
-            if (variable.IsGlobal) throw null;
+            if (variable.IsGlobal)
+            { Diagnostics.Add(Diagnostic.Internal($"Trying to set local variable \"{variable.Identifier}\" but it was compiled as a global variable.", statementToSet)); }
 
             compiledStatement = new CompiledVariableSetter()
             {
@@ -2538,7 +2541,8 @@ public partial class StatementCompiler
 
             if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, globalVariable.Type)) return false;
 
-            if (!globalVariable.IsGlobal) throw null;
+            if (!globalVariable.IsGlobal)
+            { Diagnostics.Add(Diagnostic.Internal($"Trying to set global variable \"{globalVariable.Identifier}\" but it was compiled as a local variable.", statementToSet)); }
 
             compiledStatement = new CompiledVariableSetter()
             {
@@ -2793,19 +2797,19 @@ public partial class StatementCompiler
         TypeInstanceStackArray type,
         Uri? file = null)
     {
-        CompiledValue? stackArraySize = default;
-
-        if (type.StackArraySize is not null)
-        {
-            if (TryCompute(type.StackArraySize, out CompiledValue _stackArraySize))
-            { stackArraySize = _stackArraySize; }
-        }
-
         GeneralType? of = CompileType(type.StackArrayOf, file);
 
         CompiledStatementWithValue? stackArraySizeStatement = null;
 
-        if (type.StackArraySize is not null) GenerateCodeForStatement(type.StackArraySize, out stackArraySizeStatement);
+        CompiledValue? stackArraySize = default;
+
+        if (type.StackArraySize is not null)
+        {
+            GenerateCodeForStatement(type.StackArraySize, out stackArraySizeStatement);
+
+            if (TryCompute(stackArraySizeStatement, out CompiledValue _stackArraySize))
+            { stackArraySize = _stackArraySize; }
+        }
 
         ArrayType result = new(of, stackArraySizeStatement, (int?)stackArraySize);
         type.SetAnalyzedType(result);

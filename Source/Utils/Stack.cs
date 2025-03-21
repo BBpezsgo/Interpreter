@@ -26,6 +26,25 @@ public class Stack<T> : List<T>
     public Stack(IEnumerable<T> items) : base(items) { }
 }
 
+public readonly struct StackAuto<T> : IDisposable
+    where T : notnull
+{
+    readonly List<T> _list;
+    readonly T _item;
+
+    public StackAuto(List<T> list, T item)
+    {
+        _list = list;
+        _item = item;
+    }
+
+    public void Dispose()
+    {
+        T popped = _list.Pop();
+        if (!popped.Equals(_item)) Debugger.Break();
+    }
+}
+
 public static class StackUtils
 {
     public static void Pop<T>(this List<T> list, int count)
@@ -41,6 +60,13 @@ public static class StackUtils
     {
         list.Add(item);
         return item;
+    }
+
+    public static StackAuto<T> PushAuto<T>(this List<T> list, T item)
+        where T : notnull
+    {
+        list.Add(item);
+        return new(list, item);
     }
 
     public static void PushIf<T>(this List<T> list, T? item) where T : struct

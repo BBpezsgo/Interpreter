@@ -41,7 +41,7 @@ public partial class StatementCompiler
 
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(size);
 
-        if (TryEvaluate(allocator, parameters, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
+        if (TryEvaluate2(allocator, ImmutableArray.Create(compiledSize), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -587,8 +587,10 @@ public partial class StatementCompiler
             return GenerateCodeForFunctionCall_External(arguments, caller.SaveValue, callee, externalFunction, caller.Location, out compiledStatement);
         }
 
+        if (!GenerateCodeForArguments(arguments, callee, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
+
         if (AllowEvaluating &&
-            TryEvaluate(callee, arguments, out CompiledValue? returnValue, out RuntimeStatement[]? runtimeStatements) &&
+            TryEvaluate2(callee, compiledArguments, out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -603,8 +605,6 @@ public partial class StatementCompiler
             };
             return true;
         }
-
-        if (!GenerateCodeForArguments(arguments, callee, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
         if (AllowFunctionInlining &&
             callee.IsInlineable)
@@ -868,29 +868,6 @@ public partial class StatementCompiler
     {
         compiledStatement = null;
 
-        if (AllowEvaluating &&
-            TryCompute(@operator, out CompiledValue predictedValue))
-        {
-            if (expectedType is not null &&
-                predictedValue.TryCast(expectedType, out CompiledValue casted))
-            {
-                predictedValue = casted;
-            }
-
-            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{predictedValue}\"", @operator));
-            OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
-            @operator.PredictedValue = predictedValue;
-
-            compiledStatement = new CompiledEvaluatedValue()
-            {
-                Value = predictedValue,
-                Type = new BuiltinType(predictedValue.Type),
-                Location = @operator.Location,
-                SaveValue = @operator.SaveValue,
-            };
-            return true;
-        }
-
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out PossibleDiagnostic? notFoundError))
         {
             CompiledOperator? operatorDefinition = result.Function;
@@ -900,7 +877,18 @@ public partial class StatementCompiler
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
 
-            return GenerateCodeForFunctionCall(@operator, @operator.Arguments, result, out compiledStatement);
+            if (!GenerateCodeForFunctionCall(@operator, @operator.Arguments, result, out compiledStatement)) return false;
+
+            if (AllowEvaluating &&
+                TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                evaluated.TryCast(compiledStatement.Type, out evaluated))
+            {
+                compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
+                @operator.PredictedValue = evaluated;
+            }
+
+            return true;
         }
         else if (LanguageOperators.BinaryOperators.Contains(@operator.Operator.Content))
         {
@@ -1051,7 +1039,7 @@ public partial class StatementCompiler
                     CompiledValue leftValue = GetInitialValue(leftNType, leftBitwidth);
                     CompiledValue rightValue = GetInitialValue(rightNType, rightBitwidth);
 
-                    if (!TryCompute(@operator.Operator.Content, leftValue, rightValue, out predictedValue, out PossibleDiagnostic? evaluateError))
+                    if (!TryCompute(@operator.Operator.Content, leftValue, rightValue, out var predictedValue, out PossibleDiagnostic? evaluateError))
                     {
                         Diagnostics.Add(evaluateError.ToError(@operator));
                         return false;
@@ -1080,6 +1068,16 @@ public partial class StatementCompiler
                 Location = @operator.Location,
                 SaveValue = @operator.SaveValue,
             };
+
+            if (AllowEvaluating &&
+                TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                evaluated.TryCast(compiledStatement.Type, out evaluated))
+            {
+                compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
+                @operator.PredictedValue = evaluated;
+            }
+
             return true;
         }
         else if (@operator.Operator.Content == "=")
@@ -1095,23 +1093,6 @@ public partial class StatementCompiler
     bool GenerateCodeForStatement(UnaryOperatorCall @operator, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
-
-        if (AllowEvaluating &&
-            TryCompute(@operator, out CompiledValue predictedValue))
-        {
-            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{predictedValue}\"", @operator));
-            OnGotStatementType(@operator, new BuiltinType(predictedValue.Type));
-            @operator.PredictedValue = predictedValue;
-
-            compiledStatement = new CompiledEvaluatedValue()
-            {
-                Value = predictedValue,
-                Location = @operator.Location,
-                SaveValue = @operator.SaveValue,
-                Type = new BuiltinType(predictedValue.Type),
-            };
-            return true;
-        }
 
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperator>? result, out PossibleDiagnostic? operatorNotFoundError))
         {
@@ -1155,6 +1136,16 @@ public partial class StatementCompiler
                 SaveValue = @operator.SaveValue,
                 Type = operatorDefinition.Type,
             };
+
+            if (AllowEvaluating &&
+                TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                evaluated.TryCast(compiledStatement.Type, out evaluated))
+            {
+                compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
+                @operator.PredictedValue = evaluated;
+            }
+
             return true;
         }
         else if (LanguageOperators.UnaryOperators.Contains(@operator.Operator.Content))
@@ -1173,6 +1164,16 @@ public partial class StatementCompiler
                         SaveValue = @operator.SaveValue,
                         Type = BuiltinType.U8,
                     };
+
+                    if (AllowEvaluating &&
+                        TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                        evaluated.TryCast(compiledStatement.Type, out evaluated))
+                    {
+                        compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
+                        @operator.PredictedValue = evaluated;
+                    }
+
                     return true;
                 }
                 case UnaryOperatorCall.BinaryNOT:
@@ -1187,6 +1188,16 @@ public partial class StatementCompiler
                         SaveValue = @operator.SaveValue,
                         Type = left.Type,
                     };
+
+                    if (AllowEvaluating &&
+                        TryCompute2(compiledStatement, out CompiledValue evaluated) &&
+                        evaluated.TryCast(compiledStatement.Type, out evaluated))
+                    {
+                        compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
+                        @operator.PredictedValue = evaluated;
+                    }
+
                     return true;
                 }
                 default:
@@ -2103,7 +2114,7 @@ public partial class StatementCompiler
 
         if (baseStatement.Type.Is(out ArrayType? arrayType))
         {
-            if (TryCompute(index.Index, out CompiledValue computedIndexData))
+            if (TryCompute2(indexStatement, out CompiledValue computedIndexData))
             {
                 index.Index.PredictedValue = computedIndexData;
 

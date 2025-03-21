@@ -318,44 +318,59 @@ public partial class StatementCompiler
         AliasDefinitions.AddRange(collectedAST.AST.AliasDefinitions);
     }
 
+    static bool ThingEquality<TThing1, TThing2>(TThing1 a, TThing2 b)
+        where TThing1 : IIdentifiable<Token>, IInFile
+        where TThing2 : IIdentifiable<Token>, IInFile
+    {
+        if (a.Identifier.Content != b.Identifier.Content) return false;
+        if (a.File != b.File) return false;
+        return true;
+    }
+
+    static bool FunctionEquality<TFunction>(TFunction a, TFunction b)
+        where TFunction : FunctionThingDefinition, ICompiledFunction
+    {
+        if (!a.Type.Equals(b.Type)) return false;
+        if (!Utils.SequenceEquals(a.ParameterTypes, b.ParameterTypes)) return false;
+        if (!ThingEquality(a, b)) return false;
+        return true;
+    }
+
+
+    bool IsSymbolDefined<TThing>(TThing thing)
+        where TThing : IIdentifiable<Token>, IInFile
+    {
+        if (CompiledStructs.Any(other => ThingEquality(other, thing)))
+        { return true; }
+
+        if (CompiledFunctions.Any(other => ThingEquality(other, thing)))
+        { return true; }
+
+        if (CompiledAliases.Any(other => ThingEquality(other, thing)))
+        { return true; }
+
+        return false;
+    }
+
     void CompileDefinitions(Uri file, ImmutableArray<ParsedFile> parsedFiles)
     {
-        static bool ThingEquality<TThing1, TThing2>(TThing1 a, TThing2 b)
-            where TThing1 : IIdentifiable<Token>, IInFile
-            where TThing2 : IIdentifiable<Token>, IInFile
+        // First compile the structs without fields
+        // so it can reference other structs that are
+        // not compiled but will be.
+        foreach (StructDefinition @struct in StructDefinitions)
         {
-            if (a.Identifier.Content != b.Identifier.Content) return false;
-            if (a.File != b.File) return false;
-            return true;
-        }
+            if (IsSymbolDefined(@struct))
+            {
+                Diagnostics.Add(Diagnostic.Critical("Symbol already exists", @struct.Identifier, @struct.File));
+                continue;
+            }
 
-        static bool FunctionEquality<TFunction>(TFunction a, TFunction b)
-            where TFunction : FunctionThingDefinition, ICompiledFunction
-        {
-            if (!a.Type.Equals(b.Type)) return false;
-            if (!Utils.SequenceEquals(a.ParameterTypes, b.ParameterTypes)) return false;
-            if (!ThingEquality(a, b)) return false;
-            return true;
-        }
-
-        bool IsThingExists<TThing>(TThing thing)
-            where TThing : IIdentifiable<Token>, IInFile
-        {
-            if (CompiledStructs.Any(other => ThingEquality(other, thing)))
-            { return true; }
-
-            if (CompiledFunctions.Any(other => ThingEquality(other, thing)))
-            { return true; }
-
-            if (CompiledAliases.Any(other => ThingEquality(other, thing)))
-            { return true; }
-
-            return false;
+            CompiledStructs.Add(CompileStructNoFields(@struct));
         }
 
         foreach (AliasDefinition aliasDefinition in AliasDefinitions)
         {
-            if (IsThingExists(@aliasDefinition))
+            if (IsSymbolDefined(@aliasDefinition))
             {
                 Diagnostics.Add(Diagnostic.Critical("Symbol already exists", @aliasDefinition.Identifier, @aliasDefinition.File));
                 continue;
@@ -367,20 +382,6 @@ public partial class StatementCompiler
             );
             aliasDefinition.Value.SetAnalyzedType(alias.Value);
             CompiledAliases.Add(alias);
-        }
-
-        // First compile the structs without fields
-        // so it can reference other structs that are
-        // not compiled but will be.
-        foreach (StructDefinition @struct in StructDefinitions)
-        {
-            if (IsThingExists(@struct))
-            {
-                Diagnostics.Add(Diagnostic.Critical("Symbol already exists", @struct.Identifier, @struct.File));
-                continue;
-            }
-
-            CompiledStructs.Add(CompileStructNoFields(@struct));
         }
 
         // Now compile the fields. Now every struct is compiled

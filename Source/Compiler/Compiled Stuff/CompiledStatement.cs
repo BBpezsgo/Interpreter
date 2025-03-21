@@ -498,6 +498,14 @@ public class CompiledEvaluatedValue : CompiledStatementWithValue
 
         };
     }
+
+    public static CompiledEvaluatedValue Create(CompiledValue value, CompiledStatementWithValue statement) => new()
+    {
+        Value = value,
+        Location = statement.Location,
+        SaveValue = statement.SaveValue,
+        Type = statement.Type,
+    };
 }
 
 public class CompiledInstructionLabelDeclaration : CompiledStatement

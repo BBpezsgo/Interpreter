@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
@@ -1917,7 +1917,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void OnScopeExit(Position position, Uri file, CompiledScope scope)
     {
         AddComment("Scope exit");
-        Debug.Assert(scope.Equals(CleanupStack2.Pop()));
+        if (!scope.Equals(CleanupStack2.Pop()))
+        { Diagnostics.Add(Diagnostic.Internal($"There was something went wrong in a scope.", position, file)); }
 
         CleanupVariables(scope.Variables, new Location(position, file), false);
 

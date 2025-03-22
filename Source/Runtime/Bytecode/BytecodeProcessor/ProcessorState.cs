@@ -20,7 +20,7 @@ public ref partial struct ProcessorState
 
     readonly BytecodeInterpreterSettings Settings;
     public Registers Registers;
-#if !UNITY
+#if !UNITY_BURST
     ExternalFunctionAsyncReturnChecker? PendingExternalFunction;
 #endif
 
@@ -46,7 +46,7 @@ public ref partial struct ProcessorState
         Memory = memory;
         Code = code;
         ExternalFunctions = externalFunctions;
-#if !UNITY
+#if !UNITY_BURST
         PendingExternalFunction = null;
 #endif
         ScopedExternalFunctions = scopedExternalFunctions;
@@ -72,7 +72,7 @@ public ref partial struct ProcessorState
 
     public void Tick()
     {
-#if !UNITY
+#if !UNITY_BURST
         if (PendingExternalFunction != null)
         {
             if (PendingExternalFunction.Invoke(ref this, out ReadOnlySpan<byte> ret))

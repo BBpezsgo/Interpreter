@@ -42,7 +42,7 @@ public ref partial struct ProcessorState
         int pointer = GetData(CurrentInstruction.Operand1);
         Crash = pointer;
         Signal = Signal.UserCrash;
-#if !UNITY
+#if !UNITY_BURST
         string? value = HeapUtils.GetString(Memory, pointer);
         throw new UserException(value ?? string.Empty);
 #endif
@@ -552,7 +552,7 @@ public ref partial struct ProcessorState
 
         int functionId = GetData(CurrentInstruction.Operand1);
 
-#if !UNITY
+#if !UNITY_BURST
         IExternalFunction? function = null;
 
         for (int i = 0; i < ExternalFunctions.Length; i++)
@@ -630,7 +630,7 @@ public ref partial struct ProcessorState
 
         Crash = functionId;
         Signal = Signal.UndefinedExternalFunction;
-#if !UNITY
+#if !UNITY_BURST
         throw new RuntimeException($"Undefined external function \"{functionId}\"");
 #endif
     }

@@ -42,7 +42,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     int Call(int absoluteAddress, ILocated callerLocation)
     {
         int returnToValueInstruction = GeneratedCode.Count;
-        Push(0);
+        AddInstruction(Opcode.Push, 0);
 
         PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, callerLocation));
         Push(Register.BasePointer);
@@ -94,7 +94,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { Diagnostics.Add(Diagnostic.Internal($"Trying to get the address of local variable \"{variable.Identifier}\" but it was compiled as a global variable.", variable)); }
 
         if (!GeneratedVariables.TryGetValue(variable, out GeneratedVariable? generatedVariable))
-        { throw new NotImplementedException(); }
+        { throw new LanguageException($"Variable {variable} was not compiled", variable.Location.Position, variable.Location.File); }
 
         return new(
                 Register.BasePointer,

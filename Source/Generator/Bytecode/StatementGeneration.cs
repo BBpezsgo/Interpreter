@@ -2000,8 +2000,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment("}");
         }
 
-        if (size != newVariable.Type.GetSize(this, Diagnostics, newVariable))
-        { Diagnostics.Add(Diagnostic.Internal($"Variable size ({newVariable.Type.GetSize(this, Diagnostics, newVariable)}) and initial value size ({size}) mismatch", newVariable.InitialValue!)); }
+        if (size != newVariable.Cleanup.TrashType.GetSize(this, Diagnostics, newVariable))
+        { Diagnostics.Add(Diagnostic.Internal($"Variable size ({newVariable.Cleanup.TrashType.GetSize(this, Diagnostics, newVariable)}) and initial value size ({size}) mismatch", newVariable.InitialValue!)); }
 
         return newVariable.Cleanup;
     }

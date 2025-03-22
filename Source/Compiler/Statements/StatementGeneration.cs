@@ -2929,11 +2929,6 @@ public partial class StatementCompiler
     {
         if (!_generatedFunctions.Add(function)) return false;
 
-        Dictionary<string, GeneralType>? savedTypeArguments = new(TypeArguments);
-
-        TypeArguments.Clear();
-        if (typeArguments is not null) TypeArguments.AddRange(typeArguments);
-
         if (function.Identifier is not null &&
             LanguageConstants.KeywordList.Contains(function.Identifier.ToString()))
         {
@@ -2959,32 +2954,47 @@ public partial class StatementCompiler
             goto end;
         }
 
-        Print?.Invoke($"Generate \"{function.ToReadable()}\" ...", LogType.Debug);
+        Dictionary<string, GeneralType>? savedTypeArguments = new(TypeArguments);
+
+        TypeArguments.Clear();
+        if (typeArguments is not null) TypeArguments.AddRange(typeArguments);
 
         ImmutableArray<CompiledParameter> originalParameters = CompiledParameters.ToImmutableArray();
-        GeneralType? originalReturnType = CurrentReturnType;
-
         CompiledParameters.Clear();
-        CompileParameters(function.Parameters);
 
+        ImmutableArray<Scope> originalScopes = Scopes.ToImmutableArray();
+        Scopes.Clear();
+
+        GeneralType? originalReturnType = CurrentReturnType;
         if (function is IHaveCompiledType functionWithType)
         { CurrentReturnType = functionWithType.Type; }
         else
         { CurrentReturnType = BuiltinType.Void; }
 
-        if (!GenerateCodeForStatement(function.Block, out CompiledStatement? body)) return false;
+        try
+        {
+            CompileParameters(function.Parameters);
 
-        CurrentReturnType = originalReturnType;
+            if (!GenerateCodeForStatement(function.Block, out CompiledStatement? body)) return false;
 
-        CompiledParameters.Clear();
-        CompiledParameters.AddRange(originalParameters);
+            GeneratedFunctions.Add(new((ICompiledFunction)function, (CompiledBlock)body));
 
-        GeneratedFunctions.Add(new((ICompiledFunction)function, (CompiledBlock)body));
+            return true;
+        }
+        finally
+        {
+            CurrentReturnType = originalReturnType;
 
-        TypeArguments.Clear();
-        if (savedTypeArguments is not null) TypeArguments.AddRange(savedTypeArguments);
+            CompiledParameters.Clear();
+            CompiledParameters.AddRange(originalParameters);
 
-        return true;
+            Scopes.Clear();
+            Scopes.AddRange(originalScopes);
+
+            TypeArguments.Clear();
+            if (savedTypeArguments is not null)
+            { TypeArguments.AddRange(savedTypeArguments); }
+        }
 
     end:
         return false;

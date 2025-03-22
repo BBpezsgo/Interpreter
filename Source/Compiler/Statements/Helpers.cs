@@ -4172,8 +4172,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        context.RuntimeStatements.Add(new RuntimeFunctionCall2(parameters, functionCall));
-        return true;
+        return false;
     }
     bool TryCompute(CompiledFunctionCall functionCall, EvaluationContext2 context, out CompiledValue value)
     {

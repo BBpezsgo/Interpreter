@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -409,12 +409,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             case CompiledParameterGetter identifier: return TryGetAddress(identifier, out address, out size);
             case CompiledFieldGetter field: return TryGetAddress(field, out address, out size);
             default:
-                {
-                    Diagnostics.Add(Diagnostic.Critical($"Unknown statement \"{statement.GetType().Name}\"", statement));
-                    address = default;
-                    size = default;
-                    return false;
-                }
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Unknown statement \"{statement.GetType().Name}\"", statement));
+                address = default;
+                size = default;
+                return false;
+            }
         }
     }
     bool TryGetAddress(CompiledIndexGetter index, [NotNullWhen(true)] out Address? address, out int size)
@@ -529,7 +529,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     {
         if (pointer.To is not CompiledEvaluatedValue _addressToSet)
         { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.To); }
-        var addressToSet = _addressToSet.Value;
+        CompiledValue addressToSet = _addressToSet.Value;
 
         if (!CompiledValue.TryShrinkTo8bit(ref addressToSet))
         {

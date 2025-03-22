@@ -1,4 +1,4 @@
-﻿using LanguageCore.Parser;
+using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
@@ -216,11 +216,66 @@ public partial class StatementCompiler
         {
             type = CompileType(newVariable.Type);
 
-            if (type is ArrayType arrayType &&
-                newVariable.InitialValue is LiteralList literalList &&
-                arrayType.Length is null)
+            if (type is ArrayType arrayType)
             {
-                type = new ArrayType(arrayType.Of, null, literalList.Values.Length);
+                if (newVariable.InitialValue is LiteralList literalList &&
+                    arrayType.Length is null)
+                {
+                    type = new ArrayType(arrayType.Of, null, literalList.Values.Length);
+                }
+
+                if (newVariable.InitialValue is LiteralStatement literalStatement &&
+                    literalStatement.Type == LiteralType.String)
+                {
+                    if (arrayType.Of.SameAs(BasicType.U16))
+                    {
+                        int length = literalStatement.Value.Length + 1;
+
+                        if (arrayType.ComputedLength.HasValue)
+                        {
+                            length = arrayType.ComputedLength.Value;
+                        }
+                        else if (arrayType.Length is not null)
+                        {
+                            if (arrayType.Length is CompiledEvaluatedValue evaluatedLength)
+                            {
+                                length = (int)evaluatedLength.Value;
+                            }
+                        }
+
+                        if (length != literalStatement.Value.Length &&
+                            length != literalStatement.Value.Length + 1)
+                        {
+                            Diagnostics.Add(Diagnostic.Error($"String literal's length ({literalStatement.Value.Length}) doesn't match with the type's length ({length})", literalStatement));
+                        }
+
+                        type = new ArrayType(arrayType.Of, null, length);
+                    }
+                    else if (arrayType.Of.SameAs(BasicType.U8))
+                    {
+                        int length = literalStatement.Value.Length + 1;
+
+                        if (arrayType.ComputedLength.HasValue)
+                        {
+                            length = arrayType.ComputedLength.Value;
+                        }
+                        else if (arrayType.Length is not null)
+                        {
+                            if (arrayType.Length is CompiledEvaluatedValue evaluatedLength)
+                            {
+                                length = (int)evaluatedLength.Value;
+                            }
+                        }
+
+                        if (length != literalStatement.Value.Length &&
+                            length != literalStatement.Value.Length + 1)
+                        {
+                            Diagnostics.Add(Diagnostic.Error($"String literal's length ({literalStatement.Value.Length}) doesn't match with the type's length ({length})", literalStatement));
+                        }
+
+                        type = new ArrayType(arrayType.Of, null, length);
+                    }
+                }
             }
 
             newVariable.Type.SetAnalyzedType(type);
@@ -243,20 +298,8 @@ public partial class StatementCompiler
             type ??= initialValue.Type;
             if (!CanCastImplicitly(initialValue.Type, type, null, this, out PossibleDiagnostic? castError))
             {
-                if (type is ArrayType a1 &&
-                    initialValue is CompiledStringInstance stringInstance &&
-                    (a1.Of.SameAs(BasicType.U8) || a1.Of.SameAs(BasicType.U16)) &&
-                    (!a1.ComputedLength.HasValue ||
-                    a1.ComputedLength.Value == stringInstance.Value.Length ||
-                    a1.ComputedLength.Value == stringInstance.Value.Length + 1))
-                {
-
-                }
-                else
-                {
-                    Diagnostics.Add(castError.ToError(initialValue));
-                    return false;
-                }
+                Diagnostics.Add(castError.ToError(initialValue));
+                return false;
             }
         }
 
@@ -1396,6 +1439,40 @@ public partial class StatementCompiler
                         SaveValue = true,
                         Type = expectedType,
                         Allocator = allocator,
+                    };
+                    return true;
+                }
+                else if (expectedType is not null &&
+                    expectedType.Is(out ArrayType? arrayType3) &&
+                    arrayType3.Of.SameAs(BasicType.U8))
+                {
+                    OnGotStatementType(literal, expectedType);
+
+                    compiledStatement = new CompiledStackStringInstance()
+                    {
+                        Value = literal.Value,
+                        IsASCII = true,
+                        Location = literal.Location,
+                        SaveValue = true,
+                        Type = expectedType,
+                        IsNullTerminated = arrayType3.ComputedLength.HasValue && arrayType3.ComputedLength.Value > literal.Value.Length,
+                    };
+                    return true;
+                }
+                else if (expectedType is not null &&
+                    expectedType.Is(out ArrayType? arrayType4) &&
+                    arrayType4.Of.SameAs(BasicType.U16))
+                {
+                    OnGotStatementType(literal, expectedType);
+
+                    compiledStatement = new CompiledStackStringInstance()
+                    {
+                        Value = literal.Value,
+                        IsASCII = false,
+                        Location = literal.Location,
+                        SaveValue = true,
+                        Type = expectedType,
+                        IsNullTerminated = arrayType4.ComputedLength.HasValue && arrayType4.ComputedLength.Value > literal.Value.Length,
                     };
                     return true;
                 }

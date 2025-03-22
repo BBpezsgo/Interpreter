@@ -3293,6 +3293,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         inlined = statement;
         return true;
     }
+    static bool Inline(CompiledStackStringInstance statement, InlineContext context, out CompiledStatementWithValue inlined)
+    {
+        inlined = statement;
+        return true;
+    }
     static bool Inline(CompiledVariableDeclaration statement, InlineContext context, out CompiledStatement inlined)
     {
         inlined = statement;
@@ -3639,6 +3644,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledExternalFunctionCall v => Inline(v, context, out inlined),
             CompiledStatementWithValueThatActuallyDoesntHaveValue v => Inline(v, context, out inlined),
             CompiledStringInstance v => Inline(v, context, out inlined),
+            CompiledStackStringInstance v => Inline(v, context, out inlined),
 
             _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
@@ -4158,6 +4164,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
+    static bool TryCompute(CompiledStackStringInstance literal, out CompiledValue value)
+    {
+        value = CompiledValue.Null;
+        return false;
+    }
     bool TryCompute(CompiledRuntimeCall anyCall, EvaluationContext2 context, out CompiledValue value)
     {
         value = CompiledValue.Null;
@@ -4295,13 +4306,23 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     bool TryCompute(CompiledIndexGetter indexCall, EvaluationContext2 context, out CompiledValue value)
     {
-        if (indexCall.Base is CompiledStringInstance literal &&
-            TryCompute(indexCall.Index, context, out CompiledValue index))
+        if (indexCall.Base is CompiledStringInstance literal1 &&
+            TryCompute(indexCall.Index, context, out CompiledValue index1))
         {
-            if (index == literal.Value.Length)
+            if (index1 == literal1.Value.Length)
             { value = new CompiledValue('\0'); }
             else
-            { value = new CompiledValue(literal.Value[(int)index]); }
+            { value = new CompiledValue(literal1.Value[(int)index1]); }
+            return true;
+        }
+
+        if (indexCall.Base is CompiledStackStringInstance literal2 &&
+            TryCompute(indexCall.Index, context, out CompiledValue index2))
+        {
+            if (index2 == literal2.Value.Length)
+            { value = new CompiledValue('\0'); }
+            else
+            { value = new CompiledValue(literal2.Value[(int)index2]); }
             return true;
         }
 
@@ -4346,6 +4367,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return statement switch
         {
             CompiledStringInstance v => TryCompute(v, out value),
+            CompiledStackStringInstance v => TryCompute(v, out value),
             CompiledEvaluatedValue v => TryCompute(v, out value),
             CompiledBinaryOperatorCall v => TryCompute(v, context, out value),
             CompiledUnaryOperatorCall v => TryCompute(v, context, out value),
@@ -4856,34 +4878,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         CompiledExternalFunctionCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Volatile,
         CompiledStatementWithValueThatActuallyDoesntHaveValue v => StatementComplexity.Bruh,
         CompiledStringInstance v => StatementComplexity.Complex | StatementComplexity.Volatile,
+        CompiledStackStringInstance v => StatementComplexity.Bruh,
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 
     #endregion
-
-    public static bool IsStringOnStack(GeneralType type, CompiledStatementWithValue? value, [NotNullWhen(true)] out CompiledStringInstance? literal, out int avaliableLength, out PossibleDiagnostic? error)
-    {
-        error = null;
-        if (type.Is(out ArrayType? arrayType) &&
-            arrayType.Of.SameAs(BasicType.U16) &&
-            value is CompiledStringInstance literalStatement &&
-            arrayType.ComputedLength.HasValue)
-        {
-            avaliableLength = arrayType.ComputedLength.Value;
-            if (literalStatement.Value.Length > arrayType.ComputedLength.Value)
-            {
-                error = new PossibleDiagnostic($"String literal is longer ({literalStatement.Value.Length}) the array's length ({arrayType.ComputedLength})", literalStatement);
-            }
-            literal = literalStatement;
-            return true;
-        }
-        else
-        {
-            avaliableLength = default;
-            literal = default;
-            return false;
-        }
-    }
 
     #region Visit
 
@@ -5108,6 +5107,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             case CompiledStringInstance v:
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Allocator)) yield return v2;
+                break;
+            case CompiledStackStringInstance v:
+                yield return v;
                 break;
             case EmptyStatement v:
                 yield return v;

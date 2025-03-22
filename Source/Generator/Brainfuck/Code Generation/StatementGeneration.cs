@@ -599,23 +599,27 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (variable.Type.Is(out ArrayType? arrayType))
             {
-                if (value is CompiledStringInstance literal &&
-                    arrayType.ComputedLength.HasValue &&
-                    literal.Value.Length == arrayType.ComputedLength.Value)
+                if (value is CompiledStackStringInstance literal)
                 {
-                    if (arrayType.Of.SameAs(BasicType.U16))
+                    if (!literal.IsASCII)
                     {
-                        int arraySize = arrayType.ComputedLength.Value;
-
-                        int size = Snippets.ARRAY_SIZE(arraySize);
+                        int size = Snippets.ARRAY_SIZE(literal.Length);
 
                         using StackAddress indexAddress = Stack.GetTemporaryAddress(1, value);
                         using StackAddress valueAddress = Stack.GetTemporaryAddress(1, value);
                         {
-                            for (int i = 0; i < literal.Value.Length; i++)
+                            int i;
+                            for (i = 0; i < literal.Value.Length; i++)
                             {
                                 Code.SetValue(indexAddress, i);
                                 Code.SetValue(valueAddress, literal.Value[i]);
+                                Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, value));
+                            }
+
+                            if (literal.IsNullTerminated)
+                            {
+                                Code.SetValue(indexAddress, i);
+                                Code.SetValue(valueAddress, '\0');
                                 Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, value));
                             }
                         }
@@ -628,17 +632,23 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     }
                     else if (arrayType.Of.SameAs(BasicType.U8))
                     {
-                        int arraySize = arrayType.ComputedLength.Value;
-
-                        int size = Snippets.ARRAY_SIZE(arraySize);
+                        int size = Snippets.ARRAY_SIZE(literal.Length);
 
                         using StackAddress indexAddress = Stack.GetTemporaryAddress(1, value);
                         using StackAddress valueAddress = Stack.GetTemporaryAddress(1, value);
                         {
-                            for (int i = 0; i < literal.Value.Length; i++)
+                            int i;
+                            for (i = 0; i < literal.Value.Length; i++)
                             {
                                 Code.SetValue(indexAddress, i);
                                 Code.SetValue(valueAddress, (byte)literal.Value[i]);
+                                Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, value));
+                            }
+
+                            if (literal.IsNullTerminated)
+                            {
+                                Code.SetValue(indexAddress, i);
+                                Code.SetValue(valueAddress, (byte)'\0');
                                 Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, value));
                             }
                         }
@@ -1069,6 +1079,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case CompiledIndirectSetter v: GenerateCodeForSetter(v); break;
             case CompiledStatementWithValueThatActuallyDoesntHaveValue v: GenerateCodeForStatement(v.Statement); break;
             case CompiledStringInstance v: GenerateCodeForStatement(v, expectedType); break;
+            case CompiledStackStringInstance v: GenerateCodeForStatement(v, expectedType); break;
             case EmptyStatement: break;
             default:
                 Diagnostics.Add(Diagnostic.Critical($"Unknown statement \"{statement.GetType().Name}\"", statement));
@@ -1598,6 +1609,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 GenerateCodeForLiteralString(statement);
             }
         }
+    }
+    void GenerateCodeForStatement(CompiledStackStringInstance statement, GeneralType? expectedType = null)
+    {
+        using DebugInfoBlock debugBlock = DebugBlock(statement);
+
+        throw new NotImplementedException();
     }
     void GenerateCodeForStatement(CompiledEvaluatedValue evaluatedValue)
     {
@@ -2326,9 +2343,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void GenerateCodeForPrinter(CompiledStatementWithValue value)
     {
-        if (value is CompiledStringInstance literal)
+        if (value is CompiledStringInstance literal1)
         {
-            GenerateCodeForPrinter(literal.Value, literal);
+            GenerateCodeForPrinter(literal1.Value, literal1);
+            return;
+        }
+
+        if (value is CompiledStackStringInstance literal2)
+        {
+            GenerateCodeForPrinter(literal2.Value, literal2);
             return;
         }
 
@@ -2373,9 +2396,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForValuePrinter(CompiledStatementWithValue value, GeneralType valueType)
     {
-        if (value is CompiledStringInstance literalValue)
+        if (value is CompiledStringInstance literalValue1)
         {
-            GenerateCodeForPrinter(literalValue.Value, literalValue);
+            GenerateCodeForPrinter(literalValue1.Value, literalValue1);
+            return;
+        }
+
+        if (value is CompiledStackStringInstance literalValue2)
+        {
+            GenerateCodeForPrinter(literalValue2.Value, literalValue2);
             return;
         }
 
@@ -2410,6 +2439,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     bool CanGenerateCodeForPrinter(CompiledStatementWithValue value)
     {
         if (value is CompiledStringInstance) return true;
+        if (value is CompiledStackStringInstance) return true;
 
         return CanGenerateCodeForValuePrinter(value.Type);
     }
@@ -2565,6 +2595,46 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     IsInitialized = v.IsInitialized,
                 });
                 continue;
+            }
+
+            if (definedType.Is<PointerType>() && passed.Value is CompiledParameterGetter _parameterGetter)
+            {
+                if (!GetVariable(_parameterGetter, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
+                {
+                    Diagnostics.Add(notFoundError.ToError(_parameterGetter));
+                    return;
+                }
+
+                if (v.IsReference)
+                {
+                    CompiledVariableDeclaration variableDeclaration = defined.ToVariable(definedType, passed);
+                    PointerType parameterType = new(v.Type);
+                    compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
+                    {
+                        IsInitialized = v.IsInitialized,
+                    });
+                    continue;
+                }
+            }
+
+            if (definedType.Is<PointerType>() && passed.Value is CompiledVariableGetter _variableGetter)
+            {
+                if (!GetVariable(_variableGetter, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
+                {
+                    Diagnostics.Add(notFoundError.ToError(_variableGetter));
+                    return;
+                }
+
+                if (v.IsReference)
+                {
+                    CompiledVariableDeclaration variableDeclaration = defined.ToVariable(definedType, passed);
+                    PointerType parameterType = new(v.Type);
+                    compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
+                    {
+                        IsInitialized = v.IsInitialized,
+                    });
+                    continue;
+                }
             }
 
             // if (GetVariable(passed.Value, out BrainfuckVariable? variable, out _) &&

@@ -1737,15 +1737,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (localVariableSetter.Variable.IsGlobal)
         {
-            if (localVariableSetter.Variable.InitialValue is not null &&
-                StatementCompiler.IsStringOnStack(localVariableSetter.Variable.Type, localVariableSetter.Variable.InitialValue, out CompiledStringInstance? literal, out _, out PossibleDiagnostic? error))
+            if (localVariableSetter.Variable.InitialValue is CompiledStackStringInstance stackString)
             {
-                if (error is not null) Diagnostics.Add(error.ToError(literal));
-
                 // globalVariableSetter.Variable.Variable.IsInitialized = true;
 
-                for (int i = 0; i < literal.Value.Length; i++)
-                { Push(new CompiledValue(literal.Value[i])); }
+                for (int i = stackString.Value.Length - 1; i >= 0; i--)
+                { Push(new CompiledValue(stackString.Value[i])); }
             }
             else
             {
@@ -1757,14 +1754,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            if (localVariableSetter.Variable.InitialValue is not null &&
-                    StatementCompiler.IsStringOnStack(localVariableSetter.Variable.Type, localVariableSetter.Variable.InitialValue, out CompiledStringInstance? literal, out _, out PossibleDiagnostic? error))
+            if (localVariableSetter.Variable.InitialValue is CompiledStackStringInstance stackString)
             {
-                if (error is not null) Diagnostics.Add(error.ToError(localVariableSetter.Value));
                 // localVariableSetter.Variable.IsInitialized = true;
 
-                for (int i = 0; i < literal.Value.Length; i++)
-                { Push(new CompiledValue(literal.Value[i])); }
+                for (int i = stackString.Value.Length - 1; i >= 0; i--)
+                { Push(new CompiledValue(stackString.Value[i])); }
             }
             else
             {
@@ -1795,10 +1790,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CompiledStatementWithValue? dereference = NeedDerefernce(fieldSetter.ToGetter());
 
-        if (StatementCompiler.IsStringOnStack(type, fieldSetter.Value, out CompiledStringInstance? stackString, out int avaliableLength, out PossibleDiagnostic? stackStringError))
+        if (fieldSetter.Value is CompiledStackStringInstance stackString)
         {
-            if (stackStringError != null) Diagnostics.Add(stackStringError.ToError(stackString));
-
             if (dereference is null)
             {
                 if (!GetAddress(fieldSetter.ToGetter(), out Address? address, out PossibleDiagnostic? error2))
@@ -1811,7 +1804,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     Push(new CompiledValue(stackString.Value[i]));
                     PopTo(new AddressOffset(address, i * 2), 2);
                 }
-                if (avaliableLength > stackString.Value.Length)
+
+                if (stackString.IsNullTerminated)
                 {
                     Push(new CompiledValue('\0'));
                     PopTo(new AddressOffset(address, stackString.Value.Length * 2), 2);
@@ -1829,7 +1823,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     Push(new CompiledValue(stackString.Value[i]));
                     PopToChecked(new AddressOffset(address, i * 2), 2);
                 }
-                if (avaliableLength > stackString.Value.Length)
+
+                if (stackString.IsNullTerminated)
                 {
                     Push(new CompiledValue('\0'));
                     PopToChecked(new AddressOffset(address, stackString.Value.Length * 2), 2);

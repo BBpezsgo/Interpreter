@@ -336,7 +336,6 @@ public partial class StatementCompiler
         return true;
     }
 
-
     bool IsSymbolDefined<TThing>(TThing thing)
         where TThing : IIdentifiable<Token>, IInFile
     {

@@ -9,5 +9,9 @@ inline void PrintStackString(T text)
 	}
 }
 
-char[1] a = "a";
+char[6] a = "asdasd";
 PrintStackString(a);
+PrintLine();
+
+char[] b = "asdasd";
+PrintLine(&b);

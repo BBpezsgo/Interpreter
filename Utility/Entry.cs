@@ -337,6 +337,54 @@ public static class Entry
 
                 break;
             }
+            case "il":
+            {
+                Output.LogDebug($"Executing \"{arguments.Source}\" ...");
+
+                List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+
+                DiagnosticsCollection diagnostics = new();
+
+                CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
+                {
+                    DontOptimize = arguments.DontOptimize,
+                    ExternalFunctions = externalFunctions.ToImmutableArray(),
+                    PreprocessorVariables = PreprocessorVariables.Normal,
+                    AdditionalImports = additionalImports,
+                    SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                        new FileSourceProvider()
+                        {
+                            ExtraDirectories = new string?[]
+                            {
+                                arguments.BasePath
+                            },
+                        }
+                    ),
+                };
+
+                if (externalFunctions.TryGet("stdout", out IExternalFunction? stdoutFunction, out _))
+                {
+                    static void callback(char c) => Console.Write(c);
+                    externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(stdoutFunction.Id, "stdout", callback));
+                }
+
+                if (externalFunctions.TryGet("stdin", out IExternalFunction? stdinFunction, out _))
+                {
+                    static char callback() => (char)Console.Read();
+                    externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(stdinFunction.Id, "stdin", callback));
+                }
+
+                CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, new(compilerSettings)
+                {
+                    ExternalFunctions = externalFunctions.ToImmutableArray(),
+                    PreprocessorVariables = PreprocessorVariables.IL,
+                }, diagnostics);
+                Func<int> res = IL.Generator.CodeGeneratorForIL.Generate(compiled, Output.Log, diagnostics);
+                diagnostics.Throw();
+                diagnostics.Print();
+
+                return res.Invoke();
+            }
             case "brainfuck":
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");

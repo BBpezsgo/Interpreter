@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -412,7 +412,13 @@ public static class Utils
 
         DiagnosticsCollection diagnostics = new();
 
-        CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(LanguageCore.IL.Generator.CodeGeneratorForMain.DefaultCompilerSettings)
+        if (externalFunctions.TryGet("stdout", out IExternalFunction? stdoutFunction, out _))
+        {
+            static void callback(char c) => Console.Write(c);
+            externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(stdoutFunction.Id, "stdout", callback));
+        }
+
+        CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(LanguageCore.IL.Generator.CodeGeneratorForIL.DefaultCompilerSettings)
         {
             ExternalFunctions = externalFunctions.ToImmutableArray(),
             AdditionalImports = AdditionalImports,
@@ -427,7 +433,7 @@ public static class Utils
                 }
             ),
         }, diagnostics);
-        Func<int> generatedCode = LanguageCore.IL.Generator.CodeGeneratorForMain.Generate(compiled, null, diagnostics);
+        Func<int> generatedCode = LanguageCore.IL.Generator.CodeGeneratorForIL.Generate(compiled, null, diagnostics);
 
         diagnostics.Throw();
 

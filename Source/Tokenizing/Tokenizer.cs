@@ -2,7 +2,7 @@
 
 namespace LanguageCore.Tokenizing;
 
-public abstract partial class Tokenizer
+public partial class Tokenizer
 {
     bool IsBeginningOfLine
     {
@@ -241,7 +241,7 @@ public abstract partial class Tokenizer
         }
     }
 
-    protected void ProcessCharacter(char currChar, int offsetTotal)
+    void ProcessCharacter(char currChar, int offsetTotal)
     {
     Again:
 
@@ -783,7 +783,7 @@ public abstract partial class Tokenizer
         }
     }
 
-    protected void EndToken(int offsetTotal, bool inFuture = false)
+    void EndToken(int offsetTotal, bool inFuture = false)
     {
         if (inFuture)
         {

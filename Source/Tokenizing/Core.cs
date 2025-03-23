@@ -2,7 +2,7 @@
 
 namespace LanguageCore.Tokenizing;
 
-public abstract partial class Tokenizer
+public partial class Tokenizer
 {
     static readonly ImmutableArray<char> Bracelets = ImmutableArray.Create(
         '{', '}',
@@ -30,19 +30,39 @@ public abstract partial class Tokenizer
         ':'
     );
 
-    protected readonly List<Token> Tokens;
-    protected readonly List<SimpleToken> UnicodeCharacters;
-    protected readonly DiagnosticsCollection Diagnostics;
-    protected readonly TokenizerSettings Settings;
-    protected readonly Uri? File;
+    readonly List<Token> Tokens;
+    readonly List<SimpleToken> UnicodeCharacters;
+    readonly DiagnosticsCollection Diagnostics;
+    readonly TokenizerSettings Settings;
+    readonly Uri? File;
 
     readonly PreparationToken CurrentToken;
     int CurrentColumn;
     int CurrentLine;
     string? SavedUnicode;
 
-    protected Tokenizer(TokenizerSettings settings, Uri? file, IEnumerable<string>? preprocessorVariables, DiagnosticsCollection diagnostics)
+    readonly string Text;
+
+    public static TokenizerResult Tokenize(string text, DiagnosticsCollection diagnostics, IEnumerable<string>? preprocessorVariables = null, Uri? file = null, TokenizerSettings? settings = null)
+        => new Tokenizer(text, settings ?? TokenizerSettings.Default, file, preprocessorVariables, diagnostics)
+        .TokenizeInternal();
+
+    TokenizerResult TokenizeInternal()
     {
+        for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
+        {
+            ProcessCharacter(Text[offsetTotal], offsetTotal);
+        }
+
+        EndToken(Text.Length);
+
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters);
+    }
+
+    public Tokenizer(string text, TokenizerSettings settings, Uri? file, IEnumerable<string>? preprocessorVariables, DiagnosticsCollection diagnostics)
+    {
+        Text = text;
+
         CurrentToken = new(default);
         CurrentColumn = 0;
         CurrentLine = 0;
@@ -59,8 +79,8 @@ public abstract partial class Tokenizer
         PreprocessorConditions = new Stack<PreprocessThing>();
     }
 
-    protected SinglePosition CurrentSinglePosition => new(CurrentLine, CurrentColumn);
-    protected Position GetCurrentPosition(int offsetTotal) => new(new Range<SinglePosition>(CurrentSinglePosition, new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(offsetTotal, offsetTotal + 1));
+    SinglePosition CurrentSinglePosition => new(CurrentLine, CurrentColumn);
+    Position GetCurrentPosition(int offsetTotal) => new(new Range<SinglePosition>(CurrentSinglePosition, new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(offsetTotal, offsetTotal + 1));
 
     void RefreshTokenPosition(int offsetTotal)
     {
@@ -70,7 +90,7 @@ public abstract partial class Tokenizer
         );
     }
 
-    protected static ReadOnlySpan<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
+    static ReadOnlySpan<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
     {
         List<Token> result = new(tokens.Count);
 

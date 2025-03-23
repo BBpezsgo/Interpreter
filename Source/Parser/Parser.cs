@@ -126,22 +126,8 @@ public sealed class Parser
         Diagnostics = diagnostics;
     }
 
-    public static ParserResult ParseFile(string file, DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, TokenizerSettings? tokenizerSettings = null, ConsoleProgressBar? tokenizerProgressBar = null)
-    {
-        TokenizerResult tokens = StreamTokenizer.Tokenize(file, diagnostics, preprocessorVariables, tokenizerSettings, tokenizerProgressBar);
-        Uri uri = new(file, UriKind.Absolute);
-        ParserResult result = new Parser(
-            tokens.Tokens,
-            uri,
-            diagnostics)
-            .ParseInternal();
-        return result;
-    }
     public static ParserResult Parse(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
         => new Parser(tokens, file, diagnostics).ParseInternal();
-
-    public static Statement.Statement ParseStatement(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
-        => new Parser(tokens, file, diagnostics).ParseStatementInternal();
 
     ParserResult ParseInternal()
     {

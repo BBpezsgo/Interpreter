@@ -80,14 +80,16 @@ public class SourceCodeManager
                 break;
             }
 
-            TokenizerResult tokens = StreamTokenizer.Tokenize(
-                content,
-                Diagnostics,
-                PreprocessorVariables,
-                finishedFile.Uri,
-                TokenizerSettings.Default,
-                null,
-                null);
+            TokenizerResult tokens;
+            using (StreamReader reader = new(content))
+            {
+                tokens = Tokenizer.Tokenize(
+                    reader.ReadToEnd(),
+                    Diagnostics,
+                    PreprocessorVariables,
+                    finishedFile.Uri,
+                    TokenizerSettings.Default);
+            }
 
             ParserResult ast = Parser.Parser.Parse(tokens.Tokens, finishedFile.Uri, Diagnostics);
 

@@ -2,7 +2,7 @@
 
 namespace LanguageCore.IL.Generator;
 
-public partial class CodeGeneratorForMain : CodeGenerator
+public partial class CodeGeneratorForIL : CodeGenerator
 {
     protected override unsafe bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {

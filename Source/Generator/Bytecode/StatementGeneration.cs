@@ -1,4 +1,4 @@
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
@@ -2064,7 +2064,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     bool GenerateCodeForFunction(ICompiledFunction function, CompiledBlock body)
     {
         function.InstructionOffset = GeneratedCode.Count;
-        Print?.Invoke($"Generate \"{((FunctionThingDefinition)function).ToReadable()}\" ...", LogType.Debug);
 
         CurrentContext = function as IDefinition;
         InFunction = true;
@@ -2256,22 +2255,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     BBLangGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
     {
-        Print?.Invoke("Generating code ...", LogType.Debug);
         ScopeSizes.Push(0);
-
-        List<string> usedExternalFunctions = new();
-
-        foreach (CompiledFunction function in CompiledFunctions)
-        {
-            if (function.ExternalFunctionName is not null)
-            { usedExternalFunctions.Add(function.ExternalFunctionName); }
-        }
-
-        foreach (CompiledOperator @operator in CompiledOperators)
-        {
-            if (@operator.ExternalFunctionName is not null)
-            { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
-        }
 
         CurrentScopeDebug.Push(new ScopeInformation()
         {
@@ -2400,10 +2384,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     DebugInfo?.ScopeInformation.Add(scope);
         // }
 
-        Print?.Invoke("Code generated", LogType.Debug);
-
         Dictionary<string, ExposedFunction> exposedFunctions = new();
-        foreach (CompiledFunction f in CompiledFunctions)
+        foreach (CompiledFunction f in compilerResult.Functions)
         {
             if (f.ExposedFunctionName is null) continue;
             if (f.InstructionOffset == InvalidFunctionAddress)
@@ -2424,10 +2406,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Code = GeneratedCode.Select(v => new Instruction(v)).ToImmutableArray(),
             DebugInfo = DebugInfo,
-            CompiledFunctions = CompiledFunctions,
-            CompiledOperators = CompiledOperators,
-            CompiledGeneralFunctions = CompiledGeneralFunctions,
-            CompiledConstructors = CompiledConstructors,
+            CompiledFunctions = compilerResult.Functions,
+            CompiledOperators = compilerResult.Operators,
+            CompiledGeneralFunctions = compilerResult.GeneralFunctions,
+            CompiledConstructors = compilerResult.Constructors,
             ExposedFunctions = exposedFunctions.ToFrozenDictionary(),
         };
     }

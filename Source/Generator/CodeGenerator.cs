@@ -48,13 +48,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     #region Protected Fields
 
-    protected ImmutableArray<CompiledStruct> CompiledStructs;
-    protected ImmutableArray<CompiledFunction> CompiledFunctions;
-    protected ImmutableArray<CompiledOperator> CompiledOperators;
-    protected ImmutableArray<CompiledConstructor> CompiledConstructors;
-    protected ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
-    protected ImmutableArray<CompiledAlias> CompiledAliases;
-
     protected readonly Stack<CompiledParameter> CompiledParameters;
     protected readonly Stack<CompiledVariableDeclaration> CompiledLocalVariables;
     protected readonly Stack<CompiledVariableDeclaration> CompiledGlobalVariables;
@@ -64,7 +57,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     protected readonly Dictionary<string, GeneralType> TypeArguments;
     protected DebugInformation? DebugInfo;
 
-    protected readonly PrintCallback? Print;
     protected readonly DiagnosticsCollection Diagnostics;
 
     public abstract int PointerSize { get; }
@@ -76,7 +68,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
     #endregion
 
-    protected CodeGenerator(CompilerResult compilerResult, DiagnosticsCollection diagnostics, PrintCallback? print)
+    protected CodeGenerator(CompilerResult compilerResult, DiagnosticsCollection diagnostics)
     {
         CompiledParameters = new Stack<CompiledParameter>();
         CompiledLocalVariables = new Stack<CompiledVariableDeclaration>();
@@ -86,42 +78,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         InFunction = false;
         TypeArguments = new Dictionary<string, GeneralType>();
 
-        CompiledStructs = compilerResult.Structs;
-        CompiledAliases = compilerResult.Aliases;
-
         Diagnostics = diagnostics;
-        Print = print;
-
-        ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
-        ImmutableArray<CompiledOperator>.Builder compiledOperators = ImmutableArray.CreateBuilder<CompiledOperator>();
-        ImmutableArray<CompiledGeneralFunction>.Builder compiledGeneralFunctions = ImmutableArray.CreateBuilder<CompiledGeneralFunction>();
-        ImmutableArray<CompiledConstructor>.Builder compiledConstructors = ImmutableArray.CreateBuilder<CompiledConstructor>();
-
-        foreach ((ICompiledFunction function, CompiledStatement _) in compilerResult.Functions2)
-        {
-            switch (function)
-            {
-                case CompiledFunction compiledFunction:
-                    compiledFunctions.Add(compiledFunction);
-                    break;
-                case CompiledOperator compiledOperator:
-                    compiledOperators.Add(compiledOperator);
-                    break;
-                case CompiledGeneralFunction compiledGeneralFunction:
-                    compiledGeneralFunctions.Add(compiledGeneralFunction);
-                    break;
-                case CompiledConstructor compiledConstructor:
-                    compiledConstructors.Add(compiledConstructor);
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-        }
-
-        CompiledFunctions = compiledFunctions.ToImmutable();
-        CompiledOperators = compiledOperators.ToImmutable();
-        CompiledGeneralFunctions = compiledGeneralFunctions.ToImmutable();
-        CompiledConstructors = compiledConstructors.ToImmutable();
     }
 
     #region SetTypeArguments()

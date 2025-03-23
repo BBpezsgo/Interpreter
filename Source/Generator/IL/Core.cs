@@ -2,7 +2,7 @@
 
 namespace LanguageCore.IL.Generator;
 
-public partial class CodeGeneratorForMain : CodeGenerator
+public partial class CodeGeneratorForIL : CodeGenerator
 {
     public static readonly CompilerSettings DefaultCompilerSettings = new()
     {
@@ -24,15 +24,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public override BuiltinType SizeofStatementType => BuiltinType.I32;
     public override BuiltinType ArrayLengthType => BuiltinType.I32;
 
-    public CodeGeneratorForMain(CompilerResult compilerResult, DiagnosticsCollection diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
+    public CodeGeneratorForIL(CompilerResult compilerResult, DiagnosticsCollection diagnostics) : base(compilerResult, diagnostics)
     { }
 
     public static Func<int> Generate(
         CompilerResult compilerResult,
         PrintCallback? printCallback,
         DiagnosticsCollection diagnostics)
-    {
-        CodeGeneratorForMain generator = new(compilerResult, diagnostics, printCallback);
-        return generator.GenerateCode(compilerResult);
-    }
+        => new CodeGeneratorForIL(compilerResult, diagnostics)
+        .GenerateCode(compilerResult);
 }

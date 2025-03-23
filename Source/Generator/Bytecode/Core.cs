@@ -211,7 +211,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { "DL", (Register.DL, BuiltinType.I8) },
     }.ToImmutableDictionary();
 
-    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print) : base(compilerResult, diagnostics, print)
+    public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, DiagnosticsCollection diagnostics) : base(compilerResult, diagnostics)
     {
         ExternalFunctions = compilerResult.ExternalFunctions;
         GeneratedCode = new();
@@ -275,8 +275,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         MainGeneratorSettings settings,
         PrintCallback? printCallback,
         DiagnosticsCollection diagnostics)
-    {
-        CodeGeneratorForMain generator = new(compilerResult, settings, diagnostics, printCallback);
-        return generator.GenerateCode(compilerResult, settings);
-    }
+        => new CodeGeneratorForMain(compilerResult, settings, diagnostics)
+        .GenerateCode(compilerResult, settings);
 }

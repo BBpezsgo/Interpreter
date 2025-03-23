@@ -298,11 +298,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     #endregion
 
-    public CodeGeneratorForBrainfuck(
-        CompilerResult compilerResult,
-        BrainfuckGeneratorSettings brainfuckSettings,
-        DiagnosticsCollection diagnostics,
-        PrintCallback? print) : base(compilerResult, diagnostics, print)
+    public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings brainfuckSettings, DiagnosticsCollection diagnostics) : base(compilerResult, diagnostics)
     {
         CompiledVariables = new Stack<BrainfuckVariable>();
         Code = new CodeHelper()
@@ -754,8 +750,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     {
         if (statements.Length == 0) return;
 
-        Print?.Invoke($"  Generating top level statements ...", LogType.Debug);
-
         ControlFlowBlock? returnBlock = BeginReturnBlock(statements[0].Location.Before(), StatementCompiler.FindControlFlowUsage(statements));
 
         using (ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress))
@@ -779,9 +773,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
     {
-        Print?.Invoke("Generating code ...", LogType.Debug);
-        Print?.Invoke("  Precompiling ...", LogType.Debug);
-
         VariableDeclaration implicitReturnValueVariable = new(
             Enumerable.Empty<Tokenizing.Token>(),
             new TypeInstanceSimple(Tokenizing.Token.CreateAnonymous("u8"), compilerResult.File),
@@ -804,25 +795,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             },
         }));
 
-        // IEnumerable<VariableDeclaration> globalVariableDeclarations = compilerResult.TopLevelStatements
-        //     .Select(v => v.Statements)
-        //     .Aggregate(Enumerable.Empty<Statement>(), (a, b) => a.Concat(b))
-        //     .Select(v => v as VariableDeclaration)
-        //     .Where(v => v is not null)
-        //     .Where(v => !v!.Modifiers.Contains(ModifierKeywords.Const))!;
-
         IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = compilerResult.CompiledStatements.OfType<CompiledVariableDeclaration>();
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(globalVariableDeclarations, false)); }
         else
         { PrecompileVariables(globalVariableDeclarations, false); }
-
-        // for (int i = 0; i < compilerResult.TopLevelStatements.Length; i++)
-        // {
-        //     (ImmutableArray<Statement> statements, Uri file) = compilerResult.TopLevelStatements[i];
-        //     GenerateTopLevelStatements(statements, file);
-        // }
 
         GenerateTopLevelStatements(compilerResult.CompiledStatements);
 
@@ -844,8 +822,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         if (Code.BranchDepth != 0)
         { throw new InternalExceptionWithoutContext($"Unbalanced branches"); }
 
-        Print?.Invoke($"Used stack size: {Stack.MaxUsedSize} bytes", LogType.Debug);
-
         return new BrainfuckGeneratorResult()
         {
             Code = Code.ToString(),
@@ -859,9 +835,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         BrainfuckGeneratorSettings brainfuckSettings,
         PrintCallback? printCallback,
         DiagnosticsCollection diagnostics)
-    => new CodeGeneratorForBrainfuck(
-        compilerResult,
-        brainfuckSettings,
-        diagnostics,
-        printCallback).GenerateCode(compilerResult);
+        => new CodeGeneratorForBrainfuck(compilerResult, brainfuckSettings, diagnostics)
+        .GenerateCode(compilerResult);
 }

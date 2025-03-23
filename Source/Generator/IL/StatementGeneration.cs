@@ -5,7 +5,7 @@ using LanguageCore.Runtime;
 
 namespace LanguageCore.IL.Generator;
 
-public partial class CodeGeneratorForMain : CodeGenerator
+public partial class CodeGeneratorForIL : CodeGenerator
 {
     readonly Dictionary<CompiledVariableDeclaration, LocalBuilder> Locals = new();
     readonly Dictionary<ICompiledFunction, DynamicMethod> Functions = new();
@@ -1211,39 +1211,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     Func<int> GenerateCode(CompilerResult compilerResult)
     {
         CompilerResult res = compilerResult;
-
-        {
-            ImmutableArray<CompiledFunction>.Builder compiledFunctions = ImmutableArray.CreateBuilder<CompiledFunction>();
-            ImmutableArray<CompiledOperator>.Builder compiledOperators = ImmutableArray.CreateBuilder<CompiledOperator>();
-            ImmutableArray<CompiledGeneralFunction>.Builder compiledGeneralFunctions = ImmutableArray.CreateBuilder<CompiledGeneralFunction>();
-            ImmutableArray<CompiledConstructor>.Builder compiledConstructors = ImmutableArray.CreateBuilder<CompiledConstructor>();
-
-            foreach ((ICompiledFunction function, CompiledStatement _) in res.Functions2)
-            {
-                switch (function)
-                {
-                    case CompiledFunction compiledFunction:
-                        compiledFunctions.Add(compiledFunction);
-                        break;
-                    case CompiledOperator compiledOperator:
-                        compiledOperators.Add(compiledOperator);
-                        break;
-                    case CompiledGeneralFunction compiledGeneralFunction:
-                        compiledGeneralFunctions.Add(compiledGeneralFunction);
-                        break;
-                    case CompiledConstructor compiledConstructor:
-                        compiledConstructors.Add(compiledConstructor);
-                        break;
-                    default:
-                        throw new UnreachableException();
-                }
-            }
-
-            CompiledFunctions = compiledFunctions.ToImmutable();
-            CompiledOperators = compiledOperators.ToImmutable();
-            CompiledGeneralFunctions = compiledGeneralFunctions.ToImmutable();
-            CompiledConstructors = compiledConstructors.ToImmutable();
-        }
 
         AssemblyBuilder assemBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName()
         {

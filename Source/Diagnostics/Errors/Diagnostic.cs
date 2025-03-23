@@ -1,3 +1,4 @@
+using LanguageCore.Compiler;
 
 namespace LanguageCore;
 
@@ -133,11 +134,12 @@ public class Diagnostic :
         return this;
     }
 
-    public (string SourceCode, string Arrows)? GetArrows(LanguageException.GetFileContent? getFileContent = null)
+    public (string SourceCode, string Arrows)? GetArrows(IEnumerable<ISourceProvider>? sourceProviders = null)
     {
         if (File == null) return null;
         if (!File.IsFile) return null;
-        return LanguageException.GetArrows(Position, getFileContent?.Invoke(File) ?? System.IO.File.ReadAllText(File.AbsolutePath));
+        string? source = SourceCodeManager.LoadSourceSync(sourceProviders, File.ToString());
+        return source is not null ? LanguageException.GetArrows(Position, source) : null;
     }
 
     public override string ToString()

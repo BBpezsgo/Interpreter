@@ -35,11 +35,23 @@ public static class HelloWorld
         DiagnosticsCollection diagnostics = new();
 
         // This will collect and compiles the necessary files and does some basic optimizations.
-        CompilerResult compiled = StatementCompiler.CompileFile(new Uri(scriptPath), new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
+        CompilerResult compiled = StatementCompiler.CompileFile(scriptPath, new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
-            BasePath = standardLibraryPath,
             ExternalFunctions = externalFunctions.ToImmutableArray(),
             PreprocessorVariables = PreprocessorVariables.Normal,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+            //  Use the default source provider that searches files on the local system.
+                new FileSourceProvider()
+                {
+                    // Specify an extra directory to search in.
+                    // With this, you can use `using System` and it will
+                    // find it in the "StandardLibrary" folder.
+                    ExtraDirectories = new string[]
+                    {
+                        standardLibraryPath
+                    },
+                }
+            ),
         }, diagnostics);
 
         // Now you can actually generate the bytecodes.

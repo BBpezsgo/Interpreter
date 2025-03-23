@@ -84,7 +84,7 @@ public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
 
 public static class DiagnosticsCollectionExtensions
 {
-    public static void Print(this IReadOnlyDiagnosticsCollection diagnosticsCollection, LanguageException.GetFileContent? getFileContent = null)
+    public static void Print(this IReadOnlyDiagnosticsCollection diagnosticsCollection, IEnumerable<ISourceProvider>? sourceProviders = null)
     {
         foreach (DiagnosticWithoutContext diagnostic in diagnosticsCollection.DiagnosticsWithoutContext)
         {
@@ -106,6 +106,6 @@ public static class DiagnosticsCollectionExtensions
         }
 
         foreach (Diagnostic diagnostic in diagnosticsCollection.Diagnostics)
-        { Output.LogDiagnostic(diagnostic, getFileContent); }
+        { Output.LogDiagnostic(diagnostic, sourceProviders); }
     }
 }

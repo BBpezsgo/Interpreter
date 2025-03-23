@@ -52,10 +52,18 @@ public static class ExternalFunctions
         externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<float, float>(externalFunctions.GenerateId(), "sin", MathF.Sin));
 
         DiagnosticsCollection diagnostics = new();
-        CompilerResult compiled = StatementCompiler.CompileFile(new Uri(scriptPath), new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
+        CompilerResult compiled = StatementCompiler.CompileFile(scriptPath, new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
             ExternalFunctions = externalFunctions.ToImmutableArray(),
-            BasePath = standardLibraryPath,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        standardLibraryPath
+                    },
+                }
+            ),
         }, diagnostics);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings.Default, null, diagnostics);
         diagnostics.Print();

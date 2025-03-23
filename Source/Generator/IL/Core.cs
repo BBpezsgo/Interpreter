@@ -11,9 +11,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BooleanType = BuiltinType.U8,
         ExitCodeType = BuiltinType.I32,
         SizeofStatementType = BuiltinType.I32,
-        BasePath = null,
         DontOptimize = true,
         ExternalFunctions = ImmutableArray<Runtime.IExternalFunction>.Empty,
+        SourceProviders = ImmutableArray.Create<ISourceProvider>(
+            FileSourceProvider.Instance
+        ),
     };
 
     public override int PointerSize => 8;

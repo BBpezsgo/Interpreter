@@ -29,7 +29,7 @@ public readonly struct TestFile
 
     public void DoMain(bool heapShouldBeEmpty = true, Action<List<IExternalFunction>>? externalFunctionAdder = null)
     {
-        MainResult result = Utils.RunMain(LanguageCore.Utils.ToFileUri(SourceFile), GetInput(), externalFunctionAdder);
+        MainResult result = Utils.RunMain(SourceFile, GetInput(), externalFunctionAdder);
         Console.Write($"ExitCode: {result.ExitCode}");
         ExpectedResult expected = GetExpectedResult();
         expected.Assert(result, heapShouldBeEmpty);
@@ -37,7 +37,7 @@ public readonly struct TestFile
 
     public void DoIL()
     {
-        int result = Utils.RunIL(LanguageCore.Utils.ToFileUri(SourceFile), GetInput());
+        int result = Utils.RunIL(SourceFile, GetInput());
         Console.Write($"ExitCode: {result}");
         ExpectedResult expected = GetExpectedResult();
         if (expected.ExitCode != result)
@@ -46,7 +46,7 @@ public readonly struct TestFile
 
     public void DoBrainfuck(bool memoryShouldBeEmpty = true, int? expectedMemoryPointer = 0)
     {
-        (BrainfuckResult result, BrainfuckResult resultCompact, BrainfuckResult resultUnoptimized) = Utils.RunBrainfuck(LanguageCore.Utils.ToFileUri(SourceFile), GetInput());
+        (BrainfuckResult result, BrainfuckResult resultCompact, BrainfuckResult resultUnoptimized) = Utils.RunBrainfuck(SourceFile, GetInput());
 
         if (result.StdOutput != resultCompact.StdOutput) throw new AssertFailedException($"Compacted brainfuck code made different result (stdout)");
         if (result.MemoryPointer != resultCompact.MemoryPointer) throw new AssertFailedException($"Compacted brainfuck code made different result (memory pointer)");
@@ -65,7 +65,7 @@ public readonly struct TestFile
 
     public void DoAssembly()
     {
-        AssemblyResult result = Utils.RunAssembly(LanguageCore.Utils.ToFileUri(SourceFile), GetInput());
+        AssemblyResult result = Utils.RunAssembly(SourceFile, GetInput());
         Console.Write($"ExitCode: {result.ExitCode}");
         ExpectedResult expected = GetExpectedResult();
         expected.Assert(result);
@@ -314,7 +314,7 @@ public static class Utils
         return new TestFile(sourceFile, resultFile, inputFile);
     }
 
-    public static MainResult RunMain(Uri file, string input, Action<List<IExternalFunction>>? externalFunctionAdder = null)
+    public static MainResult RunMain(string file, string input, Action<List<IExternalFunction>>? externalFunctionAdder = null)
     {
         List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
@@ -324,20 +324,36 @@ public static class Utils
 
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
         {
-            BasePath = BasePath,
             ExternalFunctions = externalFunctions.ToImmutableArray(),
             DontOptimize = false,
             PreprocessorVariables = PreprocessorVariables.Normal,
             AdditionalImports = AdditionalImports,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        BasePath
+                    },
+                }
+            ),
         }, diagnostics);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
         compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
         {
-            BasePath = BasePath,
             ExternalFunctions = externalFunctions.ToImmutableArray(),
             DontOptimize = true,
             PreprocessorVariables = PreprocessorVariables.Normal,
             AdditionalImports = AdditionalImports,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        BasePath
+                    },
+                }
+            ),
         }, diagnostics);
         BBLangGeneratorResult generatedCodeUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings)
         {
@@ -390,7 +406,7 @@ public static class Utils
         return result;
     }
 
-    public static int RunIL(Uri file, string input)
+    public static int RunIL(string file, string input)
     {
         List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
@@ -398,10 +414,18 @@ public static class Utils
 
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(LanguageCore.IL.Generator.CodeGeneratorForMain.DefaultCompilerSettings)
         {
-            BasePath = BasePath,
             ExternalFunctions = externalFunctions.ToImmutableArray(),
             PreprocessorVariables = PreprocessorVariables.Normal,
             AdditionalImports = AdditionalImports,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        BasePath
+                    },
+                }
+            ),
         }, diagnostics);
         Func<int> generatedCode = LanguageCore.IL.Generator.CodeGeneratorForMain.Generate(compiled, null, diagnostics);
 
@@ -410,7 +434,7 @@ public static class Utils
         return generatedCode.Invoke();
     }
 
-    public static (BrainfuckResult Normal, BrainfuckResult Compact, BrainfuckResult Unoptimized) RunBrainfuck(Uri file, string input)
+    public static (BrainfuckResult Normal, BrainfuckResult Compact, BrainfuckResult Unoptimized) RunBrainfuck(string file, string input)
     {
         BrainfuckResult resultNormal;
         BrainfuckResult resultCompact;
@@ -425,10 +449,18 @@ public static class Utils
         DiagnosticsCollection diagnostics = new();
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BrainfuckCompilerSettings)
         {
-            BasePath = BasePath,
             DontOptimize = false,
             PreprocessorVariables = PreprocessorVariables.Brainfuck,
             AdditionalImports = AdditionalImports,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        BasePath
+                    },
+                }
+            ),
         }, diagnostics);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generated = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings, null, diagnostics);
         diagnostics.Throw();
@@ -436,10 +468,18 @@ public static class Utils
         diagnostics = new DiagnosticsCollection();
         CompilerResult compiledUnoptimized = StatementCompiler.CompileFile(file, new CompilerSettings(BrainfuckCompilerSettings)
         {
-            BasePath = BasePath,
             DontOptimize = true,
             PreprocessorVariables = PreprocessorVariables.Brainfuck,
             AdditionalImports = AdditionalImports,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        BasePath
+                    },
+                }
+            ),
         }, diagnostics);
         LanguageCore.Brainfuck.Generator.BrainfuckGeneratorResult generatedUnoptimized = LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.Generate(compiledUnoptimized, new LanguageCore.Brainfuck.Generator.BrainfuckGeneratorSettings(BrainfuckGeneratorSettings)
         { DontOptimize = true }, null, diagnostics);
@@ -484,21 +524,29 @@ public static class Utils
         return (resultNormal, resultCompact, resultUnoptimized);
     }
 
-    public static AssemblyResult RunAssembly(Uri file, string input)
+    public static AssemblyResult RunAssembly(string file, string input)
     {
         DiagnosticsCollection diagnostics = new();
 
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
         {
-            BasePath = BasePath,
             AdditionalImports = AdditionalImports,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        BasePath
+                    },
+                }
+            ),
         }, diagnostics);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
         diagnostics.Throw();
 
         string asm = LanguageCore.Assembly.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, BitWidth._32);
 
-        string outputFile = file.LocalPath + "_executable";
+        string outputFile = file + "_executable";
 
         LanguageCore.Assembly.Assembler.Assemble(asm, outputFile);
 

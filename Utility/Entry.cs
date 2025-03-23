@@ -7,7 +7,6 @@ using LanguageCore.Brainfuck;
 using LanguageCore.Brainfuck.Generator;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
-using LanguageCore.Tokenizing;
 
 namespace LanguageCore;
 
@@ -64,7 +63,7 @@ public static class Entry
 
         string[] additionalImports = new string[]
         {
-            "../StandardLibrary/Primitives.bbc"
+            "Primitives"
         };
 
         switch (arguments.Format)
@@ -90,11 +89,19 @@ public static class Entry
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
-                    BasePath = arguments.BasePath,
                     DontOptimize = arguments.DontOptimize,
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.Normal,
                     AdditionalImports = additionalImports,
+                    SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                        new FileSourceProvider()
+                        {
+                            ExtraDirectories = new string?[]
+                            {
+                                arguments.BasePath
+                            },
+                        }
+                    ),
                 };
                 MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
                 {
@@ -345,14 +352,21 @@ public static class Entry
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
                 BrainfuckGeneratorResult generated;
-                ImmutableArray<Token> tokens;
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForBrainfuck.DefaultCompilerSettings)
                 {
-                    BasePath = arguments.BasePath,
                     DontOptimize = arguments.DontOptimize,
                     PreprocessorVariables = PreprocessorVariables.Brainfuck,
                     AdditionalImports = additionalImports,
+                    SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                        new FileSourceProvider()
+                        {
+                            ExtraDirectories = new string?[]
+                            {
+                                arguments.BasePath
+                            },
+                        }
+                    ),
                 };
                 BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)
                 {
@@ -367,7 +381,6 @@ public static class Entry
                 DiagnosticsCollection diagnostics = new();
                 if (arguments.ThrowErrors)
                 {
-                    tokens = AnyTokenizer.Tokenize(arguments.Source, diagnostics, PreprocessorVariables.Brainfuck).Tokens;
                     CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Throw();
@@ -380,7 +393,6 @@ public static class Entry
                 {
                     try
                     {
-                        tokens = AnyTokenizer.Tokenize(arguments.Source, diagnostics, PreprocessorVariables.Brainfuck).Tokens;
                         CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                         diagnostics.Throw();
@@ -600,11 +612,19 @@ public static class Entry
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
-                    BasePath = arguments.BasePath,
                     DontOptimize = arguments.DontOptimize,
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.Normal,
                     AdditionalImports = additionalImports,
+                    SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                        new FileSourceProvider()
+                        {
+                            ExtraDirectories = new string?[]
+                            {
+                                arguments.BasePath
+                            },
+                        }
+                    ),
                 };
                 MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
                 {
@@ -665,7 +685,7 @@ public static class Entry
                 }
 
                 string asm = Assembly.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, bits);
-                string outputFile = arguments.Source.LocalPath + "_executable";
+                string outputFile = arguments.Source + "_executable";
 
                 Output.LogDebug("Assembling and linking ...");
 

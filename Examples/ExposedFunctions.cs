@@ -26,12 +26,26 @@ public static class ExposedFunctions
 
         List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
         DiagnosticsCollection diagnostics = new();
-        CompilerResult compiled = StatementCompiler.CompileFile(new Uri(scriptPath), new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
+        CompilerResult compiled = StatementCompiler.CompileFile(scriptPath, new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
-            BasePath = standardLibraryPath,
             ExternalFunctions = externalFunctions.ToImmutableArray(),
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        standardLibraryPath
+                    },
+                }
+            ),
         }, diagnostics);
-        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings.Default, null, diagnostics);
+        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings.Default)
+        {
+            // The global variables would be cleaned up at the end of the top-level statements.
+            // To prevent undefined behavior when accessing global variables from an exposed function,
+            // disable the cleanup of the variables.
+            CleanupGlobalVaraibles = false,
+        }, null, diagnostics);
         diagnostics.Print();
         diagnostics.Throw();
 

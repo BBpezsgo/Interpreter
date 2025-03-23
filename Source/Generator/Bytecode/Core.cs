@@ -139,10 +139,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BooleanType = BuiltinType.U8,
         ExitCodeType = BuiltinType.I32,
         SizeofStatementType = BuiltinType.I32,
-        BasePath = null,
         DontOptimize = false,
         ExternalFunctions = ImmutableArray<IExternalFunction>.Empty,
         PreprocessorVariables = PreprocessorVariables.Normal,
+        SourceProviders = ImmutableArray.Create<ISourceProvider>(
+            FileSourceProvider.Instance
+        ),
     };
 
     #region Fields

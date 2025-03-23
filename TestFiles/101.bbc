@@ -1,0 +1,11 @@
+struct a
+{
+
+}
+
+alias b a;
+
+struct c
+{
+    b d;
+}

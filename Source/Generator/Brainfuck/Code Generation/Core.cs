@@ -1,4 +1,4 @@
-using LanguageCore.Compiler;
+﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -98,7 +98,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             }
         ),
         DontOptimize = false,
-        BasePath = null,
+        SourceProviders = ImmutableArray.Create<ISourceProvider>(
+            FileSourceProvider.Instance
+        ),
     };
 
     const string ReturnVariableName = "@return";

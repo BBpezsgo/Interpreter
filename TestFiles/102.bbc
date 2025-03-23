@@ -1,0 +1,11 @@
+inline int B(int a, int b)
+{
+    return a + A(b, 1);
+}
+
+inline int A(int a, int b)
+{
+    return a + B(b, 1);
+}
+
+A(3, 7);

@@ -111,9 +111,11 @@ public class MainFileTests
     [TestMethod, Timeout(Timeout)] public void Test92() => Utils.GetTest(92).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test93() => Utils.GetTest(93).DoMain();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test94() => Utils.GetTest(94).DoMain();
-    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test95() => Utils.GetTest(95).DoMain();
+    [TestMethod, Timeout(Timeout), Ignore("No")] public void Test95() => Utils.GetTest(95).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test96() => Utils.GetTest(96).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test97() => Utils.GetTest(97).DoMain();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test98() => Utils.GetTest(98).DoMain();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test99() => Utils.GetTest(99).DoMain();
+    [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test100() => Utils.GetTest(100).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test101() => Utils.GetTest(101).DoMain();
 }

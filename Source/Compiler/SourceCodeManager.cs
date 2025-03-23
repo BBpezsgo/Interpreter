@@ -1,16 +1,9 @@
 ﻿using System.IO;
-using System.Net.Http;
 using System.Threading.Tasks;
 using LanguageCore.Parser;
 using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Compiler;
-
-#if UNITY
-public delegate UnityEngine.Awaitable<Stream?>? FileParser(Uri file);
-#else
-public delegate Task<Stream?>? FileParser(Uri file);
-#endif
 
 public readonly record struct ParsedFile(
     Uri File,
@@ -23,9 +16,9 @@ record PendingFile(
     Uri Uri,
     UsingDefinition? Initiator,
 #if UNITY
-    UnityEngine.Awaitable<Stream?> Task
+    UnityEngine.Awaitable<Stream> Task
 #else
-    Task<Stream?> Task
+    Task<Stream> Task
 #endif
 );
 
@@ -34,58 +27,18 @@ public class SourceCodeManager
     readonly HashSet<Uri> CompiledUris;
     readonly DiagnosticsCollection Diagnostics;
     readonly IEnumerable<string> PreprocessorVariables;
-    readonly FileParser? FileParser;
+    readonly ImmutableArray<ISourceProvider> SourceProviders;
     readonly List<PendingFile> PendingFiles;
     readonly List<ParsedFile> ParsedFiles;
-    readonly string? BasePath;
 
-    public SourceCodeManager(DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, FileParser? fileParser, string? basePath)
+    public SourceCodeManager(DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, ImmutableArray<ISourceProvider> sourceProviders)
     {
         CompiledUris = new();
         Diagnostics = diagnostics;
         PreprocessorVariables = preprocessorVariables;
-        FileParser = fileParser;
         PendingFiles = new();
         ParsedFiles = new();
-        BasePath = basePath;
-    }
-
-    static IEnumerable<Uri> GetFileQuery(string @using, Uri? parent, string? basePath)
-    {
-        if (!@using.EndsWith($".{LanguageConstants.LanguageExtension}", StringComparison.Ordinal)) @using += $".{LanguageConstants.LanguageExtension}";
-
-        if (Uri.TryCreate(parent, @using, out Uri? file))
-        { yield return file; }
-
-        if (parent is not null &&
-            basePath is not null &&
-            Uri.TryCreate(new Uri(parent, basePath), @using, out file))
-        { yield return file; }
-
-        if (parent is not null &&
-            !parent.IsFile)
-        { yield break; }
-
-        if (@using.StartsWith("/~")) @using = @using[1..];
-        if (@using.StartsWith('~'))
-        { @using = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "." + @using[1..]); }
-
-        string? directory = parent == null ? null : (new FileInfo(parent.AbsolutePath).Directory?.FullName);
-
-        if (directory is not null)
-        {
-            if (basePath != null)
-            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, directory), @using), UriKind.Absolute); }
-
-            yield return new Uri(Path.GetFullPath(@using, directory), UriKind.Absolute);
-        }
-        else
-        {
-            if (basePath != null)
-            { yield return new Uri(Path.Combine(Path.GetFullPath(basePath, Environment.CurrentDirectory), @using), UriKind.Absolute); }
-
-            yield return new Uri(Path.GetFullPath(@using, Environment.CurrentDirectory), UriKind.Absolute);
-        }
+        SourceProviders = sourceProviders;
     }
 
     void ProcessPendingFiles()
@@ -145,166 +98,214 @@ public class SourceCodeManager
 
             foreach (UsingDefinition @using in ast.Usings)
             {
-                IEnumerable<Uri> query = GetFileQuery(@using.PathString, finishedFile.Uri, BasePath);
-                if (!FromAnywhere(@using, query, out _))
+                LoadSource(@using, @using.PathString, finishedFile.Uri, out _);
+            }
+        }
+    }
+
+    bool LoadSource(UsingDefinition? initiator, string requestedFile, Uri? currentFile, [NotNullWhen(true)] out Uri? resolvedUri)
+    {
+        resolvedUri = null;
+        bool wasHandlerFound = false;
+
+        foreach (ISourceProvider sourceProvider in SourceProviders)
+        {
+            if (sourceProvider is ISourceProviderSync providerSync)
+            {
+                SourceProviderResultSync res = providerSync.TryLoad(requestedFile, currentFile);
+                switch (res.Type)
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"File \"{@using.PathString}\" not found", @using));
-                    continue;
+                    case SourceProviderResultType.Success:
+                        resolvedUri = res.ResolvedUri!;
+                        wasHandlerFound = true;
+                        if (CompiledUris.Contains(resolvedUri))
+                        { return true; }
+                        CompiledUris.Add(resolvedUri);
+                        if (initiator is not null) initiator.CompiledUri = resolvedUri.ToString();
+
+                        if (res.Stream is null)
+                        {
+                            Diagnostics.Add(Diagnostic.Internal($"Invalid handler for \"{resolvedUri}\": resulted in success but not provided a data stream", initiator?.Position, initiator?.File));
+                            return false;
+                        }
+#if UNITY
+                        UnityEngine.AwaitableCompletionSource<Stream> task = new();
+                        task.SetResult(res.Stream);
+                        PendingFiles.Add(new PendingFile(resolvedUri, initiator, task.Awaitable));
+#else
+                        PendingFiles.Add(new PendingFile(resolvedUri, initiator, Task.FromResult(res.Stream)));
+#endif
+                        return true;
+                    case SourceProviderResultType.NotFound:
+                        resolvedUri = res.ResolvedUri!;
+                        wasHandlerFound = true;
+                        continue;
+                    case SourceProviderResultType.Error:
+                        resolvedUri = res.ResolvedUri!;
+                        wasHandlerFound = true;
+                        Diagnostics.Add(Diagnostic.Error(res.ErrorMessage ?? $"Failed to load \"{resolvedUri?.ToString() ?? requestedFile}\"", initiator?.Position, initiator?.File));
+                        return false;
+                    case SourceProviderResultType.NextHandler:
+                        continue;
+                }
+            }
+            else if (sourceProvider is ISourceProviderAsync providerAsync)
+            {
+                SourceProviderResultAsync res = providerAsync.TryLoad(requestedFile, currentFile);
+                switch (res.Type)
+                {
+                    case SourceProviderResultType.Success:
+                        resolvedUri = res.ResolvedUri!;
+                        wasHandlerFound = true;
+                        if (CompiledUris.Contains(resolvedUri))
+                        { return true; }
+                        CompiledUris.Add(resolvedUri);
+
+                        if (initiator is not null) initiator.CompiledUri = resolvedUri.ToString();
+                        if (res.Stream is null)
+                        {
+                            Diagnostics.Add(Diagnostic.Internal($"Invalid handler for \"{resolvedUri}\": resulted in success but not provided a data stream", initiator?.Position, initiator?.File));
+                            return false;
+                        }
+                        PendingFiles.Add(new PendingFile(resolvedUri, initiator, res.Stream));
+                        return true;
+                    case SourceProviderResultType.NotFound:
+                        resolvedUri = res.ResolvedUri!;
+                        wasHandlerFound = true;
+                        continue;
+                    case SourceProviderResultType.Error:
+                        resolvedUri = res.ResolvedUri!;
+                        wasHandlerFound = true;
+                        Diagnostics.Add(Diagnostic.Error(res.ErrorMessage ?? $"Failed to load \"{resolvedUri?.ToString() ?? requestedFile}\"", initiator?.Position, initiator?.File));
+                        return false;
+                    case SourceProviderResultType.NextHandler:
+                        continue;
+                }
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        if (initiator is not null)
+        {
+            if (wasHandlerFound)
+            { Diagnostics.Add(Diagnostic.Error($"File \"{requestedFile}\" not found", initiator)); }
+            else
+            { Diagnostics.Add(Diagnostic.Error($"No handler exists for \"{requestedFile}\"", initiator)); }
+        }
+        else
+        {
+            if (wasHandlerFound)
+            { Diagnostics.Add(DiagnosticWithoutContext.Error($"File \"{requestedFile}\" not found")); }
+            else
+            { Diagnostics.Add(DiagnosticWithoutContext.Error($"No handler exists for \"{requestedFile}\"")); }
+        }
+        return false;
+    }
+
+#if UNITY
+    public static UnityEngine.Awaitable<Stream>? LoadSource(IEnumerable<ISourceProvider>? sourceProviders, string requestedFile, Uri? currentFile = null)
+#else
+    public static Task<Stream>? LoadSource(IEnumerable<ISourceProvider>? sourceProviders, string requestedFile, Uri? currentFile = null)
+#endif
+    {
+        if (sourceProviders is null) return null;
+        foreach (ISourceProvider sourceProvider in sourceProviders)
+        {
+            if (sourceProvider is ISourceProviderSync providerSync)
+            {
+                SourceProviderResultSync res = providerSync.TryLoad(requestedFile, currentFile);
+                switch (res.Type)
+                {
+                    case SourceProviderResultType.Success:
+                        if (res.Stream is null) return null;
+#if UNITY
+                        UnityEngine.AwaitableCompletionSource<Stream> task = new();
+                        task.SetResult(res.Stream);
+                        return task.Awaitable;
+#else
+                        return Task.FromResult(res.Stream);
+#endif
+                    case SourceProviderResultType.NotFound:
+                        continue;
+                    case SourceProviderResultType.Error:
+                        return null;
+                    case SourceProviderResultType.NextHandler:
+                        continue;
+                }
+            }
+            else if (sourceProvider is ISourceProviderAsync providerAsync)
+            {
+                SourceProviderResultAsync res = providerAsync.TryLoad(requestedFile, currentFile);
+                switch (res.Type)
+                {
+                    case SourceProviderResultType.Success:
+                        return res.Stream;
+                    case SourceProviderResultType.NotFound:
+                        continue;
+                    case SourceProviderResultType.Error:
+                        return null;
+                    case SourceProviderResultType.NextHandler:
+                        continue;
+                }
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        return null;
+    }
+
+    public static string? LoadSourceSync(IEnumerable<ISourceProvider>? sourceProviders, string requestedFile, Uri? currentFile = null)
+    {
+#if UNITY
+        throw new System.NotSupportedException($"Unity not supported");
+#else
+        try
+        {
+            if (sourceProviders is not null)
+            {
+                var res = LoadSource(sourceProviders, requestedFile, currentFile);
+                if (res is not null)
+                {
+                    res.Wait();
+                    if (res.Result is not null)
+                    {
+                        using StreamReader reader = new(res.Result);
+                        string content = reader.ReadToEnd();
+                        return content;
+                    }
                 }
             }
         }
-    }
-
-    static bool FromWeb(
-        Uri file,
-        [NotNullWhen(true)] out Stream? content)
-    {
-        Output.LogInfo($"  Download file \"{file}\" ...");
-
-        using HttpClient client = new();
-        using Task<HttpResponseMessage> getTask = client.GetAsync(file);
-        try
+        catch (Exception)
         {
-            getTask.Wait();
+
         }
-        catch (AggregateException ex)
-        {
-            foreach (Exception error in ex.InnerExceptions)
-            { Output.LogError(error.Message); }
-
-            content = default;
-            return false;
-        }
-        using HttpResponseMessage res = getTask.Result;
-
-        if (!res.IsSuccessStatusCode)
-        {
-            Output.LogError($"HTTP {res.StatusCode}");
-
-            content = default;
-            return false;
-        }
-
-        Task<byte[]> _content = res.Content.ReadAsByteArrayAsync();
-        _content.Wait();
-        content = new MemoryStream(_content.Result);
-        return true;
-    }
-
-    static bool FromFile(
-        Uri file,
-        [NotNullWhen(true)] out Stream? content)
-    {
-        content = default;
-
-        string path = file.AbsolutePath;
-
-        if (path.StartsWith("/~")) path = path[1..];
-        if (path.StartsWith('~'))
-        { path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "." + path[1..]); }
-
-        if (!File.Exists(path))
-        { return false; }
-
-        Output.LogDebug($"  Load local file \"{path}\" ...");
-
-        content = File.OpenRead(path);
-
-        return true;
-    }
-
-    bool FromAnywhere(
-        UsingDefinition? initiator,
-        Uri file)
-    {
-        if (initiator is not null)
-        {
-            if (file.IsFile)
-            { initiator.CompiledUri = file.AbsolutePath; }
-            else
-            { initiator.CompiledUri = file.ToString(); }
-        }
-
-        if (CompiledUris.Contains(file))
-        { return true; }
-
-        if (FileParser is not null)
-        {
-#pragma warning disable IDE0008 // Use explicit type
-            var task = FileParser.Invoke(file);
-#pragma warning restore IDE0008
-            if (task is not null)
-            {
-                CompiledUris.Add(file);
-                PendingFiles.Add(new PendingFile(file, initiator, task));
-                return true;
-            }
-        }
-
-        if (file.Scheme is "https" or "http")
-        {
-            if (FromWeb(file, out Stream? content))
-            {
-                CompiledUris.Add(file);
-#if UNITY
-                UnityEngine.AwaitableCompletionSource<Stream?> task = new();
-                task.SetResult(content);
-                PendingFiles.Add(new PendingFile(file, initiator, task.Awaitable));
-#else
-                Task<Stream?> task = Task.FromResult<Stream?>(content);
-                PendingFiles.Add(new PendingFile(file, initiator, task));
+        return null;
 #endif
-                return true;
-            }
-        }
-        else if (file.IsFile)
-        {
-            if (FromFile(file, out Stream? content))
-            {
-                CompiledUris.Add(file);
-#if UNITY
-                UnityEngine.AwaitableCompletionSource<Stream?> task = new();
-                task.SetResult(content);
-                PendingFiles.Add(new PendingFile(file, initiator, task.Awaitable));
-#else
-                Task<Stream?> task = Task.FromResult<Stream?>(content);
-                PendingFiles.Add(new PendingFile(file, initiator, task));
-#endif
-                return true;
-            }
-        }
-
-        return false;
     }
 
-    bool FromAnywhere(
-        UsingDefinition? initiator,
-        IEnumerable<Uri> query,
-        [NotNullWhen(true)] out Uri? uri)
+    SourceCodeManagerResult Entry(string? file, IEnumerable<string>? additionalImports)
     {
-        foreach (Uri item in query)
-        {
-            if (FromAnywhere(initiator, item))
-            {
-                uri = item;
-                return true;
-            }
-        }
+        Uri? resolvedEntry = null;
 
-        uri = null;
-        return false;
-    }
-
-    ImmutableArray<ParsedFile> Entry(
-        Uri? file,
-        IEnumerable<string>? additionalImports)
-    {
         if (file is not null)
         {
-            if (!FromAnywhere(null, file))
+            if (!LoadSource(null, file, null, out resolvedEntry))
             {
-                Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{file}\" not found"));
-                return ImmutableArray<ParsedFile>.Empty;
+                if (resolvedEntry is null)
+                { Uri.TryCreate(file, UriKind.RelativeOrAbsolute, out resolvedEntry); }
+
+                return new()
+                {
+                    ParsedFiles = ImmutableArray<ParsedFile>.Empty,
+                    ResolvedEntry = resolvedEntry,
+                };
             }
         }
 
@@ -312,12 +313,7 @@ public class SourceCodeManager
         {
             foreach (string additionalImport in additionalImports)
             {
-                IEnumerable<Uri> query = GetFileQuery(additionalImport, null, BasePath);
-                if (!FromAnywhere(null, query, out _))
-                {
-                    Diagnostics.Add(DiagnosticWithoutContext.Critical($"File \"{additionalImport}\" not found"));
-                    continue;
-                }
+                LoadSource(null, additionalImport, null, out _);
             }
         }
 
@@ -330,18 +326,21 @@ public class SourceCodeManager
             ProcessPendingFiles();
         }
 
-        return ParsedFiles.ToImmutableArray();
+        return new()
+        {
+            ParsedFiles = ParsedFiles.ToImmutableArray(),
+            ResolvedEntry = resolvedEntry,
+        };
     }
 
-    public static ImmutableArray<ParsedFile> Collect(
-        Uri? file,
-        string? basePath,
+    public static SourceCodeManagerResult Collect(
+        string? file,
         DiagnosticsCollection diagnostics,
         IEnumerable<string> preprocessorVariables,
-        FileParser? fileParser,
-        IEnumerable<string>? additionalImports)
+        IEnumerable<string>? additionalImports,
+        ImmutableArray<ISourceProvider> sourceProviders)
     {
-        SourceCodeManager sourceCodeManager = new(diagnostics, preprocessorVariables, fileParser, basePath);
+        SourceCodeManager sourceCodeManager = new(diagnostics, preprocessorVariables, sourceProviders);
         return sourceCodeManager.Entry(file, additionalImports);
     }
 }

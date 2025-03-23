@@ -1,8 +1,6 @@
 ﻿using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
-using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
-using LanguageCore.Tokenizing;
 
 namespace LanguageCore;
 
@@ -25,24 +23,33 @@ public static class Interactive
         DiagnosticsCollection diagnostics = new();
         BBLangGeneratorResult generated;
 
+        ImmutableArray<ISourceProvider> sourceProviders = ImmutableArray.Create<ISourceProvider>(
+            new MemorySourceProvider(new Dictionary<string, string>()
+            {
+                { "memory:///", source }
+            }),
+            new FileSourceProvider()
+            {
+                ExtraDirectories = new string[]
+                {
+                    "/home/BB/Projects/BBLang/Core/StandardLibrary"
+                },
+            }
+        );
+
         try
         {
-            ImmutableArray<Token> tokens = StringTokenizer.Tokenize(source, new(), PreprocessorVariables.Interactive, Utils.AssemblyFile).Tokens;
-            if (tokens.Length == 0) return;
-            Statement statement = Parser.Parser.ParseStatement(tokens, Utils.AssemblyFile, diagnostics);
-
             List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
 
-            CompilerResult compiled = Compiler.StatementCompiler.CompileInteractive(
-                statement,
+            CompilerResult compiled = StatementCompiler.CompileFile(
+                "memory:///",
                 new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
-                    BasePath = "/home/BB/Projects/BBLang/Core/StandardLibrary",
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.Interactive,
+                    SourceProviders = sourceProviders,
                 },
-                diagnostics,
-                Utils.AssemblyFile);
+                diagnostics);
 
             generated = CodeGeneratorForMain.Generate(
                 compiled,
@@ -57,7 +64,7 @@ public static class Interactive
         }
         finally
         {
-            diagnostics.Print(v => v == Utils.AssemblyFile ? source : null);
+            diagnostics.Print(sourceProviders);
         }
 
         if (diagnostics.HasErrors) return;

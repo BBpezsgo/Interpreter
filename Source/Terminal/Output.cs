@@ -38,12 +38,12 @@ public static class Output
 
     public static void LogError(string message) => Log(message, ErrorColor);
 
-    public static void LogError(LanguageException exception, LanguageException.GetFileContent? getFileContent = null)
+    public static void LogError(LanguageException exception, IEnumerable<ISourceProvider>? sourceProviders = null)
     {
         Console.ForegroundColor = ErrorColor;
         Console.WriteLine(exception.ToString());
 
-        (string SourceCode, string Arrows)? arrows = exception.GetArrows(getFileContent);
+        (string SourceCode, string Arrows)? arrows = exception.GetArrows(sourceProviders);
         if (arrows.HasValue)
         {
             Console.WriteLine(arrows.Value.SourceCode);
@@ -52,10 +52,10 @@ public static class Output
         Console.ResetColor();
     }
 
-    public static void LogDiagnostic(Diagnostic diagnostic, LanguageException.GetFileContent? getFileContent = null)
-        => LogDiagnostic(diagnostic, 0, getFileContent);
+    public static void LogDiagnostic(Diagnostic diagnostic, IEnumerable<ISourceProvider>? sourceProviders = null)
+        => LogDiagnostic(diagnostic, 0, sourceProviders);
 
-    static void LogDiagnostic(Diagnostic diagnostic, int depth, LanguageException.GetFileContent? getFileContent = null)
+    static void LogDiagnostic(Diagnostic diagnostic, int depth, IEnumerable<ISourceProvider>? sourceProviders = null)
     {
         if (!(diagnostic.Level switch
         {
@@ -80,7 +80,7 @@ public static class Output
 
         Console.Write(new string(' ', depth * 2));
         Console.WriteLine(diagnostic.ToString());
-        (string SourceCode, string Arrows)? arrows = diagnostic.GetArrows(getFileContent);
+        (string SourceCode, string Arrows)? arrows = diagnostic.GetArrows(sourceProviders);
         if (arrows.HasValue)
         {
             Console.Write(new string(' ', depth * 2));
@@ -98,7 +98,7 @@ public static class Output
         Console.ResetColor();
 
         foreach (Diagnostic subdiagnostic in diagnostic.SubErrors)
-        { LogDiagnostic(subdiagnostic, depth + 1, getFileContent); }
+        { LogDiagnostic(subdiagnostic, depth + 1, sourceProviders); }
     }
 
     public static void LogError(Exception exception)

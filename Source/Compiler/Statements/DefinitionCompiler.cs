@@ -616,39 +616,40 @@ public partial class StatementCompiler
         }
     }
 
-    CompilerResult CompileMainFile(Uri file)
+    CompilerResult CompileMainFile(string file)
     {
-        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(file, Settings.BasePath, Diagnostics, PreprocessorVariables, Settings.FileParser, Settings.AdditionalImports);
+        SourceCodeManagerResult res = SourceCodeManager.Collect(file, Diagnostics, PreprocessorVariables, Settings.AdditionalImports, Settings.SourceProviders);
 
-        foreach (ParsedFile parsedFile in parsedFiles)
-        { AddAST(parsedFile, parsedFile.File != file); }
+        foreach (ParsedFile parsedFile in res.ParsedFiles)
+        { AddAST(parsedFile, parsedFile.File != res.ResolvedEntry); }
 
-        foreach (ParsedFile parsedFile in parsedFiles)
+        foreach (ParsedFile parsedFile in res.ParsedFiles)
         {
-            if (parsedFile.File != file) continue;
+            if (parsedFile.File != res.ResolvedEntry) continue;
             TopLevelStatements.Add((parsedFile.AST.TopLevelStatements, parsedFile.File));
         }
 
-        return CompileInternal(file, parsedFiles);
+        // This should not be null ...
+        if (res.ResolvedEntry is null) throw new InternalExceptionWithoutContext($"I can't really explain this error ...");
+        return CompileInternal(res.ResolvedEntry, res.ParsedFiles);
     }
 
     CompilerResult CompileInteractiveInternal(Statement statement, Uri file)
     {
-        ImmutableArray<ParsedFile> parsedFiles = SourceCodeManager.Collect(
+        SourceCodeManagerResult res = SourceCodeManager.Collect(
             null,
-            Settings.BasePath,
             Diagnostics,
             PreprocessorVariables,
-            null,
-            new string[] { "Primitives", "System" }
+            new string[] { "Primitives", "System" },
+            Settings.SourceProviders
         );
 
-        foreach (ParsedFile parsedFile in parsedFiles)
+        foreach (ParsedFile parsedFile in res.ParsedFiles)
         { AddAST(parsedFile); }
 
         TopLevelStatements.Add((ImmutableArray.Create(statement), file));
 
-        return CompileInternal(file, parsedFiles);
+        return CompileInternal(file, res.ParsedFiles);
     }
 
     CompilerResult CompileInternal(Uri file, ImmutableArray<ParsedFile> parsedFiles)
@@ -678,7 +679,7 @@ public partial class StatementCompiler
     }
 
     public static CompilerResult CompileFile(
-        Uri file,
+        string file,
         CompilerSettings settings,
         DiagnosticsCollection diagnostics)
     {

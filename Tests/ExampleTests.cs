@@ -53,4 +53,18 @@ public class ExampleTests
             $"Function \"with_return_value\" returned 66{writer.NewLine}",
             output.ToString());
     }
+
+    [TestMethod, Timeout(Timeout)]
+    public void CustomSourceProvider()
+    {
+        StringBuilder output = new();
+        using StringWriter writer = new(output);
+        Console.SetOut(writer);
+
+        Examples.CustomSourceProvider.Run();
+
+        Assert.AreEqual(
+            "Hello",
+            output.ToString());
+    }
 }

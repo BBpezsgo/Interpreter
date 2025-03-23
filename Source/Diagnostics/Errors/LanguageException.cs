@@ -1,10 +1,10 @@
-﻿namespace LanguageCore;
+﻿using LanguageCore.Compiler;
+
+namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
 public class LanguageException : Exception
 {
-    public delegate string? GetFileContent(Uri uri);
-
     public Position Position { get; protected set; }
     public Uri? File { get; protected set; }
 
@@ -59,11 +59,12 @@ public class LanguageException : Exception
         return result.ToString();
     }
 
-    public (string SourceCode, string Arrows)? GetArrows(GetFileContent? getFileContent = null)
+    public (string SourceCode, string Arrows)? GetArrows(IEnumerable<ISourceProvider>? sourceProviders = null)
     {
         if (File == null) return null;
         if (!File.IsFile) return null;
-        return GetArrows(Position, getFileContent?.Invoke(File) ?? System.IO.File.ReadAllText(File.AbsolutePath));
+        string? content = SourceCodeManager.LoadSourceSync(sourceProviders, File.ToString());
+        return content is not null ? GetArrows(Position, content) : null;
     }
 
     public static (string SourceCode, string Arrows)? GetArrows(Position position, string text)

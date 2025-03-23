@@ -7,7 +7,7 @@ public class CommandLineOptions
     [Value(0,
         Required = false,
         HelpText = "The input file to compile. If not specified, the \"interactive\" will be launched instead.")]
-    public Uri? Source { get; set; }
+    public string? Source { get; set; }
 
     [Option("verbose",
         Required = false,

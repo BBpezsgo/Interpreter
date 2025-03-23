@@ -513,7 +513,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         AddComment($"Call \"{((ISimpleReadable)caller.Declaration).ToReadable()}\" {{");
 
-        if (caller.Function.ReturnValueSize > 0)
+        if (caller.Function.ReturnValueSize > 0 && caller.SaveValue)
         {
             AddComment($"Initial return value {{");
             StackAlloc(caller.Function.ReturnValueSize, false);

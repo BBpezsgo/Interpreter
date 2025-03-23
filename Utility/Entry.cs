@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using CommandLine;
@@ -76,16 +76,6 @@ public static class Entry
 
                 BBLangGeneratorResult generatedCode;
                 DiagnosticsCollection diagnostics = new();
-
-                // {
-                //     CompilerResult compiled = Compiler.Compiler.CompileFile(arguments.Source, externalFunctions, compilerSettings, PreprocessorVariables.Normal, diagnostics, null, additionalImports);
-                //     Func<int> res = IL.Generator.CodeGeneratorForMain.Generate(compiled, Output.Log, diagnostics);
-                //     Console.WriteLine(res.Invoke());
-                //     diagnostics.Print();
-                //     diagnostics.Throw();
-                //     diagnostics.Clear();
-                //     return 0;
-                // }
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {

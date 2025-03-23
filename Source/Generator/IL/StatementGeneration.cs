@@ -13,12 +13,93 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     ModuleBuilder Module = null!;
 
+    void GenerateDeallocator(CompiledCleanup cleanup, ILGenerator il)
+    {
+        if (cleanup.Deallocator is null) return;
+
+        if (cleanup.Deallocator.ExternalFunctionName is not null)
+        {
+            Diagnostics.Add(Diagnostic.Critical($"External deallocator not supported", cleanup));
+            return;
+        }
+
+        if (cleanup.Deallocator.ReturnSomething)
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Deallocator should not return anything", cleanup));
+            return;
+        }
+
+        if (!Functions.TryGetValue(cleanup.Deallocator, out DynamicMethod? function))
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Function \"{cleanup.Deallocator}\" wasn't compiled", cleanup));
+            return;
+        }
+
+        if (function.GetParameters().Length != 1)
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Invalid deallocator", cleanup));
+            return;
+        }
+
+        il.Emit(OpCodes.Dup);
+        il.Emit(OpCodes.Call, function);
+    }
+
+    void GenerateDestructor(CompiledCleanup cleanup, ILGenerator il)
+    {
+        GeneralType deallocateableType = cleanup.TrashType;
+
+        if (cleanup.TrashType.Is<PointerType>())
+        {
+            if (cleanup.Destructor is null)
+            {
+                GenerateDeallocator(cleanup, il);
+                return;
+            }
+        }
+        else
+        {
+            if (cleanup.Destructor is null)
+            { return; }
+        }
+
+        if (!Functions.TryGetValue(cleanup.Destructor, out DynamicMethod? function))
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Function \"{cleanup.Destructor}\" wasn't compiled", cleanup));
+            return;
+        }
+
+        if (function.GetParameters().Length != 1)
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Invalid destructor", cleanup));
+            return;
+        }
+
+        il.Emit(OpCodes.Dup);
+        il.Emit(OpCodes.Call, function);
+
+        if (deallocateableType.Is<PointerType>())
+        {
+            GenerateDeallocator(cleanup, il);
+        }
+    }
+
     void EmitStatement(CompiledEvaluatedValue statement, ILGenerator il)
     {
         switch (statement.Value.Type)
         {
+            case RuntimeType.U8:
+                il.Emit(OpCodes.Ldc_I4_S, statement.Value.U8);
+                return;
+            case RuntimeType.I8:
+                il.Emit(OpCodes.Ldc_I4_S, statement.Value.U8);
+                return;
             case RuntimeType.U16:
-                il.Emit(OpCodes.Ldc_I4_S, statement.Value.U16);
+                // There is no overload for ushort ...
+                il.Emit(OpCodes.Ldc_I4, statement.Value.I16);
+                return;
+            case RuntimeType.I16:
+                il.Emit(OpCodes.Ldc_I4, statement.Value.I16);
                 return;
             case RuntimeType.I32:
                 switch (statement.Value.I32)
@@ -51,22 +132,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     default: il.Emit(OpCodes.Ldc_I4, statement.Value.U32); break;
                 }
                 return;
+            case RuntimeType.F32:
+                il.Emit(OpCodes.Ldc_R4, statement.Value.F32);
+                return;
+            case RuntimeType.Null:
+                Diagnostics.Add(Diagnostic.Internal($"Value has type of null", statement));
+                return;
         }
-
-        throw new NotImplementedException();
     }
-
     void EmitStatement(CompiledReturn statement, ILGenerator il)
     {
-        if (statement.Value is null)
+        if (statement.Value is not null)
         {
-            throw new NotImplementedException();
+            EmitStatement(statement.Value, il);
         }
-
-        EmitStatement(statement.Value, il);
         il.Emit(OpCodes.Ret);
     }
-
     void EmitStatement(CompiledBinaryOperatorCall statement, ILGenerator il)
     {
         switch (statement.Operator)
@@ -277,9 +358,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        throw new NotImplementedException();
+        Diagnostics.Add(Diagnostic.Critical($"Unimplemented binary operator {statement.Operator}", statement));
     }
-
     void EmitStatement(CompiledUnaryOperatorCall statement, ILGenerator il)
     {
         switch (statement.Operator)
@@ -304,30 +384,37 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        throw new NotImplementedException();
+        Diagnostics.Add(Diagnostic.Critical($"Unimplemented unary operator {statement.Operator}", statement));
     }
-
     void EmitStatement(CompiledVariableDeclaration statement, ILGenerator il)
     {
         if (Locals.ContainsKey(statement)) return;
         LocalBuilder local = Locals[statement] = il.DeclareLocal(ToType(statement.Type));
         if (statement.InitialValue is not null)
         {
-            EmitStatement(statement.InitialValue, il);
-            il.Emit(OpCodes.Stloc, local.LocalIndex);
+            if (statement.InitialValue is CompiledConstructorCall constructorCall)
+            {
+                EmitStatement(constructorCall, il, local);
+            }
+            else if (statement.InitialValue is CompiledStackAllocation compiledStackAllocation)
+            {
+                EmitStatement(compiledStackAllocation, il, local);
+            }
+            else
+            {
+                EmitStatement(statement.InitialValue, il);
+                il.Emit(OpCodes.Stloc, local.LocalIndex);
+            }
         }
     }
-
     void EmitStatement(CompiledVariableGetter statement, ILGenerator il)
     {
         il.Emit(OpCodes.Ldloc, Locals[statement.Variable].LocalIndex);
     }
-
     void EmitStatement(CompiledParameterGetter statement, ILGenerator il)
     {
         il.Emit(OpCodes.Ldarg, statement.Variable.Index);
     }
-
     void EmitStatement(CompiledFieldGetter statement, ILGenerator il)
     {
         CompiledStatementWithValue _object = statement.Object;
@@ -364,15 +451,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            throw new NotImplementedException();
+            Diagnostics.Add(Diagnostic.Critical($"This should be a struct", statement.Object));
         }
     }
-
     void EmitStatement(CompiledFunctionCall statement, ILGenerator il)
     {
         if (!Functions.TryGetValue(statement.Function, out DynamicMethod? function))
         {
-            throw new NotImplementedException();
+            Diagnostics.Add(Diagnostic.Internal($"Function \"{statement.Function}\" wasn't compiled", statement));
+            return;
         }
 
         for (int i = 0; i < statement.Arguments.Length; i++)
@@ -387,25 +474,32 @@ public partial class CodeGeneratorForMain : CodeGenerator
             il.Emit(OpCodes.Pop);
         }
     }
-
     void EmitStatement(CompiledExternalFunctionCall statement, ILGenerator il)
     {
-        if (statement.Function is ExternalFunctionSync f &&
-            f.UnmanagedCallback != 0)
+        switch (statement.Function)
         {
-            foreach (CompiledPassedArgument item in statement.Arguments)
+            case ExternalFunctionSync f:
             {
-                EmitStatement(item.Value, il);
+                if (f.UnmarshaledCallback.Method.IsStatic)
+                {
+                    foreach (CompiledPassedArgument item in statement.Arguments)
+                    {
+                        EmitStatement(item.Value, il);
+                    }
+                    il.Emit(OpCodes.Call, f.UnmarshaledCallback.GetMethodInfo());
+
+                    return;
+                }
+
+                Diagnostics.Add(Diagnostic.Critical($"Non-static external functions not supported", statement));
+                break;
             }
-            il.Emit(OpCodes.Ldc_I4, f.UnmanagedCallback);
-            il.Emit(OpCodes.Calli);
 
-            return;
+            default:
+                Diagnostics.Add(Diagnostic.Critical($"{statement.Function.GetType()} external functions not supported", statement));
+                break;
         }
-
-        throw new NotImplementedException();
     }
-
     void EmitStatement(CompiledVariableSetter statement, ILGenerator il)
     {
         EmitStatement(statement.Value, il);
@@ -454,15 +548,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            throw new NotImplementedException();
+            Diagnostics.Add(Diagnostic.Critical($"This should be a struct", statement.Object));
         }
     }
     void EmitStatement(CompiledIndirectSetter statement, ILGenerator il)
     {
+        switch (statement.AddressValue)
+        {
+            case CompiledVariableGetter:
+            case CompiledParameterGetter:
+            case CompiledFieldGetter:
+                break;
+            default:
+                Diagnostics.Add(Diagnostic.Critical($"Unsafe!!!", statement));
+                return;
+        }
+
         EmitStatement(statement.AddressValue, il);
         EmitStatement(statement.Value, il);
         if (!statement.AddressValue.Type.Is(out PointerType? pointer))
-        { throw new NotImplementedException(); }
+        {
+            Diagnostics.Add(Diagnostic.Critical($"This should be a pointer", statement.AddressValue));
+            return;
+        }
 
         switch (pointer.To.FinalValue)
         {
@@ -475,18 +583,45 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     case BasicType.I16: il.Emit(OpCodes.Stind_I2); break;
                     case BasicType.U32: il.Emit(OpCodes.Stind_I4); break;
                     case BasicType.I32: il.Emit(OpCodes.Stind_I4); break;
+                    case BasicType.U64: il.Emit(OpCodes.Stind_I8); break;
+                    case BasicType.I64: il.Emit(OpCodes.Stind_I8); break;
                     case BasicType.F32: il.Emit(OpCodes.Stind_R4); break;
-                    default: throw new NotImplementedException();
+                    default:
+                        Diagnostics.Add(Diagnostic.Critical($"Unimplemented indirect setter for type {v.Type}", statement));
+                        break;
                 }
                 break;
-            default: throw new NotImplementedException();
+            case StructType v:
+                il.Emit(OpCodes.Stobj, ToType(v));
+                break;
+            case PointerType:
+                il.Emit(OpCodes.Stind_Ref);
+                break;
+            default:
+                Diagnostics.Add(Diagnostic.Critical($"Unimplemented indirect setter for type {pointer.To.FinalValue}", statement));
+                break;
         }
     }
     void EmitStatement(CompiledPointer statement, ILGenerator il)
     {
+        switch (statement.To)
+        {
+            case CompiledVariableGetter:
+            case CompiledParameterGetter:
+            case CompiledFieldGetter:
+                break;
+            default:
+                Diagnostics.Add(Diagnostic.Critical($"Unsafe!!!", statement));
+                return;
+        }
+
         EmitStatement(statement.To, il);
+
         if (!statement.To.Type.Is(out PointerType? pointer))
-        { throw new NotImplementedException(); }
+        {
+            Diagnostics.Add(Diagnostic.Critical($"This should be a pointer", statement.To));
+            return;
+        }
 
         switch (pointer.To.FinalValue)
         {
@@ -499,11 +634,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     case BasicType.I16: il.Emit(OpCodes.Ldind_I2); break;
                     case BasicType.U32: il.Emit(OpCodes.Ldind_I4); break;
                     case BasicType.I32: il.Emit(OpCodes.Ldind_I4); break;
+                    case BasicType.U64: il.Emit(OpCodes.Ldind_I8); break;
+                    case BasicType.I64: il.Emit(OpCodes.Ldind_I8); break;
                     case BasicType.F32: il.Emit(OpCodes.Ldind_R4); break;
-                    default: throw new NotImplementedException();
+                    default:
+                        Diagnostics.Add(Diagnostic.Critical($"Unimplemented dereference for type {v.Type}", statement));
+                        break;
                 }
                 break;
-            default: throw new NotImplementedException();
+            default:
+                Diagnostics.Add(Diagnostic.Critical($"Unimplemented dereference for type {pointer.To.FinalValue}", statement));
+                break;
         }
     }
     void EmitStatement(CompiledWhileLoop statement, ILGenerator il)
@@ -522,7 +663,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         il.Emit(OpCodes.Br, loopStart);
         il.MarkLabel(loopEnd);
 
-        if (LoopLabels.Pop() != loopEnd) throw new InternalExceptionWithoutContext();
+        if (LoopLabels.Pop() != loopEnd)
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Something went wrong ...", statement));
+        }
     }
     void EmitStatement(CompiledForLoop statement, ILGenerator il)
     {
@@ -543,7 +687,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         il.MarkLabel(loopEnd);
 
-        if (LoopLabels.Pop() != loopEnd) throw new InternalExceptionWithoutContext();
+        if (LoopLabels.Pop() != loopEnd)
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Something went wrong ...", statement));
+        }
     }
     void EmitStatement(CompiledIf statement, ILGenerator il)
     {
@@ -574,7 +721,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     current = null;
                     break;
 
-                default: throw new NotImplementedException();
+                default:
+                    throw new UnreachableException();
             }
         }
 
@@ -642,10 +790,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
                 else
                 {
-                    throw new NotImplementedException();
+                    Diagnostics.Add(Diagnostic.Critical($"This should be a struct", v.Object));
                 }
                 break;
-            default: throw new NotImplementedException();
+            default:
+                Diagnostics.Add(Diagnostic.Critical($"Can't get the address of {statement.Of} ({statement.Of.GetType().Name})", statement.Of));
+                break;
         }
     }
     void EmitStatement(CompiledTypeCast statement, ILGenerator il)
@@ -656,12 +806,164 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case BuiltinType v:
                 switch (v.Type)
                 {
+                    case BasicType.U8: il.Emit(OpCodes.Conv_U1); break;
+                    case BasicType.I8: il.Emit(OpCodes.Conv_I1); break;
                     case BasicType.U16: il.Emit(OpCodes.Conv_U2); break;
-                    default: throw new NotImplementedException();
+                    case BasicType.I16: il.Emit(OpCodes.Conv_I2); break;
+                    case BasicType.U32: il.Emit(OpCodes.Conv_U4); break;
+                    case BasicType.I32: il.Emit(OpCodes.Conv_I4); break;
+                    case BasicType.U64: il.Emit(OpCodes.Conv_U8); break;
+                    case BasicType.I64: il.Emit(OpCodes.Conv_I8); break;
+                    case BasicType.F32: il.Emit(OpCodes.Conv_R4); break;
+                    default:
+                        Diagnostics.Add(Diagnostic.Critical($"Invalid casting type {v.Type}", statement));
+                        break;
                 }
                 return;
-            default: throw new NotImplementedException();
+            default:
+                Diagnostics.Add(Diagnostic.Critical($"Unimplemented casting type {statement.Type.FinalValue}", statement));
+                break;
         }
+    }
+    void EmitStatement(CompiledCrash statement, ILGenerator il)
+    {
+        il.Emit(OpCodes.Ldstr, "Crash");
+        il.Emit(OpCodes.Newobj, typeof(Exception).GetConstructor(new Type[] { typeof(string) })!);
+        il.Emit(OpCodes.Throw);
+    }
+    void EmitStatement(CompiledSizeof statement, ILGenerator il)
+    {
+        if (!FindSize(statement.Of, out int size, out PossibleDiagnostic? error))
+        {
+            Diagnostics.Add(error.ToError(statement));
+            return;
+        }
+
+        il.Emit(OpCodes.Ldc_I4, size);
+    }
+    void EmitStatement(CompiledDelete statement, ILGenerator il)
+    {
+        EmitStatement(statement.Value, il);
+        GenerateDestructor(statement.Cleanup, il);
+        il.Emit(OpCodes.Pop);
+    }
+    void EmitStatement(CompiledConstructorCall statement, ILGenerator il, LocalBuilder? destination = null)
+    {
+        if (!Functions.TryGetValue(statement.Function, out DynamicMethod? function))
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Function \"{statement.Function}\" wasn't compiled", statement));
+            return;
+        }
+
+        if (!statement.Object.Type.Is<PointerType>())
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Only pointer constructors supported", statement));
+            return;
+        }
+
+        if (destination is not null && statement.Object is CompiledStackAllocation stackAllocation)
+        {
+            EmitStatement(stackAllocation, il, destination);
+
+            il.Emit(OpCodes.Ldloc, destination.LocalIndex);
+            for (int i = 0; i < statement.Arguments.Length; i++)
+            {
+                EmitStatement(statement.Arguments[i].Value, il);
+            }
+
+            il.Emit(OpCodes.Call, function);
+
+            if (!statement.SaveValue &&
+                function.ReturnType != typeof(void))
+            {
+                il.Emit(OpCodes.Pop);
+            }
+        }
+        else
+        {
+            EmitStatement(statement.Object, il);
+
+            il.Emit(OpCodes.Dup);
+
+            for (int i = 0; i < statement.Arguments.Length; i++)
+            {
+                EmitStatement(statement.Arguments[i].Value, il);
+            }
+
+            il.Emit(OpCodes.Call, function);
+
+            if (!statement.SaveValue &&
+                function.ReturnType != typeof(void))
+            {
+                il.Emit(OpCodes.Pop);
+            }
+        }
+    }
+    void EmitStatement(CompiledStackAllocation statement, ILGenerator il, LocalBuilder? destination = null)
+    {
+        switch (statement.Type)
+        {
+            case StructType v:
+            {
+                Type type = ToType(v);
+                if (destination is not null)
+                {
+                    il.Emit(OpCodes.Ldloca_S, destination.LocalIndex);
+                    il.Emit(OpCodes.Initobj, type);
+                }
+                else
+                {
+                    LocalBuilder local = il.DeclareLocal(type);
+                    il.Emit(OpCodes.Ldloca_S, local.LocalIndex);
+                    il.Emit(OpCodes.Initobj, type);
+                    il.Emit(OpCodes.Ldloc, local.LocalIndex);
+                }
+                break;
+            }
+            default:
+            {
+                Diagnostics.Add(Diagnostic.Internal($"Only structs supported for stack allocations", statement));
+                break;
+            }
+        }
+    }
+    void EmitStatement(CompiledStringInstance statement, ILGenerator il)
+    {
+        if (statement.IsASCII)
+        {
+            Diagnostics.Add(Diagnostic.Internal($"ASCII strings not supported", statement));
+        }
+
+        il.Emit(OpCodes.Ldstr, statement.Value + "\0");
+    }
+    void EmitStatement(CompiledIndexGetter statement, ILGenerator il)
+    {
+        if (statement.Base.Type.Is(out PointerType? v1) &&
+            v1.To.Is(out ArrayType? v2) &&
+            v2.Of.SameAs(BuiltinType.Char))
+        {
+            EmitStatement(statement.Base, il);
+            EmitStatement(statement.Index, il);
+            il.Emit(OpCodes.Callvirt, typeof(string).GetMethod("get_Chars", new Type[] { typeof(int) })!);
+            return;
+        }
+
+        Diagnostics.Add(Diagnostic.Critical($"Unimplemented address getter {statement.Base.Type}[{statement.Index.Type}]", statement));
+    }
+    void EmitStatement(CompiledIndexSetter statement, ILGenerator il)
+    {
+        Diagnostics.Add(Diagnostic.Critical($"Unimplemented address setter {statement.Base.Type}[{statement.Index.Type}]", statement));
+    }
+    void EmitStatement(FunctionAddressGetter statement, ILGenerator il)
+    {
+        if (!Functions.TryGetValue(statement.Function, out DynamicMethod? function))
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Function \"{statement.Function}\" wasn't compiled", statement));
+            return;
+        }
+
+        Diagnostics.Add(Diagnostic.Critical($"Function address getters not supported", statement));
+        // il.Emit(OpCodes.Ldftn, function);
     }
     void EmitStatement(CompiledStatement statement, ILGenerator il)
     {
@@ -691,6 +993,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case CompiledAddressGetter v: EmitStatement(v, il); break;
             case CompiledFakeTypeCast v: EmitStatement(v.Value, il); break;
             case CompiledTypeCast v: EmitStatement(v, il); break;
+            case CompiledCrash v: EmitStatement(v, il); break;
+            case CompiledStatementWithValueThatActuallyDoesntHaveValue v: EmitStatement(v.Statement, il); break;
+            case CompiledSizeof v: EmitStatement(v, il); break;
+            case CompiledDelete v: EmitStatement(v, il); break;
+            case CompiledStackAllocation v: EmitStatement(v, il); break;
+            case CompiledConstructorCall v: EmitStatement(v, il); break;
+            case CompiledStringInstance v: EmitStatement(v, il); break;
+            case CompiledIndexGetter v: EmitStatement(v, il); break;
+            case CompiledIndexSetter v: EmitStatement(v, il); break;
+            case FunctionAddressGetter v: EmitStatement(v, il); break;
             default: throw new NotImplementedException(statement.GetType().Name);
         }
     }
@@ -708,11 +1020,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AliasType v: GetTypeId(builder, v.Value); break;
             case StructType v: GetTypeId(builder, v); break;
             case BuiltinType v: GetTypeId(builder, v); break;
-            default: throw new NotImplementedException();
+            case ArrayType v: GetTypeId(builder, v); break;
+            case FunctionType v: GetTypeId(builder, v); break;
+            case PointerType v: GetTypeId(builder, v); break;
+            default: throw new UnreachableException();
         }
     }
     static void GetTypeId(StringBuilder builder, BuiltinType type)
     {
+        builder.Append("b_");
         builder.Append(type.Type switch
         {
             BasicType.Void => "void",
@@ -723,12 +1039,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
             BasicType.I16 => "i16",
             BasicType.U32 => "u32",
             BasicType.I32 => "i32",
+            BasicType.U64 => "u64",
+            BasicType.I64 => "i64",
             BasicType.F32 => "f32",
             _ => "bruh",
         });
     }
     static void GetTypeId(StringBuilder builder, StructType type)
     {
+        builder.Append("s_");
         builder.Append(type.Struct.Identifier.Content);
         if (type.Struct.Template is not null)
         {
@@ -742,6 +1061,28 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
             }
         }
+    }
+    static void GetTypeId(StringBuilder builder, ArrayType type)
+    {
+        builder.Append("a_");
+        builder.Append(type.ComputedLength?.ToString() ?? "_");
+        builder.Append('_');
+        GetTypeId(builder, type.Of);
+    }
+    static void GetTypeId(StringBuilder builder, FunctionType type)
+    {
+        builder.Append("f_");
+        GetTypeId(builder, type.ReturnType);
+        for (int i = 0; i < type.Parameters.Length; i++)
+        {
+            builder.Append('_');
+            GetTypeId(builder, type.Parameters[i]);
+        }
+    }
+    static void GetTypeId(StringBuilder builder, PointerType type)
+    {
+        builder.Append("p_");
+        GetTypeId(builder, type.To);
     }
 
     Type[] ToType(ImmutableArray<GeneralType> types)
@@ -759,10 +1100,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BuiltinType v => ToType(v),
         StructType v => ToType(v),
         PointerType v => ToType(v),
-        _ => throw new NotImplementedException(),
+        ArrayType v => ToType(v),
+        FunctionType v => ToType(v),
+        _ => throw new UnreachableException(),
     };
-    static Type ToType(PointerType type)
+    Type ToType(PointerType type)
     {
+        if (type.To.Is(out ArrayType? arrayType) &&
+            arrayType.Of.SameAs(BuiltinType.Char))
+        {
+            return typeof(string);
+        }
         return typeof(nint);
     }
     Type ToType(StructType type)
@@ -770,7 +1118,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         string id = GetTypeId(type);
         Type? result = Module.GetType(id, false, false);
         if (result is not null) return result;
-        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public);
+        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType));
         foreach (CompiledField field in type.Struct.Fields)
         {
             GeneralType fieldType = type.ReplaceType(field.Type, out PossibleDiagnostic? error);
@@ -779,7 +1127,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         return builder.CreateType();
     }
-    static Type ToType(BuiltinType type) => type.Type switch
+    Type ToType(BuiltinType type) => type.Type switch
     {
         BasicType.Void => typeof(void),
         BasicType.U8 => typeof(byte),
@@ -789,8 +1137,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BasicType.U32 => typeof(uint),
         BasicType.I32 => typeof(int),
         BasicType.F32 => typeof(float),
-        _ => throw new NotImplementedException(),
+        BasicType.U64 => typeof(ulong),
+        BasicType.I64 => typeof(long),
+        BasicType.Any => throw new NotImplementedException(),
+        _ => throw new UnreachableException(),
     };
+    Type ToType(ArrayType type)
+    {
+        throw new NotImplementedException();
+    }
+    Type ToType(FunctionType type)
+    {
+        return typeof(nint);
+    }
 
     Func<int> GenerateCodeForTopLevelStatements(ImmutableArray<CompiledStatement> statements)
     {
@@ -827,11 +1186,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     case BasicType.I32:
                         il.Emit(OpCodes.Ldc_I4_0);
                         break;
-                    default: throw new NotImplementedException();
+                    default:
+                        Diagnostics.Add(DiagnosticWithoutContext.Critical($"Unimplemented return type {v.Type}"));
+                        break;
                 }
                 break;
             }
-            default: throw new NotImplementedException();
+            case PointerType v:
+            {
+                il.Emit(OpCodes.Ldnull);
+                break;
+            }
+            default:
+                Diagnostics.Add(DiagnosticWithoutContext.Critical($"Unimplemented return type {returnType.FinalValue}"));
+                break;
         }
         il.Emit(OpCodes.Ret);
 
@@ -867,7 +1235,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         compiledConstructors.Add(compiledConstructor);
                         break;
                     default:
-                        throw new NotImplementedException();
+                        throw new UnreachableException();
                 }
             }
 
@@ -896,7 +1264,34 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         Module);
                     break;
                 }
-                default: throw new NotImplementedException();
+                case CompiledOperator v:
+                {
+                    Functions[function] = new DynamicMethod(
+                        $"op_{v.Identifier.Content}",
+                        ToType(v.Type),
+                        ToType(v.ParameterTypes),
+                        Module);
+                    break;
+                }
+                case CompiledConstructor v:
+                {
+                    Functions[function] = new DynamicMethod(
+                        $"ctor_{v.Identifier.Content}",
+                        ToType(v.Type),
+                        ToType(v.ParameterTypes),
+                        Module);
+                    break;
+                }
+                case CompiledGeneralFunction v:
+                {
+                    Functions[function] = new DynamicMethod(
+                        $"genr_{v.Identifier.Content}",
+                        ToType(v.Type),
+                        ToType(v.ParameterTypes),
+                        Module);
+                    break;
+                }
+                default: throw new UnreachableException();
             }
         }
 

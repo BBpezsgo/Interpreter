@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -415,8 +415,8 @@ public static class Utils
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(LanguageCore.IL.Generator.CodeGeneratorForMain.DefaultCompilerSettings)
         {
             ExternalFunctions = externalFunctions.ToImmutableArray(),
-            PreprocessorVariables = PreprocessorVariables.Normal,
             AdditionalImports = AdditionalImports,
+            PreprocessorVariables = PreprocessorVariables.IL,
             SourceProviders = ImmutableArray.Create<ISourceProvider>(
                 new FileSourceProvider()
                 {

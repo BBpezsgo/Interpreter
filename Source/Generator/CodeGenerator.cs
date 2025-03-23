@@ -236,6 +236,8 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             case BasicType.I16: size = 2; return true;
             case BasicType.U32: size = 4; return true;
             case BasicType.I32: size = 4; return true;
+            case BasicType.U64: size = 8; return true;
+            case BasicType.I64: size = 8; return true;
             case BasicType.F32: size = 4; return true;
             default: throw new UnreachableException();
         }

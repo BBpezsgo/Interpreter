@@ -1682,13 +1682,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     static CompiledValue GetInitialValue(NumericType type, BitWidth bitWidth) => (type, bitWidth) switch
     {
-        (NumericType.Float, _) => new CompiledValue(default(float)),
+        (NumericType.Float, BitWidth._32) => new CompiledValue(default(float)),
         (NumericType.SignedInteger, BitWidth._8) => new CompiledValue(default(sbyte)),
         (NumericType.SignedInteger, BitWidth._16) => new CompiledValue(default(short)),
         (NumericType.SignedInteger, BitWidth._32) => new CompiledValue(default(int)),
+        (NumericType.SignedInteger, BitWidth._64) => new CompiledValue(default(long)),
         (NumericType.UnsignedInteger, BitWidth._8) => new CompiledValue(default(byte)),
         (NumericType.UnsignedInteger, BitWidth._16) => new CompiledValue(default(ushort)),
         (NumericType.UnsignedInteger, BitWidth._32) => new CompiledValue(default(uint)),
+        (NumericType.UnsignedInteger, BitWidth._64) => new CompiledValue(default(ulong)),
         _ => throw new NotImplementedException(),
     };
 
@@ -2202,6 +2204,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     GeneralType FindStatementType(Identifier identifier, GeneralType? expectedType = null)
     {
+        if (identifier.Content.StartsWith('#'))
+        {
+            identifier.Reference = null;
+            identifier.AnalyzedType = TokenAnalyzedType.ConstantName;
+            return OnGotStatementType(identifier, BooleanType);
+        }
+
         if (BBLang.Generator.CodeGeneratorForMain.RegisterKeywords.TryGetValue(identifier.Content, out (Register Register, BuiltinType Type) registerKeyword))
         { return registerKeyword.Type; }
 
@@ -4851,6 +4860,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             case BasicType.I16: size = 2; return true;
             case BasicType.U32: size = 4; return true;
             case BasicType.I32: size = 4; return true;
+            case BasicType.U64: size = 8; return true;
+            case BasicType.I64: size = 8; return true;
             case BasicType.F32: size = 4; return true;
             default: throw new UnreachableException();
         }

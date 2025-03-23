@@ -6,6 +6,10 @@ public static class PreprocessorVariables
         "BYTECODE"
         );
 
+    public static readonly ImmutableArray<string> IL = ImmutableArray.Create(
+        "IL"
+        );
+
     public static readonly ImmutableArray<string> Interactive = ImmutableArray.Create(
         "BYTECODE",
         "INTERACTIVE"

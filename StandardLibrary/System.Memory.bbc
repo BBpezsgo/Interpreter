@@ -17,10 +17,10 @@ const int HeapSize = 512;
 #endif
 const int HeaderSize = sizeof(BlockHeader);
 
-#if BRAINFUCK
-#else
-*(0 as BlockHeader*) = (BlockHeader)HeapSize;
-#endif
+if ((!#BRAINFUCK) && (!#IL))
+{
+    *(0 as BlockHeader*) = (BlockHeader)HeapSize;
+}
 
 export void GetHeader(BlockHeader* headerPtr, int* size, bool* allocated)
 {
@@ -84,6 +84,9 @@ bool JoinFreeBlocks()
 [Builtin("alloc")]
 export any* Alloc(int sizeNeed)
 {
+#if IL
+    crash "Nope";
+#else
     if (sizeNeed <= 0) { crash "Bruh"; }
 
     BlockHeader* headerPointer = 0 as BlockHeader*;
@@ -127,6 +130,7 @@ export any* Alloc(int sizeNeed)
         headerPointer += blockSize + HeaderSize;
     }
     return 0 as any*;
+#endif
 }
 
 [Builtin("free")]

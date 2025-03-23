@@ -13,6 +13,8 @@ public class BuiltinType : GeneralType,
     public static readonly BuiltinType I16 = new(BasicType.I16);
     public static readonly BuiltinType U32 = new(BasicType.U32);
     public static readonly BuiltinType I32 = new(BasicType.I32);
+    public static readonly BuiltinType U64 = new(BasicType.U64);
+    public static readonly BuiltinType I64 = new(BasicType.I64);
     public static readonly BuiltinType F32 = new(BasicType.F32);
     public static readonly BuiltinType Void = new(BasicType.Void);
     public static readonly BuiltinType Any = new(BasicType.Any);
@@ -73,6 +75,8 @@ public class BuiltinType : GeneralType,
             case BasicType.I16: size = 2; return true;
             case BasicType.U32: size = 4; return true;
             case BasicType.I32: size = 4; return true;
+            case BasicType.U64: size = 8; return true;
+            case BasicType.I64: size = 8; return true;
             case BasicType.F32: size = 4; return true;
             default: throw new UnreachableException();
         }
@@ -96,7 +100,7 @@ public class BuiltinType : GeneralType,
             BitWidth._8 => U8,
             BitWidth._16 => Char,
             BitWidth._32 => U32,
-            BitWidth._64 => throw new NotImplementedException(),
+            BitWidth._64 => U64,
             _ => throw new UnreachableException(),
         },
         NumericType.SignedInteger => size switch
@@ -104,7 +108,7 @@ public class BuiltinType : GeneralType,
             BitWidth._8 => I8,
             BitWidth._16 => I16,
             BitWidth._32 => I32,
-            BitWidth._64 => throw new NotImplementedException(),
+            BitWidth._64 => I64,
             _ => throw new UnreachableException(),
         },
         NumericType.Float => size switch
@@ -149,6 +153,8 @@ public class BuiltinType : GeneralType,
         BasicType.I16 => TypeKeywords.I16,
         BasicType.U32 => TypeKeywords.U32,
         BasicType.I32 => TypeKeywords.I32,
+        BasicType.U64 => TypeKeywords.U64,
+        BasicType.I64 => TypeKeywords.I64,
         BasicType.F32 => TypeKeywords.F32,
         _ => throw new UnreachableException(),
     };

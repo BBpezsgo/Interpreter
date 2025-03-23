@@ -14,13 +14,12 @@ public readonly struct ExternalFunctionSync : IExternalFunction
     public int ParametersSize { get; }
     public int ReturnValueSize { get; }
     public ExternalFunctionSyncCallback MarshaledCallback { get; }
-    public nint UnmanagedCallback { get; }
+    public Delegate UnmarshaledCallback { get; }
 
-    public ExternalFunctionSync(ExternalFunctionSyncCallback callback, Delegate unmanagedCallback, int id, string? name, int parametersSize, int returnValueSize)
+    public ExternalFunctionSync(ExternalFunctionSyncCallback marshaledCallback, Delegate unmarshaledCallback, int id, string? name, int parametersSize, int returnValueSize)
     {
-        MarshaledCallback = callback;
-        if (callback is not null && callback.Target is not null && callback.Method.IsStatic && callback.Method is not DynamicMethod)
-        { UnmanagedCallback = Marshal.GetFunctionPointerForDelegate(unmanagedCallback); }
+        MarshaledCallback = marshaledCallback;
+        UnmarshaledCallback = unmarshaledCallback;
         Id = id;
         Name = name;
         ParametersSize = parametersSize;

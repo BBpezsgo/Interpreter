@@ -194,6 +194,10 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
             { result.Append(value.To<uint>()); }
             else if (type.SameAs(BasicType.I32))
             { result.Append(value.To<int>()); }
+            else if (type.SameAs(BasicType.U64))
+            { result.Append(value.To<ulong>()); }
+            else if (type.SameAs(BasicType.I64))
+            { result.Append(value.To<long>()); }
             else if (type.Is(out PointerType? pointerType))
             {
                 if (pointerType.To is ArrayType toArrayType)

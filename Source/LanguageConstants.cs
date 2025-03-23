@@ -22,6 +22,8 @@ public static class TypeKeywords
     public const string I16 = "i16";
     public const string U32 = "u32";
     public const string I32 = "i32";
+    public const string U64 = "u64";
+    public const string I64 = "i64";
     public const string F32 = "f32";
 
     public static ImmutableArray<string> List { get; } = ImmutableArray.Create
@@ -34,6 +36,8 @@ public static class TypeKeywords
         TypeKeywords.I16,
         TypeKeywords.U32,
         TypeKeywords.I32,
+        TypeKeywords.U64,
+        TypeKeywords.I64,
         TypeKeywords.F32
     );
 
@@ -48,6 +52,8 @@ public static class TypeKeywords
         { TypeKeywords.I16, BasicType.I16 },
         { TypeKeywords.U32, BasicType.U32 },
         { TypeKeywords.I32, BasicType.I32 },
+        { TypeKeywords.U64, BasicType.U64 },
+        { TypeKeywords.I64, BasicType.I64 },
         { TypeKeywords.F32, BasicType.F32 },
     }.ToImmutableDictionary();
 }
@@ -113,6 +119,8 @@ public static class LanguageConstants
         TypeKeywords.I16,
         TypeKeywords.U32,
         TypeKeywords.I32,
+        TypeKeywords.U64,
+        TypeKeywords.I64,
         TypeKeywords.F32,
 
         ProtectionKeywords.Private,
@@ -215,6 +223,8 @@ public static class BuiltinFunctions
                   || v.SameAs(BasicType.I16)
                   || v.SameAs(BasicType.U32)
                   || v.SameAs(BasicType.I32)
+                  || v.SameAs(BasicType.U64)
+                  || v.SameAs(BasicType.I64)
             )
         },
         {

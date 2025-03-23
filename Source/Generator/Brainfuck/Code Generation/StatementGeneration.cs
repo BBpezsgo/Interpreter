@@ -269,6 +269,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case BasicType.I16: size = 1; return true;
             case BasicType.U32: size = 1; return true;
             case BasicType.I32: size = 1; return true;
+            case BasicType.U64: size = 1; return true;
+            case BasicType.I64: size = 1; return true;
             case BasicType.F32: size = 1; return true;
             default: throw new UnreachableException();
         }

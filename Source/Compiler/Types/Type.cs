@@ -14,6 +14,8 @@ public enum BasicType : byte
     I16,
     U32,
     I32,
+    U64,
+    I64,
     F32,
 }
 
@@ -39,21 +41,15 @@ public static class TypeExtensions
         switch (type.Type)
         {
             case BasicType.U8:
+            case BasicType.U16:
+            case BasicType.U32:
+            case BasicType.U64:
                 numericType = NumericType.UnsignedInteger;
                 return true;
             case BasicType.I8:
-                numericType = NumericType.SignedInteger;
-                return true;
-            case BasicType.U16:
-                numericType = NumericType.UnsignedInteger;
-                return true;
             case BasicType.I16:
-                numericType = NumericType.SignedInteger;
-                return true;
-            case BasicType.U32:
-                numericType = NumericType.UnsignedInteger;
-                return true;
             case BasicType.I32:
+            case BasicType.I64:
                 numericType = NumericType.SignedInteger;
                 return true;
             case BasicType.F32:
@@ -97,6 +93,10 @@ public static class TypeExtensions
             case BasicType.I32:
             case BasicType.F32:
                 bitWidth = BitWidth._32;
+                return true;
+            case BasicType.U64:
+            case BasicType.I64:
+                bitWidth = BitWidth._64;
                 return true;
             default:
                 return false;

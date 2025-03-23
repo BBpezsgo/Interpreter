@@ -806,6 +806,8 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 
     public const string LogicalNOT = "!";
     public const string BinaryNOT = "~";
+    public const string UnaryPlus = "+";
+    public const string UnaryMinus = "-";
 
     #endregion
 

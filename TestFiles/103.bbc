@@ -1,0 +1,14 @@
+using System;
+
+float2 a = new float2(7f, 1f);
+float2 b = new float2(2f, 3f);
+a = new float2(-a.x, -a.y);
+b = -b;
+a = +a;
+b = +b;
+
+PrintLine(a.x);
+PrintLine(a.y);
+
+PrintLine(b.x);
+PrintLine(b.y);

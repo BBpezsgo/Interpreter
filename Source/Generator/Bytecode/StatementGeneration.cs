@@ -864,6 +864,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 return;
             }
+            case CompiledUnaryOperatorCall.UnaryMinus:
+            {
+                GenerateCodeForStatement(@operator.Left);
+
+                bool isFloat = @operator.Left.Type.SameAs(BasicType.F32);
+
+                using (RegisterUsage.Auto left = Registers.GetFree())
+                using (RegisterUsage.Auto right = Registers.GetFree())
+                {
+                    PopTo(right.Get(bitWidth));
+                    AddInstruction(Opcode.Move, left.Get(bitWidth), new InstructionOperand(isFloat ? new CompiledValue(0f) : new CompiledValue(0)));
+
+                    AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, left.Get(bitWidth), right.Get(bitWidth));
+
+                    Push(left.Get(bitWidth));
+                }
+
+                return;
+            }
+            case CompiledUnaryOperatorCall.UnaryPlus:
+            {
+                GenerateCodeForStatement(@operator.Left);
+                return;
+            }
             default:
             {
                 Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator}\"", @operator));

@@ -1243,6 +1243,54 @@ public partial class StatementCompiler
 
                     return true;
                 }
+                case UnaryOperatorCall.UnaryMinus:
+                {
+                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
+
+                    compiledStatement = new CompiledUnaryOperatorCall()
+                    {
+                        Left = left,
+                        Location = @operator.Location,
+                        Operator = @operator.Operator.Content,
+                        SaveValue = @operator.SaveValue,
+                        Type = left.Type,
+                    };
+
+                    if (AllowEvaluating &&
+                        TryCompute(compiledStatement, out CompiledValue evaluated) &&
+                        evaluated.TryCast(compiledStatement.Type, out evaluated))
+                    {
+                        compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
+                        @operator.PredictedValue = evaluated;
+                    }
+
+                    return true;
+                }
+                case UnaryOperatorCall.UnaryPlus:
+                {
+                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
+
+                    compiledStatement = new CompiledUnaryOperatorCall()
+                    {
+                        Left = left,
+                        Location = @operator.Location,
+                        Operator = @operator.Operator.Content,
+                        SaveValue = @operator.SaveValue,
+                        Type = left.Type,
+                    };
+
+                    if (AllowEvaluating &&
+                        TryCompute(compiledStatement, out CompiledValue evaluated) &&
+                        evaluated.TryCast(compiledStatement.Type, out evaluated))
+                    {
+                        compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
+                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
+                        @operator.PredictedValue = evaluated;
+                    }
+
+                    return true;
+                }
                 default:
                 {
                     Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));

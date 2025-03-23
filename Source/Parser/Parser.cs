@@ -91,7 +91,8 @@ public sealed class Parser
 
     static readonly ImmutableArray<string> UnaryPrefixOperators = ImmutableArray.Create<string>
     (
-        "!", "~"
+        "!", "~",
+        "-", "+"
     );
 
 #pragma warning disable RCS1213, IDE0052, CA1823 // Remove unread private members

@@ -128,6 +128,8 @@ public static class LanguageOperators
     {
         UnaryOperatorCall.LogicalNOT,
         UnaryOperatorCall.BinaryNOT,
+        UnaryOperatorCall.UnaryPlus,
+        UnaryOperatorCall.UnaryMinus,
     };
 
     public static HashSet<string> BinaryOperators { get; } = new HashSet<string>()

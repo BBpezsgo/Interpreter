@@ -93,3 +93,6 @@ export inline float2 -(float2 a, float2 b) { return new float2(a.x - b.x, a.y - 
 
 export inline float2 *(float2 a, float b) { return new float2(a.x * b, a.y * b); }
 export inline float2 /(float2 a, float b) { return new float2(a.x / b, a.y / b); }
+
+export inline float2 +(float2 v) { return new float2(+v.x, +v.y); }
+export inline float2 -(float2 v) { return new float2(-v.x, -v.y); }

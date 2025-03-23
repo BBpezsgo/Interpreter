@@ -2060,6 +2060,16 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 result = leftType;
                 break;
             }
+            case UnaryOperatorCall.UnaryMinus:
+            {
+                result = leftType;
+                break;
+            }
+            case UnaryOperatorCall.UnaryPlus:
+            {
+                result = leftType;
+                break;
+            }
             default:
             {
                 Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
@@ -3738,6 +3748,22 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region Compile Time Evaluation
 
+    static bool TryComputeSimple(string @operator, CompiledValue left, [NotNullWhen(true)] out CompiledValue result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        // TODO: wtf
+        error = null;
+        result = @operator switch
+        {
+            UnaryOperatorCall.LogicalNOT => !left,
+            UnaryOperatorCall.BinaryNOT => ~left,
+            UnaryOperatorCall.UnaryPlus => +left,
+            UnaryOperatorCall.UnaryMinus => -left,
+
+            _ => throw new NotImplementedException($"Unknown unary operator \"{@operator}\""),
+        };
+        return true;
+    }
+
     static bool TryComputeSimple(string @operator, CompiledValue left, CompiledValue right, [NotNullWhen(true)] out CompiledValue result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         // TODO: wtf
@@ -3746,9 +3772,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             error = null;
             result = @operator switch
             {
-                UnaryOperatorCall.LogicalNOT => !left,
-                UnaryOperatorCall.BinaryNOT => ~left,
-
                 BinaryOperatorCall.Addition => left + right,
                 BinaryOperatorCall.Subtraction => left - right,
                 BinaryOperatorCall.Multiplication => left * right,
@@ -3772,7 +3795,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 BinaryOperatorCall.CompLEQ => new CompiledValue(left <= right),
                 BinaryOperatorCall.CompGEQ => new CompiledValue(left >= right),
 
-                _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
+                _ => throw new NotImplementedException($"Unknown binary operator \"{@operator}\""),
             };
             return true;
         }
@@ -3860,22 +3883,24 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        string op = @operator.Operator.Content;
-
-        if (op == UnaryOperatorCall.LogicalNOT)
+        switch (@operator.Operator.Content)
         {
-            value = !leftValue;
-            return true;
+            case UnaryOperatorCall.LogicalNOT:
+                value = !leftValue;
+                return true;
+            case UnaryOperatorCall.BinaryNOT:
+                value = ~leftValue;
+                return true;
+            case UnaryOperatorCall.UnaryPlus:
+                value = +leftValue;
+                return true;
+            case UnaryOperatorCall.UnaryMinus:
+                value = -leftValue;
+                return true;
+            default:
+                value = leftValue;
+                return true;
         }
-
-        if (op == UnaryOperatorCall.BinaryNOT)
-        {
-            value = ~leftValue;
-            return true;
-        }
-
-        value = leftValue;
-        return true;
     }
     static bool TryComputeSimple(IndexCall indexCall, out CompiledValue value)
     {
@@ -4137,22 +4162,24 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        string op = @operator.Operator;
-
-        if (op == UnaryOperatorCall.LogicalNOT)
+        switch (@operator.Operator)
         {
-            value = !leftValue;
-            return true;
+            case UnaryOperatorCall.LogicalNOT:
+                value = !leftValue;
+                return true;
+            case UnaryOperatorCall.BinaryNOT:
+                value = ~leftValue;
+                return true;
+            case UnaryOperatorCall.UnaryPlus:
+                value = +leftValue;
+                return true;
+            case UnaryOperatorCall.UnaryMinus:
+                value = -leftValue;
+                return true;
+            default:
+                value = leftValue;
+                return true;
         }
-
-        if (op == UnaryOperatorCall.BinaryNOT)
-        {
-            value = ~leftValue;
-            return true;
-        }
-
-        value = leftValue;
-        return true;
     }
     static bool TryCompute(CompiledEvaluatedValue literal, out CompiledValue value)
     {

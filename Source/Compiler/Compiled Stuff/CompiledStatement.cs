@@ -450,6 +450,8 @@ public class CompiledUnaryOperatorCall : CompiledStatementWithValue
 
     public const string LogicalNOT = "!";
     public const string BinaryNOT = "~";
+    public const string UnaryMinus = "-";
+    public const string UnaryPlus = "+";
 
     #endregion
 

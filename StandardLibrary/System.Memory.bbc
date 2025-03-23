@@ -80,6 +80,7 @@ bool JoinFreeBlocks()
     return false;
 }
 
+[Expose("alloc")]
 [Builtin("alloc")]
 export any* Alloc(int sizeNeed)
 {

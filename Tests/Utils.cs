@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -194,7 +194,7 @@ public readonly struct ExpectedResult
     {
         Assert(other);
 
-        if (heapShouldBeEmpty && HeapUtils.GetUsedSize(other.Heap.AsSpan()) != 0)
+        if (heapShouldBeEmpty && BytecodeHeapImplementation.GetUsedSize(other.Heap.AsSpan()) != 0)
         { throw new AssertFailedException($"Heap isn't empty"); }
 
         return this;

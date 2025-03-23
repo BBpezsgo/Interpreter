@@ -1,0 +1,18 @@
+using System.Console;
+
+[External("str")]
+void PassString(string text);
+
+[Expose("str")]
+void ReceiveString(string text)
+{
+    Print("Received string \"");
+    Print(text);
+    Print("\"");
+    PrintLine();
+
+    delete text;
+}
+
+temp string text = "你好";
+PassString(text);

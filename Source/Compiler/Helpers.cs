@@ -729,7 +729,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         FunctionPerfectus perfectus = FunctionPerfectus.None;
 
-        static FunctionPerfectus Max(FunctionPerfectus a, FunctionPerfectus b) => a > b ? a : b;
+        void TryOverride(FunctionPerfectus _perfectus, TFunction _function)
+        {
+            if (_perfectus > perfectus)
+            {
+                perfectus = _perfectus;
+                result_ = _function;
+            }
+        }
 
         bool HandleIdentifier(TFunction function)
         {
@@ -737,11 +744,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 !function.Identifier.Equals(query.Identifier))
             { return false; }
 
-            perfectus = Max(perfectus, FunctionPerfectus.Identifier);
+            TryOverride(FunctionPerfectus.Identifier, function);
             return true;
         }
 
-        bool HandleParameterCount(TFunction function)
+        bool HandlePartialParameterCount(TFunction function)
         {
             int partial = 0;
             for (int i = 0; i < function.Parameters.Count; i++)
@@ -764,11 +771,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     return false;
                 }
 
-                perfectus = Max(perfectus, FunctionPerfectus.PartialParameterCount);
+                TryOverride(FunctionPerfectus.PartialParameterCount, function);
                 return true;
             }
 
-            perfectus = Max(perfectus, FunctionPerfectus.PerfectParameterCount);
+            TryOverride(FunctionPerfectus.PerfectParameterCount, function);
             return true;
         }
 
@@ -828,7 +835,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
             }
 
-            perfectus = Max(perfectus, FunctionPerfectus.ParameterTypes);
+            TryOverride(FunctionPerfectus.ParameterTypes, function);
             return true;
         }
 
@@ -888,11 +895,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
             }
 
-            if (perfectus < FunctionPerfectus.PerfectParameterTypes)
-            {
-                perfectus = Max(perfectus, FunctionPerfectus.PerfectParameterTypes);
-                result_ = function;
-            }
+            TryOverride(FunctionPerfectus.PerfectParameterTypes, function);
             return true;
         }
 
@@ -938,11 +941,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
             }
 
-            if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
-            {
-                perfectus = Max(perfectus, FunctionPerfectus.VeryPerfectParameterTypes);
-                result_ = function;
-            }
+            TryOverride(FunctionPerfectus.VeryPerfectParameterTypes, function);
             return true;
         }
 
@@ -959,7 +958,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
             }
 
-            perfectus = Max(perfectus, FunctionPerfectus.ReturnType);
+            TryOverride(FunctionPerfectus.ReturnType, function);
             return true;
         }
 
@@ -976,11 +975,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
             }
 
-            if (perfectus < FunctionPerfectus.PerfectParameterTypes)
-            {
-                perfectus = Max(perfectus, FunctionPerfectus.PerfectParameterTypes);
-                result_ = function;
-            }
+            TryOverride(FunctionPerfectus.PerfectParameterTypes, function);
             return true;
         }
 
@@ -997,11 +992,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
             }
 
-            if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
-            {
-                perfectus = Max(perfectus, FunctionPerfectus.VeryPerfectParameterTypes);
-                result_ = function;
-            }
+            TryOverride(FunctionPerfectus.VeryPerfectReturnType, function);
             return true;
         }
 
@@ -1010,18 +1001,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (query.RelevantFile is null ||
                 function.File != query.RelevantFile)
             {
-                // Not in the same file
                 return false;
             }
 
             if (perfectus >= FunctionPerfectus.File)
             {
                 error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: multiple {kindNameLower}s matched in the same file");
-                // Debugger.Break();
             }
 
-            perfectus = FunctionPerfectus.File;
-            result_ = function;
+            TryOverride(FunctionPerfectus.File, function);
             return true;
         }
 
@@ -1030,7 +1018,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (!HandleIdentifier(function))
             { continue; }
 
-            if (!HandleParameterCount(function))
+            if (!HandlePartialParameterCount(function))
             { continue; }
 
             if (!HandleParameterTypes(function))
@@ -1040,16 +1028,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             { continue; }
 
             // MATCHED --> Searching for most relevant function
-
-            if (perfectus < FunctionPerfectus.Good)
-            {
-                result_ = function;
-                perfectus = FunctionPerfectus.Good;
-            }
-            else if (result_ is null)
-            {
-                result_ = function;
-            }
 
             if (!HandlePerfectParameterTypes(function))
             { continue; }
@@ -1075,7 +1053,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (!HandleIdentifier(function))
             { continue; }
 
-            if (!HandleParameterCount(function))
+            if (!HandlePartialParameterCount(function))
             { continue; }
 
             if (!query.Arguments.HasValue)
@@ -1086,13 +1064,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, query.Arguments.Value.Select(v => query.Converter.Invoke(v, null)), _typeArguments))
             { continue; }
 
-            perfectus = FunctionPerfectus.PerfectParameterTypes;
-            typeArguments = _typeArguments;
+            if (perfectus < FunctionPerfectus.File)
+            {
+                perfectus = FunctionPerfectus.PerfectParameterTypes;
+                typeArguments = _typeArguments;
+                result_ = function;
+            }
 
             // MATCHED --> Searching for most relevant function
-
-            if (perfectus < FunctionPerfectus.File)
-            { result_ = function; }
 
             if (!HandleFile(function))
             { continue; }
@@ -4026,133 +4005,104 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
-    class EvaluationContext2
+    class EvaluationScope
     {
-        readonly Dictionary<CompiledStatementWithValue, CompiledValue> _values;
-        readonly Stack<Stack<Dictionary<string, CompiledValue>>>? _frames;
+        public readonly Dictionary<CompiledVariableDeclaration, CompiledValue> Variables = new();
+    }
+
+    class EvaluationFrame
+    {
+        public CompiledValue? ReturnValue;
+        public readonly Dictionary<string, CompiledValue> Parameters = new();
+        public readonly Stack<EvaluationScope> Scopes = new();
+    }
+
+    class EvaluationContext
+    {
+        public readonly Stack<EvaluationFrame> Frames;
 
         public readonly Stack<ICompiledFunctionDefinition> Calls;
         public readonly List<RuntimeStatement2> RuntimeStatements;
-        public Dictionary<string, CompiledValue>? LastScope => _frames?.Last.Last;
+
         public bool IsReturning;
         public bool IsBreaking;
 
-        public static EvaluationContext2 Empty => new(null, null);
+        public static EvaluationContext Empty => new();
 
-        public static EvaluationContext2 EmptyWithVariables => new(null, new Dictionary<string, CompiledValue>());
-
-        public Dictionary<string, CompiledValue> Variables
-        {
-            get
-            {
-                if (_frames is null || _frames.Count == 0) return new Dictionary<string, CompiledValue>();
-                Dictionary<string, CompiledValue> result = new();
-                foreach (Dictionary<string, CompiledValue> scope in _frames.Last)
-                {
-                    result.AddRange(scope);
-                }
-                return result;
-            }
-        }
-
-        public EvaluationContext2(IDictionary<CompiledStatementWithValue, CompiledValue>? values, IDictionary<string, CompiledValue>? variables)
+        public EvaluationContext()
         {
             Calls = new();
-
-            if (values != null)
-            { _values = new Dictionary<CompiledStatementWithValue, CompiledValue>(values); }
-            else
-            { _values = new Dictionary<CompiledStatementWithValue, CompiledValue>(); }
-
-            if (variables != null)
-            { _frames = new Stack<Stack<Dictionary<string, CompiledValue>>>() { new() { new Dictionary<string, CompiledValue>(variables) } }; }
-            else
-            { _frames = null; }
-
-            RuntimeStatements = new List<RuntimeStatement2>();
+            Frames = new();
+            RuntimeStatements = new();
         }
 
-        public bool TryGetValue(CompiledStatementWithValue statement, out CompiledValue value)
-        {
-            if (_values.TryGetValue(statement, out value))
-            { return true; }
-
-            if (statement is CompiledVariableGetter variableGetter &&
-                TryGetVariable(variableGetter.Variable.Identifier, out value))
-            { return true; }
-
-            if (statement is CompiledParameterGetter parameterGetter &&
-                TryGetVariable(parameterGetter.Variable.Identifier.Content, out value))
-            { return true; }
-
-            value = default;
-            return false;
-        }
-
-        public bool TryGetVariable(string name, out CompiledValue value)
+        public bool TryGetVariable(CompiledVariableDeclaration name, out CompiledValue value)
         {
             value = default;
 
-            if (_frames == null)
+            if (Frames.LastOrDefault is null)
             { return false; }
 
-            Stack<Dictionary<string, CompiledValue>> frame = _frames.Last;
-            foreach (Dictionary<string, CompiledValue> scope in frame)
+            foreach (EvaluationScope scope in Frames.LastOrDefault.Scopes)
             {
-                if (scope.TryGetValue(name, out value))
-                { return true; }
+                if (!scope.Variables.TryGetValue(name, out value)) continue;
+                return true;
             }
 
             return false;
         }
 
-        public bool TrySetVariable(string name, CompiledValue value)
+        public bool TryGetParameter(string name, out CompiledValue value)
         {
-            if (_frames == null)
+            value = default;
+
+            if (Frames.LastOrDefault is null)
             { return false; }
 
-            Stack<Dictionary<string, CompiledValue>> frame = _frames.Last;
-            foreach (Dictionary<string, CompiledValue> scope in frame)
+            return Frames.LastOrDefault.Parameters.TryGetValue(name, out value);
+        }
+
+        public bool TrySetVariable(CompiledVariableDeclaration name, CompiledValue value)
+        {
+            if (Frames.LastOrDefault is null)
+            { return false; }
+
+            foreach (EvaluationScope scope in Frames.LastOrDefault.Scopes)
             {
-                if (scope.ContainsKey(name))
-                {
-                    scope[name] = value;
-                    return true;
-                }
+                if (!scope.Variables.ContainsKey(name)) continue;
+                scope.Variables[name] = value;
+                return true;
             }
 
             return false;
         }
 
-        public bool TryGetType(CompiledStatementWithValue statement, [NotNullWhen(true)] out GeneralType? type)
+        public bool TrySetParameter(string name, CompiledValue value)
         {
-            if (!TryGetValue(statement, out CompiledValue value))
-            {
-                type = null;
-                return false;
-            }
+            if (Frames.LastOrDefault is null)
+            { return false; }
 
-            type = new BuiltinType(value.Type);
+            if (Frames.LastOrDefault.Parameters.ContainsKey(name))
+            { return false; }
+
+            Frames.LastOrDefault.Parameters[name] = value;
             return true;
         }
 
-        public void PushScope(IDictionary<string, CompiledValue>? variables = null)
+        public void PushScope()
         {
-            if (_frames is null) return;
-            if (variables is null)
-            { _frames?.Last.Push(new Dictionary<string, CompiledValue>()); }
-            else
-            { _frames?.Last.Push(new Dictionary<string, CompiledValue>(variables)); }
+            if (Frames.LastOrDefault is null) return;
+            Frames.LastOrDefault.Scopes.Push(new());
         }
 
         public void PopScope()
         {
-            if (_frames is null) return;
-            _frames.Last.Pop();
+            if (Frames.LastOrDefault is null) return;
+            Frames.LastOrDefault.Scopes.Pop();
         }
     }
 
-    bool TryCompute(CompiledPointer pointer, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledPointer pointer, EvaluationContext context, out CompiledValue value)
     {
         if (pointer.To is CompiledAddressGetter addressGetter)
         { return TryCompute(addressGetter.Of, context, out value); }
@@ -4160,11 +4110,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute(CompiledBinaryOperatorCall @operator, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledBinaryOperatorCall @operator, EvaluationContext context, out CompiledValue value)
     {
-        if (context.TryGetValue(@operator, out value))
-        { return true; }
-
         if (!TryCompute(@operator.Left, context, out CompiledValue leftValue))
         {
             value = CompiledValue.Null;
@@ -4200,10 +4147,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 break;
             }
             default:
-                if (context is not null &&
-                    context.TryGetValue(@operator, out value))
-                { return true; }
-
                 value = CompiledValue.Null;
                 return false;
         }
@@ -4211,11 +4154,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = leftValue;
         return true;
     }
-    bool TryCompute(CompiledUnaryOperatorCall @operator, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledUnaryOperatorCall @operator, EvaluationContext context, out CompiledValue value)
     {
-        if (context.TryGetValue(@operator, out value))
-        { return true; }
-
         if (!TryCompute(@operator.Left, context, out CompiledValue leftValue))
         {
             value = CompiledValue.Null;
@@ -4237,8 +4177,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 value = -leftValue;
                 return true;
             default:
-                value = leftValue;
-                return true;
+                value = CompiledValue.Null;
+                return false;
         }
     }
     static bool TryCompute(CompiledEvaluatedValue literal, out CompiledValue value)
@@ -4246,33 +4186,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = literal.Value;
         return true;
     }
-    static bool TryCompute(CompiledStringInstance literal, out CompiledValue value)
-    {
-        value = CompiledValue.Null;
-        return false;
-    }
-    static bool TryCompute(CompiledStackStringInstance literal, out CompiledValue value)
-    {
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(CompiledRuntimeCall anyCall, EvaluationContext2 context, out CompiledValue value)
-    {
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(CompiledExternalFunctionCall functionCall, EvaluationContext2 context, out CompiledValue value)
-    {
-        value = CompiledValue.Null;
-
-        if (!TryCompute(functionCall.Arguments, context, out ImmutableArray<CompiledValue> parameters))
-        {
-            return false;
-        }
-
-        return false;
-    }
-    bool TryCompute(CompiledFunctionCall functionCall, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledFunctionCall functionCall, EvaluationContext context, out CompiledValue value)
     {
         value = CompiledValue.Null;
 
@@ -4315,7 +4229,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-    bool TryCompute(CompiledSizeof functionCall, EvaluationContext2 context, out CompiledValue value)
+    static bool TryCompute(CompiledSizeof functionCall, EvaluationContext context, out CompiledValue value)
     {
         if (!FindSize(functionCall.Of, out int size, out PossibleDiagnostic? findSizeError))
         {
@@ -4326,90 +4240,82 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = new CompiledValue(size);
         return true;
     }
-    bool TryCompute(CompiledVariableGetter identifier, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledVariableGetter identifier, EvaluationContext context, out CompiledValue value)
     {
-        if (context.TryGetValue(identifier, out value))
-        { return true; }
-
-        if (TryGetVariableValue2(identifier, out value))
-        { return true; }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(CompiledParameterGetter identifier, EvaluationContext2 context, out CompiledValue value)
-    {
-        if (context.TryGetValue(identifier, out value))
-        { return true; }
-
-        if (TryGetVariableValue2(identifier, out value))
-        { return true; }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryGetVariableValue2(CompiledVariableGetter identifier, out CompiledValue value)
-    {
-        value = default;
-        return false;
-    }
-    bool TryGetVariableValue2(CompiledParameterGetter identifier, out CompiledValue value)
-    {
-        value = default;
-        return false;
-    }
-    bool TryCompute(CompiledFieldGetter field, EvaluationContext2 context, out CompiledValue value)
-    {
-        if (context.TryGetValue(field, out value))
-        { return true; }
-
-        value = CompiledValue.Null;
-        return false;
-    }
-    bool TryCompute(CompiledFakeTypeCast typeCast, EvaluationContext2 context, out CompiledValue value)
-    {
-        if (TryCompute(typeCast.Value, context, out value))
+        if (!context.TryGetVariable(identifier.Variable, out value))
         {
-            if (!typeCast.Type.Is(out BuiltinType? builtinType)) return false;
-            value = CompiledValue.CreateUnsafe(value.I32, builtinType.RuntimeType);
-            return true;
+            value = CompiledValue.Null;
+            return false;
         }
 
-        value = CompiledValue.Null;
-        return false;
+        return true;
     }
-    bool TryCompute(CompiledTypeCast typeCast, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledParameterGetter identifier, EvaluationContext context, out CompiledValue value)
     {
-        if (TryCompute(typeCast.Value, context, out value))
+        if (!context.TryGetParameter(identifier.Variable.Identifier.Content, out value))
         {
-            if (!typeCast.Type.Is(out BuiltinType? builtinType)) return false;
-            if (!value.TryCast(builtinType.RuntimeType, out value))
-            { return false; }
-            return true;
+            value = CompiledValue.Null;
+            return false;
         }
 
-        value = CompiledValue.Null;
-        return false;
+        return true;
     }
-    bool TryCompute(CompiledIndexGetter indexCall, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute(CompiledFakeTypeCast typeCast, EvaluationContext context, out CompiledValue value)
     {
-        if (indexCall.Base is CompiledStringInstance literal1 &&
-            TryCompute(indexCall.Index, context, out CompiledValue index1))
+        if (!TryCompute(typeCast.Value, context, out value))
         {
-            if (index1 == literal1.Value.Length)
+            value = CompiledValue.Null;
+            return false;
+        }
+
+        if (!typeCast.Type.Is(out BuiltinType? builtinType)) return false;
+
+        value = CompiledValue.CreateUnsafe(value.I32, builtinType.RuntimeType);
+        return true;
+    }
+    bool TryCompute(CompiledTypeCast typeCast, EvaluationContext context, out CompiledValue value)
+    {
+        if (!TryCompute(typeCast.Value, context, out value))
+        {
+            value = CompiledValue.Null;
+            return false;
+        }
+
+        if (!typeCast.Type.Is(out BuiltinType? builtinType)) return false;
+        if (!value.TryCast(builtinType.RuntimeType, out CompiledValue casted)) return false;
+
+        value = casted;
+        return true;
+    }
+    bool TryCompute(CompiledIndexGetter indexCall, EvaluationContext context, out CompiledValue value)
+    {
+        if (!TryCompute(indexCall.Index, context, out CompiledValue index))
+        {
+            value = CompiledValue.Null;
+            return false;
+        }
+
+        if (indexCall.Base is CompiledStringInstance stringInstance)
+        {
+            if (index == stringInstance.Value.Length)
             { value = new CompiledValue('\0'); }
             else
-            { value = new CompiledValue(literal1.Value[(int)index1]); }
+            { value = new CompiledValue(stringInstance.Value[(int)index]); }
             return true;
         }
 
-        if (indexCall.Base is CompiledStackStringInstance literal2 &&
-            TryCompute(indexCall.Index, context, out CompiledValue index2))
+        if (indexCall.Base is CompiledStackStringInstance stackString)
         {
-            if (index2 == literal2.Value.Length)
+            if (index == stackString.Value.Length)
             { value = new CompiledValue('\0'); }
             else
-            { value = new CompiledValue(literal2.Value[(int)index2]); }
+            { value = new CompiledValue(stackString.Value[(int)index]); }
+            return true;
+        }
+
+        if (indexCall.Base is CompiledLiteralList listLiteral &&
+            TryCompute(listLiteral.Values[(int)index], context, out value))
+        {
             return true;
         }
 
@@ -4417,8 +4323,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return false;
     }
     bool TryCompute([NotNullWhen(true)] CompiledStatementWithValue? statement, out CompiledValue value)
-        => TryCompute(statement, EvaluationContext2.Empty, out value);
-    bool TryCompute(IEnumerable<CompiledStatementWithValue>? statements, EvaluationContext2 context, [NotNullWhen(true)] out ImmutableArray<CompiledValue> values)
+        => TryCompute(statement, EvaluationContext.Empty, out value);
+    bool TryCompute(IEnumerable<CompiledStatementWithValue>? statements, EvaluationContext context, [NotNullWhen(true)] out ImmutableArray<CompiledValue> values)
     {
         if (statements is null)
         {
@@ -4441,54 +4347,37 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         values = result.ToImmutable();
         return true;
     }
-    bool TryCompute([NotNullWhen(true)] CompiledStatementWithValue? statement, EvaluationContext2 context, out CompiledValue value)
+    bool TryCompute([NotNullWhen(true)] CompiledStatementWithValue? statement, EvaluationContext context, out CompiledValue value)
     {
         value = CompiledValue.Null;
-
-        if (statement is null)
-        { return false; }
-
-        if (context.TryGetValue(statement, out value))
-        { return true; }
-
         return statement switch
         {
-            CompiledStringInstance v => TryCompute(v, out value),
-            CompiledStackStringInstance v => TryCompute(v, out value),
             CompiledEvaluatedValue v => TryCompute(v, out value),
             CompiledBinaryOperatorCall v => TryCompute(v, context, out value),
             CompiledUnaryOperatorCall v => TryCompute(v, context, out value),
             CompiledPointer v => TryCompute(v, context, out value),
-            CompiledExternalFunctionCall v => TryCompute(v, context, out value),
             CompiledFunctionCall v => TryCompute(v, context, out value),
             CompiledSizeof v => TryCompute(v, context, out value),
-            CompiledRuntimeCall v => TryCompute(v, context, out value),
             CompiledVariableGetter v => TryCompute(v, context, out value),
             CompiledParameterGetter v => TryCompute(v, context, out value),
             CompiledFakeTypeCast v => TryCompute(v, context, out value),
             CompiledTypeCast v => TryCompute(v, context, out value),
-            CompiledFieldGetter v => TryCompute(v, context, out value),
             CompiledIndexGetter v => TryCompute(v, context, out value),
             CompiledPassedArgument v => TryCompute(v.Value, context, out value),
+
+            CompiledStringInstance => false,
+            CompiledStackStringInstance => false,
+            CompiledExternalFunctionCall => false,
+            CompiledRuntimeCall => false,
+            CompiledFieldGetter => false,
             CompiledStackAllocation => false,
             CompiledConstructorCall => false,
             CompiledAddressGetter => false,
             CompiledLiteralList => false,
             CompiledStatementWithValueThatActuallyDoesntHaveValue => false,
-            _ => throw new NotImplementedException(statement.GetType().ToString()),
-        };
-    }
-    CompiledStatementWithValue TryCompute(CompiledStatementWithValue v)
-    {
-        if (!TryCompute(v, out var evaluated)) return v;
-        if (!evaluated.TryCast(v.Type, out var casted)) return v;
+            null => false,
 
-        return new CompiledEvaluatedValue()
-        {
-            Value = casted,
-            SaveValue = v.SaveValue,
-            Location = v.Location,
-            Type = v.Type,
+            _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
     }
 
@@ -4497,14 +4386,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = default;
         runtimeStatements = default;
 
-        var found = GeneratedFunctions.FirstOrDefault(v => v.Function == function);
+        CompiledFunction? found = GeneratedFunctions.FirstOrDefault(v => v.Function == function);
 
         if (found is null)
-        {
-            return false;
-        }
+        { return false; }
 
-        if (TryCompute(parameters, EvaluationContext2.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
+        if (TryCompute(parameters, EvaluationContext.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
             TryEvaluate(found, parameterValues, out value, out runtimeStatements))
         { return true; }
 
@@ -4515,14 +4402,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = default;
         runtimeStatements = default;
 
-        var found = GeneratedFunctions.FirstOrDefault(v => v.Function == function);
+        CompiledFunction? found = GeneratedFunctions.FirstOrDefault(v => v.Function == function);
 
         if (found is null)
         {
             return false;
         }
 
-        if (TryCompute(parameters, EvaluationContext2.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
+        if (TryCompute(parameters, EvaluationContext.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
             TryEvaluate(found, parameterValues, out value, out runtimeStatements))
         { return true; }
 
@@ -4533,7 +4420,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = default;
         runtimeStatements = default;
 
-        if (TryCompute(parameters, EvaluationContext2.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
+        if (TryCompute(parameters, EvaluationContext.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
             TryEvaluate(function, parameterValues, out value, out runtimeStatements))
         { return true; }
 
@@ -4565,21 +4452,19 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             parameterValues = castedParameterValues.ToImmutableArray();
         }
 
-        Dictionary<string, CompiledValue> arguments = new();
-
         if (function.Function.ReturnSomething)
         {
-            if (!function.Function.Type.Is(out BuiltinType? returnType))
+            if (!function.Function.Type.Is<BuiltinType>())
             { return false; }
-
-            if (function.Function.ReturnSomething)
-            { arguments.Add("@return", GetInitialValue(returnType.Type)); }
         }
 
-        for (int i = 0; i < parameterValues.Length; i++)
-        { arguments.Add(function.Function.Parameters[i].Identifier.Content, parameterValues[i]); }
+        EvaluationContext context = new();
+        context.Frames.Add(new EvaluationFrame());
 
-        EvaluationContext2 context = new(null, arguments);
+        for (int i = 0; i < parameterValues.Length; i++)
+        {
+            context.Frames.Last.Parameters.Add(function.Function.Parameters[i].Identifier.Content, parameterValues[i]);
+        }
 
         CurrentEvaluationContext2.Push(context);
 
@@ -4592,16 +4477,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (function.Function.ReturnSomething)
         {
-            if (context.LastScope is null)
+            if (context.Frames?.LastOrDefault is null)
             { throw new InternalExceptionWithoutContext(); }
-            value = context.LastScope["@return"];
+            if (!context.Frames.LastOrDefault.ReturnValue.HasValue)
+            { return false; }
+            value = context.Frames.LastOrDefault.ReturnValue.Value;
         }
 
         runtimeStatements = context.RuntimeStatements.ToArray();
 
         return true;
     }
-    bool TryEvaluate(CompiledWhileLoop whileLoop, EvaluationContext2 context)
+    bool TryEvaluate(CompiledWhileLoop whileLoop, EvaluationContext context)
     {
         int iterations = 64;
 
@@ -4631,7 +4518,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         context.IsBreaking = false;
         return true;
     }
-    bool TryEvaluate(CompiledForLoop forLoop, EvaluationContext2 context)
+    bool TryEvaluate(CompiledForLoop forLoop, EvaluationContext context)
     {
         int iterations = 5048;
 
@@ -4670,7 +4557,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         context.PopScope();
         return true;
     }
-    bool TryEvaluate(CompiledIf ifContainer, EvaluationContext2 context)
+    bool TryEvaluate(CompiledIf ifContainer, EvaluationContext context)
     {
         CompiledBranch? current = ifContainer;
         while (true)
@@ -4700,18 +4587,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-    bool TryEvaluate(CompiledBlock block, EvaluationContext2 context)
+    bool TryEvaluate(CompiledBlock block, EvaluationContext context)
     {
         context.PushScope();
         bool result = TryEvaluate(block.Statements, context);
         context.PopScope();
         return result;
     }
-    bool TryEvaluate(CompiledVariableDeclaration variableDeclaration, EvaluationContext2 context)
+    bool TryEvaluate(CompiledVariableDeclaration variableDeclaration, EvaluationContext context)
     {
         CompiledValue value;
 
-        if (context.LastScope is null)
+        if (context.Frames.LastOrDefault is null)
         { return false; }
 
         if (variableDeclaration.InitialValue is null &&
@@ -4726,44 +4613,44 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             { return false; }
         }
 
-        if (!context.LastScope.TryAdd(variableDeclaration.Identifier, value))
+        if (!(context.Frames.LastOrDefault.Scopes.LastOrDefault?.Variables.TryAdd(variableDeclaration, value) ?? false))
         { return false; }
 
         return true;
     }
-    bool TryEvaluate(CompiledVariableSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledVariableSetter anyAssignment, EvaluationContext context)
     {
         if (!TryCompute(anyAssignment.Value, context, out CompiledValue value))
         { return false; }
 
-        if (!context.TrySetVariable(anyAssignment.Variable.Identifier, value))
+        if (!context.TrySetVariable(anyAssignment.Variable, value))
         { return false; }
 
         return true;
     }
-    bool TryEvaluate(CompiledParameterSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledParameterSetter anyAssignment, EvaluationContext context)
     {
         if (!TryCompute(anyAssignment.Value, context, out CompiledValue value))
         { return false; }
 
-        if (!context.TrySetVariable(anyAssignment.Variable.Identifier.Content, value))
+        if (!context.TrySetParameter(anyAssignment.Variable.Identifier.Content, value))
         { return false; }
 
         return true;
     }
-    bool TryEvaluate(CompiledFieldSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledFieldSetter anyAssignment, EvaluationContext context)
     {
         return false;
     }
-    bool TryEvaluate(CompiledIndexSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledIndexSetter anyAssignment, EvaluationContext context)
     {
         return false;
     }
-    bool TryEvaluate(CompiledIndirectSetter anyAssignment, EvaluationContext2 context)
+    bool TryEvaluate(CompiledIndirectSetter anyAssignment, EvaluationContext context)
     {
         return false;
     }
-    bool TryEvaluate(CompiledReturn keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledReturn keywordCall, EvaluationContext context)
     {
         context.IsReturning = true;
 
@@ -4772,30 +4659,29 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (!TryCompute(keywordCall.Value, context, out CompiledValue returnValue))
             { return false; }
 
-            if (!context.TrySetVariable("@return", returnValue))
-            { return false; }
+            context.Frames.Last.ReturnValue = returnValue;
         }
 
         return true;
     }
-    bool TryEvaluate(CompiledBreak keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledBreak keywordCall, EvaluationContext context)
     {
         context.IsBreaking = true;
         return true;
     }
-    bool TryEvaluate(CompiledCrash keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledCrash keywordCall, EvaluationContext context)
     {
         return false;
     }
-    bool TryEvaluate(CompiledGoto keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledGoto keywordCall, EvaluationContext context)
     {
         return false;
     }
-    bool TryEvaluate(CompiledDelete keywordCall, EvaluationContext2 context)
+    bool TryEvaluate(CompiledDelete keywordCall, EvaluationContext context)
     {
         return false;
     }
-    bool TryEvaluate(CompiledStatement statement, EvaluationContext2 context) => statement switch
+    bool TryEvaluate(CompiledStatement statement, EvaluationContext context) => statement switch
     {
         CompiledStatementWithValue v => TryCompute(v, context, out _),
         CompiledBlock v => TryEvaluate(v, context),
@@ -4815,7 +4701,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         CompiledIf v => TryEvaluate(v, context),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
-    bool TryEvaluate(ImmutableArray<CompiledStatement> statements, EvaluationContext2 context)
+    bool TryEvaluate(ImmutableArray<CompiledStatement> statements, EvaluationContext context)
     {
         foreach (CompiledStatement statement in statements)
         {
@@ -4828,7 +4714,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return true;
     }
 
-    readonly Stack<EvaluationContext2> CurrentEvaluationContext2 = new();
+    readonly Stack<EvaluationContext> CurrentEvaluationContext2 = new();
 
     #endregion
 

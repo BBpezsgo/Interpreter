@@ -1,0 +1,14 @@
+int a = 4;
+
+int main()
+{
+    int a = 8;
+    return A();
+}
+
+int A(int v = a)
+{
+    return v;
+}
+
+return main();

@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -170,8 +170,8 @@ public readonly struct ExpectedResult
 
     public ExpectedResult Assert(IResult other)
     {
-        if (!string.Equals(StdOutput, other.StdOutput, StringComparison.Ordinal))
-        { throw new AssertFailedException($"Standard output isn't what is expected:{Environment.NewLine}Expected: \"{StdOutput.Escape()}\"{Environment.NewLine}Actual:   \"{other.StdOutput.Escape()}\""); }
+        if (!string.Equals(StdOutput.Replace("\r", ""), other.StdOutput.Replace("\r", ""), StringComparison.Ordinal))
+        { throw new AssertFailedException($"Standard output isn't what is expected:{Environment.NewLine}Expected: \"{StdOutput.Replace("\r", "").Escape()}\"{Environment.NewLine}Actual:   \"{other.StdOutput.Replace("\r", "").Escape()}\""); }
 
         if (ExitCode != other.ExitCode)
         { throw new AssertFailedException($"Exit code isn't what is expected:{Environment.NewLine}Expected: {ExitCode}{Environment.NewLine}Actual:   {other.ExitCode}"); }
@@ -181,8 +181,8 @@ public readonly struct ExpectedResult
 
     public ExpectedResult Assert(BrainfuckResult other)
     {
-        if (!string.Equals(StdOutput, other.StdOutput, StringComparison.Ordinal))
-        { throw new AssertFailedException($"Standard output isn't what is expected:{Environment.NewLine}Expected: \"{StdOutput.Escape()}\"{Environment.NewLine}Actual:   \"{other.StdOutput.Escape()}\""); }
+        if (!string.Equals(StdOutput.Replace("\r", ""), other.StdOutput.Replace("\r", ""), StringComparison.Ordinal))
+        { throw new AssertFailedException($"Standard output isn't what is expected:{Environment.NewLine}Expected: \"{StdOutput.Replace("\r", "").Escape()}\"{Environment.NewLine}Actual:   \"{other.StdOutput.Replace("\r", "").Escape()}\""); }
 
         if (unchecked((byte)ExitCode) != other.ExitCode)
         { throw new AssertFailedException($"Exit code isn't what is expected:{Environment.NewLine}Expected: {unchecked((byte)ExitCode)}{Environment.NewLine}Actual:   {other.ExitCode}"); }

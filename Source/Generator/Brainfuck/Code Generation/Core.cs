@@ -1,6 +1,6 @@
 ﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
+using LanguageCore.Parser.Statements;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.Brainfuck.Generator;
@@ -295,7 +295,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     static readonly BuiltinType ExitCodeType = BuiltinType.U8;
 
-    ImmutableDictionary<ICompiledFunction, CompiledStatement> FunctionBodies;
+    ImmutableDictionary<ICompiledFunctionDefinition, CompiledStatement> FunctionBodies;
 
     #endregion
 
@@ -316,11 +316,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         VariableCleanupStack = new Stack<int>();
         Returns = new Stack<ControlFlowBlock>();
         Breaks = new Stack<ControlFlowBlock>();
-        DebugInfo = brainfuckSettings.GenerateDebugInformation ? new DebugInformation(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.File, v.Tokens.Tokens))) : null;
+        DebugInfo = brainfuckSettings.GenerateDebugInformation ? new DebugInformation(compilerResult.RawTokens.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.File, v.Tokens.Tokens))) : null;
         MaxRecursiveDepth = 4;
         Settings = brainfuckSettings;
 
-        FunctionBodies = compilerResult.Functions2.Select(v => new KeyValuePair<ICompiledFunction, CompiledStatement>(v.Function, v.Body)).ToImmutableDictionary();
+        FunctionBodies = compilerResult.Functions.Select(v => new KeyValuePair<ICompiledFunctionDefinition, CompiledStatement>(v.Function, v.Body)).ToImmutableDictionary();
     }
 
     GeneratorSnapshot Snapshot() => new(this);
@@ -372,25 +372,25 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     DebugInfoBlock DebugBlock(ILocated location) => new(Code, DebugInfo, location.Location.Position, location.Location.File);
     DebugInfoBlock DebugBlock(IPositioned position, Uri file) => new(Code, DebugInfo, position, file);
 
-    DebugFunctionBlock<CompiledFunction> FunctionBlock(CompiledFunction function, Dictionary<string, GeneralType>? typeArguments) => new(
+    DebugFunctionBlock<CompiledFunctionDefinition> FunctionBlock(CompiledFunctionDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
         function,
         typeArguments);
 
-    DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledOperator function, Dictionary<string, GeneralType>? typeArguments) => new(
+    DebugFunctionBlock<CompiledOperatorDefinition> FunctionBlock(CompiledOperatorDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
         function,
         typeArguments);
 
-    DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledGeneralFunction function, Dictionary<string, GeneralType>? typeArguments) => new(
+    DebugFunctionBlock<CompiledOperatorDefinition> FunctionBlock(CompiledGeneralFunctionDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
         function,
         typeArguments);
 
-    DebugFunctionBlock<CompiledOperator> FunctionBlock(CompiledConstructor function, Dictionary<string, GeneralType>? typeArguments) => new(
+    DebugFunctionBlock<CompiledOperatorDefinition> FunctionBlock(CompiledConstructorDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
         function,
@@ -430,7 +430,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
             if (index.Index is CompiledEvaluatedValue indexValue)
             {
-                address = new AddressRuntimePointer2(index.Base) + ((int)indexValue.Value * arrayType.Of.GetSize(this, Diagnostics, index.Base));
+                address = new AddressRuntimePointer(index.Base) + ((int)indexValue.Value * arrayType.Of.GetSize(this, Diagnostics, index.Base));
                 return true;
             }
 
@@ -515,7 +515,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
             GeneralType fieldType = field.Type;
 
-            address = new AddressRuntimePointer2(field.Object) + fieldOffset;
+            address = new AddressRuntimePointer(field.Object) + fieldOffset;
             size = fieldType.GetSize(this, Diagnostics, field);
             return true;
         }
@@ -796,14 +796,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             },
         }));
 
-        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = compilerResult.CompiledStatements.OfType<CompiledVariableDeclaration>();
+        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = compilerResult.Statements.OfType<CompiledVariableDeclaration>();
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(globalVariableDeclarations, false)); }
         else
         { PrecompileVariables(globalVariableDeclarations, false); }
 
-        GenerateTopLevelStatements(compilerResult.CompiledStatements);
+        GenerateTopLevelStatements(compilerResult.Statements);
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { CleanupVariables(VariableCleanupStack.Pop()); }

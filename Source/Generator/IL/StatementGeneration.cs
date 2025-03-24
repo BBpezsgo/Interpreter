@@ -8,7 +8,7 @@ namespace LanguageCore.IL.Generator;
 public partial class CodeGeneratorForIL : CodeGenerator
 {
     readonly Dictionary<CompiledVariableDeclaration, LocalBuilder> Locals = new();
-    readonly Dictionary<ICompiledFunction, DynamicMethod> Functions = new();
+    readonly Dictionary<ICompiledFunctionDefinition, DynamicMethod> Functions = new();
     readonly Stack<Label> LoopLabels = new();
 
     ModuleBuilder Module = null!;
@@ -1218,11 +1218,11 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }, AssemblyBuilderAccess.RunAndCollect);
         Module = assemBuilder.DefineDynamicModule("DynamicModule");
 
-        foreach ((ICompiledFunction function, _) in res.Functions2)
+        foreach ((ICompiledFunctionDefinition function, _) in res.Functions)
         {
             switch (function)
             {
-                case CompiledFunction v:
+                case CompiledFunctionDefinition v:
                 {
                     Functions[function] = new DynamicMethod(
                         v.Identifier.Content,
@@ -1231,7 +1231,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                         Module);
                     break;
                 }
-                case CompiledOperator v:
+                case CompiledOperatorDefinition v:
                 {
                     Functions[function] = new DynamicMethod(
                         $"op_{v.Identifier.Content}",
@@ -1240,7 +1240,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                         Module);
                     break;
                 }
-                case CompiledConstructor v:
+                case CompiledConstructorDefinition v:
                 {
                     Functions[function] = new DynamicMethod(
                         $"ctor_{v.Identifier.Content}",
@@ -1249,7 +1249,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                         Module);
                     break;
                 }
-                case CompiledGeneralFunction v:
+                case CompiledGeneralFunctionDefinition v:
                 {
                     Functions[function] = new DynamicMethod(
                         $"genr_{v.Identifier.Content}",
@@ -1262,9 +1262,9 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
         }
 
-        Func<int> result = GenerateCodeForTopLevelStatements(res.CompiledStatements);
+        Func<int> result = GenerateCodeForTopLevelStatements(res.Statements);
 
-        foreach ((ICompiledFunction function, CompiledBlock body) in res.Functions2)
+        foreach ((ICompiledFunctionDefinition function, CompiledBlock body) in res.Functions)
         {
             ILGenerator il = Functions[function].GetILGenerator();
             EmitMethod(body.Statements, function.Type, il);

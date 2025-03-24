@@ -1,6 +1,4 @@
-﻿using LanguageCore.Parser.Statement;
-
-namespace LanguageCore.Tokenizing;
+﻿namespace LanguageCore.Tokenizing;
 
 public partial class Tokenizer
 {

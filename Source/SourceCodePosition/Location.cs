@@ -1,7 +1,10 @@
-
 namespace LanguageCore;
 
-public readonly struct Location : IEquatable<Location>, ILocated
+public readonly struct Location :
+    IEquatable<Location>,
+    ILocated,
+    IPositioned,
+    IInFile
 {
     public Position Position { get; }
     public Uri File { get; }

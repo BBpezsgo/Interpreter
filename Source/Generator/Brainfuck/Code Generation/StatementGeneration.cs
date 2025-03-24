@@ -1,6 +1,6 @@
 ﻿using LanguageCore.Compiler;
 using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
+using LanguageCore.Parser.Statements;
 
 namespace LanguageCore.Brainfuck.Generator;
 
@@ -817,7 +817,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void CompileSetter(AddressOffset address, CompiledStatementWithValue value)
     {
-        if (address.Base is AddressRuntimePointer2 runtimePointer2)
+        if (address.Base is AddressRuntimePointer runtimePointer2)
         {
             GeneralType referenceType = runtimePointer2.PointerValue.Type;
 
@@ -2327,7 +2327,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void PushFrom(AddressOffset address, int size)
     {
-        if (address.Base is AddressRuntimePointer2 runtimePointer2)
+        if (address.Base is AddressRuntimePointer runtimePointer2)
         {
             using (Code.Block(this, $"Load data (dereferenced from \"{runtimePointer2.PointerValue}\" + {address.Offset})"))
             {
@@ -2519,7 +2519,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         return true;
     }
 
-    void GenerateCodeForFunction(CompiledFunction function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated caller)
+    void GenerateCodeForFunction(CompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated caller)
     {
         if (!AllowFunctionInlining ||
             !IsFunctionInlineable(function, parameters))
@@ -2531,19 +2531,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GenerateCodeForFunction_(function, parameters, typeArguments, caller);
     }
 
-    void GenerateCodeForFunction(ICompiledFunction function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated caller)
+    void GenerateCodeForFunction(ICompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated caller)
     {
         switch (function)
         {
-            case CompiledFunction v: GenerateCodeForFunction(v, parameters, typeArguments, caller); break;
-            case CompiledOperator v: GenerateCodeForFunction(v, parameters, typeArguments, caller); break;
-            case CompiledGeneralFunction v: GenerateCodeForFunction(v, parameters, typeArguments, caller); break;
-            case CompiledConstructor v: GenerateCodeForFunction(v, parameters, typeArguments, (CompiledConstructorCall)caller); break;
+            case CompiledFunctionDefinition v: GenerateCodeForFunction(v, parameters, typeArguments, caller); break;
+            case CompiledOperatorDefinition v: GenerateCodeForFunction(v, parameters, typeArguments, caller); break;
+            case CompiledGeneralFunctionDefinition v: GenerateCodeForFunction(v, parameters, typeArguments, caller); break;
+            case CompiledConstructorDefinition v: GenerateCodeForFunction(v, parameters, typeArguments, (CompiledConstructorCall)caller); break;
         }
     }
 
     void GenerateCodeForParameterPassing<TFunction>(TFunction function, ImmutableArray<CompiledPassedArgument> parameters, Stack<BrainfuckVariable> compiledParameters, Dictionary<string, GeneralType>? typeArguments)
-        where TFunction : ICompiledFunction, ISimpleReadable
+        where TFunction : ICompiledFunctionDefinition, ISimpleReadable
     {
         for (int i = 0; i < parameters.Length; i++)
         {
@@ -2709,9 +2709,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
     }
 
-    void GenerateCodeForFunction_(CompiledFunction function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
+    void GenerateCodeForFunction_(CompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
     {
-        using DebugFunctionBlock<CompiledFunction> debugFunction = FunctionBlock(function, typeArguments);
+        using DebugFunctionBlock<CompiledFunctionDefinition> debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ExternalFunctionName == ExternalFunctionNames.StdOut)
         {
@@ -2856,9 +2856,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CurrentMacro.Pop();
     }
 
-    void GenerateCodeForFunction(CompiledOperator function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
+    void GenerateCodeForFunction(CompiledOperatorDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
     {
-        using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
+        using DebugFunctionBlock<CompiledOperatorDefinition> debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ExternalFunctionName == ExternalFunctionNames.StdOut)
         {
@@ -3006,9 +3006,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CurrentMacro.Pop();
     }
 
-    void GenerateCodeForFunction(CompiledGeneralFunction function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
+    void GenerateCodeForFunction(CompiledGeneralFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
     {
-        using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
+        using DebugFunctionBlock<CompiledOperatorDefinition> debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ParameterCount != parameters.Length)
         {
@@ -3101,9 +3101,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CurrentMacro.Pop();
     }
 
-    void GenerateCodeForFunction(CompiledConstructor function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, CompiledConstructorCall callerPosition)
+    void GenerateCodeForFunction(CompiledConstructorDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, CompiledConstructorCall callerPosition)
     {
-        using DebugFunctionBlock<CompiledOperator> debugFunction = FunctionBlock(function, typeArguments);
+        using DebugFunctionBlock<CompiledOperatorDefinition> debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ParameterCount - 1 != parameters.Length)
         {

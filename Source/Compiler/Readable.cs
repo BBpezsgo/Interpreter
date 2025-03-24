@@ -1,16 +1,16 @@
 ﻿using LanguageCore.Compiler;
-using LanguageCore.Parser.Statement;
+using LanguageCore.Parser.Statements;
 
 namespace LanguageCore;
 
 public interface IReadable
 {
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch);
+    string ToReadable(Func<StatementWithValue, GeneralType> typeSearch);
 }
 
 public interface ISimpleReadable : IReadable
 {
-    public string ToReadable();
+    string ToReadable();
 
     string IReadable.ToReadable(Func<StatementWithValue, GeneralType> typeSearch) => ToReadable();
 }

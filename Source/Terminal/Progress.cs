@@ -48,11 +48,11 @@ public struct ConsoleProgressBar : IDisposable
 
         if (!_show) return;
 
-        #if NET_STANDARD
+#if NET_STANDARD
         _line = Console.CursorTop;
-        #else
+#else
         _line = Console.GetCursorPosition().Top;
-        #endif
+#endif
         Console.WriteLine();
     }
 
@@ -77,11 +77,11 @@ public struct ConsoleProgressBar : IDisposable
         { return; }
 
         (int Left, int Top) prevCursorPosition =
-        #if NET_STANDARD
+#if NET_STANDARD
             (Console.CursorLeft, Console.CursorTop);
-        #else
+#else
             Console.GetCursorPosition();
-        #endif
+#endif
 
         Console.SetCursorPosition(0, _line);
 
@@ -107,11 +107,11 @@ public struct ConsoleProgressBar : IDisposable
         if (!_show) return;
 
         (int Left, int Top) prevCursorPosition =
-        #if NET_STANDARD
+#if NET_STANDARD
             (Console.CursorLeft, Console.CursorTop);
-        #else
+#else
             Console.GetCursorPosition();
-        #endif
+#endif
 
         Console.SetCursorPosition(0, _line);
 
@@ -177,11 +177,11 @@ public struct ConsoleProgressLabel : IDisposable
         _isNotFirst = true;
 
         (int Left, int Top) prevCursorPosition =
-            #if NET_STANDARD
+#if NET_STANDARD
                 (Console.CursorLeft, Console.CursorTop);
-            #else
+#else
                 Console.GetCursorPosition();
-            #endif
+#endif
 
         Console.SetCursorPosition(0, _line);
 
@@ -212,11 +212,11 @@ public struct ConsoleProgressLabel : IDisposable
         if (!_show) return;
 
         (int Left, int Top) prevCursorPosition =
-        #if NET_STANDARD
+#if NET_STANDARD
             (Console.CursorLeft, Console.CursorTop);
-        #else
+#else
             Console.GetCursorPosition();
-        #endif
+#endif
 
         Console.SetCursorPosition(0, _line);
 

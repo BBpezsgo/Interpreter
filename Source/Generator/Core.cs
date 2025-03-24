@@ -1,132 +1,6 @@
 ﻿using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
-using LanguageCore.Runtime;
 
 namespace LanguageCore.Compiler;
-
-public abstract class Address
-{
-    public static Address operator -(Address a, int b)
-        => a + -b;
-    public static Address operator +(Address a, int b)
-    {
-        if (a is AddressOffset addressOffset)
-        {
-            return new AddressOffset(addressOffset.Base, addressOffset.Offset + b);
-        }
-        else if (a is AddressAbsolute addressAbsolute)
-        {
-            return new AddressAbsolute(addressAbsolute.Value + b);
-        }
-        else
-        {
-            return new AddressOffset(a, b);
-        }
-    }
-}
-
-public class AddressOffset : Address
-{
-    public Address Base { get; }
-    public int Offset { get; }
-
-    public AddressOffset(Register register, int offset)
-    {
-        Base = new AddressRegisterPointer(register);
-        Offset = offset;
-    }
-
-    public AddressOffset(Address @base, int offset)
-    {
-        if (@base is AddressOffset baseAddressOffset)
-        {
-            Base = baseAddressOffset.Base;
-            Offset = baseAddressOffset.Offset + offset;
-        }
-        else
-        {
-            Base = @base;
-            Offset = offset;
-        }
-    }
-
-    [ExcludeFromCodeCoverage]
-    public override string ToString() => Offset switch
-    {
-        > 0 => $"{Base} + {Offset}",
-        < 0 => $"{Base} - {-Offset}",
-        _ => $"{Base} + 0"
-    };
-}
-
-public class AddressPointer : Address
-{
-    public Address PointerAddress { get; }
-
-    public AddressPointer(Address pointerAddress)
-    {
-        PointerAddress = pointerAddress;
-    }
-
-    [ExcludeFromCodeCoverage]
-    public override string ToString() => $"*[{PointerAddress}]";
-}
-
-public class AddressRegisterPointer : Address
-{
-    public Register Register { get; }
-
-    public AddressRegisterPointer(Register register)
-    {
-        Register = register;
-    }
-
-    [ExcludeFromCodeCoverage]
-    public override string ToString() => $"{Register}";
-}
-
-public class AddressRuntimePointer2 : Address
-{
-    public CompiledStatementWithValue PointerValue { get; }
-
-    public AddressRuntimePointer2(CompiledStatementWithValue pointerValue)
-    {
-        PointerValue = pointerValue;
-    }
-
-    [ExcludeFromCodeCoverage]
-    public override string ToString() => $"*[{PointerValue}]";
-}
-
-public class AddressRuntimeIndex2 : Address
-{
-    public Address Base { get; }
-    public CompiledStatementWithValue IndexValue { get; }
-    public int ElementSize { get; }
-
-    public AddressRuntimeIndex2(Address @base, CompiledStatementWithValue indexValue, int elementSize)
-    {
-        Base = @base;
-        IndexValue = indexValue;
-        ElementSize = elementSize;
-    }
-
-    [ExcludeFromCodeCoverage]
-    public override string ToString() => $"({Base} + {IndexValue} * {ElementSize})";
-}
-
-public class AddressAbsolute : Address
-{
-    public int Value { get; }
-
-    public AddressAbsolute(int value)
-    {
-        Value = value;
-    }
-
-    [ExcludeFromCodeCoverage]
-    public override string ToString() => Value.ToString();
-}
 
 readonly struct UndefinedOffset<TFunction>
 {
@@ -187,45 +61,34 @@ public readonly struct Reference<TSource>
 
 public interface IHaveInstructionOffset
 {
-    public int InstructionOffset { get; set; }
-}
-
-public interface ICompiledFunction :
-    IHaveCompiledType,
-    IInFile,
-    IHaveInstructionOffset
-{
-    public bool ReturnSomething { get; }
-    public Block? Block { get; }
-    public IReadOnlyList<ParameterDefinition> Parameters { get; }
-    public IReadOnlyList<GeneralType> ParameterTypes { get; }
+    int InstructionOffset { get; set; }
 }
 
 public interface ITemplateable<TSelf> where TSelf : notnull
 {
-    public bool IsTemplate { get; }
-    public TSelf InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters);
+    bool IsTemplate { get; }
+    TSelf InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters);
 }
 
 public interface IReferenceable
 {
-    public IEnumerable<Reference> References { get; }
+    IEnumerable<Reference> References { get; }
 }
 
 public interface IReferenceable<TBy> : IReferenceable
 {
-    public new List<Reference<TBy>> References { get; }
+    new List<Reference<TBy>> References { get; }
     IEnumerable<Reference> IReferenceable.References => References.Select(v => (Reference)v);
 }
 
 public interface IHaveCompiledType
 {
-    public GeneralType Type { get; }
+    GeneralType Type { get; }
 }
 
 public interface IInContext<TContext>
 {
-    public TContext Context { get; }
+    TContext Context { get; }
 }
 
 public enum Protection
@@ -238,17 +101,17 @@ public interface IDefinition { }
 
 public interface IDefinition<TOther> : IDefinition
 {
-    public bool DefinitionEquals(TOther other);
+    bool DefinitionEquals(TOther other);
 }
 
 public interface IIdentifiable<TIdentifier>
 {
-    public TIdentifier Identifier { get; }
+    TIdentifier Identifier { get; }
 }
 
 public interface IHaveAttributes
 {
-    public ImmutableArray<AttributeUsage> Attributes { get; }
+    ImmutableArray<AttributeUsage> Attributes { get; }
 }
 
 public interface IExternalFunctionDefinition

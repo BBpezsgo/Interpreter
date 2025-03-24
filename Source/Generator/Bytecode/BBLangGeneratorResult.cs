@@ -17,9 +17,9 @@ public struct BBLangGeneratorResult
     public ImmutableArray<Instruction> Code;
     public DebugInformation? DebugInfo;
     public GeneratorStatistics Statistics;
-    public ImmutableArray<CompiledFunction> CompiledFunctions;
-    public ImmutableArray<CompiledOperator> CompiledOperators;
-    public ImmutableArray<CompiledGeneralFunction> CompiledGeneralFunctions;
-    public ImmutableArray<CompiledConstructor> CompiledConstructors;
+    public ImmutableArray<CompiledFunctionDefinition> CompiledFunctions;
+    public ImmutableArray<CompiledOperatorDefinition> CompiledOperators;
+    public ImmutableArray<CompiledGeneralFunctionDefinition> CompiledGeneralFunctions;
+    public ImmutableArray<CompiledConstructorDefinition> CompiledConstructors;
     public FrozenDictionary<string, ExposedFunction> ExposedFunctions;
 }

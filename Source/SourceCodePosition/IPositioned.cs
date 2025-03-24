@@ -2,5 +2,5 @@
 
 public interface IPositioned
 {
-    public Position Position { get; }
+    Position Position { get; }
 }

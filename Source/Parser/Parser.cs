@@ -1,7 +1,7 @@
-namespace LanguageCore.Parser;
+using LanguageCore.Parser.Statements;
+using LanguageCore.Tokenizing;
 
-using Statement;
-using Tokenizing;
+namespace LanguageCore.Parser;
 
 public sealed class Parser
 {
@@ -13,7 +13,7 @@ public sealed class Parser
     Token? CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
     Token? PreviousToken => (CurrentTokenIndex >= 1 && CurrentTokenIndex <= Tokens.Length) ? Tokens[CurrentTokenIndex - 1] : null;
 
-    static readonly ImmutableArray<string> AllModifiers = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> AllModifiers = ImmutableArray.Create
     (
         ProtectionKeywords.Export,
         ProtectionKeywords.Private,
@@ -25,48 +25,48 @@ public sealed class Parser
         ModifierKeywords.This
     );
 
-    static readonly ImmutableArray<string> FunctionModifiers = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> FunctionModifiers = ImmutableArray.Create
     (
         ProtectionKeywords.Export,
         ModifierKeywords.Inline
     );
 
-    static readonly ImmutableArray<string> AliasModifiers = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> AliasModifiers = ImmutableArray.Create
     (
         ProtectionKeywords.Export
     );
 
-    static readonly ImmutableArray<string> FieldModifiers = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> FieldModifiers = ImmutableArray.Create
     (
         ProtectionKeywords.Private
     );
 
-    static readonly ImmutableArray<string> GeneralStatementModifiers = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> GeneralStatementModifiers = ImmutableArray.Create
     (
         ModifierKeywords.Temp
     );
 
-    static readonly ImmutableArray<string> VariableModifiers = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> VariableModifiers = ImmutableArray.Create
     (
         ProtectionKeywords.Export,
         ModifierKeywords.Temp,
         ModifierKeywords.Const
     );
 
-    static readonly ImmutableArray<string> ParameterModifiers = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> ParameterModifiers = ImmutableArray.Create
     (
         ModifierKeywords.This,
         ModifierKeywords.Ref,
         ModifierKeywords.Temp
     );
 
-    static readonly ImmutableArray<string> ArgumentModifiers = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> ArgumentModifiers = ImmutableArray.Create
     (
         ModifierKeywords.Ref,
         ModifierKeywords.Temp
     );
 
-    static readonly ImmutableArray<string> OverloadableOperators = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> OverloadableOperators = ImmutableArray.Create
     (
         "<<", ">>",
         "+", "-", "*", "/", "%",
@@ -75,13 +75,13 @@ public sealed class Parser
         "&&", "||"
     );
 
-    static readonly ImmutableArray<string> CompoundAssignmentOperators = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> CompoundAssignmentOperators = ImmutableArray.Create
     (
         "+=", "-=", "*=", "/=", "%=",
         "&=", "|=", "^="
     );
 
-    static readonly ImmutableArray<string> BinaryOperators = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> BinaryOperators = ImmutableArray.Create
     (
         "<<", ">>",
         "+", "-", "*", "/", "%",
@@ -89,7 +89,7 @@ public sealed class Parser
         "<", ">", ">=", "<=", "!=", "==", "&&", "||"
     );
 
-    static readonly ImmutableArray<string> UnaryPrefixOperators = ImmutableArray.Create<string>
+    static readonly ImmutableArray<string> UnaryPrefixOperators = ImmutableArray.Create
     (
         "!", "~",
         "-", "+"
@@ -106,7 +106,7 @@ public sealed class Parser
     readonly Dictionary<string, StructDefinition> Structs = new();
     readonly List<UsingDefinition> Usings = new();
     readonly List<AliasDefinition> AliasDefinitions = new();
-    readonly List<Statement.Statement> TopLevelStatements = new();
+    readonly List<Statement> TopLevelStatements = new();
     // === ===
 
     Parser(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
@@ -157,9 +157,9 @@ public sealed class Parser
             Tokens);
     }
 
-    Statement.Statement ParseStatementInternal()
+    Statement ParseStatementInternal()
     {
-        if (ExpectStatementUnchecked(out Statement.Statement? statement))
+        if (ExpectStatementUnchecked(out Statement? statement))
         {
             Diagnostics.Throw();
             return statement;
@@ -246,7 +246,7 @@ public sealed class Parser
         { Operators.Add(operatorDefinition); }
         else if (ExpectAliasDefinition(out AliasDefinition? aliasDefinition))
         { AliasDefinitions.Add(aliasDefinition); }
-        else if (ExpectStatement(out Statement.Statement? statement))
+        else if (ExpectStatement(out Statement? statement))
         { TopLevelStatements.Add(statement); }
         else
         { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken!, File); }
@@ -1098,7 +1098,7 @@ public sealed class Parser
         return true;
     }
 
-    void SetStatementThings(Statement.Statement statement)
+    void SetStatementThings(Statement statement)
     {
         if (statement == null)
         {
@@ -1129,13 +1129,13 @@ public sealed class Parser
             return false;
         }
 
-        List<Statement.Statement> statements = new();
+        List<Statement> statements = new();
 
         int endlessSafe = 0;
         Token? bracketEnd;
         while (!ExpectOperator("}", out bracketEnd))
         {
-            if (!ExpectStatement(out Statement.Statement? statement))
+            if (!ExpectStatement(out Statement? statement))
             {
                 SkipCrapTokens();
                 if (CurrentToken is null)
@@ -1256,7 +1256,7 @@ public sealed class Parser
         if (!ExpectOperator(")", out Token? bracketEnd))
         { throw new SyntaxException($"Expected \")\" after while-loop condition", condition.Position.After(), File); }
 
-        if (!ExpectStatement(out Statement.Statement? block))
+        if (!ExpectStatement(out Statement? block))
         { throw new SyntaxException($"Expected a statement after \"{keyword}\" condition", bracketEnd.Position.After(), File); }
 
         whileLoop = new WhileLoop(keyword, condition, block, File);
@@ -1301,7 +1301,7 @@ public sealed class Parser
 
         StatementWithValue? condition = null;
 
-        Statement.Statement? block;
+        Statement? block;
 
         if (needParameters)
         {
@@ -1333,7 +1333,7 @@ public sealed class Parser
         return true;
     }
 
-    bool ExpectStatement([NotNullWhen(true)] out Statement.Statement? statement)
+    bool ExpectStatement([NotNullWhen(true)] out Statement? statement)
     {
         if (!ExpectStatementUnchecked(out statement))
         {
@@ -1356,7 +1356,7 @@ public sealed class Parser
         return true;
     }
 
-    bool ExpectStatementUnchecked([NotNullWhen(true)] out Statement.Statement? statement)
+    bool ExpectStatementUnchecked([NotNullWhen(true)] out Statement? statement)
     {
         if (ExpectInstructionLabel(out InstructionLabel? instructionLabel))
         {
@@ -1643,7 +1643,7 @@ public sealed class Parser
         return true;
     }
 
-    static BinaryOperatorCall? FindRightmostStatement(Statement.Statement? statement, int rightSidePrecedence)
+    static BinaryOperatorCall? FindRightmostStatement(Statement? statement, int rightSidePrecedence)
     {
         if (statement is not BinaryOperatorCall leftSide) return null;
         if (OperatorPrecedence(leftSide.Operator.Content) >= rightSidePrecedence) return null;
@@ -2002,7 +2002,7 @@ public sealed class Parser
         StackArrayWithoutLength = 0x4,
     }
 
-    static readonly ImmutableArray<string> TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType = ImmutableArray.Create<string>("<", "(", "[");
+    static readonly ImmutableArray<string> TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType = ImmutableArray.Create("<", "(", "[");
 
     bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type)
     {
@@ -2139,7 +2139,7 @@ public sealed class Parser
         return true;
     }
 
-    static bool NeedSemicolon(Statement.Statement statement) => statement is not (
+    static bool NeedSemicolon(Statement statement) => statement is not (
         ForLoop or
         WhileLoop or
         Block or

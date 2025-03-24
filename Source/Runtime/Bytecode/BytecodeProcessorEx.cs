@@ -168,12 +168,12 @@ public class BytecodeProcessorEx
 
     public unsafe UserCall Call<T0>(in ExposedFunction function, T0 arg0)
         where T0 : unmanaged
-        => CallUnsafe(function, Utils.ToBytes(PackedValues.Create(arg0)));
+        => CallUnsafe(function, MemoryUtils.ToBytes(PackedValues.Create(arg0)));
 
     public unsafe UserCall Call<T0, T1>(in ExposedFunction function, T0 arg0, T1 arg1)
         where T0 : unmanaged
         where T1 : unmanaged
-        => CallUnsafe(function, Utils.ToBytes(PackedValues.Create(arg1, arg0)));
+        => CallUnsafe(function, MemoryUtils.ToBytes(PackedValues.Create(arg1, arg0)));
 
     #endregion
 

@@ -1,5 +1,5 @@
 ﻿using LanguageCore.Compiler;
-using LanguageCore.Parser.Statement;
+using LanguageCore.Parser.Statements;
 
 namespace LanguageCore;
 

@@ -1,32 +1,14 @@
 ﻿using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace LanguageCore;
 
 public interface IDuplicatable<T> where T : notnull
 {
-    public T Duplicate();
+    T Duplicate();
 }
 
 public static class Utils
 {
-#if !NET_STANDARD
-    public static Uri AssemblyFile => new(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, Process.GetCurrentProcess().ProcessName + ".exe"), UriKind.Absolute);
-
-    public static unsafe void Write<T>(this Span<byte> buffer, in T value) where T : unmanaged => MemoryMarshal.Write(buffer, in value);
-    public static unsafe T Read<T>(this Span<byte> buffer) where T : unmanaged => MemoryMarshal.Read<T>(buffer);
-#endif
-
-    public static unsafe byte[] ToBytes<T>(this T v) where T : unmanaged => new Span<byte>(&v, sizeof(T)).ToArray();
-    public static unsafe Span<byte> AsBytes<T>(ref this T v) where T : unmanaged => new(Unsafe.AsPointer(ref v), sizeof(T));
-
-    public static unsafe T To<T>(this nint v) where T : unmanaged => *(T*)v;
-    public static unsafe T To<T>(this Span<byte> v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }
-    public static unsafe T To<T>(this ReadOnlySpan<byte> v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }
-    public static unsafe T To<T>(this ImmutableArray<byte> v) where T : unmanaged { fixed (byte* ptr = v.AsSpan()) return *(T*)ptr; }
-    public static unsafe T To<T>(this byte[] v) where T : unmanaged { fixed (byte* ptr = v) return *(T*)ptr; }
-
     /// <summary>
     /// Source: <see href="https://stackoverflow.com/questions/3855956/check-if-an-executable-exists-in-the-windows-path"/>
     /// </summary>

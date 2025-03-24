@@ -205,8 +205,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AddressOffset v: PopTo(v, size); break;
             case AddressPointer v: PopTo(v, size); break;
             case AddressRegisterPointer v: PopTo(v, size); break;
-            case AddressRuntimePointer2 v: PopTo(v, size); break;
-            case AddressRuntimeIndex2 v: PopTo(v, size); break;
+            case AddressRuntimePointer v: PopTo(v, size); break;
+            case AddressRuntimeIndex v: PopTo(v, size); break;
             default: throw new NotImplementedException();
         }
     }
@@ -323,7 +323,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PopTo(AddressRuntimePointer2 address, int size)
+    void PopTo(AddressRuntimePointer address, int size)
     {
         GenerateAddressResolver(address);
         using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -333,7 +333,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PopTo(AddressRuntimeIndex2 address, int size)
+    void PopTo(AddressRuntimeIndex address, int size)
     {
         AddComment($"Resolver address {{");
         GenerateAddressResolver(address);
@@ -354,8 +354,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AddressOffset v: PushFrom(v, size); break;
             case AddressPointer v: PushFrom(v, size); break;
             case AddressRegisterPointer v: PushFrom(v, size); break;
-            case AddressRuntimePointer2 v: PushFrom(v, size); break;
-            case AddressRuntimeIndex2 v: PushFrom(v, size); break;
+            case AddressRuntimePointer v: PushFrom(v, size); break;
+            case AddressRuntimeIndex v: PushFrom(v, size); break;
             default: throw new NotImplementedException();
         }
     }
@@ -474,7 +474,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PushFrom(AddressRuntimePointer2 address, int size)
+    void PushFrom(AddressRuntimePointer address, int size)
     {
         GenerateAddressResolver(address);
         using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -484,7 +484,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void PushFrom(AddressRuntimeIndex2 address, int size)
+    void PushFrom(AddressRuntimeIndex address, int size)
     {
         GenerateAddressResolver(address);
         using (RegisterUsage.Auto reg = Registers.GetFree())
@@ -612,7 +612,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return false;
             }
 
-            baseAddress = new AddressRuntimePointer2(indexCall.Base);
+            baseAddress = new AddressRuntimePointer(indexCall.Base);
         }
         else if (!prevType.Is(out array))
         {
@@ -634,7 +634,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            address = new AddressRuntimeIndex2(baseAddress, indexCall.Index, elementSize);
+            address = new AddressRuntimeIndex(baseAddress, indexCall.Index, elementSize);
             return true;
         }
     }
@@ -651,7 +651,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             prevType = pointerType.To;
             baseAddress =
                 baseAddress is null
-                ? new AddressRuntimePointer2(value.Object)
+                ? new AddressRuntimePointer(value.Object)
                 : new AddressPointer(baseAddress);
         }
 

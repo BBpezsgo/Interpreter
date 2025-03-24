@@ -354,7 +354,7 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
                     result.Append(' ');
                 }
 
-                if (function is not ICompiledFunction compiledFunction)
+                if (function is not ICompiledFunctionDefinition compiledFunction)
                 {
                     result.Append(function.Parameters[j].Type.ToString());
                 }

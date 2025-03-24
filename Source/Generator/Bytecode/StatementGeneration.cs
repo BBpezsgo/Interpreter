@@ -108,7 +108,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             return;
         }
-        CompiledFunction? deallocator = cleanup.Deallocator;
+        CompiledFunctionDefinition? deallocator = cleanup.Deallocator;
 
         if (deallocator.ExternalFunctionName is not null)
         {
@@ -132,7 +132,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(deallocator.InstructionOffset, cleanup.Location);
 
         if (deallocator.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, cleanup.Location, deallocator)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunctionDefinition>(jumpInstruction, false, cleanup.Location, deallocator)); }
 
         if (deallocator.ReturnSomething)
         {
@@ -175,7 +175,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(cleanup.Destructor.InstructionOffset, cleanup.Location);
 
         if (cleanup.Destructor.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, cleanup.Location, cleanup.Destructor)); }
+        { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunctionDefinition>(jumpInstruction, false, cleanup.Location, cleanup.Destructor)); }
 
         if (deallocateableType.Is<PointerType>())
         {
@@ -463,7 +463,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddInstruction(Opcode.Jump, reg.Get(PointerBitWidth));
         }
     }
-    Stack<CompiledCleanup> GenerateCodeForArguments(IReadOnlyList<CompiledPassedArgument> arguments, ICompiledFunction compiledFunction, int alreadyPassed = 0)
+    Stack<CompiledCleanup> GenerateCodeForArguments(IReadOnlyList<CompiledPassedArgument> arguments, ICompiledFunctionDefinition compiledFunction, int alreadyPassed = 0)
     {
         Stack<CompiledCleanup> argumentCleanup = new();
 
@@ -568,16 +568,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             switch (caller.Function)
             {
-                case CompiledFunction v:
+                case CompiledFunctionDefinition v:
                     UndefinedFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
                     break;
-                case CompiledOperator v:
+                case CompiledOperatorDefinition v:
                     UndefinedOperatorFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
                     break;
-                case CompiledConstructor v:
+                case CompiledConstructorDefinition v:
                     UndefinedConstructorOffsets.Add(new(jumpInstruction, false, caller, v));
                     break;
-                case CompiledGeneralFunction v:
+                case CompiledGeneralFunctionDefinition v:
                     UndefinedGeneralFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
                     break;
                 default:
@@ -968,10 +968,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(FunctionAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        CompiledFunction? compiledFunction = variable.Function;
+        CompiledFunctionDefinition? compiledFunction = variable.Function;
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunctionDefinition>(GeneratedCode.Count, true, variable, compiledFunction)); }
 
         Push(compiledFunction.InstructionOffset);
     }
@@ -1146,7 +1146,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GeneralType instanceType = constructorCall.Type;
         ImmutableArray<GeneralType> parameters = constructorCall.Arguments.Select(v => v.Type).ToImmutableArray();
 
-        CompiledConstructor? compiledFunction = constructorCall.Function;
+        CompiledConstructorDefinition? compiledFunction = constructorCall.Function;
 
         AddComment($"Call \"{compiledFunction.ToReadable()}\" {{");
 
@@ -1161,7 +1161,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(compiledFunction.InstructionOffset, constructorCall);
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructor>(jumpInstruction, false, constructorCall, compiledFunction)); }
+        { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructorDefinition>(jumpInstruction, false, constructorCall, compiledFunction)); }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -1315,13 +1315,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
                 break;
             }
-            case AddressRuntimePointer2 runtimePointer:
+            case AddressRuntimePointer runtimePointer:
             {
                 GenerateCodeForStatement(runtimePointer.PointerValue);
                 CheckPointerNull();
                 break;
             }
-            case AddressRuntimeIndex2 runtimeIndex:
+            case AddressRuntimeIndex runtimeIndex:
             {
                 GenerateAddressResolver(runtimeIndex.Base);
 
@@ -2061,7 +2061,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    bool GenerateCodeForFunction(ICompiledFunction function, CompiledBlock body)
+    bool GenerateCodeForFunction(ICompiledFunctionDefinition function, CompiledBlock body)
     {
         function.InstructionOffset = GeneratedCode.Count;
 
@@ -2284,7 +2284,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = compilerResult.CompiledStatements
+        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = compilerResult.Statements
             .OfType<CompiledVariableDeclaration>();
 
         Stack<CompiledCleanup> globalVariablesCleanup = new();
@@ -2336,7 +2336,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        GenerateCodeForTopLevelStatements(compilerResult.CompiledStatements);
+        GenerateCodeForTopLevelStatements(compilerResult.Statements);
 
         AddComment("Pop abs global address");
         Pop(AbsGlobalAddressType.GetSize(this)); // Pop abs global offset
@@ -2367,7 +2367,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         //     });
         // }
 
-        foreach ((ICompiledFunction function, CompiledBlock body) in compilerResult.Functions2)
+        foreach ((ICompiledFunctionDefinition function, CompiledBlock body) in compilerResult.Functions)
         {
             GenerateCodeForFunction(function, body);
         }
@@ -2385,7 +2385,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         // }
 
         Dictionary<string, ExposedFunction> exposedFunctions = new();
-        foreach (CompiledFunction f in compilerResult.Functions)
+        foreach (CompiledFunctionDefinition f in compilerResult.FunctionDefinitions)
         {
             if (f.ExposedFunctionName is null) continue;
             if (f.InstructionOffset == InvalidFunctionAddress)
@@ -2406,10 +2406,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Code = GeneratedCode.Select(v => new Instruction(v)).ToImmutableArray(),
             DebugInfo = DebugInfo,
-            CompiledFunctions = compilerResult.Functions,
-            CompiledOperators = compilerResult.Operators,
-            CompiledGeneralFunctions = compilerResult.GeneralFunctions,
-            CompiledConstructors = compilerResult.Constructors,
+            CompiledFunctions = compilerResult.FunctionDefinitions,
+            CompiledOperators = compilerResult.OperatorDefinitions,
+            CompiledGeneralFunctions = compilerResult.GeneralFunctionDefinitions,
+            CompiledConstructors = compilerResult.ConstructorDefinitions,
             ExposedFunctions = exposedFunctions.ToFrozenDictionary(),
         };
     }

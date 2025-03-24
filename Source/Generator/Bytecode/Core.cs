@@ -161,10 +161,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     readonly List<PreparationInstruction> GeneratedCode;
 
-    readonly List<UndefinedOffset<CompiledFunction>> UndefinedFunctionOffsets;
-    readonly List<UndefinedOffset<CompiledOperator>> UndefinedOperatorFunctionOffsets;
-    readonly List<UndefinedOffset<CompiledGeneralFunction>> UndefinedGeneralFunctionOffsets;
-    readonly List<UndefinedOffset<CompiledConstructor>> UndefinedConstructorOffsets;
+    readonly List<UndefinedOffset<CompiledFunctionDefinition>> UndefinedFunctionOffsets;
+    readonly List<UndefinedOffset<CompiledOperatorDefinition>> UndefinedOperatorFunctionOffsets;
+    readonly List<UndefinedOffset<CompiledGeneralFunctionDefinition>> UndefinedGeneralFunctionOffsets;
+    readonly List<UndefinedOffset<CompiledConstructorDefinition>> UndefinedConstructorOffsets;
     readonly List<UndefinedOffset<GeneratedInstructionLabel>> UndefinedInstructionLabels;
 
     readonly RegisterUsage Registers;
@@ -226,7 +226,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Settings = settings;
         Registers = new();
         PointerSize = settings.PointerSize;
-        DebugInfo = new(compilerResult.Raw.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.File, v.Tokens.Tokens)))
+        DebugInfo = new(compilerResult.RawTokens.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.File, v.Tokens.Tokens)))
         {
             StackOffsets = new()
             {
@@ -247,10 +247,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     string thingName = item.Called switch
                     {
-                        CompiledOperator => "Operator",
-                        CompiledConstructor => "Constructor",
-                        CompiledFunction => "Function",
-                        CompiledGeneralFunction v => v.Identifier.Content switch
+                        CompiledOperatorDefinition => "Operator",
+                        CompiledConstructorDefinition => "Constructor",
+                        CompiledFunctionDefinition => "Function",
+                        CompiledGeneralFunctionDefinition v => v.Identifier.Content switch
                         {
                             BuiltinFunctionIdentifiers.Destructor => "Destructor",
                             BuiltinFunctionIdentifiers.IndexerGet => "Index getter",

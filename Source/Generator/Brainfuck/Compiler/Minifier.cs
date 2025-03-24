@@ -1,5 +1,4 @@
-﻿using LanguageCore.Compiler;
-using LanguageCore.Runtime;
+﻿using LanguageCore.Runtime;
 
 namespace LanguageCore.Brainfuck;
 
@@ -120,7 +119,7 @@ public static class Minifier
 
     static bool RemoveRedundantInitializations(ref Span<char> result, DebugInformation? debugInformation)
     {
-        PredictedNumber<int> alreadyThere = 0;
+        PredictedBrainfuckNumber alreadyThere = 0;
         for (int i = 0; i < result.Length; i++)
         {
             if (result[i] == '[' &&
@@ -183,7 +182,7 @@ public static class Minifier
 #endif
                 ']' => 0,
                 '.' => alreadyThere,
-                _ => PredictedNumber<int>.Unknown,
+                _ => PredictedBrainfuckNumber.Unknown,
             };
         }
 
@@ -239,7 +238,7 @@ public static class Minifier
 
     static bool CorrectInitializationAddresses(ref Span<char> result, DebugInformation? debugInformation)
     {
-        PredictedNumber<int> alreadyThere = 0;
+        PredictedBrainfuckNumber alreadyThere = 0;
         int initializationStarted = -1;
 
         for (int i = 0; i < result.Length; i++)
@@ -303,7 +302,7 @@ public static class Minifier
 
                 default:
                 {
-                    alreadyThere = PredictedNumber<int>.Unknown;
+                    alreadyThere = PredictedBrainfuckNumber.Unknown;
                     initializationStarted = -1;
                     break;
                 }

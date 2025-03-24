@@ -14,7 +14,7 @@ public static class Extensions
     }
 
     public static bool IsSame<TFunction>(this TFunction a, TFunction b)
-        where TFunction : FunctionThingDefinition, ICompiledFunction
+        where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition
     {
         if (!a.Type.Equals(b.Type)) return false;
         if (!a.Identifier.Content.Equals(b.Identifier.Content)) return false;

@@ -915,18 +915,20 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         int valueAddress = Stack.NextAddress;
         GenerateCodeForStatement(value);
 
-        if (value.Type.GetSize(this, Diagnostics, value) == 1 && AllowOtherOptimizations)
+        int size = value.Type.GetSize(this, Diagnostics, value);
+
+        if (size == 1 && AllowOtherOptimizations)
         {
             Heap.Set(pointerAddress, valueAddress);
         }
         else
         {
             using StackAddress tempPointerAddress = Stack.PushVirtual(1, value);
-            for (int i = 0; i < value.Type.GetSize(this, Diagnostics, value); i++)
+            for (int i = 0; i < size; i++)
             {
                 Code.CopyValue(pointerAddress, tempPointerAddress);
                 Heap.Set(tempPointerAddress, valueAddress + i);
-                Code.AddValue(pointerAddress, 1);
+                if (i + 1 < size) Code.AddValue(pointerAddress, 1);
             }
         }
 

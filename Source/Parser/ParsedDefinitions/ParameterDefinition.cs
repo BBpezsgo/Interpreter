@@ -1,4 +1,5 @@
 ﻿using LanguageCore.Compiler;
+using LanguageCore.Parser.Statements;
 using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser;
@@ -19,6 +20,7 @@ public class ParameterDefinition :
     public Token Identifier { get; }
     public TypeInstance Type { get; }
     public ImmutableArray<Token> Modifiers { get; }
+    public StatementWithValue? DefaultValue { get; }
 
     public bool IsRef => Modifiers.Contains(ModifierKeywords.Ref);
     public Position Position =>
@@ -34,14 +36,16 @@ public class ParameterDefinition :
         Type = other.Type;
         Identifier = other.Identifier;
         Context = other.Context;
+        DefaultValue = other.DefaultValue;
     }
 
-    public ParameterDefinition(IEnumerable<Token> modifiers, TypeInstance type, Token identifier, FunctionThingDefinition? context = null)
+    public ParameterDefinition(IEnumerable<Token> modifiers, TypeInstance type, Token identifier, StatementWithValue? defaultValue, FunctionThingDefinition? context = null)
     {
         Modifiers = modifiers.ToImmutableArray();
         Type = type;
         Identifier = identifier;
         Context = context;
+        DefaultValue = defaultValue;
     }
 
     public override string ToString() => $"{string.Join(' ', Modifiers)} {Type} {Identifier}".TrimStart();

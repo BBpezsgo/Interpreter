@@ -279,53 +279,24 @@ public sealed class Parser
             }
         }
 
-        if (!ExpectOperator("(", out Token? bracketStart))
+        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters))
         { CurrentTokenIndex = parseStart; return false; }
 
         possibleName.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-        List<ParameterDefinition> parameters = new();
-
-        bool expectParameter = false;
-        Token? bracketEnd;
-        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
-        {
-            Token[] parameterModifiers = ExpectModifiers();
-            CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.This, ModifierKeywords.Temp);
-
-            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
-            { throw new SyntaxException("Expected a type (the parameter's type)", PreviousToken!.Position.After(), File); }
-
-            if (!ExpectIdentifier(out Token? parameterIdentifier))
-            { throw new SyntaxException("Expected an identifier (the parameter's name)", parameterType.Position.After(), File); }
-
-            parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
-
-            ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
-            parameters.Add(parameterDefinition);
-
-            if (ExpectOperator(")", out bracketEnd))
-            { break; }
-
-            if (!ExpectOperator(","))
-            { throw new SyntaxException($"Expected \",\" or \")\" (not \"{CurrentToken}\")", PreviousToken!.Position.After(), File); }
-            else
-            { expectParameter = true; }
-        }
 
         CheckModifiers(modifiers, FunctionModifiers.AsSpan());
 
         Block? block = null;
 
         if (!ExpectOperator(";") && !ExpectBlock(out block))
-        { throw new SyntaxException($"Expected \";\" or block", PreviousToken!.Position.After(), File); }
+        { throw new SyntaxException($"Expected \";\" or block", parameters.Brackets.End.Position.After(), File); }
 
         function = new FunctionDefinition(
             attributes,
             modifiers,
             possibleType,
             possibleName,
-            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
+            parameters,
             null,
             File)
         {
@@ -426,58 +397,24 @@ public sealed class Parser
         if (!ExpectIdentifier(out Token? possibleNameT))
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpectOperator("(", out Token? bracketStart))
+        if (!ExpecParameters(ParameterModifiers, true, out var parameters))
         { CurrentTokenIndex = parseStart; return false; }
 
         possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-        List<ParameterDefinition> parameters = new();
-
-        Token? bracketEnd;
-
-        bool expectParameter = false;
-        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
-        {
-            Token[] parameterModifiers = ExpectModifiers();
-#if NET_STANDARD
-            CheckParameterModifiers(parameterModifiers, parameters.Count, ParameterModifiers.ToArray());
-#else
-            CheckParameterModifiers(parameterModifiers, parameters.Count, ParameterModifiers.AsSpan());
-#endif
-
-            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
-            { throw new SyntaxException("Expected parameter type", PreviousToken!.Position.After(), File); }
-
-            if (!ExpectIdentifier(out Token? parameterIdentifier))
-            { throw new SyntaxException("Expected a parameter name", parameterType.Position.After(), File); }
-
-            parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
-
-            ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
-            parameters.Add(parameterDefinition);
-
-            if (ExpectOperator(")", out bracketEnd))
-            { break; }
-
-            if (!ExpectOperator(","))
-            { throw new SyntaxException("Expected \",\" or \")\" after parameter definition", parameterDefinition.Position.After(), File); }
-            else
-            { expectParameter = true; }
-        }
 
         CheckModifiers(modifiers, FunctionModifiers.AsSpan());
 
         Block? block = null;
 
         if (!ExpectOperator(";") && !ExpectBlock(out block))
-        { throw new SyntaxException($"Expected \";\" or block", bracketEnd.Position.After(), File); }
+        { throw new SyntaxException($"Expected \";\" or block", parameters.Brackets.End.Position.After(), File); }
 
         function = new FunctionDefinition(
             attributes,
             modifiers,
             possibleType,
             possibleNameT,
-            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
+            parameters,
             templateInfo,
             File)
         {
@@ -503,39 +440,10 @@ public sealed class Parser
             not BuiltinFunctionIdentifiers.Destructor)
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpectOperator("(", out Token? bracketStart))
+        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out var parameters))
         { CurrentTokenIndex = parseStart; return false; }
 
         possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-        List<ParameterDefinition> parameters = new();
-
-        bool expectParameter = false;
-        Token? bracketEnd;
-        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
-        {
-            Token[] parameterModifiers = ExpectModifiers();
-            CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.Temp);
-
-            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
-            { throw new SyntaxException("Expected parameter type", PreviousToken!.Position.After(), File); }
-
-            if (!ExpectIdentifier(out Token? parameterIdentifier))
-            { throw new SyntaxException("Expected a parameter name", parameterType.Position.After(), File); }
-
-            parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
-
-            ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
-            parameters.Add(parameterDefinition);
-
-            if (ExpectOperator(")", out bracketEnd))
-            { break; }
-
-            if (!ExpectOperator(","))
-            { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken!.Position.After(), File); }
-            else
-            { expectParameter = true; }
-        }
 
         CheckModifiers(modifiers, ProtectionKeywords.Export);
 
@@ -546,7 +454,7 @@ public sealed class Parser
         function = new GeneralFunctionDefinition(
             possibleNameT,
             modifiers,
-            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
+            parameters,
             File)
         {
             Block = block
@@ -565,37 +473,8 @@ public sealed class Parser
         if (!ExpectType(AllowedType.None, out TypeInstance? type))
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpectOperator("(", out Token? bracketStart))
+        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), true, out var parameters))
         { CurrentTokenIndex = parseStart; return false; }
-
-        List<ParameterDefinition> parameters = new();
-
-        bool expectParameter = false;
-        Token? bracketEnd;
-        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
-        {
-            Token[] parameterModifiers = ExpectModifiers();
-            CheckParameterModifiers(parameterModifiers, parameters.Count, ModifierKeywords.Temp);
-
-            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
-            { throw new SyntaxException("Expected parameter type", PreviousToken!.Position.After(), File); }
-
-            if (!ExpectIdentifier(out Token? parameterIdentifier))
-            { throw new SyntaxException("Expected a parameter name", parameterType.Position.After(), File); }
-
-            parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
-
-            ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier);
-            parameters.Add(parameterDefinition);
-
-            if (ExpectOperator(")", out bracketEnd))
-            { break; }
-
-            if (!ExpectOperator(","))
-            { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken!.Position.After(), File); }
-            else
-            { expectParameter = true; }
-        }
 
         CheckModifiers(modifiers, ProtectionKeywords.Export);
 
@@ -606,7 +485,7 @@ public sealed class Parser
         function = new ConstructorDefinition(
             type,
             modifiers,
-            new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd)),
+            parameters,
             File)
         {
             Block = block
@@ -701,6 +580,64 @@ public sealed class Parser
 
         Structs.Add(structDefinition.Identifier.Content, structDefinition);
 
+        return true;
+    }
+
+    bool ExpecParameters(ImmutableArray<string> allowedParameterModifiers, bool allowDefaultValues, [NotNullWhen(true)] out ParameterDefinitionCollection? parameterDefinitions)
+    {
+        int parseStart = CurrentTokenIndex;
+        parameterDefinitions = null;
+
+        if (!ExpectOperator("(", out Token? bracketStart))
+        { CurrentTokenIndex = parseStart; return false; }
+
+        List<ParameterDefinition> parameters = new();
+
+        bool expectParameter = false;
+        bool expectOptionalParameters = false;
+        Token? bracketEnd;
+        while (!ExpectOperator(")", out bracketEnd) || expectParameter)
+        {
+            Token[] parameterModifiers = ExpectModifiers();
+#if NET_STANDARD
+            CheckParameterModifiers(parameterModifiers, parameters.Count, allowedParameterModifiers);
+#else
+            CheckParameterModifiers(parameterModifiers, parameters.Count, allowedParameterModifiers.AsSpan());
+#endif
+
+            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
+            { throw new SyntaxException("Expected parameter type", PreviousToken!.Position.After(), File); }
+
+            if (!ExpectIdentifier(out Token? parameterIdentifier))
+            { throw new SyntaxException("Expected a parameter name", parameterType.Position.After(), File); }
+
+            parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
+
+            StatementWithValue? defaultValue = null;
+            if (ExpectOperator("=", out var assignmentOperator))
+            {
+                if (!allowDefaultValues)
+                { throw new SyntaxException("Default parameter values are not valid in the current context", assignmentOperator, File); }
+                if (!ExpectExpression(out defaultValue))
+                { throw new SyntaxException("Expected expression after \"=\" in parameter definition", assignmentOperator, File); }
+                expectOptionalParameters = true;
+            }
+            else if (expectOptionalParameters)
+            { throw new SyntaxException("Parameters without default value after a parameter that has one is not supported", parameterIdentifier.Position.After(), File); }
+
+            ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier, defaultValue);
+            parameters.Add(parameterDefinition);
+
+            if (ExpectOperator(")", out bracketEnd))
+            { break; }
+
+            if (!ExpectOperator(","))
+            { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken!.Position.After(), File); }
+            else
+            { expectParameter = true; }
+        }
+
+        parameterDefinitions = new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd));
         return true;
     }
 

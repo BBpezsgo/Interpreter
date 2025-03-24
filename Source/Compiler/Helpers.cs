@@ -361,7 +361,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         /// <summary>
         /// Both function has the same number of parameters
         /// </summary>
-        ParameterCount,
+        PartialParameterCount,
+
+        /// <summary>
+        /// Both function has the same number of parameters
+        /// </summary>
+        PerfectParameterCount,
 
         /// <summary>
         /// All the parameter types are almost the same
@@ -738,46 +743,73 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         bool HandleParameterCount(TFunction function)
         {
+            // TODO
+            int partial = function.Parameters.Count;
+            // for (int i = 0; i < function.Parameters.Count; i++)
+            // {
+            //     if (function.Parameters[i].DefaultValue is null) partial = i + 1;
+            //     else break;
+            // }
+
             if (query.ArgumentCount.HasValue &&
                 function.ParameterTypes.Count != query.ArgumentCount.Value)
             {
-                if (perfectus < FunctionPerfectus.ParameterCount)
+                if (query.ArgumentCount.HasValue &&
+                    partial != query.ArgumentCount.Value)
                 {
-                    result_ = function;
-                    error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: wrong number of parameters ({query.ArgumentCount.Value}) passed to \"{function.ToReadable()}\"");
+                    if (perfectus < FunctionPerfectus.PartialParameterCount)
+                    {
+                        result_ = function;
+                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: wrong number of parameters ({query.ArgumentCount.Value}) passed to \"{function.ToReadable()}\"");
+                    }
+                    return false;
                 }
-                return false;
+
+                perfectus = Max(perfectus, FunctionPerfectus.PartialParameterCount);
+                return true;
             }
 
-            perfectus = Max(perfectus, FunctionPerfectus.ParameterCount);
+            perfectus = Max(perfectus, FunctionPerfectus.PerfectParameterCount);
             return true;
         }
 
         bool HandleParameterTypes(TFunction function)
         {
+            // TODO
+            int partial = function.Parameters.Count;
+            // for (int i = 0; i < function.Parameters.Count; i++)
+            // {
+            //     if (function.Parameters[i].DefaultValue is null) partial = i + 1;
+            //     else break;
+            // }
+
             if (query.Arguments.HasValue)
             {
+                int checkCount = Math.Max(partial, query.Arguments.Value.Length);
                 GeneralType[] _checkedParameterTypes = new GeneralType[query.Arguments.Value.Length];
                 List<PossibleDiagnostic> errors = new();
-                if (!Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (i, defined, passed) =>
-                    {
-                        GeneralType _passed = query.Converter.Invoke(passed, defined);
 
-                        _checkedParameterTypes[i] = _passed;
+                bool checker(int i, GeneralType defined, TArgument passed)
+                {
+                    GeneralType _passed = query.Converter.Invoke(passed, defined);
 
-                        if (_passed.Equals(defined))
-                        { return true; }
+                    _checkedParameterTypes[i] = _passed;
 
-                        if (StatementCompiler.CanCastImplicitly(_passed, defined, null, null, out PossibleDiagnostic? error1))
-                        { return true; }
+                    if (_passed.Equals(defined))
+                    { return true; }
 
-                        if (passed is ILocated located &&
-                            error_ is not null)
-                        { error_ = error_.TrySetLocation(located); }
+                    if (StatementCompiler.CanCastImplicitly(_passed, defined, null, null, out PossibleDiagnostic? error1))
+                    { return true; }
 
-                        errors.Add(error1);
-                        return false;
-                    }))
+                    if (passed is ILocated located &&
+                        error_ is not null)
+                    { error_ = error_.TrySetLocation(located); }
+
+                    errors.Add(error1);
+                    return false;
+                }
+
+                if (!Utils.SequenceEquals(function.ParameterTypes.Take(checkCount), query.Arguments.Value.Take(checkCount), checker))
                 {
                     if (perfectus < FunctionPerfectus.ParameterTypes)
                     {
@@ -804,10 +836,20 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         bool HandlePerfectParameterTypes(TFunction function)
         {
+            // TODO
+            int partial = function.Parameters.Count;
+            // for (int i = 0; i < function.Parameters.Count; i++)
+            // {
+            //     if (function.Parameters[i].DefaultValue is null) partial = i + 1;
+            //     else break;
+            // }
+
             if (query.Arguments.HasValue)
             {
+                int checkCount = Math.Max(partial, query.Arguments.Value.Length);
                 GeneralType[] _checkedParameterTypes = new GeneralType[query.Arguments.Value.Length];
-                if (!Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (i, defined, passed) =>
+
+                bool checker(int i, GeneralType defined, TArgument passed)
                 {
                     GeneralType _passed = query.Converter.Invoke(passed, defined);
 
@@ -826,7 +868,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     { error_ = error_.TrySetLocation(located); }
 
                     return false;
-                }))
+                }
+
+                if (!Utils.SequenceEquals(function.ParameterTypes.Take(checkCount), query.Arguments.Value.Take(checkCount), checker))
                 {
                     if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                     {
@@ -857,15 +901,27 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         bool HandleVeryPerfectParameterTypes(TFunction function)
         {
+            // TODO
+            int partial = function.Parameters.Count;
+            // for (int i = 0; i < function.Parameters.Count; i++)
+            // {
+            //     if (function.Parameters[i].DefaultValue is null) partial = i + 1;
+            //     else break;
+            // }
+
             if (query.Arguments.HasValue)
             {
+                int checkCount = Math.Max(partial, query.Arguments.Value.Length);
                 GeneralType[] _checkedParameterTypes = new GeneralType[query.Arguments.Value.Length];
-                if (!Utils.SequenceEquals(function.ParameterTypes, query.Arguments.Value, (i, defined, passed) =>
+
+                bool checker(int i, GeneralType defined, TArgument passed)
                 {
                     GeneralType _passed = query.Converter.Invoke(passed, null);
                     _checkedParameterTypes[i] = _passed;
                     return _passed.Equals(defined);
-                }))
+                }
+
+                if (!Utils.SequenceEquals(function.ParameterTypes.Take(checkCount), query.Arguments.Value.Take(checkCount), checker))
                 {
                     if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
                     {
@@ -4422,6 +4478,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledConstructorCall => false,
             CompiledAddressGetter => false,
             CompiledLiteralList => false,
+            CompiledStatementWithValueThatActuallyDoesntHaveValue => false,
             _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
     }

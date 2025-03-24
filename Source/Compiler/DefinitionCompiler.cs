@@ -460,6 +460,7 @@ public partial class StatementCompiler
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters),
                         Token.CreateAnonymous(StatementKeywords.This),
+                        null,
                         method)
                     );
 
@@ -482,6 +483,7 @@ public partial class StatementCompiler
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
                         Token.CreateAnonymous(StatementKeywords.This),
+                        null,
                         method)
                     );
 
@@ -542,6 +544,7 @@ public partial class StatementCompiler
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
                         Token.CreateAnonymous(StatementKeywords.This),
+                        null,
                         method)
                     );
 
@@ -586,6 +589,7 @@ public partial class StatementCompiler
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         constructor.Type,
                         Token.CreateAnonymous(StatementKeywords.This),
+                        null,
                         constructor)
                     );
 

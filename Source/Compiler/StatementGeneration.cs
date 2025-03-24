@@ -466,6 +466,20 @@ public partial class StatementCompiler
 
         ImmutableArray<CompiledPassedArgument>.Builder result = ImmutableArray.CreateBuilder<CompiledPassedArgument>(arguments.Count);
 
+        // int partial = 0;
+        // for (int i = 0; i < compiledFunction.Parameters.Count; i++)
+        // {
+        //     if (compiledFunction.Parameters[i].DefaultValue is null) partial = i + 1;
+        //     else break;
+        // }
+
+        // TODO:
+        // if (arguments.Count < partial)
+        // {
+        //     Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{callee.ToReadable()}\": required {compiledFunction.ParameterCount} passed {arguments.Count}", caller));
+        //     return false;
+        // }
+
         for (int i = 0; i < arguments.Count; i++)
         {
             ParameterDefinition parameter = compiledFunction.Parameters[i + alreadyPassed];
@@ -612,6 +626,14 @@ public partial class StatementCompiler
             Diagnostics.Add(Diagnostic.Error($"Function \"{callee.ToReadable()}\" could not be called due to its protection level", caller));
             return false;
         }
+
+        // int partial = 0;
+        // for (int i = 0; i < callee.Parameters.Count; i++)
+        // {
+        //     if (callee.Parameters[i].DefaultValue is null) partial = i + 1;
+        //     else break;
+        // }
+        // TODO
 
         if (arguments.Length != callee.Parameters.Count)
         {
@@ -3223,20 +3245,6 @@ public partial class StatementCompiler
 
     void GenerateCode(ImmutableArray<ParsedFile> parsedFiles, Uri file)
     {
-        List<string> usedExternalFunctions = new();
-
-        foreach (CompiledFunctionDefinition function in CompiledFunctions)
-        {
-            if (function.ExternalFunctionName is not null)
-            { usedExternalFunctions.Add(function.ExternalFunctionName); }
-        }
-
-        foreach (CompiledOperatorDefinition @operator in CompiledOperators)
-        {
-            if (@operator.ExternalFunctionName is not null)
-            { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
-        }
-
         foreach (Statement? item in TopLevelStatements.SelectMany(v => v.Statements))
         {
             if (item is VariableDeclaration variableDeclaration)

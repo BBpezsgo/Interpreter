@@ -1,0 +1,14 @@
+using System;
+
+void A(int a = 5)
+{
+    PrintLine(a);
+}
+
+void A(int a, int b = 7)
+{
+    PrintLine(a);
+    PrintLine(b);
+}
+
+A(3);

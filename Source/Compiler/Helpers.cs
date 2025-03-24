@@ -743,13 +743,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         bool HandleParameterCount(TFunction function)
         {
-            // TODO
-            int partial = function.Parameters.Count;
-            // for (int i = 0; i < function.Parameters.Count; i++)
-            // {
-            //     if (function.Parameters[i].DefaultValue is null) partial = i + 1;
-            //     else break;
-            // }
+            int partial = 0;
+            for (int i = 0; i < function.Parameters.Count; i++)
+            {
+                if (function.Parameters[i].DefaultValue is null) partial = i + 1;
+                else break;
+            }
 
             if (query.ArgumentCount.HasValue &&
                 function.ParameterTypes.Count != query.ArgumentCount.Value)
@@ -775,13 +774,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         bool HandleParameterTypes(TFunction function)
         {
-            // TODO
-            int partial = function.Parameters.Count;
-            // for (int i = 0; i < function.Parameters.Count; i++)
-            // {
-            //     if (function.Parameters[i].DefaultValue is null) partial = i + 1;
-            //     else break;
-            // }
+            int partial = 0;
+            for (int i = 0; i < function.Parameters.Count; i++)
+            {
+                if (function.Parameters[i].DefaultValue is null) partial = i + 1;
+                else break;
+            }
 
             if (query.Arguments.HasValue)
             {
@@ -836,13 +834,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         bool HandlePerfectParameterTypes(TFunction function)
         {
-            // TODO
-            int partial = function.Parameters.Count;
-            // for (int i = 0; i < function.Parameters.Count; i++)
-            // {
-            //     if (function.Parameters[i].DefaultValue is null) partial = i + 1;
-            //     else break;
-            // }
+            int partial = 0;
+            for (int i = 0; i < function.Parameters.Count; i++)
+            {
+                if (function.Parameters[i].DefaultValue is null) partial = i + 1;
+                else break;
+            }
 
             if (query.Arguments.HasValue)
             {
@@ -901,13 +898,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         bool HandleVeryPerfectParameterTypes(TFunction function)
         {
-            // TODO
-            int partial = function.Parameters.Count;
-            // for (int i = 0; i < function.Parameters.Count; i++)
-            // {
-            //     if (function.Parameters[i].DefaultValue is null) partial = i + 1;
-            //     else break;
-            // }
+            int partial = 0;
+            for (int i = 0; i < function.Parameters.Count; i++)
+            {
+                if (function.Parameters[i].DefaultValue is null) partial = i + 1;
+                else break;
+            }
 
             if (query.Arguments.HasValue)
             {

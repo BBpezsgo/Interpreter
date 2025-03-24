@@ -533,6 +533,70 @@ public partial class StatementCompiler
             });
         }
 
+        int remaining = compiledFunction.Parameters.Count - arguments.Count;
+
+        for (int i = 0; i < remaining; i++)
+        {
+            ParameterDefinition parameter = compiledFunction.Parameters[arguments.Count + i + alreadyPassed];
+            GeneralType parameterType = compiledFunction.ParameterTypes[arguments.Count + i + alreadyPassed];
+            StatementWithValue? argument = compiledFunction.Parameters[arguments.Count + i + alreadyPassed].DefaultValue;
+            if (argument is null)
+            {
+                Diagnostics.Add(Diagnostic.Internal($"Can't explain this error", parameter));
+                return false;
+            }
+            else
+            {
+                Diagnostics.Add(Diagnostic.Warning($"WIP", argument));
+            }
+
+            if (!GenerateCodeForStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
+
+            if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, this, out PossibleDiagnostic? error))
+            { Diagnostics.Add(error.ToError(argument)); }
+
+            if (compiledArgument.Type.GetSize(this, Diagnostics, argument) != parameterType.GetSize(this, Diagnostics, parameter))
+            { Diagnostics.Add(Diagnostic.Internal($"Bad argument type passed: expected \"{parameterType}\" passed \"{compiledArgument.Type}\"", argument)); }
+
+            bool typeAllowsTemp = compiledArgument.Type.Is<PointerType>();
+
+            bool calleeAllowsTemp = parameter.Modifiers.Contains(ModifierKeywords.Temp);
+
+            bool callerAllowsTemp = StatementCanBeDeallocated(argument, out bool explicitDeallocate);
+
+            if (callerAllowsTemp)
+            {
+                if (explicitDeallocate && !calleeAllowsTemp)
+                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value: parameter definition does not have a \"{ModifierKeywords.Temp}\" modifier", argument)); }
+                if (explicitDeallocate && !typeAllowsTemp)
+                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this type", argument)); }
+            }
+            else
+            {
+                if (explicitDeallocate)
+                { Diagnostics.Add(Diagnostic.Warning($"Can not deallocate this value", argument)); }
+            }
+
+            CompiledCleanup? compiledCleanup = null;
+            if (calleeAllowsTemp && callerAllowsTemp && typeAllowsTemp)
+            {
+                GenerateDestructor(compiledArgument.Type, argument.Location, out compiledCleanup);
+            }
+
+            result.Add(new CompiledPassedArgument()
+            {
+                Value = compiledArgument,
+                Type = compiledArgument.Type,
+                Cleanup = compiledCleanup ?? new CompiledCleanup()
+                {
+                    Location = compiledArgument.Location,
+                    TrashType = compiledArgument.Type,
+                },
+                Location = compiledArgument.Location,
+                SaveValue = compiledArgument.SaveValue,
+            });
+        }
+
         compiledArguments = result.ToImmutable();
         return true;
     }
@@ -627,15 +691,14 @@ public partial class StatementCompiler
             return false;
         }
 
-        // int partial = 0;
-        // for (int i = 0; i < callee.Parameters.Count; i++)
-        // {
-        //     if (callee.Parameters[i].DefaultValue is null) partial = i + 1;
-        //     else break;
-        // }
-        // TODO
+        int partial = 0;
+        for (int i = 0; i < callee.Parameters.Count; i++)
+        {
+            if (callee.Parameters[i].DefaultValue is null) partial = i + 1;
+            else break;
+        }
 
-        if (arguments.Length != callee.Parameters.Count)
+        if (arguments.Length < partial)
         {
             Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{callee.ToReadable()}\": required {callee.ParameterCount} passed {arguments.Length}", caller));
             return false;
@@ -1219,106 +1282,106 @@ public partial class StatementCompiler
             switch (@operator.Operator.Content)
             {
                 case UnaryOperatorCall.LogicalNOT:
-                {
-                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
-
-                    compiledStatement = new CompiledUnaryOperatorCall()
                     {
-                        Left = left,
-                        Location = @operator.Location,
-                        Operator = @operator.Operator.Content,
-                        SaveValue = @operator.SaveValue,
-                        Type = BuiltinType.U8,
-                    };
+                        if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
 
-                    if (AllowEvaluating &&
-                        TryCompute(compiledStatement, out CompiledValue evaluated) &&
-                        evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
-                    {
-                        compiledStatement = CompiledEvaluatedValue.Create(casted, compiledStatement);
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                        @operator.PredictedValue = casted;
+                        compiledStatement = new CompiledUnaryOperatorCall()
+                        {
+                            Left = left,
+                            Location = @operator.Location,
+                            Operator = @operator.Operator.Content,
+                            SaveValue = @operator.SaveValue,
+                            Type = BuiltinType.U8,
+                        };
+
+                        if (AllowEvaluating &&
+                            TryCompute(compiledStatement, out CompiledValue evaluated) &&
+                            evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
+                        {
+                            compiledStatement = CompiledEvaluatedValue.Create(casted, compiledStatement);
+                            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
+                            @operator.PredictedValue = casted;
+                        }
+
+                        return true;
                     }
-
-                    return true;
-                }
                 case UnaryOperatorCall.BinaryNOT:
-                {
-                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
-
-                    compiledStatement = new CompiledUnaryOperatorCall()
                     {
-                        Left = left,
-                        Location = @operator.Location,
-                        Operator = @operator.Operator.Content,
-                        SaveValue = @operator.SaveValue,
-                        Type = left.Type,
-                    };
+                        if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
 
-                    if (AllowEvaluating &&
-                        TryCompute(compiledStatement, out CompiledValue evaluated) &&
-                        evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
-                    {
-                        compiledStatement = CompiledEvaluatedValue.Create(casted, compiledStatement);
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                        @operator.PredictedValue = casted;
+                        compiledStatement = new CompiledUnaryOperatorCall()
+                        {
+                            Left = left,
+                            Location = @operator.Location,
+                            Operator = @operator.Operator.Content,
+                            SaveValue = @operator.SaveValue,
+                            Type = left.Type,
+                        };
+
+                        if (AllowEvaluating &&
+                            TryCompute(compiledStatement, out CompiledValue evaluated) &&
+                            evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
+                        {
+                            compiledStatement = CompiledEvaluatedValue.Create(casted, compiledStatement);
+                            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
+                            @operator.PredictedValue = casted;
+                        }
+
+                        return true;
                     }
-
-                    return true;
-                }
                 case UnaryOperatorCall.UnaryMinus:
-                {
-                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
-
-                    compiledStatement = new CompiledUnaryOperatorCall()
                     {
-                        Left = left,
-                        Location = @operator.Location,
-                        Operator = @operator.Operator.Content,
-                        SaveValue = @operator.SaveValue,
-                        Type = left.Type,
-                    };
+                        if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
 
-                    if (AllowEvaluating &&
-                        TryCompute(compiledStatement, out CompiledValue evaluated) &&
-                        evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
-                    {
-                        compiledStatement = CompiledEvaluatedValue.Create(casted, compiledStatement);
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                        @operator.PredictedValue = casted;
+                        compiledStatement = new CompiledUnaryOperatorCall()
+                        {
+                            Left = left,
+                            Location = @operator.Location,
+                            Operator = @operator.Operator.Content,
+                            SaveValue = @operator.SaveValue,
+                            Type = left.Type,
+                        };
+
+                        if (AllowEvaluating &&
+                            TryCompute(compiledStatement, out CompiledValue evaluated) &&
+                            evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
+                        {
+                            compiledStatement = CompiledEvaluatedValue.Create(casted, compiledStatement);
+                            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
+                            @operator.PredictedValue = casted;
+                        }
+
+                        return true;
                     }
-
-                    return true;
-                }
                 case UnaryOperatorCall.UnaryPlus:
-                {
-                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
-
-                    compiledStatement = new CompiledUnaryOperatorCall()
                     {
-                        Left = left,
-                        Location = @operator.Location,
-                        Operator = @operator.Operator.Content,
-                        SaveValue = @operator.SaveValue,
-                        Type = left.Type,
-                    };
+                        if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
 
-                    if (AllowEvaluating &&
-                        TryCompute(compiledStatement, out CompiledValue evaluated) &&
-                        evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
-                    {
-                        compiledStatement = CompiledEvaluatedValue.Create(casted, compiledStatement);
-                        Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                        @operator.PredictedValue = casted;
+                        compiledStatement = new CompiledUnaryOperatorCall()
+                        {
+                            Left = left,
+                            Location = @operator.Location,
+                            Operator = @operator.Operator.Content,
+                            SaveValue = @operator.SaveValue,
+                            Type = left.Type,
+                        };
+
+                        if (AllowEvaluating &&
+                            TryCompute(compiledStatement, out CompiledValue evaluated) &&
+                            evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
+                        {
+                            compiledStatement = CompiledEvaluatedValue.Create(casted, compiledStatement);
+                            Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
+                            @operator.PredictedValue = casted;
+                        }
+
+                        return true;
                     }
-
-                    return true;
-                }
                 default:
-                {
-                    Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
-                    return false;
-                }
+                    {
+                        Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File));
+                        return false;
+                    }
             }
         }
         else
@@ -1337,12 +1400,85 @@ public partial class StatementCompiler
         switch (literal.Type)
         {
             case LiteralType.Integer:
-            {
-                if (expectedType is not null)
                 {
-                    if (expectedType.SameAs(BasicType.U8))
+                    if (expectedType is not null)
                     {
-                        if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
+                        if (expectedType.SameAs(BasicType.U8))
+                        {
+                            if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((byte)literal.GetInt()),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.I8))
+                        {
+                            if (literal.GetInt() is >= sbyte.MinValue and <= sbyte.MaxValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((sbyte)literal.GetInt()),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.U16))
+                        {
+                            if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((ushort)literal.GetInt()),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.I16))
+                        {
+                            if (literal.GetInt() is >= short.MinValue and <= short.MaxValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((short)literal.GetInt()),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.U32))
+                        {
+                            if (literal.GetInt() >= (int)uint.MinValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((uint)literal.GetInt()),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.I32))
                         {
                             OnGotStatementType(literal, expectedType);
                             compiledStatement = new CompiledEvaluatedValue()
@@ -1350,14 +1486,11 @@ public partial class StatementCompiler
                                 Location = literal.Location,
                                 SaveValue = literal.SaveValue,
                                 Type = expectedType,
-                                Value = new CompiledValue((byte)literal.GetInt()),
+                                Value = new CompiledValue((int)literal.GetInt()),
                             };
                             return true;
                         }
-                    }
-                    else if (expectedType.SameAs(BasicType.I8))
-                    {
-                        if (literal.GetInt() is >= sbyte.MinValue and <= sbyte.MaxValue)
+                        else if (expectedType.SameAs(BasicType.F32))
                         {
                             OnGotStatementType(literal, expectedType);
                             compiledStatement = new CompiledEvaluatedValue()
@@ -1365,339 +1498,269 @@ public partial class StatementCompiler
                                 Location = literal.Location,
                                 SaveValue = literal.SaveValue,
                                 Type = expectedType,
-                                Value = new CompiledValue((sbyte)literal.GetInt()),
+                                Value = new CompiledValue((float)literal.GetInt()),
                             };
                             return true;
                         }
                     }
-                    else if (expectedType.SameAs(BasicType.U16))
+
+                    if (!GetLiteralType(literal.Type, out GeneralType? literalType))
+                    { literalType = BuiltinType.I32; }
+
+                    OnGotStatementType(literal, literalType);
+                    compiledStatement = new CompiledEvaluatedValue()
                     {
-                        if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
-                        {
-                            OnGotStatementType(literal, expectedType);
-                            compiledStatement = new CompiledEvaluatedValue()
-                            {
-                                Location = literal.Location,
-                                SaveValue = literal.SaveValue,
-                                Type = expectedType,
-                                Value = new CompiledValue((ushort)literal.GetInt()),
-                            };
-                            return true;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.I16))
-                    {
-                        if (literal.GetInt() is >= short.MinValue and <= short.MaxValue)
-                        {
-                            OnGotStatementType(literal, expectedType);
-                            compiledStatement = new CompiledEvaluatedValue()
-                            {
-                                Location = literal.Location,
-                                SaveValue = literal.SaveValue,
-                                Type = expectedType,
-                                Value = new CompiledValue((short)literal.GetInt()),
-                            };
-                            return true;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.U32))
-                    {
-                        if (literal.GetInt() >= (int)uint.MinValue)
-                        {
-                            OnGotStatementType(literal, expectedType);
-                            compiledStatement = new CompiledEvaluatedValue()
-                            {
-                                Location = literal.Location,
-                                SaveValue = literal.SaveValue,
-                                Type = expectedType,
-                                Value = new CompiledValue((uint)literal.GetInt()),
-                            };
-                            return true;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.I32))
-                    {
-                        OnGotStatementType(literal, expectedType);
-                        compiledStatement = new CompiledEvaluatedValue()
-                        {
-                            Location = literal.Location,
-                            SaveValue = literal.SaveValue,
-                            Type = expectedType,
-                            Value = new CompiledValue((int)literal.GetInt()),
-                        };
-                        return true;
-                    }
-                    else if (expectedType.SameAs(BasicType.F32))
-                    {
-                        OnGotStatementType(literal, expectedType);
-                        compiledStatement = new CompiledEvaluatedValue()
-                        {
-                            Location = literal.Location,
-                            SaveValue = literal.SaveValue,
-                            Type = expectedType,
-                            Value = new CompiledValue((float)literal.GetInt()),
-                        };
-                        return true;
-                    }
+                        Location = literal.Location,
+                        SaveValue = literal.SaveValue,
+                        Type = literalType,
+                        Value = new CompiledValue((int)literal.GetInt()),
+                    };
+                    return true;
                 }
-
-                if (!GetLiteralType(literal.Type, out GeneralType? literalType))
-                { literalType = BuiltinType.I32; }
-
-                OnGotStatementType(literal, literalType);
-                compiledStatement = new CompiledEvaluatedValue()
-                {
-                    Location = literal.Location,
-                    SaveValue = literal.SaveValue,
-                    Type = literalType,
-                    Value = new CompiledValue((int)literal.GetInt()),
-                };
-                return true;
-            }
             case LiteralType.Float:
-            {
-                if (!GetLiteralType(literal.Type, out GeneralType? literalType))
-                { literalType = BuiltinType.F32; }
-
-                OnGotStatementType(literal, literalType);
-                compiledStatement = new CompiledEvaluatedValue()
                 {
-                    Location = literal.Location,
-                    SaveValue = literal.SaveValue,
-                    Type = literalType,
-                    Value = new CompiledValue((float)literal.GetFloat()),
-                };
-                return true;
-            }
+                    if (!GetLiteralType(literal.Type, out GeneralType? literalType))
+                    { literalType = BuiltinType.F32; }
+
+                    OnGotStatementType(literal, literalType);
+                    compiledStatement = new CompiledEvaluatedValue()
+                    {
+                        Location = literal.Location,
+                        SaveValue = literal.SaveValue,
+                        Type = literalType,
+                        Value = new CompiledValue((float)literal.GetFloat()),
+                    };
+                    return true;
+                }
             case LiteralType.String:
-            {
-                if (expectedType is not null &&
-                    expectedType.Is(out PointerType? pointerType) &&
-                    pointerType.To.Is(out ArrayType? arrayType) &&
-                    arrayType.Of.SameAs(BasicType.U8))
                 {
-                    OnGotStatementType(literal, expectedType);
-
-                    compiledStatement = null;
-                    if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.U8.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
-
-                    compiledStatement = new CompiledStringInstance()
+                    if (expectedType is not null &&
+                        expectedType.Is(out PointerType? pointerType) &&
+                        pointerType.To.Is(out ArrayType? arrayType) &&
+                        arrayType.Of.SameAs(BasicType.U8))
                     {
-                        Value = literal.Value,
-                        IsASCII = true,
-                        Location = literal.Location,
-                        SaveValue = true,
-                        Type = expectedType,
-                        Allocator = allocator,
-                    };
-                    return true;
+                        OnGotStatementType(literal, expectedType);
+
+                        compiledStatement = null;
+                        if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.U8.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
+
+                        compiledStatement = new CompiledStringInstance()
+                        {
+                            Value = literal.Value,
+                            IsASCII = true,
+                            Location = literal.Location,
+                            SaveValue = true,
+                            Type = expectedType,
+                            Allocator = allocator,
+                        };
+                        return true;
+                    }
+                    else if (expectedType is not null &&
+                        expectedType.Is(out PointerType? pointerType2) &&
+                        pointerType2.To.Is(out ArrayType? arrayType2) &&
+                        arrayType2.Of.SameAs(BasicType.U16))
+                    {
+                        OnGotStatementType(literal, expectedType);
+
+                        compiledStatement = null;
+                        if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.Char.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
+
+                        compiledStatement = new CompiledStringInstance()
+                        {
+                            Value = literal.Value,
+                            IsASCII = false,
+                            Location = literal.Location,
+                            SaveValue = true,
+                            Type = expectedType,
+                            Allocator = allocator,
+                        };
+                        return true;
+                    }
+                    else if (expectedType is not null &&
+                        expectedType.Is(out ArrayType? arrayType3) &&
+                        arrayType3.Of.SameAs(BasicType.U8))
+                    {
+                        OnGotStatementType(literal, expectedType);
+
+                        compiledStatement = new CompiledStackStringInstance()
+                        {
+                            Value = literal.Value,
+                            IsASCII = true,
+                            Location = literal.Location,
+                            SaveValue = true,
+                            Type = expectedType,
+                            IsNullTerminated = arrayType3.ComputedLength.HasValue && arrayType3.ComputedLength.Value > literal.Value.Length,
+                        };
+                        return true;
+                    }
+                    else if (expectedType is not null &&
+                        expectedType.Is(out ArrayType? arrayType4) &&
+                        arrayType4.Of.SameAs(BasicType.U16))
+                    {
+                        OnGotStatementType(literal, expectedType);
+
+                        compiledStatement = new CompiledStackStringInstance()
+                        {
+                            Value = literal.Value,
+                            IsASCII = false,
+                            Location = literal.Location,
+                            SaveValue = true,
+                            Type = expectedType,
+                            IsNullTerminated = arrayType4.ComputedLength.HasValue && arrayType4.ComputedLength.Value > literal.Value.Length,
+                        };
+                        return true;
+                    }
+                    else
+                    {
+                        OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, new CompiledEvaluatedValue()
+                        {
+                            Value = literal.Value.Length + 1,
+                            Location = literal.Location,
+                            Type = ArrayLengthType,
+                            SaveValue = true
+                        }, literal.Value.Length + 1)));
+
+                        BuiltinType type = BuiltinType.Char;
+
+                        compiledStatement = null;
+                        if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * type.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
+
+                        compiledStatement = new CompiledStringInstance()
+                        {
+                            Value = literal.Value,
+                            IsASCII = false,
+                            Location = literal.Location,
+                            SaveValue = true,
+                            Type = new PointerType(new ArrayType(type, null, literal.Value.Length + 1)),
+                            Allocator = allocator,
+                        };
+                        return true;
+                    }
                 }
-                else if (expectedType is not null &&
-                    expectedType.Is(out PointerType? pointerType2) &&
-                    pointerType2.To.Is(out ArrayType? arrayType2) &&
-                    arrayType2.Of.SameAs(BasicType.U16))
-                {
-                    OnGotStatementType(literal, expectedType);
-
-                    compiledStatement = null;
-                    if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.Char.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
-
-                    compiledStatement = new CompiledStringInstance()
-                    {
-                        Value = literal.Value,
-                        IsASCII = false,
-                        Location = literal.Location,
-                        SaveValue = true,
-                        Type = expectedType,
-                        Allocator = allocator,
-                    };
-                    return true;
-                }
-                else if (expectedType is not null &&
-                    expectedType.Is(out ArrayType? arrayType3) &&
-                    arrayType3.Of.SameAs(BasicType.U8))
-                {
-                    OnGotStatementType(literal, expectedType);
-
-                    compiledStatement = new CompiledStackStringInstance()
-                    {
-                        Value = literal.Value,
-                        IsASCII = true,
-                        Location = literal.Location,
-                        SaveValue = true,
-                        Type = expectedType,
-                        IsNullTerminated = arrayType3.ComputedLength.HasValue && arrayType3.ComputedLength.Value > literal.Value.Length,
-                    };
-                    return true;
-                }
-                else if (expectedType is not null &&
-                    expectedType.Is(out ArrayType? arrayType4) &&
-                    arrayType4.Of.SameAs(BasicType.U16))
-                {
-                    OnGotStatementType(literal, expectedType);
-
-                    compiledStatement = new CompiledStackStringInstance()
-                    {
-                        Value = literal.Value,
-                        IsASCII = false,
-                        Location = literal.Location,
-                        SaveValue = true,
-                        Type = expectedType,
-                        IsNullTerminated = arrayType4.ComputedLength.HasValue && arrayType4.ComputedLength.Value > literal.Value.Length,
-                    };
-                    return true;
-                }
-                else
-                {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, new CompiledEvaluatedValue()
-                    {
-                        Value = literal.Value.Length + 1,
-                        Location = literal.Location,
-                        Type = ArrayLengthType,
-                        SaveValue = true
-                    }, literal.Value.Length + 1)));
-
-                    BuiltinType type = BuiltinType.Char;
-
-                    compiledStatement = null;
-                    if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * type.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
-
-                    compiledStatement = new CompiledStringInstance()
-                    {
-                        Value = literal.Value,
-                        IsASCII = false,
-                        Location = literal.Location,
-                        SaveValue = true,
-                        Type = new PointerType(new ArrayType(type, null, literal.Value.Length + 1)),
-                        Allocator = allocator,
-                    };
-                    return true;
-                }
-            }
             case LiteralType.Char:
-            {
-                if (literal.Value.Length != 1)
                 {
-                    Diagnostics.Add(Diagnostic.Internal($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, literal.File));
-                    if (literal.Value.Length == 0) break;
+                    if (literal.Value.Length != 1)
+                    {
+                        Diagnostics.Add(Diagnostic.Internal($"Literal char contains {literal.Value.Length} characters but only 1 allowed", literal, literal.File));
+                        if (literal.Value.Length == 0) break;
+                    }
+
+                    if (expectedType is not null)
+                    {
+                        if (expectedType.SameAs(BasicType.U8))
+                        {
+                            if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((byte)literal.Value[0]),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.I8))
+                        {
+                            if ((int)literal.Value[0] is >= sbyte.MinValue and <= sbyte.MaxValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((sbyte)literal.Value[0]),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.U16))
+                        {
+                            OnGotStatementType(literal, expectedType);
+                            compiledStatement = new CompiledEvaluatedValue()
+                            {
+                                Location = literal.Location,
+                                SaveValue = literal.SaveValue,
+                                Type = expectedType,
+                                Value = new CompiledValue((char)literal.Value[0]),
+                            };
+                            return true;
+                        }
+                        else if (expectedType.SameAs(BasicType.I16))
+                        {
+                            if ((int)literal.Value[0] is >= short.MinValue and <= short.MaxValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((short)literal.Value[0]),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.U32))
+                        {
+                            if (literal.Value[0] >= uint.MinValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((uint)literal.Value[0]),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.I32))
+                        {
+                            if (literal.Value[0] >= int.MinValue)
+                            {
+                                OnGotStatementType(literal, expectedType);
+                                compiledStatement = new CompiledEvaluatedValue()
+                                {
+                                    Location = literal.Location,
+                                    SaveValue = literal.SaveValue,
+                                    Type = expectedType,
+                                    Value = new CompiledValue((int)literal.Value[0]),
+                                };
+                                return true;
+                            }
+                        }
+                        else if (expectedType.SameAs(BasicType.F32))
+                        {
+                            OnGotStatementType(literal, expectedType);
+                            compiledStatement = new CompiledEvaluatedValue()
+                            {
+                                Location = literal.Location,
+                                SaveValue = literal.SaveValue,
+                                Type = expectedType,
+                                Value = new CompiledValue((float)literal.Value[0]),
+                            };
+                            return true;
+                        }
+                    }
+
+                    if (!GetLiteralType(literal.Type, out GeneralType? literalType))
+                    { literalType = BuiltinType.Char; }
+
+                    OnGotStatementType(literal, literalType);
+                    compiledStatement = new CompiledEvaluatedValue()
+                    {
+                        Location = literal.Location,
+                        SaveValue = literal.SaveValue,
+                        Type = literalType,
+                        Value = new CompiledValue((char)literal.Value[0]),
+                    };
+                    return true;
                 }
-
-                if (expectedType is not null)
-                {
-                    if (expectedType.SameAs(BasicType.U8))
-                    {
-                        if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
-                        {
-                            OnGotStatementType(literal, expectedType);
-                            compiledStatement = new CompiledEvaluatedValue()
-                            {
-                                Location = literal.Location,
-                                SaveValue = literal.SaveValue,
-                                Type = expectedType,
-                                Value = new CompiledValue((byte)literal.Value[0]),
-                            };
-                            return true;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.I8))
-                    {
-                        if ((int)literal.Value[0] is >= sbyte.MinValue and <= sbyte.MaxValue)
-                        {
-                            OnGotStatementType(literal, expectedType);
-                            compiledStatement = new CompiledEvaluatedValue()
-                            {
-                                Location = literal.Location,
-                                SaveValue = literal.SaveValue,
-                                Type = expectedType,
-                                Value = new CompiledValue((sbyte)literal.Value[0]),
-                            };
-                            return true;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.U16))
-                    {
-                        OnGotStatementType(literal, expectedType);
-                        compiledStatement = new CompiledEvaluatedValue()
-                        {
-                            Location = literal.Location,
-                            SaveValue = literal.SaveValue,
-                            Type = expectedType,
-                            Value = new CompiledValue((char)literal.Value[0]),
-                        };
-                        return true;
-                    }
-                    else if (expectedType.SameAs(BasicType.I16))
-                    {
-                        if ((int)literal.Value[0] is >= short.MinValue and <= short.MaxValue)
-                        {
-                            OnGotStatementType(literal, expectedType);
-                            compiledStatement = new CompiledEvaluatedValue()
-                            {
-                                Location = literal.Location,
-                                SaveValue = literal.SaveValue,
-                                Type = expectedType,
-                                Value = new CompiledValue((short)literal.Value[0]),
-                            };
-                            return true;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.U32))
-                    {
-                        if (literal.Value[0] >= uint.MinValue)
-                        {
-                            OnGotStatementType(literal, expectedType);
-                            compiledStatement = new CompiledEvaluatedValue()
-                            {
-                                Location = literal.Location,
-                                SaveValue = literal.SaveValue,
-                                Type = expectedType,
-                                Value = new CompiledValue((uint)literal.Value[0]),
-                            };
-                            return true;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.I32))
-                    {
-                        if (literal.Value[0] >= int.MinValue)
-                        {
-                            OnGotStatementType(literal, expectedType);
-                            compiledStatement = new CompiledEvaluatedValue()
-                            {
-                                Location = literal.Location,
-                                SaveValue = literal.SaveValue,
-                                Type = expectedType,
-                                Value = new CompiledValue((int)literal.Value[0]),
-                            };
-                            return true;
-                        }
-                    }
-                    else if (expectedType.SameAs(BasicType.F32))
-                    {
-                        OnGotStatementType(literal, expectedType);
-                        compiledStatement = new CompiledEvaluatedValue()
-                        {
-                            Location = literal.Location,
-                            SaveValue = literal.SaveValue,
-                            Type = expectedType,
-                            Value = new CompiledValue((float)literal.Value[0]),
-                        };
-                        return true;
-                    }
-                }
-
-                if (!GetLiteralType(literal.Type, out GeneralType? literalType))
-                { literalType = BuiltinType.Char; }
-
-                OnGotStatementType(literal, literalType);
-                compiledStatement = new CompiledEvaluatedValue()
-                {
-                    Location = literal.Location,
-                    SaveValue = literal.SaveValue,
-                    Type = literalType,
-                    Value = new CompiledValue((char)literal.Value[0]),
-                };
-                return true;
-            }
             default: throw new UnreachableException();
         }
 
@@ -2091,54 +2154,54 @@ public partial class StatementCompiler
         switch (instanceType)
         {
             case PointerType pointerType:
-            {
-                if (!GenerateAllocator(new AnyCall(
-                    new Identifier(Token.CreateAnonymous("sizeof"), newInstance.File),
-                    new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To, newInstance.File) },
-                    Array.Empty<Token>(),
-                    TokenPair.CreateAnonymous(newInstance.Position, "(", ")"),
-                    newInstance.File
-                ), out compiledStatement))
-                { return false; }
-
-                compiledStatement = new CompiledFakeTypeCast()
                 {
-                    Value = compiledStatement,
-                    Type = instanceType,
-                    Location = compiledStatement.Location,
-                    SaveValue = compiledStatement.SaveValue,
-                };
-                return true;
-            }
+                    if (!GenerateAllocator(new AnyCall(
+                        new Identifier(Token.CreateAnonymous("sizeof"), newInstance.File),
+                        new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To, newInstance.File) },
+                        Array.Empty<Token>(),
+                        TokenPair.CreateAnonymous(newInstance.Position, "(", ")"),
+                        newInstance.File
+                    ), out compiledStatement))
+                    { return false; }
+
+                    compiledStatement = new CompiledFakeTypeCast()
+                    {
+                        Value = compiledStatement,
+                        Type = instanceType,
+                        Location = compiledStatement.Location,
+                        SaveValue = compiledStatement.SaveValue,
+                    };
+                    return true;
+                }
 
             case StructType structType:
-            {
-                structType.Struct.References.AddReference(newInstance.Type, newInstance.File);
-                compiledStatement = new CompiledStackAllocation()
                 {
-                    Type = structType,
-                    Location = newInstance.Location,
-                    SaveValue = newInstance.SaveValue,
-                };
-                return true;
-            }
+                    structType.Struct.References.AddReference(newInstance.Type, newInstance.File);
+                    compiledStatement = new CompiledStackAllocation()
+                    {
+                        Type = structType,
+                        Location = newInstance.Location,
+                        SaveValue = newInstance.SaveValue,
+                    };
+                    return true;
+                }
 
             case ArrayType arrayType:
-            {
-                compiledStatement = new CompiledStackAllocation()
                 {
-                    Type = arrayType,
-                    Location = newInstance.Location,
-                    SaveValue = newInstance.SaveValue,
-                };
-                return true;
-            }
+                    compiledStatement = new CompiledStackAllocation()
+                    {
+                        Type = arrayType,
+                        Location = newInstance.Location,
+                        SaveValue = newInstance.SaveValue,
+                    };
+                    return true;
+                }
 
             default:
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Unknown type \"{instanceType}\"", newInstance.Type, newInstance.File));
-                return false;
-            }
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Unknown type \"{instanceType}\"", newInstance.Type, newInstance.File));
+                    return false;
+                }
         }
     }
     bool GenerateCodeForStatement(ConstructorCall constructorCall, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
@@ -2321,37 +2384,37 @@ public partial class StatementCompiler
         switch (address)
         {
             case AddressPointer:
-            {
-                return true;
-            }
-            case AddressRegisterPointer:
-            {
-                return true;
-            }
-            case AddressOffset addressOffset:
-            {
-                if (!GenerateAddressResolver(addressOffset.Base)) return false;
-
-                return true;
-            }
-            case AddressRuntimePointer:
-            {
-                return true;
-            }
-            case AddressRuntimeIndex runtimeIndex:
-            {
-                GenerateAddressResolver(runtimeIndex.Base);
-
-                GeneralType indexType = runtimeIndex.IndexValue.Type;
-
-                if (!indexType.Is<BuiltinType>())
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"int\") and not \"{indexType}\"", runtimeIndex.IndexValue));
-                    return false;
+                    return true;
                 }
+            case AddressRegisterPointer:
+                {
+                    return true;
+                }
+            case AddressOffset addressOffset:
+                {
+                    if (!GenerateAddressResolver(addressOffset.Base)) return false;
 
-                return true;
-            }
+                    return true;
+                }
+            case AddressRuntimePointer:
+                {
+                    return true;
+                }
+            case AddressRuntimeIndex runtimeIndex:
+                {
+                    GenerateAddressResolver(runtimeIndex.Base);
+
+                    GeneralType indexType = runtimeIndex.IndexValue.Type;
+
+                    if (!indexType.Is<BuiltinType>())
+                    {
+                        Diagnostics.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"int\") and not \"{indexType}\"", runtimeIndex.IndexValue));
+                        return false;
+                    }
+
+                    return true;
+                }
             default: throw new NotImplementedException();
         }
     }

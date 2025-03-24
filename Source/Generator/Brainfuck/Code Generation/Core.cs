@@ -101,6 +101,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         SourceProviders = ImmutableArray.Create<ISourceProvider>(
             FileSourceProvider.Instance
         ),
+        PreprocessorVariables = PreprocessorVariables.Brainfuck,
     };
 
     const string ReturnVariableName = "@return";

@@ -2014,7 +2014,12 @@ public partial class StatementCompiler
             }
             else if (@if.NextLink is not null)
             {
-                return GenerateCodeForStatement(@if.NextLink, out compiledStatement);
+                if (!GenerateCodeForStatement(@if.NextLink, out compiledStatement)) return false;
+                if (compiledStatement is CompiledElse nextElse)
+                {
+                    compiledStatement = nextElse.Body;
+                }
+                return true;
             }
             else
             {

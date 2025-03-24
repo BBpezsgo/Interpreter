@@ -1,7 +1,7 @@
 namespace Tests;
 
-[TestClass, TestCategory("IL"), TestCategory("FileTest")]
-public class ILFileTests
+[TestClass, TestCategory("IL"), TestCategory("Generic")]
+public class ILTests
 {
     const int Timeout = 5000 * 1000;
 

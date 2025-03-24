@@ -2,8 +2,8 @@ using LanguageCore.Runtime;
 
 namespace Tests;
 
-[TestClass, TestCategory("Main"), TestCategory("FileTest")]
-public class MainFileTests
+[TestClass, TestCategory("Main"), TestCategory("Generic")]
+public class MainTests
 {
     const int Timeout = 50000 * 1000;
 

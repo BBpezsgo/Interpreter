@@ -1,7 +1,7 @@
 ﻿namespace Tests;
 
-[TestClass, TestCategory("Brainfuck"), TestCategory("FileTest")]
-public class BrainfuckFileTests
+[TestClass, TestCategory("Brainfuck"), TestCategory("Generic")]
+public class BrainfuckTests
 {
     const int Timeout = 10 * 1000;
     const int LongTimeout = 30 * 1000;

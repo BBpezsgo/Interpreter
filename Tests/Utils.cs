@@ -693,7 +693,7 @@ public static class Utils
             bool isFileTest = false;
             for (int i = 0; i < categories.Length; i++)
             {
-                if (categories[i] == "FileTest")
+                if (categories[i] == "Generic")
                 { isFileTest = true; }
                 else
                 { category = categories[i]; }

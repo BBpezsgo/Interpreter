@@ -11,8 +11,10 @@ const BlockHeader SizeMask = 0x7fffffff;
 #endif
 
 #if BRAINFUCK
+[External("heap_size")]
 const int HeapSize = 127;
 #else
+[External("heap_size")]
 const int HeapSize = 512;
 #endif
 const int HeaderSize = sizeof(BlockHeader);

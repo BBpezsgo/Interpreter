@@ -1100,6 +1100,8 @@ public sealed class Parser
         variableDeclaration = null;
         int startTokenIndex = CurrentTokenIndex;
 
+        AttributeUsage[] attributes = ExpectAttributes();
+
         List<Token> modifiers = new();
         while (ExpectIdentifier(out Token? modifier, VariableModifiers.AsSpan()))
         { modifiers.Add(modifier); }
@@ -1132,6 +1134,7 @@ public sealed class Parser
         }
 
         variableDeclaration = new VariableDeclaration(
+            attributes,
             modifiers,
             possibleType,
             new(possibleVariableName, File),

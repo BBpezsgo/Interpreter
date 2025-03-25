@@ -318,17 +318,24 @@ public class LiteralList : StatementWithValue
     }
 }
 
-public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifiable<Identifier>
+public class VariableDeclaration : Statement,
+    IHaveType,
+    IExportable,
+    IIdentifiable<Identifier>,
+    IHaveAttributes
 {
     /// <summary>
     /// Set by the compiler
     /// </summary>
     public GeneralType? CompiledType { get; set; }
 
+    public ImmutableArray<AttributeUsage> Attributes { get; }
     public TypeInstance Type { get; }
     public Identifier Identifier { get; }
     public StatementWithValue? InitialValue { get; }
     public ImmutableArray<Token> Modifiers { get; }
+
+    public string? ExternalConstantName => Attributes.TryGetAttribute(AttributeConstants.ExternalIdentifier, out AttributeUsage? attribute) && attribute.TryGetValue(out string? name) ? name : null;
 
     public override Position Position =>
         new Position(Type, Identifier, InitialValue)
@@ -337,6 +344,7 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
 
     public VariableDeclaration(VariableDeclaration other) : base(other)
     {
+        Attributes = other.Attributes;
         Type = other.Type;
         Identifier = other.Identifier;
         InitialValue = other.InitialValue;
@@ -345,12 +353,14 @@ public class VariableDeclaration : Statement, IHaveType, IExportable, IIdentifia
     }
 
     public VariableDeclaration(
+        IEnumerable<AttributeUsage> attributes,
         IEnumerable<Token> modifiers,
         TypeInstance type,
         Identifier variableName,
         StatementWithValue? initialValue,
         Uri file) : base(file)
     {
+        Attributes = attributes.ToImmutableArray();
         Type = type;
         Identifier = variableName;
         InitialValue = initialValue;

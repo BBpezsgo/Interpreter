@@ -2,11 +2,11 @@
 
 public interface IReadOnlyDiagnosticsCollection
 {
-    public IReadOnlyCollection<Diagnostic> Diagnostics { get; }
-    public IReadOnlyCollection<DiagnosticWithoutContext> DiagnosticsWithoutContext { get; }
-    public bool HasErrors { get; }
+    IReadOnlyCollection<Diagnostic> Diagnostics { get; }
+    IReadOnlyCollection<DiagnosticWithoutContext> DiagnosticsWithoutContext { get; }
+    bool HasErrors { get; }
 
-    public void Throw();
+    void Throw();
 }
 
 [ExcludeFromCodeCoverage]

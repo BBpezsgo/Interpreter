@@ -170,6 +170,37 @@ public partial class StatementCompiler
         }
     }
 
+    void CompileVariableAttributes(VariableDeclaration function)
+    {
+        foreach (AttributeUsage attribute in function.Attributes)
+        {
+            switch (attribute.Identifier.Content)
+            {
+                case AttributeConstants.ExternalIdentifier:
+                {
+                    if (attribute.Parameters.Length != 1)
+                    {
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                        break;
+                    }
+
+                    if (attribute.Parameters[0].Type != LiteralType.String)
+                    {
+                        Diagnostics.Add(Diagnostic.Error($"Invalid parameter type \"{attribute.Parameters[0].Type}\" for attribute \"{attribute.Identifier}\" at {0}: expected \"{LiteralType.String}\"", attribute));
+                        break;
+                    }
+
+                    break;
+                }
+                default:
+                {
+                    CompileUserAttribute(function, attribute);
+                    break;
+                }
+            }
+        }
+    }
+
     void CompileUserAttribute(IHaveAttributes context, AttributeUsage attribute)
     {
         foreach (UserDefinedAttribute userDefinedAttribute in UserDefinedAttributes)

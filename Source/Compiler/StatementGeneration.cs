@@ -292,7 +292,35 @@ public partial class StatementCompiler
 
         CompiledStatementWithValue? initialValue = null;
 
-        if (newVariable.InitialValue is not null)
+        CompileVariableAttributes(newVariable);
+
+        if (newVariable.ExternalConstantName is not null)
+        {
+            var externalConstant = ExternalConstants.FirstOrDefault(v => v.Name == newVariable.ExternalConstantName);
+            if (externalConstant is null)
+            {
+                Diagnostics.Add(Diagnostic.Warning($"External constant \"{newVariable.ExternalConstantName}\" not found", newVariable));
+            }
+            else
+            {
+                type ??= new BuiltinType(externalConstant.Value.Type);
+                if (!externalConstant.Value.TryCast(type, out var castedValue))
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Can't cast external constant value {externalConstant.Value} of type \"{new BuiltinType(externalConstant.Value.Type)}\" to {type}", newVariable));
+                    return false;
+                }
+
+                initialValue = new CompiledEvaluatedValue()
+                {
+                    Value = castedValue,
+                    Location = newVariable.Location,
+                    SaveValue = true,
+                    Type = type,
+                };
+            }
+        }
+
+        if (initialValue is null && newVariable.InitialValue is not null)
         {
             if (!GenerateCodeForStatement(newVariable.InitialValue, out initialValue, type)) return false;
             type ??= initialValue.Type;

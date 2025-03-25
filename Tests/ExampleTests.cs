@@ -67,4 +67,14 @@ public class ExampleTests
             "Hello",
             output.ToString());
     }
+
+    [TestMethod, Timeout(Timeout)]
+    public void ExternalConstantsProvider()
+    {
+        StringBuilder output = new();
+        using StringWriter writer = new(output);
+        Console.SetOut(writer);
+
+        Examples.ExternalConstants.Run();
+    }
 }

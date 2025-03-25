@@ -1,4 +1,5 @@
 ﻿using LanguageCore.Compiler;
+using LanguageCore.Runtime;
 
 namespace LanguageCore.IL.Generator;
 
@@ -13,7 +14,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
         SizeofStatementType = BuiltinType.I32,
         DontOptimize = false,
         PreprocessorVariables = PreprocessorVariables.IL,
-        ExternalFunctions = ImmutableArray<Runtime.IExternalFunction>.Empty,
+        ExternalConstants = ImmutableArray<ExternalConstant>.Empty,
+        ExternalFunctions = ImmutableArray<IExternalFunction>.Empty,
         SourceProviders = ImmutableArray.Create<ISourceProvider>(
             FileSourceProvider.Instance
         ),

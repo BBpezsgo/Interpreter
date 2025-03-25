@@ -87,6 +87,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         BooleanType = BuiltinType.U8,
         ExitCodeType = BuiltinType.U8,
         SizeofStatementType = BuiltinType.U8,
+        ExternalConstants = ImmutableArray<ExternalConstant>.Empty,
         ExternalFunctions = ImmutableArray.Create<IExternalFunction>(
             new ExternalFunctionStub("stdin")
             {
@@ -775,6 +776,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
     {
         VariableDeclaration implicitReturnValueVariable = new(
+            Enumerable.Empty<AttributeUsage>(),
             Enumerable.Empty<Tokenizing.Token>(),
             new TypeInstanceSimple(Tokenizing.Token.CreateAnonymous("u8"), compilerResult.File),
             new Identifier(Tokenizing.Token.CreateAnonymous(ReturnVariableName), compilerResult.File),

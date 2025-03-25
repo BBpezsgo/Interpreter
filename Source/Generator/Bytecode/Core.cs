@@ -140,6 +140,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ExitCodeType = BuiltinType.I32,
         SizeofStatementType = BuiltinType.I32,
         DontOptimize = false,
+        ExternalConstants = ImmutableArray<ExternalConstant>.Empty,
         ExternalFunctions = ImmutableArray<IExternalFunction>.Empty,
         PreprocessorVariables = PreprocessorVariables.Normal,
         SourceProviders = ImmutableArray.Create<ISourceProvider>(

@@ -1,5 +1,5 @@
 /*
-This demonstrates a simple usage of this project.
+This demonstrates a simple usage of using custom source providers.
 */
 
 using System.IO;

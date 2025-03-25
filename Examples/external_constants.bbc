@@ -1,0 +1,16 @@
+
+// If there is no external constant "external_1", it will throw an error.
+[External("external_1")]
+const i32 External_1;
+
+// If there is no external constant "external_2", the assigned value will be used.
+[External("external_2")]
+const i32 External_2 = 64;
+
+// If there is no external constant "external_3", the variable will not be initialized.
+[External("external_3")]
+i32 External_3;
+
+// If there is no external constant "external_4", the assigned value will be used.
+[External("external_4")]
+i32 External_4 = 48;

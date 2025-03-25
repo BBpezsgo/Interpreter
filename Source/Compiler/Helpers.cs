@@ -31,6 +31,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     public const int InvalidFunctionAddress = int.MinValue;
 
     readonly ImmutableArray<IExternalFunction> ExternalFunctions;
+    readonly ImmutableArray<ExternalConstant> ExternalConstants;
 
     public BuiltinType ArrayLengthType => Settings.ArrayLengthType;
     public BuiltinType BooleanType => Settings.BooleanType;
@@ -1142,8 +1143,30 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (GetConstant(variableDeclaration.Identifier.Content, variableDeclaration.File, out _, out _))
         { Diagnostics.Add(Diagnostic.Critical($"Constant \"{variableDeclaration.Identifier}\" already defined", variableDeclaration.Identifier, variableDeclaration.File)); }
 
+        CompileVariableAttributes(variableDeclaration);
+
         CompiledValue constantValue;
-        if (variableDeclaration.InitialValue == null)
+
+        if (variableDeclaration.ExternalConstantName is not null)
+        {
+            ExternalConstant? externalConstant = ExternalConstants.FirstOrDefault(v => v.Name == variableDeclaration.ExternalConstantName);
+            if (externalConstant is not null)
+            {
+                constantValue = externalConstant.Value;
+                goto gotExternalValue;
+            }
+            else if (variableDeclaration.InitialValue is null)
+            {
+                Diagnostics.Add(Diagnostic.Critical($"External constant \"{variableDeclaration.ExternalConstantName}\" not found", variableDeclaration));
+                constantValue = default;
+            }
+            else
+            {
+                Diagnostics.Add(Diagnostic.Warning($"External constant \"{variableDeclaration.ExternalConstantName}\" not found", variableDeclaration));
+            }
+        }
+
+        if (variableDeclaration.InitialValue is null)
         {
             Diagnostics.Add(Diagnostic.Critical($"Constant value must have initial value", variableDeclaration));
             constantValue = default;
@@ -1158,6 +1181,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             }
         }
 
+    gotExternalValue:
+
         GeneralType constantType;
         if (variableDeclaration.Type != StatementKeywords.Var)
         {
@@ -1165,7 +1190,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             variableDeclaration.Type.SetAnalyzedType(constantType);
 
             if (constantType.Is(out BuiltinType? builtinType))
-            { constantValue.TryCast(builtinType.RuntimeType, out constantValue); }
+            {
+                if (!constantValue.TryCast(builtinType.RuntimeType, out CompiledValue castedConstantValue))
+                {
+                    Diagnostics.Add(Diagnostic.Warning($"Can't cast constant value {constantValue} of type \"{new BuiltinType(constantValue.Type)}\" to {constantType}", variableDeclaration));
+                }
+                constantValue = castedConstantValue;
+            }
         }
         else
         {
@@ -2871,6 +2902,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         { return false; }
 
         inlined = new VariableDeclaration(
+            attributes: statement.Attributes,
             modifiers: statement.Modifiers,
             type: statement.Type,
             variableName: statement.Identifier,

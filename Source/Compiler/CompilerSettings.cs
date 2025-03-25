@@ -6,6 +6,7 @@ public struct CompilerSettings
 {
     public required bool DontOptimize { get; set; }
     public required ImmutableArray<IExternalFunction> ExternalFunctions { get; set; }
+    public required ImmutableArray<ExternalConstant> ExternalConstants { get; set; }
     public required BuiltinType ExitCodeType { get; set; }
     public required int PointerSize { get; set; }
     public required BuiltinType BooleanType { get; set; }
@@ -22,6 +23,7 @@ public struct CompilerSettings
     {
         DontOptimize = other.DontOptimize;
         ExternalFunctions = other.ExternalFunctions;
+        ExternalConstants = other.ExternalConstants;
         ExitCodeType = other.ExitCodeType;
         PointerSize = other.PointerSize;
         BooleanType = other.BooleanType;

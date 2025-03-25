@@ -25,7 +25,7 @@ public partial struct CompiledValue :
         RuntimeType.I16 => I16.ToString(),
         RuntimeType.U32 => U32.ToString(),
         RuntimeType.I32 => I32.ToString(),
-        RuntimeType.F32 => F32.ToString(),
+        RuntimeType.F32 => F32.ToString() + "f",
         _ => throw new UnreachableException(),
     };
 

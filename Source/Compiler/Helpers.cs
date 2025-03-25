@@ -803,7 +803,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     if (_passed.Equals(defined))
                     { return true; }
 
-                    if (StatementCompiler.CanCastImplicitly(_passed, defined, null, null, out PossibleDiagnostic? error1))
+                    if (StatementCompiler.CanCastImplicitly(_passed, defined, null, out PossibleDiagnostic? error1))
                     { return true; }
 
                     if (passed is ILocated located &&
@@ -948,7 +948,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         bool HandleReturnType(TFunction function)
         {
             if (query.ReturnType is not null &&
-                !StatementCompiler.CanCastImplicitly(function.Type, query.ReturnType, null, null, out PossibleDiagnostic? error1))
+                !StatementCompiler.CanCastImplicitly(function.Type, query.ReturnType, null, out PossibleDiagnostic? error1))
             {
                 if (perfectus < FunctionPerfectus.ReturnType)
                 {
@@ -1567,7 +1567,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return false;
     }
 
-    public static bool CanCastImplicitly(GeneralType source, GeneralType destination, StatementWithValue? value, IRuntimeInfoProvider? runtime, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    public static bool CanCastImplicitly(GeneralType source, GeneralType destination, StatementWithValue? value, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
 
@@ -1576,21 +1576,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (destination.SameAs(BasicType.Any))
         { return true; }
-
-        if (runtime is not null)
-        {
-            if (!destination.GetSize(runtime, out int destinationSize, out error))
-            { return false; }
-
-            if (!source.GetSize(runtime, out int sourceSize, out error))
-            { return false; }
-
-            if (sourceSize != destinationSize)
-            {
-                error = new($"Can't cast \"{source}\" (size of {sourceSize} bytes) value to \"{destination}\" (size of {destinationSize} bytes)");
-                return false;
-            }
-        }
 
         if (value is LiteralStatement literal &&
             literal.Type == LiteralType.String)
@@ -1670,9 +1655,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         error = new($"Can't cast \"{source}\" to \"{destination}\" implicitly");
         return false;
     }
-
-    bool CanCastImplicitly(GeneralType source, GeneralType destination, StatementWithValue? value, [NotNullWhen(false)] out PossibleDiagnostic? error)
-        => StatementCompiler.CanCastImplicitly(source, destination, value, this, out error);
 
     public static BitWidth MaxBitWidth(BitWidth a, BitWidth b) => a > b ? a : b;
 
@@ -2015,7 +1997,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                         break;
                 }
                 if (expectedType is not null &&
-                    CanCastImplicitly(result, expectedType, null, this, out _))
+                    CanCastImplicitly(result, expectedType, null, out _))
                 { result = expectedType; }
                 return OnGotStatementType(@operator, result);
             }

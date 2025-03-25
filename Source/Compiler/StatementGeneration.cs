@@ -296,7 +296,7 @@ public partial class StatementCompiler
         {
             if (!GenerateCodeForStatement(newVariable.InitialValue, out initialValue, type)) return false;
             type ??= initialValue.Type;
-            if (!CanCastImplicitly(initialValue.Type, type, null, this, out PossibleDiagnostic? castError))
+            if (!CanCastImplicitly(initialValue.Type, type, null, out PossibleDiagnostic? castError))
             {
                 Diagnostics.Add(castError.ToError(initialValue));
                 return false;
@@ -488,7 +488,7 @@ public partial class StatementCompiler
 
             if (!GenerateCodeForStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
 
-            if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, this, out PossibleDiagnostic? error))
+            if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, out PossibleDiagnostic? error))
             { Diagnostics.Add(error.ToError(argument)); }
 
             if (compiledArgument.Type.GetSize(this, Diagnostics, argument) != parameterType.GetSize(this, Diagnostics, parameter))
@@ -556,7 +556,7 @@ public partial class StatementCompiler
 
                 if (!GenerateCodeForStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
 
-                if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, this, out PossibleDiagnostic? error))
+                if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, out PossibleDiagnostic? error))
                 { Diagnostics.Add(error.ToError(argument)); }
 
                 if (compiledArgument.Type.GetSize(this, Diagnostics, argument) != parameterType.GetSize(this, Diagnostics, parameter))
@@ -623,7 +623,7 @@ public partial class StatementCompiler
 
             if (!GenerateCodeForStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
 
-            if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, this, out PossibleDiagnostic? error))
+            if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, out PossibleDiagnostic? error))
             { Diagnostics.Add(error.ToError(compiledArgument)); }
 
             bool canDeallocate = true; // temp type maybe?
@@ -827,7 +827,7 @@ public partial class StatementCompiler
                     {
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Function inlined", caller));
 
-                        if (!CanCastImplicitly(statementWithValue.Type, callee.Type, null, this, out PossibleDiagnostic? castError))
+                        if (!CanCastImplicitly(statementWithValue.Type, callee.Type, null, out PossibleDiagnostic? castError))
                         { Diagnostics.Add(castError.ToError(statementWithValue)); }
 
                         compiledStatement = statementWithValue;
@@ -905,7 +905,7 @@ public partial class StatementCompiler
 
             GeneralType resultType = SizeofStatementType;
             if (expectedType is not null &&
-                CanCastImplicitly(resultType, expectedType, null, this, out _))
+                CanCastImplicitly(resultType, expectedType, null, out _))
             {
                 resultType = expectedType;
             }
@@ -975,7 +975,7 @@ public partial class StatementCompiler
             if (argument.Equals(parameter))
             { return true; }
 
-            if (StatementCompiler.CanCastImplicitly(argumentType, parameter, null, this, out argumentError))
+            if (StatementCompiler.CanCastImplicitly(argumentType, parameter, null, out argumentError))
             { return true; }
 
             argumentError = argumentError.TrySetLocation(argument);
@@ -1190,7 +1190,7 @@ public partial class StatementCompiler
         OK:
 
             if (expectedType is not null &&
-                CanCastImplicitly(resultType, expectedType, null, this, out _))
+                CanCastImplicitly(resultType, expectedType, null, out _))
             {
                 resultType = expectedType;
             }

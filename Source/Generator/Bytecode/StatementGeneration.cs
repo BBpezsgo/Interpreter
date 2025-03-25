@@ -635,7 +635,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (argument.Equals(parameter))
             { return true; }
 
-            if (StatementCompiler.CanCastImplicitly(argumentType, parameter, null, this, out argumentError))
+            if (StatementCompiler.CanCastImplicitly(argumentType, parameter, null, out argumentError))
             { return true; }
 
             argumentError = argumentError.TrySetLocation(argument);

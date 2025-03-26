@@ -2,9 +2,7 @@
 
 public readonly struct Range<T> :
     IEquatable<Range<T>>,
-    IEquatable<T>,
-    IEqualityOperators<Range<T>, Range<T>, bool>,
-    IEqualityOperators<Range<T>, T, bool>
+    IEquatable<T>
     where T : IEquatable<T>
 {
     public readonly T Start;

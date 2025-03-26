@@ -5,8 +5,7 @@ public class Token :
     IPositioned,
     IEquatable<Token>,
     IEquatable<string>,
-    IDuplicatable<Token>,
-    IAdditionOperators<Token, Token, Token>
+    IDuplicatable<Token>
 {
     public static Token Empty => new(TokenType.Whitespace, string.Empty, true, Position.Zero);
 

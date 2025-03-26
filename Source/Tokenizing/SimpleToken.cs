@@ -2,8 +2,7 @@
 
 public readonly struct SimpleToken :
     IPositioned,
-    IEquatable<SimpleToken>,
-    IEqualityOperators<SimpleToken, SimpleToken, bool>
+    IEquatable<SimpleToken>
 {
     public Position Position { get; }
     public string Content { get; }

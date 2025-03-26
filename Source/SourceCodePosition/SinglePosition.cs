@@ -3,8 +3,6 @@
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public struct SinglePosition :
     IEquatable<SinglePosition>,
-    IComparisonOperators<SinglePosition, SinglePosition, bool>,
-    IMinMaxValue<SinglePosition>,
     IComparable<SinglePosition>,
     IComparable
 {

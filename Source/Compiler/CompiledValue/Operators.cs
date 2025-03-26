@@ -2,18 +2,7 @@
 
 namespace LanguageCore.Compiler;
 
-public partial struct CompiledValue :
-    IAdditionOperators<CompiledValue, CompiledValue, CompiledValue>,
-    ISubtractionOperators<CompiledValue, CompiledValue, CompiledValue>,
-    IMultiplyOperators<CompiledValue, CompiledValue, CompiledValue>,
-    IDivisionOperators<CompiledValue, CompiledValue, CompiledValue>,
-    IModulusOperators<CompiledValue, CompiledValue, CompiledValue>,
-    IComparisonOperators<CompiledValue, CompiledValue, bool>,
-    IUnaryPlusOperators<CompiledValue, CompiledValue>,
-    IUnaryNegationOperators<CompiledValue, CompiledValue>,
-    IBitwiseOperators<CompiledValue, CompiledValue, CompiledValue>,
-    IShiftOperators<CompiledValue, CompiledValue, CompiledValue>,
-    IShiftOperators<CompiledValue, int, CompiledValue>
+public partial struct CompiledValue
 {
     /// <inheritdoc/>
     public static CompiledValue operator +(CompiledValue a, CompiledValue b)

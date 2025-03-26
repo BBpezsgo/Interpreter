@@ -2,8 +2,7 @@
 
 [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public readonly struct Position :
-    IEquatable<Position>,
-    IEqualityOperators<Position, Position, bool>
+    IEquatable<Position>
 {
     public static Position UnknownPosition => new(new Range<SinglePosition>(SinglePosition.Undefined), new Range<int>(-1));
     public static Position Zero => new(new Range<SinglePosition>(SinglePosition.Zero), new Range<int>(0));

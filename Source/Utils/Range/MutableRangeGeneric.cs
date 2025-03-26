@@ -3,8 +3,7 @@
 public struct MutableRange<T> :
     IEquatable<MutableRange<T>>,
     IEquatable<Range<T>>,
-    IEquatable<T>,
-    IEqualityOperators<MutableRange<T>, MutableRange<T>, bool>
+    IEquatable<T>
     where T : IEquatable<T>
 {
     public T Start;

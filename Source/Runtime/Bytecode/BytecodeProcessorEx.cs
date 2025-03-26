@@ -166,24 +166,115 @@ public class BytecodeProcessorEx
 
     #region Call
 
-    public unsafe UserCall Call<T0>(in ExposedFunction function, T0 arg0)
+    public UserCall Call(in ExposedFunction function)
+        => CallUnsafe(function, Array.Empty<byte>());
+
+    public UserCall Call<T0>(in ExposedFunction function, T0 arg0)
         where T0 : unmanaged
         => CallUnsafe(function, MemoryUtils.ToBytes(PackedValues.Create(arg0)));
 
-    public unsafe UserCall Call<T0, T1>(in ExposedFunction function, T0 arg0, T1 arg1)
+    public UserCall Call<T0, T1>(in ExposedFunction function, T0 arg0, T1 arg1)
         where T0 : unmanaged
         where T1 : unmanaged
         => CallUnsafe(function, MemoryUtils.ToBytes(PackedValues.Create(arg1, arg0)));
 
+    public UserCall Call<T0, T1, T2>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        => CallUnsafe(function, MemoryUtils.ToBytes(PackedValues.Create(arg2, arg1, arg0)));
+
+    public UserCall Call<T0, T1, T2, T3>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2, T3 arg3)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        => CallUnsafe(function, MemoryUtils.ToBytes(PackedValues.Create(arg3, arg2, arg1, arg0)));
+
+    public UserCall Call<T0, T1, T2, T3, T4>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        => CallUnsafe(function, MemoryUtils.ToBytes(PackedValues.Create(arg4, arg3, arg2, arg1, arg0)));
+
+    public UserCall Call<T0, T1, T2, T3, T4, T5>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+        => CallUnsafe(function, MemoryUtils.ToBytes(PackedValues.Create(arg5, arg4, arg3, arg2, arg1, arg0)));
+
+    public UserCall Call<T0, T1, T2, T3, T4, T5, T6>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+        where T6 : unmanaged
+        => CallUnsafe(function, MemoryUtils.ToBytes(PackedValues.Create(arg6, arg5, arg4, arg3, arg2, arg1, arg0)));
+
     #endregion
 
-    public UserCall Call(in ExposedFunction function)
-    {
-        if (function.ArgumentsSize != 0) throw new ArgumentException($"Invalid number of bytes passed to exposed function \"{function.Identifier}\": expected {function.ArgumentsSize} passed {0}");
-        UserCall userCall = new(function.InstructionOffset, Array.Empty<byte>(), function.ReturnValueSize);
-        UserCalls.Enqueue(userCall);
-        return userCall;
-    }
+    #region Call
+
+    public byte[] CallSync(in ExposedFunction function)
+        => CallUnsafeSync(function, Array.Empty<byte>());
+
+    public byte[] CallSync<T0>(in ExposedFunction function, T0 arg0)
+        where T0 : unmanaged
+        => CallUnsafeSync(function, MemoryUtils.ToBytes(PackedValues.Create(arg0)));
+
+    public byte[] CallSync<T0, T1>(in ExposedFunction function, T0 arg0, T1 arg1)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        => CallUnsafeSync(function, MemoryUtils.ToBytes(PackedValues.Create(arg1, arg0)));
+
+    public byte[] CallSync<T0, T1, T2>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        => CallUnsafeSync(function, MemoryUtils.ToBytes(PackedValues.Create(arg2, arg1, arg0)));
+
+    public byte[] CallSync<T0, T1, T2, T3>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2, T3 arg3)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        => CallUnsafeSync(function, MemoryUtils.ToBytes(PackedValues.Create(arg3, arg2, arg1, arg0)));
+
+    public byte[] CallSync<T0, T1, T2, T3, T4>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        => CallUnsafeSync(function, MemoryUtils.ToBytes(PackedValues.Create(arg4, arg3, arg2, arg1, arg0)));
+
+    public byte[] CallSync<T0, T1, T2, T3, T4, T5>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+        => CallUnsafeSync(function, MemoryUtils.ToBytes(PackedValues.Create(arg5, arg4, arg3, arg2, arg1, arg0)));
+
+    public byte[] CallSync<T0, T1, T2, T3, T4, T5, T6>(in ExposedFunction function, T0 arg0, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+        where T0 : unmanaged
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where T4 : unmanaged
+        where T5 : unmanaged
+        where T6 : unmanaged
+        => CallUnsafeSync(function, MemoryUtils.ToBytes(PackedValues.Create(arg6, arg5, arg4, arg3, arg2, arg1, arg0)));
+
+    #endregion
 
     public UserCall CallUnsafe(in ExposedFunction function, byte[] arguments)
     {
@@ -191,6 +282,19 @@ public class BytecodeProcessorEx
         UserCall userCall = new(function.InstructionOffset, arguments, function.ReturnValueSize);
         UserCalls.Enqueue(userCall);
         return userCall;
+    }
+
+    public byte[] CallUnsafeSync(in ExposedFunction function, byte[] arguments)
+    {
+        UserCall userCall = CallUnsafe(function, arguments);
+
+        while (userCall.Result is null)
+        {
+            if (!Tick())
+            { throw new RuntimeException($"Failed to execute the user call for some reason..."); }
+        }
+
+        return userCall.Result;
     }
 
     public UserCall CallUnsafe(int instructionOffset, byte[] arguments, int returnValueSize)

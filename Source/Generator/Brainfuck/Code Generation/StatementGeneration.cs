@@ -2758,7 +2758,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ParameterCount != parameters.Length)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
             return;
         }
 
@@ -2905,7 +2905,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ParameterCount != parameters.Length)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
             return;
         }
 
@@ -3012,7 +3012,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ParameterCount != parameters.Length)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition));
             return;
         }
 
@@ -3107,7 +3107,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ParameterCount - 1 != parameters.Length)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to constructor \"{function.ToReadable()}\" (required {function.ParameterCount - 1} passed {parameters.Length})", callerPosition));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to constructor \"{function.ToReadable()}\" (required {function.ParameterCount - 1} passed {parameters.Length})", callerPosition));
             return;
         }
 

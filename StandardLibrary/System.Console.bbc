@@ -103,26 +103,19 @@ i32 _FindMaxPowOf10(i32 num)
     return result;
 }
 
-/*
- * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
- */
-export void Print(int message)
+#if BRAINFUCK
+
+export inline void Print(byte message)
 {
-    if (message < 0)
-    {
-        Print('-');
-        message = message * -1;
-    }
-    
-    int pow10 = _FindMaxPowOf10(message);
-    while (pow10)
-    {
-        int digit = message / pow10;
-        Print((char)(digit + '0'));
-        message -= digit * pow10;
-        pow10 /= 10;
-    }
+    Print(message as u8);
 }
+
+export inline void Print(int message)
+{
+    Print(message as u8);
+}
+
+#endif
 
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
@@ -208,6 +201,27 @@ export void Print(u32 message)
         Print((char)(digit + (u32)'0'));
         message -= digit * pow10;
         pow10 /= (u32)10;
+    }
+}
+
+/*
+ * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
+ */
+export void Print(i32 message)
+{
+    if (message < 0)
+    {
+        Print('-');
+        message = message * -1;
+    }
+    
+    int pow10 = _FindMaxPowOf10(message);
+    while (pow10)
+    {
+        int digit = message / pow10;
+        Print((char)(digit + '0'));
+        message -= digit * pow10;
+        pow10 /= 10;
     }
 }
 

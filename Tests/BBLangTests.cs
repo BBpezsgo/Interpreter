@@ -125,4 +125,5 @@ public class MainTests
     [TestMethod, Timeout(Timeout)] public void Test106() => Utils.GetTest(106).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test107() => Utils.GetTest(107).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test108() => Utils.GetTest(108).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test109() => Utils.GetTest(109).DoMain();
 }

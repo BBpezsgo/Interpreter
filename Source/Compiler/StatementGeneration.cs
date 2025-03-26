@@ -394,7 +394,7 @@ public partial class StatementCompiler
         {
             if (keywordCall.Arguments.Length > 1)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {keywordCall.Arguments.Length}", keywordCall));
+                Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to \"{StatementKeywords.Return}\": required {0} or {1} passed {keywordCall.Arguments.Length}", keywordCall));
                 return false;
             }
 
@@ -422,7 +422,7 @@ public partial class StatementCompiler
         {
             if (keywordCall.Arguments.Length != 1)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{StatementKeywords.Crash}\": required {1} passed {keywordCall.Arguments}", keywordCall));
+                Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to \"{StatementKeywords.Crash}\": required {1} passed {keywordCall.Arguments}", keywordCall));
                 return false;
             }
 
@@ -464,7 +464,7 @@ public partial class StatementCompiler
         {
             if (keywordCall.Arguments.Length != 1)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"{"goto"}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall));
+                Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to \"{"goto"}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall));
                 return false;
             }
 
@@ -504,7 +504,7 @@ public partial class StatementCompiler
         // TODO:
         // if (arguments.Count < partial)
         // {
-        //     Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{callee.ToReadable()}\": required {compiledFunction.ParameterCount} passed {arguments.Count}", caller));
+        //     Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{callee.ToReadable()}\": required {compiledFunction.ParameterCount} passed {arguments.Count}", caller));
         //     return false;
         // }
 
@@ -737,7 +737,7 @@ public partial class StatementCompiler
 
         if (arguments.Length < partial)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{callee.ToReadable()}\": required {callee.ParameterCount} passed {arguments.Length}", caller));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{callee.ToReadable()}\": required {callee.ParameterCount} passed {arguments.Length}", caller));
             return false;
         }
 
@@ -905,7 +905,7 @@ public partial class StatementCompiler
 
             if (anyCall.Arguments.Length != 1)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to \"sizeof\": required {1} passed {anyCall.Arguments.Length}", anyCall));
+                Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to \"sizeof\": required {1} passed {anyCall.Arguments.Length}", anyCall));
                 return false;
             }
 
@@ -1277,7 +1277,7 @@ public partial class StatementCompiler
 
             if (UnaryOperatorCall.ParameterCount != operatorDefinition.ParameterCount)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to operator \"{operatorDefinition.ToReadable()}\": required {operatorDefinition.ParameterCount} passed {UnaryOperatorCall.ParameterCount}", @operator));
+                Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to operator \"{operatorDefinition.ToReadable()}\": required {operatorDefinition.ParameterCount} passed {UnaryOperatorCall.ParameterCount}", @operator));
                 return false;
             }
 
@@ -2472,11 +2472,10 @@ public partial class StatementCompiler
 
         throw new NotImplementedException();
     }
-    bool GenerateCodeForStatement(LiteralList listValue, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool GenerateCodeForStatement(LiteralList listValue, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null)
     {
         compiledStatement = null;
-
-        GeneralType? itemType = null;
+        GeneralType? itemType = (expectedType as ArrayType)?.Of;
 
         ImmutableArray<CompiledStatementWithValue>.Builder result = ImmutableArray.CreateBuilder<CompiledStatementWithValue>(listValue.Values.Length);
         for (int i = 0; i < listValue.Values.Length; i++)
@@ -2680,7 +2679,7 @@ public partial class StatementCompiler
     }
     bool GenerateCodeForStatement(StatementWithValue statement, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null, bool resolveReference = true) => statement switch
     {
-        LiteralList v => GenerateCodeForStatement(v, out compiledStatement),
+        LiteralList v => GenerateCodeForStatement(v, out compiledStatement, expectedType),
         BinaryOperatorCall v => GenerateCodeForStatement(v, out compiledStatement, expectedType),
         UnaryOperatorCall v => GenerateCodeForStatement(v, out compiledStatement),
         LiteralStatement v => GenerateCodeForStatement(v, out compiledStatement, expectedType),

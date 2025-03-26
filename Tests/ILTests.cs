@@ -113,4 +113,5 @@ public class ILTests
     [TestMethod, Timeout(Timeout)] public void Test106() => Utils.GetTest(106).DoIL();
     [TestMethod, Timeout(Timeout)] public void Test107() => Utils.GetTest(107).DoIL();
     [TestMethod, Timeout(Timeout)] public void Test108() => Utils.GetTest(108).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test109() => Utils.GetTest(109).DoIL();
 }

@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=320&f=0&s=244)](#)
-[![](https://img.shields.io/badge/Passing-320-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-0-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-244-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=331&f=2&s=258)](#)
+[![](https://img.shields.io/badge/Passing-331-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-2-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-258-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -93,3 +93,10 @@
 | [97](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/97.bbc) | ✅ | ✖ Not enought resources |
 | [99](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/99.bbc) | ✖ Not implemented | ✅ |
 | [101](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/101.bbc) | ✅ | ✅ |
+| [103](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/103.bbc) | ✅ | ✖ Floats not supported |
+| [104](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/104.bbc) | ✅ | ❌ Standard output isn't what is expected: Expected: "\u4f60\u597d\n" Actual:   "`}\n" |
+| [105](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/105.bbc) | ✅ | ✅ |
+| [106](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/106.bbc) | ✅ | ✅ |
+| [107](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/107.bbc) | ✅ | ❌ Test method Tests.BrainfuckTests.Test107 threw exception:  LanguageCore.LanguageException: Variable "a" already defined |
+| [108](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/108.bbc) | ✅ | ✅ |
+| [109](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/109.bbc) | ✅ | ✖ nah |

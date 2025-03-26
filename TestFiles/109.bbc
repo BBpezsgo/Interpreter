@@ -1,0 +1,14 @@
+using System;
+
+u16[] a = [ 3, 6, 5 ];
+char[] b = "763";
+
+Print(a[0]);
+Print(a[1]);
+Print(a[2]);
+
+Print(b[0]);
+Print(b[1]);
+Print(b[2]);
+
+PrintLine();

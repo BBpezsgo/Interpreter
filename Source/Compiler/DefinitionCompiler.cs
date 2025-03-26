@@ -70,7 +70,7 @@ public partial class StatementCompiler
                 {
                     if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of arguments passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
 
@@ -96,7 +96,7 @@ public partial class StatementCompiler
                 {
                     if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of arguments passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
 
@@ -116,7 +116,7 @@ public partial class StatementCompiler
 
                     if (builtinFunction.Parameters.Length != function.Parameters.Count)
                     {
-                        Diagnostics.Add(Diagnostic.Critical($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{builtinName}\"", function.Identifier, function.File));
                     }
 
                     if (type is null)
@@ -149,7 +149,7 @@ public partial class StatementCompiler
                 {
                     if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of arguments passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
 
@@ -180,7 +180,7 @@ public partial class StatementCompiler
                 {
                     if (attribute.Parameters.Length != 1)
                     {
-                        Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
+                        Diagnostics.Add(Diagnostic.Error($"Wrong number of arguments passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));
                         break;
                     }
 
@@ -212,7 +212,7 @@ public partial class StatementCompiler
 
             if (attribute.Parameters.Length != userDefinedAttribute.Parameters.Length)
             {
-                Diagnostics.Add(Diagnostic.Error($"Wrong number of parameters passed to attribute \"{attribute.Identifier}\": required {userDefinedAttribute.Parameters.Length}, passed {attribute.Parameters.Length}", attribute));
+                Diagnostics.Add(Diagnostic.Error($"Wrong number of arguments passed to attribute \"{attribute.Identifier}\": required {userDefinedAttribute.Parameters.Length}, passed {attribute.Parameters.Length}", attribute));
                 break;
             }
 

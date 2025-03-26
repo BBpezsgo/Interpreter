@@ -95,6 +95,10 @@ public static class Utils
         return !e2.MoveNext();
     }
 
+    public static bool SequenceEquals<TKey, TValue>(IReadOnlyDictionary<TKey, TValue> collectionA, IReadOnlyDictionary<TKey, TValue> collectionB, Func<TValue, TValue, bool> checker)
+        => collectionA.Keys.Count() == collectionB.Keys.Count() &&
+        collectionA.Keys.All(k => collectionB.ContainsKey(k) && checker(collectionB[k], collectionA[k]));
+
     public static bool PowerOf2(int n) => n != 0 && (n & (n - 1)) == 0;
 
     public static Uri ToFileUri(string path) => new UriBuilder()

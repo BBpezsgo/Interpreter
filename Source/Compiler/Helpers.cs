@@ -761,8 +761,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (query.ArgumentCount.HasValue &&
                 function.ParameterTypes.Count != query.ArgumentCount.Value)
             {
-                if (query.ArgumentCount.HasValue &&
-                    partial != query.ArgumentCount.Value)
+                if (query.ArgumentCount.Value < partial ||
+                    query.ArgumentCount.Value > function.ParameterTypes.Count)
                 {
                     if (perfectus < FunctionPerfectus.PartialParameterCount)
                     {

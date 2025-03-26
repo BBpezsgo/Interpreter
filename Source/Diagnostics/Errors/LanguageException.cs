@@ -8,7 +8,25 @@ public class LanguageException : Exception
     public Position Position { get; protected set; }
     public Uri? File { get; protected set; }
 
-    public LanguageException(string message, Position position, Uri? file) : base(message)
+    public LanguageException(string message, Position position, Uri? file)
+        : this(message, position, file, ImmutableArray<LanguageException>.Empty)
+    { }
+
+    public LanguageException(string message, Position position, Uri? file, params LanguageException[] suberrors)
+        : this(message, position, file, suberrors.ToImmutableArray())
+    { }
+
+    public LanguageException(string message, Position position, Uri? file, IEnumerable<LanguageException> suberrors)
+        : this(message, position, file, suberrors.ToImmutableArray())
+    { }
+
+    public LanguageException(string message, Position position, Uri? file, ImmutableArray<LanguageException> suberrors)
+        : base(message, suberrors.Length switch
+        {
+            0 => null,
+            1 => suberrors[0],
+            _ => new AggregateException(suberrors),
+        })
     {
         Position = position;
         File = file;

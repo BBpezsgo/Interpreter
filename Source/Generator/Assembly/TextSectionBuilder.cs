@@ -85,11 +85,7 @@ public class TextSectionBuilder : SectionBuilder
         AppendText(Environment.NewLine);
     }
 
-#if NET_STANDARD
     public void AppendInstructionNoEOL(string keyword, params string[] operands)
-#else
-    public void AppendInstructionNoEOL(string keyword, params ReadOnlySpan<string> operands)
-#endif
     {
         AppendInstructionNoEOL(keyword);
         if (operands.Length > 0)
@@ -105,11 +101,7 @@ public class TextSectionBuilder : SectionBuilder
         }
     }
 
-#if NET_STANDARD
     public void AppendInstruction(string keyword, params string[] operands)
-#else
-    public void AppendInstruction(string keyword, params ReadOnlySpan<string> operands)
-#endif
     {
         AppendInstructionNoEOL(keyword, operands);
         AppendText(Environment.NewLine);

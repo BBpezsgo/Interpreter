@@ -173,13 +173,8 @@ public static class Minifier
 
             alreadyThere = result[i] switch
             {
-#if NET_STANDARD
-                '+' => alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value + 1,
-                '-' => alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value - 1,
-#else
-                '+' => alreadyThere + 1,
-                '-' => alreadyThere - 1,
-#endif
+                '+' => alreadyThere.IsUnknown ? alreadyThere : alreadyThere + 1,
+                '-' => alreadyThere.IsUnknown ? alreadyThere : alreadyThere - 1,
                 ']' => 0,
                 '.' => alreadyThere,
                 _ => PredictedBrainfuckNumber.Unknown,
@@ -273,22 +268,14 @@ public static class Minifier
             {
                 case '+':
                 {
-#if NET_STANDARD
-                    alreadyThere = alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value + 1;
-#else
-                    alreadyThere++;
-#endif
+                    alreadyThere = alreadyThere.IsUnknown ? alreadyThere : alreadyThere + 1;
                     if (initializationStarted == -1) initializationStarted = i;
                     break;
                 }
 
                 case '-':
                 {
-#if NET_STANDARD
-                    alreadyThere = alreadyThere.IsUnknown ? alreadyThere : alreadyThere.Value - 1;
-#else
-                    alreadyThere--;
-#endif
+                    alreadyThere = alreadyThere.IsUnknown ? alreadyThere : alreadyThere - 1;
                     if (initializationStarted == -1) initializationStarted = i;
                     break;
                 }

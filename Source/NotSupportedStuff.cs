@@ -58,59 +58,59 @@ namespace System.Numerics
 
     }
 
-    public interface IModulusOperators<TSelf, TOher, TResult>
+    public interface IModulusOperators<TSelf, TOther, TResult>
     {
 
     }
 
-    public interface IUnaryPlusOperators<TSelf, TOher>
+    public interface IUnaryPlusOperators<TSelf, TOther>
     {
 
     }
 
-    public interface IUnaryNegationOperators<TSelf, TOher>
+    public interface IUnaryNegationOperators<TSelf, TOther>
     {
 
     }
 
-    public interface IShiftOperators<TSelf, TOher, TResult>
+    public interface IShiftOperators<TSelf, TOther, TResult>
     {
 
     }
 
-    public interface IBitwiseOperators<TSelf, TOher, TResult>
+    public interface IBitwiseOperators<TSelf, TOther, TResult>
     {
 
     }
 
-    public interface IAdditionOperators<TSelf, TOher, TResult>
+    public interface IAdditionOperators<TSelf, TOther, TResult>
     {
-        
+
     }
 
-    public interface ISubtractionOperators<TSelf, TOher, TResult>
+    public interface ISubtractionOperators<TSelf, TOther, TResult>
     {
-        
+
     }
 
-    public interface IEqualityOperators<TSelf, TOher, TResult>
+    public interface IEqualityOperators<TSelf, TOther, TResult>
     {
-        
+
     }
 
-    public interface IMultiplyOperators<TSelf, TOher, TResult>
+    public interface IMultiplyOperators<TSelf, TOther, TResult>
     {
-        
+
     }
 
-    public interface IDivisionOperators<TSelf, TOher, TResult>
+    public interface IDivisionOperators<TSelf, TOther, TResult>
     {
-        
+
     }
 
-    public interface IComparisonOperators<TSelf, TOher, TResult>
+    public interface IComparisonOperators<TSelf, TOther, TResult>
     {
-        
+
     }
 }
 

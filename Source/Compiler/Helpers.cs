@@ -767,7 +767,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     if (perfectus < FunctionPerfectus.PartialParameterCount)
                     {
                         result_ = function;
-                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: wrong number of parameters ({query.ArgumentCount.Value}) passed to \"{function.ToReadable()}\"");
+                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found",
+                            new PossibleDiagnostic($"Wrong number of parameters ({query.ArgumentCount.Value}) passed to \"{function.ToReadable()}\""));
                     }
                     return false;
                 }
@@ -830,7 +831,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? checkedQuery.ToReadable()}\" not found: parameter types of caller \"{checkedQuery.ToReadable()}\" doesn't match with callee \"{function.ToReadable()}\"", errors.ToArray());
+                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? checkedQuery.ToReadable()}\" not found",
+                            new PossibleDiagnostic($"Parameter types of caller \"{checkedQuery.ToReadable()}\" doesn't match with callee \"{function.ToReadable()}\"",
+                                errors.ToArray()));
                     }
                     return false;
                 }
@@ -890,7 +893,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? checkedQuery.ToReadable()}\" not found: parameter types of caller \"{checkedQuery.ToReadable()}\" doesn't match with callee \"{function.ToReadable()}\"");
+                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? checkedQuery.ToReadable()}\" not found",
+                            new PossibleDiagnostic($"Parameter types of caller \"{checkedQuery.ToReadable()}\" doesn't match with callee \"{function.ToReadable()}\""));
                     }
                     return false;
                 }
@@ -936,7 +940,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                             RelevantFile = query.RelevantFile,
                             ReturnType = query.ReturnType,
                         };
-                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? checkedQuery.ToReadable()}\" not found: parameter types of caller \"{checkedQuery.ToReadable()}\" doesn't match with callee \"{function.ToReadable()}\"");
+                        error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? checkedQuery.ToReadable()}\" not found",
+                            new PossibleDiagnostic($"Parameter types of caller \"{checkedQuery.ToReadable()}\" doesn't match with callee \"{function.ToReadable()}\""));
                     }
                     return false;
                 }
@@ -949,12 +954,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         bool HandleReturnType(TFunction function)
         {
             if (query.ReturnType is not null &&
-                !StatementCompiler.CanCastImplicitly(function.Type, query.ReturnType, null, out PossibleDiagnostic? error1))
+                !StatementCompiler.CanCastImplicitly(function.Type, query.ReturnType, null, out PossibleDiagnostic? castError))
             {
                 if (perfectus < FunctionPerfectus.ReturnType)
                 {
                     result_ = function;
-                    error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: return type of caller \"{query}\" doesn't match with callee \"{function.ToReadable()}\"", error1);
+                    error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found",
+                        new PossibleDiagnostic($"Return type of caller \"{query}\" doesn't match with callee \"{function.ToReadable()}\"",
+                            castError));
                 }
                 return false;
             }
@@ -971,7 +978,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.PerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: return type of caller \"{query}\" doesn't match with callee \"{function.ToReadable()}\"");
+                    error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found",
+                        new PossibleDiagnostic($"Return type of caller \"{query}\" doesn't match with callee \"{function.ToReadable()}\""));
                 }
                 return false;
             }
@@ -988,7 +996,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 if (perfectus < FunctionPerfectus.VeryPerfectParameterTypes)
                 {
                     result_ = function;
-                    error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: return type of caller \"{query}\" doesn't match with callee \"{function.ToReadable()}\"");
+                    error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found",
+                        new PossibleDiagnostic($"Return type of caller \"{query}\" doesn't match with callee \"{function.ToReadable()}\""));
                 }
                 return false;
             }
@@ -1007,7 +1016,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
             if (perfectus >= FunctionPerfectus.File)
             {
-                error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found: multiple {kindNameLower}s matched in the same file");
+                error_ = new PossibleDiagnostic($"{kindNameCapital} \"{readableName ?? query.ToReadable()}\" not found",
+                    new PossibleDiagnostic($"Multiple {kindNameLower}s matched in the same file"));
             }
 
             TryOverride(FunctionPerfectus.File, function);
@@ -1956,6 +1966,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return BuiltinType.Void;
         }
 
+        // Diagnostics.Add(notFoundError?.SubErrors.FirstOrDefault()?.ToWarning(functionCall));
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
         return OnGotStatementType(functionCall, result.Function.Type);
     }

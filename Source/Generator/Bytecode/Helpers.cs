@@ -78,14 +78,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new NotImplementedException(); }
 
         return new(
-                new AddressPointer(AbsoluteGlobalAddress),
-                0
-                + generatedVariable.MemoryAddress
-            //  + ((
-            //      AbsGlobalAddressSize
-            //      + BasePointerSize
-            //  ) * BytecodeProcessor.StackDirection)
-            );
+            new AddressPointer(AbsoluteGlobalAddress),
+            0
+            + generatedVariable.MemoryAddress
+        //  + ((
+        //      AbsGlobalAddressSize
+        //      + BasePointerSize
+        //  ) * BytecodeProcessor.StackDirection)
+        );
     }
 
     AddressOffset GetLocalVariableAddress(CompiledVariableDeclaration variable)
@@ -106,29 +106,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
     public AddressOffset GetReturnValueAddress(GeneralType returnType)
     {
         return new(
-                Register.BasePointer,
-                0 // We start at the saved base pointer
-                - ((
-                    ParametersSize // Offset by the parameters
-                    + StackFrameTags // Offset by the stack frame stuff
-                ) * BytecodeProcessor.StackDirection)
-                // - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
-                // + 1 // Stack pointer offset (???)
-                );
+            Register.BasePointer,
+            0 // We start at the saved base pointer
+            - ((
+                ParametersSize // Offset by the parameters
+                + StackFrameTags // Offset by the stack frame stuff
+            ) * BytecodeProcessor.StackDirection)
+        //  - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
+        //  + 1 // Stack pointer offset (???)
+        );
     }
 
     public AddressOffset GetParameterAddress(CompiledParameter parameter, int offset = 0)
     {
         return new(
-                Register.BasePointer,
-                0 // We start at the saved base pointer
-                - ((
-                    ParametersSizeBefore(parameter.Index) // ???
-                    + StackFrameTags // Offset by the stack frame stuff
-                ) * BytecodeProcessor.StackDirection)
-                + offset
-                // + 1 // Stack pointer offset (???)
-                );
+            Register.BasePointer,
+            0 // We start at the saved base pointer
+            - ((
+                ParametersSizeBefore(parameter.Index) // ???
+                + StackFrameTags // Offset by the stack frame stuff
+            ) * BytecodeProcessor.StackDirection)
+            + offset
+        //  + 1 // Stack pointer offset (???)
+            );
     }
 
     void Pop(int size)
@@ -304,7 +304,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 #if NET_STANDARD
                 CompatibilityUtils.GetEnumValues<BitWidth>().Reverse()
 #else
-                ((IEnumerable<BitWidth>)Enum.GetValues<BitWidth>()).Reverse()
+                Enum.GetValues<BitWidth>().Reverse()
 #endif
             )
             {
@@ -391,7 +391,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 #if NET_STANDARD
                             CompatibilityUtils.GetEnumValues<BitWidth>().Reverse()
 #else
-                            ((IEnumerable<BitWidth>)Enum.GetValues<BitWidth>()).Reverse()
+                            Enum.GetValues<BitWidth>().Reverse()
 #endif
                         )
                         {

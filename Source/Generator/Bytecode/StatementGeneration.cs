@@ -2,10 +2,6 @@
 using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
-#if NET_STANDARD
-#pragma warning disable CS8604 // Possible null reference argument.
-#endif
-
 namespace LanguageCore.BBLang.Generator;
 
 public partial class CodeGeneratorForMain : CodeGenerator

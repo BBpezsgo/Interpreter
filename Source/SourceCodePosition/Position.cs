@@ -25,11 +25,7 @@ public readonly struct Position :
         AbsoluteRange = absoluteRange;
     }
 
-#if NET_STANDARD
     public Position(params IPositioned?[] elements)
-#else
-    public Position(params ReadOnlySpan<IPositioned?> elements)
-#endif
     {
         if (elements.Length == 0) throw new ArgumentException($"Number of elements must be more than zero", nameof(elements));
 
@@ -66,11 +62,7 @@ public readonly struct Position :
         Range = position.Range;
         AbsoluteRange = position.AbsoluteRange;
     }
-#if NET_STANDARD
     public Position(IEnumerable<IPositioned?> elements) : this(elements.ToArray()) { }
-#else
-    public Position(IEnumerable<IPositioned?> elements) : this(elements.ToArray().AsSpan()) { }
-#endif
 
     public string ToStringRange()
     {
@@ -102,11 +94,7 @@ public readonly struct Position :
         if (Range.Start.Line != Range.End.Line)
         { throw new NotImplementedException($"Position slicing on different lines not implemented"); }
 
-#if NET_STANDARD
         if (at < 0) throw new ArgumentOutOfRangeException(nameof(at));
-#else
-        ArgumentOutOfRangeException.ThrowIfNegative(at);
-#endif
         int rangeSize = Range.End.Character - Range.Start.Character;
 
         if (rangeSize < 0)

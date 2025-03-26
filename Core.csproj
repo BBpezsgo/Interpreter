@@ -6,13 +6,12 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <LangVersion>preview</LangVersion>
+    <LangVersion>11</LangVersion>
     <PublishAot>false</PublishAot>
     <AssemblyName>BBLang</AssemblyName>
     <PackageId>BBLang</PackageId>
     <Authors>BB</Authors>
     <AnalysisLevel>preview-all</AnalysisLevel>
-    <DefineConstants>LANG_10;LANG_11;LANG_12;LANG_13</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

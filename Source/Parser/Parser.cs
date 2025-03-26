@@ -66,6 +66,21 @@ public sealed class Parser
         ModifierKeywords.Temp
     );
 
+    static readonly ImmutableArray<string> StructModifiers = ImmutableArray.Create
+    (
+        ProtectionKeywords.Export
+    );
+
+    static readonly ImmutableArray<string> ConstructorModifiers = ImmutableArray.Create
+    (
+        ProtectionKeywords.Export
+    );
+
+    static readonly ImmutableArray<string> GeneralFunctionModifiers = ImmutableArray.Create
+    (
+        ProtectionKeywords.Export
+    );
+
     static readonly ImmutableArray<string> OverloadableOperators = ImmutableArray.Create
     (
         "<<", ">>",
@@ -284,7 +299,7 @@ public sealed class Parser
 
         possibleName.AnalyzedType = TokenAnalyzedType.FunctionName;
 
-        CheckModifiers(modifiers, FunctionModifiers.AsSpan());
+        CheckModifiers(modifiers, FunctionModifiers);
 
         Block? block = null;
 
@@ -327,7 +342,7 @@ public sealed class Parser
         if (!ExpectType(AllowedType.Any | AllowedType.FunctionPointer | AllowedType.StackArrayWithoutLength, out TypeInstance? type))
         { throw new SyntaxException($"Expected type after alias identifier", identifier.Position.After(), File); }
 
-        CheckModifiers(modifiers, AliasModifiers.AsSpan());
+        CheckModifiers(modifiers, AliasModifiers);
 
         if (!ExpectOperator(";"))
         { throw new SyntaxException($"Expected semicolon after alias definition", type.Position.After(), File); }
@@ -397,12 +412,12 @@ public sealed class Parser
         if (!ExpectIdentifier(out Token? possibleNameT))
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpecParameters(ParameterModifiers, true, out var parameters))
+        if (!ExpecParameters(ParameterModifiers, true, out ParameterDefinitionCollection? parameters))
         { CurrentTokenIndex = parseStart; return false; }
 
         possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
 
-        CheckModifiers(modifiers, FunctionModifiers.AsSpan());
+        CheckModifiers(modifiers, FunctionModifiers);
 
         Block? block = null;
 
@@ -440,12 +455,12 @@ public sealed class Parser
             not BuiltinFunctionIdentifiers.Destructor)
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out var parameters))
+        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters))
         { CurrentTokenIndex = parseStart; return false; }
 
         possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
 
-        CheckModifiers(modifiers, ProtectionKeywords.Export);
+        CheckModifiers(modifiers, GeneralFunctionModifiers);
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
@@ -473,10 +488,10 @@ public sealed class Parser
         if (!ExpectType(AllowedType.None, out TypeInstance? type))
         { CurrentTokenIndex = parseStart; return false; }
 
-        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), true, out var parameters))
+        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), true, out ParameterDefinitionCollection? parameters))
         { CurrentTokenIndex = parseStart; return false; }
 
-        CheckModifiers(modifiers, ProtectionKeywords.Export);
+        CheckModifiers(modifiers, ConstructorModifiers);
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
@@ -560,7 +575,7 @@ public sealed class Parser
             }
         }
 
-        CheckModifiers(modifiers, ProtectionKeywords.Export);
+        CheckModifiers(modifiers, StructModifiers);
 
         StructDefinition structDefinition = new(
             possibleStructName,
@@ -599,11 +614,7 @@ public sealed class Parser
         while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
             Token[] parameterModifiers = ExpectModifiers();
-#if NET_STANDARD
             CheckParameterModifiers(parameterModifiers, parameters.Count, allowedParameterModifiers);
-#else
-            CheckParameterModifiers(parameterModifiers, parameters.Count, allowedParameterModifiers.AsSpan());
-#endif
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
             { throw new SyntaxException("Expected parameter type", PreviousToken!.Position.After(), File); }
@@ -614,7 +625,7 @@ public sealed class Parser
             parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
             StatementWithValue? defaultValue = null;
-            if (ExpectOperator("=", out var assignmentOperator))
+            if (ExpectOperator("=", out Token? assignmentOperator))
             {
                 if (!allowDefaultValues)
                 { throw new SyntaxException("Default parameter values are not valid in the current context", assignmentOperator, File); }
@@ -1103,7 +1114,7 @@ public sealed class Parser
         AttributeUsage[] attributes = ExpectAttributes();
 
         List<Token> modifiers = new();
-        while (ExpectIdentifier(out Token? modifier, VariableModifiers.AsSpan()))
+        while (ExpectIdentifier(out Token? modifier, VariableModifiers))
         { modifiers.Add(modifier); }
 
         TypeInstance? possibleType;
@@ -1406,21 +1417,13 @@ public sealed class Parser
             return true;
         }
 
-#if NET_STANDARD
-        if (!ExpectModifiedOrOneValue(out StatementWithValue? leftStatement, GeneralStatementModifiers.ToArray())) return false;
-#else
-        if (!ExpectModifiedOrOneValue(out StatementWithValue? leftStatement, GeneralStatementModifiers.AsSpan())) return false;
-#endif
+        if (!ExpectModifiedOrOneValue(out StatementWithValue? leftStatement, GeneralStatementModifiers)) return false;
 
         while (true)
         {
             if (!ExpectOperator(BinaryOperators, out Token? binaryOperator)) break;
 
-#if NET_STANDARD
-            if (!ExpectModifiedOrOneValue(out StatementWithValue? rightStatement, GeneralStatementModifiers.ToArray()))
-#else
-            if (!ExpectModifiedOrOneValue(out StatementWithValue? rightStatement, GeneralStatementModifiers.AsSpan()))
-#endif
+            if (!ExpectModifiedOrOneValue(out StatementWithValue? rightStatement, GeneralStatementModifiers))
             {
                 if (!ExpectUnaryOperatorCall(out UnaryOperatorCall? rightUnaryOperatorCall))
                 { throw new SyntaxException($"Expected value after operator \"{binaryOperator}\" (not \"{CurrentToken}\")", binaryOperator.Position.After(), File); }
@@ -1542,11 +1545,7 @@ public sealed class Parser
         return false;
     }
 
-#if NET_STANDARD
-    bool ExpectModifiedOrOneValue([NotNullWhen(true)] out StatementWithValue? oneValue, params string[] validModifiers)
-#else
-    bool ExpectModifiedOrOneValue([NotNullWhen(true)] out StatementWithValue? oneValue, params ReadOnlySpan<string> validModifiers)
-#endif
+    bool ExpectModifiedOrOneValue([NotNullWhen(true)] out StatementWithValue? oneValue, ImmutableArray<string> validModifiers)
     {
         if (!ExpectIdentifier(out Token? modifier, validModifiers))
         {
@@ -1562,11 +1561,7 @@ public sealed class Parser
         return true;
     }
 
-#if NET_STANDARD
-    bool ExpectModifiedValue([NotNullWhen(true)] out ModifiedStatement? modifiedStatement, params string[] validModifiers)
-#else
-    bool ExpectModifiedValue([NotNullWhen(true)] out ModifiedStatement? modifiedStatement, params ReadOnlySpan<string> validModifiers)
-#endif
+    bool ExpectModifiedValue([NotNullWhen(true)] out ModifiedStatement? modifiedStatement, ImmutableArray<string> validModifiers)
     {
         if (!ExpectIdentifier(out Token? modifier, validModifiers))
         {
@@ -1620,11 +1615,7 @@ public sealed class Parser
         {
             StatementWithValue? parameter;
 
-#if NET_STANDARD
-            if (ExpectModifiedValue(out ModifiedStatement? modifiedStatement, ArgumentModifiers.ToArray()))
-#else
-            if (ExpectModifiedValue(out ModifiedStatement? modifiedStatement, ArgumentModifiers.AsSpan()))
-#endif
+            if (ExpectModifiedValue(out ModifiedStatement? modifiedStatement, ArgumentModifiers))
             {
                 parameter = modifiedStatement;
             }
@@ -1762,7 +1753,7 @@ public sealed class Parser
 
         possibleVariableName.AnalyzedType = TokenAnalyzedType.None;
 
-        CheckModifiers(modifiers, FieldModifiers.AsSpan());
+        CheckModifiers(modifiers, FieldModifiers);
 
         field = new(possibleVariableName, possibleType, modifiers, attributes);
 
@@ -1778,7 +1769,7 @@ public sealed class Parser
 
         while (true)
         {
-            if (ExpectIdentifier(out Token? modifier, AllModifiers.AsSpan()))
+            if (ExpectIdentifier(out Token? modifier, AllModifiers))
             {
                 modifier.AnalyzedType = TokenAnalyzedType.Keyword;
                 result.Add(modifier);
@@ -1793,11 +1784,7 @@ public sealed class Parser
         return result.ToArray();
     }
 
-#if NET_STANDARD
-    void CheckParameterModifiers(IEnumerable<Token> modifiers, int parameterIndex, params string[] validModifiers)
-#else
-    void CheckParameterModifiers(IEnumerable<Token> modifiers, int parameterIndex, params ReadOnlySpan<string> validModifiers)
-#endif
+    void CheckParameterModifiers(IEnumerable<Token> modifiers, int parameterIndex, ImmutableArray<string> validModifiers)
     {
         foreach (Token modifier in modifiers)
         {
@@ -1810,19 +1797,7 @@ public sealed class Parser
         }
     }
 
-#if NET_STANDARD
-    void CheckModifiers(IEnumerable<Token> modifiers, ReadOnlySpan<string> validModifiers)
-    {
-        foreach (Token modifier in modifiers)
-        {
-            if (!validModifiers.Contains(modifier.Content))
-            { Diagnostics.Add(Diagnostic.Error($"Modifier \"{modifier}\" not valid in the current context", modifier, File)); }
-        }
-    }
-    void CheckModifiers(IEnumerable<Token> modifiers, params string[] validModifiers)
-#else
-    void CheckModifiers(IEnumerable<Token> modifiers, params ReadOnlySpan<string> validModifiers)
-#endif
+    void CheckModifiers(IEnumerable<Token> modifiers, ImmutableArray<string> validModifiers)
     {
         foreach (Token modifier in modifiers)
         {
@@ -1870,21 +1845,7 @@ public sealed class Parser
 
         return true;
     }
-#if NET_STANDARD
-    bool ExpectIdentifier([NotNullWhen(true)] out Token? result, ReadOnlySpan<string> names)
-    {
-        foreach (string name in names)
-        {
-            if (ExpectIdentifier(name, out result))
-            { return true; }
-        }
-        result = null;
-        return false;
-    }
-    bool ExpectIdentifier([NotNullWhen(true)] out Token? result, params string[] names)
-#else
-    bool ExpectIdentifier([NotNullWhen(true)] out Token? result, params ReadOnlySpan<string> names)
-#endif
+    bool ExpectIdentifier([NotNullWhen(true)] out Token? result, ImmutableArray<string> names)
     {
         foreach (string name in names)
         {

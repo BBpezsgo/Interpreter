@@ -8,19 +8,6 @@ namespace LanguageCore
             return unchecked((uint)(ch - '0')) <= 9;
         }
 
-        public static Range<SinglePosition> Fix(this Range<SinglePosition> v)
-        {
-            SinglePosition start = v.Start < v.End ? v.Start : v.End;
-            SinglePosition end = v.Start > v.End ? v.Start : v.End;
-            return new Range<SinglePosition>(start, end);
-        }
-
-        public static bool Contains(this Range<SinglePosition> range, SinglePosition value)
-        {
-            range = range.Fix();
-            return range.Start <= value && range.End >= value;
-        }
-
         public static string ReplaceLineEndings(this string self, string with)
         {
             return self.Replace("\r\n", with).Replace("\r", with).Replace("\n", with);
@@ -50,16 +37,6 @@ namespace LanguageCore
 
     public static class CompatibilityUtils
     {
-        public static Range<SinglePosition> RangeUnion(Range<SinglePosition> a, SinglePosition b)
-        {
-            return new(a.Start < b ? a.Start : b, a.End > b ? a.End : b);
-        }
-
-        public static Range<SinglePosition> RangeUnion(Range<SinglePosition> a, Range<SinglePosition> b)
-        {
-            return new(a.Start < b.Start ? a.Start : b.Start, a.End > b.End ? a.End : b.End);
-        }
-
         public static IEnumerable<T> GetEnumValues<T>()
             where T : Enum
         {

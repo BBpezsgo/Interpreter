@@ -4,7 +4,7 @@ namespace LanguageCore.Brainfuck;
 
 public interface IBrainfuckGenerator
 {
-    public CodeHelper Code { get; }
+    CodeHelper Code { get; }
 }
 
 public readonly struct AutoJumpBlock : IDisposable
@@ -380,11 +380,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </code>
     /// </para>
     /// </summary>
-#if NET_STANDARD
     public void ClearValue(params int[] addresses)
-#else
-    public void ClearValue(params ReadOnlySpan<int> addresses)
-#endif
     {
         for (int i = 0; i < addresses.Length; i++)
         { ClearValue(addresses[i]); }

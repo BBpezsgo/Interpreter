@@ -104,4 +104,13 @@ public class ILTests
     [TestMethod, Timeout(Timeout)] public void Test97() => Utils.GetTest(97).DoIL();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test98() => Utils.GetTest(98).DoIL();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test99() => Utils.GetTest(99).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test100() => Utils.GetTest(100).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test101() => Utils.GetTest(101).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test102() => Utils.GetTest(102).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test103() => Utils.GetTest(103).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test104() => Utils.GetTest(104).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test105() => Utils.GetTest(105).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test106() => Utils.GetTest(106).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test107() => Utils.GetTest(107).DoIL();
+    [TestMethod, Timeout(Timeout)] public void Test108() => Utils.GetTest(108).DoIL();
 }

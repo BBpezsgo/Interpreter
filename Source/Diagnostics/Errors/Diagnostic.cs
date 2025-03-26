@@ -49,8 +49,10 @@ public class Diagnostic :
         { Break(); }
     }
 
+    LanguageException ToException() => new(Message, Position, File, SubErrors.Select(v => v.ToException()));
+
     [DoesNotReturn]
-    public void Throw() => throw new LanguageException(Message, Position, File);
+    public void Throw() => throw ToException();
 
     public static Diagnostic Internal(string message, IPositioned? position, Uri? file, params Diagnostic?[] suberrors)
         => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, true, suberrors);

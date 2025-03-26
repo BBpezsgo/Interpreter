@@ -61,8 +61,10 @@ public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
         AddRange(other._diagnosticsWithoutContext);
     }
 
-    public void Add(Diagnostic diagnostic)
+    public void Add(Diagnostic? diagnostic)
     {
+        if (diagnostic is null) return;
+
         if (_diagnostics.Any(v => v.Equals(diagnostic)))
         { return; }
         _diagnostics.Add(diagnostic);

@@ -28,7 +28,7 @@ public static class HelloWorld
 
         // This will generate some stub function informations, so it will not produce warnings.
         // This kinda a bad implementation, so I have to fix it sometime.
-        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
         // With this `DiagnosticsCollection` you can get all the diagnostics that the compiler and the generator produced.
         // This contains all the fatal errors too, if you use the generated output while there are errors, there will be some unexpected behavior.
@@ -64,7 +64,7 @@ public static class HelloWorld
         diagnostics.Throw();
 
         // This will generate some predefined "external functions" and prepares the processor for executing code.
-        BytecodeProcessorEx interpreter = new(
+        BytecodeProcessor interpreter = new(
             BytecodeInterpreterSettings.Default,
             generatedCode.Code,
             null,

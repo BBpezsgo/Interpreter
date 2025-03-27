@@ -77,4 +77,29 @@ public class ExampleTests
 
         Examples.ExternalConstants.Run();
     }
+    [TestMethod, Timeout(Timeout)]
+    public void ExecutionManager()
+    {
+        StringBuilder output = new();
+        using StringWriter writer = new(output);
+        Console.SetOut(writer);
+
+        Examples.ExecutionManager.Run();
+
+        Assert.AreEqual(
+            ".\r\n" +
+            "init\r\n" +
+            "tick\r\n" +
+            "tick\r\n" +
+            "tick\r\n" +
+            "tick\r\n" +
+            "tick\r\n" +
+            "tick\r\n" +
+            "tick\r\n" +
+            "tick\r\n" +
+            "tick\r\n" +
+            "tick\r\n" +
+            "end\r\n",
+            output.ToString());
+    }
 }

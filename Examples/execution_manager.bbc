@@ -1,0 +1,21 @@
+using System;
+
+[Expose("init")]
+void Init()
+{
+    PrintLine("init");
+}
+
+[Expose("tick")]
+void Tick()
+{
+    PrintLine("tick");
+}
+
+[Expose("end")]
+void End()
+{
+    PrintLine("end");
+}
+
+PrintLine(".");

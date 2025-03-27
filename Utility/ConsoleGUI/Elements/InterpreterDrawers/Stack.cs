@@ -21,21 +21,21 @@ public partial class InterpreterElement
 
         CollectedScopeInfo stackDebugInfo;
         if (!Interpreter.DebugInformation.IsEmpty)
-        { stackDebugInfo = Interpreter.DebugInformation.GetScopeInformation(Interpreter.Processor.Registers.CodePointer); }
+        { stackDebugInfo = Interpreter.DebugInformation.GetScopeInformation(Interpreter.Registers.CodePointer); }
         else
         { stackDebugInfo = CollectedScopeInfo.Empty; }
 
-        ReadOnlySpan<CallTraceItem> callTrace = DebugUtils.TraceStack(Interpreter.Processor.Memory, Interpreter.Processor.Registers.BasePointer, Interpreter.DebugInformation.IsEmpty ? null : Interpreter.DebugInformation.StackOffsets);
+        ReadOnlySpan<CallTraceItem> callTrace = DebugUtils.TraceStack(Interpreter.Memory, Interpreter.Registers.BasePointer, Interpreter.DebugInformation.IsEmpty ? null : Interpreter.DebugInformation.StackOffsets);
 
         List<DataMovement> loadIndicators = new();
         List<DataMovement> storeIndicators = new();
 
-        if (Interpreter.Processor.NextInstruction.HasValue)
-        { GetDataMovementIndicators(Interpreter.Processor.NextInstruction.Value, loadIndicators, storeIndicators); }
+        if (Interpreter.NextInstruction.HasValue)
+        { GetDataMovementIndicators(Interpreter.NextInstruction.Value, loadIndicators, storeIndicators); }
 
         void DrawElement(int address, byte item, ReadOnlySpan<CallTraceItem> callTrace)
         {
-            if (Interpreter.Processor.Registers.BasePointer == address)
+            if (Interpreter.Registers.BasePointer == address)
             {
                 b.ForegroundColor = CharColor.BrightBlue;
                 b.AddText('►');
@@ -47,7 +47,7 @@ public partial class InterpreterElement
                 b.AddText('►');
                 b.ForegroundColor = CharColor.Silver;
             }
-            else if (Interpreter.Processor.Registers.StackPointer == address)
+            else if (Interpreter.Registers.StackPointer == address)
             {
                 b.ForegroundColor = CharColor.Yellow;
                 b.AddText('►');
@@ -220,7 +220,7 @@ public partial class InterpreterElement
 
         void DrawElementWInfo(int address, byte item, ReadOnlySpan<CallTraceItem> callTrace, StackElementInformation info)
         {
-            Range<int> range = info.GetRange(Interpreter.Processor.Registers.BasePointer, Interpreter.Processor.StackStart);
+            Range<int> range = info.GetRange(Interpreter.Registers.BasePointer, Interpreter.StackStart);
 
             if (range.Start == range.End)
             {
@@ -285,8 +285,8 @@ public partial class InterpreterElement
             }
         }
 
-        Range<int> interval = new(Interpreter.Processor.StackStart, Interpreter.Processor.Registers.StackPointer);
-        bool isReversed = BytecodeProcessor.StackDirection <= 0;
+        Range<int> interval = new(Interpreter.StackStart, Interpreter.Registers.StackPointer);
+        bool isReversed = ProcessorState.StackDirection <= 0;
 
         interval = RangeUtils.Intersect(interval, interval.Offset(isReversed ? -StackScrollBar.Offset : StackScrollBar.Offset));
 
@@ -296,9 +296,9 @@ public partial class InterpreterElement
 
         foreach (int i in enumerator)
         {
-            byte item = Interpreter.Processor.Memory[i];
+            byte item = Interpreter.Memory[i];
 
-            if (stackDebugInfo.TryGet(Interpreter.Processor.Registers.BasePointer, Interpreter.Processor.StackStart, i, out StackElementInformation itemDebugInfo))
+            if (stackDebugInfo.TryGet(Interpreter.Registers.BasePointer, Interpreter.StackStart, i, out StackElementInformation itemDebugInfo))
             { DrawElementWInfo(i, item, callTrace, itemDebugInfo); }
             else
             { DrawElement(i, item, callTrace); }
@@ -316,9 +316,9 @@ public partial class InterpreterElement
             if (interval.Size() == 0)
             {
                 if (isReversed)
-                { nextEmpty = Interpreter.Processor.Registers.StackPointer - (i - 1); }
+                { nextEmpty = Interpreter.Registers.StackPointer - (i - 1); }
                 else
-                { nextEmpty = Interpreter.Processor.Registers.StackPointer + (i - 1); }
+                { nextEmpty = Interpreter.Registers.StackPointer + (i - 1); }
             }
             else
             {
@@ -328,12 +328,12 @@ public partial class InterpreterElement
                 { nextEmpty = enumerator.Last() + i; }
             }
 
-            if (nextEmpty < 0 || nextEmpty >= Interpreter.Processor.Memory.Length)
+            if (nextEmpty < 0 || nextEmpty >= Interpreter.Memory.Length)
             { break; }
 
-            byte item = Interpreter.Processor.Memory[nextEmpty];
+            byte item = Interpreter.Memory[nextEmpty];
 
-            if (stackDebugInfo.TryGet(Interpreter.Processor.Registers.BasePointer, Interpreter.Processor.StackStart, nextEmpty, out StackElementInformation itemDebugInfo))
+            if (stackDebugInfo.TryGet(Interpreter.Registers.BasePointer, Interpreter.StackStart, nextEmpty, out StackElementInformation itemDebugInfo))
             { DrawElementWInfo(nextEmpty, item, callTrace, itemDebugInfo); }
             else
             { DrawElement(nextEmpty, item, callTrace); }

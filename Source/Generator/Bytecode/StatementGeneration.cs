@@ -1395,7 +1395,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddComment("Save");
 
                 for (int i = 0; i < statementSize; i++)
-                { PopTo(Register.StackPointer.ToPtr((statementSize - 1) * -BytecodeProcessor.StackDirection, BitWidth._8), BitWidth._8); }
+                { PopTo(Register.StackPointer.ToPtr((statementSize - 1) * -ProcessorState.StackDirection, BitWidth._8), BitWidth._8); }
 
                 AddComment("}");
 
@@ -1416,7 +1416,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 AddComment("Save");
 
                 for (int i = 0; i < targetSize; i++)
-                { PopTo(Register.StackPointer.ToPtr((statementSize - 1) * -BytecodeProcessor.StackDirection, BitWidth._8), BitWidth._8); }
+                { PopTo(Register.StackPointer.ToPtr((statementSize - 1) * -ProcessorState.StackDirection, BitWidth._8), BitWidth._8); }
 
                 AddComment("Discard excess");
 
@@ -1952,7 +1952,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GeneralType type = newVariable.Type;
 
-        int offset = (VariablesSize + type.GetSize(this, Diagnostics, newVariable)) * BytecodeProcessor.StackDirection;
+        int offset = (VariablesSize + type.GetSize(this, Diagnostics, newVariable)) * ProcessorState.StackDirection;
         GeneratedVariable generatedVariable = GeneratedVariables[newVariable] = new GeneratedVariable()
         {
             MemoryAddress = offset,
@@ -2271,7 +2271,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
             {
-                Address = (ExitCodeType.GetSize(this) - 1) * BytecodeProcessor.StackDirection,
+                Address = (ExitCodeType.GetSize(this) - 1) * ProcessorState.StackDirection,
                 BasePointerRelative = false,
                 Kind = StackElementKind.Internal,
                 Size = ExitCodeType.GetSize(this),

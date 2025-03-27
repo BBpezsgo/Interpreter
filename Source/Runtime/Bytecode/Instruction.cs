@@ -253,7 +253,7 @@ public readonly struct InstructionOperand
     public static explicit operator InstructionOperand(AddressRegisterPointer address) => address.Register.ToPtr(0, BitWidth._32);
     public static explicit operator InstructionOperand(AddressOffset address) => address.Base switch
     {
-        AddressRegisterPointer registerPointer => registerPointer.Register.ToPtr(address.Offset * BytecodeProcessor.StackDirection, BitWidth._32),
+        AddressRegisterPointer registerPointer => registerPointer.Register.ToPtr(address.Offset * ProcessorState.StackDirection, BitWidth._32),
         _ => throw new NotImplementedException()
     };
     public static explicit operator InstructionOperand(Address address) => address switch

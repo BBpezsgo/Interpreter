@@ -39,7 +39,7 @@ public static class Interactive
 
         try
         {
-            List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+            List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
             CompilerResult compiled = StatementCompiler.CompileFile(
                 "memory:///",
@@ -69,18 +69,18 @@ public static class Interactive
 
         if (diagnostics.HasErrors) return;
 
-        BytecodeProcessorEx interpreter = new(BytecodeInterpreterSettings.Default, generated.Code, null, generated.DebugInfo);
+        BytecodeProcessor interpreter = new(BytecodeInterpreterSettings.Default, generated.Code, null, generated.DebugInfo);
 
         interpreter.IO.OnStdOut += Console.Write;
         interpreter.IO.OnNeedInput += () => interpreter.IO.SendKey(Console.ReadKey().KeyChar);
 
-        int exitCodeAddress = interpreter.Processor.Registers.StackPointer + (sizeof(int) * BytecodeProcessor.StackDirection);
+        int exitCodeAddress = interpreter.Registers.StackPointer + (sizeof(int) * ProcessorState.StackDirection);
 
-        while (!interpreter.Processor.IsDone)
+        while (!interpreter.IsDone)
         { interpreter.Tick(); }
 
         {
-            int exitCode = interpreter.Processor.Memory.AsSpan().Get<int>(exitCodeAddress);
+            int exitCode = interpreter.Memory.AsSpan().Get<int>(exitCodeAddress);
 
             Console.WriteLine();
             Console.WriteLine($"Exit code: {exitCode}");

@@ -111,7 +111,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             - ((
                 ParametersSize // Offset by the parameters
                 + StackFrameTags // Offset by the stack frame stuff
-            ) * BytecodeProcessor.StackDirection)
+            ) * ProcessorState.StackDirection)
         //  - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
         //  + 1 // Stack pointer offset (???)
         );
@@ -125,7 +125,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             - ((
                 ParametersSizeBefore(parameter.Index) // ???
                 + StackFrameTags // Offset by the stack frame stuff
-            ) * BytecodeProcessor.StackDirection)
+            ) * ProcessorState.StackDirection)
             + offset
         //  + 1 // Stack pointer offset (???)
             );
@@ -729,9 +729,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         new AddressPointer(AbsoluteGlobalAddress),
         GlobalVariablesSize);
 
-    public int SavedBasePointerOffset => 0 * BytecodeProcessor.StackDirection;
-    public int AbsoluteGlobalOffset => ExitCodeType.GetSize(this) * -BytecodeProcessor.StackDirection;
-    public int SavedCodePointerOffset => (AbsGlobalAddressSize + CodePointerSize) * -BytecodeProcessor.StackDirection;
+    public int SavedBasePointerOffset => 0 * ProcessorState.StackDirection;
+    public int AbsoluteGlobalOffset => ExitCodeType.GetSize(this) * -ProcessorState.StackDirection;
+    public int SavedCodePointerOffset => (AbsGlobalAddressSize + CodePointerSize) * -ProcessorState.StackDirection;
 
     public const int InvalidFunctionAddress = int.MinValue;
 

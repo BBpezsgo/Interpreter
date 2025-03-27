@@ -17,7 +17,7 @@ public partial class InterpreterElement
 
         b.ResetColor();
 
-        Instruction? _instruction = Interpreter.Processor.NextInstruction;
+        Instruction? _instruction = Interpreter.NextInstruction;
 
         List<DataMovement> loadIndicators = new();
         List<DataMovement> storeIndicators = new();
@@ -26,15 +26,15 @@ public partial class InterpreterElement
         { GetDataMovementIndicators(_instruction.Value, loadIndicators, storeIndicators); }
 
         int nextHeader = 0;
-        for (int i = 0; i < Interpreter.Processor.Memory.Length; i++)
+        for (int i = 0; i < Interpreter.Memory.Length; i++)
         {
-            byte item = Interpreter.Processor.Memory[i];
-            bool isHeader = (nextHeader == i) && (Interpreter.Processor.Memory[i] != 0);
+            byte item = Interpreter.Memory[i];
+            bool isHeader = (nextHeader == i) && (Interpreter.Memory[i] != 0);
             (int, bool) header = default;
 
             if (isHeader)
             {
-                header = BytecodeHeapImplementation.GetHeader(Interpreter.Processor.Memory, i);
+                header = BytecodeHeapImplementation.GetHeader(Interpreter.Memory, i);
                 nextHeader += header.Item1 + BytecodeHeapImplementation.HeaderSize;
             }
 

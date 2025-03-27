@@ -19,18 +19,32 @@ public ref partial struct ProcessorState
     public readonly int StackStart => StackDirection > 0 ? Settings.HeapSize : Settings.HeapSize + Settings.StackSize - 1;
 
     readonly BytecodeInterpreterSettings Settings;
-    public Registers Registers;
-#if !UNITY_BURST
-    ExternalFunctionAsyncReturnChecker? PendingExternalFunction;
-#endif
 
     public readonly Span<byte> Memory;
     public readonly ReadOnlySpan<Instruction> Code;
     public readonly ReadOnlySpan<IExternalFunction> ExternalFunctions;
     public readonly unsafe ExternalFunctionScopedSync* ScopedExternalFunctions;
     public readonly int ScopedExternalFunctionsCount;
+
     public int Crash;
     public Signal Signal;
+    public Registers Registers;
+#if !UNITY_BURST
+    ExternalFunctionAsyncReturnChecker? PendingExternalFunction;
+#endif
+
+    public static unsafe ProcessorState Create(ImmutableArray<Instruction> code, byte[]? memory, FrozenDictionary<int, IExternalFunction> externalFunctions, BytecodeInterpreterSettings settings) => new ProcessorState(
+        settings,
+        new Registers()
+        {
+            StackPointer = settings.StackStart - StackDirection
+        },
+        memory ?? new byte[settings.HeapSize + settings.StackSize],
+        code.AsSpan(),
+        externalFunctions.Values.AsSpan(),
+        default,
+        default
+    );
 
     public unsafe ProcessorState(
         BytecodeInterpreterSettings settings,
@@ -153,6 +167,37 @@ public ref partial struct ProcessorState
             case Opcode.FFrom: FFrom(); break;
 
             default: throw new UnreachableException();
+        }
+    }
+
+    public readonly void ThrowIfCrashed(CompiledDebugInformation debugInformation = default)
+    {
+        switch (Signal)
+        {
+            case Signal.PointerOutOfRange:
+                throw new RuntimeException($"Pointer out of range ({Crash})")
+                {
+                    Context = GetContext(),
+                    DebugInformation = debugInformation,
+                };
+            case Signal.StackOverflow:
+                throw new RuntimeException($"Stack overflow")
+                {
+                    Context = GetContext(),
+                    DebugInformation = debugInformation,
+                };
+            case Signal.UndefinedExternalFunction:
+                throw new RuntimeException($"Undefined external function {Crash}")
+                {
+                    Context = GetContext(),
+                    DebugInformation = debugInformation,
+                };
+            case Signal.UserCrash:
+                throw new UserException(HeapUtils.GetString(Memory, Crash) ?? string.Empty)
+                {
+                    Context = GetContext(),
+                    DebugInformation = debugInformation,
+                };
         }
     }
 

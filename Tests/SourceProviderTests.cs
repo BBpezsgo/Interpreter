@@ -43,7 +43,7 @@ public class SourceProviderTests
 
         DiagnosticsCollection diagnostics = new();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
         CompilerResult compiled = StatementCompiler.CompileFile("http://localhost:6789/main.bbc", new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
@@ -58,7 +58,7 @@ public class SourceProviderTests
         diagnostics.Print();
         diagnostics.Throw();
 
-        BytecodeProcessorEx interpreter = new(
+        BytecodeProcessor interpreter = new(
             BytecodeInterpreterSettings.Default,
             generatedCode.Code,
             null,
@@ -83,7 +83,7 @@ public class SourceProviderTests
     {
         DiagnosticsCollection diagnostics = new();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
         CompilerResult compiled = StatementCompiler.CompileFile("https://raw.githubusercontent.com/BBpezsgo/Interpreter/refs/heads/master/Examples/hello_world.bbc", new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
@@ -105,7 +105,7 @@ public class SourceProviderTests
         diagnostics.Print();
         diagnostics.Throw();
 
-        BytecodeProcessorEx interpreter = new(
+        BytecodeProcessor interpreter = new(
             BytecodeInterpreterSettings.Default,
             generatedCode.Code,
             null,
@@ -129,14 +129,14 @@ public class SourceProviderTests
     {
         DiagnosticsCollection diagnostics = new();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
         CompilerResult compiled = StatementCompiler.CompileFile("/home/BB/Projects/BBLang/Core/Examples/hello_world.bbc", new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
             ExternalFunctions = externalFunctions.ToImmutableArray(),
             PreprocessorVariables = PreprocessorVariables.Normal,
             SourceProviders = ImmutableArray.Create<ISourceProvider>(
-                new CallbackSourceProvider(static file =>
+                new CallbackSourceProviderAsync(static file =>
                 {
                     if (!file.IsFile) return null;
                     if (!File.Exists(file.AbsolutePath)) return null;
@@ -149,7 +149,7 @@ public class SourceProviderTests
         diagnostics.Print();
         diagnostics.Throw();
 
-        BytecodeProcessorEx interpreter = new(
+        BytecodeProcessor interpreter = new(
             BytecodeInterpreterSettings.Default,
             generatedCode.Code,
             null,

@@ -72,7 +72,7 @@ public static class Entry
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+                List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
                 BBLangGeneratorResult generatedCode;
                 DiagnosticsCollection diagnostics = new();
@@ -173,20 +173,20 @@ public static class Entry
                     }
                 }
 
-                static void PrintStuff(BytecodeProcessorEx interpreter)
+                static void PrintStuff(BytecodeProcessor interpreter)
                 {
 #if DEBUG
                     Console.WriteLine();
                     Console.WriteLine($" ===== HEAP ===== ");
                     Console.WriteLine();
 
-                    if (interpreter.Processor.Memory.AsSpan().Get<int>(0) != 0)
+                    if (interpreter.Memory.AsSpan().Get<int>(0) != 0)
                     {
-                        int endlessSafe = interpreter.Processor.Memory.Length;
+                        int endlessSafe = interpreter.Memory.Length;
                         int i = 0;
                         while (i + BytecodeHeapImplementation.HeaderSize < 127)
                         {
-                            (int size, bool status) = BytecodeHeapImplementation.GetHeader(interpreter.Processor.Memory, i);
+                            (int size, bool status) = BytecodeHeapImplementation.GetHeader(interpreter.Memory, i);
 
                             Console.Write($"BLOCK {i}: ");
 
@@ -203,9 +203,9 @@ public static class Entry
                                 for (int j = 0; j < size; j++)
                                 {
                                     int address = i + BytecodeHeapImplementation.HeaderSize + j;
-                                    if (address >= interpreter.Processor.Memory.Length) break;
+                                    if (address >= interpreter.Memory.Length) break;
                                     Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Write(interpreter.Processor.Memory.AsSpan().Get<byte>(address));
+                                    Console.Write(interpreter.Memory.AsSpan().Get<byte>(address));
                                     Console.Write(" ");
                                 }
                                 Console.ResetColor();
@@ -234,13 +234,13 @@ public static class Entry
 
                     IEnumerable<byte> stack;
 #pragma warning disable CS0162 // Unreachable code detected
-                    if (BytecodeProcessor.StackDirection > 0)
+                    if (ProcessorState.StackDirection > 0)
                     {
-                        stack = new ArraySegment<byte>(interpreter.Processor.Memory)[interpreter.Processor.StackStart..interpreter.Processor.Registers.StackPointer];
+                        stack = new ArraySegment<byte>(interpreter.Memory)[interpreter.StackStart..interpreter.Registers.StackPointer];
                     }
                     else
                     {
-                        stack = new ArraySegment<byte>(interpreter.Processor.Memory)[interpreter.Processor.Registers.StackPointer..(interpreter.Processor.StackStart + 1)].Reverse();
+                        stack = new ArraySegment<byte>(interpreter.Memory)[interpreter.Registers.StackPointer..(interpreter.StackStart + 1)].Reverse();
                     }
 #pragma warning restore CS0162 // Unreachable code detected
 
@@ -262,7 +262,7 @@ public static class Entry
 #endif
                 }
 
-                BytecodeProcessorEx interpreter = new(
+                BytecodeProcessor interpreter = new(
                     bytecodeInterpreterSettings,
                     generatedCode.Code,
                     null,
@@ -310,7 +310,7 @@ public static class Entry
 
                     try
                     {
-                        while (!interpreter.Processor.IsDone)
+                        while (!interpreter.IsDone)
                         { interpreter.Tick(); }
                     }
                     catch (UserException error)
@@ -325,7 +325,7 @@ public static class Entry
                     }
                     catch (Exception error)
                     {
-                        Output.LogError($"Internal Exception: {new RuntimeException(error.Message, error, interpreter.Processor.GetContext(), interpreter.DebugInformation)}");
+                        Output.LogError($"Internal Exception: {new RuntimeException(error.Message, error, interpreter.GetContext(), interpreter.DebugInformation)}");
                         if (arguments.ThrowErrors) throw;
                     }
                     finally
@@ -341,7 +341,7 @@ public static class Entry
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+                List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
                 DiagnosticsCollection diagnostics = new();
 
@@ -646,7 +646,7 @@ public static class Entry
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                List<IExternalFunction> externalFunctions = Runtime.BytecodeProcessorEx.GetExternalFunctions();
+                List<IExternalFunction> externalFunctions = Runtime.BytecodeProcessor.GetExternalFunctions();
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {

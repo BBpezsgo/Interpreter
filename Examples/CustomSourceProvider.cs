@@ -92,7 +92,7 @@ public static class CustomSourceProvider
             },
         };
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
         DiagnosticsCollection diagnostics = new();
 
@@ -114,7 +114,7 @@ public static class CustomSourceProvider
         diagnostics.Print();
         diagnostics.Throw();
 
-        BytecodeProcessorEx interpreter = new(
+        BytecodeProcessor interpreter = new(
             BytecodeInterpreterSettings.Default,
             generatedCode.Code,
             null,

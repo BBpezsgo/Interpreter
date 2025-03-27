@@ -11,7 +11,7 @@ public class MemorySourceProvider : ISourceProviderSync
 
     public SourceProviderResultSync TryLoad(string requestedFile, Uri? currentFile)
     {
-        Uri uri = currentFile is not null ? new Uri(currentFile, requestedFile) : new(requestedFile);
+        Uri uri = new($"memory:///{requestedFile}");
         if (Sources.TryGetValue(requestedFile, out string? content))
         {
             return SourceProviderResultSync.Success(uri, content);

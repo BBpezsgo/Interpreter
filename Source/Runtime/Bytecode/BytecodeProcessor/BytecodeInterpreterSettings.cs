@@ -5,7 +5,7 @@ public struct BytecodeInterpreterSettings
     public int StackSize;
     public int HeapSize;
 
-    public readonly int StackStart => BytecodeProcessor.StackDirection > 0 ? HeapSize : HeapSize + StackSize - 1;
+    public readonly int StackStart => ProcessorState.StackDirection > 0 ? HeapSize : HeapSize + StackSize - 1;
 
     public static BytecodeInterpreterSettings Default => new()
     {

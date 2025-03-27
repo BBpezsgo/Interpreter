@@ -22,7 +22,7 @@ public static class Strings
 
         byte[] memory = new byte[BytecodeInterpreterSettings.Default.HeapSize + BytecodeInterpreterSettings.Default.StackSize];
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
         externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(), "str", (int stringPtr) =>
         {
@@ -48,7 +48,7 @@ public static class Strings
         diagnostics.Print();
         diagnostics.Throw();
 
-        BytecodeProcessorEx interpreter = new(
+        BytecodeProcessor interpreter = new(
             BytecodeInterpreterSettings.Default,
             generatedCode.Code,
             memory,
@@ -67,9 +67,9 @@ public static class Strings
         while (interpreter.Tick()) { }
 
         // Copying the text bytes into the memory
-        text.CopyTo(interpreter.Processor.Memory.AsSpan()[allocCall.Result!.To<int>()..]);
+        text.CopyTo(interpreter.Memory.AsSpan()[allocCall.Result!.To<int>()..]);
         // Adding a null character to the end
-        ((Span<byte>)interpreter.Processor.Memory).Set(allocCall.Result!.To<int>() + text.Length, '\0');
+        ((Span<byte>)interpreter.Memory).Set(allocCall.Result!.To<int>() + text.Length, '\0');
 
         // Calling the exposed function with the pointer to the string
         interpreter.Call(generatedCode.ExposedFunctions["str"], allocCall.Result!.To<int>());

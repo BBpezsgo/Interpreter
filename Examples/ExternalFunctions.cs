@@ -24,7 +24,7 @@ public static class ExternalFunctions
         string scriptPath = GetScriptPath();
         string standardLibraryPath = GetStandardLibraryPath();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
 
         // "External functions" are called from the interpreter by its id and not its name, so you have to provide
         // the functions' ids too. You can generate a unique id with the `externalFunctions.GenerateId()` extension function.
@@ -69,7 +69,7 @@ public static class ExternalFunctions
         diagnostics.Print();
         diagnostics.Throw();
 
-        BytecodeProcessorEx interpreter = new(
+        BytecodeProcessor interpreter = new(
             BytecodeInterpreterSettings.Default,
             generatedCode.Code,
             null,
@@ -78,7 +78,7 @@ public static class ExternalFunctions
 
         interpreter.IO.RegisterStandardIO();
 
-        while (!interpreter.Processor.IsDone)
+        while (!interpreter.IsDone)
         { interpreter.Tick(); }
     }
 }

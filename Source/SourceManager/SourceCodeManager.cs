@@ -112,6 +112,18 @@ public class SourceCodeManager
 
         foreach (ISourceProvider sourceProvider in SourceProviders)
         {
+            if (sourceProvider is ISourceQueryProvider queryProvider)
+            {
+                foreach (Uri query in queryProvider.GetQuery(requestedFile, currentFile))
+                {
+                    if (CompiledUris.Contains(query))
+                    {
+                        resolvedUri = query;
+                        return true;
+                    }
+                }
+            }
+
             if (sourceProvider is ISourceProviderSync providerSync)
             {
                 SourceProviderResultSync res = providerSync.TryLoad(requestedFile, currentFile);

@@ -76,4 +76,95 @@ public class SourceProviderTests
             output.ToString()
         );
     }
+
+    [Ignore]
+    [TestMethod]
+    public void TestGithub()
+    {
+        DiagnosticsCollection diagnostics = new();
+
+        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+
+        CompilerResult compiled = StatementCompiler.CompileFile("https://raw.githubusercontent.com/BBpezsgo/Interpreter/refs/heads/master/Examples/hello_world.bbc", new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
+        {
+            ExternalFunctions = externalFunctions.ToImmutableArray(),
+            PreprocessorVariables = PreprocessorVariables.Normal,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new HttpSourceProvider(),
+                new FileSourceProvider()
+                {
+                    AllowLocalFilesFromWeb = true,
+                    ExtraDirectories = [
+                        "/home/BB/Projects/BBLang/Core/StandardLibrary"
+                    ],
+                }
+            ),
+        }, diagnostics);
+
+        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings.Default, null, diagnostics);
+        diagnostics.Print();
+        diagnostics.Throw();
+
+        BytecodeProcessorEx interpreter = new(
+            BytecodeInterpreterSettings.Default,
+            generatedCode.Code,
+            null,
+            generatedCode.DebugInfo,
+            externalFunctions);
+
+        StringBuilder output = new();
+
+        interpreter.IO.OnStdOut += c => output.Append(c);
+
+        while (interpreter.Tick()) ;
+
+        Assert.AreEqual(
+            "Hello world!\r\n",
+            output.ToString()
+        );
+    }
+
+    [TestMethod]
+    public void TestCallback()
+    {
+        DiagnosticsCollection diagnostics = new();
+
+        List<IExternalFunction> externalFunctions = BytecodeProcessorEx.GetExternalFunctions();
+
+        CompilerResult compiled = StatementCompiler.CompileFile("/home/BB/Projects/BBLang/Core/Examples/hello_world.bbc", new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
+        {
+            ExternalFunctions = externalFunctions.ToImmutableArray(),
+            PreprocessorVariables = PreprocessorVariables.Normal,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new CallbackSourceProvider(static file =>
+                {
+                    if (!file.IsFile) return null;
+                    if (!File.Exists(file.AbsolutePath)) return null;
+                    return Task.FromResult<Stream>(File.OpenRead(file.AbsolutePath));
+                }, "/home/BB/Projects/BBLang/Core/StandardLibrary")
+            ),
+        }, diagnostics);
+
+        BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings.Default, null, diagnostics);
+        diagnostics.Print();
+        diagnostics.Throw();
+
+        BytecodeProcessorEx interpreter = new(
+            BytecodeInterpreterSettings.Default,
+            generatedCode.Code,
+            null,
+            generatedCode.DebugInfo,
+            externalFunctions);
+
+        StringBuilder output = new();
+
+        interpreter.IO.OnStdOut += c => output.Append(c);
+
+        while (interpreter.Tick()) ;
+
+        Assert.AreEqual(
+            "Hello world!\r\n",
+            output.ToString()
+        );
+    }
 }

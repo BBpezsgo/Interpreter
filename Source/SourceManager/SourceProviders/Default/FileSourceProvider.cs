@@ -2,13 +2,14 @@ using System.IO;
 
 namespace LanguageCore;
 
-public class FileSourceProvider : ISourceProviderSync
+public class FileSourceProvider : ISourceProviderSync, ISourceQueryProvider
 {
     public static readonly FileSourceProvider Instance = new();
     public static string DefaultHomeDirectory => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-    public IEnumerable<string?> ExtraDirectories { get; init; } = Enumerable.Empty<string?>();
-    public string? HomeDirectory { get; init; } = DefaultHomeDirectory;
+    public bool AllowLocalFilesFromWeb { get; set; }
+    public IEnumerable<string?> ExtraDirectories { get; set; } = Enumerable.Empty<string?>();
+    public string? HomeDirectory { get; set; } = DefaultHomeDirectory;
 
     public IEnumerable<string> GetQuery(string requestedFile, Uri? currentFile)
     {
@@ -55,9 +56,12 @@ public class FileSourceProvider : ISourceProviderSync
         }
     }
 
+    IEnumerable<Uri> ISourceQueryProvider.GetQuery(string requestedFile, Uri? currentFile)
+        => GetQuery(requestedFile, currentFile).Select(v => new Uri(v, UriKind.Absolute));
+
     public SourceProviderResultSync TryLoad(string requestedFile, Uri? currentFile)
     {
-        if (currentFile is not null && !currentFile.IsFile)
+        if (currentFile is not null && !currentFile.IsFile && !AllowLocalFilesFromWeb)
         {
             return SourceProviderResultSync.NextHandler();
         }

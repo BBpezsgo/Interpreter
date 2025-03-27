@@ -1,22 +1,36 @@
 using System.IO;
-using System.Threading.Tasks;
 
 namespace LanguageCore;
 
-#if UNITY
-public delegate UnityEngine.Awaitable<Stream>? FileParser(Uri file);
-#else
-public delegate Task<Stream>? FileParser(Uri file);
-#endif
-
-public class CallbackSourceProvider : ISourceProviderAsync, ISourceQueryProvider
+public class CallbackSourceProviderSync : ISourceProviderSync, ISourceQueryProvider
 {
     public string? BasePath { get; set; }
-    public FileParser FileParser { get; set; }
+    public Func<Uri, Stream?> FileParserSync { get; set; }
 
-    public CallbackSourceProvider(FileParser fileParser, string? basePath = null)
+    static MemoryStream GenerateStreamFromString(string s)
     {
-        FileParser = fileParser;
+        MemoryStream stream = new();
+        StreamWriter writer = new(stream);
+        writer.Write(s);
+        writer.Flush();
+        stream.Position = 0;
+        return stream;
+    }
+
+    public CallbackSourceProviderSync(Func<Uri, Stream?> fileParser, string? basePath = null)
+    {
+        FileParserSync = fileParser;
+        BasePath = basePath;
+    }
+
+    public CallbackSourceProviderSync(Func<Uri, string?> fileParser, string? basePath = null)
+    {
+        FileParserSync = v =>
+        {
+            string? content = fileParser.Invoke(v);
+            if (content is null) return null;
+            return GenerateStreamFromString(content);
+        };
         BasePath = basePath;
     }
 
@@ -58,18 +72,25 @@ public class CallbackSourceProvider : ISourceProviderAsync, ISourceQueryProvider
         }
     }
 
-    public SourceProviderResultAsync TryLoad(string requestedFile, Uri? currentFile)
+    public SourceProviderResultSync TryLoad(string requestedFile, Uri? currentFile)
     {
+        Uri? lastFile = null;
+
         foreach (Uri file in GetQuery(requestedFile, currentFile))
         {
-#pragma warning disable IDE0008 // Use explicit type
-            var task = FileParser.Invoke(file);
-#pragma warning restore IDE0008
-
-            if (task is null) continue;
-            return SourceProviderResultAsync.Success(file, task);
+            lastFile = file;
+            Stream? content = FileParserSync.Invoke(file);
+            if (content is null) continue;
+            return SourceProviderResultSync.Success(file, content);
         }
 
-        return SourceProviderResultAsync.NextHandler();
+        if (lastFile is null)
+        {
+            return SourceProviderResultSync.NextHandler();
+        }
+        else
+        {
+            return SourceProviderResultSync.NotFound(lastFile);
+        }
     }
 }

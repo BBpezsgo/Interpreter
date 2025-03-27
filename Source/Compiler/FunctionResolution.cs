@@ -183,7 +183,7 @@ public partial class StatementCompiler
 
         public TypeMatch ReturnTypeMatch { get; set; }
         public int UsedUpDefaultParameterValues { get; set; }
-        public TypeMatch[]? ParameterTypeMatch { get; set; }
+        public TypeMatch? ParameterTypeMatch { get; set; }
 
         public Dictionary<string, GeneralType>? TypeArguments { get; set; }
 
@@ -205,8 +205,8 @@ public partial class StatementCompiler
 
             if (ParameterTypeMatch is not null && other.ParameterTypeMatch is not null)
             {
-                TypeMatch a = ParameterTypeMatch.DefaultIfEmpty(TypeMatch.Equals).Min();
-                TypeMatch b = other.ParameterTypeMatch.DefaultIfEmpty(TypeMatch.Equals).Min();
+                TypeMatch a = ParameterTypeMatch.Value;
+                TypeMatch b = other.ParameterTypeMatch.Value;
                 if (a > b) return Better;
                 if (a < b) return Worse;
                 if (a == TypeMatch.None || b == TypeMatch.None) return Same;
@@ -239,7 +239,7 @@ public partial class StatementCompiler
             if (UsedUpDefaultParameterValues != match.UsedUpDefaultParameterValues) return false;
             if ((ParameterTypeMatch is null) != (match.ParameterTypeMatch is null)) return false;
             if (ParameterTypeMatch is null || match.ParameterTypeMatch is null) return false;
-            if (!Utils.SequenceEquals(ParameterTypeMatch, match.ParameterTypeMatch, (a, b) => a == b)) return false;
+            if (ParameterTypeMatch.Value != match.ParameterTypeMatch.Value) return false;
             if ((TypeArguments is null) != (match.TypeArguments is null)) return false;
             if (TypeArguments is null || match.TypeArguments is null) return false;
             if (!Utils.SequenceEquals(TypeArguments, match.TypeArguments, (a, b) => a.Key == b.Key && a.Value.Equals(b.Value))) return false;
@@ -267,10 +267,9 @@ public partial class StatementCompiler
 
         foreach (TFunction function in functions.Compiled)
         {
-            functionMatches.Add(GetFunctionMatch<TFunction, TDefinedIdentifier, TPassedIdentifier, TArgument>(function, query));
+            functionMatches.AddSorted(GetFunctionMatch<TFunction, TDefinedIdentifier, TPassedIdentifier, TArgument>(function, query));
+            if (functionMatches.Count > 2) functionMatches.RemoveAt(2);
         }
-
-        functionMatches.Sort();
 
         FunctionMatch<TFunction> best;
 
@@ -336,8 +335,7 @@ public partial class StatementCompiler
             }
 
             if (best.ParameterTypeMatch is not null &&
-                best.ParameterTypeMatch.Length > 0 &&
-                best.ParameterTypeMatch.Min() == TypeMatch.None)
+                best.ParameterTypeMatch.Value == TypeMatch.None)
             {
                 error = new PossibleDiagnostic($"{kindNameCapital} \"{readableName}\" not found", new PossibleDiagnostic($"Wrong types of arguments passed (sorry I can't tell any more info)"));
                 return false;
@@ -451,19 +449,46 @@ public partial class StatementCompiler
             result.IsFileMatches = true;
         }
 
-        TypeMatch GetArgumentMatch(GeneralType target, TArgument current, List<PossibleDiagnostic> errors)
+        void GetArgumentMatch(ref TypeMatch typeMatch, GeneralType target, TArgument current, List<PossibleDiagnostic> errors)
         {
-            GeneralType a = query.Converter.Invoke(current, null);
-            if (a.Equals(target)) return TypeMatch.Equals;
-            if (a.SameAs(target)) return TypeMatch.Same;
-            if (CanCastImplicitly(a, target, null, out PossibleDiagnostic? error)) return TypeMatch.ImplicitCast;
+            if (typeMatch == TypeMatch.None) return;
 
-            GeneralType b = query.Converter.Invoke(current, target);
-            if (b.SameAs(target)) return TypeMatch.Promotion;
+            PossibleDiagnostic? error = null;
 
-            errors.Add(error);
+            if (typeMatch >= TypeMatch.ImplicitCast)
+            {
+                GeneralType a = query.Converter.Invoke(current, null);
 
-            return TypeMatch.None;
+                if (typeMatch >= TypeMatch.Equals && a.Equals(target))
+                {
+                    typeMatch = TypeMatch.Equals;
+                    return;
+                }
+
+                if (typeMatch >= TypeMatch.Same && a.SameAs(target))
+                {
+                    typeMatch = TypeMatch.Same;
+                    return;
+                }
+
+                if (typeMatch >= TypeMatch.ImplicitCast && CanCastImplicitly(a, target, null, out error))
+                {
+                    typeMatch = TypeMatch.ImplicitCast;
+                    return;
+                }
+            }
+
+            if (typeMatch >= TypeMatch.Promotion)
+            {
+                if (query.Converter.Invoke(current, target).SameAs(target))
+                {
+                    typeMatch = TypeMatch.Promotion;
+                    return;
+                }
+            }
+
+            if (error is not null) errors.Add(error);
+            typeMatch = TypeMatch.None;
         }
 
         TypeMatch GetReturnTypeMatch(GeneralType target, GeneralType current, List<PossibleDiagnostic> errors)
@@ -476,7 +501,7 @@ public partial class StatementCompiler
             {
                 return TypeMatch.Same;
             }
-            else if (StatementCompiler.CanCastImplicitly(current, target, null, out var error))
+            else if (StatementCompiler.CanCastImplicitly(current, target, null, out PossibleDiagnostic? error))
             {
                 return TypeMatch.ImplicitCast;
             }
@@ -497,28 +522,23 @@ public partial class StatementCompiler
             }
             else
             {
-                result.ParameterTypeMatch = new TypeMatch[function.ParameterTypes.Count];
-
                 if (!GeneralType.TryGetTypeParameters(function.ParameterTypes, query.Arguments.Value.Select(v => query.Converter.Invoke(v, null)), _typeArguments))
                 {
                     result.Errors.Add(new($"Could not resolve the template types"));
                     return result;
                 }
 
+                result.ParameterTypeMatch = TypeMatch.Equals;
                 result.TypeArguments = _typeArguments;
 
-                for (int i = 0; i < function.ParameterTypes.Count; i++)
+                int checkCount = Math.Min(function.ParameterTypes.Count, query.Arguments.Value.Length);
+                for (int i = 0; i < checkCount; i++)
                 {
                     GeneralType defined = GeneralType.InsertTypeParameters(function.ParameterTypes[i], _typeArguments) ?? function.ParameterTypes[i];
-                    if (i >= query.Arguments.Value.Length)
-                    {
-                        result.ParameterTypeMatch[i] = TypeMatch.Equals;
-                    }
-                    else
-                    {
-                        TArgument passed = query.Arguments.Value[i];
-                        result.ParameterTypeMatch[i] = GetArgumentMatch(defined, passed, result.Errors);
-                    }
+                    TArgument passed = query.Arguments.Value[i];
+                    TypeMatch v = result.ParameterTypeMatch.Value;
+                    GetArgumentMatch(ref v, defined, passed, result.Errors);
+                    if (v < result.ParameterTypeMatch) result.ParameterTypeMatch = v;
                 }
             }
 
@@ -539,20 +559,16 @@ public partial class StatementCompiler
             }
             else
             {
-                result.ParameterTypeMatch = new TypeMatch[function.ParameterTypes.Count];
+                result.ParameterTypeMatch = TypeMatch.Equals;
 
-                for (int i = 0; i < function.ParameterTypes.Count; i++)
+                int checkCount = Math.Min(function.ParameterTypes.Count, query.Arguments.Value.Length);
+                for (int i = 0; i < checkCount; i++)
                 {
                     GeneralType defined = function.ParameterTypes[i];
-                    if (i >= query.Arguments.Value.Length)
-                    {
-                        result.ParameterTypeMatch[i] = TypeMatch.Equals;
-                    }
-                    else
-                    {
-                        TArgument passed = query.Arguments.Value[i];
-                        result.ParameterTypeMatch[i] = GetArgumentMatch(defined, passed, result.Errors);
-                    }
+                    TArgument passed = query.Arguments.Value[i];
+                    TypeMatch v = result.ParameterTypeMatch.Value;
+                    GetArgumentMatch(ref v, defined, passed, result.Errors);
+                    if (v < result.ParameterTypeMatch) result.ParameterTypeMatch = v;
                 }
             }
 

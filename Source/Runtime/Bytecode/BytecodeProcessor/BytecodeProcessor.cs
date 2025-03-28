@@ -24,6 +24,7 @@ public class BytecodeProcessor
     public readonly IOHandler IO;
     readonly Queue<UserCall> UserCalls = new();
     UserCall? CurrentUserCall = null;
+    bool CurrentlySyncUserCalling = false;
 
     public BytecodeProcessor(
         BytecodeInterpreterSettings settings,
@@ -71,6 +72,11 @@ public class BytecodeProcessor
         while (Tick(ref state)) { }
     }
 
+    public unsafe void RunUntilCompletion(ref ProcessorState state)
+    {
+        while (Tick(ref state)) { }
+    }
+
     /// <returns>
     /// Returns <c>false</c> if it is finished, or <c>true</c> otherwise;
     /// </returns>
@@ -97,41 +103,80 @@ public class BytecodeProcessor
 
     public unsafe void HandleUserCalls(ref ProcessorState state)
     {
-        if (state.IsDone)
+        if (!state.IsDone || CurrentlySyncUserCalling) return;
+
+        if (CurrentUserCall is not null)
         {
-            if (CurrentUserCall is not null)
-            {
-                state.Pop(CurrentUserCall.Arguments.Length);
-                Span<byte> returnValue = state.Pop(CurrentUserCall.ReturnValueSize);
-                CurrentUserCall.Result = returnValue.ToArray();
-                CurrentUserCall = null;
-            }
-
-            if (UserCalls.TryDequeue(out UserCall? userCall))
-            {
-                // Global variables are on top of the stack right now
-
-                CurrentUserCall = userCall;
-
-                // this is pointing to the last global variable's address
-                int globalVariablesAddress = state.Registers.StackPointer;
-
-                state.Registers.StackPointer -= userCall.ReturnValueSize;
-
-                state.Push(userCall.Arguments.AsSpan());
-
-                // Push the return instruction address
-                state.Push(state.Registers.CodePointer, Register.CodePointer.BitWidth());
-
-                // Push the absolute global address
-                state.Push(globalVariablesAddress, Register.StackPointer.BitWidth());
-                // Push the previous base pointer
-                state.Push(state.Registers.BasePointer, Register.BasePointer.BitWidth());
-
-                state.Registers.BasePointer = state.Registers.StackPointer;
-                state.Registers.CodePointer = userCall.InstructionOffset;
-            }
+            FinishUserCall(ref state, CurrentUserCall);
+            CurrentUserCall = null;
         }
+
+        if (UserCalls.TryDequeue(out UserCall? userCall))
+        {
+            CurrentUserCall = userCall;
+            BeginUserCall(ref state, userCall);
+
+        }
+    }
+
+    unsafe void FinishUserCall(ref ProcessorState state, UserCall userCall)
+    {
+        state.Pop(userCall.Arguments.Length);
+        Span<byte> returnValue = state.Pop(userCall.ReturnValueSize);
+        userCall.Result = returnValue.IsEmpty ? Array.Empty<byte>() : returnValue.ToArray();
+    }
+
+    unsafe void FinishUserCall(ref ProcessorState state, ref UserCallSync userCall)
+    {
+        state.Pop(userCall.Arguments.Length);
+        Span<byte> returnValue = state.Pop(userCall.ReturnValueSize);
+        userCall.Result = returnValue.IsEmpty ? Array.Empty<byte>() : returnValue.ToArray();
+    }
+
+    unsafe void BeginUserCall(ref ProcessorState state, UserCall userCall)
+    {
+        // Global variables are on top of the stack right now
+
+        // this is pointing to the last global variable's address
+        int globalVariablesAddress = state.Registers.StackPointer;
+
+        state.Registers.StackPointer -= userCall.ReturnValueSize;
+
+        state.Push(userCall.Arguments.AsSpan());
+
+        // Push the return instruction address
+        state.Push(state.Registers.CodePointer, Register.CodePointer.BitWidth());
+
+        // Push the absolute global address
+        state.Push(globalVariablesAddress, Register.StackPointer.BitWidth());
+        // Push the previous base pointer
+        state.Push(state.Registers.BasePointer, Register.BasePointer.BitWidth());
+
+        state.Registers.BasePointer = state.Registers.StackPointer;
+        state.Registers.CodePointer = userCall.InstructionOffset;
+    }
+
+    unsafe void BeginUserCall(ref ProcessorState state, ref UserCallSync userCall)
+    {
+        // Global variables are on top of the stack right now
+
+        // this is pointing to the last global variable's address
+        int globalVariablesAddress = state.Registers.StackPointer;
+
+        state.Registers.StackPointer -= userCall.ReturnValueSize;
+
+        state.Push(userCall.Arguments);
+
+        // Push the return instruction address
+        state.Push(state.Registers.CodePointer, Register.CodePointer.BitWidth());
+
+        // Push the absolute global address
+        state.Push(globalVariablesAddress, Register.StackPointer.BitWidth());
+        // Push the previous base pointer
+        state.Push(state.Registers.BasePointer, Register.BasePointer.BitWidth());
+
+        state.Registers.BasePointer = state.Registers.StackPointer;
+        state.Registers.CodePointer = userCall.InstructionOffset;
     }
 
     static List<IExternalFunction> GenerateExternalFunctions()
@@ -378,12 +423,25 @@ public class BytecodeProcessor
 
     public byte[] CallUnsafeSync(in ExposedFunction function, byte[] arguments)
     {
-        UserCall userCall = CallUnsafe(function, arguments);
+        if (function.ArgumentsSize != arguments.Length) throw new ArgumentException($"Invalid number of bytes passed to exposed function \"{function.Identifier}\": expected {function.ArgumentsSize} passed {arguments.Length}");
+
         ProcessorState state = GetState();
+        RunUntilCompletion(ref state);
+
+        UserCallSync userCall = new(function.InstructionOffset, arguments, function.ReturnValueSize);
+        BeginUserCall(ref state, ref userCall);
+        CurrentlySyncUserCalling = true;
 
         while (userCall.Result is null)
         {
             Tick(ref state);
+
+            if (state.IsDone)
+            {
+                FinishUserCall(ref state, ref userCall);
+                CurrentlySyncUserCalling = false;
+            }
+
             if (userCall.Result is null && state.IsDone)
             { throw new RuntimeException($"Failed to execute the user call for some reason..."); }
         }

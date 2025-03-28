@@ -7,9 +7,10 @@ namespace LanguageCore.IL.Generator;
 
 public partial class CodeGeneratorForIL : CodeGenerator
 {
-    readonly Dictionary<CompiledVariableDeclaration, LocalBuilder> Locals = new();
-    readonly Dictionary<ICompiledFunctionDefinition, DynamicMethod> Functions = new();
+    readonly Dictionary<CompiledVariableDeclaration, LocalBuilder> LocalBuilders = new();
+    readonly Dictionary<ICompiledFunctionDefinition, DynamicMethod> FunctionBuilders = new();
     readonly Stack<Label> LoopLabels = new();
+    readonly HashSet<ICompiledFunctionDefinition> EmittedFunctions = new();
 
     ModuleBuilder Module = null!;
 
@@ -29,11 +30,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        if (!Functions.TryGetValue(cleanup.Deallocator, out DynamicMethod? function))
-        {
-            Diagnostics.Add(Diagnostic.Internal($"Function \"{cleanup.Deallocator}\" wasn't compiled", cleanup));
-            return;
-        }
+        DynamicMethod function = GetOrEmitFunctionSignature(cleanup.Deallocator);
 
         if (function.GetParameters().Length != 1)
         {
@@ -63,11 +60,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             { return; }
         }
 
-        if (!Functions.TryGetValue(cleanup.Destructor, out DynamicMethod? function))
-        {
-            Diagnostics.Add(Diagnostic.Internal($"Function \"{cleanup.Destructor}\" wasn't compiled", cleanup));
-            return;
-        }
+        DynamicMethod function = GetOrEmitFunctionSignature(cleanup.Destructor);
 
         if (function.GetParameters().Length != 1)
         {
@@ -388,8 +381,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledVariableDeclaration statement, ILGenerator il)
     {
-        if (Locals.ContainsKey(statement)) return;
-        LocalBuilder local = Locals[statement] = il.DeclareLocal(ToType(statement.Type));
+        if (LocalBuilders.ContainsKey(statement)) return;
+        LocalBuilder local = LocalBuilders[statement] = il.DeclareLocal(ToType(statement.Type));
         if (statement.InitialValue is not null)
         {
             if (statement.InitialValue is CompiledConstructorCall constructorCall)
@@ -409,7 +402,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledVariableGetter statement, ILGenerator il)
     {
-        il.Emit(OpCodes.Ldloc, Locals[statement.Variable].LocalIndex);
+        il.Emit(OpCodes.Ldloc, LocalBuilders[statement.Variable].LocalIndex);
     }
     void EmitStatement(CompiledParameterGetter statement, ILGenerator il)
     {
@@ -456,11 +449,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledFunctionCall statement, ILGenerator il)
     {
-        if (!Functions.TryGetValue(statement.Function, out DynamicMethod? function))
-        {
-            Diagnostics.Add(Diagnostic.Internal($"Function \"{statement.Function}\" wasn't compiled", statement));
-            return;
-        }
+        DynamicMethod function = GetOrEmitFunctionSignature(statement.Function);
 
         for (int i = 0; i < statement.Arguments.Length; i++)
         {
@@ -503,7 +492,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     void EmitStatement(CompiledVariableSetter statement, ILGenerator il)
     {
         EmitStatement(statement.Value, il);
-        il.Emit(OpCodes.Stloc, Locals[statement.Variable].LocalIndex);
+        il.Emit(OpCodes.Stloc, LocalBuilders[statement.Variable].LocalIndex);
     }
     void EmitStatement(CompiledParameterSetter statement, ILGenerator il)
     {
@@ -750,7 +739,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         switch (statement.Of)
         {
             case CompiledVariableGetter v:
-                il.Emit(OpCodes.Ldloca, Locals[v.Variable]);
+                il.Emit(OpCodes.Ldloca, LocalBuilders[v.Variable]);
                 break;
             case CompiledParameterGetter v:
                 il.Emit(OpCodes.Ldarga, v.Variable.Index);
@@ -849,11 +838,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledConstructorCall statement, ILGenerator il, LocalBuilder? destination = null)
     {
-        if (!Functions.TryGetValue(statement.Function, out DynamicMethod? function))
-        {
-            Diagnostics.Add(Diagnostic.Internal($"Function \"{statement.Function}\" wasn't compiled", statement));
-            return;
-        }
+        DynamicMethod function = GetOrEmitFunctionSignature(statement.Function);
 
         if (!statement.Object.Type.Is<PointerType>())
         {
@@ -956,11 +941,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(FunctionAddressGetter statement, ILGenerator il)
     {
-        if (!Functions.TryGetValue(statement.Function, out DynamicMethod? function))
-        {
-            Diagnostics.Add(Diagnostic.Internal($"Function \"{statement.Function}\" wasn't compiled", statement));
-            return;
-        }
+        // var function = GetOrEmitFunctionSignature(statement.Function);
 
         Diagnostics.Add(Diagnostic.Critical($"Function address getters not supported", statement));
         // il.Emit(OpCodes.Ldftn, function);
@@ -1167,7 +1148,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     void EmitMethod(ImmutableArray<CompiledStatement> statements, GeneralType returnType, ILGenerator il)
     {
-        Locals.Clear();
+        LocalBuilders.Clear();
 
         foreach (CompiledStatement statement in statements)
         {
@@ -1205,71 +1186,93 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     end:
 
-        Locals.Clear();
+        LocalBuilders.Clear();
     }
 
-    Func<int> GenerateCode(CompilerResult compilerResult)
+    DynamicMethod EmitFunctionSignature(ICompiledFunctionDefinition function) => function switch
     {
-        CompilerResult res = compilerResult;
+        CompiledFunctionDefinition v => new DynamicMethod(
+            v.Identifier.Content,
+            ToType(v.Type),
+            ToType(v.ParameterTypes),
+            Module),
+        CompiledOperatorDefinition v => new DynamicMethod(
+            $"op_{v.Identifier.Content}",
+            ToType(v.Type),
+            ToType(v.ParameterTypes),
+            Module),
+        CompiledConstructorDefinition v => new DynamicMethod(
+            $"ctor_{v.Identifier.Content}",
+            ToType(v.Type),
+            ToType(v.ParameterTypes),
+            Module),
+        CompiledGeneralFunctionDefinition v => new DynamicMethod(
+            $"genr_{v.Identifier.Content}",
+            ToType(v.Type),
+            ToType(v.ParameterTypes),
+            Module),
+        _ => throw new UnreachableException(),
+    };
 
-        AssemblyBuilder assemBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName()
+    DynamicMethod GetOrEmitFunctionSignature(ICompiledFunctionDefinition function)
+    {
+        if (FunctionBuilders.TryGetValue(function, out DynamicMethod? result))
         {
-            Name = "DynamicAssembly"
-        }, AssemblyBuilderAccess.RunAndCollect);
-        Module = assemBuilder.DefineDynamicModule("DynamicModule");
+            return result;
+        }
 
-        foreach ((ICompiledFunctionDefinition function, _) in res.Functions)
+        return FunctionBuilders[function] = EmitFunctionSignature(function);
+    }
+
+    void EmitFunctions()
+    {
+        while (true)
         {
-            switch (function)
+            bool emittedSomething = false;
+            foreach ((ICompiledFunctionDefinition function, CompiledBlock body) in Functions)
             {
-                case CompiledFunctionDefinition v:
-                {
-                    Functions[function] = new DynamicMethod(
-                        v.Identifier.Content,
-                        ToType(v.Type),
-                        ToType(v.ParameterTypes),
-                        Module);
-                    break;
-                }
-                case CompiledOperatorDefinition v:
-                {
-                    Functions[function] = new DynamicMethod(
-                        $"op_{v.Identifier.Content}",
-                        ToType(v.Type),
-                        ToType(v.ParameterTypes),
-                        Module);
-                    break;
-                }
-                case CompiledConstructorDefinition v:
-                {
-                    Functions[function] = new DynamicMethod(
-                        $"ctor_{v.Identifier.Content}",
-                        ToType(v.Type),
-                        ToType(v.ParameterTypes),
-                        Module);
-                    break;
-                }
-                case CompiledGeneralFunctionDefinition v:
-                {
-                    Functions[function] = new DynamicMethod(
-                        $"genr_{v.Identifier.Content}",
-                        ToType(v.Type),
-                        ToType(v.ParameterTypes),
-                        Module);
-                    break;
-                }
-                default: throw new UnreachableException();
+                if (!FunctionBuilders.TryGetValue(function, out DynamicMethod? builder)) continue;
+                if (!EmittedFunctions.Add(function)) continue;
+                ILGenerator il = builder.GetILGenerator();
+                EmitMethod(body.Statements, function.Type, il);
+                emittedSomething = true;
             }
+            if (!emittedSomething) break;
         }
+    }
 
-        Func<int> result = GenerateCodeForTopLevelStatements(res.Statements);
+    public DynamicMethod GenerateImpl(CompiledFunction function)
+    {
+        DynamicMethod builder = GetOrEmitFunctionSignature(function.Function);
 
-        foreach ((ICompiledFunctionDefinition function, CompiledBlock body) in res.Functions)
+        ILGenerator il = builder.GetILGenerator();
+        EmitMethod(function.Body.Statements, function.Function.Type, il);
+
+        EmitFunctions();
+
+        return builder;
+    }
+
+    Func<int> GenerateImpl(ModuleBuilder? module = null)
+    {
+        if (module is null)
         {
-            ILGenerator il = Functions[function].GetILGenerator();
-            EmitMethod(body.Statements, function.Type, il);
+            AssemblyBuilder assemBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName()
+            {
+                Name = "DynamicAssembly"
+            }, AssemblyBuilderAccess.RunAndCollect);
+            module = assemBuilder.DefineDynamicModule("DynamicModule");
         }
+        Module = module;
+
+        Func<int> result = GenerateCodeForTopLevelStatements(TopLevelStatements);
+
+        EmitFunctions();
 
         return result;
     }
+
+    public static Func<int> Generate(CompilerResult compilerResult, DiagnosticsCollection diagnostics)
+        => new CodeGeneratorForIL(compilerResult, diagnostics)
+        .GenerateImpl();
 }

@@ -433,7 +433,7 @@ public static class Utils
                 }
             ),
         }, diagnostics);
-        Func<int> generatedCode = LanguageCore.IL.Generator.CodeGeneratorForIL.Generate(compiled, null, diagnostics);
+        Func<int> generatedCode = LanguageCore.IL.Generator.CodeGeneratorForIL.Generate(compiled, diagnostics);
 
         diagnostics.Throw();
 

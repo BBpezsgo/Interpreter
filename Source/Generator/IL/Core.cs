@@ -28,11 +28,4 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     public CodeGeneratorForIL(CompilerResult compilerResult, DiagnosticsCollection diagnostics) : base(compilerResult, diagnostics)
     { }
-
-    public static Func<int> Generate(
-        CompilerResult compilerResult,
-        PrintCallback? printCallback,
-        DiagnosticsCollection diagnostics)
-        => new CodeGeneratorForIL(compilerResult, diagnostics)
-        .GenerateCode(compilerResult);
 }

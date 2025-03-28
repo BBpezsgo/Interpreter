@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using CommandLine;
@@ -379,7 +379,7 @@ public static class Entry
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.IL,
                 }, diagnostics);
-                Func<int> res = IL.Generator.CodeGeneratorForIL.Generate(compiled, Output.Log, diagnostics);
+                Func<int> res = IL.Generator.CodeGeneratorForIL.Generate(compiled, diagnostics);
                 diagnostics.Throw();
                 diagnostics.Print();
 

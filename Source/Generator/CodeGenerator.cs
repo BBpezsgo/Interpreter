@@ -66,10 +66,16 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     public abstract BuiltinType SizeofStatementType { get; }
     public abstract BuiltinType ArrayLengthType { get; }
 
+    public readonly ImmutableArray<CompiledStatement> TopLevelStatements;
+    public readonly ImmutableArray<CompiledFunction> Functions;
+
     #endregion
 
     protected CodeGenerator(CompilerResult compilerResult, DiagnosticsCollection diagnostics)
     {
+        Functions = compilerResult.Functions;
+        TopLevelStatements = compilerResult.Statements;
+
         CompiledParameters = new Stack<CompiledParameter>();
         CompiledLocalVariables = new Stack<CompiledVariableDeclaration>();
         CompiledGlobalVariables = new Stack<CompiledVariableDeclaration>();

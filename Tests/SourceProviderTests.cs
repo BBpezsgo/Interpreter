@@ -63,7 +63,8 @@ public class SourceProviderTests
             generatedCode.Code,
             null,
             generatedCode.DebugInfo,
-            externalFunctions);
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions);
 
         StringBuilder output = new();
 
@@ -110,7 +111,8 @@ public class SourceProviderTests
             generatedCode.Code,
             null,
             generatedCode.DebugInfo,
-            externalFunctions);
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions);
 
         StringBuilder output = new();
 
@@ -154,7 +156,8 @@ public class SourceProviderTests
             generatedCode.Code,
             null,
             generatedCode.DebugInfo,
-            externalFunctions);
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions);
 
         StringBuilder output = new();
 

@@ -483,8 +483,7 @@ public ref partial struct ProcessorState
         using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerPush.Auto();
 #endif
 
-        int v = GetData(CurrentInstruction.Operand1);
-        Push(v, CurrentInstruction.Operand1.BitWidth);
+        Push(GetData(CurrentInstruction.Operand1), CurrentInstruction.Operand1.BitWidth);
 
         Step();
     }
@@ -591,7 +590,7 @@ public ref partial struct ProcessorState
         }
 #endif
 
-        for (int i = 0; i < ScopedExternalFunctionsCount; i++)
+        for (int i = 0; i < ScopedExternalFunctions.Length; i++)
         {
             ref readonly ExternalFunctionScopedSync scopedExternalFunction = ref ScopedExternalFunctions[i];
             if (scopedExternalFunction.Id != functionId) continue;
@@ -601,27 +600,19 @@ public ref partial struct ProcessorState
             if (scopedExternalFunction.ReturnValueSize > 0)
             {
                 Span<byte> returnValue = stackalloc byte[scopedExternalFunction.ReturnValueSize];
-#if UNITY_BURST
                 fixed (byte* _parametersPtr = _parameters)
                 fixed (byte* returnValuePtr = returnValue)
                 {
                     scopedExternalFunction.Callback(scopedExternalFunction.Scope, (nint)_parametersPtr, (nint)returnValuePtr);
                 }
-#else
-                scopedExternalFunction.Callback(scopedExternalFunction.Scope, _parameters, returnValue);
-#endif
                 Push(returnValue);
             }
             else
             {
-#if UNITY_BURST
                 fixed (byte* _parametersPtr = _parameters)
                 {
                     scopedExternalFunction.Callback(scopedExternalFunction.Scope, (nint)_parametersPtr, default);
                 }
-#else
-                scopedExternalFunction.Callback(scopedExternalFunction.Scope, _parameters, default);
-#endif
             }
 
             Step();

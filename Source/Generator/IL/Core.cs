@@ -1,4 +1,6 @@
-﻿using LanguageCore.Compiler;
+﻿using System.Reflection;
+using System.Reflection.Emit;
+using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.IL.Generator;
@@ -26,6 +28,19 @@ public partial class CodeGeneratorForIL : CodeGenerator
     public override BuiltinType SizeofStatementType => BuiltinType.I32;
     public override BuiltinType ArrayLengthType => BuiltinType.I32;
 
-    public CodeGeneratorForIL(CompilerResult compilerResult, DiagnosticsCollection diagnostics) : base(compilerResult, diagnostics)
-    { }
+    readonly ILGeneratorSettings Settings;
+
+    public CodeGeneratorForIL(CompilerResult compilerResult, DiagnosticsCollection diagnostics, ILGeneratorSettings settings, ModuleBuilder? module) : base(compilerResult, diagnostics)
+    {
+        if (module is null)
+        {
+            AssemblyBuilder assemBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName()
+            {
+                Name = "BBLangGeneratedAssembly",
+            }, AssemblyBuilderAccess.RunAndCollect);
+            module = assemBuilder.DefineDynamicModule("BBLangGeneratedModule");
+        }
+        Settings = settings;
+        Module = module;
+    }
 }

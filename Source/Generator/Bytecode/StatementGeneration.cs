@@ -545,6 +545,50 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForFunctionCall(CompiledFunctionCall caller)
     {
+        if (ILGenerator is not null)
+        {
+            CompiledFunction? f = Functions.FirstOrDefault(v => v.Function == caller.Function);
+            if (f is not null)
+            {
+                ILGenerator.Diagnostics.Clear();
+                if (ILGenerator.GenerateImplMarshaled(f, out ExternalFunctionScopedSyncCallback? method) &&
+                    !ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error) &&
+                    !ILGenerator.Diagnostics.Has(DiagnosticsLevel.Warning))
+                {
+                    int returnValueSize = f.Function.ReturnSomething ? f.Function.Type.GetSize(this) : 0;
+                    int parametersSize = f.Function.ParameterTypes.Aggregate(0, (a, b) => a + b.GetSize(this));
+                    int id = ExternalFunctions.Concat(GeneratedUnmanagedFunctions.Select(v => (IExternalFunction)v.Function).AsEnumerable()).GenerateId();
+
+                    ExternalFunctionScopedSync externFunc;
+#if UNITY_BURST
+                    UnityEngine.Debug.LogWarning($"Function {method.Method} compiled into machine code !!!");
+                    IntPtr ptr = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(method);
+                    unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0); }
+#else
+                    externFunc = new(method, id, parametersSize, returnValueSize, 0);
+#endif
+                    GeneratedUnmanagedFunctions.Add((externFunc, method));
+
+                    GenerateCodeForFunctionCall_External(new()
+                    {
+                        Declaration = f.Function,
+                        Function = externFunc,
+
+                        Arguments = caller.Arguments,
+                        Location = caller.Location,
+                        SaveValue = caller.SaveValue,
+                        Type = caller.Type,
+                    });
+
+                    Diagnostics.Add(Diagnostic.OptimizationNotice($"Function \"{f.Function}\" compiled into MSIL", caller));
+
+                    ILGenerator.Diagnostics.Clear();
+                    return;
+                }
+                ILGenerator.Diagnostics.Clear();
+            }
+        }
+
         AddComment($"Call \"{((ISimpleReadable)caller.Function).ToReadable()}\" {{");
 
         if (caller.Function.ReturnSomething)
@@ -2407,6 +2451,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CompiledGeneralFunctions = compilerResult.GeneralFunctionDefinitions,
             CompiledConstructors = compilerResult.ConstructorDefinitions,
             ExposedFunctions = exposedFunctions.ToFrozenDictionary(),
+            GeneratedUnmanagedFunctions = GeneratedUnmanagedFunctions.Select(v => v.Function).ToImmutableArray(),
+            GeneratedUnmanagedFunctionReferences = GeneratedUnmanagedFunctions.Select(v => v.Reference).ToImmutableArray(),
         };
     }
 }

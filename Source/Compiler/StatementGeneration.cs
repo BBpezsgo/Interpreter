@@ -41,7 +41,7 @@ public partial class StatementCompiler
 
         ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(size);
 
-        if (TryEvaluate(allocator, ImmutableArray.Create(compiledSize), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
+        if (TryEvaluate(allocator, ImmutableArray.Create(compiledSize), new EvaluationContext(), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -296,7 +296,7 @@ public partial class StatementCompiler
 
         if (newVariable.ExternalConstantName is not null)
         {
-            var externalConstant = ExternalConstants.FirstOrDefault(v => v.Name == newVariable.ExternalConstantName);
+            ExternalConstant? externalConstant = ExternalConstants.FirstOrDefault(v => v.Name == newVariable.ExternalConstantName);
             if (externalConstant is null)
             {
                 Diagnostics.Add(Diagnostic.Warning($"External constant \"{newVariable.ExternalConstantName}\" not found", newVariable));
@@ -304,7 +304,7 @@ public partial class StatementCompiler
             else
             {
                 type ??= new BuiltinType(externalConstant.Value.Type);
-                if (!externalConstant.Value.TryCast(type, out var castedValue))
+                if (!externalConstant.Value.TryCast(type, out CompiledValue castedValue))
                 {
                     Diagnostics.Add(Diagnostic.Critical($"Can't cast external constant value {externalConstant.Value} of type \"{new BuiltinType(externalConstant.Value.Type)}\" to {type}", newVariable));
                     return false;
@@ -757,7 +757,7 @@ public partial class StatementCompiler
         GenerateCodeForFunction(callee, typeArguments);
 
         if (AllowEvaluating &&
-            TryEvaluate(callee, compiledArguments, out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
+            TryEvaluate(callee, compiledArguments, new EvaluationContext(), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -857,7 +857,7 @@ public partial class StatementCompiler
 
                         if (!CanCastImplicitly(statementWithValue.Type, callee.Type, null, out PossibleDiagnostic? castError))
                         { Diagnostics.Add(castError.ToError(statementWithValue)); }
-
+                        statementWithValue.SaveValue = caller.SaveValue;
                         compiledStatement = statementWithValue;
                         return true;
                     }
@@ -2523,7 +2523,7 @@ public partial class StatementCompiler
 
         if (statementType.Equals(targetType))
         {
-            Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Keyword, typeCast.File));
+            // Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Keyword, typeCast.File));
             compiledStatement = prev;
             return true;
         }
@@ -2549,9 +2549,9 @@ public partial class StatementCompiler
 
         if (!GenerateCodeForStatement(typeCast.PrevStatement, out CompiledStatementWithValue? prev, targetType)) return false;
 
-        if (prev.Type.SameAs(targetType))
+        if (prev.Type.Equals(targetType))
         {
-            Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Type, typeCast.File));
+            // Diagnostics.Add(Diagnostic.Hint($"Redundant type conversion", typeCast.Type, typeCast.File));
             compiledStatement = prev;
             return true;
         }
@@ -2621,7 +2621,8 @@ public partial class StatementCompiler
             {
                 if (!GenerateCodeForStatement(block.Statements[i], out CompiledStatement? item)) return false;
                 if (item is EmptyStatement) continue;
-                res.Add(item);
+                ImmutableArray<CompiledStatement> reduced = ReduceStatements(item, true);
+                res.AddRange(reduced);
             }
 
             compiledStatement = new CompiledBlock()
@@ -3332,7 +3333,9 @@ public partial class StatementCompiler
                 return false;
             }
             if (compiledStatement is EmptyStatement) continue;
-            res.Add(compiledStatement);
+
+            ImmutableArray<CompiledStatement> reduced = ReduceStatements(compiledStatement, true);
+            res.AddRange(reduced);
         }
 
         CurrentReturnType = null;

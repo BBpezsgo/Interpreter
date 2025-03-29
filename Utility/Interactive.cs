@@ -69,7 +69,7 @@ public static class Interactive
 
         if (diagnostics.HasErrors) return;
 
-        BytecodeProcessor interpreter = new(BytecodeInterpreterSettings.Default, generated.Code, null, generated.DebugInfo);
+        BytecodeProcessor interpreter = new(BytecodeInterpreterSettings.Default, generated.Code, null, generated.DebugInfo, null, generated.GeneratedUnmanagedFunctions);
 
         interpreter.IO.OnStdOut += Console.Write;
         interpreter.IO.OnNeedInput += () => interpreter.IO.SendKey(Console.ReadKey().KeyChar);

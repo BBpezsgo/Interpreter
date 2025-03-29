@@ -1,4 +1,5 @@
 ﻿using LanguageCore.Compiler;
+using LanguageCore.IL.Generator;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.BBLang.Generator;
@@ -147,10 +148,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             FileSourceProvider.Instance
         ),
     };
+    readonly CodeGeneratorForIL? ILGenerator;
 
     #region Fields
 
     readonly ImmutableArray<IExternalFunction> ExternalFunctions;
+    readonly List<(ExternalFunctionScopedSync Function, ExternalFunctionScopedSyncCallback Reference)> GeneratedUnmanagedFunctions = new();
     readonly Dictionary<CompiledInstructionLabelDeclaration, GeneratedInstructionLabel> GeneratedInstructionLabels = new();
     readonly Dictionary<CompiledVariableDeclaration, GeneratedVariable> GeneratedVariables = new();
 
@@ -214,6 +217,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     public CodeGeneratorForMain(CompilerResult compilerResult, MainGeneratorSettings settings, DiagnosticsCollection diagnostics) : base(compilerResult, diagnostics)
     {
+        ILGenerator = settings.ILGeneratorSettings.HasValue ? new CodeGeneratorForIL(compilerResult, new DiagnosticsCollection(), settings.ILGeneratorSettings.Value, null) : null;
         ExternalFunctions = compilerResult.ExternalFunctions;
         GeneratedCode = new();
         CleanupStack2 = new();

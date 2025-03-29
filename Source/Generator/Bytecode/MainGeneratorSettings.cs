@@ -1,4 +1,4 @@
-﻿using LanguageCore.Compiler;
+﻿using LanguageCore.IL.Generator;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.BBLang.Generator;
@@ -12,6 +12,7 @@ public struct MainGeneratorSettings
     public int PointerSize;
     public int StackSize;
     public bool CleanupGlobalVaraibles;
+    public ILGeneratorSettings? ILGeneratorSettings;
 
     public MainGeneratorSettings(MainGeneratorSettings other)
     {
@@ -21,6 +22,7 @@ public struct MainGeneratorSettings
         PointerSize = other.PointerSize;
         StackSize = other.StackSize;
         CleanupGlobalVaraibles = other.CleanupGlobalVaraibles;
+        ILGeneratorSettings = other.ILGeneratorSettings;
     }
 
     public static MainGeneratorSettings Default => new()
@@ -31,5 +33,6 @@ public struct MainGeneratorSettings
         PointerSize = 4,
         StackSize = BytecodeInterpreterSettings.Default.StackSize,
         CleanupGlobalVaraibles = true,
+        ILGeneratorSettings = null,
     };
 }

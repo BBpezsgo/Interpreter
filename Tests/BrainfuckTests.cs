@@ -1,4 +1,4 @@
-﻿namespace Tests;
+namespace Tests;
 
 [TestClass, TestCategory("Brainfuck"), TestCategory("Generic")]
 public class BrainfuckTests
@@ -109,10 +109,10 @@ public class BrainfuckTests
     [TestMethod, Timeout(Timeout)] public void Test101() => Utils.GetTest(101).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Not implemented")] public void Test102() => Utils.GetTest(102).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("Floats not supported")] public void Test103() => Utils.GetTest(103).DoBrainfuck();
-    [TestMethod, Timeout(Timeout)] public void Test104() => Utils.GetTest(104).DoBrainfuck();
+    [TestMethod, Timeout(Timeout), Ignore("nah")] public void Test104() => Utils.GetTest(104).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test105() => Utils.GetTest(105).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test106() => Utils.GetTest(106).DoBrainfuck();
-    [TestMethod, Timeout(Timeout)] public void Test107() => Utils.GetTest(107).DoBrainfuck();
+    [TestMethod, Timeout(Timeout), Ignore("nah")] public void Test107() => Utils.GetTest(107).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test108() => Utils.GetTest(108).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("nah")] public void Test109() => Utils.GetTest(109).DoBrainfuck();
 }

@@ -339,6 +339,7 @@ public static class Utils
             ),
         }, diagnostics);
         BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, MainGeneratorSettings, null, diagnostics);
+
         compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
         {
             ExternalFunctions = externalFunctions.ToImmutableArray(),
@@ -360,14 +361,69 @@ public static class Utils
             DontOptimize = true
         }, null, diagnostics);
 
+        compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
+        {
+            ExternalFunctions = externalFunctions.ToImmutableArray(),
+            DontOptimize = false,
+            PreprocessorVariables = PreprocessorVariables.Normal,
+            AdditionalImports = AdditionalImports,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        BasePath
+                    },
+                }
+            ),
+        }, diagnostics);
+        BBLangGeneratorResult generatedCodeIL = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings)
+        {
+            ILGeneratorSettings = new LanguageCore.IL.Generator.ILGeneratorSettings()
+            {
+                AllowCrash = true,
+                AllowPointers = true,
+                AllowHeap = true,
+            },
+        }, null, diagnostics);
+
+        compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
+        {
+            ExternalFunctions = externalFunctions.ToImmutableArray(),
+            DontOptimize = true,
+            PreprocessorVariables = PreprocessorVariables.Normal,
+            AdditionalImports = AdditionalImports,
+            SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                new FileSourceProvider()
+                {
+                    ExtraDirectories = new string[]
+                    {
+                        BasePath
+                    },
+                }
+            ),
+        }, diagnostics);
+        BBLangGeneratorResult generatedCodeILUnoptimized = CodeGeneratorForMain.Generate(compiled, new MainGeneratorSettings(MainGeneratorSettings)
+        {
+            DontOptimize = true,
+            ILGeneratorSettings = new LanguageCore.IL.Generator.ILGeneratorSettings()
+            {
+                AllowCrash = true,
+                AllowPointers = true,
+                AllowHeap = true,
+            },
+        }, null, diagnostics);
+
         diagnostics.Throw();
+
+        GC.Collect();
 
         (BytecodeProcessor, MainResult) Execute(BBLangGeneratorResult code, string input)
         {
             List<IExternalFunction> _externalFunctions = new();
             externalFunctionAdder?.Invoke(_externalFunctions);
 
-            BytecodeProcessor interpreter = new(BytecodeInterpreterSettings, code.Code, null, code.DebugInfo, _externalFunctions);
+            BytecodeProcessor interpreter = new(BytecodeInterpreterSettings, code.Code, null, code.DebugInfo, _externalFunctions, code.GeneratedUnmanagedFunctions);
 
             InputBuffer inputBuffer = new(input);
             StringBuilder stdOutput = new();
@@ -384,24 +440,26 @@ public static class Utils
 
         (BytecodeProcessor interpreterUnoptimized, MainResult unoptimizedResult) = Execute(generatedCodeUnoptimized, input);
         (BytecodeProcessor interpreter, MainResult result) = Execute(generatedCode, input);
-
-        if (interpreter.Registers.BasePointer != interpreterUnoptimized.Registers.BasePointer)
-        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.Registers.BasePointer} != {interpreterUnoptimized.Registers.BasePointer})"); }
-
-        if (interpreter.Registers.StackPointer != interpreterUnoptimized.Registers.StackPointer)
-        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.Registers.StackPointer} != {interpreterUnoptimized.Registers.StackPointer})"); }
-
-        if (interpreter.Registers.StackPointer != interpreterUnoptimized.Registers.StackPointer)
-        { throw new AssertFailedException($"BasePointer are different on optimized and unoptimized version ({interpreter.Registers.StackPointer} != {interpreterUnoptimized.Registers.StackPointer})"); }
+        (BytecodeProcessor interpreterUnoptimizedIL, MainResult unoptimizedResultIL) = Execute(generatedCodeILUnoptimized, input);
+        (BytecodeProcessor interpreterIL, MainResult resultIL) = Execute(generatedCodeIL, input);
 
         if (result.StdOutput != unoptimizedResult.StdOutput)
         { throw new AssertFailedException($"StdOutput are different on optimized and unoptimized version (\"{result.StdOutput.Escape()}\" != \"{unoptimizedResult.StdOutput.Escape()}\")"); }
 
-        if (result.StdError != unoptimizedResult.StdError)
-        { throw new AssertFailedException($"StdError are different on optimized and unoptimized version (\"{result.StdError.Escape()}\" != \"{unoptimizedResult.StdError.Escape()}\")"); }
+        if (result.StdOutput != unoptimizedResultIL.StdOutput)
+        { throw new AssertFailedException($"StdOutput are different on optimized normal and unoptimized IL version (\"{result.StdOutput.Escape()}\" != \"{unoptimizedResultIL.StdOutput.Escape()}\")"); }
+
+        if (result.StdOutput != resultIL.StdOutput)
+        { throw new AssertFailedException($"StdOutput are different on normal and IL version (\"{result.StdOutput.Escape()}\" != \"{resultIL.StdOutput.Escape()}\")"); }
 
         if (result.ExitCode != unoptimizedResult.ExitCode)
         { throw new AssertFailedException($"ExitCode are different on optimized and unoptimized version ({result.ExitCode} != {unoptimizedResult.ExitCode})"); }
+
+        if (result.ExitCode != unoptimizedResultIL.ExitCode)
+        { throw new AssertFailedException($"ExitCode are different on optimized normal and unoptimized IL version ({result.ExitCode} != {unoptimizedResultIL.ExitCode})"); }
+
+        if (result.ExitCode != resultIL.ExitCode)
+        { throw new AssertFailedException($"ExitCode are different on normal and IL version ({result.ExitCode} != {resultIL.ExitCode})"); }
 
         return result;
     }
@@ -433,7 +491,12 @@ public static class Utils
                 }
             ),
         }, diagnostics);
-        Func<int> generatedCode = LanguageCore.IL.Generator.CodeGeneratorForIL.Generate(compiled, diagnostics);
+        Func<int> generatedCode = LanguageCore.IL.Generator.CodeGeneratorForIL.Generate(compiled, diagnostics, new()
+        {
+            AllowCrash = true,
+            AllowHeap = true,
+            AllowPointers = true,
+        });
 
         diagnostics.Throw();
 

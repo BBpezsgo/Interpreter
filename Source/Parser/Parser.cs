@@ -464,7 +464,7 @@ public sealed class Parser
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
-        { Diagnostics.Add(Diagnostic.Error($"Body is required for general function definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
+        { Diagnostics.Add(Diagnostic.Error($"Body is required for general function definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After() ?? Position.UnknownPosition, File)); }
 
         function = new GeneralFunctionDefinition(
             possibleNameT,
@@ -495,7 +495,7 @@ public sealed class Parser
 
         Block? block = null;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
-        { Diagnostics.Add(Diagnostic.Error($"Body is required for constructor definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After(), File)); }
+        { Diagnostics.Add(Diagnostic.Error($"Body is required for constructor definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After() ?? Position.UnknownPosition, File)); }
 
         function = new ConstructorDefinition(
             type,

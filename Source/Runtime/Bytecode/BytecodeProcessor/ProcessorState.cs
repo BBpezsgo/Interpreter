@@ -10,6 +10,9 @@ public enum Signal : byte
     PointerOutOfRange,
 }
 
+#if UNITY_BURST
+[Unity.Burst.BurstCompile]
+#endif
 public ref partial struct ProcessorState
 {
     public const int StackDirection = -1;
@@ -22,18 +25,23 @@ public ref partial struct ProcessorState
 
     public readonly Span<byte> Memory;
     public readonly ReadOnlySpan<Instruction> Code;
-    public readonly ReadOnlySpan<IExternalFunction> ExternalFunctions;
-    public readonly unsafe ExternalFunctionScopedSync* ScopedExternalFunctions;
-    public readonly int ScopedExternalFunctionsCount;
+    public readonly ReadOnlySpan<ExternalFunctionScopedSync> ScopedExternalFunctions;
 
     public int Crash;
     public Signal Signal;
     public Registers Registers;
+
 #if !UNITY_BURST
+    public readonly ReadOnlySpan<IExternalFunction> ExternalFunctions;
     ExternalFunctionAsyncReturnChecker? PendingExternalFunction;
 #endif
 
-    public static unsafe ProcessorState Create(ImmutableArray<Instruction> code, byte[]? memory, FrozenDictionary<int, IExternalFunction> externalFunctions, BytecodeInterpreterSettings settings) => new ProcessorState(
+    public static ProcessorState Create(
+        ImmutableArray<Instruction> code,
+        byte[]? memory,
+        FrozenDictionary<int, IExternalFunction> externalFunctions,
+        BytecodeInterpreterSettings settings)
+    => new(
         settings,
         new Registers()
         {
@@ -41,30 +49,31 @@ public ref partial struct ProcessorState
         },
         memory ?? new byte[settings.HeapSize + settings.StackSize],
         code.AsSpan(),
+#if !UNITY_BURST
         externalFunctions.Values.AsSpan(),
-        default,
-        default
+#endif
+        ReadOnlySpan<ExternalFunctionScopedSync>.Empty
     );
 
-    public unsafe ProcessorState(
+    public ProcessorState(
         BytecodeInterpreterSettings settings,
         Registers registers,
         Span<byte> memory,
         ReadOnlySpan<Instruction> code,
+#if !UNITY_BURST
         ReadOnlySpan<IExternalFunction> externalFunctions,
-        ExternalFunctionScopedSync* scopedExternalFunctions,
-        int scopedExternalFunctionsCount)
+#endif
+        ReadOnlySpan<ExternalFunctionScopedSync> scopedExternalFunctions)
     {
         Settings = settings;
         Registers = registers;
         Memory = memory;
         Code = code;
-        ExternalFunctions = externalFunctions;
 #if !UNITY_BURST
+        ExternalFunctions = externalFunctions;
         PendingExternalFunction = null;
 #endif
         ScopedExternalFunctions = scopedExternalFunctions;
-        ScopedExternalFunctionsCount = scopedExternalFunctionsCount;
         Crash = 0;
         Signal = Signal.None;
     }

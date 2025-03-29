@@ -22,6 +22,10 @@ public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
         _diagnostics.Any(v => v.Level == DiagnosticsLevel.Error) ||
         _diagnosticsWithoutContext.Any(v => v.Level == DiagnosticsLevel.Error);
 
+    public bool Has(DiagnosticsLevel level) =>
+        _diagnostics.Any(v => v.Level == level) ||
+        _diagnosticsWithoutContext.Any(v => v.Level == level);
+
     public DiagnosticsCollection()
     {
         _diagnostics = new();

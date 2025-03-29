@@ -8,20 +8,22 @@ public class PossibleDiagnostic
     readonly bool IsPopulated;
     readonly Position Position;
     readonly Uri? File;
+    readonly bool ShouldBreak;
 
-    public PossibleDiagnostic(string message)
-        : this(message, ImmutableArray<PossibleDiagnostic>.Empty)
+    public PossibleDiagnostic(string message, bool shouldBreak = true)
+        : this(message, ImmutableArray<PossibleDiagnostic>.Empty, shouldBreak)
     { }
 
     public PossibleDiagnostic(string message, params PossibleDiagnostic[] suberrors)
         : this(message, suberrors.ToImmutableArray())
     { }
 
-    public PossibleDiagnostic(string message, ImmutableArray<PossibleDiagnostic> suberrors)
+    public PossibleDiagnostic(string message, ImmutableArray<PossibleDiagnostic> suberrors, bool shouldBreak = true)
     {
         Message = message;
         IsPopulated = false;
         SubErrors = suberrors;
+        ShouldBreak = shouldBreak;
     }
 
     public PossibleDiagnostic(string message, ILocated location)
@@ -61,8 +63,8 @@ public class PossibleDiagnostic
 
     public Diagnostic ToError(IPositioned position, Uri file) =>
         IsPopulated ?
-        new(DiagnosticsLevel.Error, Message, Position, File!, SubErrors.Select(v => v.ToError(position, file))) :
-        new(DiagnosticsLevel.Error, Message, position.Position, file, SubErrors.Select(v => v.ToError(position, file)));
+        new(DiagnosticsLevel.Error, Message, Position, File!, ShouldBreak, SubErrors.Select(v => v.ToError(position, file))) :
+        new(DiagnosticsLevel.Error, Message, position.Position, file, ShouldBreak, SubErrors.Select(v => v.ToError(position, file)));
 
     public Diagnostic ToWarning(IPositioned position, Uri file) =>
         IsPopulated ?
@@ -71,8 +73,8 @@ public class PossibleDiagnostic
 
     public Diagnostic ToError(ILocated location) =>
         IsPopulated ?
-        new(DiagnosticsLevel.Error, Message, Position, File!, SubErrors.Select(v => v.ToError(location))) :
-        new(DiagnosticsLevel.Error, Message, location.Location.Position, location.Location.File, SubErrors.Select(v => v.ToError(location)));
+        new(DiagnosticsLevel.Error, Message, Position, File!, ShouldBreak, SubErrors.Select(v => v.ToError(location))) :
+        new(DiagnosticsLevel.Error, Message, location.Location.Position, location.Location.File, ShouldBreak, SubErrors.Select(v => v.ToError(location)));
 
     public Diagnostic ToWarning(ILocated location) =>
         IsPopulated ?

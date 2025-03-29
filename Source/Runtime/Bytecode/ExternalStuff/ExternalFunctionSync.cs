@@ -1,6 +1,3 @@
-using System.Reflection.Emit;
-using System.Runtime.InteropServices;
-
 namespace LanguageCore.Runtime;
 
 public delegate void ExternalFunctionSyncCallback(ReadOnlySpan<byte> arguments, Span<byte> returnValue);

@@ -139,7 +139,10 @@ public class SourceCodeManager
 
                         if (res.Stream is null)
                         {
-                            Diagnostics.Add(Diagnostic.Internal($"Invalid handler for \"{resolvedUri}\": resulted in success but not provided a data stream", initiator?.Position, initiator?.File));
+                            if (initiator is null)
+                            { Diagnostics.Add(DiagnosticWithoutContext.Error($"Invalid handler for \"{resolvedUri}\": resulted in success but not provided a data stream")); }
+                            else
+                            { Diagnostics.Add(Diagnostic.Error($"Invalid handler for \"{resolvedUri}\": resulted in success but not provided a data stream", initiator.Position, initiator.File)); }
                             return false;
                         }
 #if UNITY
@@ -157,7 +160,10 @@ public class SourceCodeManager
                     case SourceProviderResultType.Error:
                         resolvedUri = res.ResolvedUri!;
                         wasHandlerFound = true;
-                        Diagnostics.Add(Diagnostic.Error(res.ErrorMessage ?? $"Failed to load \"{resolvedUri?.ToString() ?? requestedFile}\"", initiator?.Position, initiator?.File));
+                        if (initiator is null)
+                        { Diagnostics.Add(DiagnosticWithoutContext.Error(res.ErrorMessage ?? $"Failed to load \"{resolvedUri?.ToString() ?? requestedFile}\"")); }
+                        else
+                        { Diagnostics.Add(Diagnostic.Error(res.ErrorMessage ?? $"Failed to load \"{resolvedUri?.ToString() ?? requestedFile}\"", initiator.Position, initiator.File)); }
                         return false;
                     case SourceProviderResultType.NextHandler:
                         continue;
@@ -190,7 +196,10 @@ public class SourceCodeManager
                     case SourceProviderResultType.Error:
                         resolvedUri = res.ResolvedUri!;
                         wasHandlerFound = true;
-                        Diagnostics.Add(Diagnostic.Error(res.ErrorMessage ?? $"Failed to load \"{resolvedUri?.ToString() ?? requestedFile}\"", initiator?.Position, initiator?.File));
+                        if (initiator is null)
+                        { Diagnostics.Add(DiagnosticWithoutContext.Error(res.ErrorMessage ?? $"Failed to load \"{resolvedUri?.ToString() ?? requestedFile}\"")); }
+                        else
+                        { Diagnostics.Add(Diagnostic.Error(res.ErrorMessage ?? $"Failed to load \"{resolvedUri?.ToString() ?? requestedFile}\"", initiator.Position, initiator.File)); }
                         return false;
                     case SourceProviderResultType.NextHandler:
                         continue;

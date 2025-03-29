@@ -20,6 +20,7 @@ public class BytecodeProcessor
     public readonly byte[] Memory;
     public readonly ImmutableArray<Instruction> Code;
     public readonly FrozenDictionary<int, IExternalFunction> ExternalFunctions;
+    readonly ImmutableArray<ExternalFunctionScopedSync> ScopedExternalFunctions;
 
     public readonly IOHandler IO;
     readonly Queue<UserCall> UserCalls = new();
@@ -31,7 +32,8 @@ public class BytecodeProcessor
         ImmutableArray<Instruction> program,
         byte[]? memory,
         DebugInformation? debugInformation = null,
-        IEnumerable<IExternalFunction>? externalFunctions = null)
+        IEnumerable<IExternalFunction>? externalFunctions = null,
+        ImmutableArray<ExternalFunctionScopedSync> scopedExternalFunctions = default)
     {
         DebugInformation = debugInformation is null ? default : new CompiledDebugInformation(debugInformation);
 
@@ -48,6 +50,7 @@ public class BytecodeProcessor
         Code = program;
         Memory = memory ?? new byte[settings.HeapSize + settings.StackSize];
         Registers.StackPointer = StackStart - ProcessorState.StackDirection;
+        ScopedExternalFunctions = !scopedExternalFunctions.IsDefaultOrEmpty ? scopedExternalFunctions : ImmutableArray<ExternalFunctionScopedSync>.Empty;
     }
 
     public unsafe ProcessorState GetState() => new(
@@ -55,9 +58,10 @@ public class BytecodeProcessor
         Registers,
         Memory,
         Code.AsSpan(),
+#if !UNITY_BURST
         ExternalFunctions.Values.AsSpan(),
-        default,
-        default
+#endif
+        ScopedExternalFunctions.AsSpan()
     );
 
     public unsafe bool Tick()

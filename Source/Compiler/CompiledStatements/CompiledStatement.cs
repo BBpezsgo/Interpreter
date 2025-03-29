@@ -1,4 +1,3 @@
-using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.Compiler;
@@ -25,7 +24,7 @@ public class EmptyStatement : CompiledStatement
 
 public abstract class CompiledStatementWithValue : CompiledStatement
 {
-    public required bool SaveValue { get; init; } = true;
+    public required bool SaveValue { get; set; } = true;
     public virtual required GeneralType Type { get; init; }
 }
 
@@ -578,6 +577,14 @@ public class CompiledForLoop : CompiledStatement
 
 public class CompiledStackAllocation : CompiledStatementWithValue
 {
+    public override string Stringify(int depth = 0) => $"new {Type}";
+    public override string ToString() => $"new {Type}";
+}
+
+public class CompiledHeapAllocation : CompiledStatementWithValue
+{
+    public required CompiledFunctionDefinition Allocator { get; init; }
+
     public override string Stringify(int depth = 0) => $"new {Type}";
     public override string ToString() => $"new {Type}";
 }

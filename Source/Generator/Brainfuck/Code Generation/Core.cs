@@ -22,21 +22,6 @@ public enum BrainfuckPrintFlags
     PrintMemory = 0b_0010,
 }
 
-public class ExternalFunctionStub : IExternalFunction
-{
-    public string Name { get; }
-    public int Id { get; init; }
-    public int ParametersSize { get; init; }
-    public int ReturnValueSize { get; init; }
-
-    public ExternalFunctionStub(string name)
-    {
-        Name = name;
-    }
-
-    public override string ToString() => $"<{ReturnValueSize}b> {Name ?? Id.ToString()}(<{ParametersSize}b>)";
-}
-
 public struct BrainfuckGeneratorSettings
 {
     public bool ClearGlobalVariablesBeforeExit;
@@ -89,14 +74,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         SizeofStatementType = BuiltinType.U8,
         ExternalConstants = ImmutableArray<ExternalConstant>.Empty,
         ExternalFunctions = ImmutableArray.Create<IExternalFunction>(
-            new ExternalFunctionStub("stdin")
-            {
-                ReturnValueSize = 1,
-            },
-            new ExternalFunctionStub("stdout")
-            {
-                ParametersSize = 1,
-            }
+            new ExternalFunctionStub(0, "stdin", 0, 1),
+            new ExternalFunctionStub(1, "stdout", 1, 0)
         ),
         DontOptimize = false,
         SourceProviders = ImmutableArray.Create<ISourceProvider>(

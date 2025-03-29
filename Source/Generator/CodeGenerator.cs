@@ -57,7 +57,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     protected readonly Dictionary<string, GeneralType> TypeArguments;
     protected DebugInformation? DebugInfo;
 
-    protected readonly DiagnosticsCollection Diagnostics;
+    internal readonly DiagnosticsCollection Diagnostics;
 
     public abstract int PointerSize { get; }
     public BitWidth PointerBitWidth => (BitWidth)PointerSize;

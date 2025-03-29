@@ -35,7 +35,7 @@ public static unsafe class ExternalFunctionGenerator
         return true;
     }
 
-    public static int GenerateId(this List<IExternalFunction> functions, string? name = null)
+    public static int GenerateId(this IEnumerable<IExternalFunction> functions, string? name = null)
     {
         int result;
 

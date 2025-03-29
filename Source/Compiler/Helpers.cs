@@ -3451,16 +3451,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     class EvaluationFrame
     {
+        public readonly CompiledFunction Function;
         public CompiledValue? ReturnValue;
         public readonly Dictionary<string, CompiledValue> Parameters = new();
         public readonly Stack<EvaluationScope> Scopes = new();
+
+        public EvaluationFrame(CompiledFunction function) => Function = function;
     }
 
     class EvaluationContext
     {
         public readonly Stack<EvaluationFrame> Frames;
 
-        public readonly Stack<ICompiledFunctionDefinition> Calls;
         public readonly List<RuntimeStatement2> RuntimeStatements;
 
         public bool IsReturning;
@@ -3470,7 +3472,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         public EvaluationContext()
         {
-            Calls = new();
             Frames = new();
             RuntimeStatements = new();
         }
@@ -3620,7 +3621,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
         }
     }
-    static bool TryCompute(CompiledEvaluatedValue literal, out CompiledValue value)
+    bool TryCompute(CompiledEvaluatedValue literal, EvaluationContext context, out CompiledValue value)
     {
         value = literal.Value;
         return true;
@@ -3650,27 +3651,19 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        if (context.Calls.Count(v => v == function) > 4)
+        if (TryEvaluate(found, parameters, context, out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
+            returnValue.HasValue &&
+            runtimeStatements.Length == 0)
         {
-            return false;
-        }
-
-        using (StackAuto<ICompiledFunctionDefinition> _ = context.Calls.PushAuto(function))
-        {
-            if (TryEvaluate(found, parameters, out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
-                returnValue.HasValue &&
-                runtimeStatements.Length == 0)
-            {
-                value = returnValue.Value;
-                return true;
-            }
+            value = returnValue.Value;
+            return true;
         }
 
         return false;
     }
-    static bool TryCompute(CompiledSizeof functionCall, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(CompiledSizeof functionCall, EvaluationContext context, out CompiledValue value)
     {
-        if (!FindSize(functionCall.Of, out int size, out PossibleDiagnostic? findSizeError))
+        if (!FindSize(functionCall.Of, out int size, out _))
         {
             value = CompiledValue.Null;
             return false;
@@ -3791,7 +3784,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return statement switch
         {
-            CompiledEvaluatedValue v => TryCompute(v, out value),
+            CompiledEvaluatedValue v => TryCompute(v, context, out value),
             CompiledBinaryOperatorCall v => TryCompute(v, context, out value),
             CompiledUnaryOperatorCall v => TryCompute(v, context, out value),
             CompiledPointer v => TryCompute(v, context, out value),
@@ -3820,7 +3813,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
     }
 
-    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
@@ -3830,13 +3823,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (found is null)
         { return false; }
 
-        if (TryCompute(parameters, EvaluationContext.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
-            TryEvaluate(found, parameterValues, out value, out runtimeStatements))
+        if (TryCompute(parameters, context, out ImmutableArray<CompiledValue> parameterValues) &&
+            TryEvaluate(found, parameterValues, context, out value, out runtimeStatements))
         { return true; }
 
         return false;
     }
-    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledStatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledStatementWithValue> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
@@ -3848,24 +3841,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        if (TryCompute(parameters, EvaluationContext.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
-            TryEvaluate(found, parameterValues, out value, out runtimeStatements))
+        if (TryCompute(parameters, context, out ImmutableArray<CompiledValue> parameterValues) &&
+            TryEvaluate(found, parameterValues, context, out value, out runtimeStatements))
         { return true; }
 
         return false;
     }
-    bool TryEvaluate(CompiledFunction function, ImmutableArray<CompiledStatementWithValue> parameters, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
-    {
-        value = default;
-        runtimeStatements = default;
-
-        if (TryCompute(parameters, EvaluationContext.Empty, out ImmutableArray<CompiledValue> parameterValues) &&
-            TryEvaluate(function, parameterValues, out value, out runtimeStatements))
-        { return true; }
-
-        return false;
-    }
-    bool TryEvaluate(CompiledFunction function, ImmutableArray<CompiledValue> parameterValues, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(CompiledFunction function, ImmutableArray<CompiledValue> parameterValues, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
     {
         value = null;
         runtimeStatements = null;
@@ -3897,30 +3879,29 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             { return false; }
         }
 
-        EvaluationContext context = new();
-        context.Frames.Add(new EvaluationFrame());
-
-        for (int i = 0; i < parameterValues.Length; i++)
-        {
-            context.Frames.Last.Parameters.Add(function.Function.Parameters[i].Identifier.Content, parameterValues[i]);
-        }
-
-        CurrentEvaluationContext2.Push(context);
-
-        bool success = TryEvaluate(function.Body, context);
-
-        CurrentEvaluationContext2.Pop();
-
-        if (!success)
+        if (context.Frames.Count > 8)
         { return false; }
 
-        if (function.Function.ReturnSomething)
+        using (StackAuto<EvaluationFrame> _ = context.Frames.PushAuto(new EvaluationFrame(function)))
         {
-            if (context.Frames?.LastOrDefault is null)
-            { throw new InternalExceptionWithoutContext(); }
-            if (!context.Frames.LastOrDefault.ReturnValue.HasValue)
+            for (int i = 0; i < parameterValues.Length; i++)
+            {
+                context.Frames.Last.Parameters.Add(function.Function.Parameters[i].Identifier.Content, parameterValues[i]);
+            }
+
+            bool success = TryEvaluate(function.Body, context);
+
+            if (!success)
             { return false; }
-            value = context.Frames.LastOrDefault.ReturnValue.Value;
+
+            if (function.Function.ReturnSomething)
+            {
+                if (context.Frames?.LastOrDefault is null)
+                { throw new InternalExceptionWithoutContext(); }
+                if (!context.Frames.LastOrDefault.ReturnValue.HasValue)
+                { return false; }
+                value = context.Frames.LastOrDefault.ReturnValue.Value;
+            }
         }
 
         runtimeStatements = context.RuntimeStatements.ToArray();
@@ -4153,8 +4134,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return true;
     }
 
-    readonly Stack<EvaluationContext> CurrentEvaluationContext2 = new();
-
     #endregion
 
     #region Find Size
@@ -4270,30 +4249,30 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     StatementComplexity GetStatementComplexity(CompiledStatementWithValue statement) => statement switch
     {
-        CompiledSizeof v => StatementComplexity.Bruh,
+        CompiledSizeof => StatementComplexity.Bruh,
         CompiledPassedArgument v => GetStatementComplexity(v.Value) | ((v.Cleanup.Destructor is not null || v.Cleanup.Deallocator is not null) ? StatementComplexity.Complex | StatementComplexity.Volatile : StatementComplexity.None),
         CompiledBinaryOperatorCall v => GetStatementComplexity(v.Left) | GetStatementComplexity(v.Right) | StatementComplexity.Complex,
         CompiledUnaryOperatorCall v => GetStatementComplexity(v.Left) | StatementComplexity.Complex,
-        CompiledEvaluatedValue v => StatementComplexity.None,
-        RegisterGetter v => StatementComplexity.None,
-        CompiledVariableGetter v => StatementComplexity.None,
-        CompiledParameterGetter v => StatementComplexity.None,
-        FunctionAddressGetter v => StatementComplexity.None,
-        InstructionLabelAddressGetter v => StatementComplexity.None,
+        CompiledEvaluatedValue => StatementComplexity.None,
+        RegisterGetter => StatementComplexity.None,
+        CompiledVariableGetter => StatementComplexity.None,
+        CompiledParameterGetter => StatementComplexity.None,
+        FunctionAddressGetter => StatementComplexity.None,
+        InstructionLabelAddressGetter => StatementComplexity.None,
         CompiledFieldGetter v => GetStatementComplexity(v.Object),
         CompiledIndexGetter v => GetStatementComplexity(v.Base) | GetStatementComplexity(v.Index),
         CompiledAddressGetter v => GetStatementComplexity(v.Of),
         CompiledPointer v => GetStatementComplexity(v.To),
-        CompiledStackAllocation v => StatementComplexity.Bruh,
+        CompiledStackAllocation => StatementComplexity.Bruh,
         CompiledConstructorCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Complex | StatementComplexity.Volatile,
         CompiledTypeCast v => GetStatementComplexity(v.Value) | StatementComplexity.Complex,
         CompiledFakeTypeCast v => GetStatementComplexity(v.Value),
         CompiledRuntimeCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Complex | StatementComplexity.Volatile,
         CompiledFunctionCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Complex | StatementComplexity.Volatile,
         CompiledExternalFunctionCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Volatile,
-        CompiledStatementWithValueThatActuallyDoesntHaveValue v => StatementComplexity.Bruh,
-        CompiledStringInstance v => StatementComplexity.Complex | StatementComplexity.Volatile,
-        CompiledStackStringInstance v => StatementComplexity.Bruh,
+        CompiledStatementWithValueThatActuallyDoesntHaveValue => StatementComplexity.Bruh,
+        CompiledStringInstance => StatementComplexity.Complex | StatementComplexity.Volatile,
+        CompiledStackStringInstance => StatementComplexity.Bruh,
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 
@@ -4325,7 +4304,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 foreach (CompiledStatement v2 in Visit(v.ReturnType)) yield return v2;
                 foreach (CompiledStatement v2 in Visit(v.Parameters)) yield return v2;
                 break;
-            case GenericType v:
+            case GenericType:
                 break;
             case StructType v:
                 foreach (CompiledStatement v2 in Visit(v.TypeArguments.Values)) yield return v2;
@@ -4545,4 +4524,79 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
 
     #endregion
+
+    ImmutableArray<CompiledStatement> ReduceStatements<TStatement>(ImmutableArray<TStatement> statements, bool forceDiscardValue = false)
+        where TStatement : CompiledStatement
+    {
+        ImmutableArray<CompiledStatement>.Builder result = ImmutableArray.CreateBuilder<CompiledStatement>();
+
+        foreach (TStatement statement in statements)
+        {
+            result.AddRange(ReduceStatements(statement, forceDiscardValue));
+        }
+
+        return result.ToImmutable();
+    }
+
+    ImmutableArray<CompiledStatement> ReduceStatements(CompiledStatement statement, bool forceDiscardValue = false)
+    {
+        if (statement is not CompiledStatementWithValue statementWithValue)
+        {
+            return ImmutableArray.Create(statement);
+        }
+
+        if (statementWithValue.SaveValue && !forceDiscardValue)
+        {
+            return ImmutableArray.Create(statement);
+        }
+
+        switch (statementWithValue)
+        {
+            case CompiledSizeof:
+                Diagnostics.Add(Diagnostic.Warning($"oh no", statement));
+                return ImmutableArray<CompiledStatement>.Empty;
+            case CompiledPassedArgument v:
+                return ReduceStatements(v.Value, true);
+            case CompiledBinaryOperatorCall v:
+                return
+                    ReduceStatements(v.Left, true)
+                    .AddRange(ReduceStatements(v.Right, true));
+            case CompiledUnaryOperatorCall v:
+                return ReduceStatements(v.Left, true);
+            case CompiledIndexGetter v:
+                return
+                    ReduceStatements(v.Base, true)
+                    .AddRange(ReduceStatements(v.Index, true));
+            case CompiledAddressGetter v:
+                return ReduceStatements(v.Of, true);
+            case CompiledPointer v:
+                return ReduceStatements(v.To, true);
+            case CompiledConstructorCall v:
+                return ReduceStatements(v.Arguments, true);
+            case CompiledTypeCast v:
+                return ReduceStatements(v.Value, true);
+            case CompiledFakeTypeCast v:
+                return ReduceStatements(v.Value, true);
+            case CompiledStatementWithValueThatActuallyDoesntHaveValue v:
+                return ReduceStatements(v.Statement);
+
+            case CompiledRuntimeCall:
+            case CompiledFunctionCall:
+            case CompiledExternalFunctionCall:
+                return ImmutableArray.Create(statement);
+
+            case CompiledEvaluatedValue:
+            case RegisterGetter:
+            case CompiledVariableGetter:
+            case CompiledParameterGetter:
+            case FunctionAddressGetter:
+            case InstructionLabelAddressGetter:
+            case CompiledFieldGetter:
+            case CompiledStackAllocation:
+            case CompiledStringInstance:
+            case CompiledStackStringInstance:
+                return ImmutableArray<CompiledStatement>.Empty;
+            default: throw new NotImplementedException();
+        }
+    }
 }

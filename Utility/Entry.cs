@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using CommandLine;
@@ -266,7 +266,11 @@ public static class Entry
                     bytecodeInterpreterSettings,
                     generatedCode.Code,
                     null,
-                    generatedCode.DebugInfo);
+                    generatedCode.DebugInfo,
+                    null,
+                    generatedCode.GeneratedUnmanagedFunctions);
+
+                GC.Collect();
 
                 if (arguments.Debug)
                 {
@@ -379,11 +383,17 @@ public static class Entry
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.IL,
                 }, diagnostics);
-                Func<int> res = IL.Generator.CodeGeneratorForIL.Generate(compiled, diagnostics);
-                diagnostics.Throw();
+                Func<int> res = IL.Generator.CodeGeneratorForIL.Generate(compiled, diagnostics, new()
+                {
+                    AllowCrash = true,
+                    AllowHeap = true,
+                    AllowPointers = true,
+                });
                 diagnostics.Print();
+                diagnostics.Throw();
 
-                return res.Invoke();
+                Console.WriteLine(res.Invoke());
+                return 0;
             }
             case "brainfuck":
             {
@@ -421,8 +431,8 @@ public static class Entry
                 {
                     CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
-                    diagnostics.Throw();
                     diagnostics.Print();
+                    diagnostics.Throw();
                     Output.LogDebug($"Optimized {generated.Statistics.Optimizations} statements");
                     Output.LogDebug($"Precomputed {generated.Statistics.Precomputations} statements");
                     Output.LogDebug($"Evaluated {generated.Statistics.FunctionEvaluations} functions");
@@ -433,8 +443,8 @@ public static class Entry
                     {
                         CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
                         generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
-                        diagnostics.Throw();
                         diagnostics.Print();
+                        diagnostics.Throw();
                         Output.LogDebug($"Optimized {generated.Statistics.Optimizations} statements");
                         Output.LogDebug($"Precomputed {generated.Statistics.Precomputations} statements");
                         Output.LogDebug($"Evaluated {generated.Statistics.FunctionEvaluations} functions");
@@ -696,8 +706,8 @@ public static class Entry
                 {
                     CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
-                    diagnostics.Throw();
                     diagnostics.Print();
+                    diagnostics.Throw();
                 }
                 else
                 {
@@ -705,8 +715,8 @@ public static class Entry
                     {
                         CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
                         generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
-                        diagnostics.Throw();
                         diagnostics.Print();
+                        diagnostics.Throw();
                     }
                     catch (LanguageException ex)
                     {

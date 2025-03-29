@@ -294,9 +294,9 @@ export byte Log10(u8 v)
  */
 export float Sqrt(float z)
 {
-    int* _z = (&z) as int*;
-	*_z = (((*_z) - (1 << 23)) >> 1) + (1 << 29);
-	return *(_z as float*);
+    int _z = z as int;
+	_z = (((_z) - (1 << 23)) >> 1) + (1 << 29);
+	return _z as float;
 }
 
 export float Round(float v)

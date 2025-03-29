@@ -86,7 +86,7 @@ struct HashMap
         {
             for (int i = this._capacity - 1; i >= 0; i--)
             {
-                if (old[i]) this.Add(old[i].Key, old[i].Value);
+                if (old[i]) this.AddNoResize(old[i].Key, old[i].Value);
             }
             delete old;
         }
@@ -94,6 +94,11 @@ struct HashMap
 
     export u8 Get(TKey key, TValue* value)
     {
+        if (!this._ptr)
+        {
+            return (u8)0;
+        }
+
         int hash = GetHash(key);
         int i = hash % this._capacity;
         int started = i;
@@ -117,6 +122,15 @@ struct HashMap
     export u8 Add(TKey key, TValue value)
     {
         this.EnsureCapacity(this._length + 1);
+        this.AddNoResize(key, value);
+    }
+
+    u8 AddNoResize(TKey key, TValue value)
+    {
+        if (!this._ptr)
+        {
+            crash "Map not initialized";
+        }
 
         int hash = GetHash(key);
         int i = hash % this._capacity;

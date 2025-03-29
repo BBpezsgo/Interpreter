@@ -15,7 +15,7 @@ public static class ExecutionManager
     static string GetStandardLibraryPath([CallerFilePath] string path = null!)
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path)!, "..", "StandardLibrary"));
 
-    static BytecodeProcessor BytecodeProcessor = null;
+    [NotNull] static BytecodeProcessor? BytecodeProcessor = null;
 
     static ExposedFunction InitFunction;
     static ExposedFunction TickFunction;

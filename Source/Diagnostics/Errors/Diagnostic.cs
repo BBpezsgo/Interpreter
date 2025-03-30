@@ -2,18 +2,10 @@ using LanguageCore.Compiler;
 
 namespace LanguageCore;
 
-public enum DiagnosticsLevel
-{
-    Error,
-    Warning,
-    Information,
-    Hint,
-    OptimizationNotice,
-}
-
 [ExcludeFromCodeCoverage]
 public class Diagnostic :
-    IEquatable<Diagnostic>
+    IEquatable<Diagnostic>,
+    IDiagnostic
 {
     public DiagnosticsLevel Level { get; }
     public string Message { get; }

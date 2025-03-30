@@ -1,9 +1,9 @@
-
 namespace LanguageCore;
 
 [ExcludeFromCodeCoverage]
 public class DiagnosticWithoutContext :
-    IEquatable<DiagnosticWithoutContext>
+    IEquatable<DiagnosticWithoutContext>,
+    IDiagnostic
 {
     public DiagnosticsLevel Level { get; }
     public string Message { get; }

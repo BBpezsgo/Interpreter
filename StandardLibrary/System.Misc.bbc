@@ -1,4 +1,0 @@
-using Primitives;
-
-[External("sleep")]
-export void Sleep(int ms);

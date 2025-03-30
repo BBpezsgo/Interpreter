@@ -249,23 +249,6 @@ public abstract class GeneralType :
         _ => false,
     };
 
-    public static bool TryGetTypeParameters(IEnumerable<GeneralType> definedParameters, IEnumerable<GeneralType?> passedParameters, Dictionary<string, GeneralType> typeParameters)
-        => GeneralType.TryGetTypeParameters(definedParameters.ToImmutableArray(), passedParameters.ToImmutableArray(), typeParameters);
-
-    public static bool TryGetTypeParameters(ImmutableArray<GeneralType> definedParameters, ImmutableArray<GeneralType?> passedParameters, Dictionary<string, GeneralType> typeParameters)
-    {
-        if (definedParameters.Length != passedParameters.Length) return false;
-
-        for (int i = 0; i < definedParameters.Length; i++)
-        {
-            if (passedParameters[i] is null) return false;
-            if (!TryGetTypeParameters(definedParameters[i], passedParameters[i]!, typeParameters))
-            { return false; }
-        }
-
-        return true;
-    }
-
     public static bool TryGetTypeParameters(GeneralType defined, GeneralType passed, Dictionary<string, GeneralType> typeParameters)
     {
         if (passed.Is(out GenericType? passedGenericType))

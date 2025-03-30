@@ -13,11 +13,12 @@ public class SourceProviderTests
     [TestMethod]
     public void TestHttp()
     {
-        using HttpServer _ = new("http://localhost:6789/", new Dictionary<string, string>()
+        using HttpServer server = new("http://localhost:6789/", new Dictionary<string, string>()
         {
             {
                 "/main.bbc",
                 """
+                using stdlib;
                 using stdlib;
 
                 u16[] message = "Hello world";
@@ -76,6 +77,7 @@ public class SourceProviderTests
             "Hello world",
             output.ToString()
         );
+        Assert.AreEqual(server.RequestCount, server.Routes.Count);
     }
 
     [Ignore]

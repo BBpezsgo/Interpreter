@@ -2,12 +2,12 @@ using Primitives;
 
 #if BRAINFUCK
 alias BlockHeader u8;
-const BlockHeader StatusFlag = 0x80;
-const BlockHeader SizeMask = 0x7f;
+const BlockHeader StatusFlag = 0x80 as BlockHeader;
+const BlockHeader SizeMask = 0x7f as BlockHeader;
 #else
 alias BlockHeader u32;
-const BlockHeader StatusFlag = 0x80000000;
-const BlockHeader SizeMask = 0x7fffffff;
+const BlockHeader StatusFlag = 0x80000000 as BlockHeader;
+const BlockHeader SizeMask = 0x7fffffff as BlockHeader;
 #endif
 
 #if BRAINFUCK

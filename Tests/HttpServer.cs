@@ -8,8 +8,10 @@ namespace Tests;
 public class HttpServer : IDisposable
 {
     readonly HttpListener Listener;
-    readonly FrozenDictionary<string, string> Routes;
     bool IsDisposed;
+
+    public readonly FrozenDictionary<string, string> Routes;
+    public int RequestCount { get; private set; }
 
     public HttpServer(string url, IDictionary<string, string> routes)
     {
@@ -25,6 +27,8 @@ public class HttpServer : IDisposable
         while (!IsDisposed)
         {
             HttpListenerContext context = await Listener.GetContextAsync();
+
+            RequestCount++;
 
             if (context.Request.Url is not null &&
                 Routes.TryGetValue(context.Request.Url.AbsolutePath, out string? content))

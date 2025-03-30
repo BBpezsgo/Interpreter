@@ -516,6 +516,18 @@ public partial class StatementCompiler
 
             if (!GenerateCodeForStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
 
+            if (parameterType.Is<PointerType>() &&
+                parameter.Modifiers.Any(v => v.Content == ModifierKeywords.This) &&
+                !compiledArgument.Type.Is<PointerType>())
+            {
+                if (!GenerateCodeForStatement(new AddressGetter(
+                    Token.CreateAnonymous("&", TokenType.Operator, argument.Position.Before()),
+                    argument,
+                    argument.File
+                ), out compiledArgument, parameterType))
+                { return false; }
+            }
+
             if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, out PossibleDiagnostic? error))
             { Diagnostics.Add(error.ToError(argument)); }
 
@@ -1509,18 +1521,15 @@ public partial class StatementCompiler
                     }
                     else if (expectedType.SameAs(BasicType.U32))
                     {
-                        if (literal.GetInt() >= (int)uint.MinValue)
+                        OnGotStatementType(literal, expectedType);
+                        compiledStatement = new CompiledEvaluatedValue()
                         {
-                            OnGotStatementType(literal, expectedType);
-                            compiledStatement = new CompiledEvaluatedValue()
-                            {
-                                Location = literal.Location,
-                                SaveValue = literal.SaveValue,
-                                Type = expectedType,
-                                Value = new CompiledValue((uint)literal.GetInt()),
-                            };
-                            return true;
-                        }
+                            Location = literal.Location,
+                            SaveValue = literal.SaveValue,
+                            Type = expectedType,
+                            Value = new CompiledValue(literal.GetInt().U32()),
+                        };
+                        return true;
                     }
                     else if (expectedType.SameAs(BasicType.I32))
                     {
@@ -1656,18 +1665,23 @@ public partial class StatementCompiler
                 }
                 else
                 {
-                    OnGotStatementType(literal, new PointerType(new ArrayType(BuiltinType.Char, new CompiledEvaluatedValue()
-                    {
-                        Value = literal.Value.Length + 1,
-                        Location = literal.Location,
-                        Type = ArrayLengthType,
-                        SaveValue = true
-                    }, literal.Value.Length + 1)));
-
                     BuiltinType type = BuiltinType.Char;
 
                     compiledStatement = null;
                     if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * type.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
+
+                    if (!GetLiteralType(literal.Type, out GeneralType? stringType))
+                    {
+                        stringType = new PointerType(new ArrayType(BuiltinType.Char, new CompiledEvaluatedValue()
+                        {
+                            Value = literal.Value.Length + 1,
+                            Location = literal.Location,
+                            Type = ArrayLengthType,
+                            SaveValue = true
+                        }, literal.Value.Length + 1));
+                    }
+
+                    OnGotStatementType(literal, stringType);
 
                     compiledStatement = new CompiledStringInstance()
                     {
@@ -1675,7 +1689,7 @@ public partial class StatementCompiler
                         IsASCII = false,
                         Location = literal.Location,
                         SaveValue = true,
-                        Type = new PointerType(new ArrayType(type, null, literal.Value.Length + 1)),
+                        Type = stringType,
                         Allocator = allocator,
                     };
                     return true;

@@ -1227,9 +1227,9 @@ public class Literal : StatementWithValue
         return result.ToString();
     }
 
-    public static int GetInt(string value)
+    public int GetInt()
     {
-        value = value.Trim();
+        string value = Value;
         int @base = 10;
         if (value.StartsWith("0b", StringComparison.Ordinal))
         {
@@ -1244,22 +1244,14 @@ public class Literal : StatementWithValue
         value = value.Replace("_", string.Empty, StringComparison.Ordinal);
         return Convert.ToInt32(value, @base);
     }
-    public static float GetFloat(string value)
+
+    public float GetFloat()
     {
-        value = value.Trim();
+        string value = Value;
         value = value.Replace("_", string.Empty, StringComparison.Ordinal);
         value = value.EndsWith('f') ? value[..^1] : value;
         return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
     }
-    public static bool GetBoolean(string value)
-    {
-        value = value.Trim();
-        return value == "true";
-    }
-
-    public int GetInt() => Literal.GetInt(Value);
-    public float GetFloat() => Literal.GetFloat(Value);
-    public bool GetBoolean() => Literal.GetBoolean(Value);
 
     public bool TryConvert<T>([NotNullWhen(true)] out T? value)
     {

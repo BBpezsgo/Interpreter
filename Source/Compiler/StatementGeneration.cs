@@ -968,7 +968,14 @@ public partial class StatementCompiler
             return GenerateCodeForFunctionCall(functionCall, functionCall.MethodArguments, result, out compiledStatement);
         }
 
-        if (!GenerateCodeForStatement(anyCall.PrevStatement, out CompiledStatementWithValue? functionValue)) return false;
+        if (!GenerateCodeForStatement(anyCall.PrevStatement, out CompiledStatementWithValue? functionValue))
+        {
+            if (notFound is not null)
+            {
+                Diagnostics.Add(notFound.ToError(anyCall.PrevStatement));
+            }
+            return false;
+        }
 
         if (!functionValue.Type.Is(out FunctionType? functionType))
         {

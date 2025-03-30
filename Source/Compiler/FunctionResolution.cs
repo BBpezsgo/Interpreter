@@ -69,13 +69,7 @@ public partial class StatementCompiler
     {
         public required TFunction Function { get; init; }
         public Dictionary<string, GeneralType>? TypeArguments { get; init; }
-        public FunctionPerfectus Perfectus { get; init; }
-
-        public void Deconstruct(
-            out TFunction function)
-        {
-            function = Function;
-        }
+        public bool Success { get; init; }
 
         public void Deconstruct(
             out TFunction function,
@@ -85,79 +79,7 @@ public partial class StatementCompiler
             typeArguments = TypeArguments;
         }
 
-        public void Deconstruct(
-            out TFunction function,
-            out Dictionary<string, GeneralType>? typeArguments,
-            out FunctionPerfectus perfectus)
-        {
-            function = Function;
-            typeArguments = TypeArguments;
-            perfectus = Perfectus;
-        }
-
         public override string? ToString() => Function.ToString();
-    }
-
-    public enum FunctionPerfectus
-    {
-        None,
-
-        /// <summary>
-        /// Both function's identifier is the same
-        /// </summary>
-        Identifier,
-
-        /// <summary>
-        /// Both function has the same number of parameters
-        /// </summary>
-        PartialParameterCount,
-
-        /// <summary>
-        /// Both function has the same number of parameters
-        /// </summary>
-        PerfectParameterCount,
-
-        /// <summary>
-        /// All the parameter types are almost the same
-        /// </summary>
-        ParameterTypes,
-
-        /// <summary>
-        /// Boundary between good and bad functions
-        /// </summary>
-        Good,
-
-        // == MATCHED --> Searching for the most relevant function ==
-
-        /// <summary>
-        /// Return types are almost the same
-        /// </summary>
-        ReturnType,
-
-        /// <summary>
-        /// All the parameter types are the same
-        /// </summary>
-        PerfectParameterTypes,
-
-        /// <summary>
-        /// Return types are the same
-        /// </summary>
-        PerfectReturnType,
-
-        /// <summary>
-        /// All the parameter types are the same
-        /// </summary>
-        VeryPerfectParameterTypes,
-
-        /// <summary>
-        /// Return types are the same
-        /// </summary>
-        VeryPerfectReturnType,
-
-        /// <summary>
-        /// Both function are in the same file
-        /// </summary>
-        File,
     }
 
     public enum TypeMatch
@@ -177,7 +99,7 @@ public partial class StatementCompiler
         public required TFunction Function { get; init; }
         public required List<PossibleDiagnostic> Errors { get; init; }
 
-        public bool IsIdentifierMatches { get; set; }
+        public int IdentifierMatch { get; set; }
         public bool IsFileMatches { get; set; }
         public bool IsParameterCountMatches { get; set; }
 
@@ -195,9 +117,9 @@ public partial class StatementCompiler
         {
             if (this.Equals(other)) return Same;
 
-            if (IsIdentifierMatches && !other.IsIdentifierMatches) return Better;
-            if (!IsIdentifierMatches && other.IsIdentifierMatches) return Worse;
-            if (!IsIdentifierMatches || !other.IsIdentifierMatches) return Same;
+            if (IdentifierMatch < other.IdentifierMatch) return Better;
+            if (IdentifierMatch > other.IdentifierMatch) return Worse;
+            if (IdentifierMatch > 0 || other.IdentifierMatch > 0) return Same;
 
             if (IsParameterCountMatches && !other.IsParameterCountMatches) return Better;
             if (!IsParameterCountMatches && other.IsParameterCountMatches) return Worse;
@@ -232,7 +154,7 @@ public partial class StatementCompiler
 
         public readonly bool Equals(FunctionMatch<TFunction> match)
         {
-            if (IsIdentifierMatches != match.IsIdentifierMatches) return false;
+            if (!IdentifierMatch.Equals(match.IdentifierMatch)) return false;
             if (IsFileMatches != match.IsFileMatches) return false;
             if (IsParameterCountMatches != match.IsParameterCountMatches) return false;
             if (ReturnTypeMatch != match.ReturnTypeMatch) return false;
@@ -303,7 +225,7 @@ public partial class StatementCompiler
             result = new FunctionQueryResult<TFunction>()
             {
                 Function = best.Function,
-                Perfectus = FunctionPerfectus.File,
+                Success = true,
                 TypeArguments = best.TypeArguments,
             };
 
@@ -322,9 +244,16 @@ public partial class StatementCompiler
                 }
             }
 
-            if (!best.IsIdentifierMatches)
+            if (best.IdentifierMatch > 0)
             {
-                error = new PossibleDiagnostic($"No {kindName} found with name \"{query.Identifier}\"");
+                if (best.IdentifierMatch == 1)
+                {
+                    error = new PossibleDiagnostic($"No {kindName} found with name \"{query.Identifier}\" (did you mean \"{best.Function.Identifier}\"?)");
+                }
+                else
+                {
+                    error = new PossibleDiagnostic($"No {kindName} found with name \"{query.Identifier}\"");
+                }
                 return false;
             }
 
@@ -363,7 +292,7 @@ public partial class StatementCompiler
                     result = new FunctionQueryResult<TFunction>()
                     {
                         Function = item.Function,
-                        Perfectus = FunctionPerfectus.File,
+                        Success = true,
                         TypeArguments = best.TypeArguments,
                     };
                     templateAlreadyAdded = true;
@@ -377,7 +306,7 @@ public partial class StatementCompiler
                     result = new FunctionQueryResult<TFunction>()
                     {
                         Function = template.Function,
-                        Perfectus = FunctionPerfectus.File,
+                        Success = true,
                         TypeArguments = best.TypeArguments,
                     };
                 }
@@ -416,11 +345,22 @@ public partial class StatementCompiler
 
         if (query.Identifier is null || function.Identifier.Equals(query.Identifier))
         {
-            result.IsIdentifierMatches = true;
+            result.IdentifierMatch = 0;
         }
         else
         {
-            result.Errors.Add(new($"Identifier \"{query.Identifier}\" does not match with \"{function.Identifier}\""));
+            result.IdentifierMatch = 2;
+
+            if (query.Identifier is string _a1 &&
+                function.Identifier is Tokenizing.Token _b1)
+            {
+                if (_a1.ToLowerInvariant() == _b1.Content.ToLowerInvariant())
+                {
+                    result.IdentifierMatch = 1;
+                }
+            }
+
+            result.Errors.Add(new($"Function \"{query.Identifier}\" does not match with \"{function.Identifier}\""));
             return result;
         }
 

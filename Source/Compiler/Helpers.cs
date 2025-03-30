@@ -333,7 +333,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
             out result,
             out error
-        ) && result.Perfectus >= FunctionPerfectus.PerfectParameterTypes;
+        ) && result.Success;
     }
 
     bool GetIndexSetter(
@@ -357,7 +357,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
             out result,
             out error
-        ) && result.Perfectus >= FunctionPerfectus.PerfectParameterTypes;
+        ) && result.Success;
     }
 
     bool TryGetBuiltinFunction(
@@ -414,7 +414,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
             out result,
             out error
-        ) && result.Perfectus >= FunctionPerfectus.PerfectParameterTypes;
+        ) && result.Success;
     }
 
     bool GetOperator(
@@ -435,7 +435,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
             out result,
             out error
-        ) && result.Perfectus >= FunctionPerfectus.PerfectParameterTypes;
+        ) && result.Success;
     }
 
     bool GetGeneralFunction(
@@ -569,6 +569,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         CompileVariableAttributes(variableDeclaration);
 
+        GeneralType? constantType = null;
+        if (variableDeclaration.Type != StatementKeywords.Var)
+        {
+            constantType = CompileType(variableDeclaration.Type, variableDeclaration.File);
+        }
+
         CompiledValue constantValue;
 
         if (variableDeclaration.ExternalConstantName is not null)
@@ -597,7 +603,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
         else
         {
-            GenerateCodeForStatement(variableDeclaration.InitialValue, out CompiledStatementWithValue? compiledInitialValue);
+            GenerateCodeForStatement(variableDeclaration.InitialValue, out CompiledStatementWithValue? compiledInitialValue, constantType);
             if (!TryCompute(compiledInitialValue, out constantValue))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue));
@@ -607,25 +613,25 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     gotExternalValue:
 
-        GeneralType constantType;
-        if (variableDeclaration.Type != StatementKeywords.Var)
+        if (constantType is not null)
         {
-            constantType = CompileType(variableDeclaration.Type, variableDeclaration.File);
-            variableDeclaration.Type.SetAnalyzedType(constantType);
-
             if (constantType.Is(out BuiltinType? builtinType))
             {
                 if (!constantValue.TryCast(builtinType.RuntimeType, out CompiledValue castedConstantValue))
                 {
-                    Diagnostics.Add(Diagnostic.Warning($"Can't cast constant value {constantValue} of type \"{new BuiltinType(constantValue.Type)}\" to {constantType}", variableDeclaration));
+                    Diagnostics.Add(Diagnostic.Error($"Can't cast constant value {constantValue} of type \"{new BuiltinType(constantValue.Type)}\" to {constantType}", variableDeclaration));
                 }
-                constantValue = castedConstantValue;
+                else
+                {
+                    constantValue = castedConstantValue;
+                }
             }
         }
         else
         {
             constantType = new BuiltinType(constantValue.Type);
         }
+        variableDeclaration.Type.SetAnalyzedType(constantType);
 
         return new(constantValue, constantType, variableDeclaration);
     }

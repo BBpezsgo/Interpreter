@@ -17,7 +17,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         if (cleanup.Deallocator is null) return;
 
-        return;
+        /*
 
         if (cleanup.Deallocator.ExternalFunctionName is not null)
         {
@@ -49,6 +49,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         il.Emit(OpCodes.Dup);
         il.Emit(OpCodes.Call, function);
+        */
     }
 
     void GenerateDestructor(CompiledCleanup cleanup, ILGenerator il, ref bool successful)

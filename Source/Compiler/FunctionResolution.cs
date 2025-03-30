@@ -191,13 +191,13 @@ public partial class StatementCompiler
 
     public delegate bool FunctionQueryArgumentConverter<TArgument>(
         TArgument passed,
-        ParameterDefinition definition,
+        ParameterDefinition? definition,
         GeneralType? defined,
         [NotNullWhen(true)] out GeneralType? result);
 
     static bool FunctionArgumentConverter(
         GeneralType argument,
-        ParameterDefinition parameterDefinition,
+        ParameterDefinition? parameterDefinition,
         GeneralType? expectedType,
         [NotNullWhen(true)] out GeneralType? result)
     {
@@ -207,7 +207,7 @@ public partial class StatementCompiler
 
     bool FunctionArgumentConverter(
         StatementWithValue argument,
-        ParameterDefinition parameterDefinition,
+        ParameterDefinition? parameterDefinition,
         GeneralType? expectedType,
         [NotNullWhen(true)] out GeneralType? result)
     {

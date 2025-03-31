@@ -288,35 +288,37 @@ public class SourceCodeManager
 
     public static string? LoadSourceSync(IEnumerable<ISourceProvider>? sourceProviders, string requestedFile, Uri? currentFile = null)
     {
-#if UNITY
-        throw new System.NotSupportedException($"Unity not supported");
-#else
         try
         {
-            if (sourceProviders is not null)
-            {
-#pragma warning disable IDE0008 // Use explicit type
-                var res = LoadSource(sourceProviders, requestedFile, currentFile);
-#pragma warning restore IDE0008
+            if (sourceProviders is null) return null;
+#if UNITY
+            UnityEngine.Awaitable<Stream>? res = LoadSource(sourceProviders, requestedFile, currentFile);
+            if (res is null) return null;
 
-                if (res is not null)
-                {
-                    res.Wait();
-                    if (res.Result is not null)
-                    {
-                        using StreamReader reader = new(res.Result);
-                        string content = reader.ReadToEnd();
-                        return content;
-                    }
-                }
+            UnityEngine.Awaitable<Stream>.Awaiter awaiter = res.GetAwaiter();
+            if (!awaiter.IsCompleted)
+            {
+                UnityEngine.Debug.LogWarning($"Async source providers are not supported in Unity. There is currently an async operation running in the background, and I can't do much about it.");
+                return null;
             }
+
+            using StreamReader reader = new(awaiter.GetResult());
+            return reader.ReadToEnd();
+#else
+            Task<Stream>? res = LoadSource(sourceProviders, requestedFile, currentFile);
+            if (res is null) return null;
+
+            res.Wait();
+            if (res.Result is null) return null;
+
+            using StreamReader reader = new(res.Result);
+            return reader.ReadToEnd();
+#endif
         }
         catch (Exception)
         {
-
+            return null;
         }
-        return null;
-#endif
     }
 
     SourceCodeManagerResult Entry(string? file, IEnumerable<string>? additionalImports)

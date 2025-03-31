@@ -28,10 +28,12 @@ public class SourceCodeManager
     readonly DiagnosticsCollection Diagnostics;
     readonly IEnumerable<string> PreprocessorVariables;
     readonly ImmutableArray<ISourceProvider> SourceProviders;
+    readonly TokenizerSettings TokenizerSettings;
+
     readonly List<PendingFile> PendingFiles;
     readonly List<ParsedFile> ParsedFiles;
 
-    public SourceCodeManager(DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, ImmutableArray<ISourceProvider> sourceProviders)
+    public SourceCodeManager(DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, ImmutableArray<ISourceProvider> sourceProviders, TokenizerSettings? tokenizerSettings)
     {
         CompiledUris = new();
         Diagnostics = diagnostics;
@@ -39,6 +41,7 @@ public class SourceCodeManager
         PendingFiles = new();
         ParsedFiles = new();
         SourceProviders = sourceProviders;
+        TokenizerSettings = tokenizerSettings ?? TokenizerSettings.Default;
     }
 
     void ProcessPendingFiles()
@@ -88,7 +91,7 @@ public class SourceCodeManager
                     Diagnostics,
                     PreprocessorVariables,
                     finishedFile.Uri,
-                    TokenizerSettings.Default);
+                    TokenizerSettings);
             }
 
             ParserResult ast = Parser.Parser.Parse(tokens.Tokens, finishedFile.Uri, Diagnostics);
@@ -364,9 +367,10 @@ public class SourceCodeManager
         DiagnosticsCollection diagnostics,
         IEnumerable<string> preprocessorVariables,
         IEnumerable<string>? additionalImports,
-        ImmutableArray<ISourceProvider> sourceProviders)
+        ImmutableArray<ISourceProvider> sourceProviders,
+        TokenizerSettings? tokenizerSettings)
     {
-        SourceCodeManager sourceCodeManager = new(diagnostics, preprocessorVariables, sourceProviders);
+        SourceCodeManager sourceCodeManager = new(diagnostics, preprocessorVariables, sourceProviders, tokenizerSettings);
         return sourceCodeManager.Entry(file, additionalImports);
     }
 }

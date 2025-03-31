@@ -32,20 +32,20 @@ struct List
     {
         this._capacity = capacity;
         this._length = 0;
-        this._ptr = Alloc(capacity * sizeof(T)) as T[]*;
+        this._ptr = new T[capacity]*;
     }
 
     export List<T>*(int capacity)
     {
         this._capacity = capacity;
         this._length = 0;
-        this._ptr = Alloc(capacity * sizeof(T)) as T[]*;
+        this._ptr = new T[capacity]*;
     }
 
     export destructor()
     {
         if (this._ptr)
-        { delete this._ptr as int*; }
+        { delete this._ptr; }
     }
 
     export void Add(T item)
@@ -57,14 +57,22 @@ struct List
             else
             { this.EnsureCapacity(4); }
         }
+
+        if (!this._ptr)
+        { crash "List not initialized"; }
+
         this._ptr[this._length] = item;
         this._length++;
     }
 
     export T Remove(int index)
     {
+        if (!this._ptr)
+        { crash "List not initialized"; }
+
         if (index < 0 || index >= this._length)
         { crash "Index out of range exception"; }
+
         T removed = this._ptr[index];
         
         int length = this._length;
@@ -82,7 +90,7 @@ struct List
         if (this._capacity < capacity)
         {
             var old = this._ptr;
-            this._ptr = Alloc(capacity * sizeof(T)) as T[]*;
+            this._ptr = new T[capacity]*;
             this._capacity = capacity;
 
             if (old)
@@ -93,7 +101,7 @@ struct List
                     this._ptr[i] = old[i];
                 }
 
-                delete old as int*;
+                delete old;
             }
         }
     }

@@ -3294,7 +3294,7 @@ public partial class StatementCompiler
         {
             if (function.IsTemplate) continue;
             if (function.InstructionOffset >= 0) continue;
-            if (!function.References.Any())
+            if (Settings.CompileEverything || !function.References.Any())
             {
                 if (function is IExposeable exposeable &&
                     exposeable.ExposedFunctionName is not null)

@@ -13,6 +13,11 @@ public class FileSourceProvider : ISourceProviderSync, ISourceQueryProvider
 
     public IEnumerable<string> GetQuery(string requestedFile, Uri? currentFile)
     {
+        if (requestedFile.StartsWith("file:///"))
+        {
+            requestedFile = requestedFile["file://".Length..];
+        }
+
         if (!requestedFile.EndsWith($".{LanguageConstants.LanguageExtension}", StringComparison.Ordinal))
         {
             requestedFile += $".{LanguageConstants.LanguageExtension}";

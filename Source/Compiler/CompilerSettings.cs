@@ -12,11 +12,13 @@ public struct CompilerSettings
     public required BuiltinType BooleanType { get; set; }
     public required BuiltinType SizeofStatementType { get; set; }
     public required BuiltinType ArrayLengthType { get; set; }
+    public required ImmutableArray<ISourceProvider> SourceProviders { get; set; }
 
+    public Tokenizing.TokenizerSettings? TokenizerSettings { get; set; }
     public IEnumerable<string>? PreprocessorVariables { get; set; }
     public IEnumerable<string>? AdditionalImports { get; set; }
     public IEnumerable<UserDefinedAttribute>? UserDefinedAttributes { get; set; }
-    public required ImmutableArray<ISourceProvider> SourceProviders { get; set; }
+    public bool CompileEverything { get; set; }
 
     [SetsRequiredMembers]
     public CompilerSettings(CompilerSettings other)
@@ -34,5 +36,7 @@ public struct CompilerSettings
         AdditionalImports = other.AdditionalImports;
         UserDefinedAttributes = other.UserDefinedAttributes;
         SourceProviders = other.SourceProviders;
+        TokenizerSettings = other.TokenizerSettings;
+        CompileEverything = other.CompileEverything;
     }
 }

@@ -4304,7 +4304,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region Visit
 
-    IEnumerable<CompiledStatement> Visit(IEnumerable<GeneralType> type)
+    static IEnumerable<CompiledStatement> Visit(IEnumerable<GeneralType> type)
     {
         foreach (GeneralType v in type)
         {
@@ -4312,7 +4312,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
-    IEnumerable<CompiledStatement> Visit(GeneralType? type)
+    static IEnumerable<CompiledStatement> Visit(GeneralType? type)
     {
         switch (type)
         {
@@ -4340,7 +4340,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
-    IEnumerable<CompiledStatement> Visit(IEnumerable<CompiledStatement> type)
+    public static IEnumerable<CompiledStatement> Visit(IEnumerable<CompiledStatement> type)
     {
         foreach (CompiledStatement v in type)
         {
@@ -4348,7 +4348,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
-    IEnumerable<CompiledStatement> Visit(CompiledStatement? statement)
+    public static IEnumerable<CompiledStatement> Visit(CompiledStatement? statement)
     {
         switch (statement)
         {

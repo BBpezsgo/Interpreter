@@ -652,7 +652,7 @@ public partial class StatementCompiler
 
     CompilerResult CompileMainFile(string file)
     {
-        SourceCodeManagerResult res = SourceCodeManager.Collect(file, Diagnostics, PreprocessorVariables, Settings.AdditionalImports, Settings.SourceProviders);
+        SourceCodeManagerResult res = SourceCodeManager.Collect(file, Diagnostics, PreprocessorVariables, Settings.AdditionalImports, Settings.SourceProviders, Settings.TokenizerSettings);
 
         foreach (ParsedFile parsedFile in res.ParsedFiles)
         { AddAST(parsedFile, parsedFile.File != res.ResolvedEntry); }
@@ -675,7 +675,8 @@ public partial class StatementCompiler
             Diagnostics,
             PreprocessorVariables,
             new string[] { "Primitives", "System" },
-            Settings.SourceProviders
+            Settings.SourceProviders,
+            Settings.TokenizerSettings
         );
 
         foreach (ParsedFile parsedFile in res.ParsedFiles)

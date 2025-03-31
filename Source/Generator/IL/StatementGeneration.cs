@@ -1230,14 +1230,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        if (!statement.Object.Type.Is<PointerType>())
-        {
-            Debugger.Break();
-            Diagnostics.Add(Diagnostic.InternalNoBreak($"Only pointer constructors supported", statement));
-            successful = false;
-            return;
-        }
-
         if (destination is not null && statement.Object is CompiledStackAllocation stackAllocation)
         {
             EmitStatement(stackAllocation, il, ref successful, destination);
@@ -1258,6 +1250,14 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
         else
         {
+            if (!statement.Object.Type.Is<PointerType>())
+            {
+                Debugger.Break();
+                Diagnostics.Add(Diagnostic.InternalNoBreak($"Only pointer constructors supported", statement));
+                successful = false;
+                return;
+            }
+
             EmitStatement(statement.Object, il, ref successful);
 
             il.Emit(OpCodes.Dup);

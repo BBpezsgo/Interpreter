@@ -1004,6 +1004,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
                 il.Emit(OpCodes.Newobj, constructor);
                 il.Emit(OpCodes.Box, type);
+                il.Emit(OpCodes.Dup);
+                il.Emit(OpCodes.Initobj, type);
                 return;
             }
 

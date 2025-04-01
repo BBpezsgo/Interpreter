@@ -1,6 +1,6 @@
 # Test Results
-[![](https://svg.test-summary.com/dashboard.svg?p=331&f=2&s=258)](#)
-[![](https://img.shields.io/badge/Passing-331-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-2-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-258-silver?style=plastic])](#)
+[![](https://svg.test-summary.com/dashboard.svg?p=375&f=13&s=153)](#)
+[![](https://img.shields.io/badge/Passing-375-brightgreen?style=plastic])](#) [![](https://img.shields.io/badge/Failing-13-red?style=plastic])](#) [![](https://img.shields.io/badge/Skipped-153-silver?style=plastic])](#)
 
 | File | Bytecode | Brainfuck |
 |:----:|:--------:|:---------:|
@@ -63,7 +63,7 @@
 | [57](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/57.bbc) | ✅ | ✅ |
 | [58](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/58.bbc) | ✅ | ✅ |
 | [59](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/59.bbc) | ✅ | ✖ Arrays with big element size not implemented |
-| [60](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/60.bbc) | ✅ | ✅ |
+| [60](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/60.bbc) | ✅ | ❌ Exit code isn't what is expected: Expected: 55 Actual:   46 |
 | [61](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/61.bbc) | ✅ | ✅ |
 | [70](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/70.bbc) | ✅ | ✅ |
 | [71](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/71.bbc) | ✅ | ✅ |
@@ -86,7 +86,7 @@
 | [88](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/88.bbc) | ✅ | ✅ |
 | [89](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/89.bbc) | ✅ | ✅ |
 | [90](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/90.bbc) | ✅ | ✅ |
-| [91](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/91.bbc) | ✅ | ✅ |
+| [91](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/91.bbc) | ✅ | ❌ Test method Tests.BrainfuckTests.Test91 threw exception:  LanguageCore.LanguageException: Can not set a "int[capacity]*" type value to the "int[]*" type field. |
 | [92](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/92.bbc) | ✅ | ✅ |
 | [93](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/93.bbc) | ✅ | ✅ |
 | [96](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/96.bbc) | ✅ | ✅ |
@@ -94,9 +94,13 @@
 | [99](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/99.bbc) | ✖ Not implemented | ✅ |
 | [101](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/101.bbc) | ✅ | ✅ |
 | [103](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/103.bbc) | ✅ | ✖ Floats not supported |
-| [104](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/104.bbc) | ✅ | ❌ Standard output isn't what is expected: Expected: "\u4f60\u597d\n" Actual:   "`}\n" |
+| [104](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/104.bbc) | ✅ | ✖ nah |
 | [105](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/105.bbc) | ✅ | ✅ |
 | [106](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/106.bbc) | ✅ | ✅ |
-| [107](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/107.bbc) | ✅ | ❌ Test method Tests.BrainfuckTests.Test107 threw exception:  LanguageCore.LanguageException: Variable "a" already defined |
+| [107](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/107.bbc) | ✅ | ✖ nah |
 | [108](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/108.bbc) | ✅ | ✅ |
 | [109](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/109.bbc) | ✅ | ✖ nah |
+| [110](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/110.bbc) | ❌ Test method Tests.MainTests.Test110 threw exception:  LanguageCore.LanguageException: Field "Add" not found in struct "struct List<T>" | ✖ nah |
+| [111](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/111.bbc) | ✅ | ❌ Exit code isn't what is expected: Expected: 47 Actual:   7 |
+| [112](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/112.bbc) | ✅ | ❌ Exit code isn't what is expected: Expected: 44 Actual:   4 |
+| [113](https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/113.bbc) | ✅ | ❌ Exit code isn't what is expected: Expected: 77 Actual:   7 |

@@ -1,0 +1,15 @@
+using System;
+using System.Lists;
+
+List<int> list = new List<int>;
+list.Add(66);
+list.Add(67);
+PrintLine(&list);
+
+list.Remove(0);
+PrintLine(&list);
+
+list.Clear();
+PrintLine(&list);
+
+delete list;

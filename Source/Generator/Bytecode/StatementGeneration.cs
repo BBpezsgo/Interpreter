@@ -1192,9 +1192,37 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GenerateCodeForStatement(constructorCall.Object);
 
-        AddComment(" Pass arguments (\"this\" is already passed):");
+        Stack<CompiledCleanup> parameterCleanup = new();
 
-        Stack<CompiledCleanup> parameterCleanup = GenerateCodeForArguments(constructorCall.Arguments, compiledFunction, 1);
+        AddComment(" Pass arguments:");
+
+        if (constructorCall.Object.Type.Is<StructType>())
+        {
+            if (!FindSize(constructorCall.Object.Type, out int size, out PossibleDiagnostic? sizeError))
+            {
+                Diagnostics.Add(sizeError.ToError(constructorCall.Object));
+                return;
+            }
+
+            AddInstruction(Opcode.Push, Register.StackPointer);
+
+            parameterCleanup.Add(new CompiledCleanup()
+            {
+                Location = constructorCall.Object.Location,
+                TrashType = new PointerType(constructorCall.Object.Type),
+            });
+
+            parameterCleanup.AddRange(GenerateCodeForArguments(constructorCall.Arguments, compiledFunction, 1));
+        }
+        else if (constructorCall.Object.Type.Is<PointerType>())
+        {
+            parameterCleanup.AddRange(GenerateCodeForArguments(constructorCall.Arguments, compiledFunction, 1));
+        }
+        else
+        {
+            Diagnostics.Add(Diagnostic.Internal($"Invalid type \"{constructorCall.Object.Type}\" used for constructor", constructorCall.Object));
+            return;
+        }
 
         AddComment(" .:");
 

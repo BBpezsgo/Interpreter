@@ -245,9 +245,9 @@ public static class Minifier
             {
                 int movementLength = removed + 1;
                 ReadOnlySpan<char> slice = result[initializationStarted..(i + movementLength)];
-                if (slice[^1] is not ']') throw new InternalExceptionWithoutContext();
+                if (slice[^1] is not ']') goto no;
                 string initialization = BrainfuckCode.GenerateModification(alreadyThere.Value, '+', '-');
-                if (!slice[..initialization.Length].SequenceEqual(initialization)) throw new InternalExceptionWithoutContext();
+                if (!slice[..initialization.Length].SequenceEqual(initialization)) goto no;
 
                 string offset = BrainfuckCode.GenerateModification(destinations[0].Offset, '>', '<');
                 string backOffset = BrainfuckCode.GenerateModification(-destinations[0].Offset, '>', '<');
@@ -263,6 +263,8 @@ public static class Minifier
 
                 return true;
             }
+
+        no:
 
             switch (result[i])
             {

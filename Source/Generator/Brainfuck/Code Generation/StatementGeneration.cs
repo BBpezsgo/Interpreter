@@ -477,9 +477,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            if (!valueVariable.IsInitialized)
-            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{valueVariable.Identifier}\" is not initialized", value)); }
-
             if (variable.Size != valueVariable.Size)
             {
                 Diagnostics.Add(Diagnostic.Critical($"Variable and value size mismatch ({variable.Size} != {valueVariable.Size})", value));
@@ -501,7 +498,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             _statistics.Optimizations++;
 
-            variable.IsInitialized = valueVariable.IsInitialized;
+            variable.IsInitialized = true;
 
             return;
         }
@@ -517,9 +514,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (variableInBinaryOperator.IsDiscarded) break;
                     if (variable.Size != 1) break;
-
-                    if (!variable.IsInitialized)
-                    { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variableInBinaryOperator.Identifier}\" is not initialized", valueBinaryOperator.Left)); }
 
                     if (AllowPrecomputing && valueBinaryOperator.Right is CompiledEvaluatedValue constantValue)
                     {
@@ -555,9 +549,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (variableInBinaryOperator.IsDiscarded) break;
                     if (variable.Size != 1) break;
-
-                    if (!variable.IsInitialized)
-                    { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variableInBinaryOperator.Identifier}\" is not initialized", valueBinaryOperator.Left)); }
 
                     if (AllowPrecomputing && valueBinaryOperator.Right is CompiledEvaluatedValue constantValue)
                     {
@@ -738,9 +729,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            if (!variable.IsInitialized)
-            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Identifier}\" is not initialized", variableGetter)); }
-
             if (variable.IsReference)
             {
                 GenerateCodeForSetter(variable, indirectSetter.Value);
@@ -767,9 +755,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 Diagnostics.Add(Diagnostic.Critical($"Bruh", parameterGetter));
                 return;
             }
-
-            if (!variable.IsInitialized)
-            { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Identifier}\" is not initialized", parameterGetter)); }
 
             if (variable.IsReference)
             {
@@ -959,9 +944,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Identifier}\" is discarded", indexSetter.Base));
                     return;
                 }
-
-                if (!variable.IsInitialized)
-                { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Identifier}\" is not initialized", indexSetter.Base)); }
             }
 
             using (Code.Block(this, $"Set array (\"{indexSetter.Base}\") index (\"{indexSetter.Index}\") (at {arrayAddress}) to \"{indexSetter.Value}\""))
@@ -1654,9 +1636,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Identifier}\" is discarded", statement));
             return;
         }
-
-        if (!variable.IsInitialized)
-        { Diagnostics.Add(Diagnostic.Warning($"Variable \"{variable.Identifier}\" is not initialized", statement)); }
 
         if (variable.Size <= 0)
         {
@@ -2596,7 +2575,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 PointerType parameterType = new(v.Type);
                 compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
                 {
-                    IsInitialized = v.IsInitialized,
+                    IsInitialized = true,
                 });
                 continue;
             }
@@ -2615,7 +2594,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     PointerType parameterType = new(v.Type);
                     compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
                     {
-                        IsInitialized = v.IsInitialized,
+                        IsInitialized = true,
                     });
                     continue;
                 }
@@ -2635,7 +2614,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     PointerType parameterType = new(v.Type);
                     compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
                     {
-                        IsInitialized = v.IsInitialized,
+                        IsInitialized = true,
                     });
                     continue;
                 }
@@ -3132,12 +3111,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType newInstanceType = callerPosition.Type;
         GenerateCodeForStatement(callerPosition.Object);
 
-        if (!newInstanceType.SameAs(function.ParameterTypes[0]))
-        {
-            Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {0}: Expected \"{function.ParameterTypes[0]}\", passed \"{newInstanceType}\"", callerPosition));
-            return;
-        }
-
         CompiledVariableDeclaration variableDeclaration = new()
         {
             Identifier = function.Parameters[0].Identifier.Content,
@@ -3151,7 +3124,26 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 Location = function.Location,
             },
         };
-        compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, false, false, null, newInstanceType.GetSize(this, Diagnostics, callerPosition), variableDeclaration));
+
+        if (newInstanceType.Is<PointerType>(out PointerType? newInstancePointerType))
+        {
+            if (!newInstancePointerType.To.Is<StructType>())
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Wrong type \"{newInstanceType}\" used for constructor", callerPosition));
+                return;
+            }
+
+            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, false, false, null, PointerSize, variableDeclaration));
+        }
+        else if (newInstanceType.Is<StructType>())
+        {
+            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, true, false, null, PointerSize, variableDeclaration));
+        }
+        else
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Wrong type \"{newInstanceType}\" used for constructor", callerPosition));
+            return;
+        }
 
         for (int i = 1; i < function.Parameters.Count; i++)
         {

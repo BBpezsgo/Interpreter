@@ -618,7 +618,7 @@ public partial class StatementCompiler
                 parameters.Insert(0,
                     new ParameterDefinition(
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
-                        constructor.Type,
+                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, constructor.File, compiledStruct.Template?.Parameters), constructor.File),
                         Token.CreateAnonymous(StatementKeywords.This),
                         null,
                         constructor)

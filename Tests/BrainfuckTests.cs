@@ -1,4 +1,4 @@
-namespace Tests;
+﻿namespace Tests;
 
 [TestClass, TestCategory("Brainfuck"), TestCategory("Generic")]
 public class BrainfuckTests
@@ -115,4 +115,8 @@ public class BrainfuckTests
     [TestMethod, Timeout(Timeout), Ignore("nah")] public void Test107() => Utils.GetTest(107).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test108() => Utils.GetTest(108).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("nah")] public void Test109() => Utils.GetTest(109).DoBrainfuck();
+    [TestMethod, Timeout(Timeout), Ignore("nah")] public void Test110() => Utils.GetTest(110).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test111() => Utils.GetTest(111).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test112() => Utils.GetTest(112).DoBrainfuck();
+    [TestMethod, Timeout(Timeout)] public void Test113() => Utils.GetTest(113).DoBrainfuck();
 }

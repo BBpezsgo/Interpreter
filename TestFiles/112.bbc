@@ -1,0 +1,16 @@
+using System.Memory;
+
+struct A
+{
+    int v;
+
+    A()
+    {
+        this.v = 4;
+    }
+}
+
+A a1 = new A();
+temp A* a2 = new A*();
+
+return a1.v * 10 + a2.v;

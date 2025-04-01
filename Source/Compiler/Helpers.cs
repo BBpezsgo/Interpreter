@@ -294,19 +294,91 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledConstructorDefinition>>? addCompilable = null)
     {
+        StructType? structType;
+
         {
             ImmutableArray<GeneralType>.Builder argumentsBuilder = ImmutableArray.CreateBuilder<GeneralType>();
-            argumentsBuilder.Add(type);
+
+            if (type.Is(out PointerType? pointerType))
+            {
+                if (!pointerType.To.Is<StructType>(out structType))
+                {
+                    result = null;
+                    error = new PossibleDiagnostic($"Invalid type \"{type}\" used for constructor");
+                    return false;
+                }
+                argumentsBuilder.Add(type);
+            }
+            else if (type.Is(out structType))
+            {
+                argumentsBuilder.Add(new PointerType(structType));
+            }
+            else
+            {
+                result = null;
+                error = new PossibleDiagnostic($"Invalid type \"{type}\" used for constructor");
+                return false;
+            }
+
             argumentsBuilder.AddRange(arguments);
             arguments = argumentsBuilder.ToImmutable();
         }
 
+        Functions<CompiledConstructorDefinition> constructors = GetConstructors();
+
+        constructors = new Functions<CompiledConstructorDefinition>()
+        {
+            Compiled = constructors.Compiled.Where(v => v.Context == structType.Struct),
+            Compilable = constructors.Compilable.Where(v => v.OriginalFunction.Context == structType.Struct),
+        };
+
         return GetFunction<CompiledConstructorDefinition, GeneralType, GeneralType, GeneralType>(
-            GetConstructors(),
+            constructors,
             "constructor",
             CompiledConstructorDefinition.ToReadable(type, arguments),
 
-            FunctionQuery.Create(type, arguments, relevantFile, null, addCompilable),
+            FunctionQuery.Create(type, arguments, relevantFile, null, addCompilable, (GeneralType passed, GeneralType defined, out int badness) =>
+            {
+                badness = 0;
+                if (passed.Is(out PointerType? passedPointerType))
+                {
+                    if (defined.Is(out PointerType? definedPointerType))
+                    {
+                        badness = 0;
+                        return passedPointerType.To.Equals(definedPointerType.To);
+                    }
+                    else if (defined.Is(out StructType? definedStructType))
+                    {
+                        badness = 1;
+                        return passedPointerType.To.Equals(definedStructType);
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                else if (passed.Is(out StructType? passedStructType))
+                {
+                    if (defined.Is(out PointerType? definedPointerType))
+                    {
+                        badness = 1;
+                        return passedStructType.Equals(definedPointerType.To);
+                    }
+                    else if (defined.Is(out StructType? definedStructType))
+                    {
+                        badness = 0;
+                        return passedStructType.Equals(definedStructType);
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }),
 
             out result,
             out error
@@ -323,8 +395,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         Action<CompliableTemplate<CompiledFunctionDefinition>>? addCompilable = null)
     {
         ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, indexType);
-        FunctionQuery<CompiledFunctionDefinition, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerGet, arguments, relevantFile, null, addCompilable);
-        return GetFunction<CompiledFunctionDefinition, Token, string, GeneralType>(
+        FunctionQuery<CompiledFunctionDefinition, string, Token, GeneralType> query = FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(BuiltinFunctionIdentifiers.IndexerGet, arguments, relevantFile, null, addCompilable);
+        return GetFunction<CompiledFunctionDefinition, string, Token, GeneralType>(
             GetFunctions(),
             "function",
             null,
@@ -347,8 +419,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         Action<CompliableTemplate<CompiledFunctionDefinition>>? addCompilable = null)
     {
         ImmutableArray<GeneralType> arguments = ImmutableArray.Create(prevType, indexType, elementType);
-        FunctionQuery<CompiledFunctionDefinition, string, GeneralType> query = FunctionQuery.Create(BuiltinFunctionIdentifiers.IndexerSet, arguments, relevantFile, null, addCompilable);
-        return GetFunction<CompiledFunctionDefinition, Token, string, GeneralType>(
+        FunctionQuery<CompiledFunctionDefinition, string, Token, GeneralType> query = FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(BuiltinFunctionIdentifiers.IndexerSet, arguments, relevantFile, null, addCompilable);
+        return GetFunction<CompiledFunctionDefinition, string, Token, GeneralType>(
             GetFunctions(),
             "function",
             null,
@@ -378,9 +450,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             .Where(v => v.Function.BuiltinFunctionName == builtinName);
 
         string readable = $"[Builtin(\"{builtinName}\")] ?({string.Join(", ", arguments)})";
-        FunctionQuery<CompiledFunctionDefinition, string, GeneralType> query = FunctionQuery.Create(null as string, arguments, relevantFile, null, addCompilable);
+        FunctionQuery<CompiledFunctionDefinition, string, Token, GeneralType> query = FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(null as string, arguments, relevantFile, null, addCompilable);
 
-        return GetFunction<CompiledFunctionDefinition, Token, string, GeneralType>(
+        return GetFunction<CompiledFunctionDefinition, string, Token, GeneralType>(
             new Functions<CompiledFunctionDefinition>()
             {
                 Compiled = builtinCompiledFunctions,
@@ -404,14 +476,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledOperatorDefinition>>? addCompilable = null)
     {
-        FunctionQuery<CompiledOperatorDefinition, string, StatementWithValue> query = FunctionQuery.Create(
+        FunctionQuery<CompiledOperatorDefinition, string, Token, StatementWithValue> query = FunctionQuery.Create<CompiledOperatorDefinition, string, Token>(
             @operator.Operator.Content,
             @operator.Arguments,
             FunctionArgumentConverter,
             relevantFile,
             null,
             addCompilable);
-        return GetFunction<CompiledOperatorDefinition, Token, string, StatementWithValue>(
+        return GetFunction<CompiledOperatorDefinition, string, Token, StatementWithValue>(
             GetOperators(),
             "operator",
             null,
@@ -431,14 +503,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         [NotNullWhen(false)] out PossibleDiagnostic? error,
         Action<CompliableTemplate<CompiledOperatorDefinition>>? addCompilable = null)
     {
-        FunctionQuery<CompiledOperatorDefinition, string, StatementWithValue> query = FunctionQuery.Create(
+        FunctionQuery<CompiledOperatorDefinition, string, Token, StatementWithValue> query = FunctionQuery.Create<CompiledOperatorDefinition, string, Token>(
             @operator.Operator.Content,
             @operator.Arguments,
             FunctionArgumentConverter,
             relevantFile,
             null,
             addCompilable);
-        return GetFunction<CompiledOperatorDefinition, Token, string, StatementWithValue>(
+        return GetFunction<CompiledOperatorDefinition, string, Token, StatementWithValue>(
             GetOperators(),
             "operator",
             null,
@@ -468,7 +540,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompilableGeneralFunctions
             .Where(v => ContextIs(v.Function, context));
 
-        return GetFunction<CompiledGeneralFunctionDefinition, Token, string, GeneralType>(
+        return GetFunction<CompiledGeneralFunctionDefinition, string, Token, GeneralType>(
             new Functions<CompiledGeneralFunctionDefinition>()
             {
                 Compiled = compiledGeneralFunctionsInContext,
@@ -477,7 +549,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             "general function",
             null,
 
-            FunctionQuery.Create(identifier, arguments, relevantFile, null, addCompilable),
+            FunctionQuery.Create<CompiledGeneralFunctionDefinition, string, Token>(identifier, arguments, relevantFile, null, addCompilable),
 
             out result,
             out error
@@ -493,14 +565,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (type is null || !type.Is(out FunctionType? functionType))
         {
             return GetFunction(
-                FunctionQuery.Create<CompiledFunctionDefinition, string>(identifier),
+                FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(identifier),
                 out result,
                 out error
             );
         }
 
         return GetFunction(
-            FunctionQuery.Create<CompiledFunctionDefinition, string>(identifier, functionType.Parameters, null, functionType.ReturnType, null),
+            FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(identifier, functionType.Parameters, null, functionType.ReturnType, null),
             out result,
             out error
         );
@@ -539,7 +611,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         Action<CompliableTemplate<CompiledFunctionDefinition>>? addCompilable = null)
     {
         string identifier = functionCallStatement.Identifier.Content;
-        FunctionQuery<CompiledFunctionDefinition, string, StatementWithValue> query = FunctionQuery.Create(
+        FunctionQuery<CompiledFunctionDefinition, string, Token, StatementWithValue> query = FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(
             identifier,
             functionCallStatement.MethodArguments,
             FunctionArgumentConverter,
@@ -554,12 +626,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
 
     bool GetFunction<TArgument>(
-        FunctionQuery<CompiledFunctionDefinition, string, TArgument> query,
+        FunctionQuery<CompiledFunctionDefinition, string, Token, TArgument> query,
 
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunctionDefinition>? result,
         [NotNullWhen(false)] out PossibleDiagnostic? error)
         where TArgument : notnull
-        => GetFunction<CompiledFunctionDefinition, Token, string, TArgument>(
+        => GetFunction<CompiledFunctionDefinition, string, Token, TArgument>(
             GetFunctions(),
             "function",
             null,
@@ -1235,7 +1307,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        if (GetFunction(FunctionQuery.Create<CompiledFunctionDefinition, string>(name.Content, null, null, relevantFile), out FunctionQueryResult<CompiledFunctionDefinition>? function, out _))
+        if (GetFunction(FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(name.Content, null, null, relevantFile), out FunctionQueryResult<CompiledFunctionDefinition>? function, out _))
         {
             name.AnalyzedType = TokenAnalyzedType.FunctionName;
             function.Function.References.Add(new Reference<StatementWithValue?>(new Identifier(name, relevantFile), relevantFile));

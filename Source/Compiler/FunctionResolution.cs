@@ -7,7 +7,7 @@ public partial class StatementCompiler
 {
     public static class FunctionQuery
     {
-        public static FunctionQuery<TFunction, TIdentifier, GeneralType> Create<TFunction, TIdentifier>(
+        public static FunctionQuery<TFunction, TIdentifier, TDefinedIdentifier, GeneralType> Create<TFunction, TIdentifier, TDefinedIdentifier>(
             TIdentifier? identifier,
             ImmutableArray<GeneralType>? arguments = null,
             FunctionQueryArgumentConverter<GeneralType>? converter = null,
@@ -26,7 +26,7 @@ public partial class StatementCompiler
                 AddCompilable = addCompilable,
             };
 
-        public static FunctionQuery<TFunction, TIdentifier, StatementWithValue> Create<TFunction, TIdentifier>(
+        public static FunctionQuery<TFunction, TIdentifier, TDefinedIdentifier, StatementWithValue> Create<TFunction, TIdentifier, TDefinedIdentifier>(
             TIdentifier? identifier,
             ImmutableArray<StatementWithValue> arguments,
             FunctionQueryArgumentConverter<StatementWithValue> converter,
@@ -45,12 +45,13 @@ public partial class StatementCompiler
                 AddCompilable = addCompilable,
             };
 
-        public static FunctionQuery<TFunction, TIdentifier, GeneralType> Create<TFunction, TIdentifier>(
+        public static FunctionQuery<TFunction, TIdentifier, TDefinedIdentifier, GeneralType> Create<TFunction, TIdentifier, TDefinedIdentifier>(
             TIdentifier? identifier,
             ImmutableArray<GeneralType> arguments,
             Uri? relevantFile = null,
             GeneralType? returnType = null,
-            Action<CompliableTemplate<TFunction>>? addCompilable = null)
+            Action<CompliableTemplate<TFunction>>? addCompilable = null,
+            FunctionQueryIdentifierMatcher<TIdentifier, TDefinedIdentifier>? identifierMatcher = null)
             where TFunction : ITemplateable<TFunction>
             => new()
             {
@@ -61,10 +62,11 @@ public partial class StatementCompiler
                 RelevantFile = relevantFile,
                 ReturnType = returnType,
                 AddCompilable = addCompilable,
+                IdentifierMatcher = identifierMatcher,
             };
     }
 
-    public readonly struct FunctionQuery<TFunction, TIdentifier, TArgument>
+    public readonly struct FunctionQuery<TFunction, TIdentifier, TDefinedIdentifier, TArgument>
         where TFunction : ITemplateable<TFunction>
     {
         public TIdentifier? Identifier { get; init; }
@@ -74,6 +76,7 @@ public partial class StatementCompiler
         public GeneralType? ReturnType { get; init; }
         public Action<CompliableTemplate<TFunction>>? AddCompilable { get; init; }
         public FunctionQueryArgumentConverter<TArgument> Converter { get; init; }
+        public FunctionQueryIdentifierMatcher<TIdentifier, TDefinedIdentifier>? IdentifierMatcher { get; init; }
 
         public string ToReadable()
         {
@@ -119,7 +122,8 @@ public partial class StatementCompiler
         public required TFunction Function { get; init; }
         public required List<PossibleDiagnostic> Errors { get; init; }
 
-        public int IdentifierMatch { get; set; }
+        public bool IsIdentifierMatched { get; set; }
+        public int IdentifierBadness { get; set; }
         public bool IsFileMatches { get; set; }
         public bool IsParameterCountMatches { get; set; }
 
@@ -137,9 +141,12 @@ public partial class StatementCompiler
         {
             if (this.Equals(other)) return Same;
 
-            if (IdentifierMatch < other.IdentifierMatch) return Better;
-            if (IdentifierMatch > other.IdentifierMatch) return Worse;
-            if (IdentifierMatch > 0 || other.IdentifierMatch > 0) return Same;
+            if (IsIdentifierMatched && !other.IsIdentifierMatched) return Better;
+            if (!IsIdentifierMatched && other.IsIdentifierMatched) return Worse;
+
+            if (IdentifierBadness < other.IdentifierBadness) return Better;
+            if (IdentifierBadness > other.IdentifierBadness) return Worse;
+            if (!IsIdentifierMatched || !other.IsIdentifierMatched) return Same;
 
             if (IsParameterCountMatches && !other.IsParameterCountMatches) return Better;
             if (!IsParameterCountMatches && other.IsParameterCountMatches) return Worse;
@@ -174,7 +181,8 @@ public partial class StatementCompiler
 
         public readonly bool Equals(FunctionMatch<TFunction> match)
         {
-            if (!IdentifierMatch.Equals(match.IdentifierMatch)) return false;
+            if (IdentifierBadness != match.IdentifierBadness) return false;
+            if (IsIdentifierMatched != match.IsIdentifierMatched) return false;
             if (IsFileMatches != match.IsFileMatches) return false;
             if (IsParameterCountMatches != match.IsParameterCountMatches) return false;
             if (ReturnTypeMatch != match.ReturnTypeMatch) return false;
@@ -194,6 +202,11 @@ public partial class StatementCompiler
         ParameterDefinition? definition,
         GeneralType? defined,
         [NotNullWhen(true)] out GeneralType? result);
+
+    public delegate bool FunctionQueryIdentifierMatcher<TIdentifier, TDefinedIdentifier>(
+        TIdentifier passed,
+        TDefinedIdentifier defined,
+        out int badness);
 
     static bool FunctionArgumentConverter(
         GeneralType argument,
@@ -234,12 +247,12 @@ public partial class StatementCompiler
         return true;
     }
 
-    public static bool GetFunction<TFunction, TDefinedIdentifier, TPassedIdentifier, TArgument>(
+    public static bool GetFunction<TFunction, TPassedIdentifier, TDefinedIdentifier, TArgument>(
         Functions<TFunction> functions,
         string kindName,
         string? readableName,
 
-        FunctionQuery<TFunction, TPassedIdentifier, TArgument> query,
+        FunctionQuery<TFunction, TPassedIdentifier, TDefinedIdentifier, TArgument> query,
 
         [NotNullWhen(true)] out FunctionQueryResult<TFunction>? result,
         [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -272,7 +285,7 @@ public partial class StatementCompiler
                 }
                 argumentTypes[i] = converted;
             }
-            FunctionQuery<TFunction, TPassedIdentifier, GeneralType> typeConvertedQuery = new()
+            FunctionQuery<TFunction, TPassedIdentifier, TDefinedIdentifier, GeneralType> typeConvertedQuery = new()
             {
                 AddCompilable = query.AddCompilable,
                 ArgumentCount = query.ArgumentCount,
@@ -311,9 +324,9 @@ public partial class StatementCompiler
                 }
             }
 
-            if (best.IdentifierMatch > 0)
+            if (!best.IsIdentifierMatched)
             {
-                if (best.IdentifierMatch == 1)
+                if (best.IdentifierBadness == 1)
                 {
                     error = new PossibleDiagnostic($"No {kindName} found with name \"{query.Identifier}\" (did you mean \"{best.Function.Identifier}\"?)");
                 }
@@ -392,7 +405,7 @@ public partial class StatementCompiler
 
     static FunctionMatch<TFunction> GetFunctionMatch<TFunction, TDefinedIdentifier, TPassedIdentifier, TArgument>(
         TFunction function,
-        FunctionQuery<TFunction, TPassedIdentifier, TArgument> query)
+        FunctionQuery<TFunction, TPassedIdentifier, TDefinedIdentifier, TArgument> query)
         where TFunction : ICompiledFunctionDefinition, IInFile, ITemplateable<TFunction>, ISimpleReadable, IIdentifiable<TDefinedIdentifier>
         where TDefinedIdentifier : notnull, IEquatable<TPassedIdentifier>
         where TArgument : notnull
@@ -410,20 +423,39 @@ public partial class StatementCompiler
             else break;
         }
 
-        if (query.Identifier is null || function.Identifier.Equals(query.Identifier))
+        if (query.Identifier is null)
         {
-            result.IdentifierMatch = 0;
+            result.IsIdentifierMatched = true;
+            result.IdentifierBadness = 0;
+        }
+        else if (query.IdentifierMatcher is not null)
+        {
+            if (query.IdentifierMatcher.Invoke(query.Identifier, function.Identifier, out int identifierBadness))
+            {
+                result.IsIdentifierMatched = true;
+                result.IdentifierBadness = identifierBadness;
+            }
+            else
+            {
+                result.IsIdentifierMatched = false;
+            }
+        }
+        else if (function.Identifier.Equals(query.Identifier))
+        {
+            result.IsIdentifierMatched = true;
+            result.IdentifierBadness = 0;
         }
         else
         {
-            result.IdentifierMatch = 2;
+            result.IsIdentifierMatched = false;
+            result.IdentifierBadness = 2;
 
             if (query.Identifier is string _a1 &&
                 function.Identifier is Tokenizing.Token _b1)
             {
                 if (_a1.ToLowerInvariant() == _b1.Content.ToLowerInvariant())
                 {
-                    result.IdentifierMatch = 1;
+                    result.IdentifierBadness = 1;
                 }
             }
 

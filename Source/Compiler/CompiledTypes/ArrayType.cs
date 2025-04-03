@@ -9,7 +9,7 @@ public class ArrayType : GeneralType,
 {
     public GeneralType Of { get; }
     public CompiledStatementWithValue? Length { get; }
-    public int? ComputedLength { get; }
+    public int? ComputedLength => Length is CompiledEvaluatedValue evaluatedValue ? (int)evaluatedValue.Value : null;
 
     public ArrayType(ArrayType other)
     {
@@ -17,11 +17,10 @@ public class ArrayType : GeneralType,
         Length = other.Length;
     }
 
-    public ArrayType(GeneralType of, CompiledStatementWithValue? length, int? computedLength)
+    public ArrayType(GeneralType of, CompiledStatementWithValue? length)
     {
         Of = of;
         Length = length;
-        ComputedLength = computedLength;
     }
 
     public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)

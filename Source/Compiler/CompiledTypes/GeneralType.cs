@@ -88,16 +88,25 @@ public abstract class GeneralType :
                 if (StatementCompiler.TryComputeSimple(type.StackArraySize, out CompiledValue _stackArraySize))
                 { stackArraySize = _stackArraySize; }
             }
+
+            GeneralType? of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer, file);
+            ArrayType result = new(of, stackArraySize.HasValue ? new CompiledEvaluatedValue()
+            {
+                Value = stackArraySize.Value,
+                Location = type.StackArraySize.Location,
+                SaveValue = true,
+                Type = BuiltinType.I32,
+            } : null);
+            type.SetAnalyzedType(result);
+            return result;
         }
-
-        GeneralType? of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer, file);
-
-        // if (type.StackArraySize is not null) throw new NotImplementedException();
-
-        ArrayType result = new(of, null, (int?)stackArraySize);
-        type.SetAnalyzedType(result);
-
-        return result;
+        else
+        {
+            GeneralType? of = GeneralType.From(type.StackArrayOf, typeFinder, constComputer, file);
+            ArrayType result = new(of, null);
+            type.SetAnalyzedType(result);
+            return result;
+        }
     }
 
     public static FunctionType From(
@@ -369,7 +378,7 @@ public abstract class GeneralType :
             {
                 GeneralType? stackArrayOf = InsertTypeParameters(arrayType.Of, typeArguments);
                 if (stackArrayOf is null) return null;
-                return new ArrayType(stackArrayOf, arrayType.Length, arrayType.ComputedLength);
+                return new ArrayType(stackArrayOf, arrayType.Length);
             }
 
             case StructType structType:

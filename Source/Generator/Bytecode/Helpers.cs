@@ -565,14 +565,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Memory Helpers
 
-    bool GetAddress(CompiledStatementWithValue value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error) => value switch
+    bool GetAddress(CompiledStatementWithValue value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        CompiledVariableGetter v => GetAddress(v, out address, out error),
-        CompiledParameterGetter v => GetAddress(v, out address, out error),
-        CompiledIndexGetter v => GetAddress(v, out address, out error),
-        CompiledFieldGetter v => GetAddress(v, out address, out error),
-        _ => throw new NotImplementedException()
-    };
+        switch (value)
+        {
+            case CompiledVariableGetter v: return GetAddress(v, out address, out error);
+            case CompiledParameterGetter v: return GetAddress(v, out address, out error);
+            case CompiledIndexGetter v: return GetAddress(v, out address, out error);
+            case CompiledFieldGetter v: return GetAddress(v, out address, out error);
+            default:
+                address = null;
+                error = new PossibleDiagnostic($"Can't get the address of {value.GetType().Name}", value);
+                return false;
+        }
+    }
 
     bool GetAddress(CompiledVariableGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {

@@ -107,7 +107,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 variableDeclaration.InitialValue is CompiledLiteralList literalList &&
                 arrayType.Length is null)
             {
-                arrayType = new ArrayType(arrayType.Of, null, literalList.Values.Length);
+                arrayType = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
+                {
+                    Value = literalList.Values.Length,
+                    Type = ArrayLengthType,
+                    Location = variableDeclaration.Location,
+                    SaveValue = true,
+                });
             }
         }
 

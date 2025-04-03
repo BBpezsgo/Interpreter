@@ -1,7 +1,7 @@
 namespace LanguageCore.Runtime;
 
 #if UNITY_BURST
-[System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)] 
+[System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]
 public delegate void ExternalFunctionUnity(nint scope, nint arguments, nint returnValue);
 #endif
 
@@ -14,8 +14,12 @@ public unsafe struct ExternalFunctionScopedSync : IExternalFunction
     public int ReturnValueSize { get; }
     public nint Scope { get; set; }
 #if UNITY_BURST
-    readonly nint _callback;
-    public readonly delegate* unmanaged[Cdecl]<nint, nint, nint, void> Callback => (delegate* unmanaged[Cdecl]<nint, nint, nint, void>)_callback;
+    nint _callback;
+    public delegate* unmanaged[Cdecl]<nint, nint, nint, void> Callback
+    {
+        readonly get => (delegate* unmanaged[Cdecl]<nint, nint, nint, void>)_callback;
+        set => _callback = (nint)value;
+    }
 #else
     public ExternalFunctionScopedSyncCallback Callback { get; }
 #endif

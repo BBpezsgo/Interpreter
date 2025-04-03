@@ -1438,7 +1438,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             itemType = BuiltinType.Any;
         }
 
-        return new ArrayType(itemType, null, list.Values.Length);
+        return new ArrayType(itemType, new CompiledEvaluatedValue()
+        {
+            Value = list.Values.Length,
+            Location = list.Location,
+            Type = ArrayLengthType,
+            SaveValue = true,
+        });
     }
     GeneralType FindStatementType(IndexCall index)
     {
@@ -1726,7 +1732,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     Location = literal.Location,
                     Type = BuiltinType.I32,
                     SaveValue = true
-                }, literal.Value.Length + 1)));
+                })));
             case LiteralType.Char:
                 if (expectedType is not null)
                 {

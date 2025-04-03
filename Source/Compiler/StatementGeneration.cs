@@ -39,7 +39,7 @@ public partial class StatementCompiler
             return false;
         }
 
-        ImmutableArray<StatementWithValue> parameters = ImmutableArray.Create(size);
+        ImmutableArray<StatementWithValue> arguments = ImmutableArray.Create(size);
 
         if (TryEvaluate(allocator, ImmutableArray.Create(compiledSize), new EvaluationContext(), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
             returnValue.HasValue &&
@@ -56,6 +56,8 @@ public partial class StatementCompiler
             return true;
         }
 
+        if (!GenerateCodeForArguments(arguments, allocator, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
+
         if (allocator.ExternalFunctionName is not null)
         {
             if (!ExternalFunctions.TryGet(allocator.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
@@ -64,10 +66,8 @@ public partial class StatementCompiler
                 return false;
             }
 
-            return GenerateCodeForFunctionCall_External(parameters, true, allocator, externalFunction, size.Location, out compiledStatement);
+            return GenerateCodeForFunctionCall_External(compiledArguments, true, allocator, externalFunction, size.Location, out compiledStatement);
         }
-
-        if (!GenerateCodeForArguments(parameters, allocator, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
         compiledStatement = new CompiledFunctionCall()
         {
@@ -221,7 +221,13 @@ public partial class StatementCompiler
                 if (newVariable.InitialValue is LiteralList literalList &&
                     arrayType.Length is null)
                 {
-                    type = new ArrayType(arrayType.Of, null, literalList.Values.Length);
+                    type = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
+                    {
+                        Value = literalList.Values.Length,
+                        Location = newVariable.Type.Location,
+                        Type = ArrayLengthType,
+                        SaveValue = true,
+                    });
                 }
 
                 if (newVariable.InitialValue is LiteralStatement literalStatement &&
@@ -249,7 +255,13 @@ public partial class StatementCompiler
                             Diagnostics.Add(Diagnostic.Error($"String literal's length ({literalStatement.Value.Length}) doesn't match with the type's length ({length})", literalStatement));
                         }
 
-                        type = new ArrayType(arrayType.Of, null, length);
+                        type = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
+                        {
+                            Value = length,
+                            Location = newVariable.Type.Location,
+                            Type = ArrayLengthType,
+                            SaveValue = true,
+                        });
                     }
                     else if (arrayType.Of.SameAs(BasicType.U8))
                     {
@@ -273,7 +285,13 @@ public partial class StatementCompiler
                             Diagnostics.Add(Diagnostic.Error($"String literal's length ({literalStatement.Value.Length}) doesn't match with the type's length ({length})", literalStatement));
                         }
 
-                        type = new ArrayType(arrayType.Of, null, length);
+                        type = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
+                        {
+                            Value = length,
+                            Location = newVariable.Type.Location,
+                            Type = ArrayLengthType,
+                            SaveValue = true,
+                        });
                     }
                 }
             }
@@ -706,18 +724,15 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateCodeForFunctionCall_External<TFunction>(IReadOnlyList<StatementWithValue> parameters, bool saveValue, TFunction compiledFunction, IExternalFunction externalFunction, Location location, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool GenerateCodeForFunctionCall_External<TFunction>(ImmutableArray<CompiledPassedArgument> arguments, bool saveValue, TFunction compiledFunction, IExternalFunction externalFunction, Location location, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
         where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition, ISimpleReadable
     {
-        compiledStatement = null;
         StatementCompiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction, Diagnostics);
-
-        if (!GenerateCodeForArguments(parameters, compiledFunction, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
         compiledStatement = new CompiledExternalFunctionCall()
         {
             Function = externalFunction,
-            Arguments = compiledArguments,
+            Arguments = arguments,
             Type = compiledFunction.Type,
             Location = location,
             SaveValue = saveValue,
@@ -753,6 +768,8 @@ public partial class StatementCompiler
             return false;
         }
 
+        if (!GenerateCodeForArguments(arguments, callee, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
+
         if (callee.ExternalFunctionName is not null)
         {
             if (!ExternalFunctions.TryGet(callee.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
@@ -761,10 +778,8 @@ public partial class StatementCompiler
                 return false;
             }
 
-            return GenerateCodeForFunctionCall_External(arguments, caller.SaveValue, callee, externalFunction, caller.Location, out compiledStatement);
+            return GenerateCodeForFunctionCall_External(compiledArguments, caller.SaveValue, callee, externalFunction, caller.Location, out compiledStatement);
         }
-
-        if (!GenerateCodeForArguments(arguments, callee, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
         GenerateCodeForFunction(callee, typeArguments);
 
@@ -839,7 +854,7 @@ public partial class StatementCompiler
                         {
                             if (inlineContext.InlinedArguments.Count(v => v == argument) > 1)
                             {
-                                Debugger.Break();
+                                //Debugger.Break();
                                 Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because this expression might be complex", argument));
                                 goto bad;
                             }
@@ -878,8 +893,8 @@ public partial class StatementCompiler
                         Debugger.Break();
                     }
 
-                bad:
-                    Debugger.Break();
+                bad:;
+                    //Debugger.Break();
                 }
                 else
                 {
@@ -1300,6 +1315,8 @@ public partial class StatementCompiler
                 return false;
             }
 
+            if (!GenerateCodeForArguments(@operator.Arguments, operatorDefinition, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
+
             if (operatorDefinition.ExternalFunctionName is not null)
             {
                 if (!ExternalFunctions.TryGet(operatorDefinition.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
@@ -1308,10 +1325,8 @@ public partial class StatementCompiler
                     return false;
                 }
 
-                return GenerateCodeForFunctionCall_External(@operator.Arguments, @operator.SaveValue, operatorDefinition, externalFunction, @operator.Location, out compiledStatement);
+                return GenerateCodeForFunctionCall_External(compiledArguments, @operator.SaveValue, operatorDefinition, externalFunction, @operator.Location, out compiledStatement);
             }
-
-            if (!GenerateCodeForArguments(@operator.Arguments, operatorDefinition, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
             compiledStatement = new CompiledFunctionCall()
             {
@@ -1678,7 +1693,7 @@ public partial class StatementCompiler
                             Location = literal.Location,
                             Type = ArrayLengthType,
                             SaveValue = true
-                        }, literal.Value.Length + 1));
+                        }));
                     }
 
                     OnGotStatementType(literal, stringType);
@@ -1839,7 +1854,13 @@ public partial class StatementCompiler
             IsASCII = withBytes,
             Location = location,
             SaveValue = true,
-            Type = new PointerType(new ArrayType(type, null, literal.Length + 1)),
+            Type = new PointerType(new ArrayType(type, new CompiledEvaluatedValue()
+            {
+                Value = literal.Length + 1,
+                Location = location,
+                Type = ArrayLengthType,
+                SaveValue = true,
+            })),
             Allocator = allocator,
         };
         return true;
@@ -2521,7 +2542,13 @@ public partial class StatementCompiler
             itemType = BuiltinType.Any;
         }
 
-        ArrayType type = new(itemType, null, listValue.Values.Length);
+        ArrayType type = new(itemType, new CompiledEvaluatedValue()
+        {
+            Value = listValue.Values.Length,
+            Location = listValue.Location,
+            Type = ArrayLengthType,
+            SaveValue = true,
+        });
 
         compiledStatement = new CompiledLiteralList()
         {
@@ -3086,22 +3113,19 @@ public partial class StatementCompiler
     {
         GeneralType? of = CompileType(type.StackArrayOf, file);
 
-        CompiledStatementWithValue? stackArraySizeStatement = null;
-
-        CompiledValue? stackArraySize = default;
-
         if (type.StackArraySize is not null)
         {
-            GenerateCodeForStatement(type.StackArraySize, out stackArraySizeStatement);
-
-            if (TryCompute(stackArraySizeStatement, out CompiledValue _stackArraySize))
-            { stackArraySize = _stackArraySize; }
+            GenerateCodeForStatement(type.StackArraySize, out CompiledStatementWithValue? stackArraySizeStatement);
+            ArrayType result = new(of, stackArraySizeStatement);
+            type.SetAnalyzedType(result);
+            return result;
         }
-
-        ArrayType result = new(of, stackArraySizeStatement, (int?)stackArraySize);
-        type.SetAnalyzedType(result);
-
-        return result;
+        else
+        {
+            ArrayType result = new(of, null);
+            type.SetAnalyzedType(result);
+            return result;
+        }
     }
 
     public FunctionType CompileType(

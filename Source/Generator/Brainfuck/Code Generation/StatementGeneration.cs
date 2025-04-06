@@ -404,11 +404,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         ) ||
             fieldSetter.Object.Type.Is<StructType>())
         {
-            if (!fieldSetter.Type.SameAs(fieldSetter.Value.Type))
-            {
-                Diagnostics.Add(Diagnostic.Critical($"Can not set a \"{fieldSetter.Value.Type}\" type value to the \"{fieldSetter.Type}\" type field.", fieldSetter.Value));
-                return;
-            }
+            // if (!fieldSetter.Type.SameAs(fieldSetter.Value.Type))
+            // {
+            //     Diagnostics.Add(Diagnostic.Critical($"Can not set a \"{fieldSetter.Value.Type}\" type value to the \"{fieldSetter.Type}\" type field.", fieldSetter.Value));
+            //     return;
+            // }
 
             if (!TryGetAddress(fieldSetter.ToGetter(), out Address? address, out int size))
             {
@@ -3117,20 +3117,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GeneralType newInstanceType = callerPosition.Type;
         GenerateCodeForStatement(callerPosition.Object);
 
-        CompiledVariableDeclaration variableDeclaration = new()
-        {
-            Identifier = function.Parameters[0].Identifier.Content,
-            InitialValue = null,
-            IsGlobal = false,
-            Location = function.Location,
-            Type = newInstanceType,
-            Cleanup = new CompiledCleanup()
-            {
-                TrashType = newInstanceType,
-                Location = function.Location,
-            },
-        };
-
         if (newInstanceType.Is<PointerType>(out PointerType? newInstancePointerType))
         {
             if (!newInstancePointerType.To.Is<StructType>())
@@ -3139,11 +3125,35 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, false, false, null, PointerSize, variableDeclaration));
+            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, false, false, null, PointerSize, new CompiledVariableDeclaration()
+            {
+                Identifier = function.Parameters[0].Identifier.Content,
+                InitialValue = null,
+                IsGlobal = false,
+                Location = function.Location,
+                Type = newInstanceType,
+                Cleanup = new CompiledCleanup()
+                {
+                    TrashType = newInstanceType,
+                    Location = function.Location,
+                },
+            }));
         }
         else if (newInstanceType.Is<StructType>())
         {
-            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, true, false, null, PointerSize, variableDeclaration));
+            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, true, false, null, PointerSize, new CompiledVariableDeclaration()
+            {
+                Identifier = function.Parameters[0].Identifier.Content,
+                InitialValue = null,
+                IsGlobal = false,
+                Location = function.Location,
+                Type = new PointerType(newInstanceType),
+                Cleanup = new CompiledCleanup()
+                {
+                    TrashType = new PointerType(newInstanceType),
+                    Location = function.Location,
+                },
+            }));
         }
         else
         {

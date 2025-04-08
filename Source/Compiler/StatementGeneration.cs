@@ -11,11 +11,11 @@ public partial class StatementCompiler
     bool AllowFunctionInlining => !Settings.DontOptimize;
     bool AllowEvaluating => !Settings.DontOptimize;
 
-    bool GenerateAllocator(StatementWithValue size, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileAllocation(StatementWithValue size, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
 
-        if (!GenerateCodeForStatement(size, out CompiledStatementWithValue? compiledSize)) return false;
+        if (!CompileStatement(size, out CompiledStatementWithValue? compiledSize)) return false;
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Allocate, ImmutableArray.Create(compiledSize.Type), size.File, out FunctionQueryResult<CompiledFunctionDefinition>? result, out PossibleDiagnostic? error, AddCompilable))
         {
@@ -56,7 +56,7 @@ public partial class StatementCompiler
             return true;
         }
 
-        if (!GenerateCodeForArguments(arguments, allocator, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
+        if (!CompileArguments(arguments, allocator, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
         if (allocator.ExternalFunctionName is not null)
         {
@@ -66,7 +66,7 @@ public partial class StatementCompiler
                 return false;
             }
 
-            return GenerateCodeForFunctionCall_External(compiledArguments, true, allocator, externalFunction, size.Location, out compiledStatement);
+            return CompileFunctionCall_External(compiledArguments, true, allocator, externalFunction, size.Location, out compiledStatement);
         }
 
         compiledStatement = new CompiledFunctionCall()
@@ -80,7 +80,7 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateDeallocator(GeneralType deallocateableType, Location location, [NotNullWhen(true)] out CompiledFunctionDefinition? deallocator)
+    bool CompileDeallocation(GeneralType deallocateableType, Location location, [NotNullWhen(true)] out CompiledFunctionDefinition? deallocator)
     {
         deallocator = null;
         ImmutableArray<GeneralType> parameterTypes = ImmutableArray.Create(deallocateableType);
@@ -115,7 +115,7 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateDestructor(GeneralType deallocateableType, Location location, [NotNullWhen(true)] out CompiledCleanup? compiledCleanup)
+    bool CompileCleanup(GeneralType deallocateableType, Location location, [NotNullWhen(true)] out CompiledCleanup? compiledCleanup)
     {
         compiledCleanup = null;
 
@@ -134,7 +134,7 @@ public partial class StatementCompiler
                         error.ToWarning(location)));
                 }
 
-                if (!GenerateDeallocator(deallocateableType, location, out CompiledFunctionDefinition? deallocator)) return false;
+                if (!CompileDeallocation(deallocateableType, location, out CompiledFunctionDefinition? deallocator)) return false;
 
                 compiledCleanup = new CompiledCleanup()
                 {
@@ -170,7 +170,7 @@ public partial class StatementCompiler
 
         if (deallocateableType.Is<PointerType>())
         {
-            if (!GenerateDeallocator(deallocateableType, location, out CompiledFunctionDefinition? deallocator)) return false;
+            if (!CompileDeallocation(deallocateableType, location, out CompiledFunctionDefinition? deallocator)) return false;
 
             compiledCleanup = new CompiledCleanup()
             {
@@ -194,9 +194,9 @@ public partial class StatementCompiler
         }
     }
 
-    #region GenerateCodeForStatement
+    #region CompileStatement
 
-    bool GenerateCodeForStatement(VariableDeclaration newVariable, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileStatement(VariableDeclaration newVariable, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
         if (newVariable.Modifiers.Contains(ModifierKeywords.Const))
@@ -340,7 +340,7 @@ public partial class StatementCompiler
 
         if (initialValue is null && newVariable.InitialValue is not null)
         {
-            if (!GenerateCodeForStatement(newVariable.InitialValue, out initialValue, type)) return false;
+            if (!CompileStatement(newVariable.InitialValue, out initialValue, type)) return false;
             type ??= initialValue.Type;
             if (!CanCastImplicitly(initialValue.Type, type, null, out PossibleDiagnostic? castError))
             {
@@ -365,7 +365,7 @@ public partial class StatementCompiler
         CompiledCleanup? compiledCleanup = null;
         if (newVariable.Modifiers.Contains(ModifierKeywords.Temp))
         {
-            GenerateDestructor(type, newVariable.Location, out compiledCleanup);
+            CompileCleanup(type, newVariable.Location, out compiledCleanup);
         }
 
         bool isGlobal = Scopes.Count == 0;
@@ -386,7 +386,7 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateCodeForStatement(InstructionLabel instructionLabel, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileStatement(InstructionLabel instructionLabel, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
@@ -404,7 +404,7 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateCodeForStatement(KeywordCall keywordCall, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileStatement(KeywordCall keywordCall, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
@@ -420,7 +420,7 @@ public partial class StatementCompiler
 
             if (keywordCall.Arguments.Length == 1)
             {
-                if (!GenerateCodeForStatement(keywordCall.Arguments[0], out returnValue, CurrentReturnType ?? ExitCodeType)) return false;
+                if (!CompileStatement(keywordCall.Arguments[0], out returnValue, CurrentReturnType ?? ExitCodeType)) return false;
 
                 if (!CanCastImplicitly(returnValue.Type, CurrentReturnType ?? ExitCodeType, keywordCall.Arguments[0], out PossibleDiagnostic? castError))
                 {
@@ -444,7 +444,7 @@ public partial class StatementCompiler
                 return false;
             }
 
-            if (!GenerateCodeForStatement(keywordCall.Arguments[0], out CompiledStatementWithValue? throwValue)) return false;
+            if (!CompileStatement(keywordCall.Arguments[0], out CompiledStatementWithValue? throwValue)) return false;
 
             compiledStatement = new CompiledCrash()
             {
@@ -465,9 +465,9 @@ public partial class StatementCompiler
 
         if (keywordCall.Identifier.Content == StatementKeywords.Delete)
         {
-            if (!GenerateCodeForStatement(keywordCall.Arguments[0], out CompiledStatementWithValue? value)) return false;
+            if (!CompileStatement(keywordCall.Arguments[0], out CompiledStatementWithValue? value)) return false;
 
-            if (!GenerateDestructor(value.Type, keywordCall.Arguments[0].Location, out CompiledCleanup? compiledCleanup)) return false;
+            if (!CompileCleanup(value.Type, keywordCall.Arguments[0].Location, out CompiledCleanup? compiledCleanup)) return false;
 
             compiledStatement = new CompiledDelete()
             {
@@ -486,7 +486,7 @@ public partial class StatementCompiler
                 return false;
             }
 
-            if (!GenerateCodeForStatement(keywordCall.Arguments[0], out CompiledStatementWithValue? to)) return false;
+            if (!CompileStatement(keywordCall.Arguments[0], out CompiledStatementWithValue? to)) return false;
 
             if (!CanCastImplicitly(to.Type, CompiledInstructionLabelDeclaration.Type, null, out PossibleDiagnostic? castError))
             {
@@ -506,7 +506,7 @@ public partial class StatementCompiler
         return false;
     }
 
-    bool GenerateCodeForArguments(IReadOnlyList<StatementWithValue> arguments, ICompiledFunctionDefinition compiledFunction, [NotNullWhen(true)] out ImmutableArray<CompiledPassedArgument> compiledArguments, int alreadyPassed = 0)
+    bool CompileArguments(IReadOnlyList<StatementWithValue> arguments, ICompiledFunctionDefinition compiledFunction, [NotNullWhen(true)] out ImmutableArray<CompiledPassedArgument> compiledArguments, int alreadyPassed = 0)
     {
         compiledArguments = ImmutableArray<CompiledPassedArgument>.Empty;
 
@@ -532,13 +532,13 @@ public partial class StatementCompiler
             GeneralType parameterType = compiledFunction.ParameterTypes[i + alreadyPassed];
             StatementWithValue argument = arguments[i];
 
-            if (!GenerateCodeForStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
+            if (!CompileStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
 
             if (parameterType.Is<PointerType>() &&
                 parameter.Modifiers.Any(v => v.Content == ModifierKeywords.This) &&
                 !compiledArgument.Type.Is<PointerType>())
             {
-                if (!GenerateCodeForStatement(new AddressGetter(
+                if (!CompileStatement(new AddressGetter(
                     Token.CreateAnonymous("&", TokenType.Operator, argument.Position.Before()),
                     argument,
                     argument.File
@@ -574,7 +574,7 @@ public partial class StatementCompiler
             CompiledCleanup? compiledCleanup = null;
             if (calleeAllowsTemp && callerAllowsTemp && typeAllowsTemp)
             {
-                GenerateDestructor(compiledArgument.Type, argument.Location, out compiledCleanup);
+                CompileCleanup(compiledArgument.Type, argument.Location, out compiledCleanup);
             }
 
             result.Add(new CompiledPassedArgument()
@@ -612,7 +612,7 @@ public partial class StatementCompiler
                     Diagnostics.Add(Diagnostic.Warning($"WIP", argument));
                 }
 
-                if (!GenerateCodeForStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
+                if (!CompileStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
 
                 if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, out PossibleDiagnostic? error))
                 { Diagnostics.Add(error.ToError(argument)); }
@@ -642,7 +642,7 @@ public partial class StatementCompiler
                 CompiledCleanup? compiledCleanup = null;
                 if (calleeAllowsTemp && callerAllowsTemp && typeAllowsTemp)
                 {
-                    GenerateDestructor(compiledArgument.Type, argument.Location, out compiledCleanup);
+                    CompileCleanup(compiledArgument.Type, argument.Location, out compiledCleanup);
                 }
 
                 result.Add(new CompiledPassedArgument()
@@ -668,7 +668,7 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateCodeForParameterPassing(IReadOnlyList<StatementWithValue> arguments, FunctionType function, [NotNullWhen(true)] out ImmutableArray<CompiledPassedArgument> compiledArguments)
+    bool CompileArguments(IReadOnlyList<StatementWithValue> arguments, FunctionType function, [NotNullWhen(true)] out ImmutableArray<CompiledPassedArgument> compiledArguments)
     {
         compiledArguments = ImmutableArray<CompiledPassedArgument>.Empty;
 
@@ -679,7 +679,7 @@ public partial class StatementCompiler
             StatementWithValue argument = arguments[i];
             GeneralType parameterType = function.Parameters[i];
 
-            if (!GenerateCodeForStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
+            if (!CompileStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
 
             if (!CanCastImplicitly(compiledArgument.Type, parameterType, null, out PossibleDiagnostic? error))
             { Diagnostics.Add(error.ToError(compiledArgument)); }
@@ -703,7 +703,7 @@ public partial class StatementCompiler
             CompiledCleanup? compiledCleanup = null;
             if (canDeallocate)
             {
-                GenerateDestructor(compiledArgument.Type, compiledArgument.Location, out compiledCleanup);
+                CompileCleanup(compiledArgument.Type, compiledArgument.Location, out compiledCleanup);
             }
 
             result.Add(new CompiledPassedArgument()
@@ -724,7 +724,7 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateCodeForFunctionCall_External<TFunction>(ImmutableArray<CompiledPassedArgument> arguments, bool saveValue, TFunction compiledFunction, IExternalFunction externalFunction, Location location, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileFunctionCall_External<TFunction>(ImmutableArray<CompiledPassedArgument> arguments, bool saveValue, TFunction compiledFunction, IExternalFunction externalFunction, Location location, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
         where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition, ISimpleReadable
     {
         StatementCompiler.CheckExternalFunctionDeclaration(this, compiledFunction, externalFunction, Diagnostics);
@@ -741,7 +741,7 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateCodeForFunctionCall<TFunction>(StatementWithValue caller, ImmutableArray<StatementWithValue> arguments, FunctionQueryResult<TFunction> _callee, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileFunctionCall<TFunction>(StatementWithValue caller, ImmutableArray<StatementWithValue> arguments, FunctionQueryResult<TFunction> _callee, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
         where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition, IExportable, ISimpleReadable, ILocated, IExternalFunctionDefinition, IHaveInstructionOffset
     {
         (TFunction callee, Dictionary<string, GeneralType>? typeArguments) = _callee;
@@ -768,7 +768,7 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (!GenerateCodeForArguments(arguments, callee, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
+        if (!CompileArguments(arguments, callee, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
         if (callee.ExternalFunctionName is not null)
         {
@@ -778,10 +778,10 @@ public partial class StatementCompiler
                 return false;
             }
 
-            return GenerateCodeForFunctionCall_External(compiledArguments, caller.SaveValue, callee, externalFunction, caller.Location, out compiledStatement);
+            return CompileFunctionCall_External(compiledArguments, caller.SaveValue, callee, externalFunction, caller.Location, out compiledStatement);
         }
 
-        GenerateCodeForFunction(callee, typeArguments);
+        CompileFunction(callee, typeArguments);
 
         if (AllowEvaluating &&
             TryEvaluate(callee, compiledArguments, new EvaluationContext(), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
@@ -921,7 +921,7 @@ public partial class StatementCompiler
         return true;
     }
 
-    bool GenerateCodeForStatement(AnyCall anyCall, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null)
+    bool CompileStatement(AnyCall anyCall, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null)
     {
         compiledStatement = null;
 
@@ -992,10 +992,10 @@ public partial class StatementCompiler
             if (functionCall.CompiledType is not null)
             { OnGotStatementType(anyCall, functionCall.CompiledType); }
 
-            return GenerateCodeForFunctionCall(functionCall, functionCall.MethodArguments, result, out compiledStatement);
+            return CompileFunctionCall(functionCall, functionCall.MethodArguments, result, out compiledStatement);
         }
 
-        if (!GenerateCodeForStatement(anyCall.PrevStatement, out CompiledStatementWithValue? functionValue))
+        if (!CompileStatement(anyCall.PrevStatement, out CompiledStatementWithValue? functionValue))
         {
             if (notFound is not null)
             {
@@ -1027,7 +1027,7 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (!GenerateCodeForParameterPassing(anyCall.Arguments, functionType, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
+        if (!CompileArguments(anyCall.Arguments, functionType, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
         PossibleDiagnostic? argumentError = null;
         if (!Utils.SequenceEquals(compiledArguments, functionType.Parameters, (argument, parameter) =>
@@ -1063,7 +1063,7 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(BinaryOperatorCall @operator, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null)
+    bool CompileStatement(BinaryOperatorCall @operator, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null)
     {
         compiledStatement = null;
 
@@ -1076,7 +1076,7 @@ public partial class StatementCompiler
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
 
-            if (!GenerateCodeForFunctionCall(@operator, @operator.Arguments, result, out compiledStatement)) return false;
+            if (!CompileFunctionCall(@operator, @operator.Arguments, result, out compiledStatement)) return false;
 
             if (AllowEvaluating &&
                 TryCompute(compiledStatement, out CompiledValue evaluated) &&
@@ -1100,8 +1100,8 @@ public partial class StatementCompiler
             StatementWithValue left = @operator.Left;
             StatementWithValue right = @operator.Right;
 
-            if (!GenerateCodeForStatement(left, out CompiledStatementWithValue? compiledLeft, expectedType)) return false;
-            if (!GenerateCodeForStatement(right, out CompiledStatementWithValue? compiledRight, expectedType)) return false;
+            if (!CompileStatement(left, out CompiledStatementWithValue? compiledLeft, expectedType)) return false;
+            if (!CompileStatement(right, out CompiledStatementWithValue? compiledRight, expectedType)) return false;
 
             GeneralType leftType = compiledLeft.Type;
             GeneralType rightType = compiledRight.Type;
@@ -1119,7 +1119,7 @@ public partial class StatementCompiler
             leftType = BuiltinType.CreateNumeric(leftNType, leftBitWidth);
             rightType = BuiltinType.CreateNumeric(rightNType, rightBitWidth);
 
-            if (!GenerateCodeForStatement(left, out compiledLeft, leftType)) return false;
+            if (!CompileStatement(left, out compiledLeft, leftType)) return false;
 
             if (leftNType != NumericType.Float &&
                 rightNType == NumericType.Float)
@@ -1129,7 +1129,7 @@ public partial class StatementCompiler
                 leftNType = NumericType.Float;
             }
 
-            if (!GenerateCodeForStatement(right, out compiledRight, rightType)) return false;
+            if (!CompileStatement(right, out compiledRight, rightType)) return false;
 
             if (leftType.SameAs(BasicType.F32) &&
                 !rightType.SameAs(BasicType.F32))
@@ -1290,7 +1290,7 @@ public partial class StatementCompiler
             return false;
         }
     }
-    bool GenerateCodeForStatement(UnaryOperatorCall @operator, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(UnaryOperatorCall @operator, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
 
@@ -1315,7 +1315,7 @@ public partial class StatementCompiler
                 return false;
             }
 
-            if (!GenerateCodeForArguments(@operator.Arguments, operatorDefinition, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
+            if (!CompileArguments(@operator.Arguments, operatorDefinition, out ImmutableArray<CompiledPassedArgument> compiledArguments)) return false;
 
             if (operatorDefinition.ExternalFunctionName is not null)
             {
@@ -1325,7 +1325,7 @@ public partial class StatementCompiler
                     return false;
                 }
 
-                return GenerateCodeForFunctionCall_External(compiledArguments, @operator.SaveValue, operatorDefinition, externalFunction, @operator.Location, out compiledStatement);
+                return CompileFunctionCall_External(compiledArguments, @operator.SaveValue, operatorDefinition, externalFunction, @operator.Location, out compiledStatement);
             }
 
             compiledStatement = new CompiledFunctionCall()
@@ -1354,7 +1354,7 @@ public partial class StatementCompiler
             {
                 case UnaryOperatorCall.LogicalNOT:
                 {
-                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
+                    if (!CompileStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
 
                     compiledStatement = new CompiledUnaryOperatorCall()
                     {
@@ -1378,7 +1378,7 @@ public partial class StatementCompiler
                 }
                 case UnaryOperatorCall.BinaryNOT:
                 {
-                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
+                    if (!CompileStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
 
                     compiledStatement = new CompiledUnaryOperatorCall()
                     {
@@ -1402,7 +1402,7 @@ public partial class StatementCompiler
                 }
                 case UnaryOperatorCall.UnaryMinus:
                 {
-                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
+                    if (!CompileStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
 
                     compiledStatement = new CompiledUnaryOperatorCall()
                     {
@@ -1426,7 +1426,7 @@ public partial class StatementCompiler
                 }
                 case UnaryOperatorCall.UnaryPlus:
                 {
-                    if (!GenerateCodeForStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
+                    if (!CompileStatement(@operator.Left, out CompiledStatementWithValue? left)) return false;
 
                     compiledStatement = new CompiledUnaryOperatorCall()
                     {
@@ -1465,8 +1465,8 @@ public partial class StatementCompiler
             return false;
         }
     }
-    bool GenerateCodeForStatement(Assignment setter, [NotNullWhen(true)] out CompiledStatement? compiledStatement) => GenerateCodeForValueSetter(setter.Left, setter.Right, out compiledStatement);
-    bool GenerateCodeForStatement(LiteralStatement literal, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null)
+    bool CompileStatement(Assignment setter, [NotNullWhen(true)] out CompiledStatement? compiledStatement) => CompileSetter(setter.Left, setter.Right, out compiledStatement);
+    bool CompileStatement(LiteralStatement literal, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null)
     {
         switch (literal.Type)
         {
@@ -1610,7 +1610,7 @@ public partial class StatementCompiler
                     OnGotStatementType(literal, expectedType);
 
                     compiledStatement = null;
-                    if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.U8.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
+                    if (!CompileAllocation(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.U8.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
 
                     compiledStatement = new CompiledStringInstance()
                     {
@@ -1631,7 +1631,7 @@ public partial class StatementCompiler
                     OnGotStatementType(literal, expectedType);
 
                     compiledStatement = null;
-                    if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.Char.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
+                    if (!CompileAllocation(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.Char.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
 
                     compiledStatement = new CompiledStringInstance()
                     {
@@ -1683,7 +1683,7 @@ public partial class StatementCompiler
                     BuiltinType type = BuiltinType.Char;
 
                     compiledStatement = null;
-                    if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * type.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
+                    if (!CompileAllocation(LiteralStatement.CreateAnonymous((1 + literal.Value.Length) * type.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledStatementWithValue? allocator)) return false;
 
                     if (!GetLiteralType(literal.Type, out GeneralType? stringType))
                     {
@@ -1840,13 +1840,13 @@ public partial class StatementCompiler
         compiledStatement = null;
         return false;
     }
-    bool GenerateCodeForLiteralString(string literal, Location location, bool withBytes, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStringLiteral(string literal, Location location, bool withBytes, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
 
         BuiltinType type = withBytes ? BuiltinType.U8 : BuiltinType.Char;
 
-        if (!GenerateAllocator(LiteralStatement.CreateAnonymous((1 + literal.Length) * type.GetSize(this), location.Position, location.File), out CompiledStatementWithValue? allocator)) return false;
+        if (!CompileAllocation(LiteralStatement.CreateAnonymous((1 + literal.Length) * type.GetSize(this), location.Position, location.File), out CompiledStatementWithValue? allocator)) return false;
 
         compiledStatement = new CompiledStringInstance()
         {
@@ -1865,7 +1865,7 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(Identifier variable, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null, bool resolveReference = true)
+    bool CompileStatement(Identifier variable, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null, bool resolveReference = true)
     {
         compiledStatement = null;
 
@@ -2019,11 +2019,11 @@ public partial class StatementCompiler
             functionNotFoundError.ToError(variable)));
         return false;
     }
-    bool GenerateCodeForStatement(AddressGetter addressGetter, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(AddressGetter addressGetter, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
 
-        if (!GenerateCodeForStatement(addressGetter.PrevStatement, out CompiledStatementWithValue? of)) return false;
+        if (!CompileStatement(addressGetter.PrevStatement, out CompiledStatementWithValue? of)) return false;
 
         compiledStatement = new CompiledAddressGetter()
         {
@@ -2034,11 +2034,11 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(Pointer pointer, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(Pointer pointer, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
 
-        if (!GenerateCodeForStatement(pointer.PrevStatement, out CompiledStatementWithValue? to)) return false;
+        if (!CompileStatement(pointer.PrevStatement, out CompiledStatementWithValue? to)) return false;
 
         GeneralType addressType = to.Type;
         if (!addressType.Is(out PointerType? pointerType))
@@ -2056,7 +2056,7 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(WhileLoop whileLoop, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileStatement(WhileLoop whileLoop, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
@@ -2072,7 +2072,7 @@ public partial class StatementCompiler
 
                 OnScopeEnter(block, false);
 
-                GenerateCodeForStatement(block, true);
+                CompileStatement(block, true);
 
                 OnScopeExit(whileLoop.Block.Position.After(), whileLoop.Block.File);
             }
@@ -2086,9 +2086,9 @@ public partial class StatementCompiler
 
         Scope scope = Scopes.Push(CompileScope(block.Statements));
 
-        if (!GenerateCodeForStatement(whileLoop.Condition, out CompiledStatementWithValue? condition)) return false;
+        if (!CompileStatement(whileLoop.Condition, out CompiledStatementWithValue? condition)) return false;
 
-        if (!GenerateCodeForStatement(block, out CompiledStatement? body, true)) return false;
+        if (!CompileStatement(block, out CompiledStatement? body, true)) return false;
 
         if (Scopes.Pop() != scope) throw new InternalExceptionWithoutContext();
 
@@ -2100,13 +2100,13 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(ForLoop forLoop, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileStatement(ForLoop forLoop, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
         Scope scope = Scopes.Push(CompileScope(Enumerable.Repeat(forLoop.VariableDeclaration, 1)));
 
-        if (!GenerateCodeForStatement(forLoop.VariableDeclaration, out CompiledStatement? variableDeclaration)) return false;
+        if (!CompileStatement(forLoop.VariableDeclaration, out CompiledStatement? variableDeclaration)) return false;
 
         /*
         if (AllowEvaluating &&
@@ -2116,10 +2116,10 @@ public partial class StatementCompiler
             {
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop condition evaluated as true", forLoop.Condition));
 
-                GenerateCodeForStatement(forLoop.Block);
+                CompileStatement(forLoop.Block);
 
                 AddComment("For-loop expression");
-                GenerateCodeForStatement(forLoop.Expression);
+                CompileStatement(forLoop.Expression);
 
                 AddComment("Jump back");
                 AddInstruction(Opcode.Jump, beginOffset - GeneratedCode.Count);
@@ -2142,10 +2142,10 @@ public partial class StatementCompiler
         }
         */
 
-        if (!GenerateCodeForStatement(forLoop.Condition, out CompiledStatementWithValue? condition)) return false;
+        if (!CompileStatement(forLoop.Condition, out CompiledStatementWithValue? condition)) return false;
 
-        if (!GenerateCodeForStatement(forLoop.Block, out CompiledStatement? body)) return false;
-        if (!GenerateCodeForStatement(forLoop.Expression, out CompiledStatement? expression)) return false;
+        if (!CompileStatement(forLoop.Block, out CompiledStatement? body)) return false;
+        if (!CompileStatement(forLoop.Expression, out CompiledStatement? expression)) return false;
 
         if (Scopes.Pop() != scope) throw new InternalExceptionWithoutContext("Bruh");
 
@@ -2159,26 +2159,26 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(IfContainer @if, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileStatement(IfContainer @if, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         LinkedIf links = @if.ToLinks();
-        return GenerateCodeForStatement(links, out compiledStatement);
+        return CompileStatement(links, out compiledStatement);
     }
-    bool GenerateCodeForStatement(LinkedIf @if, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileStatement(LinkedIf @if, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
-        if (!GenerateCodeForStatement(@if.Condition, out CompiledStatementWithValue? condition)) return false;
+        if (!CompileStatement(@if.Condition, out CompiledStatementWithValue? condition)) return false;
 
         if (condition is CompiledEvaluatedValue evaluatedCondition)
         {
             if (evaluatedCondition.Value)
             {
-                return GenerateCodeForStatement(@if.Block, out compiledStatement);
+                return CompileStatement(@if.Block, out compiledStatement);
             }
             else if (@if.NextLink is not null)
             {
-                if (!GenerateCodeForStatement(@if.NextLink, out compiledStatement)) return false;
+                if (!CompileStatement(@if.NextLink, out compiledStatement)) return false;
                 if (compiledStatement is CompiledElse nextElse)
                 {
                     compiledStatement = nextElse.Body;
@@ -2197,8 +2197,8 @@ public partial class StatementCompiler
 
         CompiledStatement? next = null;
 
-        if (@if.NextLink is not null && !GenerateCodeForStatement(@if.NextLink, out next)) return false;
-        if (!GenerateCodeForStatement(@if.Block, out CompiledStatement? body)) return false;
+        if (@if.NextLink is not null && !CompileStatement(@if.NextLink, out next)) return false;
+        if (!CompileStatement(@if.Block, out CompiledStatement? body)) return false;
 
         compiledStatement = new CompiledIf()
         {
@@ -2209,11 +2209,11 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(LinkedElse @if, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileStatement(LinkedElse @if, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
-        if (!GenerateCodeForStatement(@if.Block, out CompiledStatement? body)) return false;
+        if (!CompileStatement(@if.Block, out CompiledStatement? body)) return false;
 
         compiledStatement = new CompiledElse()
         {
@@ -2222,7 +2222,7 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(NewInstance newInstance, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(NewInstance newInstance, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
         GeneralType instanceType = CompileType(newInstance.Type);
@@ -2234,7 +2234,7 @@ public partial class StatementCompiler
         {
             case PointerType pointerType:
             {
-                if (!GenerateAllocator(new AnyCall(
+                if (!CompileAllocation(new AnyCall(
                     new Identifier(Token.CreateAnonymous("sizeof"), newInstance.File),
                     new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To, newInstance.File) },
                     Array.Empty<Token>(),
@@ -2283,7 +2283,7 @@ public partial class StatementCompiler
             }
         }
     }
-    bool GenerateCodeForStatement(ConstructorCall constructorCall, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(ConstructorCall constructorCall, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
         GeneralType instanceType = CompileType(constructorCall.Type);
@@ -2306,8 +2306,8 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (!GenerateCodeForStatement(constructorCall.ToInstantiation(), out CompiledStatementWithValue? _object)) return false;
-        if (!GenerateCodeForArguments(constructorCall.Arguments, compiledFunction, out ImmutableArray<CompiledPassedArgument> compiledArguments, 1)) return false;
+        if (!CompileStatement(constructorCall.ToInstantiation(), out CompiledStatementWithValue? _object)) return false;
+        if (!CompileArguments(constructorCall.Arguments, compiledFunction, out ImmutableArray<CompiledPassedArgument> compiledArguments, 1)) return false;
 
         compiledStatement = new CompiledConstructorCall()
         {
@@ -2320,12 +2320,12 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(Field field, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(Field field, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
         field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
 
-        if (!GenerateCodeForStatement(field.PrevStatement, out CompiledStatementWithValue? prev)) return false;
+        if (!CompileStatement(field.PrevStatement, out CompiledStatementWithValue? prev)) return false;
 
         if (prev.Type.Is(out ArrayType? arrayType) && field.Identifier.Content == "Length")
         {
@@ -2408,17 +2408,17 @@ public partial class StatementCompiler
             return true;
         }
     }
-    bool GenerateCodeForStatement(IndexCall index, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(IndexCall index, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
 
-        if (!GenerateCodeForStatement(index.PrevStatement, out CompiledStatementWithValue? baseStatement)) return false;
-        if (!GenerateCodeForStatement(index.Index, out CompiledStatementWithValue? indexStatement)) return false;
+        if (!CompileStatement(index.PrevStatement, out CompiledStatementWithValue? baseStatement)) return false;
+        if (!CompileStatement(index.Index, out CompiledStatementWithValue? indexStatement)) return false;
 
         if (GetIndexGetter(baseStatement.Type, indexStatement.Type, index.File, out FunctionQueryResult<CompiledFunctionDefinition>? indexer, out PossibleDiagnostic? notFoundError, AddCompilable))
         {
             indexer.Function.References.Add(new(index, index.File));
-            return GenerateCodeForFunctionCall(index, ImmutableArray.Create(index.PrevStatement, index.Index), indexer, out compiledStatement);
+            return CompileFunctionCall(index, ImmutableArray.Create(index.PrevStatement, index.Index), indexer, out compiledStatement);
         }
 
         if (baseStatement.Type.Is(out ArrayType? arrayType))
@@ -2458,46 +2458,7 @@ public partial class StatementCompiler
         Diagnostics.Add(Diagnostic.Critical($"Index getter for type \"{baseStatement.Type}\" not found", index));
         return false;
     }
-    bool GenerateAddressResolver(Address address)
-    {
-        switch (address)
-        {
-            case AddressPointer:
-            {
-                return true;
-            }
-            case AddressRegisterPointer:
-            {
-                return true;
-            }
-            case AddressOffset addressOffset:
-            {
-                if (!GenerateAddressResolver(addressOffset.Base)) return false;
-
-                return true;
-            }
-            case AddressRuntimePointer:
-            {
-                return true;
-            }
-            case AddressRuntimeIndex runtimeIndex:
-            {
-                GenerateAddressResolver(runtimeIndex.Base);
-
-                GeneralType indexType = runtimeIndex.IndexValue.Type;
-
-                if (!indexType.Is<BuiltinType>())
-                {
-                    Diagnostics.Add(Diagnostic.Critical($"Index type must be builtin (ie. \"int\") and not \"{indexType}\"", runtimeIndex.IndexValue));
-                    return false;
-                }
-
-                return true;
-            }
-            default: throw new NotImplementedException();
-        }
-    }
-    bool GenerateCodeForStatement(ModifiedStatement modifiedStatement, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(ModifiedStatement modifiedStatement, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         StatementWithValue statement = modifiedStatement.Statement;
         Token modifier = modifiedStatement.Modifier;
@@ -2509,12 +2470,12 @@ public partial class StatementCompiler
 
         if (modifier.Content == ModifierKeywords.Temp)
         {
-            return GenerateCodeForStatement(statement, out compiledStatement);
+            return CompileStatement(statement, out compiledStatement);
         }
 
         throw new NotImplementedException();
     }
-    bool GenerateCodeForStatement(LiteralList listValue, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null)
+    bool CompileStatement(LiteralList listValue, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null)
     {
         compiledStatement = null;
         GeneralType? itemType = (expectedType as ArrayType)?.Of;
@@ -2522,7 +2483,7 @@ public partial class StatementCompiler
         ImmutableArray<CompiledStatementWithValue>.Builder result = ImmutableArray.CreateBuilder<CompiledStatementWithValue>(listValue.Values.Length);
         for (int i = 0; i < listValue.Values.Length; i++)
         {
-            if (!GenerateCodeForStatement(listValue.Values[i], out CompiledStatementWithValue? item, itemType)) return false;
+            if (!CompileStatement(listValue.Values[i], out CompiledStatementWithValue? item, itemType)) return false;
 
             if (itemType is null)
             {
@@ -2559,13 +2520,13 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(BasicTypeCast typeCast, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(BasicTypeCast typeCast, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
 
         GeneralType targetType = CompileType(typeCast.Type);
 
-        if (!GenerateCodeForStatement(typeCast.PrevStatement, out CompiledStatementWithValue? prev)) return false;
+        if (!CompileStatement(typeCast.PrevStatement, out CompiledStatementWithValue? prev)) return false;
 
         GeneralType statementType = prev.Type;
 
@@ -2588,14 +2549,14 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(ManagedTypeCast typeCast, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
+    bool CompileStatement(ManagedTypeCast typeCast, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
         GeneralType targetType = CompileType(typeCast.Type);
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
 
-        if (!GenerateCodeForStatement(typeCast.PrevStatement, out CompiledStatementWithValue? prev, targetType)) return false;
+        if (!CompileStatement(typeCast.PrevStatement, out CompiledStatementWithValue? prev, targetType)) return false;
 
         if (prev.Type.Equals(targetType))
         {
@@ -2657,7 +2618,7 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(Block block, [NotNullWhen(true)] out CompiledStatement? compiledStatement, bool ignoreScope = false)
+    bool CompileStatement(Block block, [NotNullWhen(true)] out CompiledStatement? compiledStatement, bool ignoreScope = false)
     {
         compiledStatement = null;
 
@@ -2667,7 +2628,7 @@ public partial class StatementCompiler
         {
             for (int i = 0; i < block.Statements.Length; i++)
             {
-                if (!GenerateCodeForStatement(block.Statements[i], out CompiledStatement? item)) return false;
+                if (!CompileStatement(block.Statements[i], out CompiledStatement? item)) return false;
                 if (item is EmptyStatement) continue;
                 ImmutableArray<CompiledStatement> reduced = ReduceStatements(item, true);
                 res.AddRange(reduced);
@@ -2685,7 +2646,7 @@ public partial class StatementCompiler
 
         for (int i = 0; i < block.Statements.Length; i++)
         {
-            if (!GenerateCodeForStatement(block.Statements[i], out CompiledStatement? item)) return false;
+            if (!CompileStatement(block.Statements[i], out CompiledStatement? item)) return false;
             res.Add(item);
         }
 
@@ -2698,12 +2659,12 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForStatement(Statement statement, [NotNullWhen(true)] out CompiledStatement? compiledStatement, GeneralType? expectedType = null, bool resolveReference = true)
+    bool CompileStatement(Statement statement, [NotNullWhen(true)] out CompiledStatement? compiledStatement, GeneralType? expectedType = null, bool resolveReference = true)
     {
         switch (statement)
         {
             case StatementWithValue v:
-                if (GenerateCodeForStatement(v, out CompiledStatementWithValue? compiledStatementWithValue))
+                if (CompileStatement(v, out CompiledStatementWithValue? compiledStatementWithValue))
                 {
                     compiledStatement = compiledStatementWithValue;
                     return true;
@@ -2713,61 +2674,61 @@ public partial class StatementCompiler
                     compiledStatement = compiledStatementWithValue;
                     return false;
                 }
-            case VariableDeclaration v: return GenerateCodeForStatement(v, out compiledStatement);
-            case KeywordCall v: return GenerateCodeForStatement(v, out compiledStatement);
-            case AnyAssignment v: return GenerateCodeForStatement(v.ToAssignment(), out compiledStatement);
-            case WhileLoop v: return GenerateCodeForStatement(v, out compiledStatement);
-            case ForLoop v: return GenerateCodeForStatement(v, out compiledStatement);
-            case IfContainer v: return GenerateCodeForStatement(v, out compiledStatement);
-            case LinkedIf v: return GenerateCodeForStatement(v, out compiledStatement);
-            case LinkedElse v: return GenerateCodeForStatement(v, out compiledStatement);
-            case Block v: return GenerateCodeForStatement(v, out compiledStatement);
-            case InstructionLabel v: return GenerateCodeForStatement(v, out compiledStatement);
+            case VariableDeclaration v: return CompileStatement(v, out compiledStatement);
+            case KeywordCall v: return CompileStatement(v, out compiledStatement);
+            case AnyAssignment v: return CompileStatement(v.ToAssignment(), out compiledStatement);
+            case WhileLoop v: return CompileStatement(v, out compiledStatement);
+            case ForLoop v: return CompileStatement(v, out compiledStatement);
+            case IfContainer v: return CompileStatement(v, out compiledStatement);
+            case LinkedIf v: return CompileStatement(v, out compiledStatement);
+            case LinkedElse v: return CompileStatement(v, out compiledStatement);
+            case Block v: return CompileStatement(v, out compiledStatement);
+            case InstructionLabel v: return CompileStatement(v, out compiledStatement);
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
     }
-    bool GenerateCodeForStatement(StatementWithValue statement, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null, bool resolveReference = true) => statement switch
+    bool CompileStatement(StatementWithValue statement, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement, GeneralType? expectedType = null, bool resolveReference = true) => statement switch
     {
-        LiteralList v => GenerateCodeForStatement(v, out compiledStatement, expectedType),
-        BinaryOperatorCall v => GenerateCodeForStatement(v, out compiledStatement, expectedType),
-        UnaryOperatorCall v => GenerateCodeForStatement(v, out compiledStatement),
-        LiteralStatement v => GenerateCodeForStatement(v, out compiledStatement, expectedType),
-        Identifier v => GenerateCodeForStatement(v, out compiledStatement, expectedType, resolveReference),
-        AddressGetter v => GenerateCodeForStatement(v, out compiledStatement),
-        Pointer v => GenerateCodeForStatement(v, out compiledStatement),
-        NewInstance v => GenerateCodeForStatement(v, out compiledStatement),
-        ConstructorCall v => GenerateCodeForStatement(v, out compiledStatement),
-        IndexCall v => GenerateCodeForStatement(v, out compiledStatement),
-        Field v => GenerateCodeForStatement(v, out compiledStatement),
-        BasicTypeCast v => GenerateCodeForStatement(v, out compiledStatement),
-        ManagedTypeCast v => GenerateCodeForStatement(v, out compiledStatement),
-        ModifiedStatement v => GenerateCodeForStatement(v, out compiledStatement),
-        AnyCall v => GenerateCodeForStatement(v, out compiledStatement, expectedType),
+        LiteralList v => CompileStatement(v, out compiledStatement, expectedType),
+        BinaryOperatorCall v => CompileStatement(v, out compiledStatement, expectedType),
+        UnaryOperatorCall v => CompileStatement(v, out compiledStatement),
+        LiteralStatement v => CompileStatement(v, out compiledStatement, expectedType),
+        Identifier v => CompileStatement(v, out compiledStatement, expectedType, resolveReference),
+        AddressGetter v => CompileStatement(v, out compiledStatement),
+        Pointer v => CompileStatement(v, out compiledStatement),
+        NewInstance v => CompileStatement(v, out compiledStatement),
+        ConstructorCall v => CompileStatement(v, out compiledStatement),
+        IndexCall v => CompileStatement(v, out compiledStatement),
+        Field v => CompileStatement(v, out compiledStatement),
+        BasicTypeCast v => CompileStatement(v, out compiledStatement),
+        ManagedTypeCast v => CompileStatement(v, out compiledStatement),
+        ModifiedStatement v => CompileStatement(v, out compiledStatement),
+        AnyCall v => CompileStatement(v, out compiledStatement, expectedType),
         _ => throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\""),
     };
 
-    bool GenerateCodeForValueSetter(Statement statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileSetter(Statement statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
         switch (statementToSet)
         {
-            case Identifier v: return GenerateCodeForValueSetter(v, value, out compiledStatement);
-            case Field v: return GenerateCodeForValueSetter(v, value, out compiledStatement);
-            case IndexCall v: return GenerateCodeForValueSetter(v, value, out compiledStatement);
-            case Pointer v: return GenerateCodeForValueSetter(v, value, out compiledStatement);
+            case Identifier v: return CompileSetter(v, value, out compiledStatement);
+            case Field v: return CompileSetter(v, value, out compiledStatement);
+            case IndexCall v: return CompileSetter(v, value, out compiledStatement);
+            case Pointer v: return CompileSetter(v, value, out compiledStatement);
             default:
                 Diagnostics.Add(Diagnostic.Critical($"The left side of the assignment operator should be a variable, field or memory address. Passed \"{statementToSet.GetType().Name}\"", statementToSet));
                 return false;
         }
     }
-    bool GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileSetter(Identifier statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
         if (RegisterKeywords.TryGetValue(statementToSet.Content, out (Register Register, BuiltinType Type) registerKeyword))
         {
-            if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, registerKeyword.Type)) return false;
+            if (!CompileStatement(value, out CompiledStatementWithValue? _value, registerKeyword.Type)) return false;
 
             GeneralType valueType = _value.Type;
 
@@ -2801,7 +2762,7 @@ public partial class StatementCompiler
             statementToSet.CompiledType = parameter.Type;
             statementToSet.Reference = parameter;
 
-            if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, parameter.Type)) return false;
+            if (!CompileStatement(value, out CompiledStatementWithValue? _value, parameter.Type)) return false;
 
             GeneralType valueType = _value.Type;
 
@@ -2829,7 +2790,7 @@ public partial class StatementCompiler
             statementToSet.CompiledType = variable.Type;
             statementToSet.Reference = variable;
 
-            if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, variable.Type)) return false;
+            if (!CompileStatement(value, out CompiledStatementWithValue? _value, variable.Type)) return false;
 
             if (variable.IsGlobal)
             { Diagnostics.Add(Diagnostic.Internal($"Trying to set local variable \"{variable.Identifier}\" but it was compiled as a global variable.", statementToSet)); }
@@ -2853,7 +2814,7 @@ public partial class StatementCompiler
             statementToSet.CompiledType = globalVariable.Type;
             statementToSet.Reference = globalVariable;
 
-            if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, globalVariable.Type)) return false;
+            if (!CompileStatement(value, out CompiledStatementWithValue? _value, globalVariable.Type)) return false;
 
             if (!globalVariable.IsGlobal)
             { Diagnostics.Add(Diagnostic.Internal($"Trying to set global variable \"{globalVariable.Identifier}\" but it was compiled as a local variable.", statementToSet)); }
@@ -2879,13 +2840,13 @@ public partial class StatementCompiler
             globalVariableNotFoundError.ToError(statementToSet)));
         return false;
     }
-    bool GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileSetter(Field statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
         statementToSet.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
 
-        if (!GenerateCodeForStatement(statementToSet.PrevStatement, out CompiledStatementWithValue? prev)) return false;
+        if (!CompileStatement(statementToSet.PrevStatement, out CompiledStatementWithValue? prev)) return false;
         GeneralType prevType = prev.Type;
 
         if (prevType.Is<ArrayType>() && statementToSet.Identifier.Content == "Length")
@@ -2916,7 +2877,7 @@ public partial class StatementCompiler
             }
 
             GeneralType type = GeneralType.InsertTypeParameters(compiledField.Type, structPointerType.TypeArguments) ?? compiledField.Type;
-            if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, type)) return false;
+            if (!CompileStatement(value, out CompiledStatementWithValue? _value, type)) return false;
 
             if (!CanCastImplicitly(_value.Type, type, value, out PossibleDiagnostic? castError2))
             {
@@ -2948,7 +2909,7 @@ public partial class StatementCompiler
             }
 
             GeneralType type = GeneralType.InsertTypeParameters(compiledField.Type, structType.TypeArguments) ?? compiledField.Type;
-            if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, type)) return false;
+            if (!CompileStatement(value, out CompiledStatementWithValue? _value, type)) return false;
 
             if (!CanCastImplicitly(_value.Type, type, value, out PossibleDiagnostic? castError2))
             {
@@ -2973,12 +2934,12 @@ public partial class StatementCompiler
 
         throw new NotImplementedException();
     }
-    bool GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileSetter(IndexCall statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
-        if (!GenerateCodeForStatement(statementToSet.PrevStatement, out CompiledStatementWithValue? _base)) return false;
-        if (!GenerateCodeForStatement(statementToSet.Index, out CompiledStatementWithValue? _index)) return false;
+        if (!CompileStatement(statementToSet.PrevStatement, out CompiledStatementWithValue? _base)) return false;
+        if (!CompileStatement(statementToSet.Index, out CompiledStatementWithValue? _index)) return false;
 
         GeneralType itemType;
 
@@ -2998,12 +2959,12 @@ public partial class StatementCompiler
 
     OK:
 
-        if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, itemType)) return false;
+        if (!CompileStatement(value, out CompiledStatementWithValue? _value, itemType)) return false;
 
         if (GetIndexSetter(_base.Type, _value.Type, _index.Type, statementToSet.File, out FunctionQueryResult<CompiledFunctionDefinition>? indexer, out PossibleDiagnostic? indexerNotFoundError, AddCompilable))
         {
             indexer.Function.References.Add(new(statementToSet, statementToSet.File));
-            if (GenerateCodeForFunctionCall(statementToSet, ImmutableArray.Create<StatementWithValue>(statementToSet.PrevStatement, statementToSet.Index, value), indexer, out CompiledStatementWithValue? compiledStatement2))
+            if (CompileFunctionCall(statementToSet, ImmutableArray.Create<StatementWithValue>(statementToSet.PrevStatement, statementToSet.Index, value), indexer, out CompiledStatementWithValue? compiledStatement2))
             {
                 compiledStatement = compiledStatement2;
                 return true;
@@ -3029,11 +2990,11 @@ public partial class StatementCompiler
         };
         return true;
     }
-    bool GenerateCodeForValueSetter(Pointer statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
+    bool CompileSetter(Pointer statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
 
-        if (!GenerateCodeForStatement(statementToSet.PrevStatement, out CompiledStatementWithValue? prev)) return false;
+        if (!CompileStatement(statementToSet.PrevStatement, out CompiledStatementWithValue? prev)) return false;
 
         GeneralType targetType;
         if (prev.Type.Is(out PointerType? pointerType))
@@ -3041,7 +3002,7 @@ public partial class StatementCompiler
         else
         { targetType = OnGotStatementType(statementToSet, BuiltinType.Any); }
 
-        if (!GenerateCodeForStatement(value, out CompiledStatementWithValue? _value, targetType)) return false;
+        if (!CompileStatement(value, out CompiledStatementWithValue? _value, targetType)) return false;
 
         if (!CanCastImplicitly(_value.Type, targetType, value, out PossibleDiagnostic? castError))
         {
@@ -3115,7 +3076,7 @@ public partial class StatementCompiler
 
         if (type.StackArraySize is not null)
         {
-            GenerateCodeForStatement(type.StackArraySize, out CompiledStatementWithValue? stackArraySizeStatement);
+            CompileStatement(type.StackArraySize, out CompiledStatementWithValue? stackArraySizeStatement);
             ArrayType result = new(of, stackArraySizeStatement);
             type.SetAnalyzedType(result);
             return result;
@@ -3236,7 +3197,7 @@ public partial class StatementCompiler
 
     HashSet<FunctionThingDefinition> _generatedFunctions = new();
 
-    bool GenerateCodeForFunction(FunctionThingDefinition function, Dictionary<string, GeneralType>? typeArguments)
+    bool CompileFunction(FunctionThingDefinition function, Dictionary<string, GeneralType>? typeArguments)
     {
         if (!_generatedFunctions.Add(function)) return false;
 
@@ -3286,7 +3247,7 @@ public partial class StatementCompiler
         {
             CompileParameters(function.Parameters);
 
-            if (!GenerateCodeForStatement(function.Block, out CompiledStatement? body)) return false;
+            if (!CompileStatement(function.Block, out CompiledStatement? body)) return false;
 
             GeneratedFunctions.Add(new((ICompiledFunctionDefinition)function, (CompiledBlock)body));
 
@@ -3310,10 +3271,10 @@ public partial class StatementCompiler
     end:
         return false;
     }
-    bool GenerateCodeForFunctions<TFunction>(IEnumerable<TFunction> functions)
+    bool CompileFunctions<TFunction>(IEnumerable<TFunction> functions)
         where TFunction : FunctionThingDefinition, IHaveInstructionOffset, IReferenceable
     {
-        bool generatedAnything = false;
+        bool compiledAnything = false;
         foreach (TFunction function in functions)
         {
             if (function.IsTemplate) continue;
@@ -3329,15 +3290,15 @@ public partial class StatementCompiler
                 }
             }
 
-            if (GenerateCodeForFunction(function, null))
-            { generatedAnything = true; }
+            if (CompileFunction(function, null))
+            { compiledAnything = true; }
         }
-        return generatedAnything;
+        return compiledAnything;
     }
-    bool GenerateCodeForCompilableFunctions<T>(IReadOnlyList<CompliableTemplate<T>> functions)
+    bool CompileFunctionTemplates<T>(IReadOnlyList<CompliableTemplate<T>> functions)
         where T : FunctionThingDefinition, ITemplateable<T>, IHaveInstructionOffset
     {
-        bool generatedAnything = false;
+        bool compiledAnything = false;
         int i = 0;
         while (i < functions.Count)
         {
@@ -3346,10 +3307,10 @@ public partial class StatementCompiler
 
             if (function.Function.InstructionOffset >= 0) continue;
 
-            if (GenerateCodeForFunction(function.Function, function.TypeArguments))
-            { generatedAnything = true; }
+            if (CompileFunction(function.Function, function.TypeArguments))
+            { compiledAnything = true; }
         }
-        return generatedAnything;
+        return compiledAnything;
     }
 
     void CompileParameters(ImmutableArray<ParameterDefinition> parameters)
@@ -3363,7 +3324,7 @@ public partial class StatementCompiler
         }
     }
 
-    bool GenerateCodeForTopLevelStatements(ImmutableArray<Statement> statements, [NotNullWhen(true)] out ImmutableArray<CompiledStatement> compiledStatements)
+    bool CompileTopLevelStatements(ImmutableArray<Statement> statements, [NotNullWhen(true)] out ImmutableArray<CompiledStatement> compiledStatements)
     {
         CurrentReturnType = ExitCodeType;
 
@@ -3371,7 +3332,7 @@ public partial class StatementCompiler
 
         foreach (Statement statement in statements)
         {
-            if (!GenerateCodeForStatement(statement, out CompiledStatement? compiledStatement))
+            if (!CompileStatement(statement, out CompiledStatement? compiledStatement))
             {
                 CurrentReturnType = null;
                 compiledStatements = ImmutableArray<CompiledStatement>.Empty;
@@ -3413,25 +3374,25 @@ public partial class StatementCompiler
 
         foreach ((ImmutableArray<Statement> Statements, Uri File) item in TopLevelStatements)
         {
-            if (!GenerateCodeForTopLevelStatements(item.Statements, out ImmutableArray<CompiledStatement> v)) continue;
+            if (!CompileTopLevelStatements(item.Statements, out ImmutableArray<CompiledStatement> v)) continue;
             CompiledTopLevelStatements.AddRange(v);
         }
 
         while (true)
         {
-            bool generatedAnything = false;
+            bool compiledAnything = false;
 
-            generatedAnything = GenerateCodeForFunctions(CompiledFunctions) || generatedAnything;
-            generatedAnything = GenerateCodeForFunctions(CompiledOperators) || generatedAnything;
-            generatedAnything = GenerateCodeForFunctions(CompiledGeneralFunctions) || generatedAnything;
-            generatedAnything = GenerateCodeForFunctions(CompiledConstructors) || generatedAnything;
+            compiledAnything = CompileFunctions(CompiledFunctions) || compiledAnything;
+            compiledAnything = CompileFunctions(CompiledOperators) || compiledAnything;
+            compiledAnything = CompileFunctions(CompiledGeneralFunctions) || compiledAnything;
+            compiledAnything = CompileFunctions(CompiledConstructors) || compiledAnything;
 
-            generatedAnything = GenerateCodeForCompilableFunctions(CompilableFunctions) || generatedAnything;
-            generatedAnything = GenerateCodeForCompilableFunctions(CompilableConstructors) || generatedAnything;
-            generatedAnything = GenerateCodeForCompilableFunctions(CompilableOperators) || generatedAnything;
-            generatedAnything = GenerateCodeForCompilableFunctions(CompilableGeneralFunctions) || generatedAnything;
+            compiledAnything = CompileFunctionTemplates(CompilableFunctions) || compiledAnything;
+            compiledAnything = CompileFunctionTemplates(CompilableConstructors) || compiledAnything;
+            compiledAnything = CompileFunctionTemplates(CompilableOperators) || compiledAnything;
+            compiledAnything = CompileFunctionTemplates(CompilableGeneralFunctions) || compiledAnything;
 
-            if (!generatedAnything) break;
+            if (!compiledAnything) break;
         }
 
         /*

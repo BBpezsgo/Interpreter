@@ -693,7 +693,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
         else
         {
-            GenerateCodeForStatement(variableDeclaration.InitialValue, out CompiledStatementWithValue? compiledInitialValue, constantType);
+            CompileStatement(variableDeclaration.InitialValue, out CompiledStatementWithValue? compiledInitialValue, constantType);
             if (!TryCompute(compiledInitialValue, out constantValue))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue));

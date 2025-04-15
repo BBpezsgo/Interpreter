@@ -880,10 +880,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
                     successful = false;
                     return;
                 }
-                il.Emit(OpCodes.Ldloca, local);
+                il.Emit(OpCodes.Ldloca_S, local);
                 break;
             case CompiledParameterGetter v:
-                il.Emit(OpCodes.Ldarga, v.Variable.Index);
+                il.Emit(OpCodes.Ldarga_S, v.Variable.Index);
                 break;
             case CompiledFieldGetter v:
                 CompiledStatementWithValue _object = v.Object;
@@ -1234,7 +1234,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             EmitStatement(stackAllocation, il, ref successful, destination);
 
-            il.Emit(OpCodes.Ldloc, destination.LocalIndex);
+            il.Emit(OpCodes.Ldloca_S, destination.LocalIndex);
             for (int i = 0; i < statement.Arguments.Length; i++)
             {
                 EmitStatement(statement.Arguments[i].Value, il, ref successful);

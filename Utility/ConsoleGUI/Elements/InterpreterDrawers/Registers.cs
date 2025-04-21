@@ -95,67 +95,67 @@ public partial class InterpreterElement
         b.AddText("CP:");
         if (loadIndicators.Contains(Register.CodePointer))
         {
-            b.ForegroundColor = CharColor.Red;
+            b.ForegroundColor = CLI.AnsiColor.Red;
             b.AddChar('○');
         }
         else if (storeIndicators.Contains(Register.CodePointer))
         {
-            b.ForegroundColor = CharColor.Red;
+            b.ForegroundColor = CLI.AnsiColor.Red;
             b.AddChar('●');
         }
         else
         {
             b.AddChar(' ');
         }
-        b.ForegroundColor = CharColor.BrightCyan;
+        b.ForegroundColor = CLI.AnsiColor.BrightCyan;
         b.AddText(Interpreter.Registers.CodePointer.ToString());
-        b.BackgroundColor = CharColor.Black;
+        b.BackgroundColor = CLI.AnsiColor.Black;
         b.FinishLine();
-        b.ForegroundColor = CharColor.Silver;
+        b.ForegroundColor = CLI.AnsiColor.Silver;
 
         b.AddText(' ', 2);
         b.AddText("SP:");
         if (loadIndicators.Contains(Register.StackPointer))
         {
-            b.ForegroundColor = CharColor.Red;
+            b.ForegroundColor = CLI.AnsiColor.Red;
             b.AddChar('○');
         }
         else if (storeIndicators.Contains(Register.StackPointer))
         {
-            b.ForegroundColor = CharColor.Red;
+            b.ForegroundColor = CLI.AnsiColor.Red;
             b.AddChar('●');
         }
         else
         {
             b.AddChar(' ');
         }
-        b.ForegroundColor = CharColor.BrightCyan;
+        b.ForegroundColor = CLI.AnsiColor.BrightCyan;
         b.AddText(Interpreter.Registers.StackPointer.ToString());
-        b.BackgroundColor = CharColor.Black;
+        b.BackgroundColor = CLI.AnsiColor.Black;
         b.FinishLine();
-        b.ForegroundColor = CharColor.Silver;
+        b.ForegroundColor = CLI.AnsiColor.Silver;
 
         b.AddText(' ', 2);
         b.AddText("BP:");
         if (loadIndicators.Contains(Register.BasePointer))
         {
-            b.ForegroundColor = CharColor.Red;
+            b.ForegroundColor = CLI.AnsiColor.Red;
             b.AddChar('○');
         }
         else if (storeIndicators.Contains(Register.BasePointer))
         {
-            b.ForegroundColor = CharColor.Red;
+            b.ForegroundColor = CLI.AnsiColor.Red;
             b.AddChar('●');
         }
         else
         {
             b.AddChar(' ');
         }
-        b.ForegroundColor = CharColor.BrightCyan;
+        b.ForegroundColor = CLI.AnsiColor.BrightCyan;
         b.AddText(Interpreter.Registers.BasePointer.ToString());
-        b.BackgroundColor = CharColor.Black;
+        b.BackgroundColor = CLI.AnsiColor.Black;
         b.FinishLine();
-        b.ForegroundColor = CharColor.Silver;
+        b.ForegroundColor = CLI.AnsiColor.Silver;
 
         //  A:  4294967295       
 
@@ -232,7 +232,7 @@ public partial class InterpreterElement
                 loadIndicators.Contains(regH) ||
                 loadIndicators.Contains(regL))
             {
-                b.ForegroundColor = CharColor.Red;
+                b.ForegroundColor = CLI.AnsiColor.Red;
                 b.AddChar('○');
             }
             else if (storeIndicators.Contains(regDW) ||
@@ -240,19 +240,19 @@ public partial class InterpreterElement
                      storeIndicators.Contains(regH) ||
                      storeIndicators.Contains(regL))
             {
-                b.ForegroundColor = CharColor.Red;
+                b.ForegroundColor = CLI.AnsiColor.Red;
                 b.AddChar('●');
             }
             else
             {
                 b.AddChar(' ');
             }
-            b.ForegroundColor = CharColor.BrightCyan;
+            b.ForegroundColor = CLI.AnsiColor.BrightCyan;
             b.AddText(isHex ? "0x" + Convert.ToString(@long, 16) : @long.ToString());
             b.AddSpace(24);
-            b.BackgroundColor = CharColor.Black;
+            b.BackgroundColor = CLI.AnsiColor.Black;
             b.FinishLine();
-            b.ForegroundColor = CharColor.Silver;
+            b.ForegroundColor = CLI.AnsiColor.Silver;
         }
 
         DrawGeneralRegister('A', Interpreter.Registers.EAX);

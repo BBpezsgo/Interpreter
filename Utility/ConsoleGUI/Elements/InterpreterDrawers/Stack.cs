@@ -1,5 +1,4 @@
-﻿using Win32.Console;
-using LanguageCore;
+﻿using LanguageCore;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
@@ -37,25 +36,25 @@ public partial class InterpreterElement
         {
             if (Interpreter.Registers.BasePointer == address)
             {
-                b.ForegroundColor = CharColor.BrightBlue;
+                b.ForegroundColor = CLI.AnsiColor.BrightBlue;
                 b.AddText('►');
-                b.ForegroundColor = CharColor.Silver;
+                b.ForegroundColor = CLI.AnsiColor.Silver;
             }
             else if (callTrace.Contains(v => v.BasePointer == address))
             {
-                b.ForegroundColor = CharColor.Silver;
+                b.ForegroundColor = CLI.AnsiColor.Silver;
                 b.AddText('►');
-                b.ForegroundColor = CharColor.Silver;
+                b.ForegroundColor = CLI.AnsiColor.Silver;
             }
             else if (Interpreter.Registers.StackPointer == address)
             {
-                b.ForegroundColor = CharColor.Yellow;
+                b.ForegroundColor = CLI.AnsiColor.Yellow;
                 b.AddText('►');
-                b.ForegroundColor = CharColor.Silver;
+                b.ForegroundColor = CLI.AnsiColor.Silver;
             }
             else
             {
-                b.ForegroundColor = CharColor.Silver;
+                b.ForegroundColor = CLI.AnsiColor.Silver;
                 b.AddText(' ');
             }
 
@@ -64,17 +63,17 @@ public partial class InterpreterElement
             {
                 if (loadIndicators[i].Address == address)
                 {
-                    b.ForegroundColor = CharColor.BrightRed;
+                    b.ForegroundColor = CLI.AnsiColor.BrightRed;
                     b.AddText('○');
-                    b.ForegroundColor = CharColor.Silver;
+                    b.ForegroundColor = CLI.AnsiColor.Silver;
                     dataMovementShown = true;
                     break;
                 }
                 else if (loadIndicators[i].Contains(address))
                 {
-                    b.ForegroundColor = CharColor.BrightRed;
+                    b.ForegroundColor = CLI.AnsiColor.BrightRed;
                     b.AddText('|');
-                    b.ForegroundColor = CharColor.Silver;
+                    b.ForegroundColor = CLI.AnsiColor.Silver;
                     dataMovementShown = true;
                     break;
                 }
@@ -86,17 +85,17 @@ public partial class InterpreterElement
                 {
                     if (storeIndicators[i].Address == address)
                     {
-                        b.ForegroundColor = CharColor.BrightRed;
+                        b.ForegroundColor = CLI.AnsiColor.BrightRed;
                         b.AddText('●');
-                        b.ForegroundColor = CharColor.Silver;
+                        b.ForegroundColor = CLI.AnsiColor.Silver;
                         dataMovementShown = true;
                         break;
                     }
                     else if (storeIndicators[i].Contains(address))
                     {
-                        b.ForegroundColor = CharColor.BrightRed;
+                        b.ForegroundColor = CLI.AnsiColor.BrightRed;
                         b.AddText('|');
-                        b.ForegroundColor = CharColor.Silver;
+                        b.ForegroundColor = CLI.AnsiColor.Silver;
                         dataMovementShown = true;
                         break;
                     }
@@ -109,17 +108,17 @@ public partial class InterpreterElement
             b.AddText(address.ToString());
             b.AddSpace(7);
 
-            b.ForegroundColor = CharColor.Silver;
-            b.BackgroundColor = CharColor.Black;
+            b.ForegroundColor = CLI.AnsiColor.Silver;
+            b.BackgroundColor = CLI.AnsiColor.Black;
 
             if (item == 0)
             {
-                b.ForegroundColor = CharColor.Gray;
+                b.ForegroundColor = CLI.AnsiColor.Gray;
                 b.AddText('0');
             }
             else
             {
-                b.ForegroundColor = CharColor.BrightCyan;
+                b.ForegroundColor = CLI.AnsiColor.BrightCyan;
                 b.AddText(item.ToString());
             }
         }
@@ -131,76 +130,76 @@ public partial class InterpreterElement
                 case ArrayType v:
                     DrawType(v.Of);
 
-                    b.ForegroundColor = CharColor.Gray;
+                    b.ForegroundColor = CLI.AnsiColor.Gray;
                     b.AddText('[');
 
                     if (v.ComputedLength.HasValue)
                     {
-                        b.ForegroundColor = CharColor.Silver;
+                        b.ForegroundColor = CLI.AnsiColor.Silver;
                         b.AddText(v.ComputedLength.Value.ToString());
                     }
                     else if (v.Length is not null)
                     {
-                        b.ForegroundColor = CharColor.Silver;
+                        b.ForegroundColor = CLI.AnsiColor.Silver;
                         b.AddText('?');
                     }
 
-                    b.ForegroundColor = CharColor.Gray;
+                    b.ForegroundColor = CLI.AnsiColor.Gray;
                     b.AddText(']');
 
                     break;
                 case BuiltinType v:
-                    b.ForegroundColor = CharColor.BrightBlue;
+                    b.ForegroundColor = CLI.AnsiColor.BrightBlue;
                     b.AddText(v.ToString());
 
                     break;
                 case FunctionType v:
                     DrawType(v.ReturnType);
 
-                    b.ForegroundColor = CharColor.Gray;
+                    b.ForegroundColor = CLI.AnsiColor.Gray;
                     b.AddText('(');
 
                     for (int i = 0; i < v.Parameters.Length; i++)
                     {
                         if (i > 0)
                         {
-                            b.ForegroundColor = CharColor.Gray;
+                            b.ForegroundColor = CLI.AnsiColor.Gray;
                             b.AddText(", ");
                         }
 
                         DrawType(v.Parameters[i]);
                     }
 
-                    b.ForegroundColor = CharColor.Gray;
+                    b.ForegroundColor = CLI.AnsiColor.Gray;
                     b.AddText(')');
 
                     break;
                 case GenericType v:
-                    b.ForegroundColor = CharColor.Gray;
+                    b.ForegroundColor = CLI.AnsiColor.Gray;
                     b.AddText(v.ToString());
 
                     break;
                 case PointerType v:
                     DrawType(v.To);
 
-                    b.ForegroundColor = CharColor.Silver;
+                    b.ForegroundColor = CLI.AnsiColor.Silver;
                     b.AddText('*');
 
                     break;
                 case StructType v:
-                    b.ForegroundColor = CharColor.BrightGreen;
+                    b.ForegroundColor = CLI.AnsiColor.BrightGreen;
                     b.AddText(v.Struct.Identifier.Content);
 
                     if (!v.TypeArguments.IsEmpty)
                     {
-                        b.ForegroundColor = CharColor.Gray;
+                        b.ForegroundColor = CLI.AnsiColor.Gray;
                         b.AddChar('<');
                         b.AddText(string.Join(", ", v.TypeArguments.Values));
                         b.AddChar('>');
                     }
                     else if (v.Struct.Template is not null)
                     {
-                        b.ForegroundColor = CharColor.Gray;
+                        b.ForegroundColor = CLI.AnsiColor.Gray;
                         b.AddChar('<');
                         b.AddText(string.Join(", ", v.Struct.Template.Parameters));
                         b.AddChar('>');
@@ -208,11 +207,11 @@ public partial class InterpreterElement
 
                     break;
                 case AliasType v:
-                    b.ForegroundColor = CharColor.BrightGreen;
+                    b.ForegroundColor = CLI.AnsiColor.BrightGreen;
                     b.AddText(v.ToString());
                     break;
                 default:
-                    b.ForegroundColor = CharColor.Gray;
+                    b.ForegroundColor = CLI.AnsiColor.Gray;
                     b.AddText(type.ToString());
                     break;
             }
@@ -224,20 +223,20 @@ public partial class InterpreterElement
 
             if (range.Start == range.End)
             {
-                b.ForegroundColor = CharColor.Silver;
+                b.ForegroundColor = CLI.AnsiColor.Silver;
 
                 DrawElement(address, item, callTrace);
 
-                b.ForegroundColor = CharColor.Gray;
+                b.ForegroundColor = CLI.AnsiColor.Gray;
                 b.AddText($" ({info.Kind}) ");
 
                 DrawType(info.Type);
 
                 b.ForegroundColor = info.Kind switch
                 {
-                    StackElementKind.Internal => CharColor.Gray,
-                    StackElementKind.Variable => CharColor.Silver,
-                    StackElementKind.Parameter => CharColor.Silver,
+                    StackElementKind.Internal => CLI.AnsiColor.Gray,
+                    StackElementKind.Variable => CLI.AnsiColor.Silver,
+                    StackElementKind.Parameter => CLI.AnsiColor.Silver,
                     _ => throw new UnreachableException(),
                 };
                 b.AddText(' ');
@@ -245,27 +244,27 @@ public partial class InterpreterElement
             }
             else if (range.Start == address)
             {
-                b.ForegroundColor = CharColor.Gray;
+                b.ForegroundColor = CLI.AnsiColor.Gray;
                 b.AddText($" ({info.Kind}) ");
 
                 DrawType(info.Type);
 
                 b.ForegroundColor = info.Kind switch
                 {
-                    StackElementKind.Internal => CharColor.Gray,
-                    StackElementKind.Variable => CharColor.Silver,
-                    StackElementKind.Parameter => CharColor.Silver,
+                    StackElementKind.Internal => CLI.AnsiColor.Gray,
+                    StackElementKind.Variable => CLI.AnsiColor.Silver,
+                    StackElementKind.Parameter => CLI.AnsiColor.Silver,
                     _ => throw new UnreachableException(),
                 };
                 b.AddText(' ');
                 b.AddText(info.Identifier);
 
-                b.ForegroundColor = CharColor.Gray;
+                b.ForegroundColor = CLI.AnsiColor.Gray;
                 b.AddText(" {");
 
-                b.BackgroundColor = CharColor.Black;
+                b.BackgroundColor = CLI.AnsiColor.Black;
                 b.FinishLine();
-                b.ForegroundColor = CharColor.Silver;
+                b.ForegroundColor = CLI.AnsiColor.Silver;
 
                 DrawElement(address, item, callTrace);
             }
@@ -273,9 +272,9 @@ public partial class InterpreterElement
             {
                 DrawElement(address, item, callTrace);
 
-                b.BackgroundColor = CharColor.Black;
+                b.BackgroundColor = CLI.AnsiColor.Black;
                 b.FinishLine();
-                b.ForegroundColor = CharColor.Gray;
+                b.ForegroundColor = CLI.AnsiColor.Gray;
                 b.AddText(' ');
                 b.AddText('}');
             }
@@ -303,9 +302,9 @@ public partial class InterpreterElement
             else
             { DrawElement(i, item, callTrace); }
 
-            b.BackgroundColor = CharColor.Black;
+            b.BackgroundColor = CLI.AnsiColor.Black;
             b.FinishLine();
-            b.ForegroundColor = CharColor.Silver;
+            b.ForegroundColor = CLI.AnsiColor.Silver;
         }
 
         const int EmptyCount = 32;
@@ -338,9 +337,9 @@ public partial class InterpreterElement
             else
             { DrawElement(nextEmpty, item, callTrace); }
 
-            b.BackgroundColor = CharColor.Black;
+            b.BackgroundColor = CLI.AnsiColor.Black;
             b.FinishLine();
-            b.ForegroundColor = CharColor.Silver;
+            b.ForegroundColor = CLI.AnsiColor.Silver;
         }
 
         StackScrollBar.Draw(b);

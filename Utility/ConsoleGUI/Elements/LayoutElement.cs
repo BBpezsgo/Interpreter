@@ -15,7 +15,7 @@ public class LayoutElement : Element, IElementWithSubelements, IInlineLayoutElem
         Elements.BeforeDraw();
     }
 
-    public override ConsoleChar DrawContent(int x, int y)
+    public override CLI.AnsiChar DrawContent(int x, int y)
     {
         return Elements.DrawContent(x, y) ?? CharacterBrush.ErrorChar;
     }

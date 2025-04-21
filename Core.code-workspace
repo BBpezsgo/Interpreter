@@ -23,6 +23,9 @@
 		},
 		{
 			"path": "../SpeedTests"
+		},
+		{
+			"path": "../../Console.UI"
 		}
 	],
 	"settings": {

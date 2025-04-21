@@ -345,11 +345,11 @@ public sealed partial class InterpreterElement : WindowElement
     {
         ConsolePanel.Write(message, logType switch
         {
-            LogType.Normal => CharColor.Silver,
-            LogType.Warning => CharColor.BrightYellow,
-            LogType.Error => CharColor.BrightRed,
-            LogType.Debug => CharColor.Silver,
-            _ => CharColor.Silver,
+            LogType.Normal => CLI.AnsiColor.Silver,
+            LogType.Warning => CLI.AnsiColor.BrightYellow,
+            LogType.Error => CLI.AnsiColor.BrightRed,
+            LogType.Debug => CLI.AnsiColor.Silver,
+            _ => CLI.AnsiColor.Silver,
         });
         ConsolePanel.Write("\n");
     }

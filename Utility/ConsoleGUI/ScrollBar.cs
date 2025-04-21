@@ -39,11 +39,11 @@ public class ScrollBar
         {
             if (y == scrollY)
             {
-                buffer[x, y] = new ConsoleChar(' ', CharColor.Black, CharColor.White);
+                buffer[x, y] = new CLI.AnsiChar(' ', CLI.AnsiColor.Black, CLI.AnsiColor.White);
             }
             else
             {
-                buffer[x, y] = new ConsoleChar((char)0x2592, CharColor.Gray, CharColor.Black);
+                buffer[x, y] = new CLI.AnsiChar((char)0x2592, CLI.AnsiColor.Gray, CLI.AnsiColor.Black);
             }
         }
     }
@@ -57,11 +57,11 @@ public class ScrollBar
             return;
         }
 
-        Coord currentPos = e.MousePosition;
+        var currentPos = e.MousePosition;
         currentPos.X -= (short)sender.Rect.X;
         currentPos.Y -= (short)(sender.Rect.Y + 1);
 
-        Coord pressedPos = ConsoleMouse.LeftPressedAt;
+        var pressedPos = ConsoleMouse.LeftPressedAt;
         pressedPos.X -= (short)sender.Rect.X;
         pressedPos.Y -= (short)(sender.Rect.Y + 1);
 

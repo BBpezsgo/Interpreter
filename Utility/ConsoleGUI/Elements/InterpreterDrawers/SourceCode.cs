@@ -1,5 +1,6 @@
-﻿using Win32.Console;
+﻿using LanguageCore;
 using LanguageCore.Runtime;
+using Win32.Console;
 
 namespace ConsoleGUI;
 
@@ -20,9 +21,9 @@ public partial class InterpreterElement
         void LinePrefix(string lineNumber)
         {
             b.AddText(' ', 4 - lineNumber.Length);
-            b.ForegroundColor = CharColor.Silver;
+            b.ForegroundColor = CLI.AnsiColor.Silver;
             b.AddText(lineNumber);
-            b.ForegroundColor = CharColor.Silver;
+            b.ForegroundColor = CLI.AnsiColor.Silver;
             b.AddSpace(5);
         }
 
@@ -65,11 +66,11 @@ public partial class InterpreterElement
                         }
 
                         LinePrefix(string.Empty);
-                        b.ForegroundColor = CharColor.Gray;
+                        b.ForegroundColor = CLI.AnsiColor.Gray;
                         b.AddText(' ', Math.Max(0, indent * 2));
                         b.AddText(comment);
-                        b.ForegroundColor = CharColor.Silver;
-                        b.BackgroundColor = CharColor.Black;
+                        b.ForegroundColor = CLI.AnsiColor.Silver;
+                        b.BackgroundColor = CLI.AnsiColor.Black;
                         b.FinishLine();
 
                         if (!comment.EndsWith("{ }", StringComparison.Ordinal) && comment.EndsWith('{'))
@@ -83,7 +84,7 @@ public partial class InterpreterElement
             if (CurrentJump is BreakPointJump breakPointJump &&
                 !breakPointJump.Invisible &&
                 breakPointJump.Instruction == i)
-            { b.BackgroundColor = CharColor.Red; }
+            { b.BackgroundColor = CLI.AnsiColor.Red; }
 
             if (sender.Rect.Contains(ConsoleMouse.RecordedConsolePosition) &&
                 ConsoleMouse.RecordedConsolePosition.Y - sender.Rect.Top - 1 == b.CurrentLine &&
@@ -93,11 +94,11 @@ public partial class InterpreterElement
                 if (ConsoleMouse.IsPressed(MouseButton.Left) &&
                     ConsoleMouse.LeftPressedAt.Y - sender.Rect.Top - 1 == b.CurrentLine)
                 {
-                    b.BackgroundColor = CharColor.BrightRed;
+                    b.BackgroundColor = CLI.AnsiColor.BrightRed;
                 }
                 else
                 {
-                    b.BackgroundColor = CharColor.Red;
+                    b.BackgroundColor = CLI.AnsiColor.Red;
                 }
 
                 if (ConsoleMouse.IsUp(MouseButton.Left) &&
@@ -117,15 +118,15 @@ public partial class InterpreterElement
             }
 
             LinePrefix((i + 1).ToString());
-            b.BackgroundColor = CharColor.Black;
+            b.BackgroundColor = CLI.AnsiColor.Black;
 
-            b.ForegroundColor = CharColor.BrightYellow;
+            b.ForegroundColor = CLI.AnsiColor.BrightYellow;
             b.AddText(' ', Math.Max(0, indent * 2));
             b.AddText(' ');
             if (IsNextInstruction)
             {
                 IsNextInstruction = false;
-                b.BackgroundColor = CharColor.BrightRed;
+                b.BackgroundColor = CLI.AnsiColor.BrightRed;
             }
             b.AddText(instruction.Opcode.ToString());
             b.AddText(' ');
@@ -134,27 +135,27 @@ public partial class InterpreterElement
 
             void WritePointerOperand(string size, string? @base, int offset)
             {
-                b.ForegroundColor = CharColor.Gray;
+                b.ForegroundColor = CLI.AnsiColor.Gray;
                 b.AddText(size);
                 b.AddText(' ');
                 b.AddText('[');
                 if (@base != null)
                 {
-                    b.ForegroundColor = CharColor.White;
+                    b.ForegroundColor = CLI.AnsiColor.White;
                     b.AddText(@base);
                 }
                 if (offset > 0)
                 {
-                    b.ForegroundColor = CharColor.BrightCyan;
+                    b.ForegroundColor = CLI.AnsiColor.BrightCyan;
                     b.AddText('+');
                     b.AddText(offset.ToString());
                 }
                 else if (offset < 0)
                 {
-                    b.ForegroundColor = CharColor.BrightCyan;
+                    b.ForegroundColor = CLI.AnsiColor.BrightCyan;
                     b.AddText(offset.ToString());
                 }
-                b.ForegroundColor = CharColor.Gray;
+                b.ForegroundColor = CLI.AnsiColor.Gray;
                 b.AddText(']');
             }
 
@@ -163,27 +164,27 @@ public partial class InterpreterElement
                 switch (operand.Type)
                 {
                     case InstructionOperandType.Immediate8:
-                        b.ForegroundColor = CharColor.Gray;
+                        b.ForegroundColor = CLI.AnsiColor.Gray;
                         b.AddText("BYTE ");
-                        b.ForegroundColor = CharColor.BrightCyan;
+                        b.ForegroundColor = CLI.AnsiColor.BrightCyan;
                         b.AddText(operand.Value.ToString());
                         break;
                     case InstructionOperandType.Immediate16:
-                        b.ForegroundColor = CharColor.Gray;
+                        b.ForegroundColor = CLI.AnsiColor.Gray;
                         b.AddText("WORD ");
-                        b.ForegroundColor = CharColor.BrightCyan;
+                        b.ForegroundColor = CLI.AnsiColor.BrightCyan;
                         b.AddText(operand.Value.ToString());
                         break;
                     case InstructionOperandType.Immediate32:
-                        b.ForegroundColor = CharColor.Gray;
+                        b.ForegroundColor = CLI.AnsiColor.Gray;
                         b.AddText("DWORD ");
-                        b.ForegroundColor = CharColor.BrightCyan;
+                        b.ForegroundColor = CLI.AnsiColor.BrightCyan;
                         b.AddText(operand.Value.ToString());
                         break;
                     case InstructionOperandType.Immediate64:
-                        b.ForegroundColor = CharColor.Gray;
+                        b.ForegroundColor = CLI.AnsiColor.Gray;
                         b.AddText("QWORD ");
-                        b.ForegroundColor = CharColor.BrightCyan;
+                        b.ForegroundColor = CLI.AnsiColor.BrightCyan;
                         b.AddText(operand.Value.ToString());
                         break;
                     case InstructionOperandType.Pointer8: WritePointerOperand("BYTE", null, operand.Value); break;
@@ -193,79 +194,79 @@ public partial class InterpreterElement
                         switch ((Register)operand.Value)
                         {
                             case Register.CodePointer:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("CP");
                                 break;
                             case Register.StackPointer:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("SP");
                                 break;
                             case Register.BasePointer:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("BP");
                                 break;
                             case Register.EAX:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("EAX");
                                 break;
                             case Register.AX:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("AX");
                                 break;
                             case Register.AH:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("AH");
                                 break;
                             case Register.AL:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("AL");
                                 break;
                             case Register.EBX:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("EBX");
                                 break;
                             case Register.BX:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("BX");
                                 break;
                             case Register.BH:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("BH");
                                 break;
                             case Register.BL:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("BL");
                                 break;
                             case Register.ECX:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("ECX");
                                 break;
                             case Register.CX:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("CX");
                                 break;
                             case Register.CH:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("CH");
                                 break;
                             case Register.CL:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("CL");
                                 break;
                             case Register.EDX:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("EDX");
                                 break;
                             case Register.DX:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("DX");
                                 break;
                             case Register.DH:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("DH");
                                 break;
                             case Register.DL:
-                                b.ForegroundColor = CharColor.White;
+                                b.ForegroundColor = CLI.AnsiColor.White;
                                 b.AddText("DL");
                                 break;
                             default: throw new UnreachableException();
@@ -323,21 +324,21 @@ public partial class InterpreterElement
 
             if (operandCount >= 2)
             {
-                b.ForegroundColor = CharColor.BrightCyan;
+                b.ForegroundColor = CLI.AnsiColor.BrightCyan;
                 WriteOperand(instruction.Operand2);
             }
 
-            b.BackgroundColor = CharColor.Black;
+            b.BackgroundColor = CLI.AnsiColor.Black;
 
             b.FinishLine();
-            b.ForegroundColor = CharColor.Silver;
+            b.ForegroundColor = CLI.AnsiColor.Silver;
         }
 
         if (CurrentJump is not null)
         {
             string t = CurrentJump.IsPaused ? $" Jump: {CurrentJump} " : $" Jumping: {CurrentJump} ";
-            b.ForegroundColor = CharColor.Black;
-            b.BackgroundColor = CharColor.White;
+            b.ForegroundColor = CLI.AnsiColor.Black;
+            b.BackgroundColor = CLI.AnsiColor.White;
             b.SetText(t, sender.Rect.Right - (2 + t.Length));
         }
 

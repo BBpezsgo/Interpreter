@@ -30,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../../Console.UI/Console.UI.csproj" />
     <ProjectReference Include="..\Core.csproj" />
     <ProjectReference Include="..\..\..\Math\Math.csproj" />
     <ProjectReference Include="..\..\..\Win32-Stuff\Win32.csproj" />

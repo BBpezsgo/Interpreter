@@ -1,5 +1,4 @@
-﻿using Win32.Console;
-using LanguageCore.Runtime;
+﻿using LanguageCore.Runtime;
 
 namespace ConsoleGUI;
 
@@ -47,17 +46,17 @@ public partial class InterpreterElement
             {
                 if (loadIndicators[j].Address == i)
                 {
-                    b.ForegroundColor = CharColor.BrightRed;
+                    b.ForegroundColor = CLI.AnsiColor.BrightRed;
                     b.AddText('○');
-                    b.ForegroundColor = CharColor.Silver;
+                    b.ForegroundColor = CLI.AnsiColor.Silver;
                     addLoadIndicator = true;
                     break;
                 }
                 else if (loadIndicators[j].Contains(i))
                 {
-                    b.ForegroundColor = CharColor.BrightRed;
+                    b.ForegroundColor = CLI.AnsiColor.BrightRed;
                     b.AddText('|');
-                    b.ForegroundColor = CharColor.Silver;
+                    b.ForegroundColor = CLI.AnsiColor.Silver;
                     addLoadIndicator = true;
                     break;
                 }
@@ -67,17 +66,17 @@ public partial class InterpreterElement
             {
                 if (storeIndicators[j].Address == i)
                 {
-                    b.ForegroundColor = CharColor.BrightRed;
+                    b.ForegroundColor = CLI.AnsiColor.BrightRed;
                     b.AddText('●');
-                    b.ForegroundColor = CharColor.Silver;
+                    b.ForegroundColor = CLI.AnsiColor.Silver;
                     addStoreIndicator = true;
                     break;
                 }
                 else if (storeIndicators[j].Contains(i))
                 {
-                    b.ForegroundColor = CharColor.BrightRed;
+                    b.ForegroundColor = CLI.AnsiColor.BrightRed;
                     b.AddText('|');
-                    b.ForegroundColor = CharColor.Silver;
+                    b.ForegroundColor = CLI.AnsiColor.Silver;
                     addStoreIndicator = true;
                     break;
                 }
@@ -86,26 +85,26 @@ public partial class InterpreterElement
             int space = ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString(CultureInfo.InvariantCulture).Length;
             b.AddText(' ', space);
 
-            b.ForegroundColor = CharColor.Silver;
+            b.ForegroundColor = CLI.AnsiColor.Silver;
             b.AddText(i.ToString(CultureInfo.InvariantCulture));
-            b.ForegroundColor = CharColor.White;
+            b.ForegroundColor = CLI.AnsiColor.White;
             b.AddSpace(5);
 
             if (isHeader)
             {
-                b.BackgroundColor = CharColor.Gray;
+                b.BackgroundColor = CLI.AnsiColor.Gray;
                 b.AddText("HEADER | ");
                 b.AddText(header.Item1.ToString());
                 b.AddText(" | ");
                 if (header.Item2)
                 {
-                    b.BackgroundColor = CharColor.BrightYellow;
-                    b.ForegroundColor = CharColor.Black;
+                    b.BackgroundColor = CLI.AnsiColor.BrightYellow;
+                    b.ForegroundColor = CLI.AnsiColor.Black;
                 }
                 else
                 {
-                    b.BackgroundColor = CharColor.BrightGreen;
-                    b.ForegroundColor = CharColor.White;
+                    b.BackgroundColor = CLI.AnsiColor.BrightGreen;
+                    b.ForegroundColor = CLI.AnsiColor.White;
                 }
                 b.AddText(header.Item2 ? "USED" : "FREE");
             }
@@ -113,19 +112,19 @@ public partial class InterpreterElement
             {
                 if (item == 0)
                 {
-                    b.ForegroundColor = CharColor.Gray;
+                    b.ForegroundColor = CLI.AnsiColor.Gray;
                     b.AddText('0');
                 }
                 else
                 {
-                    b.ForegroundColor = CharColor.BrightCyan;
+                    b.ForegroundColor = CLI.AnsiColor.BrightCyan;
                     b.AddText(item.ToString());
                 }
             }
 
-            b.BackgroundColor = CharColor.Black;
+            b.BackgroundColor = CLI.AnsiColor.Black;
             b.FinishLine();
-            b.ForegroundColor = CharColor.Silver;
+            b.ForegroundColor = CLI.AnsiColor.Silver;
         }
 
         HeapScrollBar.Draw(b);

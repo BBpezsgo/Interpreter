@@ -10,9 +10,9 @@ public class StandardIOElement : InlineElement
     readonly struct ConsoleText
     {
         public readonly string Text;
-        public readonly byte Color;
+        public readonly CLI.AnsiColor Color;
 
-        public ConsoleText(string text, byte color)
+        public ConsoleText(string text, CLI.AnsiColor color)
         {
             Text = text;
             Color = color;
@@ -49,7 +49,7 @@ public class StandardIOElement : InlineElement
         return new LanguageCore.Range<int>(0, Math.Max(1, totalLines));
     }
 
-    public void Write(string text, byte color = CharColor.Silver)
+    public void Write(string text, CLI.AnsiColor color = CLI.AnsiColor.Silver)
     {
         ConsoleTexts.Add(new ConsoleText(text, color));
     }

@@ -21,7 +21,7 @@ public class WindowElement : Element
         Elements.BeforeDraw();
     }
 
-    public override ConsoleChar DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleChar.Empty);
+    public override CLI.AnsiChar DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), CLI.AnsiChar.Empty);
 
     public void OnMouseEventBase(MouseEvent mouse)
     {

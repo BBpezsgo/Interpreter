@@ -1,4 +1,5 @@
-﻿using Win32;
+﻿using CLI;
+using Win32;
 using Win32.Console;
 
 namespace ConsoleGUI;
@@ -87,7 +88,7 @@ sealed class MainThreadEvents<T> : IMainThreadThing
 }
 
 [ExcludeFromCodeCoverage]
-sealed class ConsoleGUI : AnsiRenderer, IDisposable
+sealed class ConsoleGUI : CLI.AnsiRendererExtended, IDisposable
 {
     const int TIMER_RESIZE_ELEMENTS = 1000;
     const int TIMER_AUTO_REFRESH_CONSOLE = 1000;
@@ -216,7 +217,7 @@ sealed class ConsoleGUI : AnsiRenderer, IDisposable
     {
         NextRefreshConsole = false;
 
-        this.Fill(new ConsoleChar((char)0x2591, CharColor.Gray, CharColor.Black));
+        this.Fill(new CLI.AnsiChar((char)0x2591, CLI.AnsiColor.Gray, CLI.AnsiColor.Black));
 
         try
         {

@@ -26,21 +26,21 @@ public class DrawBuffer
 
     public int Length => ConsoleBuffer.Length;
 
-    public byte ForegroundColor { get; set; }
-    public byte BackgroundColor { get; set; }
+    public CLI.AnsiColor ForegroundColor { get; set; }
+    public CLI.AnsiColor BackgroundColor { get; set; }
 
     public int Width { get; }
     public int Height { get; }
 
-    readonly ConsoleChar[] ConsoleBuffer;
+    readonly CLI.AnsiChar[] ConsoleBuffer;
 
-    public ConsoleChar this[int index]
+    public CLI.AnsiChar this[int index]
     {
         get => ConsoleBuffer[index];
         set => ConsoleBuffer[index] = value;
     }
 
-    public ConsoleChar this[int x, int y]
+    public CLI.AnsiChar this[int x, int y]
     {
         get => this[x + (y * Width)];
         set => this[x + (y * Width)] = value;
@@ -48,13 +48,13 @@ public class DrawBuffer
 
     public DrawBuffer()
     {
-        this.ConsoleBuffer = Array.Empty<ConsoleChar>();
+        this.ConsoleBuffer = Array.Empty<CLI.AnsiChar>();
         this.CurrentIndex = 0;
     }
 
     public DrawBuffer(int width, int height)
     {
-        this.ConsoleBuffer = new ConsoleChar[Math.Max(width * height, 0)];
+        this.ConsoleBuffer = new CLI.AnsiChar[Math.Max(width * height, 0)];
         this.CurrentIndex = 0;
         this.Width = width;
         this.Height = height;
@@ -105,7 +105,7 @@ public class DrawBuffer
         return newPoints.ToArray();
     }
 
-    public void DrawLine((int x, int y)[] points, byte color)
+    public void DrawLine((int x, int y)[] points, CLI.AnsiColor color)
     {
         if (points.Length == 0) return;
 
@@ -147,9 +147,9 @@ public class DrawBuffer
             }
         }
     }
-    public void DrawLine((int, int) p1, (int, int) p2, byte color)
+    public void DrawLine((int, int) p1, (int, int) p2, CLI.AnsiColor color)
         => DrawLine(p1.Item1, p1.Item2, p2.Item1, p2.Item2, color);
-    public void DrawLine(int x1, int y1, int x2, int y2, byte color)
+    public void DrawLine(int x1, int y1, int x2, int y2, CLI.AnsiColor color)
     {
         (int, int)? prev = (x1, y1);
         for (int x = x1; x <= x2; x++)
@@ -172,7 +172,7 @@ public class DrawBuffer
                     }
                 }
 
-                this[x, y] = new ConsoleChar(c, color, CharColor.Black);
+                this[x, y] = new CLI.AnsiChar(c, color, CLI.AnsiColor.Black);
 
                 prev = (x, y);
             }
@@ -189,8 +189,8 @@ public class DrawBuffer
 
     public void ResetColor()
     {
-        this.ForegroundColor = CharColor.Silver;
-        this.BackgroundColor = CharColor.Black;
+        this.ForegroundColor = CLI.AnsiColor.Silver;
+        this.BackgroundColor = CLI.AnsiColor.Black;
     }
 
     public bool AddChar(char v)
@@ -198,7 +198,7 @@ public class DrawBuffer
         if (CurrentIndex >= this.ConsoleBuffer.Length) return false;
         if (CurrentIndex < 0) return false;
 
-        this.ConsoleBuffer[Math.Clamp(CurrentIndex, 0, this.ConsoleBuffer.Length - 1)] = new ConsoleChar(v, ForegroundColor, BackgroundColor);
+        this.ConsoleBuffer[Math.Clamp(CurrentIndex, 0, this.ConsoleBuffer.Length - 1)] = new CLI.AnsiChar(v, ForegroundColor, BackgroundColor);
 
         CurrentIndex++;
         if (CurrentIndex >= this.ConsoleBuffer.Length) return false;
@@ -223,11 +223,11 @@ public class DrawBuffer
         { if (!this.SetChar(v[i], i + from)) break; }
     }
 
-    public bool AddChar(char v, byte fg, byte bg)
+    public bool AddChar(char v, CLI.AnsiColor fg, CLI.AnsiColor bg)
     {
         if (CurrentIndex >= this.ConsoleBuffer.Length) return false;
 
-        this.ConsoleBuffer[Math.Clamp(CurrentIndex, 0, this.ConsoleBuffer.Length - 1)] = new ConsoleChar(v, fg, bg);
+        this.ConsoleBuffer[Math.Clamp(CurrentIndex, 0, this.ConsoleBuffer.Length - 1)] = new CLI.AnsiChar(v, fg, bg);
 
         CurrentIndex++;
         if (CurrentIndex >= this.ConsoleBuffer.Length) return false;
@@ -262,7 +262,7 @@ public class DrawBuffer
         this.AddChar(' ');
     }
 
-    public void Fill(byte color)
+    public void Fill(CLI.AnsiColor color)
     {
         for (int i = 0; i < this.ConsoleBuffer.Length; i++)
         {
@@ -332,10 +332,22 @@ public enum Side
 [ExcludeFromCodeCoverage]
 public static class Extensions
 {
-    public static ConsoleChar DrawBorder(this Element element, int x, int y)
+    public static CLI.AnsiChar DrawBorder(this Element element, int x, int y)
     {
-        if (!element.Contains(x, y)) return ConsoleChar.Empty;
+        if (!element.Contains(x, y)) return CLI.AnsiChar.Empty;
         Side side = element.Rect.GetSide(x, y);
+        CLI.AnsiChar result = side switch
+        {
+            Side.TopLeft => '┌'.Details(),
+            Side.Top => '─'.Details(),
+            Side.TopRight => '┐'.Details(),
+            Side.Right => '│'.Details(),
+            Side.BottomRight => '┘'.Details(),
+            Side.Bottom => '─'.Details(),
+            Side.BottomLeft => '└'.Details(),
+            Side.Left => '│'.Details(),
+            _ => CLI.AnsiChar.Empty,
+        };
         if (!string.IsNullOrEmpty(element.Title))
         {
             const int titleOffset = 2;
@@ -343,29 +355,20 @@ public static class Extensions
             if (side == Side.Top)
             {
                 if (relativeX == titleOffset - 1)
-                { return '┤'.Details(); }
+                { result = '┐'.Details(); }
                 if (relativeX == element.Title.Length + titleOffset)
-                { return '├'.Details(); }
+                { result = '┌'.Details(); }
                 if (relativeX >= titleOffset && relativeX < element.Title.Length + titleOffset)
-                { return element.Title[relativeX - titleOffset].Details(); }
+                { result = element.Title[relativeX - titleOffset].Details(); }
             }
         }
-        ConsoleChar result = side switch
-        {
-            Side.TopLeft => '┌'.Details(),
-            Side.Top => '─'.Details(),
-            Side.TopRight => '┒'.Details(),
-            Side.Right => '┃'.Details(),
-            Side.BottomRight => '┛'.Details(),
-            Side.Bottom => '━'.Details(),
-            Side.BottomLeft => '┕'.Details(),
-            Side.Left => '│'.Details(),
-            _ => ConsoleChar.Empty,
-        };
         if (element.IsFocused)
         {
-            result.Background = CharColor.Gray;
-            result.Foreground = CharColor.Black;
+            result.Foreground = CLI.AnsiColor.BrightRed;
+        }
+        else
+        {
+            result.Foreground = CLI.AnsiColor.White;
         }
         return result;
     }
@@ -376,6 +379,8 @@ public static class Extensions
         element.Rect.Contains(x - 1, y) ||
         element.Rect.Contains(x, y - 1) ||
         element.Rect.Contains(x - 1, y - 1);
+    public static bool Contains(this Element element, CLI.Point position)
+        => element.Contains(position.X, position.Y);
     public static bool Contains(this Element element, Coord position)
         => element.Contains(position.X, position.Y);
 
@@ -400,7 +405,7 @@ public static class Extensions
         }
     }
 
-    public static ConsoleChar DrawContentWithBorders(this Element element, int x, int y)
+    public static CLI.AnsiChar DrawContentWithBorders(this Element element, int x, int y)
     {
         if (element.HasBorder)
         {
@@ -416,7 +421,7 @@ public static class Extensions
         return element.DrawContent(x, y);
     }
 
-    public static ConsoleChar? DrawContent(this Element[] elements, int x, int y)
+    public static CLI.AnsiChar? DrawContent(this Element[] elements, int x, int y)
     {
         for (int i = 0; i < elements.Length; i++)
         {
@@ -444,8 +449,8 @@ public static class Extensions
     public static T? Clamp<T>(this T[] v, int i) where T : struct => v.IsOutside(i) ? null : v[i];
 
     public static bool IsOutside(this DrawBuffer v, int i) => (i < 0) || (i >= v.Length);
-    public static ConsoleChar Clamp(this DrawBuffer v, int i, ConsoleChar @default) => v.IsOutside(i) ? @default : v[i];
-    public static ConsoleChar? Clamp(this DrawBuffer v, int i) => v.IsOutside(i) ? null : v[i];
+    public static CLI.AnsiChar Clamp(this DrawBuffer v, int i, CLI.AnsiChar @default) => v.IsOutside(i) ? @default : v[i];
+    public static CLI.AnsiChar? Clamp(this DrawBuffer v, int i) => v.IsOutside(i) ? null : v[i];
 
     public static Side GetSide(this Rectangle v, int x, int y)
     {
@@ -484,12 +489,12 @@ public static class Extensions
         return Side.None;
     }
 
-    public static ConsoleChar Details(this char v) => new(v, CharColor.Silver, CharColor.Black);
+    public static CLI.AnsiChar Details(this char v) => new(v, CLI.AnsiColor.Silver, CLI.AnsiColor.Black);
 }
 
 [ExcludeFromCodeCoverage]
 public static class Utils
 {
     public static int GetIndex(int x, int y, int width) => x + (y * width);
-    public static int GetIndex(Coord position, int width) => position.X + (position.Y * width);
+    public static int GetIndex(CLI.Point position, int width) => position.X + (position.Y * width);
 }

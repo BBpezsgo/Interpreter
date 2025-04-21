@@ -1,10 +1,8 @@
-﻿using Win32.Console;
-
-namespace ConsoleGUI;
+﻿namespace ConsoleGUI;
 
 [ExcludeFromCodeCoverage]
 public static class CharacterBrush
 {
-    public static ConsoleChar Solid(byte color) => new(' ', color, color);
-    public static ConsoleChar ErrorChar => new(' ', CharColor.BrightMagenta, CharColor.BrightMagenta);
+    public static CLI.AnsiChar Solid(CLI.AnsiColor color) => new(' ', color, color);
+    public static CLI.AnsiChar ErrorChar => new(' ', CLI.AnsiColor.BrightMagenta, CLI.AnsiColor.BrightMagenta);
 }

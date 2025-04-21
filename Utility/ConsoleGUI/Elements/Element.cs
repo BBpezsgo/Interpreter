@@ -15,7 +15,7 @@ public class Element : IMainThreadThing
     public DrawBuffer DrawBuffer = new();
     protected MouseEvent LastMouse;
 
-    public virtual ConsoleChar DrawContent(int x, int y) => DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleChar.Empty);
+    public virtual CLI.AnsiChar DrawContent(int x, int y) => DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), CLI.AnsiChar.Empty);
 
     public void ClearBuffer() => DrawBuffer = new(Rect.Width, Rect.Height);
 

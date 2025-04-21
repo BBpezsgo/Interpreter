@@ -1,6 +1,5 @@
 ﻿using LanguageCore;
 using LanguageCore.Runtime;
-using Win32.Console;
 
 namespace ConsoleGUI;
 
@@ -29,7 +28,7 @@ public partial class InterpreterElement
         {
             FunctionInformation callFrame = callStack[i];
 
-            sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+            sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
             sender.DrawBuffer.AddText(' ');
 
             sender.DrawBuffer.AddText(' ', 3 - i.ToString(CultureInfo.InvariantCulture).Length);
@@ -37,12 +36,12 @@ public partial class InterpreterElement
             sender.DrawBuffer.AddText(i.ToString(CultureInfo.InvariantCulture));
             sender.DrawBuffer.AddSpace(5);
 
-            sender.DrawBuffer.ForegroundColor = CharColor.Silver;
-            sender.DrawBuffer.BackgroundColor = CharColor.Black;
+            sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
+            sender.DrawBuffer.BackgroundColor = CLI.AnsiColor.Black;
 
             if (!callFrame.IsValid)
             {
-                sender.DrawBuffer.ForegroundColor = CharColor.BrightCyan;
+                sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.BrightCyan;
                 sender.DrawBuffer.AddText(callTraceRaw[i].InstructionPointer.ToString(CultureInfo.InvariantCulture));
             }
             else
@@ -51,10 +50,10 @@ public partial class InterpreterElement
                 {
                     string functionName = callFrame.ReadableIdentifier[..callFrame.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal)];
 
-                    sender.DrawBuffer.ForegroundColor = CharColor.BrightYellow;
+                    sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.BrightYellow;
                     sender.DrawBuffer.AddText(functionName);
 
-                    sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                    sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
                     sender.DrawBuffer.AddChar('(');
 
                     string parameters = callFrame.ReadableIdentifier[(callFrame.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal) + 1)..callFrame.ReadableIdentifier.IndexOf(')', StringComparison.Ordinal)];
@@ -76,7 +75,7 @@ public partial class InterpreterElement
                     {
                         if (j > 0)
                         {
-                            sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                            sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
                             sender.DrawBuffer.AddText(',');
                             sender.DrawBuffer.AddText(' ');
                         }
@@ -84,16 +83,16 @@ public partial class InterpreterElement
                         string param = parameters2[j];
                         if (TypeKeywords.List.Contains(param))
                         {
-                            sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
+                            sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.BrightBlue;
                         }
                         else
                         {
-                            sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                            sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
                         }
                         sender.DrawBuffer.AddText(param);
                     }
 
-                    sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                    sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
                     sender.DrawBuffer.AddChar(')');
 
                     sender.DrawBuffer.ResetColor();
@@ -104,9 +103,9 @@ public partial class InterpreterElement
                 }
             }
 
-            sender.DrawBuffer.BackgroundColor = CharColor.Black;
+            sender.DrawBuffer.BackgroundColor = CLI.AnsiColor.Black;
             sender.DrawBuffer.FinishLine();
-            sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+            sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
         }
 
         if (!Interpreter.DebugInformation.IsEmpty)
@@ -115,7 +114,7 @@ public partial class InterpreterElement
 
             if (callframe.IsValid)
             {
-                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
                 sender.DrawBuffer.AddText(' ');
 
                 sender.DrawBuffer.AddText(' ', 3 - (i + 1).ToString(CultureInfo.InvariantCulture).Length);
@@ -123,17 +122,17 @@ public partial class InterpreterElement
                 sender.DrawBuffer.AddText((i + 1).ToString(CultureInfo.InvariantCulture));
                 sender.DrawBuffer.AddSpace(5);
 
-                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
-                sender.DrawBuffer.BackgroundColor = CharColor.Black;
+                sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
+                sender.DrawBuffer.BackgroundColor = CLI.AnsiColor.Black;
 
                 if (callframe.ReadableIdentifier!.Contains('(', StringComparison.Ordinal))
                 {
                     string functionName = callframe.ReadableIdentifier[..callframe.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal)];
 
-                    sender.DrawBuffer.ForegroundColor = CharColor.BrightYellow;
+                    sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.BrightYellow;
                     sender.DrawBuffer.AddText(functionName);
 
-                    sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                    sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
                     sender.DrawBuffer.AddChar('(');
 
                     string parameters = callframe.ReadableIdentifier[(callframe.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal) + 1)..callframe.ReadableIdentifier.IndexOf(')', StringComparison.Ordinal)];
@@ -155,7 +154,7 @@ public partial class InterpreterElement
                     {
                         if (j > 0)
                         {
-                            sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                            sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
                             sender.DrawBuffer.AddText(',');
                             sender.DrawBuffer.AddText(' ');
                         }
@@ -163,16 +162,16 @@ public partial class InterpreterElement
                         string param = parameters2[j];
                         if (TypeKeywords.List.Contains(param))
                         {
-                            sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
+                            sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.BrightBlue;
                         }
                         else
                         {
-                            sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                            sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
                         }
                         sender.DrawBuffer.AddText(param);
                     }
 
-                    sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                    sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
                     sender.DrawBuffer.AddChar(')');
 
                     sender.DrawBuffer.ResetColor();
@@ -182,12 +181,12 @@ public partial class InterpreterElement
                     sender.DrawBuffer.AddText(callframe.ReadableIdentifier);
                 }
 
-                sender.DrawBuffer.ForegroundColor = CharColor.Gray;
+                sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Gray;
                 sender.DrawBuffer.AddText(" (current)");
 
-                sender.DrawBuffer.BackgroundColor = CharColor.Black;
+                sender.DrawBuffer.BackgroundColor = CLI.AnsiColor.Black;
                 sender.DrawBuffer.FinishLine();
-                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                sender.DrawBuffer.ForegroundColor = CLI.AnsiColor.Silver;
             }
         }
     }

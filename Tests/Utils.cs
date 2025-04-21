@@ -728,10 +728,7 @@ public static class Utils
 
     public static void GenerateResultsFile(string testResultsDirectory, string resultFile)
     {
-        string? latest = GetLatestResultFile(testResultsDirectory);
-
-        if (latest is null)
-        { throw new FileNotFoundException($"No test result file found in directory {testResultsDirectory}"); }
+        string? latest = GetLatestResultFile(testResultsDirectory) ?? throw new FileNotFoundException($"No test result file found in directory {testResultsDirectory}");
 
         (Dictionary<string, TrxTestDefinition> definitions, TrxTestResult[] results) = LoadTestResults(latest);
 
@@ -789,13 +786,14 @@ public static class Utils
 
         file.WriteLine();
 
-        file.WriteLine("| File | Bytecode | Brainfuck |");
-        file.WriteLine("|:----:|:--------:|:---------:|");
+        file.WriteLine("| File | Bytecode | Brainfuck | IL |");
+        file.WriteLine("|:----:|:--------:|:---------:|:--:|");
 
         foreach ((int serialNumber, List<(string? Category, string Outcome, string? ErrorMessage)>? fileResults) in sortedTestFiles)
         {
             (string? Outcome, string? ErrorMessage) bytecodeResult = (null, null);
             (string? Outcome, string? ErrorMessage) brainfuckResult = (null, null);
+            (string? Outcome, string? ErrorMessage) ilResult = (null, null);
 
             foreach ((string? category, string outcome, string? errorMessage) in fileResults)
             {
@@ -803,11 +801,13 @@ public static class Utils
                 {
                     case "Main": bytecodeResult = (outcome, errorMessage); break;
                     case "Brainfuck": brainfuckResult = (outcome, errorMessage); break;
+                    case "IL": ilResult = (outcome, errorMessage); break;
                 }
             }
 
             if (bytecodeResult.Outcome == "NotExecuted" &&
-                brainfuckResult.Outcome == "NotExecuted")
+                brainfuckResult.Outcome == "NotExecuted" &&
+                ilResult.Outcome == "NotExecuted")
             { continue; }
 
             static string? TranslateOutcome(string? outcome) => outcome switch
@@ -820,6 +820,7 @@ public static class Utils
 
             bytecodeResult.Outcome = TranslateOutcome(bytecodeResult.Outcome);
             brainfuckResult.Outcome = TranslateOutcome(brainfuckResult.Outcome);
+            ilResult.Outcome = TranslateOutcome(ilResult.Outcome);
 
             string translatedName = $"https://github.com/BBpezsgo/Interpreter/blob/master/TestFiles/{serialNumber.ToString().PadLeft(2, '0')}.{LanguageConstants.LanguageExtension}";
             translatedName = $"[{serialNumber}]({translatedName})";
@@ -842,6 +843,15 @@ public static class Utils
             {
                 file.Write(' ');
                 file.Write(brainfuckResult.ErrorMessage.ReplaceLineEndings(" "));
+            }
+
+            file.Write(" | ");
+
+            file.Write(ilResult.Outcome);
+            if (ilResult.ErrorMessage is not null)
+            {
+                file.Write(' ');
+                file.Write(ilResult.ErrorMessage.ReplaceLineEndings(" "));
             }
 
             file.Write(" |");

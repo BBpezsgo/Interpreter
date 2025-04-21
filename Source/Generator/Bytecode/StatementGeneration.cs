@@ -982,6 +982,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
+    void GenerateCodeForStatement(CompiledStackStringInstance stringInstance)
+    {
+        if (stringInstance.IsNullTerminated)
+        {
+            if (stringInstance.IsASCII) Push(new CompiledValue(default(byte)));
+            else Push(new CompiledValue(default(char)));
+        }
+        for (int i = stringInstance.Value.Length - 1; i >= 0; i--)
+        {
+            if (stringInstance.IsASCII) Push(new CompiledValue((byte)stringInstance.Value[i]));
+            else Push(new CompiledValue(stringInstance.Value[i]));
+        }
+    }
     void GenerateCodeForStatement(RegisterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         AddInstruction(Opcode.Push, variable.Register);
@@ -1572,6 +1585,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case CompiledInstructionLabelDeclaration v: GenerateCodeForStatement(v); break;
             case CompiledStatementWithValueThatActuallyDoesntHaveValue v: GenerateCodeForStatement(v.Statement); break;
             case CompiledStringInstance v: GenerateCodeForStatement(v); break;
+            case CompiledStackStringInstance v: GenerateCodeForStatement(v); break;
             case EmptyStatement: break;
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
@@ -1829,35 +1843,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (localVariableSetter.Variable.IsGlobal)
         {
-            if (localVariableSetter.Variable.InitialValue is CompiledStackStringInstance stackString)
-            {
-                // globalVariableSetter.Variable.Variable.IsInitialized = true;
-
-                for (int i = stackString.Value.Length - 1; i >= 0; i--)
-                { Push(new CompiledValue(stackString.Value[i])); }
-            }
-            else
-            {
-                GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
-            }
-
+            GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
             PopTo(GetGlobalVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter.Variable));
+            // localVariableSetter.Variable.Variable.IsInitialized = true;
             return;
         }
         else
         {
-            if (localVariableSetter.Variable.InitialValue is CompiledStackStringInstance stackString)
-            {
-                // localVariableSetter.Variable.IsInitialized = true;
-
-                for (int i = stackString.Value.Length - 1; i >= 0; i--)
-                { Push(new CompiledValue(stackString.Value[i])); }
-            }
-            else
-            {
-                GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
-            }
-
+            GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
             PopTo(GetLocalVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter));
             // localVariableSetter.Variable.Variable.IsInitialized = true;
             return;

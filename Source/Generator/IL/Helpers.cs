@@ -19,7 +19,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         return true;
     }
 
-    bool LoadIndirect(GeneralType type, ILGenerator il, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool LoadIndirect(GeneralType type, ILProxy il, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
 
@@ -58,7 +58,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         return false;
     }
 
-    bool StoreIndirect(GeneralType type, ILGenerator il, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool StoreIndirect(GeneralType type, ILProxy il, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
 
@@ -97,7 +97,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         return false;
     }
 
-    static bool LoadIndirect(Type type, ILGenerator il, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool LoadIndirect(Type type, ILProxy il, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
 
@@ -120,7 +120,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
     }
 
-    static bool StoreIndirect(Type type, ILGenerator il, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool StoreIndirect(Type type, ILProxy il, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
 
@@ -143,7 +143,43 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
     }
 
-    static bool EmitDefaultValue(GeneralType type, ILGenerator il, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static void StoreLocal(ILProxy il, int localIndex)
+    {
+        switch (localIndex)
+        {
+            case 0: il.Emit(OpCodes.Stloc_0); break;
+            case 1: il.Emit(OpCodes.Stloc_1); break;
+            case 2: il.Emit(OpCodes.Stloc_2); break;
+            case 3: il.Emit(OpCodes.Stloc_3); break;
+            default: il.Emit(OpCodes.Stloc, localIndex); break;
+        }
+    }
+
+    static void LoadLocal(ILProxy il, int localIndex)
+    {
+        switch (localIndex)
+        {
+            case 0: il.Emit(OpCodes.Ldloc_0); break;
+            case 1: il.Emit(OpCodes.Ldloc_1); break;
+            case 2: il.Emit(OpCodes.Ldloc_2); break;
+            case 3: il.Emit(OpCodes.Ldloc_3); break;
+            default: il.Emit(OpCodes.Ldloc, localIndex); break;
+        }
+    }
+
+    static void LoadArgument(ILProxy il, int index)
+    {
+        switch (index)
+        {
+            case 0: il.Emit(OpCodes.Ldarg_0); break;
+            case 1: il.Emit(OpCodes.Ldarg_1); break;
+            case 2: il.Emit(OpCodes.Ldarg_2); break;
+            case 3: il.Emit(OpCodes.Ldarg_3); break;
+            default: il.Emit(OpCodes.Ldarg, index); break;
+        }
+    }
+
+    static bool EmitDefaultValue(GeneralType type, ILProxy il, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
 

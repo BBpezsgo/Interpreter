@@ -160,4 +160,19 @@ public static class GeneralExtensions
         return -1;
 #endif
     }
+
+    public static void AppendIndented(this StringBuilder stringBuilder, string indent, string value)
+    {
+        string[] lines = value.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                stringBuilder.Append(indent);
+                stringBuilder.Append(value);
+            }
+            stringBuilder.AppendLine();
+        }
+    }
 }

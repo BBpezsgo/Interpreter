@@ -1,5 +1,7 @@
-﻿using System.Reflection.Emit;
+﻿using System.Reflection;
+using System.Reflection.Emit;
 using LanguageCore.Compiler;
+using LanguageCore.IL.Reflection;
 
 namespace LanguageCore.IL.Generator;
 
@@ -216,5 +218,143 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 error = new PossibleDiagnostic($"Unimplemented return type {type}");
                 return false;
         }
+    }
+
+    static void EmitValue(float value, ILProxy il) => il.Emit(OpCodes.Ldc_R4, value);
+    static void EmitValue(int value, ILProxy il)
+    {
+        switch (value)
+        {
+            case -1: il.Emit(OpCodes.Ldc_I4_M1); break;
+            case 0: il.Emit(OpCodes.Ldc_I4_0); break;
+            case 1: il.Emit(OpCodes.Ldc_I4_1); break;
+            case 2: il.Emit(OpCodes.Ldc_I4_2); break;
+            case 3: il.Emit(OpCodes.Ldc_I4_3); break;
+            case 4: il.Emit(OpCodes.Ldc_I4_4); break;
+            case 5: il.Emit(OpCodes.Ldc_I4_5); break;
+            case 6: il.Emit(OpCodes.Ldc_I4_6); break;
+            case 7: il.Emit(OpCodes.Ldc_I4_7); break;
+            case 8: il.Emit(OpCodes.Ldc_I4_8); break;
+            case >= sbyte.MinValue and <= sbyte.MaxValue: il.Emit(OpCodes.Ldc_I4_S, (sbyte)value); break;
+            default: il.Emit(OpCodes.Ldc_I4, value); break;
+        }
+    }
+
+    static void Stringify(StringBuilder builder, int indentation, Type type)
+    {
+        builder.Indent(indentation);
+        builder.Append($"{type.Attributes & TypeAttributes.VisibilityMask} ");
+
+        foreach (TypeAttributes attribute in Enum.GetValues<TypeAttributes>()
+            .Where(v => (v & TypeAttributes.VisibilityMask) == 0 && v != 0))
+        {
+            if (type.Attributes.HasFlag(attribute))
+            {
+                builder.Append($"{attribute} ");
+            }
+        }
+
+        builder.Append(type.Name);
+        builder.AppendLine();
+
+        builder.Indent(indentation);
+        builder.Append('{');
+        builder.AppendLine();
+
+        foreach (MemberInfo member in type.GetMembers(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance))
+        {
+            if (member is FieldInfo field)
+            {
+                Stringify(builder, indentation + 1, field);
+            }
+        }
+
+        builder.Indent(indentation);
+        builder.Append('}');
+        builder.AppendLine();
+    }
+
+    static void Stringify(StringBuilder builder, int indentation, FieldInfo field)
+    {
+        builder.Indent(indentation);
+        builder.Append($"{field.Attributes & FieldAttributes.FieldAccessMask} ");
+
+        foreach (FieldAttributes attribute in Enum.GetValues<FieldAttributes>()
+            .Where(v => (v & FieldAttributes.FieldAccessMask) == 0 && v != 0))
+        {
+            if (field.Attributes.HasFlag(attribute))
+            {
+                builder.Append($"{attribute} ");
+            }
+        }
+
+        builder.Append(field.FieldType.ToString());
+        builder.Append(' ');
+        builder.Append(field.Name);
+        builder.Append(';');
+        builder.AppendLine();
+    }
+
+    static void Stringify(StringBuilder builder, int indentation, DynamicMethod method)
+    {
+        builder.Indent(indentation);
+        builder.Append($"{method.Attributes & MethodAttributes.MemberAccessMask} ");
+
+        foreach (MethodAttributes attribute in Enum.GetValues<MethodAttributes>()
+            .Where(v => (v & MethodAttributes.MemberAccessMask) == 0 && v != 0))
+        {
+            if (method.Attributes.HasFlag(attribute))
+            {
+                builder.Append($"{attribute} ");
+            }
+        }
+
+        builder.Append(method.ReturnType.ToString());
+        builder.Append(' ');
+        builder.Append(method.Name);
+        builder.Append('(');
+        ParameterInfo[] parameters = method.GetParameters();
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            if (i > 0) builder.Append(", ");
+            ParameterInfo parameter = parameters[i];
+            foreach (ParameterAttributes attribute in Enum.GetValues<ParameterAttributes>().Where(v => v is not ParameterAttributes.None))
+            {
+                if (parameter.Attributes.HasFlag(attribute))
+                {
+                    builder.Append($"{attribute} ");
+                }
+            }
+            builder.Append(parameter.ParameterType.ToString());
+            builder.Append(' ');
+            builder.Append(parameter.Name);
+        }
+        builder.Append(')');
+        builder.AppendLine();
+
+        builder.Indent(indentation);
+        builder.Append('{');
+        builder.AppendLine();
+
+        byte[]? il = DynamicMethodILProvider.GetByteArray(method);
+        if (il is null)
+        {
+            builder.Indent(indentation + 1);
+            builder.AppendLine("// IL isn't avaliable");
+        }
+        else
+        {
+            foreach (ILInstruction instruction in new ILReader(il, new DynamicScopeTokenResolver(method)))
+            {
+                builder.Indent(indentation + 1);
+                builder.Append(instruction.ToString());
+                builder.AppendLine();
+            }
+        }
+
+        builder.Indent(indentation);
+        builder.Append('}');
+        builder.AppendLine();
+        builder.AppendLine();
     }
 }

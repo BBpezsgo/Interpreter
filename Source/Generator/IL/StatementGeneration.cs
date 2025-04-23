@@ -3,6 +3,7 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using LanguageCore.Compiler;
+using LanguageCore.IL.Reflection;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.IL.Generator;
@@ -15,7 +16,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     readonly HashSet<ICompiledFunctionDefinition> EmittedFunctions = new();
     readonly ModuleBuilder Module;
 
-    readonly bool GenerateText = false;
+    readonly bool GenerateText = true;
     readonly List<string>? Builders;
 
     void GenerateDeallocator(CompiledCleanup cleanup, ILProxy il, ref bool successful)
@@ -100,69 +101,18 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     void EmitStatement(CompiledEvaluatedValue statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         switch (statement.Value.Type)
         {
             case RuntimeType.U8:
-                il.Emit(OpCodes.Ldc_I4_S, statement.Value.U8);
-                return;
             case RuntimeType.I8:
-                il.Emit(OpCodes.Ldc_I4_S, statement.Value.U8);
-                return;
             case RuntimeType.U16:
-                if (statement.Value.I16 is >= byte.MinValue and <= byte.MaxValue)
-                {
-                    il.Emit(OpCodes.Ldc_I4_S, statement.Value.I16);
-                }
-                else
-                {
-                    il.Emit(OpCodes.Ldc_I4, statement.Value.I16);
-                }
-                return;
             case RuntimeType.I16:
-                if (statement.Value.I16 is >= sbyte.MinValue and <= sbyte.MaxValue)
-                {
-                    il.Emit(OpCodes.Ldc_I4_S, statement.Value.I16);
-                }
-                else
-                {
-                    il.Emit(OpCodes.Ldc_I4, statement.Value.I16);
-                }
-                return;
             case RuntimeType.I32:
-                switch (statement.Value.I32)
-                {
-                    case -1: il.Emit(OpCodes.Ldc_I4_M1); break;
-                    case 0: il.Emit(OpCodes.Ldc_I4_0); break;
-                    case 1: il.Emit(OpCodes.Ldc_I4_1); break;
-                    case 2: il.Emit(OpCodes.Ldc_I4_2); break;
-                    case 3: il.Emit(OpCodes.Ldc_I4_3); break;
-                    case 4: il.Emit(OpCodes.Ldc_I4_4); break;
-                    case 5: il.Emit(OpCodes.Ldc_I4_5); break;
-                    case 6: il.Emit(OpCodes.Ldc_I4_6); break;
-                    case 7: il.Emit(OpCodes.Ldc_I4_7); break;
-                    case 8: il.Emit(OpCodes.Ldc_I4_8); break;
-                    default: il.Emit(OpCodes.Ldc_I4, statement.Value.I32); break;
-                }
-                return;
             case RuntimeType.U32:
-                switch (statement.Value.U32)
-                {
-                    case 0: il.Emit(OpCodes.Ldc_I4_0); break;
-                    case 1: il.Emit(OpCodes.Ldc_I4_1); break;
-                    case 2: il.Emit(OpCodes.Ldc_I4_2); break;
-                    case 3: il.Emit(OpCodes.Ldc_I4_3); break;
-                    case 4: il.Emit(OpCodes.Ldc_I4_4); break;
-                    case 5: il.Emit(OpCodes.Ldc_I4_5); break;
-                    case 6: il.Emit(OpCodes.Ldc_I4_6); break;
-                    case 7: il.Emit(OpCodes.Ldc_I4_7); break;
-                    case 8: il.Emit(OpCodes.Ldc_I4_8); break;
-                    default: il.Emit(OpCodes.Ldc_I4, statement.Value.U32); break;
-                }
+                EmitValue(statement.Value.I32, il);
                 return;
             case RuntimeType.F32:
-                il.Emit(OpCodes.Ldc_R4, statement.Value.F32);
+                EmitValue(statement.Value.F32, il);
                 return;
             case RuntimeType.Null:
                 Diagnostics.Add(Diagnostic.Internal($"Value has type of null", statement));
@@ -173,8 +123,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledReturn statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         if (statement.Value is not null)
         {
             EmitStatement(statement.Value, il, ref successful);
@@ -183,8 +131,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledBinaryOperatorCall statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         switch (statement.Operator)
         {
             case "+":
@@ -427,8 +373,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledUnaryOperatorCall statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         switch (statement.Operator)
         {
             case "!":
@@ -488,8 +432,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        il.MarkSequencePoint(statement);
-
         LocalBuilder local = LocalBuilders[statement] = il.DeclareLocal(type);
         if (statement.InitialValue is not null)
         {
@@ -524,18 +466,15 @@ public partial class CodeGeneratorForIL : CodeGenerator
             successful = false;
             return;
         }
-        il.MarkSequencePoint(statement);
+
         LoadLocal(il, local.LocalIndex);
     }
     void EmitStatement(CompiledParameterGetter statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
         LoadArgument(il, statement.Variable.Index);
     }
     void EmitStatement(CompiledFieldGetter statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         CompiledStatementWithValue _object = statement.Object;
 
         if (!_object.Type.Is(out PointerType? objectType))
@@ -597,8 +536,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        il.MarkSequencePoint(statement);
-
         for (int i = 0; i < statement.Arguments.Length; i++)
         {
             EmitStatement(statement.Arguments[i].Value, il, ref successful);
@@ -613,8 +550,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledExternalFunctionCall statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         switch (statement.Function)
         {
             case ExternalFunctionSync f:
@@ -658,8 +593,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        il.MarkSequencePoint(statement);
-
         switch (statement.Value)
         {
             case CompiledConstructorCall constructorCall:
@@ -676,14 +609,11 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledParameterSetter statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
         EmitStatement(statement.Value, il, ref successful);
         il.Emit(OpCodes.Starg, statement.Variable.Index);
     }
     void EmitStatement(CompiledFieldSetter statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         CompiledStatementWithValue _object = statement.Object;
 
         if (!_object.Type.Is(out PointerType? objectType))
@@ -753,8 +683,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 return;
         }
 
-        il.MarkSequencePoint(statement);
-
         EmitStatement(statement.AddressValue, il, ref successful);
         EmitStatement(statement.Value, il, ref successful);
         if (!statement.AddressValue.Type.Is(out PointerType? pointer))
@@ -793,8 +721,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 return;
         }
 
-        il.MarkSequencePoint(statement);
-
         EmitStatement(statement.To, il, ref successful);
 
         if (!statement.To.Type.Is(out PointerType? pointer))
@@ -813,8 +739,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledWhileLoop statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         Label loopStart = il.DefineLabel();
         Label loopEnd = il.DefineLabel();
 
@@ -837,8 +761,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledForLoop statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         EmitStatement(statement.VariableDeclaration, il, ref successful);
 
         Label loopStart = il.DefineLabel();
@@ -864,8 +786,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledIf statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         Label labelEnd = il.DefineLabel();
 
         CompiledBranch? current = statement;
@@ -909,12 +829,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        il.MarkSequencePoint(statement);
         il.Emit(OpCodes.Br, LoopLabels.Last);
     }
     void EmitStatement(CompiledBlock statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
         foreach (CompiledStatement v in statement.Statements)
         {
             EmitStatement(v, il, ref successful);
@@ -928,8 +846,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             successful = false;
             return;
         }
-
-        il.MarkSequencePoint(statement);
 
         switch (statement.Of)
         {
@@ -1022,8 +938,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             successful = false;
             return;
         }
-
-        il.MarkSequencePoint(statement);
 
         switch (pointerType.To.FinalValue)
         {
@@ -1186,8 +1100,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
         }
 
-        il.MarkSequencePoint(statement);
-
         if (statement.Type.SameAs(BuiltinType.I32) &&
             statement.Value.Type.SameAs(BuiltinType.F32))
         {
@@ -1223,7 +1135,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledTypeCast statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
         EmitStatement(statement.Value, il, ref successful);
         switch (statement.Type.FinalValue)
         {
@@ -1260,8 +1171,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        il.MarkSequencePoint(statement);
-
         switch (statement.Value)
         {
             case CompiledStringInstance compiledStringInstance:
@@ -1289,12 +1198,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        il.MarkSequencePoint(statement);
-        il.Emit(OpCodes.Ldc_I4, size);
+        EmitValue(size, il);
     }
     void EmitStatement(CompiledDelete statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
         EmitStatement(statement.Value, il, ref successful);
         GenerateDestructor(statement.Cleanup, il, ref successful);
         il.Emit(OpCodes.Pop);
@@ -1307,8 +1214,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             successful = false;
             return;
         }
-
-        il.MarkSequencePoint(statement);
 
         if (statement.Object is CompiledStackAllocation stackAllocation)
         {
@@ -1384,8 +1289,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledStackAllocation statement, ILProxy il, ref bool successful, LocalBuilder? destination = null)
     {
-        il.MarkSequencePoint(statement);
-
         switch (statement.Type)
         {
             case StructType v:
@@ -1434,13 +1337,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
             successful = false;
         }
 
-        il.MarkSequencePoint(statement);
         il.Emit(OpCodes.Ldstr, statement.Value + "\0");
     }
     void EmitStatement(CompiledIndexGetter statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         if (statement.Base.Type.Is(out PointerType? basePointerType) &&
             basePointerType.To.Is(out ArrayType? baseArrayType))
         {
@@ -1481,8 +1381,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledIndexSetter statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         if (statement.Base.Type.Is(out PointerType? basePointerType) &&
             basePointerType.To.Is(out ArrayType? baseArrayType))
         {
@@ -1521,8 +1419,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledRuntimeCall statement, ILProxy il, ref bool successful)
     {
-        il.MarkSequencePoint(statement);
-
         for (int i = 0; i < statement.Arguments.Length; i++)
         {
             EmitStatement(statement.Arguments[i].Value, il, ref successful);
@@ -1652,23 +1548,29 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 {
                     id += "`" + item;
                 }
-
-                if (Module.GetType(id) is not null)
-                {
-                    for (int i = 0; i < 64; i++)
-                    {
-                        string idCandidate = $"{id}_{i}";
-                        if (Module.GetType(idCandidate) is not null) continue;
-                        id = idCandidate;
-                        goto good;
-                    }
-
-                    throw new InternalExceptionWithoutContext($"Failed to generate type id for type {type}");
-                good:;
-                }
+                id = MakeUnique(id);
                 builder.Append(id);
                 return;
         }
+    }
+
+    string MakeUnique(string id)
+    {
+        if (Module.GetType(id) is not null)
+        {
+            for (int i = 0; i < 64; i++)
+            {
+                string idCandidate = $"{id}_{i}";
+                if (Module.GetType(idCandidate) is not null) continue;
+                id = idCandidate;
+                goto good;
+            }
+
+            throw new InternalExceptionWithoutContext($"Failed to generate unique id for {id}");
+        good:;
+        }
+
+        return id;
     }
 
     bool ToType(StructType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -1714,7 +1616,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             Array.Empty<Type>());
         ConstructorInfo conObj = typeof(object).GetConstructor(Array.Empty<Type>())!;
 
-        ILProxy il = new(constructor.GetILGenerator(), Module, GenerateText);
+        ILProxy il = new(constructor.GetILGenerator(), GenerateText);
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, conObj);
         il.Emit(OpCodes.Ret);
@@ -1767,20 +1669,20 @@ public partial class CodeGeneratorForIL : CodeGenerator
         return true;
     }
 
-    Func<int> GenerateCodeForTopLevelStatements(ImmutableArray<CompiledStatement> statements, ref bool successful)
+    DynamicMethod GenerateCodeForTopLevelStatements(ImmutableArray<CompiledStatement> statements, ref bool successful)
     {
         DynamicMethod method = new(
             "top_level_statements",
             typeof(int),
             Array.Empty<Type>(),
             Module);
-        ILProxy il = new(method.GetILGenerator(), Module, GenerateText);
+        ILProxy il = new(method.GetILGenerator(), GenerateText);
 
         EmitFunctionBody(statements, BuiltinType.I32, il, ref successful);
 
         Builders?.Add(il.ToString());
 
-        return (Func<int>)method.CreateDelegate(typeof(Func<int>));
+        return method;
     }
 
     void EmitFunctionBody(ImmutableArray<CompiledStatement> statements, GeneralType returnType, ILProxy il, ref bool successful)
@@ -1844,7 +1746,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (EmittedFunctions.Contains(function)) return true;
 
-        ILProxy il = new(dynamicMethod.GetILGenerator(), Module, GenerateText);
+        ILProxy il = new(dynamicMethod.GetILGenerator(), GenerateText);
 
         bool successful = true;
         EmitFunctionBody(body.Statements, function is CompiledConstructorDefinition ? BuiltinType.Void : function.Type, il, ref successful);
@@ -1948,7 +1850,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     static int GetManagedSize(Type type)
     {
         DynamicMethod method = new("GetManagedSizeImpl", typeof(uint), Array.Empty<Type>(), false);
-        ILProxy gen = new(method.GetILGenerator(), null, false);
+        ILProxy gen = new(method.GetILGenerator(), false);
         gen.Emit(OpCodes.Sizeof, type);
         gen.Emit(OpCodes.Ret);
         Func<uint> func = (Func<uint>)method.CreateDelegate(typeof(Func<uint>));
@@ -1972,7 +1874,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             .ToArray();
         int parametersSize = parameters.Aggregate(0, (a, b) => a + b.size);
 
-        ILProxy il = new(marshaled.GetILGenerator(), Module, GenerateText);
+        ILProxy il = new(marshaled.GetILGenerator(), GenerateText);
         if (method.ReturnType != typeof(void)) il.Emit(OpCodes.Ldarg_2);
 
         for (int i = 0; i < parameters.Length; i++)
@@ -1984,20 +1886,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             il.Emit(OpCodes.Ldarg_1);
             if (parametersSize > 0)
             {
-                switch (parametersSize)
-                {
-                    case 0: il.Emit(OpCodes.Ldc_I4_0); break;
-                    case 1: il.Emit(OpCodes.Ldc_I4_1); break;
-                    case 2: il.Emit(OpCodes.Ldc_I4_2); break;
-                    case 3: il.Emit(OpCodes.Ldc_I4_3); break;
-                    case 4: il.Emit(OpCodes.Ldc_I4_4); break;
-                    case 5: il.Emit(OpCodes.Ldc_I4_5); break;
-                    case 6: il.Emit(OpCodes.Ldc_I4_6); break;
-                    case 7: il.Emit(OpCodes.Ldc_I4_7); break;
-                    case 8: il.Emit(OpCodes.Ldc_I4_8); break;
-                    default: il.Emit(OpCodes.Ldc_I4, parametersSize); break;
-                }
-
+                EmitValue(parametersSize, il);
                 il.Emit(OpCodes.Conv_I);
                 il.Emit(OpCodes.Add);
             }
@@ -2037,17 +1926,30 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         bool successful = true;
 
-        Func<int> result = GenerateCodeForTopLevelStatements(TopLevelStatements, ref successful);
+        DynamicMethod result = GenerateCodeForTopLevelStatements(TopLevelStatements, ref successful);
 
         if (!successful && !Diagnostics.HasErrors)
         {
             Diagnostics.Add(DiagnosticWithoutContext.Critical($"Failed to generate valid MSIL"));
         }
 
-        // string text = string.Join(Environment.NewLine, Builders);
-        // Console.WriteLine(text);
+        // StringBuilder builder = new();
+        // 
+        // Module.CreateGlobalFunctions();
+        // 
+        // foreach ((_, Type type) in GeneratedTypes)
+        // {
+        //     Stringify(builder, 0, type);
+        // }
+        // 
+        // foreach (DynamicMethod method in FunctionBuilders.Values.Append(result))
+        // {
+        //     Stringify(builder, 0, method);
+        // }
+        // 
+        // Console.WriteLine(builder);
 
-        return result;
+        return (Func<int>)result.CreateDelegate(typeof(Func<int>));
     }
 
     public static Func<int> Generate(CompilerResult compilerResult, DiagnosticsCollection diagnostics, ILGeneratorSettings settings, ModuleBuilder? module = null)

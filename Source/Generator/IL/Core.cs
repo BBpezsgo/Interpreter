@@ -29,6 +29,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     public override BuiltinType ArrayLengthType => BuiltinType.I32;
 
     readonly ILGeneratorSettings Settings;
+    // readonly Type GlobalScopeType;
 
     public CodeGeneratorForIL(CompilerResult compilerResult, DiagnosticsCollection diagnostics, ILGeneratorSettings settings, ModuleBuilder? module) : base(compilerResult, diagnostics)
     {
@@ -48,6 +49,20 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
             module = assemBuilder.DefineDynamicModule("BBLangGeneratedModule");
         }
+
+        // TypeBuilder globalScopeTypeBuilder = module.DefineType(MakeUnique("global"));
+        // globalScopeTypeBuilder.DefineField("__memory", typeof(byte), FieldAttributes.Assembly);
+        // foreach (CompiledVariableDeclaration globalVariable in CompiledGlobalVariables)
+        // {
+        //     if (!ToType(globalVariable.Type, out Type? type, out PossibleDiagnostic? typeError))
+        //     {
+        //         Diagnostics.Add(typeError.ToError(globalVariable));
+        //         continue;
+        //     }
+        //     globalScopeTypeBuilder.DefineField(globalVariable.Identifier, type, FieldAttributes.Assembly);
+        // }
+        // GlobalScopeType = globalScopeTypeBuilder.CreateType();
+
         Settings = settings;
         Module = module;
         Builders = new();

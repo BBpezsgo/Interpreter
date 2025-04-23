@@ -175,4 +175,6 @@ public static class GeneralExtensions
             stringBuilder.AppendLine();
         }
     }
+
+    public static void Indent(this StringBuilder stringBuilder, int indent) => stringBuilder.Append(' ', indent * 2);
 }

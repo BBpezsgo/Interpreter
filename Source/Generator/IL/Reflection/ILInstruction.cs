@@ -51,7 +51,14 @@ public class InlineLabelInstruction : ILInstruction
         Label = label;
     }
 
-    public override string ToString() => ToString(Label.Id.ToString());
+    public override string ToString()
+    {
+#if NETSTANDARD
+        return ToString(Label.ToString());
+#else
+        return ToString(Label.Id.ToString());
+#endif
+    }
 }
 
 public class InlineLocalInstruction : ILInstruction

@@ -1,4 +1,3 @@
-#if NET_STANDARD
 namespace LanguageCore
 {
     public static class CompatibilityExtensions
@@ -95,4 +94,3 @@ namespace LanguageCore
         public static bool IsAsciiLetterOrDigit(char c) => IsAsciiLetter(c) | IsBetween(c, '0', '9');
     }
 }
-#endif

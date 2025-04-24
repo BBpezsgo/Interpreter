@@ -245,7 +245,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         builder.Indent(indentation);
         builder.Append($"{type.Attributes & TypeAttributes.VisibilityMask} ");
 
-        foreach (TypeAttributes attribute in Enum.GetValues<TypeAttributes>()
+        foreach (TypeAttributes attribute in CompatibilityUtils.GetEnumValues<TypeAttributes>()
             .Where(v => (v & TypeAttributes.VisibilityMask) == 0 && v != 0))
         {
             if (type.Attributes.HasFlag(attribute))
@@ -279,7 +279,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         builder.Indent(indentation);
         builder.Append($"{field.Attributes & FieldAttributes.FieldAccessMask} ");
 
-        foreach (FieldAttributes attribute in Enum.GetValues<FieldAttributes>()
+        foreach (FieldAttributes attribute in CompatibilityUtils.GetEnumValues<FieldAttributes>()
             .Where(v => (v & FieldAttributes.FieldAccessMask) == 0 && v != 0))
         {
             if (field.Attributes.HasFlag(attribute))
@@ -300,7 +300,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         builder.Indent(indentation);
         builder.Append($"{method.Attributes & MethodAttributes.MemberAccessMask} ");
 
-        foreach (MethodAttributes attribute in Enum.GetValues<MethodAttributes>()
+        foreach (MethodAttributes attribute in CompatibilityUtils.GetEnumValues<MethodAttributes>()
             .Where(v => (v & MethodAttributes.MemberAccessMask) == 0 && v != 0))
         {
             if (method.Attributes.HasFlag(attribute))
@@ -318,7 +318,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             if (i > 0) builder.Append(", ");
             ParameterInfo parameter = parameters[i];
-            foreach (ParameterAttributes attribute in Enum.GetValues<ParameterAttributes>().Where(v => v is not ParameterAttributes.None))
+            foreach (ParameterAttributes attribute in CompatibilityUtils.GetEnumValues<ParameterAttributes>().Where(v => v is not ParameterAttributes.None))
             {
                 if (parameter.Attributes.HasFlag(attribute))
                 {
@@ -356,5 +356,22 @@ public partial class CodeGeneratorForIL : CodeGenerator
         builder.Append('}');
         builder.AppendLine();
         builder.AppendLine();
+    }
+
+    static bool CheckCode(DynamicMethod method)
+    {
+        try
+        {
+            foreach (ILInstruction instruction in new ILReader(DynamicMethodILProvider.GetByteArray(method) ?? Array.Empty<byte>(), new DynamicScopeTokenResolver(method)))
+            {
+
+            }
+        }
+        catch
+        {
+            Debugger.Break();
+            return false;
+        }
+        return true;
     }
 }

@@ -187,7 +187,11 @@ public class ILProxy
     public void MarkLabel(Label loc)
     {
         IL.MarkLabel(loc);
+#if NET_STANDARD
+        if (_labelOffsets is not null) _labelOffsets[IL.ILOffset] = loc.GetHashCode();
+#else
         if (_labelOffsets is not null) _labelOffsets[IL.ILOffset] = loc.Id;
+#endif
     }
 
     public void ThrowException([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] Type excType)

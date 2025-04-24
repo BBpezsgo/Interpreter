@@ -1680,6 +1680,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         EmitFunctionBody(statements, BuiltinType.I32, il, ref successful);
 
+        successful = successful && CheckCode(method);
         Builders?.Add(il.ToString());
 
         return method;
@@ -1767,6 +1768,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return false;
         }
 
+        successful = successful && CheckCode(dynamicMethod);
         EmittedFunctions.Add(function);
         return true;
     }
@@ -1916,6 +1918,12 @@ public partial class CodeGeneratorForIL : CodeGenerator
             stringBuilder.AppendIndented("  ", il.ToString());
             stringBuilder.AppendLine($"}}");
             Builders.Add(stringBuilder.ToString());
+        }
+
+        if (!CheckCode(method))
+        {
+            Diagnostics.Add(DiagnosticWithoutContext.Error("Failed to generate valid MSIL"));
+            return false;
         }
 
         _marshalCache.Add(method, marshaled);

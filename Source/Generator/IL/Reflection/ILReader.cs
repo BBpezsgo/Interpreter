@@ -32,12 +32,10 @@ public sealed class ILReader : IEnumerable<ILInstruction>, IEnumerable
     readonly ITokenResolver _resolver;
     readonly byte[] _byteArray;
 
-    public ILReader(byte[] ilProvider, ITokenResolver tokenResolver)
+    public ILReader(byte[] il, ITokenResolver tokenResolver)
     {
-        ArgumentNullException.ThrowIfNull(ilProvider);
-
         _resolver = tokenResolver;
-        _byteArray = ilProvider;
+        _byteArray = il;
         _position = 0;
     }
 
@@ -165,8 +163,6 @@ public sealed class ILReader : IEnumerable<ILInstruction>, IEnumerable
 
     public static ILInstruction Create(int offset, OpCode opCode, object operand)
     {
-        int token;
-
         switch (opCode.OperandType)
         {
             case OperandType.InlineNone:

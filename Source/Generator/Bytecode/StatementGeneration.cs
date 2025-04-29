@@ -6,13 +6,7 @@ namespace LanguageCore.BBLang.Generator;
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
-    bool AllowLoopUnrolling => !Settings.DontOptimize;
-    bool AllowFunctionInlining => !Settings.DontOptimize;
-    bool AllowPrecomputing => !Settings.DontOptimize;
-    bool AllowEvaluating => !Settings.DontOptimize;
-    bool AllowOtherOptimizations => !Settings.DontOptimize;
     bool AllowInstructionLevelOptimizations => !Settings.DontOptimize;
-    bool AllowTrimming => !Settings.DontOptimize;
 
     GeneratorStatistics _statistics;
 

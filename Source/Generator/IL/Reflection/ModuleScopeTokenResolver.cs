@@ -5,13 +5,11 @@ namespace LanguageCore.IL.Reflection;
 public class ModuleScopeTokenResolver : ITokenResolver
 {
     readonly Module m_module;
-    readonly MethodBase m_enclosingMethod;
     readonly Type[]? m_methodContext;
     readonly Type[]? m_typeContext;
 
     public ModuleScopeTokenResolver(MethodBase method)
     {
-        m_enclosingMethod = method;
         m_module = method.Module;
         m_methodContext = (method is ConstructorInfo) ? null : method.GetGenericArguments();
         m_typeContext = method.DeclaringType?.GetGenericArguments();

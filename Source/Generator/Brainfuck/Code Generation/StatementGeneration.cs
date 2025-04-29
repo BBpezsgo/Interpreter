@@ -6,10 +6,8 @@ namespace LanguageCore.Brainfuck.Generator;
 
 public partial class CodeGeneratorForBrainfuck : CodeGenerator
 {
-    bool AllowLoopUnrolling => !Settings.DontOptimize;
     bool AllowFunctionInlining => !Settings.DontOptimize;
     bool AllowPrecomputing => !Settings.DontOptimize;
-    bool AllowEvaluating => !Settings.DontOptimize;
     bool AllowOtherOptimizations => !Settings.DontOptimize;
 
     GeneratorStatistics _statistics;

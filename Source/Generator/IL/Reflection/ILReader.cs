@@ -263,19 +263,6 @@ public sealed class ILReader : IEnumerable<ILInstruction>, IEnumerable
         return BitConverter.ToUInt16(_byteArray, pos);
     }
 
-    uint ReadUInt32()
-    {
-        int pos = _position;
-        _position += 4;
-        return BitConverter.ToUInt32(_byteArray, pos);
-    }
-    ulong ReadUInt64()
-    {
-        int pos = _position;
-        _position += 8;
-        return BitConverter.ToUInt64(_byteArray, pos);
-    }
-
     int ReadInt32()
     {
         int pos = _position;
